@@ -15,8 +15,10 @@
  */
 package com.intellij.diagnostic.hprof.parser
 
-import java.nio.ByteBuffer
+import com.intellij.diagnostic.hprof.util.HProfReadBufferSlidingWindow
+import org.jetbrains.annotations.ApiStatus
 
+@ApiStatus.Internal
 open class HProfVisitor {
 
   private val myTopLevelVisits = BooleanArray(RecordType.HeapDumpEnd.value + 1)
@@ -128,7 +130,7 @@ open class HProfVisitor {
     arrayObjectId: Long, stackTraceSerialNumber: Long,
     numberOfElements: Long,
     elementType: Type,
-    primitiveArrayData: ByteBuffer) {
+    primitiveArrayData: HProfReadBufferSlidingWindow) {
   }
 
   open fun visitClassDump(
@@ -144,7 +146,7 @@ open class HProfVisitor {
 
   open fun visitObjectArrayDump(arrayObjectId: Long, stackTraceSerialNumber: Long, arrayClassObjectId: Long, objects: LongArray) {}
 
-  open fun visitInstanceDump(objectId: Long, stackTraceSerialNumber: Long, classObjectId: Long, bytes: ByteBuffer) {}
+  open fun visitInstanceDump(objectId: Long, stackTraceSerialNumber: Long, classObjectId: Long, bytes: HProfReadBufferSlidingWindow) {}
 
   open fun visitUnloadClass(classSerialNumber: Long) {}
 }

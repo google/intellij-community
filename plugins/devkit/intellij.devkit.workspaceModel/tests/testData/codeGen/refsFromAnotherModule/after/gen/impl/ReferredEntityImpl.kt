@@ -1,3 +1,5 @@
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.workspaceModel.test.api.impl
 
 import com.intellij.platform.workspace.jps.entities.ContentRootEntity
@@ -15,11 +17,10 @@ import com.intellij.platform.workspace.storage.impl.EntityLink
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
-import com.intellij.platform.workspace.storage.impl.extractOneToOneChild
-import com.intellij.platform.workspace.storage.impl.updateOneToOneChildOfParent
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.workspaceModel.test.api.ReferredEntity
 import com.intellij.workspaceModel.test.api.ReferredEntityBuilder
@@ -46,7 +47,7 @@ readField("name")
 return dataSource.name
 }
 override val contentRoot: ContentRootEntity?
-get() = snapshot.extractOneToOneChild(CONTENTROOT_CONNECTION_ID, this)
+get() = snapshot.instrumentation.getOneChild(CONTENTROOT_CONNECTION_ID, this) as? ContentRootEntity
 
 override val entitySource: EntitySource
 get() {
@@ -131,10 +132,9 @@ override var contentRoot: ContentRootEntityBuilder?
 get(){
 val _diff = diff
 return if (_diff != null) {
-@OptIn(EntityStorageInstrumentationApi::class)
 ((_diff as MutableEntityStorageInstrumentation).getOneChildBuilder(CONTENTROOT_CONNECTION_ID, this) as? ContentRootEntityBuilder) ?: (this.entityLinks[EntityLink(true, CONTENTROOT_CONNECTION_ID)] as? ContentRootEntityBuilder)
 } else {
-this.entityLinks[EntityLink(true, CONTENTROOT_CONNECTION_ID)] as? ContentRootEntityBuilder
+(this.entityLinks[EntityLink(true, CONTENTROOT_CONNECTION_ID)] as? ContentRootEntityBuilder)
 }
 }
 set(value){
@@ -148,7 +148,7 @@ value.entityLinks[EntityLink(false, CONTENTROOT_CONNECTION_ID)] = this
 _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
 }
 if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)){
-_diff.updateOneToOneChildOfParent(CONTENTROOT_CONNECTION_ID, this, value)
+_diff.instrumentation.replaceChildren(CONTENTROOT_CONNECTION_ID, this, listOfNotNull(value))
 }
 else{
 if (value is ModifiableWorkspaceEntityBase<*, *>){
@@ -180,7 +180,6 @@ modifiable.id = createEntityId()
 return modifiable
 }
 
-@OptIn(EntityStorageInstrumentationApi::class)
 override fun createEntity(snapshot: EntityStorageInstrumentation): ReferredEntity{
 val entityId = createEntityId()
 return snapshot.initializeEntity(entityId){

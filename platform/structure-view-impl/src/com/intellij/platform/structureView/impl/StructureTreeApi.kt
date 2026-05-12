@@ -9,13 +9,17 @@ import com.intellij.platform.structureView.impl.dto.StructureViewDtoId
 import com.intellij.platform.structureView.impl.dto.StructureViewModelDto
 import fleet.rpc.RemoteApi
 import fleet.rpc.Rpc
+import fleet.rpc.client.durable
 import fleet.rpc.remoteApiDescriptor
+import kotlinx.coroutines.flow.Flow
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.TestOnly
 
 @Internal
 @Rpc
 interface StructureTreeApi : RemoteApi<Unit> {
+  suspend fun getShowPopupRequestFlow(): Flow<ShowStructurePopupRequest>
+
   suspend fun createStructureViewModel(id: StructureViewDtoId, fileEditorId: FileEditorId, fileId: VirtualFileId, projectId: ProjectId): StructureViewModelDto?
 
   suspend fun structureViewModelDisposed(id: StructureViewDtoId)
@@ -30,6 +34,12 @@ interface StructureTreeApi : RemoteApi<Unit> {
   companion object {
     suspend fun getInstance(): StructureTreeApi {
       return RemoteApiProviderService.resolve(remoteApiDescriptor<StructureTreeApi>())
+    }
+
+    suspend fun callDisposeModel(id: StructureViewDtoId) {
+      durable {
+        getInstance().structureViewModelDisposed(id)
+      }
     }
   }
 }

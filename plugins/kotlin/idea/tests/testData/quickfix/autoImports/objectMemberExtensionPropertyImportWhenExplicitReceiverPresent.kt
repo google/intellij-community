@@ -1,4 +1,5 @@
 // "Import extension property 'T.foobar'" "true"
+// K2_ERROR: Unresolved reference 'foobar' on receiver of type 'T'.
 package p
 
 class T

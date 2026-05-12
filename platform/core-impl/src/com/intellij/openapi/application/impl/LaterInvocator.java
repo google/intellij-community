@@ -4,6 +4,7 @@ package com.intellij.openapi.application.impl;
 import com.intellij.diagnostic.LoadingState;
 import com.intellij.model.SideEffectGuard;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ModalityStateListener;
@@ -71,6 +72,15 @@ public final class LaterInvocator {
   public static void addModalityStateListener(@NotNull ModalityStateListener listener, @NotNull Disposable parentDisposable) {
     if (!ourModalityStateMulticaster.getListeners().contains(listener)) {
       ourModalityStateMulticaster.addListener(listener, parentDisposable);
+    }
+  }
+
+  private static void fireBeforeModalityStateChanged(boolean entering, @NotNull Object modalEntity) {
+    ourModalityStateMulticaster.getMulticaster().beforeModalityStateChanged(entering, modalEntity);
+
+    Application app = ApplicationManager.getApplication();
+    if (app != null) {
+      app.getMessageBus().syncPublisher(ModalityStateListener.TOPIC).beforeModalityStateChanged(entering, modalEntity);
     }
   }
 
@@ -187,7 +197,7 @@ public final class LaterInvocator {
       LOG.debug("enterModal:" + modalEntity);
     }
 
-    ourModalityStateMulticaster.getMulticaster().beforeModalityStateChanged(true, modalEntity);
+    fireBeforeModalityStateChanged(true, modalEntity);
 
     ourModalEntities.add(modalEntity);
     synchronized (ourModalityStack) {
@@ -208,7 +218,7 @@ public final class LaterInvocator {
       LOG.debug("enterModal:" + dialog.getName() + " ; for project: " + project.getName());
     }
 
-    ourModalityStateMulticaster.getMulticaster().beforeModalityStateChanged(true, dialog);
+    fireBeforeModalityStateChanged(true, dialog);
 
     List<Dialog> modalEntitiesList = projectToModalEntities.computeIfAbsent(project, __->ContainerUtil.createLockFreeCopyOnWriteList());
     modalEntitiesList.add(dialog);
@@ -240,7 +250,7 @@ public final class LaterInvocator {
       LOG.debug("leaveModal:" + dialog.getName() + " ; for project: " + project.getName());
     }
 
-    ourModalityStateMulticaster.getMulticaster().beforeModalityStateChanged(false, dialog);
+    fireBeforeModalityStateChanged(false, dialog);
 
     int index = ourModalEntities.indexOf(dialog);
 
@@ -281,7 +291,7 @@ public final class LaterInvocator {
     }
 
     Cancellation.executeInNonCancelableSection(() -> {
-      ourModalityStateMulticaster.getMulticaster().beforeModalityStateChanged(false, modalEntity);
+      fireBeforeModalityStateChanged(false, modalEntity);
 
       int index = ourModalEntities.indexOf(modalEntity);
       LOG.assertTrue(index >= 0);

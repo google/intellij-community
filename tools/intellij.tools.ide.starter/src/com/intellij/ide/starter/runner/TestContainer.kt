@@ -3,9 +3,9 @@ package com.intellij.ide.starter.runner
 import com.intellij.ide.starter.ci.CIServer
 import com.intellij.ide.starter.config.ConfigurationStorage
 import com.intellij.ide.starter.ide.IDETestContext
-import com.intellij.ide.starter.ide.IdeProductProvider
 import com.intellij.ide.starter.ide.InstalledIde
 import com.intellij.ide.starter.models.IdeInfo
+import com.intellij.ide.starter.models.IdeInfoType
 import com.intellij.ide.starter.models.TestCase
 import com.intellij.ide.starter.path.GlobalPaths
 import com.intellij.ide.starter.path.IDEDataPaths
@@ -46,8 +46,13 @@ interface TestContainer {
     }
 
     fun applyDefaultVMOptions(context: IDETestContext): IDETestContext {
-      return when (context.testCase.ideInfo == IdeProductProvider.AI) {
+      return when (context.testCase.ideInfo.productCode == IdeInfoType.ANDROID_STUDIO.productCode) {
         true -> context
+          .addProjectToTrustedLocations()
+          .disableFusSendingOnIdeClose()
+          .disableReportingStatisticsToProduction()
+          .disableReportingStatisticToJetStat()
+          .disableMigrationNotification()
           .applyVMOptionsPatch {
             overrideDirectories(context.paths)
             withEnv("STUDIO_VM_OPTIONS", context.ide.patchedVMOptionsFile.toString())

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.dependencyAnalyzer
 
 import com.intellij.gradle.toolingExtension.util.GradleVersionUtil
@@ -11,8 +11,9 @@ import org.jetbrains.plugins.gradle.frameworkSupport.GradleDsl
 import org.jetbrains.plugins.gradle.frameworkSupport.buildscript.GradleBuildScriptBuilder.Companion.buildScript
 import org.jetbrains.plugins.gradle.importing.BuildViewMessagesImportingTestCase.Companion.assertNodeWithDeprecatedGradleWarning
 import org.jetbrains.plugins.gradle.testFramework.annotations.AllGradleVersionsSource
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatConfigurationCacheIsSupported
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatIsolatedProjectsIsSupported
+import org.jetbrains.plugins.gradle.testFramework.util.CONFIGURATION_CACHE_SUPPORTED_VERSIONS
+import org.jetbrains.plugins.gradle.testFramework.util.ISOLATED_PROJECTS_SUPPORTED_VERSIONS
+import org.jetbrains.plugins.gradle.tooling.annotation.TargetVersions
 import org.junit.jupiter.params.ParameterizedTest
 
 class GradleDependencyNodeIndexTest : GradleDependencyNodeIndexTestCase() {
@@ -25,15 +26,15 @@ class GradleDependencyNodeIndexTest : GradleDependencyNodeIndexTestCase() {
 
   @ParameterizedTest
   @AllGradleVersionsSource
+  @TargetVersions(CONFIGURATION_CACHE_SUPPORTED_VERSIONS)
   fun `test collecting dependency nodes with configuration cache`(gradleVersion: GradleVersion) {
-    assumeThatConfigurationCacheIsSupported(gradleVersion)
     testCollectingDependencyNodes(gradleVersion, "org.gradle.configuration-cache=true")
   }
 
   @ParameterizedTest
   @AllGradleVersionsSource
+  @TargetVersions(ISOLATED_PROJECTS_SUPPORTED_VERSIONS)
   fun `test collecting dependency nodes with isolated projects`(gradleVersion: GradleVersion) {
-    assumeThatIsolatedProjectsIsSupported(gradleVersion)
     testCollectingDependencyNodes(gradleVersion, "org.gradle.unsafe.isolated-projects=true")
   }
 

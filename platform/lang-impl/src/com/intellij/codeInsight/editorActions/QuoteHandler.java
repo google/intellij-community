@@ -5,6 +5,7 @@ import com.intellij.codeInsight.CodeInsightSettings;
 import com.intellij.lang.LanguageQuoteHandling;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.highlighter.HighlighterIterator;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Implement this interface for {@link QuoteHandlerEP} to provide "Insert pair quote" functionality
@@ -36,7 +37,7 @@ public interface QuoteHandler {
    * @param iterator highlighting iterator at the state corresponding to the {@code offset}
    * @param offset   the offset at which the quote is going to be inserted/deleted
    */
-  boolean isClosingQuote(HighlighterIterator iterator, int offset);
+  boolean isClosingQuote(@NotNull HighlighterIterator iterator, int offset);
 
   /**
    * Checks whether there is the opening quote or the last one of the set of opening quotes
@@ -45,7 +46,7 @@ public interface QuoteHandler {
    * @param iterator highlighting iterator at the state corresponding to the {@code offset}
    * @param offset   the offset at which the quote was inserted
    */
-  boolean isOpeningQuote(HighlighterIterator iterator, int offset);
+  boolean isOpeningQuote(@NotNull HighlighterIterator iterator, int offset);
 
   /**
    * Called <em>after</em> the quote has been inserted in the editor to check that it belongs
@@ -60,7 +61,7 @@ public interface QuoteHandler {
    * @param offset   the offset at which the quote was inserted
    * @see #isOpeningQuote(HighlighterIterator, int)
    */
-  boolean hasNonClosedLiteral(Editor editor, HighlighterIterator iterator, int offset);
+  boolean hasNonClosedLiteral(@NotNull Editor editor, @NotNull HighlighterIterator iterator, int offset);
 
-  boolean isInsideLiteral(HighlighterIterator iterator);
+  boolean isInsideLiteral(@NotNull HighlighterIterator iterator);
 }

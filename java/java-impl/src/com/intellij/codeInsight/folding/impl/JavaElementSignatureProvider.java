@@ -31,7 +31,7 @@ public final class JavaElementSignatureProvider extends AbstractElementSignature
       return null;
     }
     switch (element) {
-      case PsiImportList __ -> {
+      case PsiImportList _ -> {
         return element.equals(psiJavaFile.getImportList()) ? "imports" : null;
       }
       case PsiMethod psiMethod -> {
@@ -131,7 +131,7 @@ public final class JavaElementSignatureProvider extends AbstractElementSignature
 
         return buffer.toString();
       }
-      case PsiDocComment __ -> {
+      case PsiDocComment _ -> {
         StringBuilder buffer = new StringBuilder();
         buffer.append("docComment").append(ELEMENTS_SEPARATOR);
 

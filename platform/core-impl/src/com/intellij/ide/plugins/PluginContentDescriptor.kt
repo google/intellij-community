@@ -59,7 +59,7 @@ class PluginContentDescriptor(@JvmField val modules: List<ModuleItem>) {
       if (targetModule == null) {
         // TODO should lift this log out of here
         logger<PluginManagerCore>().error("Plugin id='$diagnosticPluginId' uses required-if-available statement in content module '${moduleId.name}' " +
-                                          "with a target module that is unknown or is not configured by the environment: $requiredIfAvailable")
+                                          "with a target module that is unknown or is not configured by the environment: ${requiredIfAvailable.displayName}")
         return loadingRule
       }
       if (targetModule.isAvailable) {
@@ -68,7 +68,7 @@ class PluginContentDescriptor(@JvmField val modules: List<ModuleItem>) {
       return loadingRule
     }
 
-    override fun toString(): String = "ModuleItem(id=$moduleId, descriptor=$_descriptor, configFile=$configFile)"
+    override fun toString(): String = "ModuleItem(id=${moduleId.displayName}, descriptor=$_descriptor, configFile=$configFile)"
   }
 
   override fun toString(): String = "PluginContentDescriptor(modules=$modules)"

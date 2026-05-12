@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vfs.newvfs.persistent;
 
 import com.intellij.openapi.diagnostic.Logger;
@@ -10,7 +10,6 @@ import com.intellij.openapi.vfs.newvfs.persistent.mapped.content.VFSContentStora
 import com.intellij.openapi.vfs.newvfs.persistent.recovery.VFSRecoverer;
 import com.intellij.openapi.vfs.newvfs.persistent.recovery.VFSRecoveryInfo;
 import com.intellij.platform.util.io.storages.StorageFactory;
-import com.intellij.platform.util.io.storages.blobstorage.StreamlinedBlobStorageHelper;
 import com.intellij.platform.util.io.storages.blobstorage.StreamlinedBlobStorageOverMMappedFile;
 import com.intellij.platform.util.io.storages.enumerator.DurableStringEnumerator;
 import com.intellij.platform.util.io.storages.mmapped.MMappedFileStorageFactory;
@@ -21,7 +20,6 @@ import com.intellij.util.io.DataEnumerator;
 import com.intellij.util.io.IOUtil;
 import com.intellij.util.io.ScannableDataEnumeratorEx;
 import com.intellij.util.io.SimpleStringPersistentEnumerator;
-import com.intellij.util.io.StorageLockContext;
 import com.intellij.util.io.blobstorage.SpaceAllocationStrategy;
 import com.intellij.util.io.blobstorage.SpaceAllocationStrategy.DataLengthPlusFixedPercentStrategy;
 import com.intellij.util.io.blobstorage.StreamlinedBlobStorage;
@@ -30,7 +28,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
-import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.ApiStatus.Internal;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -71,11 +69,9 @@ import static java.util.stream.Collectors.joining;
  * state for {@link VFSRecoverer}s to fix.</li>
  * </ol>
  */
-@ApiStatus.Internal
+@Internal
 public final class PersistentFSLoader {
   private static final Logger LOG = Logger.getInstance(PersistentFSLoader.class);
-
-  private static final StorageLockContext PERSISTENT_FS_STORAGE_CONTEXT = new StorageLockContext(false, true);
 
   /**
    * We want the 'main exception' to be
@@ -510,7 +506,7 @@ public final class PersistentFSLoader {
     //avg record size is ~60b, hence I've chosen minCapacity=64 bytes, and defaultCapacity= 2*minCapacity
     SpaceAllocationStrategy allocationStrategy = new DataLengthPlusFixedPercentStrategy(
       /*min: */64, /*default: */ 128,
-      /*max: */StreamlinedBlobStorageHelper.MAX_CAPACITY,
+      /*max: */StreamlinedBlobStorageOverMMappedFile.MAX_CAPACITY,
       /*percentOnTop: */30
     );
 
@@ -643,7 +639,6 @@ public final class PersistentFSLoader {
   NotNullLazyValue<IntList> reusableFileIdsLazy() {
     return reusableFileIdsLazy;
   }
-
 
   public void setNamesStorage(ScannableDataEnumeratorEx<String> namesStorage) {
     this.namesStorage = namesStorage;

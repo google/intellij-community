@@ -99,7 +99,7 @@ class KtClassDef(
         analyze(module) {
             val classLikeSymbol = pointer.restoreSymbol() ?: return@analyze null
             val psi = classLikeSymbol.psi ?: return@analyze null
-            buildClassType(classLikeSymbol).asPsiType(psi, true)
+            typeCreator.classType(classLikeSymbol).asPsiType(psi, true)
         }
 
     override fun equals(other: Any?): Boolean =

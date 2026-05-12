@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.kotlin.runConfigurations.testng` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "testng_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "testng",
   module_name = "intellij.kotlin.runConfigurations.testng",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":testng_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinc-kotlin-compiler-common",
@@ -34,11 +29,15 @@ jvm_library(
     "//java/java-impl:impl",
     "//plugins/kotlin/base/plugin",
     "//platform/execution",
+    "//platform/ide-core",
+    "//platform/testRunner",
+    "//platform/statistics",
   ]
 )
 
 jvm_library(
   name = "testng_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.runConfigurations.testng",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -62,6 +61,15 @@ jvm_library(
     "//java/java-impl:impl_test_lib",
     "//plugins/kotlin/base/plugin:plugin_test_lib",
     "//platform/execution:execution_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
+    "//platform/testRunner:testRunner_test_lib",
+    "//platform/statistics:statistics_test_lib",
   ]
 )
 ### auto-generated section `build intellij.kotlin.runConfigurations.testng` end
+
+### auto-generated section `iml intellij.kotlin.runConfigurations.testng` start
+exports_files([
+  "intellij.kotlin.runConfigurations.testng.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.runConfigurations.testng` end

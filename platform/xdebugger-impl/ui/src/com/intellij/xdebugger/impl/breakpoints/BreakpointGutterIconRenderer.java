@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger.impl.breakpoints;
 
 import com.intellij.openapi.actionSystem.ActionGroup;
@@ -11,12 +11,13 @@ import com.intellij.openapi.util.registry.Registry;
 import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointProxy;
 import com.intellij.platform.debugger.impl.shared.proxy.XDebugManagerProxy;
 import com.intellij.platform.debugger.impl.shared.proxy.XDebugSessionProxy;
+import com.intellij.platform.debugger.impl.shared.proxy.XLightLineBreakpointProxy;
 import com.intellij.platform.debugger.impl.ui.XDebuggerEntityConverter;
 import com.intellij.xdebugger.XDebuggerBundle;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
+import com.intellij.xdebugger.breakpoints.XLineBreakpointVerticalPlacement;
 import com.intellij.xdebugger.impl.actions.EditBreakpointAction;
-
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -33,6 +34,15 @@ public final class BreakpointGutterIconRenderer extends CommonBreakpointGutterIc
   @Override
   public @NotNull Icon getIcon() {
     return myBreakpoint.getIcon();
+  }
+
+  @Override
+  public @NotNull VerticalAlignment getVerticalAlignment() {
+    if (myBreakpoint instanceof XLightLineBreakpointProxy lineBreakpoint &&
+        lineBreakpoint.getPlacement() == XLineBreakpointVerticalPlacement.INTER_LINE) {
+      return VerticalAlignment.BETWEEN_LINES;
+    }
+    return VerticalAlignment.ON_LINE;
   }
 
   @Override
@@ -102,11 +112,12 @@ public final class BreakpointGutterIconRenderer extends CommonBreakpointGutterIc
   public boolean equals(Object obj) {
     return obj instanceof BreakpointGutterIconRenderer renderer
            && myBreakpoint.equals(renderer.myBreakpoint)
-           && Comparing.equal(getIcon(), renderer.getIcon());
+           && Comparing.equal(getIcon(), renderer.getIcon())
+           && getVerticalAlignment() == renderer.getVerticalAlignment();
   }
 
   @Override
   public int hashCode() {
-    return getBreakpoint().hashCode();
+    return 31 * getBreakpoint().hashCode() + getVerticalAlignment().hashCode();
   }
 }

@@ -1,11 +1,11 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vcs.changes.patch.tool
 
 import com.intellij.diff.DiffContext
 import com.intellij.diff.DiffViewerEx
 import com.intellij.diff.EditorDiffViewer
 import com.intellij.diff.FrameDiffTool
-import com.intellij.diff.actions.impl.SetEditorSettingsAction
+import com.intellij.diff.actions.impl.SetEditorSettingsActionGroup
 import com.intellij.diff.tools.holders.EditorHolder
 import com.intellij.diff.tools.holders.TextEditorHolder
 import com.intellij.diff.tools.util.DiffDataKeys
@@ -47,7 +47,7 @@ internal class PatchDiffViewer(
   private val editorHolder: EditorHolder
 
   private val prevNextDifferenceIterable: MyPrevNextDifferenceIterable
-  private val editorSettingsAction: SetEditorSettingsAction
+  private val editorSettingsAction: SetEditorSettingsActionGroup
 
   private var hunks: List<Hunk> = mutableListOf()
 
@@ -78,7 +78,7 @@ internal class PatchDiffViewer(
         sink[DiffDataKeys.CURRENT_CHANGE_RANGE] = prevNextDifferenceIterable.currentLineRange
       }
     }
-    editorSettingsAction = SetEditorSettingsAction(TextDiffViewerUtil.getTextSettings(diffContext), editors)
+    editorSettingsAction = SetEditorSettingsActionGroup(TextDiffViewerUtil.getTextSettings(diffContext), editors)
     editorSettingsAction.applyDefaults()
 
     listenTypingAttempts(diffContext, editor)

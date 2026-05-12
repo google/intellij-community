@@ -1,6 +1,6 @@
 ### auto-generated section `build intellij.devkit.threading` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_threading",
@@ -11,18 +11,13 @@ create_kotlinc_options(
   plugin_options = ["plugin:androidx.compose.compiler.plugins.kotlin:generateFunctionKeyMetaAnnotations=true"]
 )
 
-resourcegroup(
-  name = "threading_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "threading",
   module_name = "intellij.devkit.threading",
   visibility = ["//visibility:public"],
   srcs = glob(["gen/**/*.kt", "gen/**/*.java", "src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":threading_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_threading",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -30,6 +25,8 @@ jvm_library(
     "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
     "//platform/platform-api:ide",
+    "//platform/ide-core",
+    "//platform/progress/shared:ide-progress",
     "//java/java-psi-api:psi",
     "//platform/core-ui",
     "//platform/compose",
@@ -41,6 +38,7 @@ jvm_library(
 
 jvm_library(
   name = "threading_test_lib",
+  testonly = True,
   module_name = "intellij.devkit.threading",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -51,6 +49,8 @@ jvm_library(
     "//platform/core-api:core_test_lib",
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//platform/platform-api:ide_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
     "//java/java-psi-api:psi_test_lib",
     "//platform/core-ui:core-ui_test_lib",
     "//platform/compose:compose_test_lib",
@@ -60,3 +60,9 @@ jvm_library(
   plugins = ["@lib//:compose-plugin"]
 )
 ### auto-generated section `build intellij.devkit.threading` end
+
+### auto-generated section `iml intellij.devkit.threading` start
+exports_files([
+  "intellij.devkit.threading.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.devkit.threading` end

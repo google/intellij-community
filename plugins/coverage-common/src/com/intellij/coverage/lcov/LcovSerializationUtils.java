@@ -11,9 +11,10 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,10 +29,10 @@ public final class LcovSerializationUtils {
   private static final String END_OF_RECORD = "end_of_record";
   private static final Pattern FN_PATTERN = Pattern.compile("^FN:(\\d+),(.+)$");
 
-  public static @NotNull LcovCoverageReport readLCOV(@NotNull List<File> lcovFiles) throws IOException {
+  public static @NotNull LcovCoverageReport readLCOVFromPaths(@NotNull List<Path> lcovFiles) throws IOException {
     LcovCoverageReport report = new LcovCoverageReport();
-    for (File lcovFile : lcovFiles) {
-      try (BufferedReader reader = new BufferedReader(new FileReader(lcovFile, StandardCharsets.UTF_8))) {
+    for (Path lcovFile : lcovFiles) {
+      try (BufferedReader reader = Files.newBufferedReader(lcovFile, StandardCharsets.UTF_8)) {
         String currentFileName = null;
         String currentFunction = null;
         List<LcovCoverageReport.LineHits> lineDataList = null;
@@ -70,6 +71,19 @@ public final class LcovSerializationUtils {
       }
     }
     return report;
+  }
+
+  /**
+   * @deprecated Use {@link #readLCOVFromPaths(List)} instead.
+   */
+  @SuppressWarnings("IO_FILE_USAGE")
+  @Deprecated
+  public static @NotNull LcovCoverageReport readLCOV(@NotNull List<File> lcovFiles) throws IOException {
+    List<Path> lcovPaths = new ArrayList<>(lcovFiles.size());
+    for (File lcovFile : lcovFiles) {
+      lcovPaths.add(lcovFile.toPath());
+    }
+    return readLCOVFromPaths(lcovPaths);
   }
 
   public static ProjectData convertToProjectData(@NotNull LcovCoverageReport report,

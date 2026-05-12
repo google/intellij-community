@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.ide
 
 import com.github.benmanes.caffeine.cache.CacheLoader
@@ -147,7 +147,7 @@ abstract class RestService : HttpRequestHandler() {
 
   private val abuseCounter = Caffeine.newBuilder()
     .expireAfterWrite(1, TimeUnit.MINUTES)
-    .build<Any, AtomicInteger>(CacheLoader { AtomicInteger() })
+    .build(CacheLoader { AtomicInteger() })
 
   private val trustedOrigins = Caffeine.newBuilder()
     .maximumSize(1024)
@@ -159,7 +159,7 @@ abstract class RestService : HttpRequestHandler() {
   private var isBlockUnknownHosts = false
 
   /**
-   * Service url must be "/api/$serviceName", but to preserve backward compatibility, prefixless path could be also supported
+   * The service URL must be "/api/$serviceName", but to preserve backward compatibility, prefix-less path could be also supported.
    */
   protected open val isPrefixlessAllowed: Boolean
     get() = false
@@ -171,10 +171,9 @@ abstract class RestService : HttpRequestHandler() {
     get() = false
 
   /**
-   * Use human-readable name or UUID if it is an internal service.
+   * Use a human-readable name or UUID if it is an internal service.
    */
-  @NlsSafe
-  protected abstract fun getServiceName(): String
+  protected abstract fun getServiceName(): @NlsSafe String
 
   override fun isSupported(request: FullHttpRequest): Boolean {
     if (!isMethodSupported(request.method())) {
@@ -219,7 +218,7 @@ abstract class RestService : HttpRequestHandler() {
         return true
       }
 
-      val counter = abuseCounter.get(getRequesterId(urlDecoder, request, context))!!
+      val counter = abuseCounter.get(getRequesterId(urlDecoder, request, context))
       if (counter.incrementAndGet() > getMaxRequestsPerMinute()) {
         HttpResponseStatus.TOO_MANY_REQUESTS.sendError(context.channel(), request)
         return true
@@ -262,11 +261,6 @@ abstract class RestService : HttpRequestHandler() {
     }
   }
 
-  @Throws(InterruptedException::class, InvocationTargetException::class)
-  protected open fun isHostTrusted(request: FullHttpRequest, urlDecoder: QueryStringDecoder): Boolean =
-    @Suppress("DEPRECATION")
-    isHostTrusted(request)
-
   /**
    * Used to set individual API access rate limits.
    */
@@ -274,10 +268,8 @@ abstract class RestService : HttpRequestHandler() {
   protected open fun getRequesterId(urlDecoder: QueryStringDecoder, request: FullHttpRequest, context: ChannelHandlerContext): Any =
     (context.channel().remoteAddress() as InetSocketAddress).address
 
-  @Deprecated("Use {@link #isHostTrusted(FullHttpRequest, QueryStringDecoder)}")
   @Throws(InterruptedException::class, InvocationTargetException::class)
-  // e.g., Upsource trust to configured host
-  protected open fun isHostTrusted(request: FullHttpRequest): Boolean {
+  protected open fun isHostTrusted(request: FullHttpRequest, urlDecoder: QueryStringDecoder): Boolean {
     if (service<BuiltInWebServerAuth>().isRequestSigned(request) || isOriginAllowed(request) == OriginCheckResult.ALLOW) {
       return true
     }
@@ -300,7 +292,7 @@ abstract class RestService : HttpRequestHandler() {
       }
     }
 
-    val lock = hostLocks.computeIfAbsent(host ?: "") { Object() }
+    val lock = hostLocks.computeIfAbsent(host ?: "") { Any() }
     synchronized(lock) {
       if (host == null || scheme == null) {
         if (isBlockUnknownHosts) {
@@ -359,10 +351,11 @@ abstract class RestService : HttpRequestHandler() {
       LOG.error("Expected 'request.hostName' to be localhost. hostName='$hostName', origin='$origin'")
     }
 
-    return (originHost != null && (
+    return originHost != null && (
       trustedPredefinedHosts.contains(originHost) ||
       System.getProperty(systemPropertyKey, "").splitToSequence(',').contains(originHost) ||
-      isLocalhost(originHost)))
+      isLocalhost(originHost)
+    )
   }
 
   /**

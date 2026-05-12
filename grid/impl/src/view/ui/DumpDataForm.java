@@ -55,12 +55,12 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.util.text.StringUtilRt;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBLayeredPane;
 import com.intellij.ui.components.JBPanelWithEmptyText;
 import com.intellij.ui.components.JBScrollPane;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.uiDesigner.core.GridLayoutManager;
 import com.intellij.uiDesigner.core.Spacer;
@@ -279,7 +279,7 @@ public class DumpDataForm {
     ComboBox<DataExtractorFactory> comboBox = myExtractorCombobox.getComponent();
     comboBox.setSwingPopup(false);
     comboBox.setModel(new DefaultComboBoxModel<>(factories.toArray(new DataExtractorFactory[0])));
-    comboBox.setRenderer(SimpleListCellRenderer.create("", f -> DataExtractorFactories.getDisplayName(f, scripts)));
+    comboBox.setRenderer(BuilderKt.textListCellRenderer("", f -> DataExtractorFactories.getDisplayName(f, scripts)));
     DataExtractorFactory currentFactory = ContainerUtil.find(factories, factory -> currentFactoryId.equals(factory.getId()));
     comboBox.setSelectedItem(currentFactory);
     comboBox.addItemListener(e -> {

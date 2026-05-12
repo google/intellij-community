@@ -1,4 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.externalSystem.impl.dependencySubstitution.impl
 
 import com.intellij.platform.externalSystem.impl.dependencySubstitution.DependencySubstitutionEntity
@@ -8,18 +10,25 @@ import com.intellij.platform.workspace.jps.entities.LibraryId
 import com.intellij.platform.workspace.jps.entities.ModuleEntity
 import com.intellij.platform.workspace.jps.entities.ModuleEntityBuilder
 import com.intellij.platform.workspace.jps.entities.ModuleId
-import com.intellij.platform.workspace.storage.*
+import com.intellij.platform.workspace.storage.ConnectionId
+import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
+import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
+import com.intellij.platform.workspace.storage.MutableEntityStorage
+import com.intellij.platform.workspace.storage.SymbolicEntityId
+import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
+import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.EntityLink
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.SoftLinkable
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
-import com.intellij.platform.workspace.storage.impl.extractOneToManyParent
 import com.intellij.platform.workspace.storage.impl.indices.WorkspaceMutableIndex
-import com.intellij.platform.workspace.storage.impl.updateOneToManyParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import org.jetbrains.annotations.ApiStatus.Internal
 
@@ -40,7 +49,8 @@ internal class DependencySubstitutionEntityImpl(private val dataSource: Dependen
   }
 
   override val owner: ModuleEntity
-    get() = snapshot.extractOneToManyParent(OWNER_CONNECTION_ID, this)!!
+    get() = snapshot.instrumentation.getParent(OWNER_CONNECTION_ID, this) as? ModuleEntity
+            ?: error("Parent owner not found for DependencySubstitutionEntity")
   override val library: LibraryId
     get() {
       readField("library")
@@ -100,7 +110,7 @@ internal class DependencySubstitutionEntityImpl(private val dataSource: Dependen
         error("Field WorkspaceEntity#entitySource should be initialized")
       }
       if (_diff != null) {
-        if (_diff.extractOneToManyParent<WorkspaceEntityBase>(OWNER_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getParentBuilder(OWNER_CONNECTION_ID, this) == null) {
           error("Field DependencySubstitutionEntity#owner should be initialized")
         }
       }
@@ -147,12 +157,13 @@ internal class DependencySubstitutionEntityImpl(private val dataSource: Dependen
       get() {
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(OWNER_CONNECTION_ID, this) as? ModuleEntityBuilder)
-          ?: (this.entityLinks[EntityLink(false, OWNER_CONNECTION_ID)]!! as ModuleEntityBuilder)
+          ?: (this.entityLinks[EntityLink(false, OWNER_CONNECTION_ID)] as? ModuleEntityBuilder)
+          ?: error("owner is null for DependencySubstitutionEntity")
         }
         else {
-          this.entityLinks[EntityLink(false, OWNER_CONNECTION_ID)]!! as ModuleEntityBuilder
+          (this.entityLinks[EntityLink(false, OWNER_CONNECTION_ID)] as? ModuleEntityBuilder)
+          ?: error("owner is null for DependencySubstitutionEntity")
         }
       }
       set(value) {
@@ -168,7 +179,7 @@ internal class DependencySubstitutionEntityImpl(private val dataSource: Dependen
           _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
         }
         if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)) {
-          _diff.updateOneToManyParentOfChild(OWNER_CONNECTION_ID, this, value)
+          _diff.instrumentation.addChild(OWNER_CONNECTION_ID, value, this)
         }
         else {
 // Setting backref of the list
@@ -282,7 +293,6 @@ internal class DependencySubstitutionEntityData : WorkspaceEntityData<Dependency
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): DependencySubstitutionEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {

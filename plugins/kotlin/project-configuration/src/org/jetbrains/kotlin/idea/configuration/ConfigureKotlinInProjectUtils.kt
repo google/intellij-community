@@ -38,7 +38,6 @@ import org.jetbrains.kotlin.config.LanguageVersionSettingsImpl
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.idea.base.facet.isMultiPlatformModule
 import org.jetbrains.kotlin.idea.base.facet.platform.platform
-import org.jetbrains.kotlin.idea.base.indices.KotlinPackageIndexUtils
 import org.jetbrains.kotlin.idea.base.platforms.KotlinCommonLibraryKind
 import org.jetbrains.kotlin.idea.base.platforms.KotlinJavaScriptLibraryKind
 import org.jetbrains.kotlin.idea.base.platforms.KotlinNativeLibraryKind
@@ -122,7 +121,6 @@ fun DependencyScope.toGradleCompileScope(isAndroidModule: Boolean): String = whe
     DependencyScope.TEST -> if (isAndroidModule) "implementation" else "testImplementation"
     DependencyScope.RUNTIME -> "runtime"
     DependencyScope.PROVIDED -> "implementation"
-    else -> "implementation"
 }
 
 fun DependencyScope.toGradleCompileScope(targetModule: Module? = null): String = when (this) {
@@ -130,7 +128,6 @@ fun DependencyScope.toGradleCompileScope(targetModule: Module? = null): String =
     DependencyScope.TEST -> if (targetModule?.isMultiPlatformModule == true) "implementation" else "testImplementation"
     DependencyScope.RUNTIME -> "runtime"
     DependencyScope.PROVIDED -> "implementation"
-    else -> "implementation"
 }
 
 fun RepositoryDescription.toGroovyRepositorySnippet(): String = "maven { url '$url' }"
@@ -391,10 +388,6 @@ fun hasAnyKotlinRuntimeInScope(module: Module): Boolean {
     }
 }
 
-fun isStdlibModule(module: Module): Boolean {
-    return KotlinPackageIndexUtils.packageExists(FqName("kotlin"), module.moduleProductionSourceScope)
-}
-
 fun getPlatform(module: Module): String {
     return when {
         module.platform.isJvm() -> {
@@ -412,7 +405,7 @@ fun getPlatform(module: Module): String {
 
         module.platform.isJs() && hasKotlinJsRuntimeInScope(module) -> "js"
         module.platform.isCommon() -> "common"
-        module.platform.isNative() -> "native." + (module.platform?.componentPlatforms?.first()?.targetName ?: "unknown")
+        module.platform.isNative() -> "native." + module.platform.componentPlatforms.first().targetName
         else -> "unknown"
     }
 }

@@ -1,11 +1,5 @@
 ### auto-generated section `build intellij.textmate.backend` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_provided_library", "resourcegroup")
-
-resourcegroup(
-  name = "backend_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_provided_library")
 
 jvm_provided_library(
   name = "plugins_textmate_common_provided",
@@ -67,10 +61,14 @@ jvm_library(
   module_name = "intellij.textmate.backend",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":backend_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:jetbrains-annotations-provided",
     "@lib//:kotlin-stdlib-provided",
+    "//platform/ide-core",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//platform/util:util-ui",
     ":plugins_textmate_common_provided",
     ":spellchecker_provided",
     ":platform_core_provided",
@@ -87,6 +85,7 @@ jvm_library(
 
 jvm_library(
   name = "backend_test_lib",
+  testonly = True,
   module_name = "intellij.textmate.backend",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -106,6 +105,7 @@ jvm_library(
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//platform/platform-impl:ide-impl",
     "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/analysis-api:analysis",
     "//platform/analysis-api:analysis_test_lib",
     "//platform/code-style-api:codeStyle",
@@ -116,6 +116,14 @@ jvm_library(
     "//platform/indexing-api:indexing_test_lib",
     "//platform/core-impl",
     "//platform/core-impl:core-impl_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/util:util-ui_test_lib",
   ]
 )
 ### auto-generated section `build intellij.textmate.backend` end
+
+### auto-generated section `iml intellij.textmate.backend` start
+exports_files([
+  "intellij.textmate.backend.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.textmate.backend` end

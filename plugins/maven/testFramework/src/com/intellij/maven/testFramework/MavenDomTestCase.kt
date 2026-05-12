@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.maven.testFramework
 
 import com.intellij.codeInsight.CodeInsightSettings
@@ -22,6 +22,7 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.util.Comparing
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.newvfs.ArchiveFileSystem
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
@@ -52,6 +53,7 @@ import org.jetbrains.idea.maven.dom.converters.MavenDependencyCompletionUtil
 import org.jetbrains.idea.maven.dom.inspections.MavenModelInspection
 import org.jetbrains.idea.maven.dom.model.MavenDomProjectModel
 import org.jetbrains.idea.maven.dom.references.MavenPsiElementWrapper
+import org.jetbrains.idea.maven.model.MavenRepoArtifactInfo
 import org.jetbrains.idea.maven.onlinecompletion.model.MavenRepositoryArtifactInfo
 import org.jetbrains.idea.maven.utils.MavenLog
 import org.junit.ComparisonFailure
@@ -133,6 +135,10 @@ abstract class MavenDomTestCase : MavenMultiVersionImportingTestCase() {
     }
     refreshFiles(listOf(f))
     awaitConfiguration()
+    if (f.fileSystem is ArchiveFileSystem) {
+      MavenLog.LOG.warn("MavenDomTestCase configTest in ArchiveFileSystem skipped")
+      return
+    }
     fixture.configureFromExistingVirtualFile(f)
     myConfigTimestamps[f] = f.timeStamp
     MavenLog.LOG.warn("MavenDomTestCase configTest performed")
@@ -169,8 +175,6 @@ abstract class MavenDomTestCase : MavenMultiVersionImportingTestCase() {
     return fixture.editor
   }
 
-  protected suspend fun getEditorOffset() = getEditorOffset(projectPom)
-
   protected suspend fun getEditorOffset(f: VirtualFile): Int {
     val editor = getEditor(f)
     return readAction { editor.caretModel.offset }
@@ -206,10 +210,15 @@ abstract class MavenDomTestCase : MavenMultiVersionImportingTestCase() {
   }
 
   protected suspend fun findTag(file: VirtualFile, path: String, clazz: Class<out MavenDomElement> = MavenDomProjectModel::class.java): XmlTag {
+    configTest(file)
     return readAction {
       val model = MavenDomUtil.getMavenDomModel(project, file, clazz)
       assertNotNull("Model is not of $clazz", model)
-      MavenDomUtil.findTag(model!!, path)!!
+      val tag = MavenDomUtil.findTag(model!!, path)
+      val xmlTag = model.xmlTag
+      assertNotNull("xmlTag is null for $path", xmlTag)
+      assertNotNull("Tag $path not found in \n${xmlTag!!.text}", tag)
+      tag!!
     }
   }
 
@@ -418,16 +427,16 @@ abstract class MavenDomTestCase : MavenMultiVersionImportingTestCase() {
 
   protected suspend fun getDependencyCompletionVariants(
     f: VirtualFile,
-    lookupElementStringFunction: Function<in MavenRepositoryArtifactInfo?, String>,
+    lookupElementStringFunction: Function<in MavenRepoArtifactInfo?, String>,
   ): Set<String> {
     configTest(f)
     val variants = fixture.completeBasic()
 
     val result: MutableSet<String> = TreeSet()
     for (each in variants) {
-      val `object` = each.getObject()
-      if (`object` is MavenRepositoryArtifactInfo) {
-        result.add(lookupElementStringFunction.apply(`object`))
+      val o = each.getObject()
+      if (o is MavenRepoArtifactInfo) {
+        result.add(lookupElementStringFunction.apply(o))
       }
     }
     return result
@@ -517,9 +526,9 @@ abstract class MavenDomTestCase : MavenMultiVersionImportingTestCase() {
     }
   }
 
-  protected suspend fun assertRenameResult(value: String, expectedXml: String?) {
+  protected suspend fun assertRenameResult(value: String, expectedXml: String?, omitModelVersionTag: Boolean = false) {
     doRename(projectPom, value)
-    assertEquals(createPomXml(expectedXml), getTestPsiFile(projectPom).text)
+    assertEquals(createPomXml(expectedXml, omitModelVersionTag), getTestPsiFile(projectPom).text)
   }
 
   protected suspend fun doRename(f: VirtualFile, value: String) {

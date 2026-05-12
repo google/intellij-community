@@ -53,6 +53,11 @@ public abstract class K2HighlightingMetaInfoTestGenerated extends AbstractK2High
             runTest("../../idea/tests/testData/highlighterMetaInfo/diagnostics/mppIsNotEnabled.kt");
         }
 
+        @TestMetadata("redundantOpenFunctionInInterfaceDiagnostic.kt")
+        public void testRedundantOpenFunctionInInterfaceDiagnostic() throws Exception {
+            runTest("../../idea/tests/testData/highlighterMetaInfo/diagnostics/redundantOpenFunctionInInterfaceDiagnostic.kt");
+        }
+
         @TestMetadata("uselessCast.kt")
         public void testUselessCast() throws Exception {
             runTest("../../idea/tests/testData/highlighterMetaInfo/diagnostics/uselessCast.kt");
@@ -560,6 +565,21 @@ public abstract class K2HighlightingMetaInfoTestGenerated extends AbstractK2High
             runTest("../../idea/tests/testData/highlighterMetaInfo/AutoCreatedItParameter.kt");
         }
 
+        @TestMetadata("ContextArguments.kt")
+        public void testContextArguments() throws Exception {
+            runTest("../../idea/tests/testData/highlighterMetaInfo/ContextArguments.kt");
+        }
+
+        @TestMetadata("ContextArgumentsWithoutValue.kt")
+        public void testContextArgumentsWithoutValue() throws Exception {
+            runTest("../../idea/tests/testData/highlighterMetaInfo/ContextArgumentsWithoutValue.kt");
+        }
+
+        @TestMetadata("ContextArgumentsWrongName.kt")
+        public void testContextArgumentsWrongName() throws Exception {
+            runTest("../../idea/tests/testData/highlighterMetaInfo/ContextArgumentsWrongName.kt");
+        }
+
         @TestMetadata("DefinitelyNotNullType.kt")
         public void testDefinitelyNotNullType() throws Exception {
             runTest("../../idea/tests/testData/highlighterMetaInfo/DefinitelyNotNullType.kt");
@@ -707,6 +727,16 @@ public abstract class K2HighlightingMetaInfoTestGenerated extends AbstractK2High
         @TestMetadata("unresolvedImport.kt")
         public void testUnresolvedImport() throws Exception {
             runTest("../../idea/tests/testData/highlighterMetaInfo/unresolved/unresolvedImport.kt");
+        }
+
+        @TestMetadata("unresolvedKDocLink.kt")
+        public void testUnresolvedKDocLink() throws Exception {
+            runTest("../../idea/tests/testData/highlighterMetaInfo/unresolved/unresolvedKDocLink.kt");
+        }
+
+        @TestMetadata("unresolvedKDocLinkWithSuppressedSamples.kt")
+        public void testUnresolvedKDocLinkWithSuppressedSamples() throws Exception {
+            runTest("../../idea/tests/testData/highlighterMetaInfo/unresolved/unresolvedKDocLinkWithSuppressedSamples.kt");
         }
 
         @TestMetadata("unresolvedLabel.kt")

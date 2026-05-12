@@ -11,8 +11,6 @@ import com.intellij.grazie.utils.TextStyleDomain
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.fileTypes.PlainTextLanguage
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.UsefulTestCase.assertEmpty
@@ -39,7 +37,7 @@ class HighlightingTest : BaseTestCase() {
   @NeedsCloud
   @Test
   fun `test MLEC and rules md all languages`() {
-    enableLanguages(setOf(Lang.AMERICAN_ENGLISH, Lang.RUSSIAN), project, testRootDisposable)
+    enableLanguages(setOf(Lang.AMERICAN_ENGLISH, Lang.RUSSIAN), testRootDisposable)
 
     configureByText("a.md", """
      Hello. I'm <GRAMMAR_ERROR descr="Grazie.RuleEngine.En.Grammar.ARTICLE_ISSUES">a </GRAMMAR_ERROR>very humble <GRAMMAR_ERROR descr="Grazie.RuleEngine.En.Grammar.ARTICLE_ISSUES">persons</GRAMMAR_ERROR>.
@@ -67,7 +65,7 @@ class HighlightingTest : BaseTestCase() {
   @NeedsCloud
   @Test
   fun `test MLEC and rules md english only`() {
-    enableLanguages(setOf(Lang.AMERICAN_ENGLISH), project, testRootDisposable)
+    enableLanguages(setOf(Lang.AMERICAN_ENGLISH), testRootDisposable)
 
     configureByText("a.md", """
       Hello. I'm <GRAMMAR_ERROR descr="Grazie.RuleEngine.En.Grammar.ARTICLE_ISSUES">a </GRAMMAR_ERROR>very humble <GRAMMAR_ERROR descr="Grazie.RuleEngine.En.Grammar.ARTICLE_ISSUES">persons</GRAMMAR_ERROR>.
@@ -88,7 +86,7 @@ class HighlightingTest : BaseTestCase() {
   @NeedsCloud
   @Test
   fun `test German`() {
-    enableLanguages(setOf(Lang.GERMANY_GERMAN), project, testRootDisposable)
+    enableLanguages(setOf(Lang.GERMANY_GERMAN), testRootDisposable)
     GrazieConfig.update { it.withParameter(TextStyleDomain.Other, Language.GERMAN, GermanParameters.GENDERN_STYLE, "star") }
     configureByText("a.md", """
       Mein Vater arbeitet <GRAMMAR_ERROR descr="Grazie.RuleEngine.De.Punctuation.IN_CLAUSE_COMMA">viel</GRAMMAR_ERROR> aber mag mit uns Zeit verbringen.
@@ -105,7 +103,7 @@ class HighlightingTest : BaseTestCase() {
   @NeedsCloud
   @Test
   fun `test Ukrainian`() {
-    enableLanguages(setOf(Lang.UKRAINIAN), project, testRootDisposable)
+    enableLanguages(setOf(Lang.UKRAINIAN), testRootDisposable)
     configureByText("a.md", """
       До наступної <STYLE_SUGGESTION descr="Українською правильно писати «зупинка»">останівки</STYLE_SUGGESTION> ми їхали мовчки.
       Я й не <GRAMMAR_ERROR descr="Граматична помилка">думав що комп'ютерна лінгвістика</GRAMMAR_ERROR> це легко.
@@ -118,7 +116,7 @@ class HighlightingTest : BaseTestCase() {
 
   @Test
   fun `test only LT results for language with no TREE or MLEC support`() {
-    enableLanguages(setOf(Lang.AMERICAN_ENGLISH, Lang.GREEK), project, testRootDisposable)
+    enableLanguages(setOf(Lang.AMERICAN_ENGLISH, Lang.GREEK), testRootDisposable)
     configureByText("a.txt", """
      <GRAMMAR_ERROR descr="GREEK_REDUNDANT_2">Άρα λοιπόν</GRAMMAR_ERROR> πρακτικά το πεδίο αυτό περιέχει τον μέγιστο αριθμό κόμβων από τους οποίους πρέπει να περάσει το πακέτο έως ότου τελικά παραδοθεί στον παραλήπτη.
      """.trimIndent())
@@ -351,7 +349,7 @@ class HighlightingTest : BaseTestCase() {
     checkCloud("a.md", """
       - `shortDescription` - [MultiformatMessageString object]. Contains the field `text` with the name of an inspection as a value. 
       
-      - **/data/results**: directory to store the analysis results, needs to be empty before each Qodana run
+      - **/data/results**: directory to store the analysis <GRAMMAR_ERROR descr="Grazie.MLEC.En.All: Redundant punctuation">results,</GRAMMAR_ERROR> needs to be empty before each Qodana run
        
       Have you tried <GRAMMAR_ERROR descr="Grazie.RuleEngine.En.Spelling.COMMON_TYPOS">a[ples</GRAMMAR_ERROR>? Would you like one?
     """.trimIndent().trimIndent())
@@ -390,9 +388,9 @@ class HighlightingTest : BaseTestCase() {
   @Test
   fun `test treating markup as quotes`() {
     configureByText("a.md", """
-      From the toolbar, click _Add link_, then select **is duplicated by**.
-      **This** is still <GRAMMAR_ERROR>an </GRAMMAR_ERROR>mistake.
-      This happened in *Tuesday*.
+      From the toolbar, click _<GRAMMAR_ERROR descr="Grazie.RuleEngine.En.Grammar.MISSING_ARTICLE">Add link</GRAMMAR_ERROR>_, then select **is duplicated by**.
+      **This** is still <GRAMMAR_ERROR descr="Grazie.RuleEngine.En.Grammar.ARTICLE_ISSUES">an </GRAMMAR_ERROR>mistake.
+      This happened <GRAMMAR_ERROR descr="Grazie.MLEC.En.All: Incorrect preposition">in</GRAMMAR_ERROR> *Tuesday*.
       Import a *Workflow*
     """.trimIndent())
     myFixture.checkHighlighting()
@@ -473,11 +471,23 @@ class HighlightingTest : BaseTestCase() {
   @NeedsCloud
   @Test
   fun `test LT Oxford spelling rules are synchronized with our setting`() {
-    enableLanguages(setOf(Lang.BRITISH_ENGLISH), project, testRootDisposable)
-    assertFalse(GrazieConfig.get().useOxfordSpelling)
-    assertNotEmpty(GrazieConfig.get().userDisabledRules.filter { it.contains("OXFORD_SPELLING") })
+    enableLanguages(setOf(Lang.BRITISH_ENGLISH), testRootDisposable)
+    val nonOtherDomains = TextStyleDomain.entries.filterNot { it == TextStyleDomain.Other }
 
-    myFixture.configureByText("a.txt", "Summarising a text is great!")
+    assertFalse(GrazieConfig.get().useOxfordSpelling)
+    assertEmpty(GrazieConfig.get().userEnabledRules.filter { it.contains("OXFORD_SPELLING") })
+    nonOtherDomains.forEach { domain ->
+      assertEmpty(GrazieConfig.get().domainEnabledRules[domain].orEmpty().filter { it.contains("OXFORD_SPELLING") })
+    }
+
+    myFixture.configureByText("Test.java", """
+      // Summarising a text is great! This sentence is required for language detection.
+
+      /**
+       * Summarising a text is great! This sentence is required for language detection.
+       */
+      public class Test {}
+    """.trimIndent())
     myFixture.checkHighlighting()
 
     GrazieConfig.update { it.withOxfordSpelling(true) }
@@ -485,8 +495,19 @@ class HighlightingTest : BaseTestCase() {
       PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
     }
 
-    assertEmpty(GrazieConfig.get().userDisabledRules.filter { it.contains("OXFORD_SPELLING") })
-    assertNotEmpty(myFixture.doHighlighting())
+    assertNotEmpty(GrazieConfig.get().userEnabledRules.filter { it.contains("OXFORD_SPELLING") })
+    nonOtherDomains.forEach { domain ->
+      assertNotEmpty(GrazieConfig.get().domainEnabledRules[domain].orEmpty().filter { it.contains("OXFORD_SPELLING") })
+    }
+    myFixture.configureByText("Test.java", """
+      // <STYLE_SUGGESTION descr="Grazie.RuleEngine.En.Style.VARIANT_LEXICAL_DIFFERENCES">Summarising</STYLE_SUGGESTION> a text is great! This sentence is required for language detection.
+
+      /**
+       * <STYLE_SUGGESTION descr="Grazie.RuleEngine.En.Style.VARIANT_LEXICAL_DIFFERENCES">Summarising</STYLE_SUGGESTION> a text is great! This sentence is required for language detection.
+       */
+      public class Test {}
+    """.trimIndent())
+    myFixture.checkHighlighting()
   }
 
   @Test
@@ -494,6 +515,27 @@ class HighlightingTest : BaseTestCase() {
     myFixture.configureByText("a.txt", "The future development would <GRAMMAR_ERROR>be <caret>tends</GRAMMAR_ERROR> to increase the horsepower.")
     myFixture.checkHighlighting()
     myFixture.findSingleIntention("tend")
+  }
+
+  @Test
+  fun `test closeMlecMerging MLEC client ability`() {
+    myFixture.configureByText(
+      "a.txt",
+      "One can <GRAMMAR_ERROR descr=\"MD_BASEFORM\">li<caret>stened</GRAMMAR_ERROR> <GRAMMAR_ERROR descr=\"Grazie.RuleEngine.En.Grammar.PREPOSITION_ISSUES\">music</GRAMMAR_ERROR> or <GRAMMAR_ERROR descr=\"Grazie.MLEC.En.All: Incorrect verb tense form\">watched</GRAMMAR_ERROR> some funny videos."
+    )
+    myFixture.checkHighlighting()
+    val listenIntention = myFixture.findSingleIntention("listen")
+    myFixture.launchAction(listenIntention)
+    myFixture.checkResult("One can listen music or watched some funny videos.")
+
+    myFixture.configureByText(
+      "a.txt",
+      "One can listen <GRAMMAR_ERROR descr=\"Grazie.RuleEngine.En.Grammar.PREPOSITION_ISSUES\"><caret>music</GRAMMAR_ERROR> or <GRAMMAR_ERROR descr=\"Grazie.MLEC.En.All: Incorrect verb tense form\">watched</GRAMMAR_ERROR> some funny videos."
+    )
+    myFixture.checkHighlighting()
+    val musicIntention = myFixture.findSingleIntention("to music")
+    myFixture.launchAction(musicIntention)
+    myFixture.checkResult("One can listen to music or watched some funny videos.")
   }
 
   @NeedsCloud
@@ -570,15 +612,31 @@ class HighlightingTest : BaseTestCase() {
     )
   }
 
+  @NeedsCloud
+  @Test
+  fun `test disable oxford spelling`() {
+    GrazieConfig.update { it.copy(useOxfordSpelling = true) }
+    enableLanguages(setOf(Lang.BRITISH_ENGLISH), testRootDisposable)
+    configureByText("a.txt", "// The detailed field <STYLE_SUGGESTION><caret>summarises</STYLE_SUGGESTION>")
+    myFixture.checkHighlighting()
+
+    val intention = myFixture.findSingleIntention("Disable Oxford Spelling")
+    EdtInvocationManager.invokeAndWaitIfNeeded {
+      myFixture.launchAction(intention)
+      UIUtil.dispatchAllInvocationEvents()
+    }
+    assertFalse(GrazieConfig.get().useOxfordSpelling, "Disable Oxford Spelling should've updated GrazieConfig")
+    assertEquals(GrazieConfig.get().availableLanguages, setOf(Lang.BRITISH_ENGLISH), "Disable Oxford Spelling should have not updated available languages")
+  }
+
   companion object {
     @JvmStatic
-    fun enableLanguages(langs: Set<Lang>, project: Project, disposable: Disposable) {
+    fun enableLanguages(langs: Set<Lang>, disposable: Disposable) {
       EdtInvocationManager.invokeAndWaitIfNeeded {
         GrazieConfig.update { it.copy(enabledLanguages = langs) }
         UIUtil.dispatchAllInvocationEvents()
       }
-      GrazieTestBase.loadLangs(langs, project)
-      Disposer.register(disposable) { GrazieTestBase.unloadLangs(project) }
+      GrazieTestBase.loadLangs(langs, disposable)
     }
 
     @JvmStatic

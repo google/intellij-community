@@ -84,17 +84,32 @@ private abstract class BaseMetalavaCommand(name: String) : CliktCommand(name = n
                 commands.joinToString(" "),
                 jewelDir,
                 timeoutAmount = 60.minutes,
+                exitOnError = false,
                 outputRedirect = Redirect.PRINT,
             )
         }
 
         if (result.isSuccess) {
             println("\n✅ Done!")
+        } else {
+            exitWithError(
+                "Metalava API compatibility check failed while running '$taskPath$task'. " +
+                    "See the Gradle output above for details."
+            )
         }
     }
 
     protected open fun contributeArgs(): List<String> = emptyList()
 }
+
+private class CleanBaselineCommand : BaseMetalavaCommand(name = "clean-baselines") {
+    override fun help(context: Context): String = "Cleans baseline dumps."
+
+    override fun run() {
+        runTask("cleanBaselines")
+    }
+}
+
 
 private class UpdateCommand : BaseMetalavaCommand(name = "update") {
     override fun help(context: Context): String = "Update stored Metalava API signature dumps."
@@ -134,4 +149,4 @@ private class MetalavaSignaturesCommand : CliktCommand() {
     override fun run() = Unit
 }
 
-MetalavaSignaturesCommand().subcommands(UpdateCommand(), ValidateCommand()).main(args)
+MetalavaSignaturesCommand().subcommands(UpdateCommand(), ValidateCommand(), CleanBaselineCommand()).main(args)

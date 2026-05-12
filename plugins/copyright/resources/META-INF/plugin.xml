@@ -34,6 +34,8 @@
     <actionOnSaveInfoProvider id="copyrightInfoProvider"
                               implementation="com.maddyhome.idea.copyright.actions.CopyrightOnSaveInfoProvider"/>
     <actionOnSave id="copyrightOnSaveAction" implementation="com.maddyhome.idea.copyright.actions.CopyrightOnSaveAction"/>
+    <projectSettings service="com.maddyhome.idea.copyright.actions.UpdateCopyrightCheckinHandlerState"/>
+    <projectSettings service="com.intellij.copyright.CopyrightManager"/>
   </extensions>
 
   <extensions defaultExtensionNs="com.intellij.copyright">

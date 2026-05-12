@@ -81,12 +81,10 @@
     <statistic.eventLog.eventLoggerProvider
       implementation="com.intellij.searchEverywhereMl.SearchEverywhereEventLoggerProvider"
       order="first"/>
+    <applicationSettings service="com.intellij.searchEverywhereMl.SearchEverywhereMlSettingsService"/>
   </extensions>
 
   <extensionPoints>
-    <extensionPoint
-      interface="com.intellij.searchEverywhereMl.features.SearchEverywhereStateFeaturesProvider"
-      dynamic="true" name="searchEverywhereStateFeaturesProvider"/>
     <extensionPoint qualifiedName="com.intellij.searchEverywhereMl.textEmbeddingProvider"
                     interface="com.intellij.searchEverywhereMl.TextEmbeddingProvider"
                     dynamic="true"/>

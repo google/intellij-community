@@ -724,7 +724,7 @@ public final class DfaPsiUtil {
         return JavaPsiFacade.getElementFactory(aClass.getProject()).createType(aClass, arguments);
       }
     }
-    return result;
+    return GenericsUtil.getVariableTypeByExpressionType(result);
   }
 
   /**

@@ -1152,7 +1152,7 @@ public final class AttributesStorageOverBlobStorage implements VFSAttributesStor
       return AttributesRecord
         .putDedicatedValueRecordHeader(toWrite, fileId, attributeId)
         .put(newValueBytes, 0, newValueSize);
-    });
+    }, newValueSize);
   }
 
   /**

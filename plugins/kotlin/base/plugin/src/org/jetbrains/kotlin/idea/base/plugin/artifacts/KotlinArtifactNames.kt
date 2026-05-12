@@ -19,6 +19,7 @@ object KotlinArtifactNames {
     const val KOTLIN_TEST_JS: String = "kotlin-test-js.klib"
     const val KOTLIN_MAIN_KTS: String = "kotlin-main-kts.jar"
     const val KOTLIN_SCRIPT_RUNTIME: String = "kotlin-script-runtime.jar"
+    const val KOTLINX_COROUTINES_CORE_JVM: String = "kotlinx-coroutines-core-jvm.jar"
     const val KOTLIN_SCRIPTING_COMMON: String = "kotlin-scripting-common.jar"
     const val KOTLIN_SCRIPTING_JVM: String = "kotlin-scripting-jvm.jar"
     const val KOTLIN_COMPILER: String = "kotlin-compiler.jar"

@@ -29,7 +29,7 @@ public final class PageUpWithSelectionAction extends EditorAction implements Act
       }
       else {
         if (caret == null) {
-          editor.getCaretModel().runForEachCaret(__ -> EditorActionUtil.moveCaretPageUp(editor, true));
+          editor.getCaretModel().runForEachCaret(_ -> EditorActionUtil.moveCaretPageUp(editor, true));
         }
         else {
           // assuming caret is equal to CaretModel.getCurrentCaret()

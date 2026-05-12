@@ -6,8 +6,6 @@ import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.analyzeCopy
-import org.jetbrains.kotlin.analysis.api.projectStructure.KaDanglingFileResolutionMode
 import org.jetbrains.kotlin.analysis.api.projectStructure.isDangling
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinOptimizeImportsFacility
 import org.jetbrains.kotlin.idea.base.psi.copied
@@ -25,7 +23,6 @@ import org.jetbrains.kotlin.resolve.ImportPath
 @ApiStatus.Internal
 class KtFileWithReplacedImports private constructor(
     val ktFile: KtFile,
-    private val isCopyOfDanglingFile: Boolean,
 ) {
     /**
      * Replaces a list of imports in the [ktFile].
@@ -63,16 +60,9 @@ class KtFileWithReplacedImports private constructor(
         }
 
     /**
-     * Allows one to analyze code in [ktFile] with respect to replaced imports.
+     * Allows one to analyze code in [ktFile].
      */
-    fun <T> analyze(action: KaSession.() -> T): T =
-        if (isCopyOfDanglingFile) {
-            // it's safe to just analyze dangling file by itself
-            analyze(ktFile, action)
-        } else {
-            // we have to use analyzeCopy on a copy of a real file
-            analyzeCopy(ktFile, KaDanglingFileResolutionMode.PREFER_SELF, action)
-        }
+    fun <T> analyze(action: KaSession.() -> T): T = analyze(ktFile, action)
 
     companion object {
         fun createFrom(originalFile: KtFile): KtFileWithReplacedImports {
@@ -84,7 +74,7 @@ class KtFileWithReplacedImports private constructor(
                 originalFile.copied()
             }
 
-            return KtFileWithReplacedImports(copyFile, isCopyOfDangling)
+            return KtFileWithReplacedImports(copyFile)
         }
     }
 }

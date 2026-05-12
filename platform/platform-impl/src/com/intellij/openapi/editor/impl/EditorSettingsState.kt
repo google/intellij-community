@@ -25,6 +25,7 @@ import com.intellij.openapi.editor.impl.stickyLines.ui.StickyLineComponent.Compa
 import com.intellij.openapi.editor.state.CustomOutValueModifier
 import com.intellij.openapi.editor.state.ObservableState
 import com.intellij.openapi.editor.state.ObservableStateListener
+import com.intellij.openapi.editor.state.StateProperty
 import com.intellij.openapi.editor.state.SyncDefaultValueCalculator
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.options.advanced.AdvancedSettings
@@ -84,6 +85,11 @@ class EditorSettingsState(private val editor: EditorImpl?,
     private val LOG = logger<EditorSettingsState>()
   }
 
+  // Use for code-style-derived properties: their defaults depend on backend-side data (e.g. .clang-format, .editorconfig)
+  // that the frontend in Remote Development cannot compute independently, so they must always be transferred.
+  private inline fun <reified T> codeStyleProperty(noinline defaultValueCalculator: () -> T): StateProperty<T> =
+    property(alwaysTransfer = true, defaultValueCalculator = defaultValueCalculator)
+
   // This group of settings does not have a UI
   var myAdditionalLinesCount: Int by property(Registry.intValue("editor.virtual.lines", 5))
   var myAdditionalColumnsCount: Int by property(3)
@@ -94,8 +100,8 @@ class EditorSettingsState(private val editor: EditorImpl?,
   var myAreLineNumbersAfterIcons: Boolean by property { false }
 
   // These come from CodeStyleSettings.
-  var myUseTabCharacter: Boolean by property {
-    ReadAction.compute(ThrowableComputable {
+  var myUseTabCharacter: Boolean by codeStyleProperty {
+    ReadAction.computeBlocking(ThrowableComputable {
       val file = getVirtualFile()
 
       if (file == null || project == null) {
@@ -109,7 +115,7 @@ class EditorSettingsState(private val editor: EditorImpl?,
       }
     })
   }
-  var myWrapWhenTypingReachesRightMargin: Boolean by property {
+  var myWrapWhenTypingReachesRightMargin: Boolean by codeStyleProperty {
     val settings = if (editor == null) {
       CodeStyle.getDefaultSettings()
     }
@@ -118,7 +124,7 @@ class EditorSettingsState(private val editor: EditorImpl?,
     }
     settings.isWrapOnTyping(language)
   }
-  var softMargins: List<Int> by property {
+  var softMargins: List<Int> by codeStyleProperty {
     if (editor == null) {
       mutableListOf()
     }
@@ -126,7 +132,7 @@ class EditorSettingsState(private val editor: EditorImpl?,
       getEditorCodeStyleSettingsOrDefaults(editor).getSoftMargins(language)
     }
   }
-  var rightMargin: Int by property {
+  var rightMargin: Int by codeStyleProperty {
     val settings = if (editor == null) {
       CodeStyle.getProjectOrDefaultSettings(project)
     }
@@ -168,7 +174,7 @@ class EditorSettingsState(private val editor: EditorImpl?,
   var myIsSmartHome: Boolean by property { EditorSettingsExternalizable.getInstance().isSmartHome }
   var myIsBlockCursor: Boolean by property { EditorSettingsExternalizable.getInstance().isBlockCursor }
   var myIsFullLineHeightCursor: Boolean by property { EditorSettingsExternalizable.getInstance().isFullLineHeightCursor }
-  var myIsAnimatedCaret: Boolean by property { EditorSettingsExternalizable.getInstance().isAnimatedCaret }
+  var myIsSmoothCaretMovement: Boolean by property { EditorSettingsExternalizable.getInstance().isSmoothCaretMovement }
   var myCaretEasing: EditorSettings.CaretEasing by property { EditorSettingsExternalizable.getInstance().caretEasing }
   var myCaretRowShown: Boolean by property { EditorSettingsExternalizable.getInstance().isCaretRowShown }
   var myIsWhitespacesShown: Boolean by property { EditorSettingsExternalizable.getInstance().isWhitespacesShown }
@@ -267,7 +273,7 @@ class EditorSettingsState(private val editor: EditorImpl?,
             EditorSettingsExternalizable.PropNames.PROP_SMART_HOME -> refresh(::myIsSmartHome)
             EditorSettingsExternalizable.PropNames.PROP_IS_BLOCK_CURSOR -> refresh(::myIsBlockCursor)
             EditorSettingsExternalizable.PropNames.PROP_IS_FULL_LINE_HEIGHT_CURSOR -> refresh(::myIsFullLineHeightCursor)
-            EditorSettingsExternalizable.PropNames.PROP_IS_ANIMATED_CARET -> refresh(::myIsAnimatedCaret)
+            EditorSettingsExternalizable.PropNames.PROP_IS_ANIMATED_CARET -> refresh(::myIsSmoothCaretMovement)
             EditorSettingsExternalizable.PropNames.PROP_CARET_EASING -> refresh(::myCaretEasing)
             EditorSettingsExternalizable.PropNames.PROP_IS_WHITESPACES_SHOWN -> refresh(::myIsWhitespacesShown)
             EditorSettingsExternalizable.PropNames.PROP_IS_LEADING_WHITESPACES_SHOWN -> refresh(::myIsLeadingWhitespacesShown)

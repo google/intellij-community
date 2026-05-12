@@ -128,7 +128,7 @@ interface JpsModuleListSerializer {
 
   fun getFileName(entity: ModuleEntity): String
 
-  fun deleteObsoleteFile(fileUrl: String, writer: JpsFileContentWriter)
+  suspend fun deleteObsoleteFile(fileUrl: String, writer: JpsFileContentWriter)
 }
 
 /**
@@ -155,22 +155,22 @@ interface JpsProjectSerializers {
                       unloadedModuleNames: com.intellij.platform.workspace.jps.UnloadedModulesNameHolder,
                       errorReporter: ErrorReporter): List<EntitySource>
 
-  fun reloadFromChangedFiles(change: JpsConfigurationFilesChange,
+  suspend fun reloadFromChangedFiles(change: JpsConfigurationFilesChange,
                              reader: JpsFileContentReader,
                              unloadedModuleNames: com.intellij.platform.workspace.jps.UnloadedModulesNameHolder,
                              errorReporter: ErrorReporter): ReloadingResult
 
   @TestOnly
-  fun saveAllEntities(storage: EntityStorage, writer: JpsFileContentWriter)
+  suspend fun saveAllEntities(storage: EntityStorage, writer: JpsFileContentWriter)
 
   @TestOnly
-  fun saveAffectedEntities(storage: EntityStorage, affectedEntitySources: Set<EntitySource>, writer: JpsFileContentWriter)
+  suspend fun saveAffectedEntities(storage: EntityStorage, affectedEntitySources: Set<EntitySource>, writer: JpsFileContentWriter)
 
-  fun saveEntities(storage: EntityStorage, unloadedEntityStorage: EntityStorage, affectedSources: Set<EntitySource>,
-                   writer: JpsFileContentWriter)
+  suspend fun saveEntities(
+    storage: EntityStorage, unloadedEntityStorage: EntityStorage, affectedSources: Set<EntitySource>,
+    writer: JpsFileContentWriter,
+  )
   
-  fun getAllModulePaths(): List<ModulePath>
-
   fun changeEntitySourcesToDirectoryBasedFormat(builder: MutableEntityStorage)
 }
 
@@ -185,9 +185,11 @@ interface ErrorReporter {
   fun reportError(message: @Nls String, file: VirtualFileUrl)
 }
 
-data class JpsConfigurationFilesChange(val addedFileUrls: Collection<String>,
-                                       val removedFileUrls: Collection<String>,
-                                       val changedFileUrls: Collection<String>) {
+typealias UrlAndChangeRequestor = Pair<String, Any> // VFileEvent.getRequestor()
+
+data class JpsConfigurationFilesChange(val addedFileUrls: Collection<UrlAndChangeRequestor>,
+                                       val removedFileUrls: Collection<UrlAndChangeRequestor>,
+                                       val changedFileUrls: Collection<UrlAndChangeRequestor>) {
   override fun toString(): String {
     val description = StringBuilder()
     description.append("JpsConfigurationFilesChange:\n")

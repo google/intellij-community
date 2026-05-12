@@ -24,6 +24,7 @@
                      enabledByDefault="false" isInternal="true"
                      level="ERROR" implementationClass="com.intellij.java.dev.codeInsight.internal.HighlightVisitorInternalInspection"
                      key="inspections.highlight.visitor.internal.display.name"/>
+    <applicationSettings service="com.intellij.java.dev.psiViewer.debug.PsiViewerDebugSettings"/>
   </extensions>
 
   <actions>

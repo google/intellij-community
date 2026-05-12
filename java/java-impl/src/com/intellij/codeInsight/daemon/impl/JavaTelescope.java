@@ -127,14 +127,14 @@ final class JavaTelescope {
     AtomicInteger count = new AtomicInteger();
     ClassInheritorsSearch.INSTANCE.createQuery(new ClassInheritorsSearch.SearchParameters(aClass, aClass.getUseScope(), true, true, true))
       .asIterable()
-      .forEach((Consumer<? super PsiClass>)__ -> count.incrementAndGet());
+      .forEach((Consumer<? super PsiClass>)_ -> count.incrementAndGet());
 
     return count.get();
   }
 
   static int collectOverridingMethods(@NotNull PsiMethod method) {
     AtomicInteger count = new AtomicInteger();
-    OverridingMethodsSearch.search(method).asIterable().forEach((Consumer<? super PsiMethod>)__ -> count.incrementAndGet());
+    OverridingMethodsSearch.search(method).asIterable().forEach((Consumer<? super PsiMethod>)_ -> count.incrementAndGet());
 
     return count.get();
   }

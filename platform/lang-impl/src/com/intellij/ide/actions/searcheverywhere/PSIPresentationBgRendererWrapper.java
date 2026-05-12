@@ -8,6 +8,7 @@ import com.intellij.navigation.ItemPresentation;
 import com.intellij.navigation.NavigationItem;
 import com.intellij.navigation.PsiElementNavigationItem;
 import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.actionSystem.DataSink;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.util.Disposer;
@@ -23,6 +24,7 @@ import com.intellij.ui.render.RendererPanelsUtils;
 import com.intellij.ui.speedSearch.SpeedSearchUtil;
 import com.intellij.util.IconUtil;
 import com.intellij.util.Processor;
+import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.NamedColorUtil;
 import com.intellij.util.ui.UIUtil;
 import org.jetbrains.annotations.ApiStatus;
@@ -43,13 +45,14 @@ import java.awt.Insets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
 public final class PSIPresentationBgRendererWrapper implements WeightedSearchEverywhereContributor<Object>, ScopeSupporting,
                                                                AutoCompletionContributor, PossibleSlowContributor, EssentialContributor,
                                                                SearchEverywhereExtendedInfoProvider, SearchEverywherePreviewProvider,
-                                                               SearchEverywhereContributorWrapper {
+                                                               SearchEverywhereContributorWrapper, PossibleInternalCommandsContributor {
   private static final Logger LOG = Logger.getInstance(PSIPresentationBgRendererWrapper.class);
 
   private final WeightedSearchEverywhereContributor<Object> myDelegate;
@@ -80,6 +83,24 @@ public final class PSIPresentationBgRendererWrapper implements WeightedSearchEve
   @Override
   public @NotNull SearchEverywhereContributor<?> getEffectiveContributor() {
     return myDelegate;
+  }
+
+  @Override
+  @ApiStatus.Internal
+  public boolean shouldTreatAsACommandQuery(@NotNull String string) {
+    if (myDelegate instanceof PossibleInternalCommandsContributor) {
+      return ((PossibleInternalCommandsContributor)myDelegate).shouldTreatAsACommandQuery(string);
+    }
+    return false;
+  }
+
+  @Override
+  @ApiStatus.Internal
+  public boolean shouldTreatAsACommandQueryWithArg(@NotNull String string) {
+    if (myDelegate instanceof PossibleInternalCommandsContributor) {
+      return ((PossibleInternalCommandsContributor)myDelegate).shouldTreatAsACommandQueryWithArg(string);
+    }
+    return false;
   }
 
   public static WeightedSearchEverywhereContributor<Object> wrapIfNecessary(AbstractGotoSEContributor delegate) {
@@ -397,8 +418,12 @@ public final class PSIPresentationBgRendererWrapper implements WeightedSearchEve
   }
 
   @Override
-  public @Nullable Object getDataForItem(@NotNull Object element, @NotNull String dataId) {
-    return myDelegate.getDataForItem(getItem(element), dataId);
+  public @NotNull List<@NotNull BiConsumer<Object, @NotNull DataSink>> getDataProviders() {
+    List<BiConsumer<Object, DataSink>> delegateDataProviders = myDelegate.getDataProviders();
+
+    return ContainerUtil.map(delegateDataProviders, dataProvider -> {
+      return (o, sink) -> dataProvider.accept(getItem(o), sink);
+    });
   }
 
   @Override

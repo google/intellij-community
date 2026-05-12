@@ -126,7 +126,7 @@ public final class ComponentTreeBuilder implements Disposable {
 
     // Set selection in the tree
     Promises.collectResults(treeVisitors).onProcessed(visitors -> {
-      TreeUtil.promiseSelect(myTree, visitors.stream()).onProcessed(__ -> {
+      TreeUtil.promiseSelect(myTree, visitors.stream()).onProcessed(_ -> {
         // Notify the ComponentTree that selected component changed
         myEditor.fireSelectedComponentChanged();
       });

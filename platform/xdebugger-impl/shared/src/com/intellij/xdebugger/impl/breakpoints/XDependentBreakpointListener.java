@@ -7,6 +7,11 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.EventListener;
 
+/**
+ * Interface for listening to events related to dependent breakpoints in the XBreakpoint system.
+ * <p/>
+ * A thread where the listener is invoked is unspecified and may vary depending on the implementation.
+ */
 public interface XDependentBreakpointListener extends EventListener {
 
   @Topic.ProjectLevel

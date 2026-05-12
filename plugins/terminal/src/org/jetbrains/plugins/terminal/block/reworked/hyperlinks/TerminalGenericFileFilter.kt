@@ -84,7 +84,7 @@ class TerminalGenericFileFilter(
       if (pathEndIndex - pathStartIndex < PATH_MIN) return null
 
       val path = line.substring(pathStartIndex, pathEndIndex)
-      if (path == "/") {
+      if (path.all { it == '/' || it == '\\' }) {
         // Ignore single slashes, as these are probably referring to something
         // other than the file system root (e.g. progress indicators like "[10 / 1,000]").
         return null

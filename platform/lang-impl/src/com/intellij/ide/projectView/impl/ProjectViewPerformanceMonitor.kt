@@ -61,11 +61,15 @@ internal class ProjectViewPerformanceMonitor(
   }
 
   fun beginUpdateAll(causes: Collection<ProjectViewUpdateCause>): TreeModelUpdateRequest {
-    return Request("The entire PV", requestId.incrementAndFetch(), causes)
+    val id = requestId.incrementAndFetch()
+    LOG.trace { "[request $id] The entire PV is updated because $causes" }
+    return Request(id, causes)
   }
 
   fun beginUpdatePath(path: TreePath, structure: Boolean, causes: Collection<ProjectViewUpdateCause>): TreeModelUpdateRequest {
-    return Request("The path=$path, structure=$structure", requestId.incrementAndFetch(), causes)
+    val id = requestId.incrementAndFetch()
+    LOG.trace { "[request $id] The path=$path, structure=$structure is updated because $causes" }
+    return Request(id, causes)
   }
 
   private fun processEvent(event: Event) {
@@ -95,13 +99,12 @@ internal class ProjectViewPerformanceMonitor(
     }
   }
 
-  private inner class Request(private val what: String, val id: Long, causes: Collection<ProjectViewUpdateCause>) : TreeModelUpdateRequest {
+  private inner class Request(val id: Long, causes: Collection<ProjectViewUpdateCause>) : TreeModelUpdateRequest {
     private val startedTime = TimeSource.Monotonic.markNow()
     private val count = AtomicInt(0)
     private val finished = AtomicBoolean(false)
     
     init {
-      LOG.trace { "[request $id] $what is updated because $causes" }
       events.trySend(StartedEvent(id, causes, startedTime))
     }
     

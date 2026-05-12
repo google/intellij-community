@@ -15,8 +15,8 @@ import com.jetbrains.python.codeInsight.typing.PyTypingTypeProvider
 import com.jetbrains.python.psi.PyAssignmentExpression
 import com.jetbrains.python.psi.PyClass
 import com.jetbrains.python.psi.PyElement
-import com.jetbrains.python.psi.PyExpression
 import com.jetbrains.python.psi.PyFunction
+import com.jetbrains.python.psi.PyListLiteralExpression
 import com.jetbrains.python.psi.PyNamedParameter
 import com.jetbrains.python.psi.PyParenthesizedExpression
 import com.jetbrains.python.psi.PyRecursiveElementVisitor
@@ -37,8 +37,14 @@ class PyNewStyleGenericSyntaxInspection : PyInspection() {
     holder: ProblemsHolder,
     isOnTheFly: Boolean,
     session: LocalInspectionToolSession,
-  ): PsiElementVisitor = Visitor(holder,
-                                 PyInspectionVisitor.getContext(session))
+  ): PsiElementVisitor {
+    val context = PyInspectionVisitor.getContext(session)
+    if (context.usesExternalTypeEngine) {
+      return PsiElementVisitor.EMPTY_VISITOR
+    }
+
+    return Visitor(holder, context)
+  }
 
   private class Visitor(holder: ProblemsHolder, context: TypeEvalContext) : PyInspectionVisitor(holder, context) {
 
@@ -49,22 +55,13 @@ class PyNewStyleGenericSyntaxInspection : PyInspection() {
       boundExpression?.accept(object : PyRecursiveElementVisitor() {
         override fun visitPyElement(node: PyElement) {
           if (!(node is PyParenthesizedExpression && node === boundExpression) &&
-              !(node is PyTupleExpression && node.parent === boundExpression)
+              !(node is PyTupleExpression && node.parent === boundExpression) &&
+              node is PyReferenceExpression
           ) {
-            if (node is PyExpression) {
-              if (!PyTypeHintsInspection.Helper.isValidTypeHint(node, myTypeEvalContext)) {
-                registerProblem(
-                  node,
-                  PyPsiBundle.message("INSP.type.hints.invalid.type.expression"),
-                )
-              }
-              if (node is PyReferenceExpression) {
-                node.getTypeParameterType()?.let {
-                  registerProblem(node,
-                                  PyPsiBundle.message("INSP.new.style.generics.are.not.allowed.inside.type.param.bounds"),
-                                  ProblemHighlightType.GENERIC_ERROR)
-                }
-              }
+            node.getTypeParameterType()?.let {
+              registerProblem(node,
+                              PyPsiBundle.message("INSP.new.style.generics.are.not.allowed.inside.type.param.bounds"),
+                              ProblemHighlightType.GENERIC_ERROR)
             }
           }
           super.visitPyElement(node)

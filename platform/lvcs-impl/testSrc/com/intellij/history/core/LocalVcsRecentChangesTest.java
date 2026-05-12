@@ -11,7 +11,7 @@ import org.junit.Test;
 import java.util.List;
 
 public class LocalVcsRecentChangesTest extends LocalHistoryTestCase {
-  LocalHistoryFacade vcs = new InMemoryLocalHistoryFacade();
+  LocalHistoryFacade vcs = createInMemoryFacade();
   RootEntry root = new RootEntry();
 
   @Test

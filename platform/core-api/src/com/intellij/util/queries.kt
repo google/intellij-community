@@ -17,3 +17,8 @@ fun <T> Query<T>.filteringNotNull(): Query<T & Any> {
   @Suppress("UNCHECKED_CAST")
   return filtering { it != null } as Query<T & Any>
 }
+
+inline fun <reified T> Query<*>.filteringIsInstance(): Query<T> {
+  @Suppress("UNCHECKED_CAST")
+  return filtering { it is T } as Query<T>
+}

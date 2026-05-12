@@ -1,4 +1,4 @@
-public class EtendingReadOnlyInterfaces {
+public class ExtendingReadOnlyInterfaces {
     public static class Lists {
         <error>public static class ExtendIList1 implements IList<String></error> {
 
@@ -146,15 +146,13 @@ public class EtendingReadOnlyInterfaces {
 
         }
 
-        // NOTE: looks like a bug in compiler see KT-17738
+        public static class ExtendSMap extends SMap<A> {
 
-        //public static class ExtendSMap extends SMap<A> {
-        //
-        //}
-        //
-        //public static class ExtendABMap extends ABMap {
-        //
-        //}
+        }
+
+        public static class ExtendABMap extends ABMap {
+
+        }
     }
 
     public static class MapEntrys {

@@ -1,7 +1,5 @@
 // WITH_STDLIB
 // PROBLEM: none
-// IGNORE_K1
-// IGNORE_K2
 class A(val b: B?)
 class B
 class C(val d: D)

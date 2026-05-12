@@ -23,6 +23,7 @@ class UpdateFromSourcesSettings : SimplePersistentStateComponent<UpdateFromSourc
 class UpdateFromSourcesSettingsState : BaseState() {
   var showSettings: Boolean by property(true)
   var workIdePath: String? by string()
+  var additionalVmOptionsForBuildScripts: String? by string()
   var buildDisabledPlugins: Boolean by property(false)
   var pluginDirectoriesForDisabledPlugins: MutableList<String> by list<String>()
   var restartAutomatically: Boolean by property(false)

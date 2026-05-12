@@ -9,7 +9,6 @@ import com.intellij.ide.actions.searcheverywhere.SearchEverywhereFiltersAction
 import com.intellij.ide.actions.searcheverywhere.SearchEverywhereManagerImpl
 import com.intellij.ide.util.gotoByName.SearchEverywhereConfiguration
 import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.platform.searchEverywhere.SeItemData
 import com.intellij.platform.searchEverywhere.SeParams
@@ -59,9 +58,9 @@ class SeAllTab(delegate: SeTabDelegate) : SeDefaultTabBase(delegate) {
                                      delegate.canBeShownInFindResults()).getEmptyResultInfo(delegate.project, context)
   }
 
-  override suspend fun openInFindToolWindow(session: SeSession, params: SeParams, initEvent: AnActionEvent): Boolean {
+  override suspend fun openInFindToolWindow(session: SeSession, params: SeParams): Boolean {
     val allTabFilter = SeEverywhereFilter.from(params.filter)
-    return delegate.openInFindToolWindow(session, params, initEvent, true, allTabFilter.disabledProviderIds)
+    return delegate.openInFindToolWindow(session, params, true, allTabFilter.disabledProviderIds)
   }
 
   override suspend fun getUpdatedPresentation(item: SeItemData): SeItemPresentation? {

@@ -382,7 +382,7 @@ public class TextResultView implements ResultView {
   }
 
   private void updateText(@NotNull List<GridRow> rows) {
-    Condition<?> disposed = (__) -> Disposer.isDisposed(this);
+    Condition<?> disposed = (_) -> Disposer.isDisposed(this);
     ApplicationManager.getApplication().invokeLater(() -> {
       if (disposed.value(null)) return;
       DataExtractorFactory extractorFactory = DataExtractorFactories.getExtractorFactory(myResultPanel, GridUtil::suggestPlugin);

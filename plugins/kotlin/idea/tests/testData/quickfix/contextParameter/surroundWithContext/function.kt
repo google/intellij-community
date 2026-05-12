@@ -1,0 +1,12 @@
+// "Surround call with 'context'" "true"
+// COMPILER_ARGUMENTS: -XXLanguage:+ContextParameters
+// IGNORE_K1
+// DISABLE_K2_ERRORS
+// QuickFix produces red code with caret position to fill missing argument
+context(i: Int) fun bar() {}
+
+fun foo() {
+    <caret>bar()
+}
+
+// FUS_K2_QUICKFIX_NAME: org.jetbrains.kotlin.idea.k2.codeinsight.fixes.SurroundCallWithContextFix

@@ -15,12 +15,12 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.util.ProgressIndicatorWithDelayedPresentation
 import com.intellij.openapi.progress.withWriteActionTitle
 import com.intellij.openapi.util.text.StringUtil
-import com.intellij.openapi.vfs.AsyncFileListener
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.impl.VirtualFileManagerImpl
 import com.intellij.openapi.vfs.impl.local.LocalFileSystemImpl
+import com.intellij.openapi.vfs.impl.local.withPrefetchForRemoteRoots
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.openapi.vfs.newvfs.monitoring.VfsUsageCollector
 import com.intellij.util.SystemProperties
@@ -31,20 +31,9 @@ import com.intellij.util.concurrency.annotations.RequiresWriteLock
 import com.intellij.util.progress.waitForMaybeCancellable
 import com.intellij.util.ui.EDT
 import org.jetbrains.annotations.ApiStatus
-import java.util.HashMap
-import java.util.LinkedHashSet
 import java.util.Objects
 import java.util.concurrent.TimeUnit
 import java.util.function.Consumer
-import kotlin.collections.ArrayList
-import kotlin.collections.Collection
-import kotlin.collections.List
-import kotlin.collections.MutableList
-import kotlin.collections.MutableMap
-import kotlin.collections.any
-import kotlin.collections.filter
-import kotlin.collections.mutableListOf
-import kotlin.collections.set
 import kotlin.concurrent.Volatile
 import kotlin.math.min
 
@@ -123,9 +112,9 @@ internal class RefreshSessionImpl internal constructor(
     (RefreshQueue.getInstance() as RefreshQueueImpl).execute(this)
   }
 
-  override suspend fun executeInBackgroundWriteAction() {
+  override suspend fun executeInBackgroundWriteAction(highPriority: Boolean) {
     if (prepareExecution()) return
-    (RefreshQueue.getInstance() as RefreshQueueImpl).executeSuspending(this)
+    (RefreshQueue.getInstance() as RefreshQueueImpl).executeSuspending(this, highPriority)
   }
 
   fun prepareExecution(): /* if nothing to do */ Boolean {
@@ -184,19 +173,21 @@ internal class RefreshSessionImpl internal constructor(
 
     var count = 0
     val events = ArrayList<VFileEvent?>()
-    do {
-      if (myCancelled) break
-      if (LOG.isTraceEnabled) LOG.trace("try=$count")
+    withPrefetchForRemoteRoots(refreshRoots) {
+      do {
+        if (myCancelled) break
+        if (LOG.isTraceEnabled) LOG.trace("try=$count")
 
-      val worker = RefreshWorker(refreshRoots, myIsRecursive)
-      myWorker = worker
-      events.addAll(worker.scan())
-      myWorker = null
+        val worker = RefreshWorker(refreshRoots, myIsRecursive)
+        myWorker = worker
+        events.addAll(worker.scan())
+        myWorker = null
 
-      count++
-      if (LOG.isTraceEnabled) LOG.trace("events=${events.size}")
+        count++
+        if (LOG.isTraceEnabled) LOG.trace("events=${events.size}")
+      }
+      while (myIsRecursive && !myIsBackground && count < RETRY_LIMIT && workQueue.any { f -> (f as NewVirtualFile).isDirty() })
     }
-    while (myIsRecursive && !myIsBackground && count < RETRY_LIMIT && workQueue.any { f -> (f as NewVirtualFile).isDirty() })
 
     t = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t)
     var localRoots = 0
@@ -217,7 +208,7 @@ internal class RefreshSessionImpl internal constructor(
         workQueue.size, types, if (myCancelled) "cancelled" else "done", count, events.size))
     }
 
-    val result = if (events.isEmpty()) mutableListOf<VFileEvent>() else LinkedHashSet<VFileEvent>(events)
+    val result = if (events.isEmpty()) mutableListOf() else LinkedHashSet(events.filterNotNull())
     myEventCount = result.size
     return result
   }
@@ -237,7 +228,7 @@ internal class RefreshSessionImpl internal constructor(
   @RequiresWriteLock
   fun fireEvents(
     events: List<CompoundVFileEvent>,
-    appliers: List<AsyncFileListener.ChangeApplier>,
+    appliers: AsyncEventSupport.ChangeAppliers,
     excludeAsyncListeners: Boolean,
   ) {
     try {
@@ -265,7 +256,7 @@ internal class RefreshSessionImpl internal constructor(
   @RequiresWriteLock
   private fun fireEventsInWriteAction(
     events: List<CompoundVFileEvent>,
-    appliers: List<AsyncFileListener.ChangeApplier>,
+    appliers: AsyncEventSupport.ChangeAppliers,
     excludeAsyncListeners: Boolean,
   ) {
     val manager = VirtualFileManager.getInstance() as VirtualFileManagerImpl
@@ -311,7 +302,7 @@ internal class RefreshSessionImpl internal constructor(
   @RequiresBackgroundThread
   fun fireEventsInBackgroundWriteAction(
     events: List<CompoundVFileEvent>,
-    appliers: List<AsyncFileListener.ChangeApplier>,
+    appliers: AsyncEventSupport.ChangeAppliers,
     excludeAsyncListeners: Boolean,
   ) {
     try {
@@ -333,7 +324,7 @@ internal class RefreshSessionImpl internal constructor(
   }
 
   @RequiresWriteLock
-  private fun doFireEvents(events: List<CompoundVFileEvent>, appliers: List<AsyncFileListener.ChangeApplier>, excludeAsyncListeners: Boolean) {
+  private fun doFireEvents(events: List<CompoundVFileEvent>, appliers: AsyncEventSupport.ChangeAppliers, excludeAsyncListeners: Boolean) {
     var t = System.nanoTime()
     fireEventsInWriteAction(events, appliers, excludeAsyncListeners)
     t = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t)

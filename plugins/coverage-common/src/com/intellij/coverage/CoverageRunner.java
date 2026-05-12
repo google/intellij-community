@@ -11,6 +11,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
+import java.nio.file.Path;
 
 /**
  * Represents coverage framework inside IntelliJ.
@@ -21,18 +22,31 @@ public abstract class CoverageRunner {
 
   /**
    * Loads coverage data from {@code sessionDataFile} into IntelliJ presentation, {@link ProjectData}.
-   * 
-   * @param baseCoverageSuite suite where coverage would be loaded. 
+   *
+   * @param baseCoverageSuite suite where coverage would be loaded.
    *                          Can be used to retrieve additional information about configuration which was run with coverage.
-   * @deprecated Override {@link CoverageRunner#loadCoverageData(File, CoverageSuite, CoverageLoadErrorReporter)}
+   * @deprecated Override {@link CoverageRunner#loadCoverageData(Path, CoverageSuite, CoverageLoadErrorReporter)}
    */
+  @SuppressWarnings({"IO_FILE_USAGE", "unused"})
   @Deprecated
   public @Nullable ProjectData loadCoverageData(final @NotNull File sessionDataFile, final @Nullable CoverageSuite baseCoverageSuite) {
     throw new IllegalStateException("Should not be called, please override loadCoverageDataWithLogging");
   }
 
+  /**
+   * @deprecated Use {@link #loadCoverageDataWithReporting(Path, CoverageSuite)} instead.
+   */
+  @SuppressWarnings("IO_FILE_USAGE")
+  @Deprecated
   public final @Nullable ProjectData loadCoverageDataWithReporting(
     final @NotNull File sessionDataFile,
+    final @Nullable CoverageSuite baseCoverageSuite
+  ) {
+    return loadCoverageDataWithReporting(sessionDataFile.toPath(), baseCoverageSuite);
+  }
+
+  public final @Nullable ProjectData loadCoverageDataWithReporting(
+    final @NotNull Path sessionDataFile,
     final @Nullable CoverageSuite baseCoverageSuite
   ) {
     if (baseCoverageSuite == null) {
@@ -42,7 +56,8 @@ public abstract class CoverageRunner {
     CoverageLoadingResult result;
     listener.coverageLoadingStarted(sessionDataFile);
     try {
-      result = loadCoverageData(sessionDataFile, baseCoverageSuite, new CoverageLoadErrorReporterImplementation(listener, sessionDataFile));
+      result =
+        loadCoverageData(sessionDataFile, baseCoverageSuite, new CoverageLoadErrorReporterImplementation(listener, sessionDataFile));
     }
     catch (Exception e) {
       if (e instanceof ControlFlowException) throw e;
@@ -60,8 +75,11 @@ public abstract class CoverageRunner {
    *
    * @param baseCoverageSuite suite where coverage would be loaded.
    *                          Can be used to retrieve additional information about configuration which was run with coverage.
-   * @param reporter wrapper around {@link CoverageLoadingListener} is used for notifying about errors during coverage loading
+   * @param reporter          wrapper around {@link CoverageLoadingListener} is used for notifying about errors during coverage loading
+   * @deprecated Override {@link #loadCoverageData(Path, CoverageSuite, CoverageLoadErrorReporter)} instead.
    */
+  @SuppressWarnings({"IO_FILE_USAGE", "unused"})
+  @Deprecated
   @ApiStatus.OverrideOnly
   protected @NotNull CoverageLoadingResult loadCoverageData(
     final @NotNull File sessionDataFile,
@@ -71,13 +89,32 @@ public abstract class CoverageRunner {
     ProjectData data = loadCoverageData(sessionDataFile, baseCoverageSuite);
     if (data == null) {
       return new FailedCoverageLoadingResult("Couldn't load coverage data");
-    } else {
+    }
+    else {
       return new SuccessCoverageLoadingResult(data);
     }
   }
 
   /**
-   * When multiple coverage runners are available for one {@link CoverageEngine}, 
+   * Loads coverage data from {@code sessionDataFile} into IntelliJ presentation {@link ProjectData},
+   * with a result of execution {@link CoverageLoadingResult}.
+   *
+   * @param baseCoverageSuite suite where coverage would be loaded.
+   *                          Can be used to retrieve additional information about configuration which was run with coverage.
+   * @param reporter          wrapper around {@link CoverageLoadingListener} is used for notifying about errors during coverage loading
+   */
+  @SuppressWarnings("IO_FILE_USAGE")
+  @ApiStatus.OverrideOnly
+  protected @NotNull CoverageLoadingResult loadCoverageData(
+    final @NotNull Path sessionDataFile,
+    final @Nullable CoverageSuite baseCoverageSuite,
+    final @NotNull CoverageLoadErrorReporter reporter
+  ) {
+    return loadCoverageData(sessionDataFile.toFile(), baseCoverageSuite, reporter);
+  }
+
+  /**
+   * When multiple coverage runners are available for one {@link CoverageEngine},
    * {@code getPresentableName()} is used to render coverage runner in UI.
    */
   public abstract @NotNull @NonNls String getPresentableName();
@@ -90,7 +127,7 @@ public abstract class CoverageRunner {
   /**
    * Used to compose file name where coverage framework should save coverage data.
    * It is also used to check if runner can load data from disk without actual loading.
-   * 
+   *
    * @return file extension of the file where coverage framework stores coverage data.
    */
   public abstract @NotNull @NonNls String getDataFileExtension();
@@ -101,9 +138,21 @@ public abstract class CoverageRunner {
 
   /**
    * Checks whether a file is supported by the runner.
+   *
+   * @deprecated Override {@link #canBeLoaded(Path)} instead.
    */
+  @SuppressWarnings({"IO_FILE_USAGE", "unused"})
+  @Deprecated
   public boolean canBeLoaded(@NotNull File candidate) {
     return true;
+  }
+
+  /**
+   * Checks whether a file is supported by the runner.
+   */
+  @SuppressWarnings("IO_FILE_USAGE")
+  public boolean canBeLoaded(@NotNull Path candidate) {
+    return canBeLoaded(candidate.toFile());
   }
 
   /**
@@ -122,8 +171,8 @@ public abstract class CoverageRunner {
   }
 
   /**
-   * @return true if coverage framework can collect coverage information per test. 
-   *         Then IntelliJ would allow e.g., seeing what tests cover selected line.
+   * @return true if coverage framework can collect coverage information per test.
+   * Then IntelliJ would allow e.g., seeing what tests cover selected line.
    */
   @ApiStatus.Internal
   public boolean isCoverageByTestApplicable() {

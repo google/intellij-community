@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.statistics.metrics.BooleanMetrics
 import org.jetbrains.kotlin.statistics.metrics.NumericalMetrics
 import org.jetbrains.kotlin.statistics.metrics.StringMetrics
 
-private const val BASE_FUS_VERSION = 15
+private const val BASE_FUS_VERSION = 16
 
 object KotlinGradleFUSCollector : CounterUsagesCollector() {
 
@@ -23,9 +23,9 @@ object KotlinGradleFUSCollector : CounterUsagesCollector() {
 
     private fun listOfAllMetrics(): Array<Any> {
         val result = ArrayList<Any>()
-        result.addAll(StringMetrics.values())
-        result.addAll(BooleanMetrics.values())
-        result.addAll(NumericalMetrics.values())
+        result.addAll(StringMetrics.entries.toTypedArray())
+        result.addAll(BooleanMetrics.entries.toTypedArray())
+        result.addAll(NumericalMetrics.entries.toTypedArray())
         return result.toArray()
     }
 

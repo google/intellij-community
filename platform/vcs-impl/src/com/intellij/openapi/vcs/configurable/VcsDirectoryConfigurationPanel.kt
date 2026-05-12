@@ -393,7 +393,7 @@ internal class VcsDirectoryConfigurationPanel(private val project: Project) : Di
 
   private fun getProjectMappingDescription(): @Nls String {
     @Suppress("HardCodedStringLiteral")
-    val message = DefaultVcsRootPolicy.getInstance(project).projectConfigurationMessage.replace('\n', ' ')
+    val message = DefaultVcsRootPolicy.getInstance(project).projectMappingDescription.replace('\n', ' ')
     return StringUtil.escapeXmlEntities(VcsDirectoryMapping.PROJECT_CONSTANT.get() + " - " + message)
   }
 

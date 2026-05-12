@@ -42,6 +42,18 @@ public class VarHandleWrapperImpl extends VarHandleWrapper implements VarHandleW
   }
 
   @Override
+  public Object getVolatile(Object thisObject) {
+    assert !isArray;
+    return myVarHandle.getVolatile(thisObject);
+  }
+
+  @Override
+  public void setVolatile(Object thisObject, Object value) {
+    assert !isArray;
+    myVarHandle.setVolatile(thisObject, value);
+  }
+
+  @Override
   public boolean compareAndSet(Object thisObject, Object expected, Object actual) {
     assert !isArray;
     //assert !myVarHandle.varType().isPrimitive() : myVarHandle;

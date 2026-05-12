@@ -1,4 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.java.workspace.entities.impl
 
 import com.intellij.java.workspace.entities.JavaModuleSettingsEntity
@@ -16,11 +18,10 @@ import com.intellij.platform.workspace.storage.impl.EntityLink
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
-import com.intellij.platform.workspace.storage.impl.extractOneToOneParent
-import com.intellij.platform.workspace.storage.impl.updateOneToOneParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 
@@ -38,7 +39,8 @@ internal class JavaModuleSettingsEntityImpl(private val dataSource: JavaModuleSe
   }
 
   override val module: ModuleEntity
-    get() = snapshot.extractOneToOneParent(MODULE_CONNECTION_ID, this)!!
+    get() = snapshot.instrumentation.getParent(MODULE_CONNECTION_ID, this) as? ModuleEntity
+            ?: error("Parent module not found for JavaModuleSettingsEntity")
   override val inheritedCompilerOutput: Boolean
     get() {
       readField("inheritedCompilerOutput")
@@ -110,7 +112,7 @@ internal class JavaModuleSettingsEntityImpl(private val dataSource: JavaModuleSe
         error("Field WorkspaceEntity#entitySource should be initialized")
       }
       if (_diff != null) {
-        if (_diff.extractOneToOneParent<WorkspaceEntityBase>(MODULE_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getParentBuilder(MODULE_CONNECTION_ID, this) == null) {
           error("Field JavaModuleSettingsEntity#module should be initialized")
         }
       }
@@ -152,12 +154,13 @@ internal class JavaModuleSettingsEntityImpl(private val dataSource: JavaModuleSe
       get() {
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(MODULE_CONNECTION_ID, this) as? ModuleEntityBuilder)
-          ?: (this.entityLinks[EntityLink(false, MODULE_CONNECTION_ID)]!! as ModuleEntityBuilder)
+          ?: (this.entityLinks[EntityLink(false, MODULE_CONNECTION_ID)] as? ModuleEntityBuilder)
+          ?: error("module is null for JavaModuleSettingsEntity")
         }
         else {
-          this.entityLinks[EntityLink(false, MODULE_CONNECTION_ID)]!! as ModuleEntityBuilder
+          (this.entityLinks[EntityLink(false, MODULE_CONNECTION_ID)] as? ModuleEntityBuilder)
+          ?: error("module is null for JavaModuleSettingsEntity")
         }
       }
       set(value) {
@@ -171,7 +174,7 @@ internal class JavaModuleSettingsEntityImpl(private val dataSource: JavaModuleSe
           _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
         }
         if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)) {
-          _diff.updateOneToOneParentOfChild(MODULE_CONNECTION_ID, this, value)
+          _diff.instrumentation.addChild(MODULE_CONNECTION_ID, value, this)
         }
         else {
           if (value is ModifiableWorkspaceEntityBase<*, *>) {
@@ -252,7 +255,6 @@ internal class JavaModuleSettingsEntityData : WorkspaceEntityData<JavaModuleSett
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): JavaModuleSettingsEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {

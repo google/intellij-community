@@ -2,6 +2,7 @@
 package com.intellij.ide.plugins
 
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.util.BuildNumber
 import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleLoadingRuleValue
 import com.intellij.platform.pluginSystem.testFramework.PluginSetTestBuilder
@@ -39,6 +40,18 @@ class PluginSetLoadingTest {
 
   private val rootPath get() = inMemoryFs.fs.getPath("/")
   private val pluginsDirPath get() = rootPath.resolve("wd/plugins")
+  private var loadingErrors: List<PluginLoadingError> = emptyList()
+
+  @Test
+  fun `fleet backend logs plugin loading errors without scheduling user notification`() {
+    val policy = PluginLoadingErrorReportingPolicy.product(
+      isUnitTestMode = false,
+      isHeadless = true,
+      isFleetBackend = true,
+    )
+    assertThat(policy.logLevel).isEqualTo(PluginLoadingErrorLogLevel.WARN)
+    assertThat(policy.reportToUser).isFalse()
+  }
 
   @Test
   fun `use newer plugin`() {
@@ -244,9 +257,8 @@ class PluginSetLoadingTest {
     }.buildDir(pluginsDirPath.resolve("bar"))
     val pluginSet = buildPluginSet()
     assertThat(pluginSet).hasExactlyEnabledPlugins("foo")
-    val errors = PluginManagerCore.getAndClearPluginLoadingErrors()
-    assertThat(errors).hasSizeGreaterThan(0)
-    assertThat(errors[0].htmlMessage.toString()).contains("conflicts with", "bar.module", "foo.module", "package prefix")
+    assertThat(loadingErrors).hasSizeGreaterThan(0)
+    assertThat(loadingErrors[0].htmlMessage.toString()).contains("conflicts with", "bar.module", "foo.module", "package prefix")
   }
   
   @Test
@@ -276,9 +288,8 @@ class PluginSetLoadingTest {
     }.buildDir(pluginsDirPath.resolve("foo"))
     val pluginSet = buildPluginSet()
     assertThat(pluginSet).doesNotHaveEnabledPlugins()
-    val errors = PluginManagerCore.getAndClearPluginLoadingErrors()
-    assertThat(errors).hasSizeGreaterThan(0)
-    assertThat(errors[0].htmlMessage.toString()).contains("conflicts with", "foo.module", "package prefix")
+    assertThat(loadingErrors).hasSizeGreaterThan(0)
+    assertThat(loadingErrors[0].htmlMessage.toString()).contains("conflicts with", "foo.module", "package prefix")
   }
 
   @Test
@@ -297,9 +308,8 @@ class PluginSetLoadingTest {
     assertThat(pluginSet).hasExactlyEnabledPlugins("foo", "bar")
     // FIXME these plugins are not related, but one of them loads => depends on implicit order
     assertThat(pluginSet).hasExactlyEnabledModulesWithoutMainDescriptors("foo.module")
-    val errors = PluginManagerCore.getAndClearPluginLoadingErrors()
-    assertThat(errors).isNotEmpty()
-    assertThat(errors[0].htmlMessage.toString()).contains("conflicts with", "bar", "foo.module", "package prefix")
+    assertThat(loadingErrors).isNotEmpty()
+    assertThat(loadingErrors[0].htmlMessage.toString()).contains("conflicts with", "bar", "foo.module", "package prefix")
   }
 
   @Test
@@ -434,6 +444,17 @@ class PluginSetLoadingTest {
   }
 
   @Test
+  fun `findEnabledPlugin resolves plugin alias to declaring plugin`() {
+    plugin("com.example.owner") {
+      pluginAlias("com.example.owner.alias")
+    }.buildDir(pluginsDirPath.resolve("owner"))
+
+    val pluginSet = buildPluginSet()
+    val owner = pluginSet.getEnabledPlugin("com.example.owner")
+    assertThat(pluginSet.findEnabledPlugin(PluginId.getId("com.example.owner.alias"))).isSameAs(owner)
+  }
+
+  @Test
   fun `plugin with duplicate content module fails to load`() {
     plugin("foo") {
       content {
@@ -443,9 +464,8 @@ class PluginSetLoadingTest {
     }.buildDir(pluginsDirPath.resolve("foo"))
     val pluginSet = buildPluginSet()
     assertThat(pluginSet).doesNotHaveEnabledPlugins()
-    val errors = PluginManagerCore.getAndClearPluginLoadingErrors()
-    assertThat(errors).hasSizeGreaterThan(0)
-    assertThat(errors[0].htmlMessage.toString()).contains("foo", "invalid plugin descriptor")
+    assertThat(loadingErrors).hasSizeGreaterThan(0)
+    assertThat(loadingErrors[0].htmlMessage.toString()).contains("foo", "invalid plugin descriptor")
   }
 
   @Test
@@ -575,6 +595,71 @@ class PluginSetLoadingTest {
     assertThat(pluginSet).hasExactlyEnabledPlugins(PluginManagerCore.CORE_PLUGIN_ID, *ids.map { "intellij.textmate.$it" }.toTypedArray())
   }
 
+  @Test
+  fun `getEnabledModules honors module dependencies`() {
+    plugin("com.intellij") {
+      pluginAlias("com.intellij.modules.microservices")
+    }.buildDir(pluginsDirPath.resolve("com.intellij"))
+
+    plugin("com.intellij.microservices.ui") {
+      name = "Endpoints"
+      vendor = "JetBrains"
+      category = "Microservices"
+      dependencies {
+        plugin("com.intellij.modules.microservices")
+      }
+    }.buildDir(pluginsDirPath.resolve("com.intellij.microservices.ui"))
+
+    plugin("com.jetbrains.restClient") {
+      name = "HTTP Client"
+      category = "Other Tools"
+      vendor = "JetBrains"
+      dependencies {
+        plugin("com.intellij.modules.microservices")
+      }
+      content {
+        module("intellij.restClient.microservicesUI") {
+          dependencies {
+            plugin("com.intellij.microservices.ui")
+          }
+        }
+      }
+    }.buildDir(pluginsDirPath.resolve("com.jetbrains.restClient"))
+
+    val pluginSet = buildPluginSet()
+    assertThat(loadingErrors).isEmpty()
+    val moduleOrder = pluginSet.getEnabledModules().map { it.getPluginId().idString + ":" + it.contentModuleName }
+    val validOrders = listOf(
+      listOf(
+        "com.intellij:null",
+        "com.jetbrains.restClient:null",
+        "com.intellij.microservices.ui:null",
+        "com.jetbrains.restClient:intellij.restClient.microservicesUI"
+      ),
+      listOf(
+        "com.intellij:null",
+        "com.intellij.microservices.ui:null",
+        "com.jetbrains.restClient:null",
+        "com.jetbrains.restClient:intellij.restClient.microservicesUI"
+      )
+    ) // both are correct
+    assert(moduleOrder in validOrders) { "Invalid module order: $moduleOrder" }
+  }
+
+  @Test
+  fun `incompatible-with's origin gets excluded instead of target`() {
+    plugin("foo") {}.buildDir(pluginsDirPath.resolve("foo"))
+    plugin("bar") {
+      incompatibleWith = listOf("foo")
+    }.buildDir(pluginsDirPath.resolve("bar"))
+
+    val pluginSet = buildPluginSet()
+    assertThat(pluginSet).hasExactlyEnabledPlugins("foo")
+    assertThat(loadingErrors).hasSize(1)
+    val error = loadingErrors[0]
+    assertThat(error.htmlMessage.toString()).contains("bar", "not compatible", "foo")
+  }
+
   private fun writeDescriptor(id: String, @Language("xml") data: String) {
     pluginsDirPath.resolve(id)
       .resolve(PluginManagerCore.PLUGIN_XML_PATH)
@@ -586,5 +671,9 @@ class PluginSetLoadingTest {
     assertThat(pluginSet).hasExactlyEnabledPlugins(*enabledIds.toTypedArray())
   }
 
-  private fun buildPluginSet(builder: PluginSetTestBuilder.() -> Unit = {}): PluginSet = PluginSetTestBuilder.fromPath(pluginsDirPath).apply(builder).build()
+  private fun buildPluginSet(builder: PluginSetTestBuilder.() -> Unit = {}): PluginSet {
+    val state = PluginSetTestBuilder.fromPath(pluginsDirPath).apply(builder).buildState()
+    loadingErrors = state.loadingErrors
+    return state.pluginSet
+  }
 }

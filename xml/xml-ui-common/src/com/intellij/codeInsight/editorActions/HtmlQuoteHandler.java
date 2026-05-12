@@ -3,32 +3,33 @@ package com.intellij.codeInsight.editorActions;
 
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.highlighter.HighlighterIterator;
+import org.jetbrains.annotations.NotNull;
 
 public class HtmlQuoteHandler implements QuoteHandler {
   private final QuoteHandler myBaseQuoteHandler = new XmlQuoteHandler();
 
   @Override
-  public boolean isClosingQuote(HighlighterIterator iterator, int offset) {
+  public boolean isClosingQuote(@NotNull HighlighterIterator iterator, int offset) {
     if (myBaseQuoteHandler.isClosingQuote(iterator, offset)) return true;
     return false;
   }
 
   @Override
-  public boolean isOpeningQuote(HighlighterIterator iterator, int offset) {
+  public boolean isOpeningQuote(@NotNull HighlighterIterator iterator, int offset) {
     if (myBaseQuoteHandler.isOpeningQuote(iterator, offset)) return true;
 
     return false;
   }
 
   @Override
-  public boolean hasNonClosedLiteral(Editor editor, HighlighterIterator iterator, int offset) {
+  public boolean hasNonClosedLiteral(@NotNull Editor editor, @NotNull HighlighterIterator iterator, int offset) {
     if (myBaseQuoteHandler.hasNonClosedLiteral(editor,iterator, offset)) return true;
 
     return false;
   }
 
   @Override
-  public boolean isInsideLiteral(HighlighterIterator iterator) {
+  public boolean isInsideLiteral(@NotNull HighlighterIterator iterator) {
     if (myBaseQuoteHandler.isInsideLiteral(iterator)) return true;
 
     return false;

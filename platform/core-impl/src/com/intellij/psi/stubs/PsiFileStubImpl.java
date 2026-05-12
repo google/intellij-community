@@ -113,7 +113,7 @@ public class PsiFileStubImpl<T extends PsiFile> extends StubBase<T> implements P
     return EMPTY_ARRAY;
   }
 
-  private static StubTree getOrCalcStubTree(PsiFile stubBindingRoot) {
+  private static @Nullable StubTree getOrCalcStubTree(@Nullable PsiFile stubBindingRoot) {
     StubTree result = null;
     if (stubBindingRoot instanceof PsiFileWithStubSupport) {
       result = ((PsiFileWithStubSupport)stubBindingRoot).getStubTree();

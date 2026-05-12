@@ -3,8 +3,8 @@ package com.intellij.application.options.codeStyle.arrangement.additional
 
 import com.intellij.openapi.application.ApplicationBundle
 import com.intellij.psi.codeStyle.CommonCodeStyleSettings
-import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import javax.swing.JComboBox
 
 class ForceArrangementPanel {
@@ -23,7 +23,7 @@ class ForceArrangementPanel {
   val panel = panel {
     group(ApplicationBundle.message("arrangement.settings.additional.title")) {
       row(ApplicationBundle.message("arrangement.settings.additional.force.combobox.name")) {
-        cbForceRearrange = comboBox(forceRearrangeValues.keys, SimpleListCellRenderer.create("") { forceRearrangeValues[it] }).component
+        cbForceRearrange = comboBox(forceRearrangeValues.keys, textListCellRenderer("") { forceRearrangeValues[it] }).component
       }
     }
   }

@@ -703,6 +703,16 @@ public final class AllIconsKeys {
   }
 
   @GeneratedFromIntelliJSources
+  public static final class Build {
+    /** 16x16 */ 
+    @GeneratedFromIntelliJSources
+    public static final @NotNull IntelliJIconKey CompletionCloud = new IntelliJIconKey("expui/build/completionCloud.svg", "expui/build/completionCloud.svg", AllIconsKeys.class);
+    /** 16x16 */ 
+    @GeneratedFromIntelliJSources
+    public static final @NotNull IntelliJIconKey CompletionLocalCache = new IntelliJIconKey("expui/build/completionLocalCache.svg", "expui/build/completionLocalCache.svg", AllIconsKeys.class);
+  }
+
+  @GeneratedFromIntelliJSources
   public static final class Chooser {
     /** 16x16 */ 
     @GeneratedFromIntelliJSources
@@ -1293,7 +1303,7 @@ public final class AllIconsKeys {
     public static final @NotNull IntelliJIconKey Gitignore = new IntelliJIconKey("expui/fileTypes/gitignore.svg", "expui/fileTypes/gitignore.svg", AllIconsKeys.class);
     /** 16x16 */ 
     @GeneratedFromIntelliJSources
-    public static final @NotNull IntelliJIconKey Hprof = new IntelliJIconKey("fileTypes/hprof.svg", "fileTypes/hprof.svg", AllIconsKeys.class);
+    public static final @NotNull IntelliJIconKey Hprof = new IntelliJIconKey("fileTypes/hprof.svg", "expui/fileTypes/hprof.svg", AllIconsKeys.class);
     /** 16x16 */ 
     @GeneratedFromIntelliJSources
     public static final @NotNull IntelliJIconKey Htaccess = new IntelliJIconKey("fileTypes/htaccess.svg", "fileTypes/htaccess.svg", AllIconsKeys.class);
@@ -2733,6 +2743,12 @@ public final class AllIconsKeys {
     public static final @NotNull IntelliJIconKey LogFolder = new IntelliJIconKey("nodes/logFolder.svg", "expui/nodes/logFolder.svg", AllIconsKeys.class);
     /** 16x16 */ 
     @GeneratedFromIntelliJSources
+    public static final @NotNull IntelliJIconKey McpServer = new IntelliJIconKey("expui/nodes/mcpServer.svg", "expui/nodes/mcpServer.svg", AllIconsKeys.class);
+    /** 16x16 */ 
+    @GeneratedFromIntelliJSources
+    public static final @NotNull IntelliJIconKey McpServerWidget = new IntelliJIconKey("expui/nodes/mcpServerWidget.svg", "expui/nodes/mcpServerWidget.svg", AllIconsKeys.class);
+    /** 16x16 */ 
+    @GeneratedFromIntelliJSources
     public static final @NotNull IntelliJIconKey Method = new IntelliJIconKey("nodes/method.svg", "expui/nodes/method.svg", AllIconsKeys.class);
     /** 16x16 */ 
     @GeneratedFromIntelliJSources
@@ -4108,7 +4124,7 @@ public final class AllIconsKeys {
     public static final @NotNull IntelliJIconKey Server = new IntelliJIconKey("webreferences/server.svg", "expui/webReferences/server.svg", AllIconsKeys.class);
     /** 16x16 */ 
     @GeneratedFromIntelliJSources
-    public static final @NotNull IntelliJIconKey WebSocket = new IntelliJIconKey("webreferences/webSocket.svg", "webreferences/webSocket.svg", AllIconsKeys.class);
+    public static final @NotNull IntelliJIconKey WebSocket = new IntelliJIconKey("webreferences/webSocket.svg", "expui/webReferences/webSocket.svg", AllIconsKeys.class);
   }
 
   @GeneratedFromIntelliJSources

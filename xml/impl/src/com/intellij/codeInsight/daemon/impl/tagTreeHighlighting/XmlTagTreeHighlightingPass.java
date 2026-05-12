@@ -241,7 +241,7 @@ public class XmlTagTreeHighlightingPass extends TextEditorHighlightingPass {
     RangeHighlighter highlighter =
       mm.addRangeHighlighter(null, range.getStartOffset(), range.getEndOffset(), 0, HighlighterTargetArea.LINES_IN_RANGE);
 
-    highlighter.setLineMarkerRenderer((__, g, r) -> {
+    highlighter.setLineMarkerRenderer((_, g, r) -> {
       g.setColor(color);
       g.fillRect(r.x - 1, r.y, 2, r.height);
     });
@@ -293,8 +293,7 @@ public class XmlTagTreeHighlightingPass extends TextEditorHighlightingPass {
 
     for (RangeHighlighter highlighter : markupModel.getAllHighlighters()) {
       HighlightInfo info = HighlightInfo.fromRangeHighlighter(highlighter);
-      if (info == null) continue;
-      if (info.type == Holder.TYPE) {
+      if (info != null && info.type == Holder.TYPE) {
         highlighter.dispose();
       }
     }

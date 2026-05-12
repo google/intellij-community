@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.updateSettings.impl
 
 import com.intellij.openapi.updateSettings.UpdateStrategyCustomization
@@ -13,11 +13,10 @@ import org.jetbrains.annotations.ApiStatus
 @ApiStatus.Internal
 class UpdateStrategy @JvmOverloads constructor(
   private val currentBuild: BuildNumber,
-  private val product: Product? = null,
-  private val settings: UpdateSettings = UpdateSettings.getInstance(),
+  private val product: Product?,
+  private val settings: UpdateSettings,
   private val customization: UpdateStrategyCustomization = UpdateStrategyCustomization.getInstance(),
 ) {
-
   fun checkForUpdates(): PlatformUpdates {
     if (product == null || product.channels.isEmpty()) {
       return PlatformUpdates.Empty
@@ -27,19 +26,15 @@ class UpdateStrategy @JvmOverloads constructor(
     val ignoredBuilds = settings.ignoredBuildNumbers.toSet()
 
     return product.channels
-             .asSequence()
-             .filter { ch -> customization.isChannelApplicableForUpdates(ch, selectedChannel) }        // filters out inapplicable channels
-             .sortedBy { ch -> ch.status }                                                             // reorders channels (EAPs first)
-             .flatMap { ch -> ch.builds.asSequence().map { build -> build to ch } }                    // maps into a sequence of <build, channel> pairs
-             .filter { p -> isApplicable(p.first, ignoredBuilds) }                                     // filters out inapplicable builds
-             .maxWithOrNull(Comparator { p1, p2 -> compareBuilds(p1.first.number, p2.first.number) })  // a build with the max number, preferring the same baseline
-             ?.let { (newBuild, channel) ->
-               PlatformUpdates.Loaded(
-                 newBuild,
-                 channel,
-                 patches(newBuild, product, currentBuild),
-               )
-             } ?: PlatformUpdates.Empty
+      .asSequence()
+      .filter { ch -> customization.isChannelApplicableForUpdates(ch, selectedChannel) }        // filters out inapplicable channels
+      .sortedBy { ch -> ch.status }                                                             // reorders channels (EAPs first)
+      .flatMap { ch -> ch.builds.asSequence().map { build -> build to ch } }                    // maps into a sequence of <build, channel> pairs
+      .filter { p -> isApplicable(p.first, ignoredBuilds) }                                     // filters out inapplicable builds
+      .maxWithOrNull(Comparator { p1, p2 -> compareBuilds(p1.first.number, p2.first.number) })  // a build with the max number, preferring the same baseline
+      ?.let { (newBuild, channel) ->
+        PlatformUpdates.Loaded(newBuild, channel, patches(newBuild, product, currentBuild))
+      } ?: PlatformUpdates.Empty
   }
 
   private fun isApplicable(candidate: BuildInfo, ignoredBuilds: Set<String>): Boolean =
@@ -73,7 +68,7 @@ class UpdateStrategy @JvmOverloads constructor(
             val fromBuild = patch.fromBuild.withoutProductCode()
             upgrades.putValue(toBuild, fromBuild)
             if (patch.size != null) {
-              val maxSize = number.findAll(patch.size).map { it.value.toIntOrNull() }.filterNotNull().maxOrNull()
+              val maxSize = number.findAll(patch.size).mapNotNull { it.value.toIntOrNull() }.maxOrNull()
               if (maxSize != null) sizes += (fromBuild to toBuild) to maxSize
             }
           }

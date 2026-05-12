@@ -69,7 +69,7 @@ object ProblemsViewToolWindowUtils {
 
   @JvmStatic
   fun selectProjectErrorsTab(project: Project) {
-    selectTab(project, ProblemsViewProjectErrorsPanelProvider.ID)
+    selectTab(project, "ProjectErrors")
   }
   
   fun getContentById(project: Project, id: String): Content? {

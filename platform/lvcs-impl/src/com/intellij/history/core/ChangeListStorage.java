@@ -2,23 +2,31 @@
 package com.intellij.history.core;
 
 import com.intellij.history.core.changes.ChangeSet;
-import com.intellij.util.Consumer;
-import it.unimi.dsi.fastutil.ints.IntSet;
 import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.Iterator;
 
 @ApiStatus.Internal
 public interface ChangeListStorage {
-  void close();
+  void close(boolean drop);
 
-  void force();
+  void flush();
 
   long nextId();
 
-  @Nullable
-  ChangeSetHolder readPrevious(int id, IntSet recursionGuard);
+  /**
+   * Purges the changesets older than the specified [period].
+   * Changesets are considered "related" and are not purged if their timestamps are closer than [intervalBetweenActivities].
+   */
+  void purge(long period, long intervalBetweenActivities);
 
-  void purge(long period, int intervalBetweenActivities, Consumer<? super ChangeSet> processor);
+  void writeNextSet(@NotNull ChangeSet changeSet);
 
-  void writeNextSet(ChangeSet changeSet);
+  /**
+   * Returns an iterator over the change sets in the storage.
+   *
+   * @return iterator over change sets, starting from the last written change set at the time of the call
+   */
+  @NotNull Iterator<@NotNull ChangeSet> iterate();
 }

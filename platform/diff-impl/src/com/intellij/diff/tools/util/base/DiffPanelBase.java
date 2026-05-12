@@ -22,7 +22,7 @@ import java.util.Objects;
 
 public abstract class DiffPanelBase extends JPanel implements UiCompatibleDataProvider {
   protected final @Nullable Project myProject;
-  protected final @NotNull DiffContext myContext;
+  protected final @Nullable DiffContext myContext;
 
   private final @NotNull List<JComponent> myPersistentNotifications = new ArrayList<>();
   private final @NotNull List<JComponent> myNotifications = new ArrayList<>();
@@ -38,7 +38,7 @@ public abstract class DiffPanelBase extends JPanel implements UiCompatibleDataPr
   // field initialized in concrete constructors
   @SuppressWarnings("NotNullFieldNotInitialized") protected @NotNull String myCurrentCard;
 
-  public DiffPanelBase(@Nullable Project project, @NotNull DiffContext context) {
+  public DiffPanelBase(@Nullable Project project, @Nullable DiffContext context) {
     super(new BorderLayout());
     myProject = project;
     myContext = context;
@@ -77,7 +77,7 @@ public abstract class DiffPanelBase extends JPanel implements UiCompatibleDataPr
       myContentPanel.repaint();
     };
 
-    if (keepFocus) {
+    if (keepFocus && myContext != null) {
       DiffUtil.runPreservingFocus(myContext, task);
     }
     else {

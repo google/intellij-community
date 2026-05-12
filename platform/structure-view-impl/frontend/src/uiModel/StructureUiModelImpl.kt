@@ -2,6 +2,7 @@
 package com.intellij.platform.structureView.frontend.uiModel
 
 import com.intellij.ide.vfs.rpcId
+import com.intellij.ide.rpc.rpcId
 import com.intellij.openapi.application.UI
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.FileEditor
@@ -14,7 +15,6 @@ import com.intellij.platform.structureView.impl.dto.StructureViewModelDto
 import com.intellij.platform.structureView.impl.uiModel.StructureUiTreeElement
 import com.intellij.platform.structureView.frontend.uiModel.StructureUiTreeElementImpl.Companion.toUiElement
 import com.intellij.platform.structureView.impl.dto.StructureViewTreeElementDto
-import com.intellij.ide.rpc.rpcId
 import com.intellij.openapi.diagnostic.rethrowControlFlowException
 import com.intellij.platform.structureView.impl.dto.NodeProviderNodesDto
 import com.intellij.platform.structureView.impl.dto.StructureViewDtoId
@@ -40,7 +40,7 @@ internal class StructureUiModelImpl : StructureUiModel {
 
   private val myModelListeners = ContainerUtil.createLockFreeCopyOnWriteList<StructureUiModelListener>()
 
-  private val dtoId = StructureViewDtoId(nextId.getAndIncrement())
+  private val dtoId: StructureViewDtoId
 
   override val rootElement: StructureUiTreeElementWrapper = StructureUiTreeElementWrapper()
 
@@ -60,8 +60,21 @@ internal class StructureUiModelImpl : StructureUiModel {
    * Constructor that fetches DTO via RPC (for monolith mode or when called from frontend).
    */
   constructor(fileEditor: FileEditor, file: VirtualFile, project: Project) {
+    dtoId = StructureViewDtoId(nextId.getAndIncrement())
     cs = StructureViewScopeHolder.getInstance(project).cs.childScope("scope for ${file.name} structure view")
+    initializeWithRpcModel(fileEditor, file, project)
+  }
 
+  /**
+   * Constructor for popup flow with model pre-created in backend.
+   */
+  constructor(file: VirtualFile?, project: Project, modelId: StructureViewDtoId, model: StructureViewModelDto) {
+    dtoId = modelId
+    cs = StructureViewScopeHolder.getInstance(project).cs.childScope("scope for ${file?.name} structure view")
+    initializeWithProvidedModel(project, model)
+  }
+
+  private fun initializeWithRpcModel(fileEditor: FileEditor, file: VirtualFile, project: Project) {
     // the service scope is used to make sure the disposal request to the backend is sent after the dto is received
     StructureViewScopeHolder.getInstance(project).cs.launch {
       val dto = durable {
@@ -77,16 +90,24 @@ internal class StructureUiModelImpl : StructureUiModel {
         return@launch
       }
 
-      cs.coroutineContext.job.invokeOnCompletion {
-        StructureViewScopeHolder.getInstance(project).cs.launch {
-          durable {
-            StructureTreeApi.getInstance().structureViewModelDisposed(dtoId)
-          }
-        }
-      }
-
+      registerModelDisposal(project)
       cs.launch {
         initializeWithModel(dto)
+      }
+    }
+  }
+
+  private fun initializeWithProvidedModel(project: Project, model: StructureViewModelDto) {
+    registerModelDisposal(project)
+    cs.launch {
+      initializeWithModel(model)
+    }
+  }
+
+  private fun registerModelDisposal(project: Project) {
+    cs.coroutineContext.job.invokeOnCompletion {
+      StructureViewScopeHolder.getInstance(project).cs.launch {
+        StructureTreeApi.callDisposeModel(dtoId)
       }
     }
   }
@@ -98,12 +119,7 @@ internal class StructureUiModelImpl : StructureUiModel {
     myActions = model.actions.map { it.toImpl() }
 
     myEnabledActionNames.addAll(myActions.filter {
-      if (it is FilterTreeAction) {
-        it.isReverted != it.isEnabledByDefault
-      }
-      else {
-        it.isEnabledByDefault
-      }
+      it.isReverted != it.isEnabledByDefault
     }.map { it.name })
 
     model.nodes.toFlow().collect { nodesUpdate ->
@@ -168,9 +184,11 @@ internal class StructureUiModelImpl : StructureUiModel {
   }
 
   override fun setActionEnabled(action: StructureTreeAction, isEnabled: Boolean, isAutoClicked: Boolean) {
-    if (isEnabled == isActionEnabled(action)) return
+    val affectiveIsEnabled = isEnabled != action.isReverted
 
-    if (isEnabled) {
+    if (affectiveIsEnabled == isActionEnabled(action)) return
+
+    if (affectiveIsEnabled) {
       myEnabledActionNames.add(action.name)
     }
     else {
@@ -179,7 +197,7 @@ internal class StructureUiModelImpl : StructureUiModel {
 
     if (action is NodeProviderTreeAction) {
       // If enabling an incomplete node provider, mark as pending and request tree rebuild when nodes arrive
-      if (isEnabled && !action.nodesLoaded) {
+      if (affectiveIsEnabled && !action.nodesLoaded) {
         myUpdatePendingFlow.value = true
         rebuildTreeOnDeferredNodes = true
       }
@@ -305,7 +323,7 @@ internal class StructureUiModelImpl : StructureUiModel {
   }
 
   companion object {
-    private var nextId = AtomicInteger()
+    private var nextId = AtomicInteger(1)
     private val logger = logger<StructureUiModelImpl>()
   }
 }

@@ -21,6 +21,7 @@ jvm_library(
 
 jvm_library(
   name = "java_test_lib",
+  testonly = True,
   module_name = "intellij.tasks.java",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -38,3 +39,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.tasks.java` end
+
+### auto-generated section `iml intellij.tasks.java` start
+exports_files([
+  "intellij.tasks.java.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.tasks.java` end

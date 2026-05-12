@@ -907,4 +907,5 @@ public class OptimizeImportsTest extends OptimizeImportsTestCase {
 
   public void testUnresolvedReferenceAfterParenthesis() { doTest(); }
   public void testInvalidExtendsList() { doTest(); }
+  public void testUnusedImportInBrokenAssignment() { doTest(); }
 }

@@ -621,6 +621,12 @@ def get_versions():
     cfg = get_config()
     verbose = cfg.verbose
 
+    # TODO: re-check other keys if they affect something
+    return {'version': 'jb_bundled_0.0.1',
+            'full-revisionid': None,
+            'dirty': None,
+            'error': None,
+            'date': None}
     try:
         return git_versions_from_keywords(get_keywords(), cfg.tag_prefix,
                                           verbose)

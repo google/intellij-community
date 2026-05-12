@@ -82,7 +82,7 @@ kotlin {
       isTransitive = false
     }
     api(project(":fleet.rhizomedb.transactor"))
-    api(project(":fleet.rhizomedb"))
+    implementation(project(":fleet.rhizomedb"))
     api(project(":fleet.util.core"))
     api(project(":fleet.rpc"))
     implementation(project(":fleet.reporting.api"))

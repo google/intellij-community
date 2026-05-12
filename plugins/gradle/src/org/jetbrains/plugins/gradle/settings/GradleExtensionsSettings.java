@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.settings;
 
 import com.intellij.openapi.diagnostic.Logger;
@@ -274,7 +274,7 @@ public class GradleExtensionsSettings {
 
       Map<String, GradleTask> tasksMap = new LinkedHashMap<>();
       for (ExternalTask task : gradleExtensions.getTasks()) {
-        GradleTask gradleTask = taskCache.computeIfAbsent(task.getName() + task.getType(), __ -> convertGradleTask(task));
+        GradleTask gradleTask = taskCache.computeIfAbsent(task.getName() + task.getType(), _ -> convertGradleTask(task));
         tasksMap.put(gradleTask.getName(), gradleTask);
       }
 

@@ -117,23 +117,67 @@ def test_array_with_dtype():
 
 # 6
 def test_define_format_function():
-    assert numpy_tables_helpers.__define_format_function(None) is None
-    assert numpy_tables_helpers.__define_format_function('null') is None
-    assert numpy_tables_helpers.__define_format_function('garbage') is None
-    assert numpy_tables_helpers.__define_format_function(1) is None
+    valid_formats = [
+        ("%f", (1.1, "1.100000")),
+        ("%.0f", (1.6, "2")),
+        ("%.3f", (1.12345, "1.123")),
+        ("%e", (1.1, "1.100000e+00")),
+        ("%.1e", (1.1, "1.1e+00")),
+        ("%g", (1.1, "1.1")),
+        ("%.3g", (1.12345, "1.12")),
+        ("%d", (42.9, "42")),
+        ("%i", (42.9, "42")),
+        ("%6.2f", (1.1, "  1.10")),  # width + precision
+        ("%-6.2f", (1.1, "1.10  ")),  # left-aligned
+        ("%+6.2f", (1.1, " +1.10")),  # explicit sign
+        ("%06.2f", (1.1, "001.10")),  # zero-padded
+        ("% d", (1.1, " 1")),
+        ("% s", (1.1, " 1.1")),
+        ("% .2f", (1.1, " 1.10")),
 
-    format_to_result = {
-        "%.2f": (1.1, "1.10"),
-        "%.12f": (1.1, "1.100000000000"),
-        "%.2e": (1.1, "1.10e+00"),
-        "%d": (1.1, "1"),
-        "%d garbage": (1.1, "1 garbage"),
-    }
-    for format_str, (float_value, expected_result) in format_to_result.items():
+        ("%#f", (1.1, "1.100000")),  # alternate form (still valid)
+        ("%#.0f", (1.0, "1.")),  # forces decimal point
+        ("%+d", (1.1, "+1")),
+
+        ("%.0f%%", (0.123 * 100, "12%")),
+        ("%.1f%%", (0.123 * 100, "12.3%")),
+        ("%.2f%%", (0.123 * 100, "12.30%")),
+        ("%.2f%%", (1.1, "1.10%")),
+        ("%.2f%%", (0.0, "0.00%")),
+        ("%.2f%%", (100.0, "100.00%")),
+        ("%.2f%%", (-5.0, "-5.00%")),
+
+        ("%.2f", (float("nan"), "nan")),
+        ("%.2f", (float("inf"), "inf")),
+        ("%.2f", (-float("inf"), "-inf")),
+        ("%d", (-1.9, "-1")),
+    ]
+    for format_str, (float_value, expected_result) in valid_formats:
         formatter = numpy_tables_helpers.__define_format_function(format_str)
         assert formatter is not None
         assert callable(formatter)
         assert formatter(float_value) == expected_result
+
+    invalid_formats = [
+        None,
+        "null",
+        1,
+        "",
+        " ",
+        "no format",  # no %
+        "%",  # incomplete
+        "%.f",  # missing precision
+        "%..2f",  # malformed
+        "%2",  # incomplete specifier
+        "%q",  # unsupported specifier
+        "%%%",  # malformed escaping
+        object(),  # non-string
+        [],  # non-string
+        "value: %.2f",  # we don't pass such format TODO: is this restriction needed?
+    ]
+    for format_str in invalid_formats:
+        formatter = numpy_tables_helpers.__define_format_function(format_str)
+        assert formatter is None
 
 
 # 7

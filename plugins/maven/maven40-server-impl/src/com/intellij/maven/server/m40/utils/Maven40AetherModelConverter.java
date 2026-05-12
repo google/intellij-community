@@ -14,22 +14,27 @@ import org.eclipse.aether.util.graph.manager.DependencyManagerUtils;
 import org.eclipse.aether.util.graph.transformer.ConflictResolver;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.idea.maven.model.MavenBuild;
 import org.jetbrains.idea.maven.model.MavenArtifact;
 import org.jetbrains.idea.maven.model.MavenArtifactNode;
 import org.jetbrains.idea.maven.model.MavenArtifactState;
+import org.jetbrains.idea.maven.model.MavenSource;
 import org.jetbrains.idea.maven.model.MavenId;
 import org.jetbrains.idea.maven.model.MavenModel;
 import org.jetbrains.idea.maven.model.MavenParent;
 import org.jetbrains.idea.maven.model.MavenRemoteRepository;
 
 import java.io.File;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -65,7 +70,42 @@ public final class Maven40AetherModelConverter extends Maven40ModelConverter {
     result.setModules(mavenProject.getModules());
 
     convertBuild(mavenProject.getFile(), result.getBuild(), model.getBuild());
+    addMissingCompileSourceRoots(result.getBuild(),
+                                 mavenProject.getCompileSourceRoots(),
+                                 mavenProject.getTestCompileSourceRoots());
     return result;
+  }
+
+  // getCompileSourceRoots()/getTestCompileSourceRoots() are deprecated in Maven 4's MavenProject but remain
+  // the only way to access source roots added at build time by plugins (e.g. Kotlin via addCompileSourceRoot()).
+  // build.getDelegate().getSources() only reflects <source> model elements,
+  // not runtime additions, so there is no non-deprecated alternative for capturing plugin-added sources.
+  private static void addMissingCompileSourceRoots(@NotNull MavenBuild build,
+                                                   @NotNull List<String> compileRoots,
+                                                   @NotNull List<String> testCompileRoots) {
+    Set<String> existing = build.getMavenSources().stream()
+      .map(MavenSource::getDirectory)
+      .collect(Collectors.toCollection(HashSet::new));
+
+    List<MavenSource> extra = new ArrayList<>();
+    for (String dir : compileRoots) {
+      String abs = Paths.get(dir).toAbsolutePath().normalize().toString();
+      if (existing.add(abs)) {
+        extra.add(MavenSource.fromSrc(abs, false));
+      }
+    }
+    for (String dir : testCompileRoots) {
+      String abs = Paths.get(dir).toAbsolutePath().normalize().toString();
+      if (existing.add(abs)) {
+        extra.add(MavenSource.fromSrc(abs, true));
+      }
+    }
+
+    if (!extra.isEmpty()) {
+      List<MavenSource> combined = new ArrayList<>(build.getMavenSources());
+      combined.addAll(extra);
+      build.setMavenSources(combined);
+    }
   }
 
   @SuppressWarnings("SSBasedInspection")

@@ -2,7 +2,7 @@
 package org.jetbrains.kotlin.idea.base.platforms
 
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.runReadAction
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.fileTypes.FileTypeManager
@@ -53,9 +53,10 @@ class LibraryEffectiveKindProviderImpl(private val project: Project): LibraryEff
         val virtualFile = classRoots.firstOrNull() ?: return null
         virtualFile.putUserData(CLASS_ROOTS_KEY, classRoots)
         try {
-            return runReadAction {
+            return ReadAction.nonBlocking<PersistentLibraryKind<*>> {
+                if (project.isDisposed || !virtualFile.isValid) return@nonBlocking null
                 KotlinLibraryKindGistProvider.getInstance().kotlinLibraryKindGist.getFileData(project, virtualFile)
-            }
+            }.executeSynchronously()
         } finally {
             virtualFile.removeUserData(CLASS_ROOTS_KEY)
         }
@@ -90,6 +91,15 @@ class LibraryEffectiveKindProviderImpl(private val project: Project): LibraryEff
     }
 
     override fun getEffectiveKind(library: LibraryEntity): PersistentLibraryKind<*>? {
+        // Respect explicitly set library kind from the workspace model entity.
+        // This mirrors the Library overload (which checks library.kind first)
+        // and is needed for non-Gradle build systems that explicitly set
+        // PersistentLibraryKind (e.g., KotlinNativeLibraryKind) on their libraries.
+        library.typeId?.let { typeId ->
+            val kind = LibraryKindRegistry.getInstance().findKindById(typeId.name)
+            if (kind is KotlinLibraryKind && kind is PersistentLibraryKind<*>) return kind
+        }
+
         val classRoots = library.roots.filter { it.type == LibraryRootTypeId.COMPILED }.mapNotNull { it.url.virtualFile }
         return getKind(classRoots.toTypedArray())
     }

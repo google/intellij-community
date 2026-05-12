@@ -22,12 +22,12 @@ class SeClassesTabFactory : SeEssentialTabFactory {
   override suspend fun getTab(scope: CoroutineScope, project: Project?, session: SeSession, initEvent: AnActionEvent, registerShortcut: (AnAction) -> Unit): SeTab? {
     project ?: return null
 
-    val delegate = SeTabDelegate(project,
-                                 session,
-                                 "Classes",
-                                 listOf(SeProviderId(SeProviderIdUtils.CLASSES_ID)),
-                                 initEvent,
-                                 scope)
+    val delegate = SeTabDelegate.create(project,
+                                        session,
+                                        "Classes",
+                                        listOf(SeProviderId(SeProviderIdUtils.CLASSES_ID)),
+                                        initEvent,
+                                        scope)
 
     return SeClassesTab(delegate)
   }

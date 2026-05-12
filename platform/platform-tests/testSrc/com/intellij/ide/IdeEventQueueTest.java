@@ -219,7 +219,7 @@ public class IdeEventQueueTest extends LightPlatformTestCase {
     var component = new JLabel();
     AppExecutorUtil.getAppScheduledExecutorService().schedule(() -> SwingUtilities.invokeLater(EmptyRunnable.getInstance()), 100, TimeUnit.MILLISECONDS);
     var start = System.nanoTime();
-    ideEventQueue.pumpEventsForHierarchy(component, future, __ -> {
+    ideEventQueue.pumpEventsForHierarchy(component, future, _ -> {
       if (cancelEventTime.isTimedOut()) {
         future.complete(null);
       }

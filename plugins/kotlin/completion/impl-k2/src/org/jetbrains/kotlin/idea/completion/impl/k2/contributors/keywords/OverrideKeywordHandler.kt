@@ -136,8 +136,8 @@ internal class OverrideKeywordHandler(
         else -> false
     }
 
-    context(session: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(session: KaSession)
     private fun createLookupElementToGenerateSingleOverrideMember(
         member: KtClassMember,
         declaration: KtCallableDeclaration?,

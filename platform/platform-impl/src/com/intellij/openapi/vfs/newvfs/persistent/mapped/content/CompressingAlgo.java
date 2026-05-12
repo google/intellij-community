@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vfs.newvfs.persistent.mapped.content;
 
 import com.intellij.openapi.util.ThreadLocalCachedByteArray;
@@ -19,14 +19,12 @@ import java.util.zip.Inflater;
  * Abstracts out content algorithm of compression for content storage
  */
 public interface CompressingAlgo {
-
   int ZIP_ID = 1;
   int LZ4_ID = 2;
   int NONE_ID = 3;
 
   /** ID unique identifying algo -- for storage versioning purposes */
   int algoID();
-
 
   /**
    * @return true if input should be compressed, false otherwise.
@@ -57,8 +55,7 @@ public interface CompressingAlgo {
   void decompress(@NotNull ByteBuffer bufferWithCompressedData,
                   byte[] bufferForDecompression) throws IOException;
 
-  class ZipAlgo implements CompressingAlgo {
-
+  final class ZipAlgo implements CompressingAlgo {
     /**
      * Compresses content if > compressContentLargerThan.
      * There is usually no reason to compress small content, but large content compression could
@@ -136,8 +133,7 @@ public interface CompressingAlgo {
     }
   }
 
-  class Lz4Algo implements CompressingAlgo {
-
+  final class Lz4Algo implements CompressingAlgo {
     /**
      * Compresses content if > compressContentLargerThan.
      * There is usually no reason to compress small content, but large content compression could
@@ -222,7 +218,7 @@ public interface CompressingAlgo {
    * {@link #shouldCompress(ByteArraySequence)} returns false always,
    * compress/decompress methods throws {@link UnsupportedOperationException}
    */
-  class NoCompressionAlgo implements CompressingAlgo {
+  final class NoCompressionAlgo implements CompressingAlgo {
     @Override
     public boolean shouldCompress(@NotNull ByteArraySequence input) {
       return false;
@@ -250,5 +246,3 @@ public interface CompressingAlgo {
     }
   }
 }
-
-

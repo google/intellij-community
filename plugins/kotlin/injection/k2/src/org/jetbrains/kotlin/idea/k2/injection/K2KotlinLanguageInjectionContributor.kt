@@ -2,14 +2,20 @@
 package org.jetbrains.kotlin.idea.k2.injection
 
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiReference
 import com.intellij.psi.util.PsiTreeUtil
 import org.intellij.plugins.intelliLang.inject.InjectorUtils
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
+import org.jetbrains.kotlin.analysis.api.KaPlatformInterface
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotation
 import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotationValue
 import org.jetbrains.kotlin.analysis.api.base.KaConstantValue
+import org.jetbrains.kotlin.analysis.api.projectStructure.KaDanglingFileModule
+import org.jetbrains.kotlin.analysis.api.projectStructure.KaDanglingFileResolutionMode
+import org.jetbrains.kotlin.analysis.api.projectStructure.copyOrigin
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
@@ -17,6 +23,7 @@ import org.jetbrains.kotlin.analysis.api.symbols.KaFunctionSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaAnnotatedSymbol
 import org.jetbrains.kotlin.idea.base.injection.InjectionInfo
 import org.jetbrains.kotlin.idea.base.injection.KotlinLanguageInjectionContributorBase
+import org.jetbrains.kotlin.idea.base.projectStructure.getKaModuleOfTypeSafe
 import org.jetbrains.kotlin.idea.references.KtReference
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.name.CallableId
@@ -26,6 +33,7 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtCallableDeclaration
 import org.jetbrains.kotlin.psi.KtElement
+import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtProperty
 import org.intellij.lang.annotations.Language as LanguageAnnotation
 
@@ -41,10 +49,23 @@ internal class K2KotlinLanguageInjectionContributor : KotlinLanguageInjectionCon
 
     override fun resolveReference(reference: PsiReference): PsiElement? = reference.resolve()
 
-    override fun getTargetProperty(ktProperty: KtProperty): KtProperty {
-        // For completion property is not physical and the whole file was copied.
-        // The references in that file are resolved to the original file's members
-        return if (ktProperty.isPhysical) ktProperty else try { PsiTreeUtil.findSameElementInCopy(ktProperty, ktProperty.containingFile.originalFile) } catch (_: IllegalStateException) { ktProperty }
+    @OptIn(KaExperimentalApi::class, KaPlatformInterface::class)
+    override fun getTargetProperty(ktProperty: KtProperty, containingFile: PsiFile): KtProperty {
+        val copyOrigin = containingFile.copyOrigin as? KtFile
+            ?: return super.getTargetProperty(ktProperty, containingFile)
+
+        val danglingFileModule = containingFile.getKaModuleOfTypeSafe<KaDanglingFileModule>(containingFile.project, useSiteModule = null)
+            ?: return super.getTargetProperty(ktProperty, containingFile)
+
+        if (danglingFileModule.resolutionMode != KaDanglingFileResolutionMode.IGNORE_SELF) {
+            return super.getTargetProperty(ktProperty, containingFile)
+        }
+
+        return try {
+            PsiTreeUtil.findSameElementInCopy(ktProperty, copyOrigin)
+        } catch (_: IllegalStateException) {
+            ktProperty
+        }
     }
 
     override fun injectionInfoByAnnotation(callableDeclaration: KtCallableDeclaration): InjectionInfo? =

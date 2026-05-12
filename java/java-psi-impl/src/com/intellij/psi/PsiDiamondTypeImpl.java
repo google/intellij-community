@@ -34,7 +34,84 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * @author anna
+ * Implementation of {@link PsiDiamondType} that represents diamond operator type inference (<>).
+ *
+ * <h2>Diamond Type Inference via Static Factory Methods</h2>
+ *
+ * <p>When the diamond operator is used (e.g., {@code new Container<>()}), the compiler needs to infer
+ * the type arguments from the context. This class implements type inference by converting constructor
+ * calls into equivalent static factory method calls.</p>
+ *
+ * <h3>Why Static Factories?</h3>
+ *
+ * <p>Java's type inference for constructors differs from method calls. For methods, the compiler can use:
+ * <ul>
+ *   <li>Return type as target type</li>
+ *   <li>Method type parameters separate from class type parameters</li>
+ *   <li>More flexible inference based on method invocation context</li>
+ * </ul>
+ *
+ * <p>By transforming constructor calls into static factory methods, we can leverage the more powerful
+ * method type inference algorithm:</p>
+ *
+ * <pre>{@code
+ * // Original diamond expression:
+ * new Container<>(value)
+ *
+ * // Transformed to static factory for inference:
+ * static <T> Container<T> staticFactory(T value) {}
+ * }</pre>
+ *
+ * <h3>How It Works</h3>
+ *
+ * <ol>
+ *   <li><b>Factory Generation:</b> {@link #generateStaticFactory} creates synthetic static methods
+ *       from constructors, combining class and constructor type parameters.</li>
+ *
+ *   <li><b>Overload Resolution:</b> {@link #getStaticFactories} applies Java's method overload resolution
+ *       to select the most specific factory method based on arguments.</li>
+ *
+ *   <li><b>Type Inference:</b> The method inference algorithm ({@link MethodCandidateInfo}) computes
+ *       type arguments, which are then extracted as the inferred diamond types.</li>
+ *
+ *   <li><b>Result Extraction:</b> {@link #resolveInferredTypesNoCheck} extracts the substitutor from
+ *       the resolved factory method and maps type parameters back to the class type parameters.</li>
+ * </ol>
+ *
+ * <h3>Example</h3>
+ *
+ * <pre>{@code
+ * class Container<T> {
+ *   Container(T value) { }
+ * }
+ *
+ * // Diamond usage:
+ * Container<> c = new Container<>("hello");
+ *
+ * // Generated factory:
+ * static <T> Container<T> staticFactory(T p0) { }
+ *
+ * // Inference determines: T = String
+ * // Result: Container<String>
+ * }</pre>
+ *
+ * <h3>Special Cases</h3>
+ *
+ * <ul>
+ *   <li><b>Anonymous classes (Java 9+):</b> Additional validation ensures inferred types are accessible
+ *       and don't contain fresh type variables or intersection types.</li>
+ *
+ *   <li><b>Varargs constructors:</b> Both varargs and non-varargs interpretations are considered during
+ *       overload resolution.</li>
+ *
+ *   <li><b>Raw types:</b> When inference produces raw types, the result is marked accordingly.</li>
+ *
+ *   <li><b>Nested classes:</b> Qualifier types are preserved in the generated factory signature.</li>
+ * </ul>
+ *
+ * @see DiamondInferenceResult
+ * @see #getStaticFactory()
+ * @see #resolveInferredTypes()
  */
 public class PsiDiamondTypeImpl extends PsiDiamondType {
   private static final Logger LOG = Logger.getInstance(PsiDiamondTypeImpl.class);
@@ -423,7 +500,7 @@ public class PsiDiamondTypeImpl extends PsiDiamondType {
         int myIdx;
         @Override
         public String fun(PsiParameter psiParameter) {
-          return psiParameter.getType().getCanonicalText() + " p" + myIdx++;
+          return psiParameter.getType().getCanonicalText(true) + " p" + myIdx++;
         }
       }, ",")).append(")");
       PsiClassType[] types = constructor.getThrowsList().getReferencedTypes();

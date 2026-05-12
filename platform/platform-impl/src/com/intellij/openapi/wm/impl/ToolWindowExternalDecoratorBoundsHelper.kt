@@ -3,7 +3,9 @@ package com.intellij.openapi.wm.impl
 
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.util.ui.StartupUiUtil
 import java.awt.Frame
+import java.awt.Rectangle
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
 
@@ -68,7 +70,7 @@ internal class ToolWindowExternalDecoratorBoundsHelper(private val decorator: To
     }
     val storedBounds = bounds
     val actualBounds = decorator.visibleWindowBounds
-    if (storedBounds != actualBounds) {
+    if (mismatched(storedBounds, actualBounds)) {
       if (decorator.isMaximized) {
         decorator.log().debug {
           "The tool window ${decorator.id} external (${decorator.getToolWindowType()}) decorator " +
@@ -101,6 +103,15 @@ internal class ToolWindowExternalDecoratorBoundsHelper(private val decorator: To
 
   private fun sinceShown(): Long? = shownAt?.let {System.currentTimeMillis() - it }
 
+}
+
+private fun mismatched(storedBounds: Rectangle, actualBounds: Rectangle): Boolean {
+  if (StartupUiUtil.isWaylandToolkit()) {
+    return storedBounds.size != actualBounds.size // no locations on Wayland :-(
+  }
+  else {
+    return storedBounds != actualBounds
+  }
 }
 
 private val ToolWindowExternalDecorator.isMaximized: Boolean

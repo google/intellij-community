@@ -9,13 +9,16 @@ import org.jetbrains.jewel.foundation.JewelFlags
 
 /** Internal action to toggle Jewel's custom popup renderer. */
 @OptIn(ExperimentalJewelApi::class)
-internal class JewelCustomPopupRendererAction : DumbAwareToggleAction(
-) {
-
+internal class JewelCustomPopupRendererAction : DumbAwareToggleAction() {
   override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 
-  override fun isSelected(e: AnActionEvent): Boolean = JewelFlags.useCustomPopupRenderer
+  override fun update(e: AnActionEvent) {
+    super.update(e)
 
+    e.presentation.isVisible = isComposeToolingEnabled()
+  }
+
+  override fun isSelected(e: AnActionEvent): Boolean = JewelFlags.useCustomPopupRenderer
 
   override fun setSelected(e: AnActionEvent, state: Boolean) {
     JewelFlags.useCustomPopupRenderer = state

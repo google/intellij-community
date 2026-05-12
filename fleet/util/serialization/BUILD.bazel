@@ -1,6 +1,6 @@
 ### auto-generated section `build fleet.util.serialization` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_serialization",
@@ -10,18 +10,13 @@ create_kotlinc_options(
   x_lambdas = "class"
 )
 
-resourcegroup(
-  name = "serialization_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "serialization",
   module_name = "fleet.util.serialization",
   visibility = ["//visibility:public"],
   srcs = glob(["srcCommonMain/**/*.kt", "srcCommonMain/**/*.java", "srcCommonMain/**/*.form"], allow_empty = True),
-  resources = [":serialization_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_serialization",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -34,6 +29,7 @@ jvm_library(
 
 jvm_library(
   name = "serialization_test_lib",
+  testonly = True,
   module_name = "fleet.util.serialization",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -44,3 +40,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build fleet.util.serialization` end
+
+### auto-generated section `iml fleet.util.serialization` start
+exports_files([
+  "fleet.util.serialization.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml fleet.util.serialization` end

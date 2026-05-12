@@ -1,7 +1,9 @@
-// "Remove single lambda parameter declaration" "true"
+// "Remove parameter 'x'" "true"
+// TOOL: org.jetbrains.kotlin.idea.k2.codeinsight.inspections.UnusedSymbolInspection
 // WITH_STDLIB
 
 fun main() {
     listOf(1).forEach { <caret>x -> println() }
 }
 // FUS_QUICKFIX_NAME: org.jetbrains.kotlin.idea.quickfix.RemoveSingleLambdaParameterFix
+// FUS_K2_QUICKFIX_NAME: org.jetbrains.kotlin.idea.codeinsights.impl.base.quickFix.RemoveUnusedVariableFix

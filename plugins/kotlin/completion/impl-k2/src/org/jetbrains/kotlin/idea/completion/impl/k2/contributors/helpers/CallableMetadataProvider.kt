@@ -35,6 +35,7 @@ import org.jetbrains.kotlin.analysis.api.symbols.KaPropertySymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaSyntheticJavaPropertySymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaTypeAliasSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.isLocal
 import org.jetbrains.kotlin.analysis.api.symbols.receiverType
 import org.jetbrains.kotlin.analysis.api.types.KaClassType
 import org.jetbrains.kotlin.analysis.api.types.KaErrorType
@@ -107,8 +108,8 @@ internal object CallableMetadataProvider {
             else -> this
         }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     fun getCallableMetadata(
         signature: KaCallableSignature<*>,
         scopeKind: KaScopeKind?,
@@ -171,8 +172,8 @@ internal object CallableMetadataProvider {
             .applyIf(hasOverriddenSymbols) { CallableMetadata(kind.correspondingBaseForThisOrSelf, scopeIndex) }
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun extensionWeight(
         signature: KaCallableSignature<*>,
         actualReceiverTypes: List<List<KaType>>,
@@ -198,7 +199,17 @@ internal object CallableMetadataProvider {
 
     context(_: KaSession)
     private fun getExpectedNonExtensionReceiver(symbol: KaCallableSymbol): KaClassSymbol? {
-        val containingClass = symbol.fakeOverrideOriginal.containingSymbol as? KaClassSymbol
+        val containingSymbol = symbol.fakeOverrideOriginal.containingSymbol
+
+        // Because of KT-85856, the `containingSymbol` for properties contained within
+        // constructors of local classes return the constructor rather than the containing class.
+        // This is a temporary workaround until KT-85856 is fixed.
+        val containingClass = if (symbol is KaPropertySymbol && containingSymbol is KaConstructorSymbol) {
+            (containingSymbol.containingSymbol as? KaClassSymbol)?.takeIf { it.isLocal }
+        } else {
+            containingSymbol as? KaClassSymbol
+        }
+
         return if (symbol is KaConstructorSymbol && (containingClass as? KaNamedClassSymbol)?.isInner == true) {
             containingClass.containingDeclaration as? KaClassSymbol
         } else {

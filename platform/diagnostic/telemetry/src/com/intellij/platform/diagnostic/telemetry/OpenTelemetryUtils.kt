@@ -63,9 +63,7 @@ object OpenTelemetryUtils {
     resolveMetricsReportingPath(System.getProperty("idea.diagnostic.opentelemetry.metrics.file", "telemetry/open-telemetry-metrics.csv"))
 
   fun metricsJsonReportingPath(): Path? =
-    //MAYBE: move .json telemetry files into .../telemetry subfolder, same as .csv telemetry files above?
-    //       OpenTelemetryJsonMeterCollector should be updated then
-    resolveMetricsReportingPath(System.getProperty("idea.diagnostic.opentelemetry.meters.file.json", "open-telemetry-meters.json"))
+    resolveMetricsReportingPath(System.getProperty("idea.diagnostic.opentelemetry.meters.file.json", "telemetry/open-telemetry-meters.json"))
 
   fun setupFileLimiterForMetrics(metricsReportingBasePath: Path): FileSetLimiter {
     val suffixDateFormat = System.getProperty("idea.diagnostic.opentelemetry.metrics.suffix-date-format", "yyyy-MM-dd-HH-mm-ss")

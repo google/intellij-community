@@ -20,6 +20,10 @@ internal val MAVEN_REPO: Path = Path.of(getMavenRepositoryPath())
 sealed interface Source {
   val filter: ((String) -> Boolean)?
     get() = null
+
+  /** Stable identity of filter inputs which can't be derived from [filter] or path matcher instances. */
+  val filterCacheKey: List<String>
+    get() = emptyList()
 }
 
 class LazySource(
@@ -64,6 +68,7 @@ data class ZipSource(
   @JvmField val distributionFileEntryProducer: DistributionFileEntryProducer?,
   @JvmField val moduleName: String?,
   override val filter: ((String) -> Boolean),
+  override val filterCacheKey: List<String> = emptyList(),
 ) : Source, Comparable<ZipSource> {
   init {
     assert(Files.isRegularFile(file)) { "'$file' is not a file" }
@@ -89,6 +94,7 @@ data class ZipSource(
     if (file != other.file) return false
     if (isPreSignedAndExtractedCandidate != other.isPreSignedAndExtractedCandidate) return false
     if (filter != other.filter) return false
+    if (filterCacheKey != other.filterCacheKey) return false
 
     return true
   }
@@ -97,6 +103,7 @@ data class ZipSource(
     var result = file.hashCode()
     result = 31 * result + isPreSignedAndExtractedCandidate.hashCode()
     result = 31 * result + filter.hashCode()
+    result = 31 * result + filterCacheKey.hashCode()
     return result
   }
 }
@@ -106,6 +113,7 @@ data class DirSource(
   @JvmField val excludes: List<PathMatcher> = emptyList(),
   @JvmField val prefix: String = "",
   @JvmField val moduleName: String?,
+  override val filterCacheKey: List<String> = emptyList(),
 ) : Source {
   init {
     assert(!Files.isRegularFile(dir)) { "'$dir' should not be a file" }
@@ -123,6 +131,7 @@ data class DirSource(
     if (dir != other.dir) return false
     if (excludes != other.excludes) return false
     if (prefix != other.prefix) return false
+    if (filterCacheKey != other.filterCacheKey) return false
 
     return true
   }
@@ -131,6 +140,7 @@ data class DirSource(
     var result = dir.hashCode()
     result = 31 * result + excludes.hashCode()
     result = 31 * result + prefix.hashCode()
+    result = 31 * result + filterCacheKey.hashCode()
     return result
   }
 }

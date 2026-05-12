@@ -1,23 +1,34 @@
-// Copyright 2000-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.testframework.sm.runner;
 
 import com.intellij.execution.Location;
 import com.intellij.execution.PsiLocation;
+import com.intellij.execution.testframework.AbstractTestProxy;
 import com.intellij.execution.testframework.Filter;
 import com.intellij.execution.testframework.TestConsoleProperties;
+import com.intellij.execution.testframework.TestFrameworkRunningModel;
+import com.intellij.execution.testframework.TestTreeView;
+import com.intellij.execution.testframework.sm.runner.events.TestDurationStrategy;
 import com.intellij.execution.testframework.sm.runner.ui.MockPrinter;
+import com.intellij.execution.testframework.ui.AbstractTestTreeBuilderBase;
+import com.intellij.execution.testframework.ui.BaseTestProxyNodeDescriptor;
+import com.intellij.ide.util.treeView.NodeDescriptor;
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiDocumentManager;
+import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.impl.FakePsiElement;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.util.IdempotenceChecker;
 import com.intellij.util.containers.ContainerUtil;
 import org.easymock.EasyMock;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import static com.intellij.execution.testframework.sm.runner.states.TestStateInfo.Magnitude;
@@ -839,6 +850,29 @@ public class SMTestProxyTest extends BaseSMTRunnerTestCase {
     assertEquals(2L, duration.longValue());
   }
 
+  public void testSetDuration_Suite_ManualStrategy() {
+    SMTestProxy.SMRootTestProxy root = new SMTestProxy.SMRootTestProxy();
+    root.setDurationStrategy(TestDurationStrategy.MANUAL);
+    SMTestProxy suite = createSuiteProxy("suite");
+    root.addChild(suite);
+
+    suite.setDuration(500);
+    Long duration = suite.getDuration();
+    assertNotNull(duration);
+    assertEquals(500L, duration.longValue());
+  }
+
+  public void testSetDuration_Suite_AutomaticStrategy() {
+    SMTestProxy.SMRootTestProxy root = new SMTestProxy.SMRootTestProxy();
+    root.setDurationStrategy(TestDurationStrategy.AUTOMATIC);
+    SMTestProxy suite = createSuiteProxy("suite");
+    root.addChild(suite);
+
+    suite.setDuration(500);
+    Long duration = suite.getDuration();
+    assertNull(duration);
+  }
+
   public void testDuration_ForSuiteWithTests() {
     final SMTestProxy suite = createSuiteProxy("root");
     final SMTestProxy test1 = createTestProxy("test1", suite);
@@ -1203,6 +1237,59 @@ public class SMTestProxyTest extends BaseSMTRunnerTestCase {
   }
 
 
+  public void testSortByDuration_usesCustomizedDuration() {
+    // dynamicTests1: getCustomizedDuration()=2200, getDuration() sum=200
+    SMTestProxy suite1 = new SMTestProxy("dynamicTests1", true, null) {
+      @Override
+      public @NotNull Long getCustomizedDuration(@NotNull TestConsoleProperties props) {
+        return 2200L;
+      }
+    };
+    createTestProxy("Test 1", suite1).setDuration(100L);
+    createTestProxy("Test 2", suite1).setDuration(100L);
+
+    // dynamicTests2: getCustomizedDuration()=1000, getDuration() sum=1000
+    SMTestProxy suite2 = new SMTestProxy("dynamicTests2", true, null) {
+      @Override
+      public @NotNull Long getCustomizedDuration(@NotNull TestConsoleProperties props) {
+        return 1000L;
+      }
+    };
+    createTestProxy("Test 1", suite2).setDuration(500L);
+    createTestProxy("Test 2", suite2).setDuration(500L);
+
+    // Sanity: raw getDuration() would incorrectly sort suite2 first (pre-fix behaviour)
+    assertEquals(200L, (long)suite1.getDuration());
+    assertEquals(1000L, (long)suite2.getDuration());
+
+    TestConsoleProperties properties = createConsoleProperties();
+    TestConsoleProperties.SORT_BY_DURATION.set(properties, true);
+
+    TestFrameworkRunningModel model = new TestFrameworkRunningModel() {
+      @Override public TestConsoleProperties getProperties() { return properties; }
+      @Override public void setFilter(@NotNull Filter<?> filter) {}
+      @Override public boolean isRunning() { return false; }
+      @Override public TestTreeView getTreeView() { return null; }
+      @Override public AbstractTestTreeBuilderBase<?> getTreeBuilder() { return null; }
+      @Override public boolean hasTestSuites() { return false; }
+      @Override public AbstractTestProxy getRoot() { return null; }
+      @Override public void selectAndNotify(AbstractTestProxy proxy) {}
+      @Override public void dispose() {}
+    };
+
+    SMTestProxy root = createSuiteProxy("root");
+    root.addChild(suite1);
+    root.addChild(suite2);
+    NodeDescriptor<?> parentDesc = new BaseTestProxyNodeDescriptor<>(getProject(), root, null);
+    BaseTestProxyNodeDescriptor<SMTestProxy> desc1 = new BaseTestProxyNodeDescriptor<>(getProject(), suite1, parentDesc);
+    BaseTestProxyNodeDescriptor<SMTestProxy> desc2 = new BaseTestProxyNodeDescriptor<>(getProject(), suite2, parentDesc);
+
+    Comparator<NodeDescriptor<?>> comparator = model.createComparator();
+
+    assertTrue("suite1 (wall=2200 ms) must sort before suite2 (wall=1000 ms)",
+               comparator.compare(desc1, desc2) < 0);
+  }
+
   private static void assertDisplayTimeEqualsToSumOfChildren(@NotNull SMTestProxy node) {
     List<? extends SMTestProxy> children = node.collectChildren(new Filter<>() {
       @Override
@@ -1219,6 +1306,158 @@ public class SMTestProxyTest extends BaseSMTRunnerTestCase {
 
   protected static void assertWeightsOrder(final Magnitude previous, final Magnitude next) {
     assertTrue(previous.getSortWeight() < next.getSortWeight());
+  }
+
+  // ── Declaration-order sorting tests (regression for KTIJ-34747) ──────────
+
+  /**
+   * Normal case: both tests have resolvable PSI locations → sorted by text offset.
+   */
+  public void testSortByDeclarationOrder_sortedByTextOffset() {
+    TestConsoleProperties properties = createConsoleProperties();
+    TestConsoleProperties.SORT_BY_DURATION.set(properties, false);
+    TestConsoleProperties.SORT_ALPHABETICALLY.set(properties, false);
+    TestConsoleProperties.SORT_BY_DECLARATION_ORDER.set(properties, true);
+    TestConsoleProperties.SUITES_ALWAYS_ON_TOP.set(properties, false);
+
+    TestFrameworkRunningModel model = createModelFor(properties);
+
+    SMTestProxy root  = createSuiteProxy("root");
+    SMTestProxy test1 = proxyAtOffset("test1", root, 10);
+    SMTestProxy test2 = proxyAtOffset("test2", root, 20);
+
+    NodeDescriptor<?> parentDesc = new BaseTestProxyNodeDescriptor<>(getProject(), root, null);
+    BaseTestProxyNodeDescriptor<SMTestProxy> desc1 = new BaseTestProxyNodeDescriptor<>(getProject(), test1, parentDesc);
+    BaseTestProxyNodeDescriptor<SMTestProxy> desc2 = new BaseTestProxyNodeDescriptor<>(getProject(), test2, parentDesc);
+
+    Comparator<NodeDescriptor<?>> comparator = model.createComparator();
+    assertTrue("test1 (offset=10) must sort before test2 (offset=20)", comparator.compare(desc1, desc2) < 0);
+    assertTrue("test2 (offset=20) must sort after test1 (offset=10)",  comparator.compare(desc2, desc1) > 0);
+  }
+
+  /**
+   * Regression test for KTIJ-34747: non-JVM KMP targets whose {@code getLocation()} returns null
+   * must not crash the comparator — they should be placed at the end instead.
+   */
+  public void testSortByDeclarationOrder_nullLocationGoesToEnd() {
+    TestConsoleProperties properties = createConsoleProperties();
+    TestConsoleProperties.SORT_BY_DURATION.set(properties, false);
+    TestConsoleProperties.SORT_ALPHABETICALLY.set(properties, false);
+    TestConsoleProperties.SORT_BY_DECLARATION_ORDER.set(properties, true);
+    TestConsoleProperties.SUITES_ALWAYS_ON_TOP.set(properties, false);
+
+    TestFrameworkRunningModel model = createModelFor(properties);
+
+    SMTestProxy root    = createSuiteProxy("root");
+    SMTestProxy jvmTest = proxyAtOffset("jvm", root, 10);  // location is non-null
+    SMTestProxy jsTest  = createTestProxy("js",  root);    // no locator → getLocation() returns null
+
+    NodeDescriptor<?> parentDesc = new BaseTestProxyNodeDescriptor<>(getProject(), root, null);
+    BaseTestProxyNodeDescriptor<SMTestProxy> jvmDesc = new BaseTestProxyNodeDescriptor<>(getProject(), jvmTest, parentDesc);
+    BaseTestProxyNodeDescriptor<SMTestProxy> jsDesc  = new BaseTestProxyNodeDescriptor<>(getProject(), jsTest,  parentDesc);
+
+    Comparator<NodeDescriptor<?>> comparator = model.createComparator();
+    assertTrue("null-location node must go after valid-location node",  comparator.compare(jsDesc,  jvmDesc) > 0);
+    assertTrue("valid-location node must go before null-location node", comparator.compare(jvmDesc, jsDesc)  < 0);
+  }
+
+  /**
+   * Two nodes both with null locations must be considered equal (no crash, both visible).
+   */
+  public void testSortByDeclarationOrder_bothNullLocationAreEqual() {
+    TestConsoleProperties properties = createConsoleProperties();
+    TestConsoleProperties.SORT_BY_DURATION.set(properties, false);
+    TestConsoleProperties.SORT_ALPHABETICALLY.set(properties, false);
+    TestConsoleProperties.SORT_BY_DECLARATION_ORDER.set(properties, true);
+    TestConsoleProperties.SUITES_ALWAYS_ON_TOP.set(properties, false);
+
+    TestFrameworkRunningModel model = createModelFor(properties);
+
+    SMTestProxy root = createSuiteProxy("root");
+    SMTestProxy js   = createTestProxy("js",   root);
+    SMTestProxy wasm = createTestProxy("wasm", root);
+    // Neither overrides getLocation → returns null for both
+
+    NodeDescriptor<?> parentDesc = new BaseTestProxyNodeDescriptor<>(getProject(), root, null);
+    BaseTestProxyNodeDescriptor<SMTestProxy> jsDesc   = new BaseTestProxyNodeDescriptor<>(getProject(), js,   parentDesc);
+    BaseTestProxyNodeDescriptor<SMTestProxy> wasmDesc = new BaseTestProxyNodeDescriptor<>(getProject(), wasm, parentDesc);
+
+    Comparator<NodeDescriptor<?>> comparator = model.createComparator();
+    assertEquals("two null-location nodes must be equal", 0, comparator.compare(jsDesc, wasmDesc));
+  }
+
+  /**
+   * Nodes under different parents must not be reordered (comparator returns 0).
+   */
+  public void testSortByDeclarationOrder_differentParentsNotReordered() {
+    TestConsoleProperties properties = createConsoleProperties();
+    TestConsoleProperties.SORT_BY_DURATION.set(properties, false);
+    TestConsoleProperties.SORT_ALPHABETICALLY.set(properties, false);
+    TestConsoleProperties.SORT_BY_DECLARATION_ORDER.set(properties, true);
+    TestConsoleProperties.SUITES_ALWAYS_ON_TOP.set(properties, false);
+
+    TestFrameworkRunningModel model = createModelFor(properties);
+
+    SMTestProxy root   = createSuiteProxy("root");
+    SMTestProxy suite1 = createSuiteProxy("suite1", root);
+    SMTestProxy suite2 = createSuiteProxy("suite2", root);
+    SMTestProxy testA  = proxyAtOffset("testA", suite1, 100);
+    SMTestProxy testB  = proxyAtOffset("testB", suite2, 5);
+
+    NodeDescriptor<?> parentDesc1 = new BaseTestProxyNodeDescriptor<>(getProject(), suite1, null);
+    NodeDescriptor<?> parentDesc2 = new BaseTestProxyNodeDescriptor<>(getProject(), suite2, null);
+    BaseTestProxyNodeDescriptor<SMTestProxy> descA = new BaseTestProxyNodeDescriptor<>(getProject(), testA, parentDesc1);
+    BaseTestProxyNodeDescriptor<SMTestProxy> descB = new BaseTestProxyNodeDescriptor<>(getProject(), testB, parentDesc2);
+
+    Comparator<NodeDescriptor<?>> comparator = model.createComparator();
+    assertEquals("nodes under different parents must not be reordered", 0, comparator.compare(descA, descB));
+  }
+
+  private TestFrameworkRunningModel createModelFor(TestConsoleProperties properties) {
+    return new TestFrameworkRunningModel() {
+      @Override public TestConsoleProperties getProperties() { return properties; }
+      @Override public void setFilter(@NotNull Filter<?> filter) {}
+      @Override public boolean isRunning() { return false; }
+      @Override public TestTreeView getTreeView() { return null; }
+      @Override public AbstractTestTreeBuilderBase<?> getTreeBuilder() { return null; }
+      @Override public boolean hasTestSuites() { return false; }
+      @Override public AbstractTestProxy getRoot() { return null; }
+      @Override public void selectAndNotify(AbstractTestProxy proxy) {}
+      @Override public void dispose() {}
+    };
+  }
+
+  /**
+   * Creates a test proxy that overrides {@code getLocation()} to return a {@link PsiLocation}
+   * backed by a {@link FakePsiElement} at the given {@code textOffset}.
+   * This bypasses the {@code SMTestLocator} / caching machinery in {@link SMTestProxy#getLocation}.
+   */
+  private SMTestProxy proxyAtOffset(String name, SMTestProxy parent, int textOffset) {
+    Project project = getProject();
+    PsiElement psi = new FakePsiElement() {
+      @Override public int getTextOffset() { return textOffset; }
+      @Override public PsiElement getParent() { return null; }
+      @Override public String getName() { return name + "@" + textOffset; }
+      @Override public boolean isValid() { return true; }
+    };
+    SMTestProxy proxy = new SMTestProxy(name, false, null) {
+      @Override
+      public @Nullable Location getLocation(@NotNull Project p, @NotNull GlobalSearchScope scope) {
+        return new Location<PsiElement>() {
+          @Override public @NotNull PsiElement getPsiElement() { return psi; }
+          @Override public @NotNull Project getProject() { return project; }
+          @Override public @Nullable com.intellij.openapi.module.Module getModule() { return null; }
+          @Override public @NotNull <T extends PsiElement> java.util.Iterator<Location<T>> getAncestors(Class<T> c, boolean strict) {
+            return java.util.Collections.emptyIterator();
+          }
+          @Override public @NotNull PsiLocation<PsiElement> toPsiLocation() {
+            return new PsiLocation<>(project, null, psi);
+          }
+        };
+      }
+    };
+    parent.addChild(proxy);
+    return proxy;
   }
 
   private static class MockTestLocator implements SMTestLocator {

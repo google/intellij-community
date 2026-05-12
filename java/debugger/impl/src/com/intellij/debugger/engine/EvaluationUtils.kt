@@ -156,23 +156,6 @@ private suspend fun <R> tryToBreakOnAnyMethodAndEvaluate(
 }
 
 @ApiStatus.Internal
-fun <Self : XBreakpoint<P>, P : XBreakpointProperties<*>, S : BreakpointState> shouldInstrumentBreakpoint(xB: XBreakpointBase<Self, P, S>): Boolean {
-  if (!JvmDebuggerUtils.isBreakpointInstrumentationSwitchedOn()) {
-    return false
-  }
-  if (xB.isLogMessage || xB.isLogStack) return false
-  val properties = xB.properties
-  if (properties !is JavaLineBreakpointProperties) return false
-
-  // Do not use instrumentation for non-standard breakpoints: any filters will back up to the old behavior
-  if (JavaLineBreakpointProperties() != properties) return false
-
-  val isLoggingBp = xB.logExpressionObject != null && xB.suspendPolicy == SuspendPolicy.NONE
-  val isConditionalBp = xB.conditionExpression != null && xB.isConditionEnabled
-  return (isLoggingBp || isConditionalBp) && !(isLoggingBp && isConditionalBp)
-}
-
-@ApiStatus.Internal
 @JvmField
 val INSTRUMENTATION_CONDITION_HIT_CALLBACK = Key.create<(SuspendContextImpl) -> Unit>("INSTRUMENTATION_CONDITION_HIT_CALLBACK")
 

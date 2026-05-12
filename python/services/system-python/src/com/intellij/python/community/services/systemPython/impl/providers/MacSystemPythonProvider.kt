@@ -1,7 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.python.community.services.systemPython.impl.providers
 
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.platform.eel.EelApi
 import com.intellij.platform.eel.isMac
 import com.intellij.python.community.services.systemPython.SystemPythonProvider
@@ -14,7 +13,6 @@ import java.nio.file.Path
 
 
 internal class MacSystemPythonProvider : SystemPythonProvider {
-  private val LOGGER: Logger = Logger.getInstance(MacSystemPythonProvider::class.java)
 
   private val directories = listOf(
     Path.of("/usr/bin"),
@@ -38,14 +36,7 @@ internal class MacSystemPythonProvider : SystemPythonProvider {
     }
 
     val pythons = withContext(Dispatchers.IO) {
-      try {
-        return@withContext collectPythonsInPaths( directories, names)
-      }
-      catch (e: RuntimeException) {
-        LOGGER.error("Failed to discover mac system pythons", e)
-      }
-
-      return@withContext emptySet()
+      return@withContext collectPythonsInPaths(directories, names)
     }
 
     return PyResult.success(pythons)

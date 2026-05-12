@@ -1,7 +1,9 @@
 <idea-plugin visibility="internal" package="org.jetbrains.kotlin.idea.highlighting">
   <dependencies>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+    <module name="intellij.java.psi"/>
     <module name="intellij.kotlin.searching"/>
-    <module name="intellij.kotlin.base.scripting"/>
+    <!-- endregion -->
   </dependencies>
 
   <extensionPoints>
@@ -19,7 +21,7 @@
     <highlightVisitor implementation="org.jetbrains.kotlin.idea.highlighting.visitor.KotlinDslSemanticHighlightingVisitor"/>
     <highlightVisitor implementation="org.jetbrains.kotlin.idea.highlighting.visitor.KotlinDiagnosticHighlightVisitor"/>
     <highlightVisitor implementation="org.jetbrains.kotlin.idea.highlighting.visitor.KotlinUnusedDeclarationHighlightingVisitor"/>
-    <highlightVisitor implementation="org.jetbrains.kotlin.idea.highlighting.visitor.KotlinUnresolvedKDocHighlightVisitor"/>
+    <highlightVisitor implementation="org.jetbrains.kotlin.idea.highlighting.visitor.ParameterNamesHighlightingExtension"/>
     <highlightErrorFilter implementation="org.jetbrains.kotlin.idea.highlighting.visitor.KotlinHighlightInjectionErrorFilter"/>
 
     <highlightUsagesHandlerFactory implementation="org.jetbrains.kotlin.idea.highlighting.KotlinHighlightExitPointsHandlerFactory"/>
@@ -32,6 +34,10 @@
     <registryKey key="kotlin.highlighting.internal.show.diagnostic.names"
                  description="Shows diagnostic names in internal mode for debugging purposes."
                  defaultValue="true"/>
+  </extensions>
+
+  <extensions defaultExtensionNs="org.jetbrains.kotlin">
+    <beforeResolveHighlightingVisitor implementation="org.jetbrains.kotlin.idea.highlighting.visitor.ParameterNamesHighlightingExtension"/>
   </extensions>
 
 </idea-plugin>

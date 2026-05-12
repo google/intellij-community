@@ -1,7 +1,9 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.plugins
 
+import com.intellij.ide.plugins.PluginDependencyAnalysis.DependencyRef
 import com.intellij.openapi.extensions.PluginId
+import com.intellij.util.containers.sequenceOfNotNull
 import org.jetbrains.annotations.ApiStatus
 
 /**
@@ -9,6 +11,8 @@ import org.jetbrains.annotations.ApiStatus
  * with each other by declared plugin and content module ids (including plugin aliases).
  *
  * @see AmbiguousPluginSet
+ *
+ * TODO: rename into PluginSet after current PluginSet is dropped, rename AmbiguousPluginSet into PluginMultiSet
  */
 @ApiStatus.Internal
 interface UnambiguousPluginSet {
@@ -87,3 +91,28 @@ fun AmbiguousPluginSet.buildFullPluginIdMapping(): Map<PluginId, List<PluginModu
 @ApiStatus.Internal
 fun AmbiguousPluginSet.buildFullContentModuleIdMapping(): Map<PluginModuleId, List<ContentModuleDescriptor>> =
   sequenceAllContentModuleIds().associateWith { resolveContentModuleId(it).toList() }
+
+@ApiStatus.Internal
+fun UnambiguousPluginSet.resolveReference(ref: DependencyRef): PluginModuleDescriptor? {
+  return when (ref) {
+    is DependencyRef.Plugin -> resolvePluginId(ref.pluginId)
+    is DependencyRef.ContentModule -> resolveContentModuleId(ref.moduleId)
+  }
+}
+
+@ApiStatus.Internal
+fun AmbiguousPluginSet.resolveReference(ref: DependencyRef): Sequence<PluginModuleDescriptor> {
+  return when (ref) {
+    is DependencyRef.Plugin -> resolvePluginId(ref.pluginId)
+    is DependencyRef.ContentModule -> resolveContentModuleId(ref.moduleId)
+  }
+}
+
+@ApiStatus.Internal
+fun UnambiguousPluginSet.asAmbiguousPluginSet(): AmbiguousPluginSet = object : AmbiguousPluginSet {
+  override val plugins: List<PluginMainDescriptor> get() = this@asAmbiguousPluginSet.plugins
+  override fun resolvePluginId(id: PluginId): Sequence<PluginModuleDescriptor> = sequenceOfNotNull(this@asAmbiguousPluginSet.resolvePluginId(id))
+  override fun resolveContentModuleId(id: PluginModuleId): Sequence<ContentModuleDescriptor> = sequenceOfNotNull(this@asAmbiguousPluginSet.resolveContentModuleId(id))
+  override fun sequenceAllPluginIds(): Sequence<PluginId> = this@asAmbiguousPluginSet.sequenceAllPluginIds()
+  override fun sequenceAllContentModuleIds(): Sequence<PluginModuleId> = this@asAmbiguousPluginSet.sequenceAllContentModuleIds()
+}

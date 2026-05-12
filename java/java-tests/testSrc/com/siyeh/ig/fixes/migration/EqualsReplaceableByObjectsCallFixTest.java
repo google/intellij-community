@@ -17,7 +17,6 @@ package com.siyeh.ig.fixes.migration;
 
 import com.intellij.codeInspection.CommonQuickFixBundle;
 import com.intellij.pom.java.LanguageLevel;
-import com.intellij.testFramework.IdeaTestUtil;
 import com.intellij.testFramework.builders.JavaModuleFixtureBuilder;
 import com.siyeh.ig.IGQuickFixesTestCase;
 import com.siyeh.ig.migration.EqualsReplaceableByObjectsCallInspection;
@@ -56,7 +55,7 @@ public class EqualsReplaceableByObjectsCallFixTest extends IGQuickFixesTestCase 
 
   @Override
   protected void tuneFixture(JavaModuleFixtureBuilder builder) {
-    builder.addJdk(IdeaTestUtil.getMockJdk18Path().getPath())
+    builder.addJdkVersion(LanguageLevel.JDK_1_8)
       .setLanguageLevel(LanguageLevel.JDK_1_7);
   }
 

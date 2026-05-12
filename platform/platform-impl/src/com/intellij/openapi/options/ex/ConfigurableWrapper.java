@@ -309,6 +309,17 @@ public class ConfigurableWrapper implements SearchableConfigurable, Weighted, Hi
              : getClass();
   }
 
+  @ApiStatus.Experimental
+  @Override
+  public boolean isSearchableInActions() {
+    UnnamedConfigurable configurable = myConfigurable;
+    if (configurable instanceof SearchableConfigurable searchableConfigurable) {
+      return searchableConfigurable.isSearchableInActions();
+    }
+
+    return myEp.searchableInActions;
+  }
+
   private @Nls @Nullable String markerText = null;
 
   @Override

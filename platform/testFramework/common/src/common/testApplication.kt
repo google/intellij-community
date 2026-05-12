@@ -70,12 +70,13 @@ import com.intellij.util.PlatformUtils
 import com.intellij.util.SystemProperties
 import com.intellij.util.WalkingState
 import com.intellij.util.concurrency.AppScheduledExecutorService
+import com.intellij.util.concurrency.ThreadingAssertions
+import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.indexing.FileBasedIndex
 import com.intellij.util.indexing.FileBasedIndexImpl
 import com.intellij.util.ref.IgnoredTraverseEntry
 import com.intellij.util.ui.EDT
 import com.intellij.util.ui.EdtInvocationManager
-import com.intellij.util.ui.UIUtil
 import com.jetbrains.JBR
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -201,7 +202,7 @@ private fun loadAppInUnitTestMode(isHeadless: Boolean) {
       // 40 seconds - tests maybe executed on cloud agents where I/O is very slow
       val timeout = System.getProperty("intellij.testFramework.modules.timeout.seconds", "40").toLong()
       val pluginSet = loadedModuleFuture.asCompletableFuture().get(timeout, TimeUnit.SECONDS)
-      app.registerComponents(modules = pluginSet.getEnabledModules(), app = app)
+      app.registerComponents(descriptors = pluginSet.sequenceResolvedSortedDescriptorsForRegistration(), app = app)
 
       val task = suspend {
         initConfigurationStore(app, emptyList())
@@ -278,8 +279,8 @@ fun Application.cleanApplicationState() {
   runCatching {
     runInEdtAndWait {
       NonBlockingReadActionImpl.waitForAsyncTaskCompletion()
+      waitForAppLeakingThreads(application = this, timeout = 10, timeUnit = TimeUnit.SECONDS)
     }
-    waitForAppLeakingThreads(application = this, timeout = 10, timeUnit = TimeUnit.SECONDS)
   }.onFailure(::addError)
 
   cleanApplicationStateCatching()?.let(::addError)
@@ -386,32 +387,38 @@ fun assertNonDefaultProjectsAreNotLeaked(ignoredTraverseEntries : List<IgnoredTr
 }
 
 @TestOnly
+@RequiresEdt
 fun waitForAppLeakingThreads(application: Application, timeout: Long, timeUnit: TimeUnit) {
   require(!application.isDisposed)
-
+  ThreadingAssertions.assertEventDispatchThread()
   val index = application.serviceIfCreated<FileBasedIndex>() as? FileBasedIndexImpl
   index?.changedFilesCollector?.waitForVfsEventsExecuted(timeout, timeUnit) {
     dispatchAllEventsInIdeEventQueue()
   }
 
-  val commitThread = application.serviceIfCreated<DocumentCommitProcessor>() as? DocumentCommitThread
-  TestOnlyThreading.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack {
-    commitThread?.waitForAllCommits(timeout, timeUnit)
-  }
+  waitForAllDocumentsCommitted(timeout, timeUnit)
 
   val stubIndex = application.serviceIfCreated<StubIndex>() as? StubIndexImpl
   stubIndex?.waitUntilStubIndexedInitialized()
 
   while (RefreshQueue.getInstance() != null && (RefreshQueueImpl.isRefreshInProgress || RefreshQueueImpl.isEventProcessingInProgress)) {
-    if (EDT.isCurrentThreadEdt()) {
-      TestOnlyThreading.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack {
-        EDT.dispatchAllInvocationEvents()
-      }
-    }
-    else {
-      UIUtil.pump()
+    TestOnlyThreading.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack {
+      EDT.dispatchAllInvocationEvents()
     }
   }
+}
+
+@RequiresEdt
+@TestOnly
+fun waitForAllDocumentsCommitted(timeout: Long, timeUnit: TimeUnit) {
+  val documentCommitThread = serviceIfCreated<DocumentCommitProcessor>() as? DocumentCommitThread
+  if (documentCommitThread != null) {
+    TestOnlyThreading.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack {
+      documentCommitThread.waitForAllCommits(timeout, timeUnit)
+    }
+  }
+  // some callbacks on document commit might require EDT. So we forcibly dispatch pending events to run these callbacks
+  EDT.dispatchAllInvocationEvents()
 }
 
 @TestOnly

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.eel.impl.local
 
 import com.intellij.execution.process.LocalProcessService
@@ -7,6 +7,7 @@ import com.intellij.openapi.components.serviceAsync
 import com.intellij.platform.eel.EelApi
 import com.intellij.platform.eel.EelProcess
 import com.intellij.platform.eel.EelWindowsProcess
+import com.intellij.platform.eel.SafeDeferred
 import com.intellij.platform.eel.channels.EelReceiveChannel
 import com.intellij.platform.eel.channels.EelSendChannel
 import com.intellij.platform.eel.provider.utils.asEelChannel
@@ -15,7 +16,6 @@ import com.intellij.util.io.awaitExit
 import com.pty4j.WinSize
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 
 internal class LocalEelWindowsProcess private constructor(
@@ -34,11 +34,14 @@ internal class LocalEelWindowsProcess private constructor(
   override val stdin: EelSendChannel = process.outputStream.asEelChannel()
   override val stdout: EelReceiveChannel = StreamClosedAwareEelReceiveChannel(process.inputStream.consumeAsEelChannel())
   override val stderr: EelReceiveChannel = StreamClosedAwareEelReceiveChannel(process.errorStream.consumeAsEelChannel())
-  override val exitCode: Deferred<Int> = scope.async(CoroutineName("LocalEelWindowsProcess ($commandLineForDebug) pid=${process.pid()}")) {
-    process.awaitExit()
-  }
+  override val exitCode: SafeDeferred<Int> = SafeDeferred(
+    scope.async(CoroutineName("LocalEelWindowsProcess ($commandLineForDebug) pid=${process.pid()}")) {
+      process.awaitExit()
+    }
+  )
 
   override suspend fun kill() {
+    LocalProcessService.getInstance().killWinProcessRecursively(process.pid().toInt())
     process.destroyForcibly()
   }
 

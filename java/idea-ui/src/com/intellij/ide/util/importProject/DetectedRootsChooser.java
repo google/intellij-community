@@ -6,7 +6,7 @@ import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.ComboBoxTableRenderer;
 import com.intellij.ui.CollectionComboBoxModel;
 import com.intellij.ui.ScrollPaneFactory;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.ui.table.TableView;
 import com.intellij.util.EventDispatcher;
 import com.intellij.util.ui.ColumnInfo;
@@ -109,7 +109,7 @@ public class DetectedRootsChooser {
     public TableCellEditor getEditor(DetectedRootData o) {
       ComboBox<DetectedProjectRoot> comboBox =
         new ComboBox<>(new CollectionComboBoxModel<>(new ArrayList<>(Arrays.asList(o.getAllRoots())), o.getSelectedRoot()));
-      comboBox.setRenderer(SimpleListCellRenderer.create("", DetectedProjectRoot::getRootTypeName));
+      comboBox.setRenderer(BuilderKt.textListCellRenderer("", DetectedProjectRoot::getRootTypeName));
       return new DefaultCellEditor(comboBox);
     }
 

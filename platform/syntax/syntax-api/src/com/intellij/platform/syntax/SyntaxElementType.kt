@@ -1,10 +1,7 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:OptIn(ExperimentalAtomicApi::class)
-@file:ApiStatus.Experimental
-
 package com.intellij.platform.syntax
 
-import org.jetbrains.annotations.ApiStatus
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.fetchAndIncrement
@@ -22,7 +19,6 @@ import kotlin.jvm.JvmOverloads
  *
  * @see [SyntaxElementType(String, LazyParser?, Any?, Boolean)] builder function
  */
-@ApiStatus.Experimental
 class SyntaxElementType internal constructor(
   private val debugName: String,
   internal val lazyParser: LazyParser?,
@@ -61,7 +57,6 @@ class SyntaxElementType internal constructor(
  * @param userData an arbitrary object associated with this element type.
  * @param transient whether this element type is lightweight or not. If `true`, the element type will not be assigned an index and cannot be stored in a set.
  */
-@ApiStatus.Experimental
 @JvmOverloads
 fun SyntaxElementType(
   debugName: String,

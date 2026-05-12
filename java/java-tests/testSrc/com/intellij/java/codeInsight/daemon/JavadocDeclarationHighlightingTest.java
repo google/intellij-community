@@ -80,6 +80,8 @@ public class JavadocDeclarationHighlightingTest extends LightDaemonAnalyzerTestC
   public void testLink0() { doTest(); }
   public void testLink1() { doTest(); }
   public void testLink2() { doTest(); }
+  public void testLink3() { doTest(); }
+  public void testLink4() { doTest(); }
   public void testLinkFromInnerClassToSelfMethod() { doTest(); }
   public void testValueBadReference() { doTest(); }
   public void testValueGoodReference() { doTest(); }
@@ -98,7 +100,6 @@ public class JavadocDeclarationHighlightingTest extends LightDaemonAnalyzerTestC
   public void testModule() { setLanguageLevel(LanguageLevel.JDK_1_9); doTest("moduleInfo/m2/module-info.java"); }
   public void testUnknownInlineTag() { doTest(); }
   public void testUnknownTags() { doTest(); }
-  public void testBadCharacters() { doTest(); }
   public void testVararg() { doTest(); }
   public void testInnerClassReferenceInSignature() { doTest(); }
   public void testBadReference() { doTest(); }

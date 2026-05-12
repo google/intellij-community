@@ -72,7 +72,7 @@ public class PsiTreeUtil {
    *
    * @param ancestor parent candidate. {@code false} will be returned if ancestor is {@code null}.
    * @param element  child candidate
-   * @param strict   whether to start search from the element ({@code true}) or from the element's parent ({@code false}).
+   * @param strict   whether to start search from the element ({@code false}) or from the element's parent ({@code true}).
    * @return {@code true} if {@code element} has {@code ancestor} as its ancestor somewhere in the hierarchy, {@code false} otherwise.
    */
   @Contract(value = "null, _, _ -> false", pure = true)
@@ -100,7 +100,7 @@ public class PsiTreeUtil {
    *
    * @param ancestor parent candidate. {@code false} will be returned if ancestor is {@code null}.
    * @param element  child candidate
-   * @param strict   whether to start search from the element ({@code true}) or from the element's parent ({@code false}).
+   * @param strict   whether to start search from the element ({@code false}) or from the element's context ({@code true}).
    * @return {@code true} if the element has ancestor as its parent somewhere in the hierarchy, {@code false} otherwise.
    */
   @Contract("null, _, _ -> false")
@@ -619,6 +619,13 @@ public class PsiTreeUtil {
     return getParentOfType(element, aClass, true);
   }
 
+  /**
+   * @param element the element to get the parent for.
+   * @return the parent stub's psi or null if {@code element} has an active stub, otherwise the parent psi or null.
+   *
+   * @see StubElement#getParentStub()
+   * @see PsiElement#getParent()
+   */
   @Contract("null -> null")
   public static @Nullable PsiElement getStubOrPsiParent(@Nullable PsiElement element) {
     if (element instanceof StubBasedPsiElement) {

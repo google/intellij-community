@@ -6,7 +6,6 @@ import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.codeInspection.java18StreamApi.StaticPseudoFunctionalStyleMethodInspection;
 import com.intellij.pom.java.LanguageLevel;
 import com.intellij.project.IntelliJProjectConfiguration;
-import com.intellij.testFramework.IdeaTestUtil;
 import com.intellij.testFramework.builders.JavaModuleFixtureBuilder;
 import com.intellij.testFramework.fixtures.JavaCodeInsightFixtureTestCase;
 import com.intellij.util.ArrayUtilRt;
@@ -24,7 +23,7 @@ public class StaticPseudoFunctionalStyleMethodTest extends JavaCodeInsightFixtur
   protected void tuneFixture(JavaModuleFixtureBuilder moduleBuilder) {
     moduleBuilder.setLanguageLevel(LanguageLevel.JDK_1_8);
     moduleBuilder.addLibrary("guava", ArrayUtilRt.toStringArray(IntelliJProjectConfiguration.getProjectLibraryClassesRootPaths("Guava")));
-    moduleBuilder.addJdk(IdeaTestUtil.getMockJdk18Path().getPath());
+    moduleBuilder.addJdkVersion(LanguageLevel.JDK_1_8);
   }
 
   public void testSimpleTransform() {

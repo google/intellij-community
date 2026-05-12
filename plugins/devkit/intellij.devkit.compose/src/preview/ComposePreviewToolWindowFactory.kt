@@ -5,6 +5,7 @@ package com.intellij.devkit.compose.preview
 
 import androidx.compose.runtime.currentComposer
 import androidx.compose.runtime.currentCompositeKeyHashCode
+import com.intellij.devkit.compose.isComposeToolingEnabled
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.UI
@@ -15,7 +16,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.getUserData
 import com.intellij.openapi.ui.putUserData
 import com.intellij.openapi.util.Key
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import kotlinx.coroutines.Dispatchers
@@ -32,7 +32,7 @@ private val LOG = fileLogger()
 internal class ComposePreviewToolWindowFactory : ToolWindowFactory, DumbAware {
 
   override fun shouldBeAvailable(project: Project): Boolean {
-    return Registry.`is`("devkit.compose.desktop.preview")
+    return isComposeToolingEnabled()
   }
 
   @OptIn(ExperimentalJewelApi::class)

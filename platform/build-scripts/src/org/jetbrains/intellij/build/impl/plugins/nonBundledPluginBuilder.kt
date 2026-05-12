@@ -46,13 +46,14 @@ import org.jetbrains.intellij.build.impl.generatePluginRepositoryMetaFile
 import org.jetbrains.intellij.build.impl.handleCustomPlatformSpecificAssets
 import org.jetbrains.intellij.build.impl.nonBundledPluginsStageDir
 import org.jetbrains.intellij.build.impl.projectStructureMapping.DistributionFileEntry
+import org.jetbrains.intellij.build.impl.validateCoScramblePluginsAreNotPublished
 import org.jetbrains.intellij.build.io.W_CREATE_NEW
 import org.jetbrains.intellij.build.io.ZipArchiver
 import org.jetbrains.intellij.build.io.archiveDir
 import org.jetbrains.intellij.build.io.writeNewFile
 import org.jetbrains.intellij.build.io.writeNewZipWithoutIndex
 import org.jetbrains.intellij.build.io.zipWithCompression
-import org.jetbrains.intellij.build.productLayout.util.mapConcurrent
+import org.jetbrains.intellij.build.mapConcurrent
 import org.jetbrains.intellij.build.telemetry.TraceManager.spanBuilder
 import org.jetbrains.intellij.build.telemetry.use
 import tools.jackson.jr.ob.JSON
@@ -100,6 +101,7 @@ private suspend fun buildNonBundledPlugins(
   if (pluginsToPublish.isEmpty()) {
     return emptyList()
   }
+  validateCoScramblePluginsAreNotPublished(pluginsToPublish)
 
   val buildKeymapPluginsTask = if (context.options.buildStepsToSkip.contains(BuildOptions.KEYMAP_PLUGINS_STEP)) {
     null
@@ -121,6 +123,10 @@ private suspend fun buildNonBundledPlugins(
   val json: Lazy<JSON> = lazy { JSON.std.without(JSON.Feature.USE_FIELDS) }
   val pluginDirs = getOsSpecificNonBundledPluginsDirs(context)
   val mappings = pluginDirs.mapNotNull { (os, arch, targetDir) ->
+    if (os != null && arch != null && !context.shouldBuildDistributionForOS(os, arch)) {
+      return@mapNotNull null
+    }
+
     val filteredPlugins = pluginsToPublish.filter {
       satisfiesOsArchRestrictions(plugin = it, osFamily = os, arch = arch)
     }.sortedWith(PLUGIN_LAYOUT_COMPARATOR_BY_MAIN_MODULE)

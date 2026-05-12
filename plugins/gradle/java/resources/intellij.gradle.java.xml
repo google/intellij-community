@@ -3,15 +3,18 @@
   <dependencies>
     <module name="intellij.gradle"/>
     <module name="intellij.gradle.toolingExtension.impl"/>
+    <module name="intellij.java.debugger.impl.shared"/>
     <module name="intellij.java"/>
     <module name="intellij.java.compiler"/>
     <module name="intellij.java.compiler.impl"/>
     <module name="intellij.java.debugger.impl"/>
-    <module name="intellij.java.debugger.impl.shared"/>
     <module name="intellij.java.execution"/>
     <module name="intellij.java.execution.impl"/>
+    <module name="intellij.java.frontback.psi"/>
     <module name="intellij.java.impl"/>
     <module name="intellij.java.indexing"/>
+    <module name="intellij.java.psi"/>
+    <module name="intellij.java.syntax"/>
     <module name="intellij.java.ui"/>
     <module name="intellij.platform.jps.build"/>
     <module name="intellij.properties.backend.psi"/>
@@ -34,6 +37,9 @@
                     dynamic="true"/>
     <extensionPoint qualifiedName="org.jetbrains.plugins.gradle.externallyHandledExtensions"
                     interface="org.jetbrains.plugins.gradle.service.resolve.GradleVersionCatalogHandler"
+                    dynamic="true"/>
+    <extensionPoint qualifiedName="org.jetbrains.plugins.gradle.versionCatalogEntrySearcher"
+                    interface="org.jetbrains.plugins.gradle.service.resolve.GradleVersionCatalogEntrySearcher"
                     dynamic="true"/>
     <extensionPoint qualifiedName="org.jetbrains.plugins.gradle.dslInspectionProvider"
                     beanClass="com.intellij.lang.LanguageExtensionPoint"
@@ -94,6 +100,8 @@
 
     <externalSystemExecutionConsoleManager
         implementation="org.jetbrains.plugins.gradle.execution.test.runner.GradleTestsExecutionConsoleManager" id="gradleTest" order="before gradle"/>
+    <externalSystemExecutionConsoleManager
+        implementation="org.jetbrains.plugins.gradle.execution.GradleJavaExecutionConsoleManager" id="gradleJava" order="before gradle"/>
     <runConfigurationProducer id="allInPackageGradleConfigurationProducer"
                               implementation="org.jetbrains.plugins.gradle.execution.test.runner.AllInPackageGradleConfigurationProducer"
                               order="last"/>
@@ -131,7 +139,7 @@
 
     <localInspection language="UAST" groupPath="Gradle" shortName="ConfigurationAvoidance"
                      bundle="messages.GradleInspectionBundle"
-                     key="inspection.display.name.configuration.avoidance" groupKey="inspection.best.practises" groupBundle="messages.GradleInspectionBundle"
+                     key="inspection.display.name.configuration.avoidance" groupKey="inspection.best.practices" groupBundle="messages.GradleInspectionBundle"
                      enabledByDefault="true" level="WARNING"
                      implementationClass="org.jetbrains.plugins.gradle.codeInspection.GradleConfigurationAvoidanceInspection"/>
 
@@ -161,11 +169,50 @@
 
     <localInspection language="UAST" groupPath="Gradle" shortName="AvoidDependencyNamedArgumentsNotation"
                      bundle="messages.GradleInspectionBundle"
-                     key="inspection.display.name.avoid.dependency.named.arguments.notation" groupKey="inspection.best.practises"
+                     key="inspection.display.name.avoid.dependency.named.arguments.notation" groupKey="inspection.best.practices"
                      groupBundle="messages.GradleInspectionBundle"
                      enabledByDefault="true" level="WEAK WARNING"
                      implementationClass="org.jetbrains.plugins.gradle.codeInspection.GradleAvoidDependencyNamedArgumentsNotationInspection"
-                     isInternal="true"/>
+                     isInternal="false"/>
+
+    <localInspection language="UAST" groupPath="Gradle" shortName="AvoidApplyPluginMethod"
+                     bundle="messages.GradleInspectionBundle"
+                     key="inspection.display.name.avoid.apply.plugin.method" groupKey="inspection.best.practices"
+                     groupBundle="messages.GradleInspectionBundle"
+                     enabledByDefault="true" level="WEAK WARNING"
+                     implementationClass="org.jetbrains.plugins.gradle.codeInspection.GradleAvoidApplyPluginMethodInspection"
+                     isInternal="false"/>
+
+    <localInspection language="UAST" groupPath="Gradle" shortName="AvoidRepositoriesInBuildGradle"
+                     bundle="messages.GradleInspectionBundle"
+                     key="inspection.display.name.avoid.repositories.in.build.gradle" groupKey="inspection.best.practices"
+                     groupBundle="messages.GradleInspectionBundle"
+                     enabledByDefault="false" level="WEAK WARNING"
+                     implementationClass="org.jetbrains.plugins.gradle.codeInspection.AvoidRepositoriesInBuildGradleInspection"
+                     isInternal="false"/>
+
+    <localInspection language="UAST" groupPath="Gradle" shortName="AvoidDuplicateDependencies"
+                     bundle="messages.GradleInspectionBundle"
+                     key="inspection.display.name.avoid.duplicate.dependencies" groupKey="inspection.best.practices"
+                     groupBundle="messages.GradleInspectionBundle"
+                     enabledByDefault="true" level="WEAK WARNING"
+                     implementationClass="org.jetbrains.plugins.gradle.codeInspection.GradleAvoidDuplicateDependenciesInspection"
+                     isInternal="false"/>
+
+    <localInspection language="UAST" groupPath="Gradle" shortName="TaskMissingDescription"
+                     bundle="messages.GradleInspectionBundle"
+                     key="inspection.display.name.task.missing.description" groupKey="inspection.best.practices"
+                     groupBundle="messages.GradleInspectionBundle"
+                     enabledByDefault="true" level="WEAK WARNING"
+                     implementationClass="org.jetbrains.plugins.gradle.codeInspection.GradleTaskMissingDescriptionInspection"
+                     isInternal="false"/>
+
+    <localInspection language="UAST" groupPath="Gradle" shortName="AvoidDuplicateRepositories"
+                     bundle="messages.GradleInspectionBundle"
+                     key="inspection.display.name.avoid.duplicate.repositories" groupKey="inspection.best.practices"
+                     groupBundle="messages.GradleInspectionBundle"
+                     enabledByDefault="true" level="WEAK WARNING"
+                     implementationClass="org.jetbrains.plugins.gradle.codeInspection.GradleAvoidDuplicateRepositoriesInspection"/>
 
   </extensions>
 </idea-plugin>

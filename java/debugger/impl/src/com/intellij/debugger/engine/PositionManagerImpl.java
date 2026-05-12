@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.debugger.engine;
 
 import com.intellij.debugger.MultiRequestPositionManager;
@@ -12,14 +12,18 @@ import com.intellij.debugger.impl.DebuggerUtilsEx;
 import com.intellij.debugger.jdi.VirtualMachineProxyImpl;
 import com.intellij.debugger.requests.ClassPrepareRequestor;
 import com.intellij.debugger.ui.breakpoints.JavaLineBreakpointType;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.fileTypes.BinaryFileTypeDecompilers;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.IndexNotReadyException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.projectRoots.Sdk;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.Ref;
+import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
@@ -40,8 +44,10 @@ import com.intellij.psi.search.FilenameIndex;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.util.PsiUtil;
+import com.intellij.ui.UIBundle;
 import com.intellij.util.concurrency.annotations.RequiresReadLock;
 import com.intellij.util.containers.ContainerUtil;
+import com.intellij.util.ui.EDT;
 import com.intellij.xdebugger.XDebuggerUtil;
 import com.sun.jdi.AbsentInformationException;
 import com.sun.jdi.Location;
@@ -276,7 +282,7 @@ public class PositionManagerImpl implements PositionManager, MultiRequestPositio
 
     @Override
     public SourcePosition mapDelegate(final SourcePosition original) {
-      return ReadAction.compute(() -> {
+      return ReadAction.nonBlocking(() -> {
         PsiFile file = original.getFile();
         int line = original.getLine();
 
@@ -313,7 +319,7 @@ public class PositionManagerImpl implements PositionManager, MultiRequestPositio
           }
         }
         return original;
-      });
+      }).executeSynchronously();
     }
   }
 
@@ -669,7 +675,20 @@ public class PositionManagerImpl implements PositionManager, MultiRequestPositio
     public SourcePosition mapDelegate(SourcePosition original) {
       PsiFile file = getFile();
       if (myOriginalLine < 0 || !file.isValid()) return original;
-      file.getViewProvider().getDocument(); // to ensure decompilation
+
+      if (Registry.is("hyperlink.ide.decompiler.open.file") &&
+          EDT.isCurrentThreadEdt() &&
+          !ApplicationManager.getApplication().isWriteAccessAllowed() &&
+          BinaryFileTypeDecompilers.getInstance().hasDecompiler(file.getVirtualFile())) {
+        ProgressManager.getInstance()
+          .runProcessWithProgressSynchronously(() ->
+                                                 ReadAction.computeCancellable(
+                                                   () -> file.getViewProvider().getDocument()),
+                                               UIBundle.message("progress.decompiling.file", file.getName()), true, file.getProject());
+      }
+      else {
+        file.getViewProvider().getDocument(); // to ensure decompilation
+      }
       SourcePosition position = calcLineMappedSourcePosition(file, myOriginalLine);
       return position != null ? position : original;
     }

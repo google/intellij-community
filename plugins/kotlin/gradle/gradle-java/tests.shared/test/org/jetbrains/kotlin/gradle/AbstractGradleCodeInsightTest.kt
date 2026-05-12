@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.gradle
 
 import com.intellij.openapi.Disposable
@@ -20,7 +20,7 @@ import org.jetbrains.kotlin.idea.test.KotlinTestUtils.toSlashEndingDirPath
 import org.jetbrains.kotlin.idea.test.TestFiles
 import org.jetbrains.plugins.gradle.frameworkSupport.GradleDsl
 import org.jetbrains.plugins.gradle.testFramework.GradleTestFixtureBuilder
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatKotlinIsSupported
+import org.jetbrains.plugins.gradle.testFramework.util.assertThatKotlinIsSupported
 import org.jetbrains.plugins.gradle.testFramework.util.withBuildFile
 import org.jetbrains.plugins.gradle.testFramework.util.withSettingsFile
 import org.junit.jupiter.api.BeforeEach
@@ -57,7 +57,7 @@ abstract class AbstractGradleCodeInsightTest : AbstractKotlinGradleCodeInsightBa
         get() = runReadAction { getFile(mainTestDataFile.path).getPsiFile(project) }
 
     override fun setUp() {
-        assumeThatKotlinIsSupported(gradleVersion)
+        assertThatKotlinIsSupported(gradleVersion)
 
         super.setUp()
 
@@ -140,6 +140,12 @@ abstract class AbstractGradleCodeInsightTest : AbstractKotlinGradleCodeInsightBa
                 includeBuild("includedBuildWithoutSettings")
                 addCode(
                     $$"""
+                    dependencyResolutionManagement {
+                        versionCatalogs {
+                            create("customLibs") { from(files("customPath/customLibs.toml")) }
+                        }
+                    }     
+                   
                     fun includeSubprojectsDynamically(path: String) {
                         val dirsWithBuildScripts = file(path).listFiles()
                             ?.filter { File(it, "build.gradle.kts").exists() }
@@ -157,6 +163,7 @@ abstract class AbstractGradleCodeInsightTest : AbstractKotlinGradleCodeInsightBa
                 withMavenCentral()
             }
             withFile("gradle/libs.versions.toml", "")
+            withFile("customPath/customLibs.toml", "")
             // subprojects files
             withBuildFile(gradleVersion, "subprojectsDir/subproject1", gradleDsl = GradleDsl.KOTLIN) {
                 withKotlinDsl()

@@ -28,7 +28,7 @@ import com.intellij.psi.PsiProvidesStatement;
 import com.intellij.psi.PsiUsesStatement;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.ui.IconManager;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.IncorrectOperationException;
 import com.intellij.util.PlatformIcons;
@@ -155,7 +155,7 @@ public class CreateServiceInterfaceOrClassFix extends CreateServiceClassFixBase 
       super(project);
       setTitle(QuickFixBundle.message("create.service"));
 
-      myModuleCombo.setRenderer(SimpleListCellRenderer.create("", Module::getName));
+      myModuleCombo.setRenderer(BuilderKt.textListCellRenderer("", Module::getName));
 
       myRootDirCombo.setRenderer(new PsiDirectoryListCellRenderer());
       myModuleCombo.addActionListener(e -> updateRootDirsCombo(psiRootDirs));

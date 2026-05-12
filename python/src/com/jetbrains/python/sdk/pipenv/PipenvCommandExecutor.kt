@@ -61,8 +61,6 @@ suspend fun setupPipEnvSdkWithProgressReport(
 
   return createSdk(
     pythonBinaryPath = PathHolder.Eel(pythonExecutablePath),
-    associatedModulePath = moduleBasePath.pathString,
-    suggestedSdkName = suggestedSdkName(moduleBasePath.pathString),
     sdkAdditionalData = PyPipEnvSdkAdditionalData()
   )
 }
@@ -78,7 +76,7 @@ suspend fun setupPipEnv(
   basePythonBinaryPath: PythonBinary?,
   installPackages: Boolean,
 ): PyResult<@SystemDependent String> {
-  val pipfile = projectPath.resolve(PipEnvFileHelper.PIP_FILE)
+  val pipfile = projectPath.resolve(PIP_FILE)
 
   if (!pipfile.exists()) {
     // Currently, if a Pipenv file exists inside the user's home directory, then it will NOT create a new Pipenv in the current project

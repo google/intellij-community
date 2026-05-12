@@ -19,4 +19,9 @@ public final class JavaCodeFoldingSettingsImpl extends JavaCodeFoldingSettingsBa
   public void loadState(final @NotNull JavaCodeFoldingSettingsImpl state) {
     XmlSerializerUtil.copyBean(state, this);
   }
+
+  @Override
+  public void noStateLoaded() {
+    //do nothing, use everything by default
+  }
 }

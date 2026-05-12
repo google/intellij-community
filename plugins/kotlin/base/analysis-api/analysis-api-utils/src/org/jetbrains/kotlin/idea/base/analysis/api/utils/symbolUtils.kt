@@ -62,8 +62,8 @@ val KaCallableSymbol.allOverriddenSymbolsWithSelf: Sequence<KaCallableSymbol>
         }
     }
 
-context(_: KaSession)
 @ApiStatus.Internal
+context(_: KaSession)
 fun KaCallableSymbol.hasOrOverridesCallableId(callableId: CallableId): Boolean {
     return allOverriddenSymbolsWithSelf.any { it.callableId == callableId }
 }
@@ -148,8 +148,8 @@ fun KaSymbol?.equalsOrEqualsByPsi(other: KaSymbol?): Boolean {
     return other != null && thisPsi == other.psi
 }
 
-context(_: KaSession)
 @ApiStatus.Internal
+context(_: KaSession)
 fun samConstructorCallsToBeConverted(functionCall: KtCallExpression): Collection<KtCallExpression> {
     val valueArguments = functionCall.valueArguments
     if (valueArguments.none { canBeSamConstructorCall(it) }) return emptyList()

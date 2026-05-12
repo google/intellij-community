@@ -4,6 +4,7 @@ package org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage
 
 import com.intellij.codeInsight.daemon.QuickFixBundle
 import com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
+import com.intellij.codeInspection.util.IntentionName
 import com.intellij.lang.jvm.actions.AnnotationRequest
 import com.intellij.lang.jvm.actions.ChangeParametersRequest
 import com.intellij.lang.jvm.actions.ExpectedParameter
@@ -44,8 +45,11 @@ internal class ChangeMethodParameters(
     val request: ChangeParametersRequest
 ) : KotlinQuickFixAction<KtNamedFunction>(target) {
 
+    @OptIn(KaAllowAnalysisOnEdt::class)
+    override fun getText(): String = allowAnalysisOnEdt { getTextPresentation() }
+
     @OptIn(KaExperimentalApi::class)
-    override fun getText(): String {
+    private fun getTextPresentation(): @IntentionName String {
         val target = element ?: return KotlinBundle.message("fix.change.signature.unavailable")
 
         val helper = JvmPsiConversionHelper.getInstance(target.project)

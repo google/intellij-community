@@ -9,7 +9,6 @@ import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.roots.ModuleRootModificationUtil
 import com.intellij.openapi.util.ThrowableComputable
 import com.intellij.pom.java.LanguageLevel
-import com.intellij.testFramework.IdeaTestUtil
 import com.intellij.testFramework.IndexingTestUtil
 import com.intellij.testFramework.builders.JavaModuleFixtureBuilder
 import com.intellij.testFramework.fixtures.kotlin.KotlinTester
@@ -29,7 +28,7 @@ abstract class PotentialDeadlockInServiceInitializationInspectionTestBase : DevK
     moduleBuilder.addLibrary("platform-util-base", PathUtil.getJarPathForClass(ProcessCanceledException::class.java))
     moduleBuilder.addLibrary("util-rt", PathUtil.getJarPathForClass(ThrowableComputable::class.java))
     // mock JDK is required for getting `CancellationException`, otherwise `ProcessCancelledException` does not inherit from `RuntimeException`
-    moduleBuilder.addJdk(IdeaTestUtil.getMockJdk18Path().path)
+    moduleBuilder.addJdkVersion(LanguageLevel.JDK_1_8)
     moduleBuilder.setLanguageLevel(LanguageLevel.JDK_17)
   }
 

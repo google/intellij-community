@@ -1,6 +1,7 @@
 // Copyright 2000-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.ui;
 
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.ui.UIUtil;
 
 import javax.swing.ComboBoxEditor;
@@ -9,6 +10,7 @@ import javax.swing.plaf.basic.BasicComboBoxRenderer;
 import java.awt.Component;
 import java.awt.Font;
 
+// Will be replaced by {@link BuilderKt#comboBoxEditorRenderer(ComboBoxEditor)} later, which supports rounded selection.
 public class EditorComboBoxRenderer extends BasicComboBoxRenderer {
   private final ComboBoxEditor myEditor;
 

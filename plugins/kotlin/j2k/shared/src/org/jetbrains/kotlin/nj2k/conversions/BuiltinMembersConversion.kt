@@ -627,10 +627,10 @@ private class ConversionsHolder(private val symbolProvider: JKSymbolProvider, pr
     private val enumConversions: List<Conversion> = listOf(
         Method("java.lang.Enum.name") convertTo Field("kotlin.Enum.name"),
         Method("java.lang.Enum.ordinal") convertTo Field("kotlin.Enum.ordinal"),
+
         Method("java.lang.Enum.valueOf") convertTo CustomExpression { expression ->
             val arguments = (expression as JKCallExpression).arguments.arguments
-            if (arguments.size != 2) return@CustomExpression expression
-            val classLiteral = arguments[0]::value.detached() as? JKClassLiteralExpression ?: return@CustomExpression expression
+            val classLiteral = arguments[0]::value.detached() as JKClassLiteralExpression
             val enumEntryName = arguments[1]::value.detached()
             val typeElement = classLiteral::classType.detached()
             JKCallExpressionImpl(
@@ -639,7 +639,9 @@ private class ConversionsHolder(private val symbolProvider: JKSymbolProvider, pr
                 JKTypeArgumentList(typeElement),
                 typeElement.type
             )
-        } withReplaceType REPLACE_WITH_QUALIFIER,
+        }
+                withReplaceType REPLACE_WITH_QUALIFIER
+                withByArgumentsFilter { it.size == 2 && it.first() is JKClassLiteralExpression },
     )
 
     private val throwableConversions: List<Conversion> = listOf(

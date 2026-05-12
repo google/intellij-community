@@ -25,9 +25,9 @@ public final class MessageCounter {
                                      @NotNull NotificationSource source,
                                      @NotNull NotificationCategory category,
                                      @NotNull ProjectSystemId projectSystemId) {
-    Object2IntMap<NotificationCategory> counter = map.computeIfAbsent(projectSystemId, __ -> new HashMap<>())
-      .computeIfAbsent(groupName, __ -> new HashMap<>())
-      .computeIfAbsent(source, __ -> new Object2IntOpenHashMap<>());
+    Object2IntMap<NotificationCategory> counter = map.computeIfAbsent(projectSystemId, _ -> new HashMap<>())
+      .computeIfAbsent(groupName, _ -> new HashMap<>())
+      .computeIfAbsent(source, _ -> new Object2IntOpenHashMap<>());
     counter.mergeInt(category, 1, Math::addExact);
   }
 
@@ -35,15 +35,15 @@ public final class MessageCounter {
                                   @NotNull NotificationSource notificationSource,
                                   @NotNull ProjectSystemId projectSystemId) {
     Map<String, Map<NotificationSource, Object2IntOpenHashMap<NotificationCategory>>> groupMap =
-      map.computeIfAbsent(projectSystemId, __ -> new HashMap<>());
+      map.computeIfAbsent(projectSystemId, _ -> new HashMap<>());
     if (groupName == null) {
       for (Map<NotificationSource, Object2IntOpenHashMap<NotificationCategory>> sourceMap : groupMap.values()) {
         sourceMap.remove(notificationSource);
       }
     }
     else {
-      Object2IntMap<NotificationCategory> counter = groupMap.computeIfAbsent(groupName, __ -> new HashMap<>())
-        .computeIfAbsent(notificationSource, __ -> new Object2IntOpenHashMap<>());
+      Object2IntMap<NotificationCategory> counter = groupMap.computeIfAbsent(groupName, _ -> new HashMap<>())
+        .computeIfAbsent(notificationSource, _ -> new Object2IntOpenHashMap<>());
       counter.clear();
     }
   }

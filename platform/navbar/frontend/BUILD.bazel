@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.navbar.frontend` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "frontend_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "frontend",
   module_name = "intellij.platform.navbar.frontend",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":frontend_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/analysis-api:analysis",
@@ -33,12 +28,14 @@ jvm_library(
     "//platform/lang-impl",
     "//platform/lang-api:lang",
     "//platform/project-frame",
+    "//platform/util/concurrency",
   ],
   exports = ["//platform/navbar/shared:navbar"]
 )
 
 jvm_library(
   name = "frontend_test_lib",
+  testonly = True,
   module_name = "intellij.platform.navbar.frontend",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -66,6 +63,13 @@ jvm_library(
     "//platform/lang-impl:lang-impl_test_lib",
     "//platform/lang-api:lang_test_lib",
     "//platform/project-frame:project-frame_test_lib",
+    "//platform/util/concurrency:concurrency_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.navbar.frontend` end
+
+### auto-generated section `iml intellij.platform.navbar.frontend` start
+exports_files([
+  "intellij.platform.navbar.frontend.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.navbar.frontend` end

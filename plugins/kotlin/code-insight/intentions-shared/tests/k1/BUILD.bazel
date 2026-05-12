@@ -3,12 +3,14 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "k1",
+  module_name = "kotlin.code-insight.intentions-shared.tests.k1",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "k1_test_lib",
+  testonly = True,
   module_name = "kotlin.code-insight.intentions-shared.tests.k1",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -27,8 +29,8 @@ jvm_library(
     "//plugins/kotlin/base/util:util_test_lib",
     "//plugins/kotlin/test-framework",
     "//plugins/kotlin/test-framework:test-framework_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//plugins/kotlin/base/psi",
@@ -65,6 +67,12 @@ jvm_library(
   runtime_deps = [":k1"]
 )
 ### auto-generated section `build kotlin.code-insight.intentions-shared.tests.k1` end
+
+### auto-generated section `iml kotlin.code-insight.intentions-shared.tests.k1` start
+exports_files([
+  "kotlin.code-insight.intentions-shared.tests.k1.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.code-insight.intentions-shared.tests.k1` end
 
 ### auto-generated section `test kotlin.code-insight.intentions-shared.tests.k1` start
 load("@community//build:tests-options.bzl", "jps_test")

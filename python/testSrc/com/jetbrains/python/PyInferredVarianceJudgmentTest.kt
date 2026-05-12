@@ -5,15 +5,12 @@ import com.jetbrains.python.fixtures.PyTestCase
 import com.jetbrains.python.psi.PyElement
 import com.jetbrains.python.psi.PyReferenceExpression
 import com.jetbrains.python.psi.PyTypeParameter
-import com.jetbrains.python.psi.types.PyInferredVarianceJudgment.getInferredVariance
-import com.jetbrains.python.psi.types.PyTypeVarType.Variance
+import com.jetbrains.python.psi.types.PyInferredVarianceJudgment.getDeclaredOrInferredVariance
+import com.jetbrains.python.psi.types.PyTypeParameterType.Variance
 import com.jetbrains.python.psi.types.TypeEvalContext
-import junit.framework.AssertionFailedError
 import org.intellij.lang.annotations.Language
 
 internal class PyInferredVarianceJudgmentTest : PyTestCase() {
-
-
   private fun doTest(expression: String, expectedVariance: Variance?, @Language("Python") text: String) {
     return doTest(expression, expectedVariance, PyTypeParameter::class.java, text)
   }
@@ -24,7 +21,7 @@ internal class PyInferredVarianceJudgmentTest : PyTestCase() {
     val typeVar: PyElement = myFixture.findElementByText(expression, clazz)
 
     val context = TypeEvalContext.userInitiated(typeVar.project, typeVar.containingFile)
-    val actualVariance = getInferredVariance(typeVar, context)
+    val actualVariance = getDeclaredOrInferredVariance(typeVar, context)
     assertEquals(expectedVariance, actualVariance)
   }
 
@@ -217,6 +214,14 @@ internal class PyInferredVarianceJudgmentTest : PyTestCase() {
       """)
   }
 
+  fun `test Generic class final attribute callable concatenate parameter`() {
+    doTest("T", Variance.CONTRAVARIANT, """
+      from typing import Callable, Concatenate, Final
+      class A[T, **P]:
+          attr: Final[Callable[Concatenate[T, P], None]]
+      """)
+  }
+
   fun `test Generic class final attribute callable return`() {
     doTest("T", Variance.COVARIANT, """
       from typing import Final, Callable
@@ -318,6 +323,14 @@ internal class PyInferredVarianceJudgmentTest : PyTestCase() {
       """)
   }
 
+  fun `test Generic class method parameter nesting callable concatenate parameter`() {
+    doTest("T", Variance.COVARIANT, """
+      from typing import Callable, Concatenate
+      class A[T, **P]:
+          def method(self, arg: Callable[Concatenate[T, P], None]): ...
+      """)
+  }
+
   fun `test Generic class method parameter nesting callable return`() {
     doTest("T", Variance.CONTRAVARIANT, """
       from typing import Callable
@@ -331,6 +344,14 @@ internal class PyInferredVarianceJudgmentTest : PyTestCase() {
       from typing import Callable
       class A[T]:
           def method(self) -> Callable[[T], None]: pass # Contravariant in Covariant -> Contravariant
+      """)
+  }
+
+  fun `test Generic class method return nesting callable concatenate parameter`() {
+    doTest("T", Variance.CONTRAVARIANT, """
+      from typing import Callable, Concatenate
+      class A[T, **P]:
+          def f2(self, t: T) -> Callable[Concatenate[T, P], None]: ...
       """)
   }
 
@@ -744,22 +765,18 @@ internal class PyInferredVarianceJudgmentTest : PyTestCase() {
   }
 
   fun `test Type in string literal`() {
-    fixme("PY-87942: No AST in string literal of type annotation", AssertionFailedError::class.java) {
-      doTest("T", Variance.COVARIANT, """
-        class A[T]:
-            def method(self) -> "T": pass
-        """)
-    }
+    doTest("T", Variance.COVARIANT, """
+      class A[T]:
+          def method(self) -> "T": pass
+      """)
   }
 
   fun `test Type in string literal with Callable`() {
-    fixme("PY-87942: No AST in string literal of type annotation", AssertionFailedError::class.java) {
-      doTest("T", Variance.COVARIANT, """
+    doTest("T", Variance.COVARIANT, """
       from typing import Callable
       class A[T]:
           def method(self, arg: "Callable[[T], None]"): pass
       """)
-    }
   }
 
   fun `test Recursive generic classes`() {
@@ -771,4 +788,68 @@ internal class PyInferredVarianceJudgmentTest : PyTestCase() {
           def method(self) -> A[U]: pass
       """)
   }
+
+  fun `test Parameter specification contravariant`() {
+    doTest("P", Variance.CONTRAVARIANT, """
+      from typing import Callable
+      
+      class A[**P]:
+          def f(self, *args: P.args, **kwargs: P.kwargs): ...
+      """)
+  }
+
+  fun `test Parameter specification flipped contravariant`() {
+    doTest("P", Variance.CONTRAVARIANT, """
+      from typing import Callable
+      
+      class A[**P]:
+          def f(self) -> Callable[P, None]: ...
+      """)
+  }
+
+  fun `test Parameter specification flipped covariant`() {
+    doTest("P", Variance.COVARIANT, """
+      from typing import Callable
+      
+      class A[**P]:
+          def f(self, f: Callable[P, None]): ...
+      """)
+  }
+
+  fun `test Parameter specification invariant`() {
+    doTest("P", Variance.INVARIANT, """
+      from typing import Callable
+      
+      class A[**P]:
+          def f(self, f: Callable[P, None]) -> Callable[P, None]: ...
+      """)
+  }
+
+  fun `test Type variable tuple covariant`() {
+    doTest("Ts", Variance.COVARIANT, """
+      from typing import Callable
+      
+      class A[*Ts]:
+          def f(self) -> tuple[*Ts]: ...
+      """)
+  }
+
+  fun `test Type variable tuple contravariant`() {
+    doTest("Ts", Variance.CONTRAVARIANT, """
+      from typing import Callable
+      
+      class A[*Ts]:
+          def f(self, t: tuple[*Ts]): ...
+      """)
+  }
+
+  fun `test Type variable tuple invariant`() {
+    doTest("Ts", Variance.INVARIANT, """
+      from typing import Callable
+      
+      class A[*Ts]:
+          def f(self, t: tuple[*Ts]) -> tuple[*Ts]: ...
+      """)
+  }
+
 }

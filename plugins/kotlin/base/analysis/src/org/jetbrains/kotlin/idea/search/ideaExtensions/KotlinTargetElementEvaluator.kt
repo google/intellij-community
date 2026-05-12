@@ -11,7 +11,9 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiReference
+import com.intellij.psi.impl.source.resolve.reference.impl.PsiMultiReference
 import com.intellij.util.BitUtil
+import org.jetbrains.kotlin.idea.base.psi.isNameBased
 import org.jetbrains.kotlin.idea.references.KtDestructuringDeclarationReference
 import org.jetbrains.kotlin.idea.references.KtSimpleNameReference
 import org.jetbrains.kotlin.idea.references.getCalleeByLambdaArgument
@@ -35,9 +37,6 @@ import org.jetbrains.kotlin.psi.psiUtil.hasBody
 import org.jetbrains.kotlin.psi.psiUtil.isAbstract
 
 abstract class KotlinTargetElementEvaluator : TargetElementEvaluatorEx2(), TargetElementEvaluatorEx, TargetElementUtilExtender {
-    companion object {
-        const val BYPASS_IMPORT_ALIAS = 0x200
-    }
 
     // Place caret after the open curly brace in lambda for generated 'it'
     abstract fun findLambdaOpenLBraceForGeneratedIt(ref: PsiReference): PsiElement?
@@ -47,7 +46,7 @@ abstract class KotlinTargetElementEvaluator : TargetElementEvaluatorEx2(), Targe
 
     override fun getAdditionalDefinitionSearchFlags() = 0
 
-    override fun getAdditionalReferenceSearchFlags() = BYPASS_IMPORT_ALIAS
+    override fun getAdditionalReferenceSearchFlags() = 0
 
     override fun getAllAdditionalFlags() = additionalDefinitionSearchFlags + additionalReferenceSearchFlags
 
@@ -88,13 +87,23 @@ abstract class KotlinTargetElementEvaluator : TargetElementEvaluatorEx2(), Targe
             return (refTarget as? KtFunction)?.getCalleeByLambdaArgument() ?: refTarget
         }
 
-        if (!BitUtil.isSet(flags, BYPASS_IMPORT_ALIAS)) {
-            (ref.element as? KtSimpleNameExpression)?.mainReference?.getImportAlias()?.let { return it }
-        }
+        (ref.element as? KtSimpleNameExpression)?.mainReference?.getImportAlias()?.let { return it }
 
         // prefer destructing declaration entry to its target if element name is accepted
         if (ref is KtDestructuringDeclarationReference && BitUtil.isSet(flags, TargetElementUtil.ELEMENT_NAME_ACCEPTED)) {
             return ref.element
+        }
+
+        if (ref is KtDestructuringDeclarationReference && ref.element.isNameBased()) {
+            ref.multiResolve(false).firstNotNullOfOrNull { it.element as? KtParameter }?.let { return it }
+        }
+
+        if (ref is PsiMultiReference) {
+            val targets = ref
+                .references
+                .filterIsInstance<KtDestructuringDeclarationReference>()
+                .firstOrNull { it.element.isNameBased() }?.multiResolve(false)
+            targets?.firstNotNullOfOrNull { it.element as? KtParameter }?.let { return it }
         }
 
         val refExpression = ref.element as? KtSimpleNameExpression

@@ -3,77 +3,55 @@
 package org.jetbrains.kotlin.idea.gradleJava.compilerPlugin
 
 import com.intellij.openapi.externalSystem.model.DataNode
-import com.intellij.openapi.externalSystem.model.Key
-import com.intellij.openapi.externalSystem.model.ProjectKeys
 import com.intellij.openapi.externalSystem.model.project.ModuleData
-import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
-import org.jetbrains.kotlin.idea.compilerPlugin.CompilerPluginSetup
-import org.jetbrains.kotlin.idea.compilerPlugin.CompilerPluginSetup.PluginOption
-import org.jetbrains.kotlin.idea.compilerPlugin.modifyCompilerArgumentsForPlugin
 import org.jetbrains.kotlin.idea.facet.KotlinFacet
 import org.jetbrains.kotlin.idea.gradleJava.configuration.GradleProjectImportHandler
-import org.jetbrains.kotlin.idea.gradleTooling.model.annotation.AnnotationBasedPluginModel
+import org.jetbrains.kotlin.idea.serialization.updateCompilerArguments
 import org.jetbrains.plugins.gradle.model.data.GradleSourceSetData
 import java.nio.file.Path
 
-abstract class AbstractAnnotationBasedCompilerPluginGradleImportHandler<T : AnnotationBasedPluginModel> : AbstractCompilerPluginGradleImportHandler<T>() {
-    abstract val annotationOptionName: String
-
-    protected open fun getAnnotationsForPreset(presetName: String): List<String> = emptyList()
-
-    override fun isEnabled(model: T): Boolean {
-        return model.isEnabled
-    }
-
-    override fun getOptions(model: T): List<PluginOption> {
-        val annotations = model.annotations
-        val presets = model.presets
-
-        val allAnnotations = annotations + presets.flatMap { getAnnotationsForPreset(it) }
-        return allAnnotations.map { PluginOption(annotationOptionName, it) }
-    }
-}
-
-abstract class AbstractCompilerPluginGradleImportHandler<T> : GradleProjectImportHandler {
-    abstract val compilerPluginId: String
-    abstract val pluginName: String
-
-    open val pluginJarFromIdea: Path
-        get() = Path.of(pluginJarFileFromIdea)
-
-    @Deprecated("Use pluginJarFromIdea instead")
-    open val pluginJarFileFromIdea: String
-        get() = pluginJarFromIdea.toString()
-    abstract val modelKey: Key<T>
-
-    override fun importBySourceSet(facet: KotlinFacet, sourceSetNode: DataNode<GradleSourceSetData>) {
-        modifyCompilerArgumentsForPlugin(facet, getPluginSetupBySourceSet(sourceSetNode),
-                                         compilerPluginId = compilerPluginId,
-                                         pluginName = pluginName)
-    }
+abstract class AbstractGradleImportHandler : GradleProjectImportHandler {
+    abstract val pluginJarsRegex: List<Regex>
+    abstract val replacedJar: Path
 
     override fun importByModule(facet: KotlinFacet, moduleNode: DataNode<ModuleData>) {
-        modifyCompilerArgumentsForPlugin(facet, getPluginSetupByModule(moduleNode),
-                                         compilerPluginId = compilerPluginId,
-                                         pluginName = pluginName)
+        processCompilerPluginClasspath(facet, pluginJarsRegex, replacedJar)
     }
 
-    protected open fun isEnabled(model: T): Boolean = true
-
-    protected open fun getOptions(model: T): List<PluginOption> = emptyList()
-
-    private fun getPluginSetupByModule(moduleNode: DataNode<ModuleData>): CompilerPluginSetup? {
-        val modelNode = ExternalSystemApiUtil.find(moduleNode, modelKey)?: return null
-        val model = modelNode.data.takeIf { isEnabled(it) } ?: return null
-        val options = getOptions(model)
-
-        // For now we can't use plugins from Gradle cause they're shaded and may have an incompatible version.
-        // So we use ones from the IDEA plugin.
-        val classpath = listOf(pluginJarFromIdea.toString())
-
-        return CompilerPluginSetup(options, classpath)
+    override fun importBySourceSet(facet: KotlinFacet, sourceSetNode: DataNode<GradleSourceSetData>) {
+        processCompilerPluginClasspath(facet, pluginJarsRegex, replacedJar)
     }
 
-    private fun getPluginSetupBySourceSet(sourceSetNode: DataNode<GradleSourceSetData>) =
-            ExternalSystemApiUtil.findParent(sourceSetNode, ProjectKeys.MODULE)?.let { getPluginSetupByModule(it) }
+    private fun processCompilerPluginClasspath(
+        facet: KotlinFacet,
+        pluginJarsRegex: List<Regex>,
+        replacedJar: Path,
+    ) {
+        val facetSettings = facet.configuration.settings
+        facetSettings.updateCompilerArguments {
+            var isAlreadyReplaced = false
+
+            val newPluginClasspaths = buildList {
+                for (jarFile in this@updateCompilerArguments.pluginClasspaths) {
+                    val jarFileName = Path.of(jarFile).fileName.toString()
+                    val matches = pluginJarsRegex.any { regex -> jarFileName.matches(regex) }
+                    if (matches) {
+                        if (!isAlreadyReplaced) {
+                            // replace only first occurrence
+                            add(replacedJar.toString())
+                            isAlreadyReplaced = true
+                        } else {
+                            // we do not expect several matching jars in classpath,
+                            // but if it happens, we just skip them
+                            continue
+                        }
+                    } else {
+                        // no need to modify -- leave as it is
+                        add(jarFile)
+                    }
+                }
+            }
+            this.pluginClasspaths = newPluginClasspaths.toTypedArray()
+        }
+    }
 }

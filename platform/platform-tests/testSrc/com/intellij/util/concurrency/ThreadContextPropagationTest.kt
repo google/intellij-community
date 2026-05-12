@@ -2,6 +2,7 @@
 package com.intellij.util.concurrency
 
 import com.intellij.concurrency.IntelliJContextElement
+import com.intellij.concurrency.IntelliJThreadContextElement
 import com.intellij.concurrency.TestElement
 import com.intellij.concurrency.TestElement2
 import com.intellij.concurrency.TestElement2Key
@@ -26,6 +27,7 @@ import com.intellij.openapi.progress.timeoutWaitUp
 import com.intellij.openapi.util.Conditions
 import com.intellij.platform.ide.progress.ModalTaskOwner
 import com.intellij.platform.ide.progress.TaskCancellation
+import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.junit5.SystemProperty
 import com.intellij.testFramework.junit5.TestApplication
@@ -294,7 +296,7 @@ class ThreadContextPropagationTest {
         runAction = true // read action is allowed to complete now
         while (true) {
           try {
-            future.get(100, TimeUnit.MILLISECONDS)
+            PlatformTestUtil.waitForFuture(future)
             break
           }
           catch (_: TimeoutException) {
@@ -350,11 +352,13 @@ class ThreadContextPropagationTest {
     finished.await()
   }
 
-  class MyIjElement(val eventTracker: AtomicBoolean) : IntelliJContextElement, AbstractCoroutineContextElement(MyIjElement) {
+  class MyIjElement(val eventTracker: AtomicBoolean) : IntelliJThreadContextElement<Unit>, AbstractCoroutineContextElement(MyIjElement) {
     companion object Key : CoroutineContext.Key<MyIjElement>
 
     override fun produceChildElement(parentContext: CoroutineContext, isStructured: Boolean): IntelliJContextElement = this
-    override fun afterChildCompleted(context: CoroutineContext) = eventTracker.set(true)
+    override fun beforeStarted(context: CoroutineContext) {
+    }
+    override fun afterCompleted(context: CoroutineContext, oldState: Unit) = eventTracker.set(true)
   }
 
   @Test
@@ -368,11 +372,13 @@ class ThreadContextPropagationTest {
     assertTrue(tracker.get())
   }
 
-  class MyCancellableIjElement(val eventTracker: AtomicBoolean) : IntelliJContextElement, AbstractCoroutineContextElement(MyIjElement) {
+  class MyCancellableIjElement(val eventTracker: AtomicBoolean) : IntelliJThreadContextElement<Unit>, AbstractCoroutineContextElement(MyIjElement) {
     companion object Key : CoroutineContext.Key<MyIjElement>
 
     override fun produceChildElement(parentContext: CoroutineContext, isStructured: Boolean): IntelliJContextElement = this
-    override fun childCanceled(context: CoroutineContext) = eventTracker.set(true)
+    override fun beforeStarted(context: CoroutineContext) {}
+    override fun afterCompleted(context: CoroutineContext, oldState: Unit) {}
+    override fun canceled(context: CoroutineContext) = eventTracker.set(true)
   }
 
   @Test
@@ -419,11 +425,12 @@ class ThreadContextPropagationTest {
     }
   }
 
-  class MyFaultyIjElement2(val e: Throwable) : IntelliJContextElement, AbstractCoroutineContextElement(MyFaultyIjElement2) {
+  class MyFaultyIjElement2(val e: Throwable) : IntelliJThreadContextElement<Unit>, AbstractCoroutineContextElement(MyFaultyIjElement2) {
     companion object Key : CoroutineContext.Key<MyFaultyIjElement2>
 
     override fun produceChildElement(parentContext: CoroutineContext, isStructured: Boolean): IntelliJContextElement? = this
-    override fun beforeChildStarted(context: CoroutineContext) = throw e
+    override fun beforeStarted(context: CoroutineContext) = throw e
+    override fun afterCompleted(context: CoroutineContext, oldState: Unit) {}
   }
 
   @Test

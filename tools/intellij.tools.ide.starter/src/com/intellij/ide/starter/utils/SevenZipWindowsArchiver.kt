@@ -26,8 +26,7 @@ object SevenZipWindowsArchiver {
     val sevenZipCacheDir = GlobalPaths.instance.getCacheDirectoryFor("7zip")
 
     fun archiveInfo(arch: CpuArch): Triple<String, Path, Path> {
-      val archSuffix = if (arch == CpuArch.ARM64) "arm64" else "x64"
-      val url = "https://www.7-zip.org/a/7z2501-$archSuffix.exe"
+      val url = if (arch == CpuArch.ARM64) SevenZipDistribution.WINDOWS_ARM64_URL else SevenZipDistribution.WINDOWS_X64_URL
       val file = sevenZipCacheDir / url.split("/").last()
       val tool = sevenZipCacheDir / file.fileName.nameWithoutExtension
       return Triple(url, file, tool)

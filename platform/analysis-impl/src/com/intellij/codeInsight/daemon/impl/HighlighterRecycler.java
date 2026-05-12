@@ -40,7 +40,7 @@ final class HighlighterRecycler {
       UpdateHighlightersUtil.LOG.debug("recycleHighlighter " + info + HighlightInfoUpdaterImpl.currentProgressInfo());
     }
     long range = ((RangeMarkerImpl)highlighter).getScalarRange();
-    incinerator.computeIfAbsent(range, __ -> new ArrayList<>()).add(info);
+    incinerator.computeIfAbsent(range, _ -> new ArrayList<>()).add(info);
   }
 
   // null means no highlighter found in the cache

@@ -10,7 +10,6 @@ import com.intellij.openapi.vcs.changes.ChangesUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.containers.CollectionFactory
 import com.intellij.util.containers.ContainerUtil
-import com.intellij.vcsUtil.VcsFileUtil
 import git4idea.GitUtil
 import git4idea.changes.GitChangeUtils
 import git4idea.changes.GitChangeUtils.GitDiffChange
@@ -100,13 +99,7 @@ internal class GitResetAddStagingAreaStateManager(val repository: GitRepository)
       ContainerUtil.addIfNotNull(allPaths, change.beforePath)
     }
 
-    for (paths in VcsFileUtil.chunkPaths(root, allPaths)) {
-      val handler = GitLineHandler(project, root, GitCommand.RESET).apply {
-        endOptions()
-        addParameters(paths)
-      }
-      Git.getInstance().runCommand(handler).throwOnError()
-    }
+    GitFileUtils.executeForFiles(project, root, GitCommand.RESET, allPaths)
   }
 
   private fun restoreExcluded() {

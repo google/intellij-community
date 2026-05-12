@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.lang;
 
 import com.intellij.openapi.util.NlsContexts;
@@ -132,6 +132,15 @@ public interface SyntaxTreeBuilder {
     while (!eof() && getCurrentOffset() < offset) {
       advanceLexer();
     }
+  }
+
+  /**
+   * Advances the lexer to the end of the file.
+   * <p>
+   * The default implementation does not bring any performance benefits over [.advanceLexer] method and should be overridden.
+   */
+  default void advanceToEOF() {
+    rawAdvanceLexer(Integer.MAX_VALUE - rawTokenIndex());
   }
 
   /**

@@ -82,7 +82,7 @@ class PatternsTest : HeavyPlatformTestCase() {
 
     val engine = JavaCoverageEngine.getInstance()
     val runner = CoverageRunner.getInstance(IDEACoverageRunner::class.java)
-    return engine.createSuite(runner, file.name, DefaultCoverageFileProvider(file),
+    return engine.createSuite(runner, file.name, DefaultCoverageFileProvider(file.toPath()),
                               if (saveToSuite) includes?.toTypedArray() else null,
                               if (saveToSuite) excludes?.toTypedArray() else null,
                               -1, false, true, false, myProject)

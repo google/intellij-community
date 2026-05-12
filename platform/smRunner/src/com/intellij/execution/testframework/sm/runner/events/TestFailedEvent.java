@@ -1,8 +1,7 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.testframework.sm.runner.events;
 
 import com.intellij.openapi.util.io.FileUtil;
-import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.util.io.URLUtil;
 import jetbrains.buildServer.messages.serviceMessages.TestFailed;
 import org.jetbrains.annotations.NotNull;
@@ -78,17 +77,6 @@ public class TestFailedEvent extends TreeNodeEvent {
 
   public boolean isActualFileTemp() {
     return myActualFileTemp;
-  }
-
-  private static long parseDuration(@Nullable String durationStr) {
-    if (!StringUtil.isEmpty(durationStr)) {
-      try {
-        return Long.parseLong(durationStr);
-      }
-      catch (NumberFormatException ignored) {
-      }
-    }
-    return -1;
   }
 
   public TestFailedEvent(@NotNull String testName,

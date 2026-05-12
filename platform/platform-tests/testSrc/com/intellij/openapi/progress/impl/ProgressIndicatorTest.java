@@ -199,7 +199,7 @@ public class ProgressIndicatorTest extends LightPlatformTestCase {
       Semaphore started = new Semaphore(N);
       Semaphore others = new Semaphore(1);
       List<Future<?>> threads = ContainerUtil.map(Collections.nCopies(N, ""),
-          __ -> ApplicationManager.getApplication().executeOnPooledThread(() -> ProgressManager.getInstance().executeProcessUnderProgress(() -> {
+          _ -> ApplicationManager.getApplication().executeOnPooledThread(() -> ProgressManager.getInstance().executeProcessUnderProgress(() -> {
             try {
               //checkCanceled() must know about canceled indicator even from different thread
               assertThrows(ProcessCanceledException.class, () -> {
@@ -1067,7 +1067,7 @@ public class ProgressIndicatorTest extends LightPlatformTestCase {
     AtomicBoolean futureEntered = new AtomicBoolean();
     AtomicBoolean futureExited = new AtomicBoolean();
     AtomicBoolean readActionCompleted = new AtomicBoolean();
-    CoreProgressManager.CheckCanceledHook hook = __ -> {
+    CoreProgressManager.CheckCanceledHook hook = _ -> {
       doReadAction(); // in case this hook gets called during read action, it will eventually SOE
       return false;
     };

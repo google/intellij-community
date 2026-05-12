@@ -8,14 +8,13 @@ public class EtendingMutableInterfaces {
 
         }
 
-        // Compiler bug causes remove(int) to clash, see KT-17782
-        //public static class ExtendCList1<E> extends CMutableList<E> {
-        //
-        //}
-        //
-        //public static class ExtendCList2<E> extends CMutableList<String> {
-        //
-        //}
+        public static class ExtendCList1<E> extends CMutableList<E> {
+
+        }
+
+        public static class ExtendCList2<E> extends CMutableList<String> {
+
+        }
 
         public static class ExtendSList extends SMutableList {
 
@@ -147,15 +146,13 @@ public class EtendingMutableInterfaces {
 
         }
 
-        // NOTE: looks like a bug in compiler see KT-17738
+        public static class ExtendSMap extends SMutableMap<A> {
 
-        //public static class ExtendSMap extends SMutableMap<A> {
-        //
-        //}
-        //
-        //public static class ExtendABMap extends ABMutableMap {
-        //
-        //}
+        }
+
+        public static class ExtendABMap extends ABMutableMap {
+
+        }
     }
 
     public static class MapEntrys {

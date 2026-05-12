@@ -3,6 +3,7 @@ package com.intellij.devkit.runtimeModuleRepository.generator
 
 import com.intellij.devkit.runtimeModuleRepository.generator.RuntimeModuleRepositoryGenerator.enumerateRuntimeDependencies
 import com.intellij.platform.runtime.repository.RuntimeModuleId
+import com.intellij.platform.runtime.repository.RuntimeModuleVisibility
 import com.intellij.platform.runtime.repository.serialization.RawRuntimeModuleDescriptor
 import com.intellij.platform.runtime.repository.serialization.RawRuntimePluginHeader
 import com.intellij.platform.runtime.repository.serialization.RuntimeModuleRepositorySerialization
@@ -29,7 +30,7 @@ object RuntimeModuleRepositoryGenerator {
   /**
    * Generates the runtime module descriptors for all modules and libraries in [project].
    */
-  fun generateRuntimeModuleDescriptorsForWholeProject(project: JpsProject, resourcePathsSchema: ResourcePathsSchema): List<RawRuntimeModuleDescriptor> {
+  fun generateRuntimeModuleDescriptorsForWholeProject(project: JpsProject, resourcePathsSchema: ResourcePathsSchema, contentModuleDetector: ContentModuleDetector): List<RawRuntimeModuleDescriptor> {
     val projectLibraries = LinkedHashSet<JpsLibrary>()
     for (module in project.modules) {
       projectLibraries.addAll(enumerateRuntimeDependencies(module).libraries.filter { it.isProjectLevel })
@@ -38,7 +39,8 @@ object RuntimeModuleRepositoryGenerator {
       includedProduction = project.modules,
       includedTests = project.modules,
       includedProjectLibraries = projectLibraries,
-      resourcePathsSchema = resourcePathsSchema
+      resourcePathsSchema = resourcePathsSchema,
+      contentModuleDetector = contentModuleDetector,
     )
   }
 
@@ -46,12 +48,15 @@ object RuntimeModuleRepositoryGenerator {
    * Generates the runtime module descriptors for production parts of [includedProduction], test parts of [includedTests] and 
    * [includedProjectLibraries].
    */
-  fun generateRuntimeModuleDescriptors(includedProduction: Collection<JpsModule>,
-                                       includedTests: Collection<JpsModule>,
-                                       includedProjectLibraries: Collection<JpsLibrary>,
-                                       resourcePathsSchema: ResourcePathsSchema): List<RawRuntimeModuleDescriptor> {
+  fun generateRuntimeModuleDescriptors(
+    includedProduction: Collection<JpsModule>,
+    includedTests: Collection<JpsModule>,
+    includedProjectLibraries: Collection<JpsLibrary>,
+    resourcePathsSchema: ResourcePathsSchema,
+    contentModuleDetector: ContentModuleDetector,
+  ): List<RawRuntimeModuleDescriptor> {
     val descriptors = ArrayList<RawRuntimeModuleDescriptor>()
-    generateDescriptorsForModules(descriptors, includedProduction, includedTests, resourcePathsSchema)
+    generateDescriptorsForModules(descriptors, includedProduction, includedTests, resourcePathsSchema, contentModuleDetector)
     for (library in includedProjectLibraries) {
       val moduleId = getProjectLibraryId(library) ?: error("Project-level library expected, but found: $library")
       descriptors.add(RawRuntimeModuleDescriptor.create(moduleId, resourcePathsSchema.libraryPaths(library), emptyList()))
@@ -59,13 +64,15 @@ object RuntimeModuleRepositoryGenerator {
     return descriptors
   }
 
-  fun saveModuleRepository(descriptors: List<RawRuntimeModuleDescriptor>, targetDirectory: Path) {
+  fun saveModuleRepository(descriptors: List<RawRuntimeModuleDescriptor>, pluginHeaders: List<RawRuntimePluginHeader>,
+                           targetDirectory: Path) {
     try {
       val bootstrapModuleName = "intellij.platform.bootstrap"
       targetDirectory.createDirectories()
-      val pluginHeaders = emptyList<RawRuntimePluginHeader>()
-      RuntimeModuleRepositorySerialization.saveToCompactFile(descriptors, pluginHeaders, bootstrapModuleName, targetDirectory.resolve(COMPACT_REPOSITORY_FILE_NAME), GENERATOR_VERSION)
-      RuntimeModuleRepositorySerialization.saveToJar(descriptors, pluginHeaders, bootstrapModuleName, targetDirectory.resolve(JAR_REPOSITORY_FILE_NAME), GENERATOR_VERSION)
+      RuntimeModuleRepositorySerialization.saveToCompactFile(descriptors,
+                                                             pluginHeaders, bootstrapModuleName, targetDirectory.resolve(COMPACT_REPOSITORY_FILE_NAME), GENERATOR_VERSION)
+      RuntimeModuleRepositorySerialization.saveToJar(descriptors,
+                                                     pluginHeaders, bootstrapModuleName, targetDirectory.resolve(JAR_REPOSITORY_FILE_NAME), GENERATOR_VERSION)
     }
     catch (e: IOException) {
       throw RuntimeException("Failed to save runtime module repository: ${e.message}", e)
@@ -82,41 +89,27 @@ private fun generateDescriptorsForModules(
   includedProduction: Collection<JpsModule>,
   includedTests: Collection<JpsModule>,
   resourcePathsSchema: ResourcePathsSchema,
+  contentModuleDetector: ContentModuleDetector,
 ) {
-  //it's better to get rid of such modules, but until it's done, we need to have this workaround to avoid duplicating IDs 
-  val productionModulesWithTestRoots = HashSet<String>()
-  val testModulesWithProductionRoots = HashSet<String>()
-  val allIncludedTestModuleNames = includedTests.mapTo(HashSet()) { it.name }
-  for (module in includedTests) {
-    if (module.name.endsWith(RuntimeModuleId.TESTS_NAME_SUFFIX) && module.hasProductionSources) {
-      testModulesWithProductionRoots.add(module.name)
-    }
-    if ((module.name + RuntimeModuleId.TESTS_NAME_SUFFIX) in allIncludedTestModuleNames && module.hasTestSources) {
-      productionModulesWithTestRoots.add(module.name)
-    }
-  }
-
-  fun getRuntimeModuleName(module: JpsModule, tests: Boolean): RuntimeModuleId {
+  fun getRuntimeModuleId(module: JpsModule, tests: Boolean): RuntimeModuleId {
     val moduleName = module.name
     if (tests) {
-      if (moduleName in productionModulesWithTestRoots) {
-        return RuntimeModuleId.raw(moduleName + RuntimeModuleId.TESTS_NAME_SUFFIX + "2")
+      val contentModuleData = contentModuleDetector.findContentModuleDataForTests(module)
+      if (contentModuleData != null) {
+        return RuntimeModuleId.contentModule(contentModuleData.name, contentModuleData.namespace)
       }
-      if (!moduleName.endsWith(RuntimeModuleId.TESTS_NAME_SUFFIX)) {
-        return RuntimeModuleId.moduleTests(moduleName)
-      }
+      return RuntimeModuleId.moduleTests(moduleName)
     }
-    else {
-      if (moduleName in testModulesWithProductionRoots) {
-        return RuntimeModuleId.raw(moduleName + "2")
-      }
+    val contentModuleData = contentModuleDetector.findContentModuleData(module)
+    if (contentModuleData != null) {
+      return RuntimeModuleId.contentModule(contentModuleData.name, contentModuleData.namespace)
     }
-    return RuntimeModuleId.module(moduleName)
+    return RuntimeModuleId.legacyJpsModule(moduleName)
   }
 
   for (module in includedProduction) {
     if (module.hasDescriptorForProduction) {
-      descriptors.add(createProductionPartDescriptor(module, ::getRuntimeModuleName, resourcePathsSchema))
+      descriptors.add(createProductionPartDescriptor(module, ::getRuntimeModuleId, resourcePathsSchema, contentModuleDetector))
     }
   }
   if (includedTests.isNotEmpty()) {
@@ -125,7 +118,7 @@ private fun generateDescriptorsForModules(
     for (module in includedTests) {
       if (module.hasTestSources) {
         descriptors.add(createTestPartDescriptor(module = module,
-                                                 runtimeModuleNameGenerator = ::getRuntimeModuleName,
+                                                 runtimeModuleIdGenerator = ::getRuntimeModuleId,
                                                  additionalDependenciesForTestsCache = additionalDependenciesForTestsCache,
                                                  productionDependenciesCache = productionDependenciesCache,
                                                  resourcePathsSchema = resourcePathsSchema))
@@ -144,11 +137,16 @@ private val JpsModule.hasTestSources
 private val JpsModule.hasProductionSources
   get() = sourceRoots.any { it.rootType in JavaModuleSourceRootTypes.PRODUCTION }
 
-private fun createProductionPartDescriptor(module: JpsModule, runtimeModuleNameGenerator: (JpsModule, Boolean) -> RuntimeModuleId, resourcePathsSchema: ResourcePathsSchema): RawRuntimeModuleDescriptor {
+private fun createProductionPartDescriptor(
+  module: JpsModule,
+  runtimeModuleIdGenerator: (JpsModule, Boolean) -> RuntimeModuleId,
+  resourcePathsSchema: ResourcePathsSchema,
+  contentModuleDetector: ContentModuleDetector
+): RawRuntimeModuleDescriptor {
   val dependencies = LinkedHashSet<RuntimeModuleId>()
   val resourcePaths = if (module.hasProductionSources) resourcePathsSchema.moduleOutputPaths(module).toMutableSet() else mutableSetOf()
   enumerateRuntimeDependencies(module).productionOnly().processModuleAndLibraries(
-    { dependencies.add(runtimeModuleNameGenerator(it, false)) },
+    { dependencies.add(runtimeModuleIdGenerator(it, false)) },
     { library ->
       val projectLibraryId = getProjectLibraryId(library)
       if (projectLibraryId != null) {
@@ -159,7 +157,9 @@ private fun createProductionPartDescriptor(module: JpsModule, runtimeModuleNameG
       }
     }
   )
-  return RawRuntimeModuleDescriptor.create(runtimeModuleNameGenerator(module, false), resourcePaths.toList(), dependencies.toList())
+  val id = runtimeModuleIdGenerator(module, false)
+  val visibility = contentModuleDetector.findContentModuleData(module)?.visibility ?: RuntimeModuleVisibility.PUBLIC
+  return RawRuntimeModuleDescriptor.create(id, visibility, resourcePaths.toList(), dependencies.toList())
 }
 
 /**
@@ -172,25 +172,25 @@ private fun createProductionPartDescriptor(module: JpsModule, runtimeModuleNameG
  */
 private fun createTestPartDescriptor(
   module: JpsModule,
-  runtimeModuleNameGenerator: (JpsModule, Boolean) -> RuntimeModuleId,
+  runtimeModuleIdGenerator: (JpsModule, Boolean) -> RuntimeModuleId,
   additionalDependenciesForTestsCache: MutableMap<JpsModule, DependenciesAndResources>,
   productionDependenciesCache: MutableMap<JpsModule, DependenciesAndResources>,
   resourcePathsSchema: ResourcePathsSchema,
 ): RawRuntimeModuleDescriptor {
   val resourcePaths = if (module.hasTestSources) resourcePathsSchema.moduleTestOutputPaths(module).toMutableSet() else mutableSetOf()
   val dependencies = LinkedHashSet<RuntimeModuleId>()
-  val forProduction = collectProductionDependenciesForModule(module, productionDependenciesCache, runtimeModuleNameGenerator, resourcePathsSchema)
+  val forProduction = collectProductionDependenciesForModule(module, productionDependenciesCache, runtimeModuleIdGenerator, resourcePathsSchema)
   forProduction.copyTo(dependencies, resourcePaths)
 
   val forTests = collectAdditionalRuntimeDependenciesAndResourcesForTests(
     module,
     productionDependenciesCache,
     additionalDependenciesForTestsCache,
-    runtimeModuleNameGenerator,
+    runtimeModuleIdGenerator,
     resourcePathsSchema
   )
   forTests.copyTo(dependencies, resourcePaths)
-  return RawRuntimeModuleDescriptor.create(runtimeModuleNameGenerator(module, true), resourcePaths.toList(), dependencies.toList())
+  return RawRuntimeModuleDescriptor.create(runtimeModuleIdGenerator(module, true), resourcePaths.toList(), dependencies.toList())
 }
 
 /**

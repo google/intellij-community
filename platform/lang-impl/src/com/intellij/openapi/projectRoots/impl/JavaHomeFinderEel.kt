@@ -19,6 +19,7 @@ import com.intellij.platform.eel.fs.EelFileSystemWindowsApi
 import com.intellij.platform.eel.fs.EelPosixFileInfo
 import com.intellij.platform.eel.fs.stat
 import com.intellij.platform.eel.path.EelPath
+import com.intellij.platform.eel.path.EelPathException
 import com.intellij.platform.eel.provider.asEelPath
 import com.intellij.platform.eel.provider.asNioPath
 import com.intellij.platform.eel.provider.getEelDescriptor
@@ -63,7 +64,12 @@ private class EelSystemInfoProvider(private val eel: EelApi) : JavaHomeFinder.Sy
 
 
   override fun getPath(path: String, vararg more: String): Path =
-    more.fold(EelPath.parse(path, eel.descriptor), EelPath::resolve).asNioPath()
+    try {
+      more.fold(EelPath.parse(path, eel.descriptor), EelPath::resolve).asNioPath()
+    }
+    catch (e: EelPathException) {
+      throw InvalidPathException(path, e.reason)
+    }
 
   override fun getUserHome(): Path? = with(eel) {
     fs.user.home.asNioPath()

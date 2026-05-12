@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build.impl
 
 import kotlinx.coroutines.CoroutineScope
@@ -15,50 +15,31 @@ import org.jetbrains.intellij.build.ModuleOutputProvider
 import org.jetbrains.intellij.build.TestingOptions
 import org.jetbrains.intellij.build.impl.compilation.ArchivedCompilationOutputStorage
 import org.jetbrains.intellij.build.impl.compilation.createArchivedStorage
-import org.jetbrains.intellij.build.impl.moduleBased.buildOriginalModuleRepository
-import org.jetbrains.intellij.build.moduleBased.OriginalModuleRepository
 import org.jetbrains.jps.model.module.JpsModule
 import java.nio.file.Path
+import kotlin.io.path.isRegularFile
 import kotlin.io.path.writeLines
 
 @Internal
 class ArchivedCompilationContext internal constructor(
   private val delegate: CompilationContext,
   private val storage: ArchivedCompilationOutputStorage = createArchivedStorage(delegate),
-  scope: CoroutineScope?,
+  private val outputProviderScope: CoroutineScope?,
 ) : CompilationContext by delegate {
   val archivesLocation: Path
     get() = storage.archivedOutputDirectory
 
-  private val originalModuleRepository = asyncLazy("Build original module repository") {
-    buildOriginalModuleRepository(this@ArchivedCompilationContext)
-  }
+  override val outputProvider: ModuleOutputProvider = ArchivedModuleOutputProvider(delegateOutputProvider = delegate.outputProvider, storage = storage, scope = outputProviderScope)
 
-  override val outputProvider: ModuleOutputProvider = ArchivedModuleOutputProvider(delegateOutputProvider = delegate.outputProvider, storage = storage, scope = scope)
-
-  override suspend fun getOriginalModuleRepository(): OriginalModuleRepository = originalModuleRepository.await()
-
-  override suspend fun getModuleRuntimeClasspath(module: JpsModule, forTests: Boolean): List<Path> {
-    return doReplace(delegate.getModuleRuntimeClasspath(module, forTests))
-  }
-
-  override fun createCopy(messages: BuildMessages, options: BuildOptions, paths: BuildPaths): CompilationContext {
-    return ArchivedCompilationContext(delegate = delegate.createCopy(messages, options, paths), storage = storage, scope = null)
-  }
-
-  @Suppress("MemberVisibilityCanBePrivate")
-  fun replaceWithCompressedIfNeeded(p: Path): Path = storage.getArchived(p)
-
-  suspend fun replaceAllWithCompressedIfNeeded(files: List<Path>): List<Path> = doReplace(files)
-
-  private suspend fun doReplace(files: Collection<Path>): List<Path> {
+    override suspend fun getModuleRuntimeClasspath(module: JpsModule, forTests: Boolean): List<Path> {
     return coroutineScope {
-      files.map { file ->
-        async {
-          replaceWithCompressedIfNeeded(file)
-        }
-      }.awaitAll()
+      delegate.getModuleRuntimeClasspath(module, forTests).map { async { storage.getArchived(it) } }.awaitAll().filterNotNull()
     }
+  }
+
+  override fun createCopy(messages: BuildMessages, options: BuildOptions, paths: BuildPaths, scope: CoroutineScope?): CompilationContext {
+    val effectiveScope = scope ?: outputProviderScope
+    return ArchivedCompilationContext(delegate = delegate.createCopy(messages, options, paths, effectiveScope), storage = storage, outputProviderScope = effectiveScope)
   }
 
   fun saveMapping(file: Path) {
@@ -76,7 +57,13 @@ private class ArchivedModuleOutputProvider(
   private val zipFilePool = ModuleOutputZipFilePool(scope)
 
   override fun getModuleOutputRoots(module: JpsModule, forTests: Boolean): List<Path> {
-    return delegateOutputProvider.getModuleOutputRoots(module, forTests).map { storage.getArchived(it) }
+    val outputRoots = delegateOutputProvider.getModuleOutputRoots(module, forTests).mapNotNull { storage.getArchived(it) }
+    for (outputRoot in outputRoots) {
+      check(outputRoot.isRegularFile()) {
+        "'${module.name}' module's output root doesn't exist: $outputRoot"
+      }
+    }
+    return outputRoots
   }
 
   override suspend fun readFileContentFromModuleOutput(module: JpsModule, relativePath: String, forTests: Boolean): ByteArray? {
@@ -133,11 +120,11 @@ internal fun CompilationContext.toArchivedIfNeeded(scope: CoroutineScope?): Comp
 val CompilationContext.asArchived: CompilationContext
   get() = toArchivedContext(scope = null)
 
-private fun CompilationContext.toArchivedContext(scope: CoroutineScope?): CompilationContext {
+internal fun CompilationContext.toArchivedContext(scope: CoroutineScope?): CompilationContext {
   return when (this) {
     is ArchivedCompilationContext -> this
     is BazelCompilationContext -> error("BazelCompilationContext must not be used as archived")
     is BuildContextImpl -> compilationContext.asArchived
-    else -> ArchivedCompilationContext(delegate = this, scope = scope)
+    else -> ArchivedCompilationContext(delegate = this, outputProviderScope = scope)
   }
 }

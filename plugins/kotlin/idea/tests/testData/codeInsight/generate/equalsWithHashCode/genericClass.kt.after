@@ -3,7 +3,7 @@ class A<T>(val n: T) {
 
     }
 
-    <caret>override fun equals(other: Any?): Boolean {
+    <selection><caret></selection>override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
 
@@ -15,6 +15,6 @@ class A<T>(val n: T) {
     }
 
     override fun hashCode(): Int {
-        return n?.hashCode() ?: 0
+        return n.hashCode()
     }
 }

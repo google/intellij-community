@@ -4,6 +4,7 @@
     <module name="intellij.kotlin.gradle.tooling"/>
     <module name="intellij.kotlin.projectWizard.idea"/>
     <module name="intellij.gradle.java"/>
+    <module name="intellij.java.psi"/>
     <module name="intellij.kotlin.gradle.gradle"/>
     <module name="kotlin.code-insight.inspections.shared"/>
   </dependencies>
@@ -19,7 +20,7 @@
   <extensions defaultExtensionNs="com.intellij">
     <psi.implicitReferenceProvider implementation="org.jetbrains.kotlin.idea.gradleCodeInsightCommon.KotlinGradleProjectReferenceProvider"/>
     <psi.implicitReferenceProvider implementation="org.jetbrains.kotlin.idea.gradleCodeInsightCommon.KotlinGradlePluginReferenceProvider"/>
-    <backgroundPostStartupActivity implementation="org.jetbrains.kotlin.idea.gradleCodeInsightCommon.native.KotlinNativeABICompatibilityChecker"/>
+    <editorNotificationProvider implementation="org.jetbrains.kotlin.idea.gradleCodeInsightCommon.native.KotlinNativeABICompatibilityChecker"/>
     <runConfigurationProducer implementation="org.jetbrains.kotlin.idea.gradleCodeInsightCommon.native.KotlinNativeRunConfigurationProducer"/>
 
     <externalSystemTaskNotificationListener implementation="org.jetbrains.kotlin.idea.gradleCodeInsightCommon.KotlinConfiguratorExternalSystemSyncListener"/>
@@ -33,6 +34,5 @@
 
   <extensions defaultExtensionNs="org.jetbrains.kotlin">
     <buildSystemDependencyManager implementation="org.jetbrains.kotlin.idea.gradleCodeInsightCommon.GradleKotlinBuildSystemDependencyManager"/>
-    <projectConfigurator implementation="org.jetbrains.kotlin.idea.gradleCodeInsightCommon.native.KotlinNativeGradleConfigurator"/>
   </extensions>
 </idea-plugin>

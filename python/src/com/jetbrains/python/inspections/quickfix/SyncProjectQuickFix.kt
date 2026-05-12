@@ -31,7 +31,7 @@ internal class SyncProjectQuickFix : LocalQuickFix {
         writeAction {
           FileDocumentManager.getInstance().saveAllDocuments()
         }
-        packageManager.sync()
+        packageManager.syncLocked()
       }
       DaemonCodeAnalyzer.getInstance(project).restart(element.containingFile, this)
     }

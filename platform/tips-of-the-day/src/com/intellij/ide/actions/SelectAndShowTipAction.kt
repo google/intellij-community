@@ -8,8 +8,8 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.components.ComponentManagerEx
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.ui.popup.PopupChooserBuilder
-import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBList
+import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import kotlinx.coroutines.launch
 
 internal class SelectAndShowTipAction : DumbAwareAction() {
@@ -25,7 +25,7 @@ internal class SelectAndShowTipAction : DumbAwareAction() {
         }
       }
       .setNamerForFiltering { tip -> tip.id }
-      .setRenderer(SimpleListCellRenderer.create("") { tip -> tip.id })
+      .setRenderer(textListCellRenderer("") { tip -> tip.id })
       .setCloseOnEnter(true)
       .setResizable(true)
       .setMovable(true)

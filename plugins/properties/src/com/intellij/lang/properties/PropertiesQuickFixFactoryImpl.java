@@ -40,4 +40,14 @@ public class PropertiesQuickFixFactoryImpl extends PropertiesQuickFixFactory {
   public LocalQuickFix createRemovePropertyLocalFix(@NotNull Property property) {
     return LocalQuickFix.from(new RemovePropertyFix(property));
   }
+
+  @Override
+  public IntentionAction createRemovePropertyFromBundleFix(@NotNull Property property) {
+    return new RemovePropertyFromBundleFix(property).asIntention();
+  }
+
+  @Override
+  public LocalQuickFix createRemovePropertyFromBundleLocalFix(@NotNull Property property) {
+    return LocalQuickFix.from(new RemovePropertyFromBundleFix(property));
+  }
 }

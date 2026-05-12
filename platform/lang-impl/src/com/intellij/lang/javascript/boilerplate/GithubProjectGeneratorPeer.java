@@ -12,7 +12,7 @@ import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.platform.WebProjectGenerator;
 import com.intellij.platform.templates.github.GithubTagInfo;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.uiDesigner.core.GridLayoutManager;
 import com.intellij.uiDesigner.core.Spacer;
@@ -101,15 +101,13 @@ public final class GithubProjectGeneratorPeer implements WebProjectGenerator.Gen
         @Override
         protected @NotNull JComboBox<GithubTagInfo> createValuesComboBox() {
           JComboBox<GithubTagInfo> box = super.createValuesComboBox();
-          box.setRenderer(SimpleListCellRenderer.create((label, tag, index) -> {
-            final String text;
-            if (tag == null) {
-              text = isBackgroundJobRunning() ? CommonBundle.getLoadingTreeNodeText() : LangBundle.message("label.unavailable");
+          box.setRenderer(BuilderKt.textListCellRenderer(info -> {
+            if (info == null) {
+              return isBackgroundJobRunning() ? CommonBundle.getLoadingTreeNodeText() : LangBundle.message("label.unavailable");
             }
             else {
-              text = tag.getName();
+              return info.getName();
             }
-            label.setText(text);
           }));
 
           return box;

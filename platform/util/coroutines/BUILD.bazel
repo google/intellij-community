@@ -6,6 +6,8 @@ jvm_library(
   module_name = "intellij.platform.util.coroutines",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = "@community//:k8",
   deps = [
     "@lib//:jetbrains-annotations",
@@ -17,6 +19,7 @@ jvm_library(
 
 jvm_library(
   name = "coroutines_test_lib",
+  testonly = True,
   module_name = "intellij.platform.util.coroutines",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -29,15 +32,23 @@ jvm_library(
 )
 ### auto-generated section `build intellij.platform.util.coroutines` end
 
+### auto-generated section `iml intellij.platform.util.coroutines` start
+exports_files([
+  "intellij.platform.util.coroutines.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.util.coroutines` end
+
 ### auto-generated section `build intellij.platform.util.coroutines.tests` start
 jvm_library(
   name = "coroutines-tests",
+  module_name = "intellij.platform.util.coroutines.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "coroutines-tests_test_lib",
+  testonly = True,
   module_name = "intellij.platform.util.coroutines.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["tests/**/*.kt", "tests/**/*.java", "tests/**/*.form"], allow_empty = True),
@@ -45,6 +56,8 @@ jvm_library(
     "@lib//:kotlin-stdlib",
     "//libraries/kotlinx/coroutines/core",
     "//libraries/kotlinx/coroutines/core:core_test_lib",
+    "//libraries/kotlinx/coroutines/test",
+    "//libraries/kotlinx/coroutines/test:test_test_lib",
     "@lib//:junit5",
     "@lib//:junit5Params",
     "//platform/testFramework/common",
@@ -57,6 +70,12 @@ jvm_library(
   runtime_deps = [":coroutines-tests"]
 )
 ### auto-generated section `build intellij.platform.util.coroutines.tests` end
+
+### auto-generated section `iml intellij.platform.util.coroutines.tests` start
+exports_files([
+  "intellij.platform.util.coroutines.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.util.coroutines.tests` end
 
 ### auto-generated section `test intellij.platform.util.coroutines.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

@@ -79,17 +79,17 @@ public class StubBasedPsiElementBase<T extends StubElement> extends ASTDelegateP
   private final @NotNull IElementType myElementType;
 
   public StubBasedPsiElementBase(@NotNull T stub, @NotNull IStubElementType<?,?> nodeType) {
-    mySubstrateRef = new SubstrateRef.StubRef(stub);
+    mySubstrateRef = SubstrateRef.createStubRef(stub);
     myElementType = nodeType;
   }
 
   public StubBasedPsiElementBase(@NotNull T stub, @NotNull IElementType nodeType) {
-    mySubstrateRef = new SubstrateRef.StubRef(stub);
+    mySubstrateRef = SubstrateRef.createStubRef(stub);
     myElementType = nodeType;
   }
 
   public StubBasedPsiElementBase(@NotNull ASTNode node) {
-    mySubstrateRef = SubstrateRef.createAstStrongRef(node);
+    mySubstrateRef = SubstrateRef.createAstRef(node);
     myElementType = node.getElementType();
   }
 
@@ -102,13 +102,13 @@ public class StubBasedPsiElementBase<T extends StubElement> extends ASTDelegateP
     if (stub != null) {
       if (nodeType == null) throw new IllegalArgumentException("null cannot be passed to 'nodeType' when 'stub' is non-null");
       if (node != null) throw new IllegalArgumentException("null must be passed to 'node' parameter when 'stub' is non-null");
-      mySubstrateRef = new SubstrateRef.StubRef(stub);
+      mySubstrateRef = SubstrateRef.createStubRef(stub);
       myElementType = nodeType;
     }
     else {
       if (node == null) throw new IllegalArgumentException("'stub' and 'node' parameters cannot be null both");
       if (nodeType != null) throw new IllegalArgumentException("null must be passed to 'nodeType' parameter when 'node' is non-null");
-      mySubstrateRef = SubstrateRef.createAstStrongRef(node);
+      mySubstrateRef = SubstrateRef.createAstRef(node);
       myElementType = node.getElementType();
     }
   }
@@ -124,18 +124,18 @@ public class StubBasedPsiElementBase<T extends StubElement> extends ASTDelegateP
    */
   @Override
   public @NotNull ASTNode getNode() {
-    if (mySubstrateRef instanceof SubstrateRef.StubRef) {
+    if (SubstrateRef.isStubRef(mySubstrateRef)) {
       ApplicationManager.getApplication().assertReadAccessAllowed();
       PsiFileImpl file = (PsiFileImpl)getContainingFile();
       if (!file.isValid()) throw new PsiInvalidElementAccessException(file);
 
       FileElement treeElement = file.getTreeElement();
-      if (treeElement != null && mySubstrateRef instanceof SubstrateRef.StubRef) {
+      if (treeElement != null && SubstrateRef.isStubRef(mySubstrateRef)) {
         return notBoundInExistingAst(file, treeElement);
       }
 
       treeElement = file.calcTreeElement();
-      if (mySubstrateRef instanceof SubstrateRef.StubRef) {
+      if (SubstrateRef.isStubRef(mySubstrateRef)) {
         return failedToBindStubToAst(file, treeElement);
       }
     }
@@ -225,7 +225,7 @@ public class StubBasedPsiElementBase<T extends StubElement> extends ASTDelegateP
    */
   @ApiStatus.Internal
   public final void setNode(@NotNull ASTNode node) {
-    setSubstrateRef(SubstrateRef.createAstStrongRef(node));
+    setSubstrateRef(SubstrateRef.createAstRef(node));
   }
 
   /**
@@ -519,7 +519,7 @@ public class StubBasedPsiElementBase<T extends StubElement> extends ASTDelegateP
   @Override
   protected Object clone() {
     final StubBasedPsiElementBase<?> copy = (StubBasedPsiElementBase<?>)super.clone();
-    copy.setSubstrateRef(SubstrateRef.createAstStrongRef(getNode()));
+    copy.setSubstrateRef(SubstrateRef.createAstRef(getNode()));
     return copy;
   }
 

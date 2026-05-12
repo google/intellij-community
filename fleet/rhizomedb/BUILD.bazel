@@ -1,6 +1,6 @@
 ### auto-generated section `build fleet.rhizomedb` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_rhizomedb",
@@ -15,18 +15,13 @@ create_kotlinc_options(
   x_lambdas = "class"
 )
 
-resourcegroup(
-  name = "rhizomedb_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "rhizomedb",
   module_name = "fleet.rhizomedb",
   visibility = ["//visibility:public"],
   srcs = glob(["srcCommonMain/**/*.kt", "srcCommonMain/**/*.java", "srcCommonMain/**/*.form"], allow_empty = True),
-  resources = [":rhizomedb_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_rhizomedb",
   deps = [
     "//fleet/util/core",
@@ -42,6 +37,7 @@ jvm_library(
 
 jvm_library(
   name = "rhizomedb_test_lib",
+  testonly = True,
   module_name = "fleet.rhizomedb",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -54,3 +50,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build fleet.rhizomedb` end
+
+### auto-generated section `iml fleet.rhizomedb` start
+exports_files([
+  "fleet.rhizomedb.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml fleet.rhizomedb` end

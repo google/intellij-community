@@ -15,7 +15,8 @@ interface ChildAbstractBaseEntityBuilder<T : ChildAbstractBaseEntity> : Workspac
   var parentEntity: ParentAbEntityBuilder
 }
 
-internal object ChildAbstractBaseEntityType : EntityType<ChildAbstractBaseEntity, ChildAbstractBaseEntityBuilder<ChildAbstractBaseEntity>>() {
+internal object ChildAbstractBaseEntityType :
+  EntityType<ChildAbstractBaseEntity, ChildAbstractBaseEntityBuilder<ChildAbstractBaseEntity>>() {
   override val entityClass: Class<ChildAbstractBaseEntity> get() = ChildAbstractBaseEntity::class.java
   operator fun invoke(
     commonData: String,

@@ -1,6 +1,6 @@
 ### auto-generated section `build intellij.kotlin.refactorings.move` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_kotlin-refactorings-move",
@@ -13,18 +13,13 @@ create_kotlinc_options(
   x_context_parameters = True
 )
 
-resourcegroup(
-  name = "kotlin-refactorings-move_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "kotlin-refactorings-move",
   module_name = "intellij.kotlin.refactorings.move",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":kotlin-refactorings-move_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_kotlin-refactorings-move",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -34,13 +29,16 @@ jvm_library(
     "//platform/editor-ui-api:editor-ui",
     "//platform/indexing-api:indexing",
     "//platform/lang-core",
+    "//platform/lang-api:lang",
     "//platform/projectModel-api:projectModel",
     "//platform/refactoring",
     "//platform/lang-impl",
     "//platform/platform-impl:ide-impl",
     "//platform/core-ui",
     "//platform/core-api:core",
+    "//platform/core-impl",
     "//java/java-impl:impl",
+    "//java/java-psi-api:psi",
     "//plugins/kotlin/frontend-independent",
     "//plugins/kotlin/base/util",
     "//plugins/kotlin/fir",
@@ -58,14 +56,17 @@ jvm_library(
     "//plugins/kotlin/base/facet",
     "//platform/observable",
     "//java/openapi:java",
+    "//java/java-frontback-psi-api:frontback-psi",
     "@lib//:kotlinc-analysis-api-platform-interface",
     "//plugins/kotlin/base/external-build-system:kotlin-base-externalSystem",
     "//platform/util/jdom",
+    "//platform/util:util-ui",
   ]
 )
 
 jvm_library(
   name = "kotlin-refactorings-move_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.refactorings.move",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -76,13 +77,16 @@ jvm_library(
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//platform/indexing-api:indexing_test_lib",
     "//platform/lang-core:lang-core_test_lib",
+    "//platform/lang-api:lang_test_lib",
     "//platform/projectModel-api:projectModel_test_lib",
     "//platform/refactoring:refactoring_test_lib",
     "//platform/lang-impl:lang-impl_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/core-ui:core-ui_test_lib",
     "//platform/core-api:core_test_lib",
+    "//platform/core-impl:core-impl_test_lib",
     "//java/java-impl:impl_test_lib",
+    "//java/java-psi-api:psi_test_lib",
     "//plugins/kotlin/frontend-independent:frontend-independent_test_lib",
     "//plugins/kotlin/base/util:util_test_lib",
     "//plugins/kotlin/fir:fir_test_lib",
@@ -100,11 +104,19 @@ jvm_library(
     "//plugins/kotlin/base/facet:facet_test_lib",
     "//platform/observable:observable_test_lib",
     "//java/openapi:java_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
     "//plugins/kotlin/base/external-build-system:kotlin-base-externalSystem_test_lib",
     "//platform/util/jdom:jdom_test_lib",
+    "//platform/util:util-ui_test_lib",
   ]
 )
 ### auto-generated section `build intellij.kotlin.refactorings.move` end
+
+### auto-generated section `iml intellij.kotlin.refactorings.move` start
+exports_files([
+  "intellij.kotlin.refactorings.move.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.refactorings.move` end
 
 ### auto-generated section `build intellij.kotlin.refactorings.move.tests` start
 create_kotlinc_options(
@@ -120,12 +132,14 @@ create_kotlinc_options(
 
 jvm_library(
   name = "kotlin-refactorings-move-tests",
+  module_name = "intellij.kotlin.refactorings.move.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "kotlin-refactorings-move-tests_test_lib",
+  testonly = True,
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
   kotlinc_opts = ":custom_kotlin-refactorings-move-tests",
@@ -146,6 +160,8 @@ jvm_library(
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//platform/indexing-api:indexing",
     "//platform/indexing-api:indexing_test_lib",
+    "//java/java-psi-api:psi",
+    "//java/java-psi-api:psi_test_lib",
     "//jps/model-api:model",
     "//jps/model-api:model_test_lib",
     "//platform/lang-core",
@@ -163,6 +179,8 @@ jvm_library(
     "//platform/core-ui:core-ui_test_lib",
     "//platform/core-api:core",
     "//platform/core-api:core_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//java/java-impl:impl",
     "//java/java-impl:impl_test_lib",
     "//plugins/kotlin/frontend-independent",
@@ -197,8 +215,8 @@ jvm_library(
     "//plugins/kotlin/base/project-structure:project-structure_test_lib",
     "//plugins/kotlin/tests-common:common-tests",
     "//plugins/kotlin/tests-common:common-tests_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//plugins/kotlin/base/plugin",
@@ -227,6 +245,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.kotlin.refactorings.move.tests` end
+
+### auto-generated section `iml intellij.kotlin.refactorings.move.tests` start
+exports_files([
+  "intellij.kotlin.refactorings.move.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.refactorings.move.tests` end
 
 ### auto-generated section `test intellij.kotlin.refactorings.move.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

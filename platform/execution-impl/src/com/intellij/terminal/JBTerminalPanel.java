@@ -3,9 +3,7 @@ package com.intellij.terminal;
 
 import com.intellij.application.options.EditorFontsConstants;
 import com.intellij.ide.DataManager;
-import com.intellij.ide.GeneralSettings;
 import com.intellij.ide.IdeEventQueue;
-import com.intellij.ide.SaveAndSyncHandler;
 import com.intellij.ide.ui.UISettings;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.ActionGroup;
@@ -18,14 +16,11 @@ import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.actionSystem.KeyboardShortcut;
 import com.intellij.openapi.actionSystem.PlatformDataKeys;
 import com.intellij.openapi.actionSystem.Shortcut;
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.ex.EditorSettingsExternalizable;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
 import com.intellij.openapi.editor.impl.ComplementaryFontsRegistry;
 import com.intellij.openapi.editor.impl.FontInfo;
-import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.registry.Registry;
@@ -154,6 +149,7 @@ public class JBTerminalPanel extends TerminalPanel implements FocusListener, Ter
     mySettingsProvider = settingsProvider;
 
     addFocusListener(this);
+    TerminalVfsSynchronizerKt.refreshVfsOnFocusChange(this, this);
 
     mySettingsProvider.addUiSettingsListener(this, this);
     setDefaultCursorShape(settingsProvider.getCursorShape());
@@ -231,7 +227,6 @@ public class JBTerminalPanel extends TerminalPanel implements FocusListener, Ter
 
   @Override
   protected void setupAntialiasing(Graphics graphics) {
-    UIUtil.setupComposite((Graphics2D)graphics);
     UISettings.setupAntialiasing(graphics);
   }
 
@@ -317,10 +312,6 @@ public class JBTerminalPanel extends TerminalPanel implements FocusListener, Ter
       myActionsToSkip = null;
       myEventDispatcher.unregister();
     }
-
-    if (GeneralSettings.getInstance().isSaveOnFrameDeactivation()) {
-      ApplicationManager.getApplication().invokeLater(() -> FileDocumentManager.getInstance().saveAllDocuments(), ModalityState.nonModal());
-    }
   }
 
   private static @NotNull List<AnAction> setupActionsToSkip() {
@@ -339,7 +330,6 @@ public class JBTerminalPanel extends TerminalPanel implements FocusListener, Ter
   public void focusLost(FocusEvent event) {
     myActionsToSkip = null;
     myEventDispatcher.unregister();
-    SaveAndSyncHandler.getInstance().scheduleRefresh();
   }
 
   @Override

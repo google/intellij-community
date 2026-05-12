@@ -1,6 +1,6 @@
 ### auto-generated section `build kotlin.code-insight.k1` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_kotlin-code-insight-k1",
@@ -10,18 +10,13 @@ create_kotlinc_options(
   ]
 )
 
-resourcegroup(
-  name = "kotlin-code-insight-k1_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "kotlin-code-insight-k1",
   module_name = "kotlin.code-insight.k1",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":kotlin-code-insight-k1_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_kotlin-code-insight-k1",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -42,6 +37,7 @@ jvm_library(
 
 jvm_library(
   name = "kotlin-code-insight-k1_test_lib",
+  testonly = True,
   module_name = "kotlin.code-insight.k1",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -62,6 +58,12 @@ jvm_library(
 )
 ### auto-generated section `build kotlin.code-insight.k1` end
 
+### auto-generated section `iml kotlin.code-insight.k1` start
+exports_files([
+  "kotlin.code-insight.k1.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.code-insight.k1` end
+
 ### auto-generated section `build kotlin.code-insight.k1.tests` start
 create_kotlinc_options(
   name = "custom_kotlin-code-insight-k1-tests",
@@ -73,12 +75,14 @@ create_kotlinc_options(
 
 jvm_library(
   name = "kotlin-code-insight-k1-tests",
+  module_name = "kotlin.code-insight.k1.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "kotlin-code-insight-k1-tests_test_lib",
+  testonly = True,
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
   kotlinc_opts = ":custom_kotlin-code-insight-k1-tests",
@@ -113,8 +117,8 @@ jvm_library(
     "//platform/testFramework:testFramework_test_lib",
     "//plugins/kotlin/test-framework",
     "//plugins/kotlin/test-framework:test-framework_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/base/plugin",
     "//plugins/kotlin/base/plugin:plugin_test_lib",
     "//plugins/kotlin/tests-common:common-tests",
@@ -125,10 +129,18 @@ jvm_library(
     "//platform/lang-impl:lang-impl_test_lib",
     "//plugins/kotlin/kotlin.ide",
     "//plugins/kotlin/kotlin.ide:kotlin.ide_test_lib",
+    "//plugins/kotlin/base/code-insight:kotlin-base-codeInsight-tests",
+    "//plugins/kotlin/base/code-insight:kotlin-base-codeInsight-tests_test_lib",
   ],
   runtime_deps = [":kotlin-code-insight-k1-tests"]
 )
 ### auto-generated section `build kotlin.code-insight.k1.tests` end
+
+### auto-generated section `iml kotlin.code-insight.k1.tests` start
+exports_files([
+  "kotlin.code-insight.k1.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.code-insight.k1.tests` end
 
 ### auto-generated section `test kotlin.code-insight.k1.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

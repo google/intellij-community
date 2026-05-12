@@ -1,9 +1,10 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.codeStyle.arrangement;
 
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.codeStyle.arrangement.std.ArrangementSettingsToken;
+import com.intellij.psi.codeStyle.arrangement.std.StdArrangementTokens;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -84,5 +85,10 @@ public class JavaElementArrangementEntry extends DefaultArrangementEntry
   @Override
   public void setHasAnnotation() {
     myHasAnnotation = true;
+  }
+
+  @Override
+  public boolean canBeGrouped() {
+    return myType == StdArrangementTokens.EntryType.CONSTRUCTOR || myType == StdArrangementTokens.EntryType.METHOD;
   }
 }

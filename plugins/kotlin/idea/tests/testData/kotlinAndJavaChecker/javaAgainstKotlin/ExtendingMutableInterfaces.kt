@@ -27,9 +27,9 @@ abstract class AMutableSet : MutableSet<A> by mutableSetOf<A>()
 
 // kotlin.collections.Iterator
 interface IMutableIterator<Elem> : MutableIterator<Elem>
-open class CMutableIterator<Elem> : MutableIterator<Elem> by mutableListOf<Elem>().iterator()
-open class SMutableIterator : MutableIterator<String> by mutableListOf<String>().iterator()
-open class AMutableIterator : MutableIterator<A> by mutableListOf<A>().iterator()
+abstract class CMutableIterator<Elem> : MutableIterator<Elem> by mutableListOf<Elem>().iterator()
+abstract class SMutableIterator : MutableIterator<String> by mutableListOf<String>().iterator()
+abstract class AMutableIterator : MutableIterator<A> by mutableListOf<A>().iterator()
 
 // kotlin.collections.Map
 interface IMutableMap<KElem, VElem> : MutableMap<KElem, VElem>
@@ -39,7 +39,6 @@ abstract class ABMutableMap : MutableMap<A, B> by mutableMapOf<A, B>()
 
 // kotlin.collections.Map.Entry
 interface IMutableMapEntry<KElem, VElem> : MutableMap.MutableEntry<KElem, VElem>
-open class CMutableMapEntry<KElem, VElem> : MutableMap.MutableEntry<KElem, VElem> by mutableMapOf<KElem, VElem>().entries.first()
-open class SMutableMapEntry<VElem> : MutableMap.MutableEntry<String, VElem> by mutableMapOf<String, VElem>().entries.first()
-open class ABMutableMapEntry : MutableMap.MutableEntry<A, B> by mutableMapOf<A, B>().entries.first()
-// IGNORE_K2
+abstract class CMutableMapEntry<KElem, VElem> : MutableMap.MutableEntry<KElem, VElem> by mutableMapOf<KElem, VElem>().entries.first()
+abstract class SMutableMapEntry<VElem> : MutableMap.MutableEntry<String, VElem> by mutableMapOf<String, VElem>().entries.first()
+abstract class ABMutableMapEntry : MutableMap.MutableEntry<A, B> by mutableMapOf<A, B>().entries.first()

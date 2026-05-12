@@ -16,7 +16,6 @@
 package com.siyeh.ig.fixes.equality;
 
 import com.intellij.pom.java.LanguageLevel;
-import com.intellij.testFramework.IdeaTestUtil;
 import com.intellij.testFramework.builders.JavaModuleFixtureBuilder;
 import com.siyeh.InspectionGadgetsBundle;
 
@@ -27,7 +26,7 @@ public class EqualityOperatorComparesObjectsInspectionJdk6Test extends EqualityO
 
   @Override
   protected void tuneFixture(JavaModuleFixtureBuilder builder) {
-    builder.addJdk(IdeaTestUtil.getMockJdk17Path().getPath())
+    builder.addJdkVersion(LanguageLevel.JDK_1_7)
       .setLanguageLevel(LanguageLevel.JDK_1_6);
   }
 }

@@ -1,10 +1,11 @@
 from collections.abc import Iterable
-from typing import Any, ClassVar, Literal, TypeVar, overload
+from typing import Any, ClassVar, Literal, overload
 
 from django.db import models
 from django.db.models.base import Model
 from django.db.models.expressions import Combinable
 from django.db.models.fields import BooleanField
+from typing_extensions import TypeVar
 
 _T = TypeVar("_T", bound=Model)
 
@@ -17,9 +18,13 @@ class BaseUserManager(models.Manager[_T]):
 class AbstractBaseUser(models.Model):
     REQUIRED_FIELDS: ClassVar[list[str]]
 
+    class Meta:
+        abstract: ClassVar[bool]
+
     password = models.CharField(max_length=128)
     last_login = models.DateTimeField(blank=True, null=True)
     is_active: bool | BooleanField[bool | Combinable, bool]
+    backend: str  # Set dynamically by authenticate(), used by login()
 
     def get_username(self) -> str: ...
     def natural_key(self) -> tuple[str]: ...
@@ -28,8 +33,8 @@ class AbstractBaseUser(models.Model):
     @property
     def is_authenticated(self) -> Literal[True]: ...
     def set_password(self, raw_password: str | None) -> None: ...
-    def check_password(self, raw_password: str) -> bool: ...
-    async def acheck_password(self, raw_password: str) -> bool: ...
+    def check_password(self, raw_password: str | None) -> bool: ...
+    async def acheck_password(self, raw_password: str | None) -> bool: ...
     def set_unusable_password(self) -> None: ...
     def has_usable_password(self) -> bool: ...
     def get_session_auth_hash(self) -> str: ...

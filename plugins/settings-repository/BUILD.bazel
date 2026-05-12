@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.settingsRepository` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "settings-repository_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "settings-repository",
   module_name = "intellij.settingsRepository",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":settings-repository_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/core-api:core",
     "//platform/credential-store",
@@ -41,9 +36,13 @@ jvm_library(
     "//platform/core-ui",
     "//libraries/caffeine",
     "//platform/platform-util-io:ide-util-io",
+    "//platform/ide-core",
+    "//platform/progress/shared:ide-progress",
     "//platform/util/coroutines",
     "//platform/credential-store-impl:credentialStore-impl",
     "@lib//:apache-sshd-osgi",
+    "//platform/util:util-ui",
+    "//platform/util-ex",
   ],
   exports = [
     "@lib//:jetbrains-intellij-deps-eclipse-jgit",
@@ -54,6 +53,7 @@ jvm_library(
 
 jvm_library(
   name = "settings-repository_test_lib",
+  testonly = True,
   module_name = "intellij.settingsRepository",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -85,15 +85,26 @@ jvm_library(
     "//platform/core-ui:core-ui_test_lib",
     "//libraries/caffeine:caffeine_test_lib",
     "//platform/platform-util-io:ide-util-io_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
     "//platform/util/coroutines:coroutines_test_lib",
     "//platform/credential-store-impl:credentialStore-impl_test_lib",
+    "//platform/util:util-ui_test_lib",
+    "//platform/util-ex:util-ex_test_lib",
   ]
 )
 ### auto-generated section `build intellij.settingsRepository` end
 
+### auto-generated section `iml intellij.settingsRepository` start
+exports_files([
+  "intellij.settingsRepository.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.settingsRepository` end
+
 ### auto-generated section `build intellij.settingsRepository.tests` start
 jvm_library(
   name = "settingsRepository-tests",
+  module_name = "intellij.settingsRepository.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -113,6 +124,7 @@ jvm_library(
 
 jvm_library(
   name = "settingsRepository-tests_test_lib",
+  testonly = True,
   module_name = "intellij.settingsRepository.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
@@ -124,6 +136,8 @@ jvm_library(
     "//platform/platform-api:ide",
     "//platform/platform-api:ide_test_lib",
     "//platform/platform-impl:ide-impl",
+    "//platform/ide-core",
+    "//platform/progress/shared:ide-progress",
     "//platform/projectModel-api:projectModel",
     "//platform/projectModel-api:projectModel_test_lib",
     "//platform/vcs-impl",
@@ -145,7 +159,8 @@ jvm_library(
     "//platform/util:util-tests_test_lib",
     "//plugins/settings-repository",
     "//plugins/settings-repository:settings-repository_test_lib",
-    "@lib//:assert_j",
+    "//libraries/assertj-core",
+    "//libraries/assertj-core:assertj-core_test_lib",
     "//platform/credential-store-ui:credentialStore-ui",
     "//platform/credential-store-ui:credentialStore-ui_test_lib",
     "//platform/testFramework/extensions:testExtensions",
@@ -158,15 +173,25 @@ jvm_library(
     "//libraries/fastutil:fastutil_test_lib",
     "//platform/util/jdom",
     "//platform/util/jdom:jdom_test_lib",
+    "//platform/util-ex",
+    "//platform/util-ex:util-ex_test_lib",
     "//platform/workspace/jps",
     "//platform/workspace/jps:jps_test_lib",
   ],
   runtime_deps = [
     ":settingsRepository-tests",
     "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
   ]
 )
 ### auto-generated section `build intellij.settingsRepository.tests` end
+
+### auto-generated section `iml intellij.settingsRepository.tests` start
+exports_files([
+  "intellij.settingsRepository.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.settingsRepository.tests` end
 
 ### auto-generated section `test intellij.settingsRepository.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

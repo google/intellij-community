@@ -7,6 +7,7 @@ import com.intellij.platform.pluginGraph.ContentModuleName
 import com.intellij.platform.pluginGraph.PluginGraph
 import org.jetbrains.intellij.build.productLayout.model.ModuleSourceInfo
 import org.jetbrains.intellij.build.productLayout.model.getModuleSourceInfo
+import org.jetbrains.intellij.build.productLayout.moduleSetPluginModuleName
 import org.jetbrains.intellij.build.productLayout.stats.AnsiStyle
 
 data class SelfContainedValidationError(
@@ -29,6 +30,110 @@ data class SelfContainedValidationError(
     appendLine("${s.yellow}To fix:${s.reset}")
     appendLine("1. Add the missing modules/sets to '${context}' to make it truly self-contained")
     appendLine("2. Or remove selfContained=true if this set is designed to compose with other sets")
+    appendLine()
+    appendLine("${s.gray}[Rule: $ruleName]${s.reset}")
+    appendLine()
+  }
+}
+
+data class ModuleSetPluginizationError(
+  override val context: String,
+  @JvmField val embeddedModules: Set<ContentModuleName> = emptySet(),
+  @JvmField val nestedPluginizedSets: Set<String> = emptySet(),
+  override val ruleName: String = "ModuleSetPluginizationValidation",
+) : ValidationError {
+  override val category: ErrorCategory get() = ErrorCategory.MODULE_SET_PLUGINIZATION
+
+  override fun format(s: AnsiStyle): String = buildString {
+    appendLine("${s.red}${s.bold}Module set '$context' cannot be materialized as a plugin${s.reset}")
+    if (embeddedModules.isNotEmpty()) {
+      appendLine()
+      appendLine("  ${s.red}*${s.reset} Contains embedded modules in transitive closure:")
+      for (module in embeddedModules.sortedBy { it.value }) {
+        appendLine("    - ${module.value}")
+      }
+    }
+    if (nestedPluginizedSets.isNotEmpty()) {
+      appendLine()
+      appendLine("  ${s.red}*${s.reset} Contains nested pluginized module sets:")
+      for (setName in nestedPluginizedSets.sorted()) {
+        appendLine("    - $setName")
+      }
+    }
+    appendLine()
+    appendLine("${s.yellow}Fix:${s.reset} keep pluginized module sets free of embedded modules and nested pluginized sets")
+    appendLine()
+    appendLine("${s.gray}[Rule: $ruleName]${s.reset}")
+    appendLine()
+  }
+}
+
+data class PluginizedModuleSetReferenceError(
+  override val context: String,
+  @JvmField val pluginizedModuleSetName: String,
+  @JvmField val ownerKind: OwnerKind,
+  override val ruleName: String = "PluginizedModuleSetReferenceValidation",
+) : ValidationError {
+  override val category: ErrorCategory get() = ErrorCategory.MODULE_SET_PLUGINIZATION
+
+  enum class OwnerKind {
+    PRODUCT,
+    MODULE_SET,
+  }
+
+  override fun format(s: AnsiStyle): String = buildString {
+    when (ownerKind) {
+      OwnerKind.PRODUCT -> appendLine(
+        "${s.red}${s.bold}Product '$context' references pluginized module set '$pluginizedModuleSetName' as a regular module set${s.reset}"
+      )
+      OwnerKind.MODULE_SET -> appendLine(
+        "${s.red}${s.bold}Module set '$context' nests pluginized module set '$pluginizedModuleSetName' as a regular module set${s.reset}"
+      )
+    }
+    appendLine()
+    appendLine(
+      "  ${s.red}*${s.reset} Pluginized module sets are standalone bundled plugin wrappers and are not inlined through moduleSet(...) references"
+    )
+    appendLine()
+    appendLine("${s.yellow}Fix:${s.reset}")
+    appendLine("1. Remove the moduleSet(...) reference to '$pluginizedModuleSetName'")
+    appendLine("2. Bundle '${moduleSetPluginModuleName(pluginizedModuleSetName).value}' in products that should ship it")
+    appendLine()
+    appendLine("${s.gray}[Rule: $ruleName]${s.reset}")
+    appendLine()
+  }
+}
+
+data class DuplicateModuleSetPluginWrapperError(
+  override val context: String,
+  override val ruleName: String = "ModuleSetPluginizationValidation",
+) : ValidationError {
+  override val category: ErrorCategory get() = ErrorCategory.MODULE_SET_PLUGINIZATION
+
+  override fun format(s: AnsiStyle): String = buildString {
+    appendLine("${s.red}${s.bold}Module-set plugin wrapper '$context' is defined in multiple registries${s.reset}")
+    appendLine()
+    appendLine("  ${s.red}*${s.reset} Community and ultimate module sets resolve to the same wrapper module name")
+    appendLine()
+    appendLine("${s.yellow}Fix:${s.reset} keep pluginized module set names unique across community and ultimate registries")
+    appendLine()
+    appendLine("${s.gray}[Rule: $ruleName]${s.reset}")
+    appendLine()
+  }
+}
+
+data class UltimateModuleSetMainModuleError(
+  override val context: String,
+  override val ruleName: String = "ModuleSetPluginizationValidation",
+) : ValidationError {
+  override val category: ErrorCategory get() = ErrorCategory.MODULE_SET_PLUGINIZATION
+
+  override fun format(s: AnsiStyle): String = buildString {
+    appendLine("${s.red}${s.bold}Ultimate module set '$context' cannot be added to intellij.moduleSet.plugin.main${s.reset}")
+    appendLine()
+    appendLine("  ${s.red}*${s.reset} addToMainModule=true is only supported for community wrappers while intellij.moduleSet.plugin.main remains community-only")
+    appendLine()
+    appendLine("${s.yellow}Fix:${s.reset} set addToMainModule=false for ultimate pluginized module sets")
     appendLine()
     appendLine("${s.gray}[Rule: $ruleName]${s.reset}")
     appendLine()
@@ -218,5 +323,55 @@ private fun formatReason(issue: ContentModuleBackingIssue): String {
     ContentModuleBackingIssueKind.MULTIPLE_BACKING_TARGETS -> "multiple backing targets"
     ContentModuleBackingIssueKind.MISMATCHED_BACKING_TARGET -> "backing target does not match base module"
     ContentModuleBackingIssueKind.MISSING_JPS_MODULE -> "backing target not found in JPS model"
+  }
+}
+
+/**
+ * Reported when an embedded module with `includeDependencies=true` transitively pulls
+ * a content module that is not explicitly declared by the product (or any of its module
+ * sets / bundled plugins).
+ *
+ * Plugin-model content modules must be the only truth for product packaging. Silently
+ * bundling a content module through JPS runtime closure makes the jar layout differ
+ * across products and hides real dependencies. Ancient JPS-only (non-content) modules
+ * are allowed to flow; content modules must be listed explicitly.
+ */
+data class ImplicitEmbeddedContentModuleError(
+  override val context: String,
+  /** Map from transitively pulled content module → set of embedded-with-includeDependencies=true roots whose chain reached it */
+  @JvmField val missingModules: Map<ContentModuleName, Set<ContentModuleName>>,
+  /** Dep chain (target names) for each missing module, from the embedded root to the violating module */
+  @JvmField val chains: Map<ContentModuleName, List<String>> = emptyMap(),
+  override val ruleName: String = "ImplicitEmbeddedContentModuleValidation",
+) : ValidationError {
+  override val category: ErrorCategory get() = ErrorCategory.IMPLICIT_EMBEDDED_CONTENT_MODULE
+
+  override fun format(s: AnsiStyle): String = buildString {
+    appendLine("${s.red}${s.bold}Product '${context}' implicitly bundles content modules via embedded-module JPS runtime-dep closure${s.reset}")
+    appendLine()
+    appendLine("${s.yellow}Packaging packs transitive JPS runtime deps of each embedded module declared with includeDependencies=true into that embedded module's jar.${s.reset}")
+    appendLine("${s.yellow}For content modules (modules with a descriptor) reached via this closure, silent bundling is forbidden — the plugin model must be the only truth for packaging.${s.reset}")
+    appendLine()
+
+    for ((missingDep, rootModules) in missingModules.entries.sortedByDescending { it.value.size }) {
+      appendLine("  ${s.red}*${s.reset} Implicitly bundled: ${s.bold}${missingDep.value}${s.reset}")
+      appendLine("    Reached from embedded module(s) with includeDependencies=true:")
+      for (root in rootModules.sortedBy { it.value }) {
+        appendLine("      - ${root.value}")
+      }
+      val chain = chains.get(missingDep)
+      if (!chain.isNullOrEmpty()) {
+        appendLine("    Chain: ${chain.joinToString(separator = " -> ")}")
+      }
+    }
+
+    appendLine()
+    appendLine("${s.yellow}Fix:${s.reset}")
+    appendLine("1. Add each implicitly bundled content module explicitly to the product's content spec (module set or additionalModules).")
+    appendLine("2. Or, if the module truly should not ship with the product, break the JPS dependency chain that pulls it in.")
+    appendLine("3. As a temporary allowlist, add the module name to the product's allowedMissingDependencies.")
+    appendLine()
+    appendLine("${s.gray}[Rule: $ruleName]${s.reset}")
+    appendLine()
   }
 }

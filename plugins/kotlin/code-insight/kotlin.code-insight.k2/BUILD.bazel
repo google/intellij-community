@@ -1,6 +1,6 @@
 ### auto-generated section `build intellij.kotlin.codeInsight` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_provided_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_provided_library")
 
 create_kotlinc_options(
   name = "custom_kotlin-codeInsight",
@@ -13,12 +13,6 @@ create_kotlinc_options(
   x_context_parameters = True
 )
 
-resourcegroup(
-  name = "kotlin-codeInsight_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_provided_library(
   name = "plugins_kotlin_code-insight_descriptions_provided",
   lib = "//plugins/kotlin/code-insight/descriptions"
@@ -29,7 +23,8 @@ jvm_library(
   module_name = "intellij.kotlin.codeInsight",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":kotlin-codeInsight_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_kotlin-codeInsight",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -60,6 +55,7 @@ jvm_library(
     "//platform/lang-core",
     "//platform/platform-impl:ide-impl",
     "//platform/core-ui",
+    "//platform/core-impl",
     "//platform/util:util-ui",
     "//java/java-psi-api:psi",
     "//java/java-psi-impl:psi-impl",
@@ -76,8 +72,11 @@ jvm_library(
     "//plugins/kotlin/formatter/minimal",
     "//plugins/kotlin/refactorings/kotlin.refactorings.k2:kotlin-refactorings",
     "//java/openapi:java",
+    "//java/java-frontback-psi-api:frontback-psi",
     "//plugins/kotlin/kotlin.searching/base",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
+    "//platform/progress/shared:ide-progress",
     "//plugins/kotlin/base/indices",
     "//plugins/kotlin/kotlin.ide",
     "//libraries/velocity",
@@ -90,12 +89,16 @@ jvm_library(
     "//plugins/kotlin/base/statistics",
     "//platform/editor-ui-ex:editor-ex",
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//platform/lang-api:lang",
+    "//platform/statistics",
+    "//plugins/kotlin/base/platforms",
     ":plugins_kotlin_code-insight_descriptions_provided",
   ]
 )
 
 jvm_library(
   name = "kotlin-codeInsight_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.codeInsight",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -126,6 +129,7 @@ jvm_library(
     "//platform/lang-core:lang-core_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/util:util-ui_test_lib",
     "//java/java-psi-api:psi_test_lib",
     "//java/java-psi-impl:psi-impl_test_lib",
@@ -140,8 +144,11 @@ jvm_library(
     "//plugins/kotlin/formatter/minimal:minimal_test_lib",
     "//plugins/kotlin/refactorings/kotlin.refactorings.k2:kotlin-refactorings_test_lib",
     "//java/openapi:java_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
     "//plugins/kotlin/kotlin.searching/base:base_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
     "//plugins/kotlin/base/indices:indices_test_lib",
     "//plugins/kotlin/kotlin.ide:kotlin.ide_test_lib",
     "//libraries/velocity:velocity_test_lib",
@@ -156,9 +163,18 @@ jvm_library(
     "//plugins/kotlin/code-insight/descriptions",
     "//plugins/kotlin/code-insight/descriptions:descriptions_test_lib",
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/lang-api:lang_test_lib",
+    "//platform/statistics:statistics_test_lib",
+    "//plugins/kotlin/base/platforms:platforms_test_lib",
   ]
 )
 ### auto-generated section `build intellij.kotlin.codeInsight` end
+
+### auto-generated section `iml intellij.kotlin.codeInsight` start
+exports_files([
+  "intellij.kotlin.codeInsight.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.codeInsight` end
 
 ### auto-generated section `build intellij.kotlin.codeInsight.tests` start
 create_kotlinc_options(
@@ -174,12 +190,14 @@ create_kotlinc_options(
 
 jvm_library(
   name = "kotlin-codeInsight-tests",
+  module_name = "intellij.kotlin.codeInsight.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "kotlin-codeInsight-tests_test_lib",
+  testonly = True,
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
   kotlinc_opts = ":custom_kotlin-codeInsight-tests",
@@ -245,9 +263,13 @@ jvm_library(
     "//platform/lang-impl:lang-impl_test_lib",
     "//platform/lang-core",
     "//platform/lang-core:lang-core_test_lib",
+    "//platform/lang-api:lang",
+    "//platform/lang-api:lang_test_lib",
     "//platform/platform-impl:ide-impl",
     "//platform/core-ui",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/util:util-ui",
     "//platform/util:util-ui_test_lib",
     "//java/java-psi-api:psi",
@@ -281,6 +303,7 @@ jvm_library(
     "//plugins/kotlin/kotlin.searching/base",
     "//plugins/kotlin/kotlin.searching/base:base_test_lib",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//plugins/kotlin/base/indices",
@@ -301,8 +324,8 @@ jvm_library(
     "//libraries/fastutil:fastutil_test_lib",
     "//plugins/kotlin/kotlin.searching",
     "//plugins/kotlin/kotlin.searching:kotlin.searching_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//java/testFramework",
     "//java/testFramework:testFramework_test_lib",
     "//plugins/kotlin/base/statistics",
@@ -319,14 +342,25 @@ jvm_library(
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
     "//plugins/kotlin/fir/testFramework",
     "//plugins/kotlin/fir/testFramework:testFramework_test_lib",
+    "//plugins/kotlin/base/code-insight:kotlin-base-codeInsight-tests",
+    "//plugins/kotlin/base/code-insight:kotlin-base-codeInsight-tests_test_lib",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework_test_lib",
   ],
   runtime_deps = [
     ":kotlin-codeInsight-tests",
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
   ]
 )
 ### auto-generated section `build intellij.kotlin.codeInsight.tests` end
+
+### auto-generated section `iml intellij.kotlin.codeInsight.tests` start
+exports_files([
+  "intellij.kotlin.codeInsight.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.codeInsight.tests` end
 
 ### auto-generated section `test intellij.kotlin.codeInsight.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

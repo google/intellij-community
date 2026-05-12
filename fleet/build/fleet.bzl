@@ -1,3 +1,3 @@
-load("//:fleet/build/rules/fleet_module.bzl", _fleet_module = "fleet_module")
+load("//fleet/build/rules:rhizomedb.bzl", _fleet_plugin_services_resources = "fleet_plugin_services_resources")
 
-fleet_module = _fleet_module
+fleet_plugin_services_resources = _fleet_plugin_services_resources

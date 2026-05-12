@@ -2,12 +2,21 @@
 package com.jetbrains.python.sdk.add.v2
 
 import com.intellij.execution.target.BrowsableTargetEnvironmentType
+import com.intellij.execution.target.TargetBrowserHints
 import com.intellij.execution.target.TargetEnvironmentConfiguration
+import com.intellij.execution.target.TargetEnvironmentRequest
 import com.intellij.execution.target.getTargetType
 import com.intellij.execution.target.joinTargetPaths
+import com.intellij.execution.target.local.LocalTargetEnvironmentRequest
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.fileLogger
+import com.intellij.openapi.fileChooser.FileChooser
+import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.projectRoots.Sdk
+import com.intellij.openapi.ui.ComboBox
+import com.intellij.openapi.ui.TextComponentAccessor
 import com.intellij.openapi.util.UserDataHolder
 import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.util.io.FileUtil
@@ -20,19 +29,22 @@ import com.intellij.python.community.execService.BinOnTarget
 import com.intellij.python.community.execService.BinaryToExec
 import com.intellij.python.community.execService.ExecService
 import com.intellij.python.community.execService.execGetStdout
-import com.intellij.python.community.execService.execute
 import com.intellij.python.community.execService.python.validatePythonAndGetInfo
 import com.intellij.python.community.services.internal.impl.VanillaPythonWithPythonInfoImpl
 import com.intellij.python.community.services.shared.VanillaPythonWithPythonInfo
 import com.intellij.python.community.services.systemPython.SysPythonRegisterError
 import com.intellij.python.community.services.systemPython.SystemPython
 import com.intellij.python.community.services.systemPython.SystemPythonService
+import com.intellij.python.venv.sdk.flavors.VirtualEnvSdkFlavor
+import com.intellij.util.SlowOperations
+import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.jetbrains.python.PyBundle.message
 import com.jetbrains.python.PythonInfo
 import com.jetbrains.python.Result
 import com.jetbrains.python.errorProcessing.MessageError
 import com.jetbrains.python.errorProcessing.PyResult
 import com.jetbrains.python.isCondaVirtualEnv
+import com.jetbrains.python.isSuccess
 import com.jetbrains.python.orLogException
 import com.jetbrains.python.pathValidation.PlatformAndRoot.Companion.getPlatformAndRoot
 import com.jetbrains.python.pathValidation.ValidationRequest
@@ -46,23 +58,29 @@ import com.jetbrains.python.sdk.PythonSdkType
 import com.jetbrains.python.sdk.PythonSdkUtil
 import com.jetbrains.python.sdk.asBinToExecute
 import com.jetbrains.python.sdk.associatedModulePath
+import com.jetbrains.python.sdk.createSdk
 import com.jetbrains.python.sdk.detectTool
+import com.jetbrains.python.sdk.flavors.PyFlavorAndData
+import com.jetbrains.python.sdk.flavors.PyFlavorData
 import com.jetbrains.python.sdk.flavors.PythonSdkFlavor
-import com.jetbrains.python.sdk.flavors.VirtualEnvSdkFlavor
 import com.jetbrains.python.sdk.getSdksToInstall
 import com.jetbrains.python.sdk.impl.PySdkBundle
 import com.jetbrains.python.sdk.impl.resolvePythonBinary
+import com.jetbrains.python.sdk.impl.resolvePythonHome
 import com.jetbrains.python.sdk.isSystemWide
+import com.jetbrains.python.target.PyTargetAwareAdditionalData
 import com.jetbrains.python.target.PythonLanguageRuntimeConfiguration
+import com.jetbrains.python.target.ui.TargetPanelExtension
 import com.jetbrains.python.venvReader.VirtualEnvReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.jetbrains.annotations.Nls
 import java.nio.file.InvalidPathException
 import java.nio.file.Path
+import javax.swing.JComponent
 import kotlin.io.path.Path
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
-import kotlin.io.path.name
 
 
 private val LOG: Logger = fileLogger()
@@ -83,10 +101,25 @@ sealed interface FileSystem<P : PathHolder> {
   suspend fun validateExecutable(path: P): PyResult<Unit>
   suspend fun fileExists(path: P): Boolean
 
+  @RequiresEdt
+  fun <T> configureFileBrowseEditor(
+    fieldAccessor: TextComponentAccessor<ComboBox<T>>,
+    comboBox: ComboBox<T>,
+    browseTitle: @Nls String,
+    parentComponent: JComponent,
+  )
+
   /**
    * [pathToPython] has to be system (not venv) if set [requireSystemPython]
    */
   suspend fun getSystemPythonFromSelection(pathToPython: P, requireSystemPython: Boolean): PyResult<DetectedSelectableInterpreter<P>>
+  suspend fun setupSdk(
+    project: Project?,
+    pythonBinaryPath: P,
+    targetPanelExtension: TargetPanelExtension?,
+  ): PyResult<Sdk>
+
+  fun createTargetRequest(): TargetEnvironmentRequest
 
   suspend fun validateVenv(homePath: P): PyResult<Unit>
   suspend fun suggestVenv(projectPath: Path): PyResult<P>
@@ -94,6 +127,7 @@ sealed interface FileSystem<P : PathHolder> {
   suspend fun detectSelectableVenv(projectPathPrefix: Path): List<DetectedSelectableInterpreter<P>>
   fun preferredInterpreterBasePath(): P? = null
   fun resolvePythonBinary(pythonHome: P): P?
+  fun resolvePythonHome(pythonBinary: P): P
   fun getVenvName(pythonHome: P): String?
 
   fun getBinaryToExec(path: P): BinaryToExec
@@ -108,6 +142,35 @@ sealed interface FileSystem<P : PathHolder> {
     override val isLocal: Boolean = eelApi == localEel
     override fun getBinaryToExec(path: PathHolder.Eel): BinaryToExec {
       return BinOnEel(path.path)
+    }
+
+    override fun createTargetRequest(): TargetEnvironmentRequest = LocalTargetEnvironmentRequest()
+
+    @RequiresEdt
+    override fun <T> configureFileBrowseEditor(
+      fieldAccessor: TextComponentAccessor<ComboBox<T>>,
+      comboBox: ComboBox<T>,
+      browseTitle: @Nls String,
+      parentComponent: JComponent,
+    ) {
+      SlowOperations.knownIssue("PY-666").use { // TODO FIX ME PLEASE if you know how
+        val descriptor = PythonSdkType.getInstance().homeChooserDescriptor.withTitle(browseTitle)
+        FileChooser.chooseFile(descriptor, null, parentComponent, null) { file ->
+          val path = file?.toNioPath()
+          path?.toString()?.let {
+            fieldAccessor.setText(comboBox, it)
+          }
+        }
+      }
+    }
+
+    override suspend fun setupSdk(
+      project: Project?,
+      pythonBinaryPath: PathHolder.Eel,
+      targetPanelExtension: TargetPanelExtension?,
+    ): PyResult<Sdk> {
+
+      return createSdk(pythonBinaryPath, null, null)
     }
 
     override fun parsePath(raw: String): PyResult<PathHolder.Eel> = try {
@@ -242,6 +305,10 @@ sealed interface FileSystem<P : PathHolder> {
       return pythonHome.path.resolvePythonBinary()?.let { PathHolder.Eel(it) }
     }
 
+    override fun resolvePythonHome(pythonBinary: PathHolder.Eel): PathHolder.Eel {
+      return PathHolder.Eel(pythonBinary.path.resolvePythonHome())
+    }
+
     override fun getVenvName(pythonHome: PathHolder.Eel): String? {
       return resolvePythonBinary(pythonHome)?.let { VirtualEnvReader().getVenvName(it.path) }
     }
@@ -262,10 +329,71 @@ sealed interface FileSystem<P : PathHolder> {
     override val isLocal: Boolean = false
 
     private val systemPythonCache = ArrayList<DetectedSelectableInterpreter<PathHolder.Target>>()
-    private lateinit var shellImpl: PyResult<String>
+    private lateinit var shellImpl: String
 
     override fun parsePath(raw: String): PyResult<PathHolder.Target> {
       return PyResult.success(PathHolder.Target(raw))
+    }
+
+    override fun createTargetRequest(): TargetEnvironmentRequest =
+      targetEnvironmentConfiguration.createEnvironmentRequest(project = null)
+
+    @RequiresEdt
+    override fun <T> configureFileBrowseEditor(
+      fieldAccessor: TextComponentAccessor<ComboBox<T>>,
+      comboBox: ComboBox<T>,
+      browseTitle: @Nls String,
+      parentComponent: JComponent,
+    ) {
+      val targetType = targetEnvironmentConfiguration.getTargetType()
+      if (targetType is BrowsableTargetEnvironmentType) {
+        val descriptor = FileChooserDescriptorFactory.singleFile().withTitle(browseTitle)
+        val hints = TargetBrowserHints(showLocalFsInBrowser = true, descriptor)
+
+        val actionListener = targetType.createBrowser(
+          ProjectManager.getInstance().defaultProject,
+          hints.customFileChooserDescriptor!!.title,
+          fieldAccessor,
+          comboBox,
+          { targetEnvironmentConfiguration },
+          hints
+        )
+        actionListener.actionPerformed(null)
+      }
+      else {
+        val dialog = ManualPathEntryDialog(browseTitle, parentComponent.width, targetEnvironmentConfiguration)
+        if (dialog.showAndGet()) {
+          fieldAccessor.setText(comboBox, dialog.path)
+        }
+      }
+    }
+
+    override suspend fun setupSdk(
+      project: Project?,
+      pythonBinaryPath: PathHolder.Target,
+      targetPanelExtension: TargetPanelExtension?,
+    ): PyResult<Sdk> {
+
+      val languageLevel = getBinaryToExec(pythonBinaryPath).validatePythonAndGetInfo().getOr { return it }.languageLevel
+
+      val (additionalData, customSdkSuggestedName) = run {
+        val data = PyTargetAwareAdditionalData(PyFlavorAndData(PyFlavorData.Empty, VirtualEnvSdkFlavor.getInstance())).also {
+          it.interpreterPath = pythonBinaryPath.toString()
+          it.targetEnvironmentConfiguration = targetEnvironmentConfiguration
+        }
+        targetPanelExtension?.let {
+          it.applyToTargetConfiguration()
+          it.applyToAdditionalData(data)
+        }
+        val name = PythonInterpreterTargetEnvironmentFactory.findDefaultSdkName(project, data, languageLevel.toPythonVersion())
+        data to name
+      }
+
+      return createSdk(
+        pythonBinaryPath,
+        customSdkSuggestedName,
+        additionalData
+      )
     }
 
     /**
@@ -278,8 +406,7 @@ sealed interface FileSystem<P : PathHolder> {
       else PyResult.localizedError(message("sdk.create.not.executable.does.not.exist.error"))
 
     override suspend fun fileExists(path: PathHolder.Target): Boolean {
-      val bin = getBinaryToExec(PathHolder.Target("/usr/bin/test"))
-      return ExecService().execute(bin, Args("-f", path.pathString), processOutputTransformer = { output -> PyResult.success(output.exitCode == 0) }).successOrNull ?: false
+      return executeCommand("test -f ${path.pathString}").isSuccess
     }
 
     override suspend fun validateVenv(homePath: PathHolder.Target): PyResult<Unit> = withContext(Dispatchers.IO) {
@@ -365,6 +492,10 @@ sealed interface FileSystem<P : PathHolder> {
       return PathHolder.Target(VirtualEnvReader().findPythonInPythonRootForTarget(pythonHomeString, platform))
     }
 
+    override fun resolvePythonHome(pythonBinary: PathHolder.Target): PathHolder.Target {
+      return PathHolder.Target(pythonBinary.pathString.substringBeforeLast("/bin/"))
+    }
+
     override fun getVenvName(pythonHome: PathHolder.Target): String? {
       val pythonBinary = resolvePythonBinary(pythonHome)
       val pythonBinaryString = pythonBinary.pathString
@@ -373,22 +504,22 @@ sealed interface FileSystem<P : PathHolder> {
     }
 
     override suspend fun which(cmd: String): PathHolder.Target? {
-      val binaryPathString = executeCommand("which $cmd") ?: return null
+      val binaryPathString = executeCommand("which $cmd").getOr { return null }
       val binaryPathOnFS = parsePath(binaryPathString).getOr { return null }
       return binaryPathOnFS
     }
 
-    override suspend fun getHomePath(): PathHolder.Target? = executeCommand($$"echo ${HOME}")?.let { PathHolder.Target(it) }
+    override suspend fun getHomePath(): PathHolder.Target? = executeCommand($$"echo ${HOME}").successOrNull?.let { PathHolder.Target(it) }
 
-    private suspend fun executeCommand(cmd: String): String? {
-      val shell = getShell().getOr { return null }
+    private suspend fun executeCommand(cmd: String): PyResult<String> {
+      val shell = getShell()
       val bin = getBinaryToExec(PathHolder.Target(shell))
-      return ExecService().execGetStdout(bin, Args("-l", "-c", cmd)).successOrNull
+      return ExecService().execGetStdout(bin, Args("-l", "-c", cmd))
     }
 
-    private suspend fun getShell(): PyResult<String> {
+    private suspend fun getShell(): String {
       if (!this::shellImpl.isInitialized) {
-        shellImpl = getShellImpl()
+        shellImpl = getShellImpl().orLogException(LOG) ?: "/bin/sh"
       }
       return shellImpl
     }
@@ -456,13 +587,4 @@ internal suspend fun <P : PathHolder> FileSystem<P>.getExistingSelectableInterpr
       }
     }
   allValidSdks
-}
-
-internal suspend fun <P : PathHolder> FileSystem<P>.getDetectedSelectableInterpreters(
-  projectPathPrefix: Path,
-  existingSelectableInterpreters: List<ExistingSelectableInterpreter<P>>,
-): List<DetectedSelectableInterpreter<P>> = withContext(Dispatchers.IO) {
-  val existingSdkPaths = existingSelectableInterpreters.map { it.homePath }.toSet()
-  val detected = detectSelectableVenv(projectPathPrefix).filterNot { it.homePath in existingSdkPaths }
-  detected
 }

@@ -3,6 +3,7 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tests",
+  module_name = "intellij.platform.runtime.product.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -13,6 +14,7 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "intellij.platform.runtime.product.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
@@ -32,6 +34,12 @@ jvm_library(
   runtime_deps = [":tests"]
 )
 ### auto-generated section `build intellij.platform.runtime.product.tests` end
+
+### auto-generated section `iml intellij.platform.runtime.product.tests` start
+exports_files([
+  "intellij.platform.runtime.product.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.runtime.product.tests` end
 
 ### auto-generated section `test intellij.platform.runtime.product.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

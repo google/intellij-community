@@ -22,11 +22,12 @@ import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNullByDefault;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * A lightweight implementation of completion using ModCompletion providers 
@@ -70,10 +71,10 @@ public final class LightModCompletionServiceImpl {
     String prefix = file.getFileDocument().getText(TextRange.create(startOffset, caretOffset));
     var matcher = new CamelHumpMatcher(prefix);
     ModCompletionItemProvider.CompletionContext context = new ModCompletionItemProvider.CompletionContext(
-      file, caretOffset, original, element, matcher, invocationCount, type);
+      () -> false, file, caretOffset, original, element, matcher, invocationCount, type);
     ProcessingContext processingContext = createContext(matcher);
     Map<CompletionSorterImpl, Classifier<LookupElement>> sortMap = new LinkedHashMap<>();
-    Map<CompletionSorterImpl, List<LookupElement>> allItems = new LinkedHashMap<>();
+    Map<CompletionSorterImpl, Set<LookupElement>> allItems = new LinkedHashMap<>();
     for (ModCompletionItemProvider provider : providers) {
       CompletionSorterImpl sorter = (CompletionSorterImpl)provider.getSorter(context);
       Classifier<LookupElement> classifier = sortMap.computeIfAbsent(sorter, s -> s.buildClassifier(Classifier.empty()));
@@ -82,12 +83,12 @@ public final class LightModCompletionServiceImpl {
             ContainerUtil.exists(item.additionalLookupStrings(), matcher::prefixMatches)) {
           CompletionItemLookupElement le = new CompletionItemLookupElement(item);
           classifier.addElement(le, processingContext);
-          allItems.computeIfAbsent(sorter, k -> new ArrayList<>()).add(le);
+          allItems.computeIfAbsent(sorter, k -> new LinkedHashSet<>()).add(le);
         }
       });
     }
     EntryStream.of(sortMap)
-      .mapKeyValue((sorter, classifier) -> classifier.classify(allItems.getOrDefault(sorter, List.of()), processingContext))
+      .mapKeyValue((sorter, classifier) -> classifier.classify(allItems.getOrDefault(sorter, Set.of()), processingContext))
       .flatMap(items -> StreamEx.of(items.spliterator()))
       .map(item -> ((CompletionItemLookupElement)item).item())
       .forEach(sink);

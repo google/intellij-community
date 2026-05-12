@@ -10762,35 +10762,6 @@
       ]
     },
     {
-      "name": "K2NewUserTracker",
-      "scope": "app",
-      "pluginId": "org.jetbrains.kotlin",
-      "classFqn": "org.jetbrains.kotlin.onboarding.k2.satisfaction.survey.K2UserTracker",
-      "storage": "k2-feedback.xml",
-      "properties": [
-        {
-          "name": "k2UserSince",
-          "type": "Unsupported",
-          "javaType": "long"
-        },
-        {
-          "name": "lastSavedPluginMode",
-          "type": "String",
-          "javaType": "java.lang.String"
-        },
-        {
-          "name": "userSawEnableK2Notification",
-          "type": "Boolean",
-          "javaType": "boolean"
-        },
-        {
-          "name": "userSawSurvey",
-          "type": "Boolean",
-          "javaType": "boolean"
-        }
-      ]
-    },
-    {
       "name": "KotlinWizardDependencyVersionStore",
       "scope": "app",
       "pluginId": "org.jetbrains.kotlin",

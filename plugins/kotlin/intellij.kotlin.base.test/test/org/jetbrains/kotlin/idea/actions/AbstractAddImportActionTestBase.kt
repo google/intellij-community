@@ -10,9 +10,12 @@ import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.idea.base.test.InTextDirectivesUtils
 import org.jetbrains.kotlin.idea.codeinsight.api.classic.quickfixes.KotlinAutoImportCallableWeigher
+import org.jetbrains.kotlin.idea.formatter.kotlinCustomSettings
 import org.jetbrains.kotlin.idea.quickfix.AutoImportVariant
 import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCase
+import org.jetbrains.kotlin.idea.util.ClassImportFilter
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtFunction
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression
 import java.io.File
@@ -43,6 +46,15 @@ abstract class AbstractAddImportActionTestBase : KotlinLightCodeInsightFixtureTe
         }
 
         fixture.configureByFile(fileName())
+        (fixture.file as? KtFile)?.kotlinCustomSettings?.let { settings ->
+            InTextDirectivesUtils.getPrefixedBoolean(fileText, "// IMPORT_NESTED_CLASSES:")?.let { settings.IMPORT_NESTED_CLASSES = it }
+        }
+
+        InTextDirectivesUtils.findLinesWithPrefixesRemoved(fileText, "// CLASS_IMPORT_FILTER_VETO_REGEX:").forEach {
+            val regex = Regex(".*${it.trim()}.*")
+            val filterExtension = ClassImportFilter { classInfo, _ -> !classInfo.fqName.asString().matches(regex) }
+            ClassImportFilter.EP_NAME.point.registerExtension(filterExtension, testRootDisposable)
+        }
 
         var actualVariants: List<AutoImportVariant>? = null
         val executeListener = object : KotlinAddImportActionInfo.ExecuteListener {
@@ -55,8 +67,10 @@ abstract class AbstractAddImportActionTestBase : KotlinLightCodeInsightFixtureTe
         (StatisticsManager.getInstance() as StatisticsManagerImpl).enableStatistics(myFixture.testRootDisposable)
         increaseUseCountOf(InTextDirectivesUtils.findListWithPrefixes(fixture.file.text, INCREASE_USE_COUNT_DIRECTIVE))
 
-        myFixture.availableIntentions
+        val importFixes = myFixture.availableIntentions
             .filter { it.familyName == "Import" }
+
+        importFixes
             .ifEmpty { error("No import fix available") }
             .forEach { importFix -> importFix.invoke(project, editor, file) }
 

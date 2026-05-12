@@ -18,8 +18,8 @@ import org.junit.runner.RunWith;
 @TestRoot("completion/tests-k1")
 @TestDataPath("$CONTENT_ROOT")
 @RunWith(JUnit3RunnerWithInners.class)
-@TestMetadata("../testData/injava/stdlib")
-public class KotlinStdLibInJavaCompletionTestGenerated extends AbstractKotlinStdLibInJavaCompletionTest {
+@TestMetadata("../testData/inJava")
+public class KotlinStdLibInJavaCompletionTestGenerated extends AbstractK1KotlinInJavaCompletionTest {
     @java.lang.Override
     @org.jetbrains.annotations.NotNull
     public final KotlinPluginMode getPluginMode() {
@@ -32,6 +32,6 @@ public class KotlinStdLibInJavaCompletionTestGenerated extends AbstractKotlinStd
 
     @TestMetadata("List.java")
     public void testList() throws Exception {
-        runTest("../testData/injava/stdlib/List.java");
+        runTest("../testData/inJava/List.java");
     }
 }

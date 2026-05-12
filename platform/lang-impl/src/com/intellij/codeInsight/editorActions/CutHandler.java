@@ -58,7 +58,7 @@ public final class CutHandler extends EditorWriteActionHandler {
     final List<TextRange> selections = new ArrayList<>();
     if (editor.getCaretModel().supportsMultipleCarets()) {
       editor.getCaretModel().runForEachCaret(
-        __ -> selections.add(new TextRange(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd())));
+        _ -> selections.add(new TextRange(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd())));
     }
 
     EditorActionManager.getInstance().getActionHandler(IdeActions.ACTION_EDITOR_COPY).execute(editor, null, dataContext);
@@ -67,7 +67,7 @@ public final class CutHandler extends EditorWriteActionHandler {
 
       Collections.reverse(selections);
       final Iterator<TextRange> it = selections.iterator();
-      editor.getCaretModel().runForEachCaret(__ -> {
+      editor.getCaretModel().runForEachCaret(_ -> {
         TextRange range = it.next();
         editor.getCaretModel().moveToOffset(range.getStartOffset());
         selectionModel.removeSelection();

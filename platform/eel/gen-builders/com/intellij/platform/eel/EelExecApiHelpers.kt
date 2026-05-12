@@ -27,19 +27,9 @@ fun EelExecApi.environmentVariables(): EelExecApiHelpers.EnvironmentVariables =
   )
 
 /**
- * Executes the process, returning either an [EelProcess] or an error provided by the remote operating system.
- * 
- * stdin, stdout and stderr of the process are always forwarded, if there are.
- * 
- * The method may throw a RuntimeException only in critical cases like connection loss or a bug.
- * 
- * See [executeProcessBuilder]
- * 
- * @param exe An **absolute** path to the executable.
- *  TODO Or do relative paths also work?
+ * @param exe Either an *absolute* path to the executable file or a binary name.
  *  
- *  All argument, all paths, should be valid for the remote machine. F.i., if the IDE runs on Windows, but IJent runs on Linux,
- *  [ExecuteProcessOptions.workingDirectory] is the path on the Linux host. There's no automatic path mapping in this interface.
+ *  When it's a binary name, the corresponginf executable is searched in the environment variable `PATH`.
  */
 @GeneratedBuilder.Result
 @Deprecated("Use spawnProcess instead")
@@ -53,11 +43,20 @@ fun EelExecApi.execute(
   )
 
 /**
- * @param exe An **absolute** path to the executable.
- *  TODO Or do relative paths also work?
+ * Executes the process, returning either an [EelProcess] or an error provided by the remote operating system.
+ * 
+ * stdin, stdout and stderr of the process are always forwarded, if there are.
+ * 
+ * The method may throw a RuntimeException only in critical cases like connection loss or a bug.
+ * 
+ * All arguments and all paths should be valid for the remote machine. F.i., if the IDE runs on Windows, but IJent runs on Linux,
+ * [ExecuteProcessOptions.workingDirectory] is the path on the Linux host. There's no automatic path mapping in this interface.
+ * 
+ * See [ExecuteProcessOptions]
+ * 
+ * @param exe Either an *absolute* path to the executable file or a binary name.
  *  
- *  All argument, all paths, should be valid for the remote machine. F.i., if the IDE runs on Windows, but IJent runs on Linux,
- *  [ExecuteProcessOptions.workingDirectory] is the path on the Linux host. There's no automatic path mapping in this interface.
+ *  When it's a binary name, the corresponginf executable is searched in the environment variable `PATH`.
  */
 @GeneratedBuilder.Result
 @ApiStatus.Experimental
@@ -157,11 +156,9 @@ object EelExecApiHelpers {
     }
 
     /**
-     * An **absolute** path to the executable.
-     * TODO Or do relative paths also work?
+     * Either an *absolute* path to the executable file or a binary name.
      *
-     * All argument, all paths, should be valid for the remote machine. F.i., if the IDE runs on Windows, but IJent runs on Linux,
-     * [ExecuteProcessOptions.workingDirectory] is the path on the Linux host. There's no automatic path mapping in this interface.
+     * When it's a binary name, the corresponginf executable is searched in the environment variable `PATH`.
      */
     @ApiStatus.Experimental
     fun exe(arg: String): Execute = apply {
@@ -262,11 +259,9 @@ object EelExecApiHelpers {
     }
 
     /**
-     * An **absolute** path to the executable.
-     * TODO Or do relative paths also work?
+     * Either an *absolute* path to the executable file or a binary name.
      *
-     * All argument, all paths, should be valid for the remote machine. F.i., if the IDE runs on Windows, but IJent runs on Linux,
-     * [ExecuteProcessOptions.workingDirectory] is the path on the Linux host. There's no automatic path mapping in this interface.
+     * When it's a binary name, the corresponginf executable is searched in the environment variable `PATH`.
      */
     @ApiStatus.Experimental
     fun exe(arg: String): SpawnProcess = apply {
@@ -337,6 +332,8 @@ object EelExecApiHelpers {
   ) : OwnedBuilder<ExternalCliEntrypoint> {
     private var envVariablesToCapture: List<String> = emptyList()
 
+    private var exactName: String? = null
+
     private var filePrefix: String = ""
 
     private var lifecycle: EelExecApi.ExternalCliLifecycle = EelExecApi.ExternalCliLifecycle.Default
@@ -360,6 +357,13 @@ object EelExecApiHelpers {
     }
 
     /**
+     * Create an entrypoint executable file with an exact name.
+     */
+    fun exactName(arg: String?): CreateExternalCli = apply {
+      this.exactName = arg
+    }
+
+    /**
      * Prefix for an entrypoint executable file that will be created. Since the path to the entrypoint is passed to some command-line tool,
      * using a self-explaining prefix makes the command line more readable and easier to debug.
      */
@@ -380,6 +384,7 @@ object EelExecApiHelpers {
       owner.createExternalCli(
         ExternalCliOptionsImpl(
           envVariablesToCapture = envVariablesToCapture,
+          exactName = exactName,
           filePrefix = filePrefix,
           lifecycle = lifecycle,
         )

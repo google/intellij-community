@@ -2,6 +2,7 @@
 package org.jetbrains.idea.maven.project.importing
 
 import kotlinx.coroutines.runBlocking
+import org.jetbrains.idea.maven.project.MavenProjectsTree
 import org.junit.Test
 
 class MavenProjectsTreeReadingPluginTest : MavenProjectsTreeTestCase() {
@@ -25,7 +26,7 @@ class MavenProjectsTreeReadingPluginTest : MavenProjectsTreeTestCase() {
                                 </parent>
                                 """.trimIndent())
     val listener = MyLoggingListener()
-    tree.addListener(listener, getTestRootDisposable())
+    project.messageBus.connect(getTestRootDisposable()).subscribe(MavenProjectsTree.Listener.TOPIC, listener)
     updateAll(projectPom, child)
     val parentProject = tree.findProject(projectPom)!!
 

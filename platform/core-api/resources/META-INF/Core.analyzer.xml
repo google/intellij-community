@@ -2,11 +2,11 @@
   <extensionPoints>
     <extensionPoint qualifiedName="com.intellij.virtualFileManagerListener" interface="com.intellij.openapi.vfs.VirtualFileManagerListener" dynamic="true"/>
 
-    <extensionPoint qualifiedName="com.intellij.eelProvider"
-                    interface="com.intellij.platform.eel.provider.EelProvider" dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.eelEnvironmentInitializer"
+                    interface="com.intellij.platform.eel.provider.EelEnvironmentInitializer" dynamic="true"/>
 
-    <extensionPoint qualifiedName="com.intellij.eelMachineResolver"
-                    interface="com.intellij.platform.eel.provider.EelMachineResolver" dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.eelAlternativeRootProvider"
+                    interface="com.intellij.platform.eel.provider.EelAlternativeRootProvider" dynamic="true"/>
 
     <extensionPoint qualifiedName="com.intellij.languageBundle" beanClass="com.intellij.DynamicBundle$LanguageBundleEP" dynamic="true"/>
 
@@ -26,8 +26,10 @@
     </extensionPoint>
 
     <extensionPoint qualifiedName="com.intellij.iconProvider" interface="com.intellij.ide.IconProvider" dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.fileIconProvider" interface="com.intellij.ide.FileIconProvider" dynamic="true"/>
 
     <extensionPoint qualifiedName="com.intellij.metaLanguage" interface="com.intellij.lang.MetaLanguage" dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.metaLanguageProvider" interface="com.intellij.lang.MetaLanguageProvider" dynamic="true"/>
 
     <extensionPoint qualifiedName="com.intellij.inspection.basicVisitor" beanClass="com.intellij.psi.BasicInspectionVisitorBean" dynamic="true">
       <with attribute="class" implements="com.intellij.psi.PsiElementVisitor"/>

@@ -41,8 +41,8 @@ import org.jetbrains.kotlin.types.Variance
 
 object ConvertReferenceToLambdaUtil {
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     fun prepareLambdaExpressionText(
         element: KtCallableReferenceExpression,
     ): String? {

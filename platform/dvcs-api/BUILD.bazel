@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.vcs.dvcs` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "vcs-dvcs_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "vcs-dvcs",
   module_name = "intellij.platform.vcs.dvcs",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":vcs-dvcs_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/core-ui",
     "//platform/projectModel-api:projectModel",
@@ -21,6 +16,7 @@ jvm_library(
     "//platform/vcs-api:vcs",
     "//platform/extensions",
     "//platform/platform-api:ide",
+    "//platform/ide-core",
     "//platform/vcs-log/api:vcs-log",
     "@lib//:kotlin-stdlib",
     "//platform/dvcs-impl/shared",
@@ -29,6 +25,7 @@ jvm_library(
 
 jvm_library(
   name = "vcs-dvcs_test_lib",
+  testonly = True,
   module_name = "intellij.platform.vcs.dvcs",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -41,8 +38,15 @@ jvm_library(
     "//platform/vcs-api:vcs_test_lib",
     "//platform/extensions:extensions_test_lib",
     "//platform/platform-api:ide_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/vcs-log/api:vcs-log_test_lib",
     "//platform/dvcs-impl/shared:shared_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.vcs.dvcs` end
+
+### auto-generated section `iml intellij.platform.vcs.dvcs` start
+exports_files([
+  "intellij.platform.vcs.dvcs.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.vcs.dvcs` end

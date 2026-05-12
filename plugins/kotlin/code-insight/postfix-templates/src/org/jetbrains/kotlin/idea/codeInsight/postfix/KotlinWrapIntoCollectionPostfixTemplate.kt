@@ -29,4 +29,5 @@ internal abstract class KotlinWrapIntoCollectionPostfixTemplate : StringBasedPos
 
     override fun getTemplateString(element: PsiElement): String = "$functionName(\$expr$)\$END$"
     override fun getElementToRemove(expr: PsiElement): PsiElement = expr
+    override fun isApplicableForModCommand(): Boolean = true
 }

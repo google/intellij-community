@@ -93,4 +93,6 @@ public class MarkdownQuoteHandlerTest extends BasePlatformTestCase {
   public void testBackticksBadBalance() {
     doTest("Hello ``code<caret>` world", '`', "Hello ``code`<caret>` world");
   }
+
+  public void testBracketOvertypeInCheckbox() { doTest("- [ <caret>]", ']', "- [ ]<caret>"); }
 }

@@ -23,6 +23,7 @@ jvm_library(
 
 jvm_library(
   name = "multiplatform_test_lib",
+  testonly = True,
   module_name = "intellij.platform.util.base.multiplatform",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -36,3 +37,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.util.base.multiplatform` end
+
+### auto-generated section `iml intellij.platform.util.base.multiplatform` start
+exports_files([
+  "intellij.platform.util.base.multiplatform.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.util.base.multiplatform` end

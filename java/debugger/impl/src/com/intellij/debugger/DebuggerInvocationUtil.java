@@ -5,6 +5,7 @@ import com.intellij.debugger.engine.evaluation.EvaluateException;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.WriteIntentReadAction;
+import com.intellij.openapi.progress.Cancellation;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiDocumentManager;
 import org.jetbrains.annotations.NotNull;
@@ -67,7 +68,7 @@ public final class DebuggerInvocationUtil {
     final Throwable[] ex = new Throwable[]{null};
     T result = PsiDocumentManager.getInstance(project).commitAndRunReadAction(() -> {
       try {
-        return computable.compute();
+        return Cancellation.computeInNonCancelableSection(() -> computable.compute());
       }
       catch (RuntimeException | EvaluateException e) {
         ex[0] = e;

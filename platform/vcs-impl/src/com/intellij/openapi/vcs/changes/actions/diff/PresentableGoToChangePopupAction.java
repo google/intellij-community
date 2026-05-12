@@ -55,6 +55,14 @@ public abstract class PresentableGoToChangePopupAction<T> extends GoToChangePopu
 
   protected abstract @Nullable PresentableChange getPresentation(@NotNull T change);
 
+  protected @NotNull List<AnAction> createToolbarActions() {
+    return Collections.emptyList();
+  }
+
+  protected @NotNull List<AnAction> createPopupMenuActions() {
+    return Collections.emptyList();
+  }
+
   @Override
   protected boolean canNavigate() {
     return getChanges().getList().size() > 1;
@@ -166,12 +174,12 @@ public abstract class PresentableGoToChangePopupAction<T> extends GoToChangePopu
 
     @Override
     protected @NotNull List<AnAction> createToolbarActions() {
-      return Collections.emptyList(); // remove diff action
+      return PresentableGoToChangePopupAction.this.createToolbarActions();
     }
 
     @Override
     protected @NotNull List<AnAction> createPopupMenuActions() {
-      return Collections.emptyList(); // remove diff action
+      return PresentableGoToChangePopupAction.this.createPopupMenuActions();
     }
 
     @Override

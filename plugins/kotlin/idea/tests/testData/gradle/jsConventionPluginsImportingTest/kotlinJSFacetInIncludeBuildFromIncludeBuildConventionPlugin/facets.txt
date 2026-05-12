@@ -1,0 +1,38 @@
+MODULES
+include-kotlin
+
+include-kotlin.main
+    externalProjectId = :include-kotlin
+    languageLevel = {{LATEST_STABLE}}
+    apiLevel = {{LATEST_STABLE}}
+    mppVersion = M3
+    targetPlatform = JS
+
+include-kotlin.test
+    externalProjectId = :include-kotlin
+    languageLevel = {{LATEST_STABLE}}
+    apiLevel = {{LATEST_STABLE}}
+    mppVersion = M3
+    additionalVisibleModuleNames = :include-kotlin:main
+    targetPlatform = JS
+
+include-plugin
+
+include-plugin.main
+    externalProjectId =
+    languageLevel = 1.8
+    apiLevel = 1.8
+    targetPlatform = JVM (17)
+
+include-plugin.test
+    externalProjectId =
+    languageLevel = 1.8
+    apiLevel = 1.8
+    additionalVisibleModuleNames = :include-plugin:main
+    targetPlatform = JVM (17)
+
+project
+
+
+Test configuration:
+- excluding following facet fields: compilerSettings

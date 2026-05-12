@@ -1,11 +1,5 @@
 ### auto-generated section `build intellij.platform.util` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_provided_library", "resourcegroup")
-
-resourcegroup(
-  name = "util_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_provided_library")
 
 jvm_provided_library(
   name = "platform_util_troveCompileOnly_provided",
@@ -17,13 +11,15 @@ jvm_library(
   module_name = "intellij.platform.util",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":util_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = "@community//:k8",
   deps = [
     "//platform/util/jdom",
     "@lib//:log4_j",
     "@lib//:jetbrains-annotations",
     "//platform/util-rt",
+    "//platform/bazel-runfiles",
     "//platform/util-class-loader:util-classLoader",
     "@lib//:jna",
     "//libraries/oro-matcher",
@@ -32,6 +28,7 @@ jvm_library(
     "//libraries/fastutil",
     "@lib//:kotlin-stdlib",
     "//platform/util/base",
+    "//platform/util/base/multiplatform",
     "//libraries/aalto-xml",
     "//platform/util/xmlDom",
     "//libraries/kotlinx/coroutines/core",
@@ -40,13 +37,12 @@ jvm_library(
     "//platform/util/coroutines",
     "//platform/util/multiplatform",
     "//platform/eel",
+    "//platform/eel-nioFs",
     ":platform_util_troveCompileOnly_provided",
   ],
   exports = [
     "@lib//:jetbrains-annotations",
     "//platform/util-rt",
-    "//platform/util/base",
-    "//platform/util/multiplatform",
   ],
   runtime_deps = [
     "//libraries/commons/io",
@@ -57,6 +53,7 @@ jvm_library(
 
 jvm_library(
   name = "util_test_lib",
+  testonly = True,
   module_name = "intellij.platform.util",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -65,15 +62,12 @@ jvm_library(
     "@lib//:jetbrains-annotations",
     "//platform/util-rt",
     "//platform/util-rt:util-rt_test_lib",
-    "//platform/util/base",
-    "//platform/util/base:base_test_lib",
-    "//platform/util/multiplatform",
-    "//platform/util/multiplatform:multiplatform_test_lib",
   ],
   runtime_deps = [
     ":util",
     "//platform/util/jdom:jdom_test_lib",
     "//platform/util-rt:util-rt_test_lib",
+    "//platform/bazel-runfiles:bazel-runfiles_test_lib",
     "//platform/util-class-loader:util-classLoader_test_lib",
     "//libraries/oro-matcher:oro-matcher_test_lib",
     "//libraries/lz4:lz4_test_lib",
@@ -83,6 +77,7 @@ jvm_library(
     "//libraries/commons/lang3:lang3_test_lib",
     "//libraries/fastutil:fastutil_test_lib",
     "//platform/util/base:base_test_lib",
+    "//platform/util/base/multiplatform:multiplatform_test_lib",
     "//libraries/aalto-xml:aalto-xml_test_lib",
     "//platform/util/xmlDom:xmlDom_test_lib",
     "//libraries/kotlinx/coroutines/core:core_test_lib",
@@ -93,28 +88,34 @@ jvm_library(
     "//platform/util/coroutines:coroutines_test_lib",
     "//platform/util/multiplatform:multiplatform_test_lib",
     "//platform/eel:eel_test_lib",
+    "//platform/eel-nioFs:eel-nioFs_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.util` end
 
+### auto-generated section `iml intellij.platform.util` start
+exports_files([
+  "intellij.platform.util.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.util` end
+
 ### auto-generated section `build intellij.platform.util.tests` start
-resourcegroup(
-  name = "util-tests_test_resources",
-  srcs = glob(["testData/**/*"]),
-  strip_prefix = "testData"
-)
+load("@rules_jvm//:jvm.bzl", "resourcegroup")
 
 resourcegroup(
-  name = "util-tests_test_resources_1",
+  name = "util-tests_test_resources",
   srcs = glob(["testResources/**/*"]),
   strip_prefix = "testResources"
 )
 
 jvm_library(
   name = "util-tests",
+  module_name = "intellij.platform.util.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
+    "@lib//:kotlin-test",
+    "//platform/eel-provider",
     "//platform/core-impl",
     "//libraries/kotlinx/coroutines/debug",
   ]
@@ -122,14 +123,17 @@ jvm_library(
 
 jvm_library(
   name = "util-tests_test_lib",
+  testonly = True,
   module_name = "intellij.platform.util.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
-  resources = [
-    ":util-tests_test_resources",
-    ":util-tests_test_resources_1",
-  ],
+  resources = glob(["testData/**/*"]),
+  resource_strip_prefix = "testData",
+  resource_jars = [":util-tests_test_resources"],
   deps = [
+    "@lib//:kotlin-test",
+    "//platform/eel-provider",
+    "//platform/eel-provider:eel-provider_test_lib",
     "//platform/util/concurrency",
     "//platform/util/concurrency:concurrency_test_lib",
     "//platform/core-ui",
@@ -143,8 +147,8 @@ jvm_library(
     "//platform/core-impl",
     "//platform/core-impl:core-impl_test_lib",
     "@lib//:kotlin-stdlib",
-    "@lib//:assert_j",
-    "@lib//:junit4",
+    "//libraries/assertj-core",
+    "//libraries/assertj-core:assertj-core_test_lib",
     "@lib//:jna",
     "//platform/core-api:core",
     "//platform/core-api:core_test_lib",
@@ -188,6 +192,8 @@ jvm_library(
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark_test_lib",
     "//platform/util/coroutines",
     "//platform/util/coroutines:coroutines_test_lib",
+    "//platform/util:util-ui",
+    "//platform/util:util-ui_test_lib",
     "@lib//:jetbrains-kotlinx-lincheck-jvm",
     "//libraries/mockito",
     "//libraries/mockito:mockito_test_lib",
@@ -197,6 +203,16 @@ jvm_library(
     "//platform/ijent/buildConstants:buildConstants_test_lib",
     "//platform/testFramework/monorepo",
     "//platform/testFramework/monorepo:monorepo_test_lib",
+    "//platform/analysis-api:analysis",
+    "//platform/analysis-api:analysis_test_lib",
+    "//platform/code-style-api:codeStyle",
+    "//platform/code-style-api:codeStyle_test_lib",
+    "//platform/testFramework/junit5/eel",
+    "//platform/testFramework/junit5/eel:eel_test_lib",
+    "//platform/testFramework/junit5/eel:testFramework-junit5-eel-tests",
+    "//platform/testFramework/junit5/eel:testFramework-junit5-eel-tests_test_lib",
+    "//platform/editor-ui-api:editor-ui",
+    "//platform/editor-ui-api:editor-ui_test_lib",
   ],
   runtime_deps = [
     ":util-tests",
@@ -204,6 +220,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.util.tests` end
+
+### auto-generated section `iml intellij.platform.util.tests` start
+exports_files([
+  "intellij.platform.util.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.util.tests` end
 
 ### auto-generated section `test intellij.platform.util.tests` start
 load("@community//build:tests-options.bzl", "jps_test")
@@ -229,25 +251,20 @@ kt_javac_options(
   no_proc = True
 )
 
-resourcegroup(
-  name = "util-ui_resources",
-  srcs = glob(["ui/resources/**/*"]),
-  strip_prefix = "ui/resources"
-)
-
 jvm_library(
   name = "util-ui",
   module_name = "intellij.platform.util.ui",
   visibility = ["//visibility:public"],
   srcs = glob(["ui/src/**/*.kt", "ui/src/**/*.java", "ui/src/**/*.form"], allow_empty = True),
-  resources = [":util-ui_resources"],
+  resources = glob(["ui/resources/**/*"]),
+  resource_strip_prefix = "ui/resources",
   javac_opts = ":custom-javac-options",
   deps = [
     "@lib//:mac-provided",
     "//platform/util",
     "//libraries/imgscalr",
     "@lib//:jna",
-    "@lib//:java_compatibility",
+    "//libraries/java-compatibility",
     "@lib//:kotlin-stdlib",
     "//libraries/fastutil",
     "//platform/util-ex",
@@ -259,6 +276,9 @@ jvm_library(
     "//libraries/jbr",
     "//libraries/jsvg",
     "//platform/util/rt-java8",
+    "//platform/util/multiplatform",
+    "//platform/util/base/multiplatform",
+    "//platform/util/base",
     "//libraries/hash4j",
     "//libraries/kotlinx/coroutines/core",
     "//platform/diagnostic",
@@ -270,6 +290,7 @@ jvm_library(
 
 jvm_library(
   name = "util-ui_test_lib",
+  testonly = True,
   module_name = "intellij.platform.util.ui",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -279,6 +300,7 @@ jvm_library(
     "@lib//:mac-provided",
     "//platform/util:util_test_lib",
     "//libraries/imgscalr:imgscalr_test_lib",
+    "//libraries/java-compatibility:java-compatibility_test_lib",
     "//libraries/fastutil:fastutil_test_lib",
     "//platform/util-ex:util-ex_test_lib",
     "//libraries/netty/buffer:buffer_test_lib",
@@ -289,6 +311,9 @@ jvm_library(
     "//libraries/jbr:jbr_test_lib",
     "//libraries/jsvg:jsvg_test_lib",
     "//platform/util/rt-java8:rt-java8_test_lib",
+    "//platform/util/multiplatform:multiplatform_test_lib",
+    "//platform/util/base/multiplatform:multiplatform_test_lib",
+    "//platform/util/base:base_test_lib",
     "//libraries/hash4j:hash4j_test_lib",
     "//libraries/kotlinx/coroutines/core:core_test_lib",
     "//platform/diagnostic:diagnostic_test_lib",
@@ -298,3 +323,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.util.ui` end
+
+### auto-generated section `iml intellij.platform.util.ui` start
+exports_files([
+  "intellij.platform.util.ui.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.util.ui` end

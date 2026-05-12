@@ -176,7 +176,7 @@ internal class ComplexPattern(private val configProvider: ComplexPatternConfigPr
   ): T {
     val options = configProvider.getOptions(queryExecutor, scopeStack)
 
-    return scopeStack.withSymbols(options.additionalScope?.queryScope ?: emptyList()) {
+    return scopeStack.withSymbols(options.additionalScope) {
       action(patterns, options.symbolsResolver, options.apiStatus, options.isRequired, options.priority,
              options.repeats, options.unique, options.additionalLastSegmentSymbol)
     }

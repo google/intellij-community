@@ -1,18 +1,20 @@
 // Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package org.jetbrains.kotlin.idea.codeInsight.surroundWith.statement
 
-import com.intellij.lang.surroundWith.ModCommandSurrounder
+import com.intellij.lang.surroundWith.PsiUpdateModCommandSurrounder
 import com.intellij.modcommand.ActionContext
-import com.intellij.modcommand.ModCommand
 import com.intellij.modcommand.ModPsiUpdater
 import com.intellij.psi.PsiElement
 import com.intellij.util.IncorrectOperationException
 import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.analyzeCopy
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
+import org.jetbrains.kotlin.analysis.api.projectStructure.KaDanglingFileResolutionMode
 import org.jetbrains.kotlin.psi.KtExpression
+import org.jetbrains.kotlin.psi.KtFile
 
-abstract class KotlinStatementsSurrounder : ModCommandSurrounder() {
+abstract class KotlinStatementsSurrounder : PsiUpdateModCommandSurrounder() {
     @OptIn(KaAllowAnalysisOnEdt::class)
     final override fun isApplicable(elements: Array<PsiElement>): Boolean {
         if (elements.isEmpty()) {
@@ -34,15 +36,14 @@ abstract class KotlinStatementsSurrounder : ModCommandSurrounder() {
     protected open val isApplicableWhenUsedAsExpression: Boolean = true
 
     @Throws(IncorrectOperationException::class)
-    final override fun surroundElements(context: ActionContext, elements: Array<out PsiElement>): ModCommand {
-        val container = elements[0].parent ?: return ModCommand.nop()
-        return ModCommand.psiUpdate(context) { updater ->
-            surroundStatements(
-                context,
-                updater.getWritable(container),
-                elements.map { updater.getWritable(it) }.toTypedArray(),
-                updater
-            )
+    final override fun surroundElements(
+        context: ActionContext,
+        elementsInCopy: Array<out PsiElement>,
+        updater: ModPsiUpdater
+    ) {
+        val container = elementsInCopy[0].parent ?: return
+        analyzeCopy(container.containingFile as KtFile, resolutionMode = KaDanglingFileResolutionMode.PREFER_SELF) {
+            surroundStatements(context, container, elementsInCopy.map { it }.toTypedArray(), updater)
         }
     }
 

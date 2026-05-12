@@ -5,7 +5,7 @@ import com.intellij.internal.jcef.test.cases.DetailedFrame
 import com.intellij.openapi.diagnostic.thisLogger
 import org.cef.callback.CefCallback
 import org.cef.handler.CefLoadHandler
-import org.cef.handler.CefResourceHandler
+import org.cef.handler.CefResourceHandlerAdapter
 import org.cef.misc.IntRef
 import org.cef.misc.StringRef
 import org.cef.network.CefRequest
@@ -13,7 +13,7 @@ import org.cef.network.CefResponse
 import java.io.IOException
 import java.io.InputStream
 
-internal class MyResourceHandler : CefResourceHandler {
+internal class MyResourceHandler : CefResourceHandlerAdapter() {
 
     private var inputStream: InputStream? = null
     private var resourceType: CefRequest.ResourceType? = null

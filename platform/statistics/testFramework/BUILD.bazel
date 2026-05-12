@@ -17,6 +17,7 @@ jvm_library(
 
 jvm_library(
   name = "testFramework_test_lib",
+  testonly = True,
   module_name = "intellij.platform.statistics.testFramework",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -29,3 +30,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.statistics.testFramework` end
+
+### auto-generated section `iml intellij.platform.statistics.testFramework` start
+exports_files([
+  "intellij.platform.statistics.testFramework.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.statistics.testFramework` end

@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.ant.jps` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "jps_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "jps",
   module_name = "intellij.ant.jps",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":jps_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = "@community//:k11",
   deps = [
     "//jps/model-api:model",
@@ -21,11 +16,14 @@ jvm_library(
     "//jps/jps-builders:build",
     "//java/java-runtime:rt",
     "//platform/util/jdom",
+    "//platform/util/base/multiplatform",
+    "//platform/util/base",
   ]
 )
 
 jvm_library(
   name = "jps_test_lib",
+  testonly = True,
   module_name = "intellij.ant.jps",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -38,13 +36,22 @@ jvm_library(
     "//jps/jps-builders:build_test_lib",
     "//java/java-runtime:rt_test_lib",
     "//platform/util/jdom:jdom_test_lib",
+    "//platform/util/base/multiplatform:multiplatform_test_lib",
+    "//platform/util/base:base_test_lib",
   ]
 )
 ### auto-generated section `build intellij.ant.jps` end
 
+### auto-generated section `iml intellij.ant.jps` start
+exports_files([
+  "intellij.ant.jps.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.ant.jps` end
+
 ### auto-generated section `build intellij.ant.jps.tests` start
 jvm_library(
   name = "jps-tests",
+  module_name = "intellij.ant.jps.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -55,6 +62,7 @@ jvm_library(
 
 jvm_library(
   name = "jps-tests_test_lib",
+  testonly = True,
   module_name = "intellij.ant.jps.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
@@ -71,11 +79,19 @@ jvm_library(
     "//jps/jps-builders:build-tests_test_lib",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
+    "//platform/util/base",
+    "//platform/util/base:base_test_lib",
     "@lib//:kotlin-stdlib",
   ],
   runtime_deps = [":jps-tests"]
 )
 ### auto-generated section `build intellij.ant.jps.tests` end
+
+### auto-generated section `iml intellij.ant.jps.tests` start
+exports_files([
+  "intellij.ant.jps.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.ant.jps.tests` end
 
 ### auto-generated section `test intellij.ant.jps.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

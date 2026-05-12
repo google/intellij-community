@@ -35,11 +35,10 @@ internal class PyVirtualEnvVcsCustomizer : VcsEnvCustomizer() {
       else -> if (context.type != ExecutableType.LOCAL) return
     }
 
-    if (PythonSdkUtil.isVirtualEnv(sdk) || PythonSdkUtil.isConda(sdk)) {
+    val pyRichSdk = sdk.pyRichSdk()
+    if (pyRichSdk.isActivatable) {
       // in case of virtualenv sdk on unix we activate virtualenv
-      if (sdk.homePath != null) {
-        envs.putAll(PySdkUtil.activateVirtualEnv(sdk))
-      }
+      envs.putAll(PySdkUtil.activateVirtualEnv(sdk))
     }
   }
 

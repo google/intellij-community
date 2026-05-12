@@ -1,14 +1,9 @@
 ### auto-generated section `build intellij.python.test.env.uv` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "uv_test_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "uv",
+  module_name = "intellij.python.test.env.uv",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -32,10 +27,12 @@ jvm_library(
 
 jvm_library(
   name = "uv_test_lib",
+  testonly = True,
   module_name = "intellij.python.test.env.uv",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":uv_test_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//python/python-test-env/core",
     "//python/python-test-env/core:core_test_lib",
@@ -70,6 +67,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.python.test.env.uv` end
+
+### auto-generated section `iml intellij.python.test.env.uv` start
+exports_files([
+  "intellij.python.test.env.uv.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.python.test.env.uv` end
 
 ### auto-generated section `test intellij.python.test.env.uv` start
 load("@community//build:tests-options.bzl", "jps_test")

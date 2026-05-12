@@ -226,6 +226,6 @@ internal class IslandsInactiveFrameGraphics2D(g: Graphics2D, private val compone
   }
 
   override fun create(): Graphics {
-    return IslandsInactiveFrameGraphics2D(super.create() as Graphics2D, component)
+    return IslandsInactiveFrameGraphics2D(myDelegate.create() as Graphics2D, component)
   }
 }

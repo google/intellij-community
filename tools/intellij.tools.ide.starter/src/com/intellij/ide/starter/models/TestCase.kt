@@ -2,19 +2,20 @@ package com.intellij.ide.starter.models
 
 import com.intellij.ide.starter.community.PublicIdeDownloader
 import com.intellij.ide.starter.community.model.BuildType
-import com.intellij.ide.starter.ide.IdeProductProvider
 import com.intellij.ide.starter.ide.installer.StandardInstaller
 import com.intellij.ide.starter.project.GitProjectInfo
 import com.intellij.ide.starter.project.LocalProjectInfo
 import com.intellij.ide.starter.project.ProjectInfoSpec
 import com.intellij.ide.starter.project.RemoteArchiveProjectInfo
 import com.intellij.tools.ide.performanceTesting.commands.MarshallableCommand
+import com.intellij.tools.ide.performanceTesting.commands.SdkObject
 
 data class TestCase<T : ProjectInfoSpec>(
   val ideInfo: IdeInfo,
   val projectInfo: T,
   val commands: Iterable<MarshallableCommand> = listOf(),
-  val useInMemoryFileSystem: Boolean = false
+  val useInMemoryFileSystem: Boolean = false,
+  val sdk: SdkObject? = null,
 ) {
 
   fun withProject(projectInfo: T): TestCase<T> = copy(projectInfo = projectInfo)
@@ -22,7 +23,8 @@ data class TestCase<T : ProjectInfoSpec>(
   fun withCommands(commands: Iterable<MarshallableCommand> = this.commands): TestCase<T> = copy(commands = commands.toList())
 
   /**
-   * You may consider using this method with [IdeProductProvider]
+   * You may consider using this method with IDE-specific IdeInfo extensions on [IdeInfo.Companion],
+   * e.g., `IdeInfo.GoLand` from `com.intellij.tools.ide.starter.product.goland`.
    */
   fun onIDE(ideInfo: IdeInfo): TestCase<T> = copy(ideInfo = ideInfo)
 
@@ -77,4 +79,12 @@ data class TestCase<T : ProjectInfoSpec>(
    *  [useRelease] and make sure it does not meet your requirements
    *  E.g: "2022.1.2" */
   fun withVersion(version: String): TestCase<T> = copyWithPublicIdeDownloaderAndUpdatedInfo(version = version)
+
+  /**
+   * Defines additional modules for the dev build server (`ConfigurationStorage.useInstaller() = false`).
+   *
+   * @see com.intellij.ide.starter.runner.AdditionalModulesForDevBuildServer
+   */
+  fun <T : ProjectInfoSpec> TestCase<T>.withAdditionalModulesForDevBuildServer(vararg additionalModules: String): TestCase<T> =
+    onIDE(ideInfo.copy(additionalModules = ideInfo.additionalModules + additionalModules))
 }

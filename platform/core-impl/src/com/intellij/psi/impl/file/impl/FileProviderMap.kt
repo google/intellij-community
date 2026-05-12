@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.impl.file.impl
 
 import com.intellij.ReviseWhenPortedToJDK
@@ -8,7 +8,6 @@ import com.intellij.codeInsight.multiverse.anyContext
 import com.intellij.openapi.diagnostic.trace
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.util.Key
-import com.intellij.psi.AbstractFileViewProvider
 import com.intellij.psi.FileViewProvider
 import com.intellij.util.containers.ContainerUtil
 import org.jetbrains.annotations.ApiStatus
@@ -48,7 +47,7 @@ internal sealed interface FileProviderMap {
    *
    * @return true if the provider was removed.
    */
-  fun remove(context: CodeInsightContext, provider: AbstractFileViewProvider): Boolean
+  fun remove(context: CodeInsightContext, provider: FileViewProvider): Boolean
 
   /**
    * Tries to cache or get [provider] for [context].
@@ -66,6 +65,11 @@ internal sealed interface FileProviderMap {
    * @return the actual context assigned to [viewProvider]. Either [context] or a context that had been assigned to [viewProvider] concurrently.
    */
   fun trySetContext(viewProvider: FileViewProvider, context: CodeInsightContext): CodeInsightContext?
+
+  /**
+   * see doc of [FileManagerEx.possiblyInvalidatePhysicalPsi]
+   */
+  var isPossiblyInvalidated: Boolean
 
   /**
    * Returns all existing entries. The returned collection is thread-safe and cannot be collected by GC.
@@ -251,7 +255,10 @@ private class FileProviderMapImpl : FileProviderMap, AtomicReference<ContextMap<
     return context
   }
 
-  override fun remove(context: CodeInsightContext, provider: AbstractFileViewProvider): Boolean {
+  @Volatile
+  override var isPossiblyInvalidated: Boolean = false
+
+  override fun remove(context: CodeInsightContext, provider: FileViewProvider): Boolean {
     update { map ->
       val currentProvider = map[context]
       if (currentProvider !== provider) {
@@ -545,3 +552,7 @@ private class EntryImpl<V : Any>(
 private val log = com.intellij.openapi.diagnostic.logger<FileProviderMap>()
 
 private val strongLinkToFileProviderMap = Key.create<FileProviderMap>("strongLinkToFileProviderMap")
+
+internal fun FileViewProvider.getFileProviderMap(): FileProviderMap? {
+  return getUserData(strongLinkToFileProviderMap)
+}

@@ -6,6 +6,7 @@ import com.intellij.codeInsight.lookup.LookupElementPresentation;
 import com.intellij.lang.Language;
 import com.intellij.lang.LanguageExtension;
 import com.intellij.lang.LanguageExtensionWithAny;
+import com.intellij.modcompletion.ModCompletionItemFilter;
 import com.intellij.modcompletion.ModCompletionItemProvider;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Editor;
@@ -31,6 +32,11 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * <b>Completion FAQ</b><p>
@@ -227,7 +233,7 @@ public abstract class CompletionContributor implements PossiblyDumbAware {
   }
 
   public static @NotNull List<CompletionContributor> forParameters(@NotNull CompletionParameters parameters) {
-    return ReadAction.compute(() -> {
+    return ReadAction.computeBlocking(() -> {
       PsiElement position = parameters.getPosition();
       Language language = PsiUtilCore.getLanguageAtOffset(position.getContainingFile(), parameters.getOffset());
       return forLanguageHonorDumbness(language, position.getProject());
@@ -246,14 +252,25 @@ public abstract class CompletionContributor implements PossiblyDumbAware {
       contributors = INSTANCE.forKey(language);
     }
 
-    if (ModCompletionItemProvider.modCommandCompletionEnabled()) {
-      List<ModCompletionItemProvider> modContributors = ModCompletionItemProvider.forLanguage(language);
-      List<CompletionItemContributor> modContributorAdapters = ContainerUtil.map(modContributors, CompletionItemContributor::new);
-      return ContainerUtil.concat(modContributorAdapters, contributors);
-    }
-    else {
+    List<ModCompletionItemProvider> providers = ModCompletionItemProvider.forLanguage(language);
+    if (providers.isEmpty()) {
       return contributors;
     }
+    List<ModCompletionItemFilter> filters = ModCompletionItemFilter.EP_NAME.allForLanguage(language);
+
+    Map<Class<? extends CompletionContributor>, Integer> order = IntStream.range(0, contributors.size())
+      .boxed().collect(Collectors.toMap(idx -> contributors.get(idx).getClass(), Function.identity(), (a, b) -> a));
+
+    Stream<Map.Entry<Integer, CompletionContributor>> modContributors = providers
+      .stream()
+      .filter(ModCompletionItemProvider::isEnabled)
+      .map(provider -> Map.entry(order.getOrDefault(provider.getAnchorContributor(), -1),
+                                 new CompletionItemContributor(provider, ContainerUtil.filter(filters, f -> f.isApplicableFor(provider)))));
+    return Stream.concat(
+      modContributors, IntStream.range(0, contributors.size()).mapToObj(idx -> Map.entry(idx, contributors.get(idx))))
+      .sorted(Map.Entry.comparingByKey())
+      .map(Map.Entry::getValue)
+      .toList();
   }
 
   @ApiStatus.Internal

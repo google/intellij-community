@@ -3,6 +3,7 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tests",
+  module_name = "intellij.kotlin.uast.base.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -13,12 +14,17 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.uast.base.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
   deps = [
     "//platform/core-api:core",
     "//platform/core-api:core_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
+    "//java/java-psi-api:psi",
+    "//java/java-psi-api:psi_test_lib",
     "//plugins/kotlin/uast/uast-kotlin-base:kotlin-uast-base",
     "//plugins/kotlin/uast/uast-kotlin-base:kotlin-uast-base_test_lib",
     "@lib//:junit4",
@@ -28,8 +34,8 @@ jvm_library(
     "@lib//:kotlin-test",
     "//uast/uast-common:uast",
     "//uast/uast-common:uast_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//java/java-runtime:rt",
     "//java/java-runtime:rt_test_lib",
     "//platform/testFramework",
@@ -46,10 +52,20 @@ jvm_library(
     "//plugins/kotlin/base/plugin:plugin_test_lib",
     "//uast/uast-java:java-uast",
     "//uast/uast-java:java-uast_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
+    "//uast/uast-common-ide:ide",
+    "//uast/uast-common-ide:ide_test_lib",
   ],
   runtime_deps = [":tests"]
 )
 ### auto-generated section `build intellij.kotlin.uast.base.tests` end
+
+### auto-generated section `iml intellij.kotlin.uast.base.tests` start
+exports_files([
+  "intellij.kotlin.uast.base.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.uast.base.tests` end
 
 ### auto-generated section `test intellij.kotlin.uast.base.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

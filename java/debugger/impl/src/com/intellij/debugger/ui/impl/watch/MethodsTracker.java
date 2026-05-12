@@ -65,7 +65,7 @@ public class MethodsTracker {
   }
 
   public MethodOccurrence getMethodOccurrence(int frameIndex, @Nullable Method method) {
-    return myCache.computeIfAbsent(frameIndex, __ -> {
+    return myCache.computeIfAbsent(frameIndex, _ -> {
       synchronized (myMethodCounter) {
         int occurrence = method != null ? myMethodCounter.addTo(method, 1) : 0;
         return new MethodOccurrence(method, occurrence);
@@ -80,7 +80,7 @@ public class MethodsTracker {
   }
 
   private CompletableFuture<Integer> getExactOccurrenceCount(@Nullable Method method) {
-    return myFinished.thenApply(__ -> myMethodCounter.getInt(method));
+    return myFinished.thenApply(_ -> myMethodCounter.getInt(method));
   }
 
   /**
@@ -97,7 +97,7 @@ public class MethodsTracker {
     private volatile CompletableFuture<Void> myRehashFinished = CompletableFuture.completedFuture(null);
 
     public CompletableFuture<V> getExact(int key) {
-      return myRehashFinished.thenApply(__ -> super.get(key));
+      return myRehashFinished.thenApply(_ -> super.get(key));
     }
 
     @Override

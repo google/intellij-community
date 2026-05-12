@@ -26,6 +26,7 @@ import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.rt.coverage.data.ProjectData;
 import com.intellij.util.TimeoutUtil;
 import com.intellij.util.containers.ContainerUtil;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -38,6 +39,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * @author Roman.Chernyatchik
  */
+@ApiStatus.Internal
 public class JavaCoverageAnnotator extends BaseCoverageAnnotator implements Disposable.Default {
   private final Map<String, PackageAnnotator.PackageCoverageInfo> myPackageCoverageInfos = new HashMap<>();
   private final Map<String, PackageAnnotator.PackageCoverageInfo> myFlattenPackageCoverageInfos = new HashMap<>();
@@ -281,7 +283,7 @@ public class JavaCoverageAnnotator extends BaseCoverageAnnotator implements Disp
     return myClassCoverageInfos;
   }
 
-  private void collectSummaryInfo(@NotNull CoverageSuitesBundle suite, Project project) {
+  protected void collectSummaryInfo(@NotNull CoverageSuitesBundle suite, Project project) {
     var collector = new JavaCoverageInfoCollector(this);
     if (shouldSkipUnloadedClassesAnalysis(suite)) {
       JavaCoverageReportEnumerator.collectSummaryInReport(suite, project, collector);

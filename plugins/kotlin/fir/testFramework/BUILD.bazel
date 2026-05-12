@@ -15,12 +15,14 @@ create_kotlinc_options(
 
 jvm_library(
   name = "testFramework",
+  module_name = "kotlin.fir.testFramework",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "testFramework_test_lib",
+  testonly = True,
   module_name = "kotlin.fir.testFramework",
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
@@ -35,16 +37,26 @@ jvm_library(
     "//plugins/kotlin/plugin/k2:k2_test_lib",
     "//plugins/kotlin/test-framework",
     "//plugins/kotlin/test-framework:test-framework_test_lib",
+    "//java/java-psi-api:psi",
+    "//java/java-psi-api:psi_test_lib",
     "//platform/core-api:core",
     "//platform/core-api:core_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/testFramework/core",
     "//platform/testFramework/core:core_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
   ],
   runtime_deps = [":testFramework"]
 )
 ### auto-generated section `build kotlin.fir.testFramework` end
+
+### auto-generated section `iml kotlin.fir.testFramework` start
+exports_files([
+  "kotlin.fir.testFramework.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.fir.testFramework` end
 
 ### auto-generated section `test kotlin.fir.testFramework` start
 load("@community//build:tests-options.bzl", "jps_test")

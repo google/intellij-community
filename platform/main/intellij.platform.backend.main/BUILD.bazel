@@ -3,6 +3,7 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "backend-main",
+  module_name = "intellij.platform.backend.main",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -29,11 +30,14 @@ jvm_library(
     "//platform/buildView/backend",
     "//platform/lang-impl/backend",
     "//platform/pluginManager/backend",
+    "//platform/backend/workspace.impl",
+    "//fleet/rhizomedb",
   ]
 )
 
 jvm_library(
   name = "backend-main_test_lib",
+  testonly = True,
   module_name = "intellij.platform.backend.main",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -62,6 +66,14 @@ jvm_library(
     "//platform/buildView/backend:backend_test_lib",
     "//platform/lang-impl/backend:backend_test_lib",
     "//platform/pluginManager/backend:backend_test_lib",
+    "//platform/backend/workspace.impl:workspace.impl_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.backend.main` end
+
+### auto-generated section `iml intellij.platform.backend.main` start
+exports_files([
+  "intellij.platform.backend.main.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.backend.main` end

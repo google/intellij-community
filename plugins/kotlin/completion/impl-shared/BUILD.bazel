@@ -27,7 +27,6 @@ jvm_library(
     "@lib//:kotlinc-analysis-api",
     "//libraries/guava",
     "//platform/projectModel-api:projectModel",
-    "//plugins/kotlin/base/frontend-agnostic",
     "//plugins/kotlin/base/project-structure",
     "//plugins/kotlin/base/psi",
     "//plugins/kotlin/completion/api",
@@ -36,8 +35,10 @@ jvm_library(
     "//platform/analysis-impl",
     "//platform/lang-impl",
     "//platform/core-ui",
+    "//platform/core-impl",
     "//platform/editor-ui-api:editor-ui",
     "//java/java-impl:impl",
+    "//java/java-psi-api:psi",
     "//plugins/kotlin/base/code-insight",
     "//plugins/kotlin/code-insight/impl-base:kotlin-codeInsight-shared",
     "//plugins/kotlin/base/resources:kotlin-base-resources",
@@ -46,11 +47,13 @@ jvm_library(
     "//libraries/kotlinx/serialization/json",
     "//plugins/kotlin/base/kotlin.base.serialization",
     "//platform/lang-api:lang",
+    "//platform/util:util-ui",
   ]
 )
 
 jvm_library(
   name = "kotlin-completion-impl-shared_test_lib",
+  testonly = True,
   module_name = "kotlin.completion.impl.shared",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -63,7 +66,6 @@ jvm_library(
     "//platform/platform-impl:ide-impl_test_lib",
     "//libraries/guava:guava_test_lib",
     "//platform/projectModel-api:projectModel_test_lib",
-    "//plugins/kotlin/base/frontend-agnostic:frontend-agnostic_test_lib",
     "//plugins/kotlin/base/project-structure:project-structure_test_lib",
     "//plugins/kotlin/base/psi:psi_test_lib",
     "//plugins/kotlin/completion/api:api_test_lib",
@@ -72,8 +74,10 @@ jvm_library(
     "//platform/analysis-impl:analysis-impl_test_lib",
     "//platform/lang-impl:lang-impl_test_lib",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//java/java-impl:impl_test_lib",
+    "//java/java-psi-api:psi_test_lib",
     "//plugins/kotlin/base/code-insight:code-insight_test_lib",
     "//plugins/kotlin/code-insight/impl-base:kotlin-codeInsight-shared_test_lib",
     "//plugins/kotlin/base/resources:kotlin-base-resources_test_lib",
@@ -82,6 +86,13 @@ jvm_library(
     "//libraries/kotlinx/serialization/json:json_test_lib",
     "//plugins/kotlin/base/kotlin.base.serialization:kotlin.base.serialization_test_lib",
     "//platform/lang-api:lang_test_lib",
+    "//platform/util:util-ui_test_lib",
   ]
 )
 ### auto-generated section `build kotlin.completion.impl.shared` end
+
+### auto-generated section `iml kotlin.completion.impl.shared` start
+exports_files([
+  "kotlin.completion.impl.shared.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.completion.impl.shared` end

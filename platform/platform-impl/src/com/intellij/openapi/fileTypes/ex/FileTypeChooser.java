@@ -270,7 +270,7 @@ public final class FileTypeChooser extends DialogWrapper {
       }
     }.installOn(myList);
 
-    myList.getSelectionModel().addListSelectionListener(__ -> updateButtonsState());
+    myList.getSelectionModel().addListSelectionListener(_ -> updateButtonsState());
 
     ScrollingUtil.selectItem(myList, FileTypes.PLAIN_TEXT);
 

@@ -6,17 +6,18 @@ import com.intellij.driver.model.LockSemantics
 import com.intellij.driver.model.OnDispatcher
 import com.intellij.driver.sdk.ui.ui
 import com.intellij.ide.starter.ci.CIServer
-import com.intellij.ide.starter.ci.teamcity.TeamCityCIServer
 import com.intellij.ide.starter.ci.teamcity.TeamCityClient
 import com.intellij.ide.starter.config.ConfigurationStorage
 import com.intellij.ide.starter.config.useDockerContainer
 import com.intellij.ide.starter.report.FailureDetailsOnCI
 import com.intellij.ide.starter.runner.IDERunContext
 import com.intellij.ide.starter.runner.events.IdeLaunchEvent
-import com.intellij.ide.starter.utils.replaceSpecialCharactersWithHyphens
+import com.intellij.platform.testFramework.teamCity.TeamCityReporter
 import com.intellij.tools.ide.starter.bus.EventsBus
 import com.intellij.tools.ide.util.common.logError
 import com.intellij.tools.ide.util.common.logOutput
+import com.intellij.util.system.OS
+import com.intellij.tools.ide.util.common.replaceSpecialCharactersWithHyphens
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.CompletableFuture
@@ -101,15 +102,18 @@ internal class DriverWithDetailedLogging(private val driver: Driver, logUiHierar
           logError("screenshot should be a regular file, but it is not: $screenshotPath")
         }
         else if (!CIServer.instance.isBuildRunningOnCI) {
-          append("Screenshot: file://${path.invariantSeparatorsPathString}\n".color(LogColor.BLUE))
+          val prefix = "file:"
+          append("Screenshot: $prefix${path.invariantSeparatorsPathString}\n".color(LogColor.BLUE))
         }
         else {
           runContext?.let { context ->
-            val artifactPath = context.contextName.replaceSpecialCharactersWithHyphens()
+            val artifactDir = context.contextName.replaceSpecialCharactersWithHyphens()
             val artifactName = path.name.replaceSpecialCharactersWithHyphens()
-            logOutput("Adding screenshot to metadata: $artifactPath/$artifactName")
-            TeamCityClient.publishTeamCityArtifacts(path, artifactPath, artifactName, false)
-            TeamCityCIServer.addTestMetadata(testName = null, TeamCityCIServer.TeamCityMetadataType.IMAGE, flowId = null, name = null, value = "$artifactPath/$artifactName")
+            val actualArtifactPathOnCi = TeamCityClient.publishTeamCityArtifacts(path, artifactDir, artifactName, false)
+            if (actualArtifactPathOnCi != null) {
+              logOutput("Adding screenshot to metadata: $actualArtifactPathOnCi")
+              TeamCityReporter.reportTestMetadata(testName = null, type = TeamCityReporter.MetadataType.IMAGE, flowId = null, name = null, value = actualArtifactPathOnCi)
+            }
           }
         }
       }

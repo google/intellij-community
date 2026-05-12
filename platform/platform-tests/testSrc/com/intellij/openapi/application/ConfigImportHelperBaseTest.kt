@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.application
 
 import com.intellij.ide.ConfigImportOptions
@@ -7,11 +7,13 @@ import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.testFramework.fixtures.BareTestFixtureTestCase
 import com.intellij.testFramework.rules.InMemoryFsRule
 import com.intellij.util.SystemProperties
+import com.intellij.util.system.LowLevelLocalMachineAccess
 import com.intellij.util.system.OS
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.rules.ExternalResource
+import java.lang.invoke.MethodHandles
 import java.nio.file.Path
 import java.nio.file.attribute.FileTime
 import java.time.LocalDateTime
@@ -22,6 +24,7 @@ import kotlin.io.path.createParentDirectories
 import kotlin.io.path.setLastModifiedTime
 import kotlin.io.path.writeText
 
+@OptIn(LowLevelLocalMachineAccess::class)
 abstract class ConfigImportHelperBaseTest : BareTestFixtureTestCase() {
   @JvmField @Rule val memoryFs = InMemoryFsRule(OS.CURRENT)
   @JvmField @Rule val configImportMarketplaceStub = ConfigImportMarketplaceStub()
@@ -31,6 +34,12 @@ abstract class ConfigImportHelperBaseTest : BareTestFixtureTestCase() {
       "'${ConfigImportHelper.IMPORT_FROM_ENV_VAR}' might affect tests. Please quit the IDE and open it again (don't use File | Restart)",
       System.getenv(ConfigImportHelper.IMPORT_FROM_ENV_VAR) == null
     )
+  }
+
+  @Before fun enforceTestMode() {
+    MethodHandles.privateLookupIn(ConfigImportHelper::class.java, MethodHandles.lookup())
+      .findStaticSetter(ConfigImportHelper::class.java, "isUnitTestMode", Boolean::class.java)
+      .invoke(true)
   }
 
   protected fun newTempDir(name: String): Path =
@@ -62,7 +71,7 @@ abstract class ConfigImportHelperBaseTest : BareTestFixtureTestCase() {
     ConfigImportHelper.doImport(oldConfigDir, newConfigDir, null, oldPluginsDir, newPluginsDir, importOptions)
   }
 
-  protected fun findInheritedDirectory(newConfigPath: Path, inheritedPath: String?): ConfigImportHelper.ConfigDirsSearchResult? =
+  protected fun findInheritedDirectory(newConfigPath: Path, inheritedPath: String?): Path? =
     ConfigImportHelper.findInheritedDirectory(newConfigPath, inheritedPath, ConfigImportHelper.findCustomConfigImportSettings(), emptyList(), thisLogger())
 
   protected fun findConfigDirectories(newConfigPath: Path): ConfigImportHelper.ConfigDirsSearchResult =

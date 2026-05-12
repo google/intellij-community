@@ -14,6 +14,8 @@ import javax.swing.ListCellRenderer
 /**
  * Use [com.intellij.ui.dsl.listCellRenderer.BuilderKt.textListCellRenderer/listCellRenderer] when possible
  */
+@Deprecated("Use com.intellij.ui.dsl.listCellRenderer.BuilderKt.textListCellRenderer/listCellRenderer instead")
+@ApiStatus.ScheduledForRemoval
 @ApiStatus.Internal
 class RoundedCellRenderer<T> @JvmOverloads constructor(private val renderer: ListCellRenderer<T>,
                                                        private val fixedHeight: Boolean = true) : ListCellRenderer<T> {

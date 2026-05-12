@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.fir.completion;
 
@@ -175,6 +175,11 @@ public abstract class K2JvmBasicCompletionFullJdkTestGenerated extends AbstractK
         @TestMetadata("ParameterName22.kt")
         public void testParameterName22() throws Exception {
             runTest("../../completion/testData/basic/fullJdk/lambdaSignature/ParameterName22.kt");
+        }
+
+        @TestMetadata("ParameterName23.kt")
+        public void testParameterName23() throws Exception {
+            runTest("../../completion/testData/basic/fullJdk/lambdaSignature/ParameterName23.kt");
         }
 
         @TestMetadata("ParameterName3.kt")

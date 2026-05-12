@@ -20,6 +20,7 @@ import com.intellij.ide.ui.UISettings
 import com.intellij.ide.ui.maximize
 import com.intellij.ide.ui.normalize
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.actionSystem.impl.MenuCancelledControlFlowException
 import com.intellij.openapi.application.AccessToken
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ThreadingSupport
@@ -55,6 +56,7 @@ import com.intellij.openapi.wm.WindowManager
 import com.intellij.openapi.wm.ex.WindowManagerEx
 import com.intellij.openapi.wm.impl.FocusManagerImpl
 import com.intellij.platform.ide.bootstrap.StartupErrorReporter
+import com.intellij.platform.ide.menu.WinAltKeyProcessor
 import com.intellij.platform.locking.impl.getGlobalThreadingSupport
 import com.intellij.ui.ComponentUtil
 import com.intellij.ui.awt.RelativePoint
@@ -456,6 +458,10 @@ class IdeEventQueue private constructor() : EventQueue() {
     var t = exception
     if (isTestMode()) {
       throw t
+    }
+
+    if (t is MenuCancelledControlFlowException) {
+      return
     }
 
     if (t is ControlFlowException && java.lang.Boolean.getBoolean("report.control.flow.exceptions.in.edt")) {
@@ -1271,6 +1277,7 @@ private fun cancelCellEditing(): Boolean {
 
 private class WindowsAltSuppressor : IdeEventQueue.NonLockedEventDispatcher {
   private var waitingForAltRelease = false
+  private var altPressedOnly = false
   private var robot: Robot? = null
 
   override fun dispatch(e: AWTEvent): Boolean = e is KeyEvent && dispatchKeyEvent(e)
@@ -1280,6 +1287,9 @@ private class WindowsAltSuppressor : IdeEventQueue.NonLockedEventDispatcher {
     val pureAlt = ke.keyCode == KeyEvent.VK_ALT && ke.modifiers or InputEvent.ALT_MASK == InputEvent.ALT_MASK
     if (!pureAlt) {
       waitingForAltRelease = false
+      if (altPressedOnly && ke.id == KeyEvent.KEY_PRESSED) {
+        altPressedOnly = false
+      }
       return false
     }
 
@@ -1297,13 +1307,14 @@ private class WindowsAltSuppressor : IdeEventQueue.NonLockedEventDispatcher {
     var dispatch = true
     if (ke.id == KeyEvent.KEY_PRESSED) {
       dispatch = !waitingForAltRelease
+      altPressedOnly = true
     }
     else if (ke.id == KeyEvent.KEY_RELEASED) {
       if (waitingForAltRelease) {
         waitingForAltRelease = false
         dispatch = false
       }
-      else if (component != null) {
+      else if (component != null && (!WinAltKeyProcessor.isEnabled() || altPressedOnly)) {
         EventQueue.invokeLater {
           try {
             val window = ComponentUtil.getWindow(component)
@@ -1322,6 +1333,8 @@ private class WindowsAltSuppressor : IdeEventQueue.NonLockedEventDispatcher {
           }
         }
       }
+
+      altPressedOnly = false
     }
     return !dispatch
   }

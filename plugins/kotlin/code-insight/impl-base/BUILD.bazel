@@ -1,6 +1,6 @@
 ### auto-generated section `build intellij.kotlin.codeInsight.shared` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_kotlin-codeInsight-shared",
@@ -14,18 +14,13 @@ create_kotlinc_options(
   x_context_parameters = True
 )
 
-resourcegroup(
-  name = "kotlin-codeInsight-shared_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "kotlin-codeInsight-shared",
   module_name = "intellij.kotlin.codeInsight.shared",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":kotlin-codeInsight-shared_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_kotlin-codeInsight-shared",
   deps = [
     "@lib//:jetbrains-annotations",
@@ -45,13 +40,13 @@ jvm_library(
     "@lib//:kotlinc-analysis-api",
     "@lib//:kotlinc-analysis-api-impl-base",
     "@lib//:kotlinc-analysis-api-k2",
-    "//plugins/kotlin/base/frontend-agnostic",
     "//plugins/kotlin/base/util",
     "//plugins/kotlin/base/psi",
     "//plugins/kotlin/base/resources:kotlin-base-resources",
     "//plugins/kotlin/base/code-insight",
     "//plugins/kotlin/base/analysis-api/analysis-api-utils:kotlin-base-analysis-utils",
     "//platform/platform-impl:ide-impl",
+    "//platform/ide-core",
     "//plugins/kotlin/base/project-structure",
     "//plugins/kotlin/formatter",
     "//plugins/kotlin/code-insight/api",
@@ -67,20 +62,25 @@ jvm_library(
     "//plugins/kotlin/base/indices",
     "//java/execution/impl",
     "//platform/util/jdom",
+    "//platform/util:util-ui",
     "//platform/vcs-api:vcs",
     "//plugins/kotlin/base/analysis",
     "//java/openapi:java",
+    "//java/java-frontback-psi-api:frontback-psi",
     "//plugins/kotlin/refactorings/kotlin.refactorings.common:kotlin-refactorings-common",
     "//platform/core-ui",
+    "//platform/core-impl",
     "//plugins/kotlin/base/facet",
     "//plugins/kotlin/base/plugin",
     "//plugins/kotlin/project-configuration",
     "//libraries/fastutil",
+    "//platform/lang-api:lang",
   ]
 )
 
 jvm_library(
   name = "kotlin-codeInsight-shared_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.codeInsight.shared",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -97,13 +97,13 @@ jvm_library(
     "//platform/refactoring:refactoring_test_lib",
     "//platform/usageView:usageView_test_lib",
     "//libraries/kotlin/reflect:reflect_test_lib",
-    "//plugins/kotlin/base/frontend-agnostic:frontend-agnostic_test_lib",
     "//plugins/kotlin/base/util:util_test_lib",
     "//plugins/kotlin/base/psi:psi_test_lib",
     "//plugins/kotlin/base/resources:kotlin-base-resources_test_lib",
     "//plugins/kotlin/base/code-insight:code-insight_test_lib",
     "//plugins/kotlin/base/analysis-api/analysis-api-utils:kotlin-base-analysis-utils_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//plugins/kotlin/base/project-structure:project-structure_test_lib",
     "//plugins/kotlin/formatter:formatter_test_lib",
     "//plugins/kotlin/code-insight/api:api_test_lib",
@@ -119,15 +119,25 @@ jvm_library(
     "//plugins/kotlin/base/indices:indices_test_lib",
     "//java/execution/impl:impl_test_lib",
     "//platform/util/jdom:jdom_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//platform/vcs-api:vcs_test_lib",
     "//plugins/kotlin/base/analysis:analysis_test_lib",
     "//java/openapi:java_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
     "//plugins/kotlin/refactorings/kotlin.refactorings.common:kotlin-refactorings-common_test_lib",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl:core-impl_test_lib",
     "//plugins/kotlin/base/facet:facet_test_lib",
     "//plugins/kotlin/base/plugin:plugin_test_lib",
     "//plugins/kotlin/project-configuration:project-configuration_test_lib",
     "//libraries/fastutil:fastutil_test_lib",
+    "//platform/lang-api:lang_test_lib",
   ]
 )
 ### auto-generated section `build intellij.kotlin.codeInsight.shared` end
+
+### auto-generated section `iml intellij.kotlin.codeInsight.shared` start
+exports_files([
+  "intellij.kotlin.codeInsight.shared.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.codeInsight.shared` end

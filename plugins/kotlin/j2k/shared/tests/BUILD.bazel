@@ -9,6 +9,7 @@ create_kotlinc_options(
 
 jvm_library(
   name = "tests",
+  module_name = "kotlin.j2k.shared.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -20,6 +21,7 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "kotlin.j2k.shared.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -34,10 +36,14 @@ jvm_library(
     "@lib//:kotlin-test",
     "//java/java-psi-api:psi",
     "//java/java-psi-api:psi_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
     "//platform/code-style-api:codeStyle",
     "//platform/code-style-api:codeStyle_test_lib",
     "//platform/core-api:core",
     "//platform/core-api:core_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/editor-ui-api:editor-ui",
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//platform/indexing-api:indexing",
@@ -52,12 +58,16 @@ jvm_library(
     "//plugins/kotlin/test-framework:test-framework_test_lib",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
+    "//platform/ide-core",
+    "//platform/progress/shared:ide-progress",
+    "//platform/util:util-ui",
+    "//platform/util:util-ui_test_lib",
     "//plugins/kotlin/tests-common:common-tests",
     "//plugins/kotlin/tests-common:common-tests_test_lib",
     "//plugins/kotlin/base/analysis",
     "//plugins/kotlin/base/analysis:analysis_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/base/plugin",
     "//plugins/kotlin/base/plugin:plugin_test_lib",
     "//plugins/kotlin/base/util",
@@ -69,9 +79,19 @@ jvm_library(
     "//plugins/kotlin/base/code-insight/minimal",
     "//plugins/kotlin/base/code-insight/minimal:minimal_test_lib",
   ],
-  runtime_deps = [":tests"]
+  runtime_deps = [
+    ":tests",
+    "//platform/ide-core:ide-core_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
+  ]
 )
 ### auto-generated section `build kotlin.j2k.shared.tests` end
+
+### auto-generated section `iml kotlin.j2k.shared.tests` start
+exports_files([
+  "kotlin.j2k.shared.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.j2k.shared.tests` end
 
 ### auto-generated section `test kotlin.j2k.shared.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

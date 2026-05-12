@@ -2,6 +2,7 @@
 package com.intellij.diff.tools.util;
 
 import com.intellij.codeInsight.breadcrumbs.FileBreadcrumbsCollector;
+import com.intellij.diff.tools.intentions.IntentionDiffFeatureKeys;
 import com.intellij.diff.tools.util.base.TextDiffViewerUtil;
 import com.intellij.diff.util.DiffDividerDrawUtil;
 import com.intellij.diff.util.DiffDrawUtil;
@@ -52,6 +53,7 @@ import com.intellij.util.containers.ContainerUtil;
 import com.intellij.xml.breadcrumbs.NavigatableCrumb;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -163,6 +165,15 @@ public class FoldingModelSupport {
   public void install(final @Nullable Data data,
                       final @Nullable UserDataHolder context,
                       final @NotNull Settings settings) {
+    install(data, context, settings, true, false);
+  }
+
+  @ApiStatus.Internal
+  public void install(final @Nullable Data data,
+                      final @Nullable UserDataHolder context,
+                      final @NotNull Settings settings,
+                      final boolean squigglesShouldRespondToHover,
+                      final boolean shouldNotDrawTopmostAndBottommostSquiggles) {
     if (!myEnabled) return;
     ThreadingAssertions.assertEventDispatchThread();
 
@@ -177,9 +188,11 @@ public class FoldingModelSupport {
       myFoldings.clear();
       myHoveredBlock = null;
 
-
       if (data != null) {
-        FoldingInstaller installer = new FoldingInstaller(context, settings);
+        final FoldingInstaller installer = new FoldingInstaller(context != null ? context.getUserData(CACHE_KEY) : null,
+                                                                settings.defaultExpanded,
+                                                                squigglesShouldRespondToHover,
+                                                                shouldNotDrawTopmostAndBottommostSquiggles);
         installer.install(data);
       }
     });
@@ -223,13 +236,20 @@ public class FoldingModelSupport {
     private final @NotNull Settings mySettings;
     private final int @NotNull [] myLineCount;
     private final int myCount;
+    private final boolean myMaterialiseEmptyGroups;
 
     private final @NotNull List<Data.Group> myGroups = new ArrayList<>();
 
     public FoldingBuilderBase(int[] lineCount, @NotNull Settings settings) {
+      this(lineCount, settings, false);
+    }
+
+    @ApiStatus.Internal
+    public FoldingBuilderBase(int[] lineCount, @NotNull Settings settings, boolean materialiseEmptyGroups) {
       mySettings = settings;
       myLineCount = lineCount;
       myCount = lineCount.length;
+      myMaterialiseEmptyGroups = materialiseEmptyGroups;
     }
 
     public @NotNull Data build(final @NotNull Iterator<int[]> changedLines) {
@@ -286,8 +306,18 @@ public class FoldingModelSupport {
       LineRange[] regions = new LineRange[myCount];
 
       for (int i = 0; i < myCount; i++) {
-        if (ends[i] - starts[i] < 2) continue;
-        regions[i] = new LineRange(starts[i], ends[i]);
+        if (!myMaterialiseEmptyGroups) {
+          if (ends[i] - starts[i] < 2) continue;
+          regions[i] = new LineRange(starts[i], ends[i]);
+        }
+        else {
+          if (starts[i] > ends[i]) {
+            regions[i] = LineRange.EMPTY;
+          }
+          else {
+            regions[i] = new LineRange(starts[i], ends[i]);
+          }
+        }
       }
       boolean hasFolding = ContainerUtil.or(regions, Objects::nonNull);
       if (!hasFolding) return null;
@@ -366,18 +396,26 @@ public class FoldingModelSupport {
 
   private class FoldingInstaller {
     private final @NotNull ExpandSuggester myExpandSuggester;
+    private final boolean myShouldRespondToHovers;
+    private final boolean myShouldNotApplyTopAndBottomSquiggles;
 
-    FoldingInstaller(@Nullable UserDataHolder context, @NotNull Settings settings) {
-      FoldingCache cache = context != null ? context.getUserData(CACHE_KEY) : null;
-      myExpandSuggester = new ExpandSuggester(cache, settings.defaultExpanded);
+    FoldingInstaller(@Nullable FoldingCache foldingCache, boolean areFoldingDefaultExpanded, boolean shouldRespondToHovers, boolean shouldNotApplyTopAndBottomSquiggles) {
+      myExpandSuggester = new ExpandSuggester(foldingCache, areFoldingDefaultExpanded);
+      myShouldRespondToHovers = shouldRespondToHovers;
+      myShouldNotApplyTopAndBottomSquiggles = shouldNotApplyTopAndBottomSquiggles;
     }
 
     public void install(@NotNull Data data) {
-      for (Data.Group group : data.groups) {
+      final var groups = data.groups;
+      for (int groupIdx = 0; groupIdx < groups.size(); groupIdx++) {
+        Data.Group group = groups.get(groupIdx);
         List<FoldedBlock> blocks = new ArrayList<>(3);
 
-        for (Data.Block block : group.blocks) {
-          ContainerUtil.addIfNotNull(blocks, createBlock(data, block, myExpandSuggester.isExpanded(block)));
+        final var groupBlocks = group.blocks;
+        for (int blockIdx = 0; blockIdx < groupBlocks.size(); blockIdx++) {
+          Data.Block block = groupBlocks.get(blockIdx);
+          final var veryFirstFoldOrVeryLast = groupIdx == 0 || groupIdx == groups.size() - 1;
+          ContainerUtil.addIfNotNull(blocks, createBlock(veryFirstFoldOrVeryLast, data, block, myExpandSuggester.isExpanded(block)));
         }
 
         if (!blocks.isEmpty()) {
@@ -390,12 +428,13 @@ public class FoldingModelSupport {
       }
     }
 
-    private @Nullable FoldedBlock createBlock(@NotNull Data data, @NotNull Data.Block block, boolean expanded) {
+    private @Nullable FoldedBlock createBlock(boolean veryFirstOrVeryLast, @NotNull Data data, @NotNull Data.Block block, boolean expanded) {
+      final boolean isAvoidSquiggle = myShouldNotApplyTopAndBottomSquiggles && veryFirstOrVeryLast;
       FoldRegion[] regions = new FoldRegion[myCount];
       String[] cachedDescriptions = null;
       for (int i = 0; i < myCount; i++) {
         LineRange range = block.ranges[i];
-        if (range != null) regions[i] = addFolding(myEditors[i], range.start, range.end, expanded);
+        if (range != null) regions[i] = addFolding(isAvoidSquiggle, myEditors[i], range.start, range.end, expanded);
       }
 
       boolean hasFolding = ContainerUtil.or(regions, Objects::nonNull);
@@ -418,16 +457,29 @@ public class FoldingModelSupport {
         }
       }
 
-      return hasFolding ? new FoldedBlock(regions, data.descriptionComputer, cachedDescriptions) : null;
+      return hasFolding ? new FoldedBlock(regions, data.descriptionComputer, cachedDescriptions, myShouldRespondToHovers, isAvoidSquiggle) : null;
     }
   }
 
   public static @Nullable FoldRegion addFolding(@NotNull EditorEx editor, int start, int end, boolean expanded) {
-    DocumentEx document = editor.getDocument();
-    final int startOffset = document.getLineStartOffset(start);
-    final int endOffset = document.getLineEndOffset(end - 1);
+    return addFolding(false, editor, start, end, expanded);
+  }
 
-    FoldRegion region = editor.getFoldingModel().addFoldRegion(startOffset, endOffset, PLACEHOLDER);
+  @ApiStatus.Internal
+  public static @Nullable FoldRegion addFolding(boolean shouldPlaceholderTextBeEmpty, @NotNull EditorEx editor, int start, int end, boolean expanded) {
+    if (start == end) return null;
+
+    FoldRegion region;
+    if (shouldPlaceholderTextBeEmpty) {
+      region = editor.getFoldingModel().addCustomLinesFolding(start, end - 1, new EmptyUnifiedLineFoldingRenderer());
+    }
+    else {
+      DocumentEx document = editor.getDocument();
+      final int startOffset = document.getLineStartOffset(start);
+      final int endOffset = document.getLineEndOffset(end - 1);
+      region = editor.getFoldingModel().addFoldRegion(startOffset, endOffset, PLACEHOLDER);
+    }
+
     if (region != null) {
       region.setExpanded(expanded);
       region.setInnerHighlightersMuted(true);
@@ -636,6 +688,7 @@ public class FoldingModelSupport {
     }
 
     private void updateHoveredBlock(@Nullable FoldedBlock newBlock) {
+      if (newBlock != null && !newBlock.shouldRespondToHover()) return;
       if (myHoveredBlock == newBlock) return;
       myHoveredBlock = newBlock;
 
@@ -955,10 +1008,23 @@ public class FoldingModelSupport {
 
     private final LazyDescription @NotNull [] myDescriptions;
     private final ProgressIndicator myDescriptionsIndicator = new EmptyProgressIndicator();
+    private final boolean myShouldRespondToHover;
+    private final boolean myShouldSkipSquiggle;
 
     public FoldedBlock(FoldRegion @NotNull [] regions,
                        @NotNull DescriptionComputer descriptionComputer,
                        String @Nullable [] cachedDescriptions) {
+      this(regions, descriptionComputer, cachedDescriptions, true, true);
+    }
+
+    @ApiStatus.Internal
+    public FoldedBlock(FoldRegion @NotNull [] regions,
+                       @NotNull DescriptionComputer descriptionComputer,
+                       String @Nullable [] cachedDescriptions,
+                       boolean shouldRespondToHover,
+                       boolean shouldSkipSquiggle) {
+      myShouldRespondToHover = shouldRespondToHover;
+      myShouldSkipSquiggle = shouldSkipSquiggle;
       assert regions.length == myCount;
       assert cachedDescriptions == null || cachedDescriptions.length == myCount;
       myRegions = regions;
@@ -977,7 +1043,7 @@ public class FoldingModelSupport {
 
       for (int i = 0; i < myCount; i++) {
         FoldRegion region = myRegions[i];
-        if (region == null || !region.isValid()) continue;
+        if (region == null || !region.isValid() || myShouldSkipSquiggle) continue;
         myHighlighters.addAll(DiffDrawUtil.createLineSeparatorHighlighter(myEditors[i],
                                                                           region.getStartOffset(), region.getEndOffset(),
                                                                           new MySeparatorPresentation(group, i)));
@@ -1015,6 +1081,11 @@ public class FoldingModelSupport {
 
     public boolean isHovered() {
       return myHoveredBlock == this;
+    }
+
+    @ApiStatus.Internal
+    public boolean shouldRespondToHover() {
+      return myShouldRespondToHover;
     }
 
     public void setExpanded(boolean value) {

@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.devkit.apiDump` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "api-dump_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "api-dump",
   module_name = "intellij.devkit.apiDump",
   visibility = ["//visibility:public"],
   srcs = glob(["gen/**/*.kt", "gen/**/*.java", "src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":api-dump_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/core-api:core",
     "//platform/workspace/jps",
@@ -21,6 +16,7 @@ jvm_library(
     "//platform/ide-core",
     "//platform/analysis-api:analysis",
     "//platform/util",
+    "//platform/util/multiplatform",
     "//platform/workspace/storage",
     "//platform/projectModel-impl",
   ]
@@ -28,6 +24,7 @@ jvm_library(
 
 jvm_library(
   name = "api-dump_test_lib",
+  testonly = True,
   module_name = "intellij.devkit.apiDump",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -38,8 +35,15 @@ jvm_library(
     "//platform/ide-core:ide-core_test_lib",
     "//platform/analysis-api:analysis_test_lib",
     "//platform/util:util_test_lib",
+    "//platform/util/multiplatform:multiplatform_test_lib",
     "//platform/workspace/storage:storage_test_lib",
     "//platform/projectModel-impl:projectModel-impl_test_lib",
   ]
 )
 ### auto-generated section `build intellij.devkit.apiDump` end
+
+### auto-generated section `iml intellij.devkit.apiDump` start
+exports_files([
+  "intellij.devkit.apiDump.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.devkit.apiDump` end

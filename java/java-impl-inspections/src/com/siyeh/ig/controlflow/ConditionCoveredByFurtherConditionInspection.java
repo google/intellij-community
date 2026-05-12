@@ -38,9 +38,11 @@ import com.intellij.psi.PsiLocalVariable;
 import com.intellij.psi.PsiParameter;
 import com.intellij.psi.PsiPatternVariable;
 import com.intellij.psi.PsiPolyadicExpression;
+import com.intellij.psi.PsiReferenceExpression;
 import com.intellij.psi.PsiVariable;
 import com.intellij.psi.controlFlow.ControlFlowUtil;
 import com.intellij.psi.tree.IElementType;
+import com.intellij.psi.util.JavaPsiPatternUtil;
 import com.intellij.psi.util.PsiExpressionTrimRenderer;
 import com.intellij.psi.util.PsiPrecedenceUtil;
 import com.intellij.psi.util.PsiTreeUtil;
@@ -53,6 +55,7 @@ import com.siyeh.InspectionGadgetsBundle;
 import com.siyeh.ig.fixes.RemoveRedundantPolyadicOperandFix;
 import com.siyeh.ig.psiutils.ParenthesesUtils;
 import com.siyeh.ig.psiutils.ReorderingUtils;
+import com.siyeh.ig.psiutils.VariableAccessUtils;
 import one.util.streamex.IntStreamEx;
 import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.NotNull;
@@ -103,6 +106,18 @@ public final class ConditionCoveredByFurtherConditionInspection extends Abstract
       return ReorderingUtils.isSideEffectFree(expression, true);
     }
 
+    private static boolean hasUsedPatternVariable(PsiExpression operand) {
+      List<PsiPatternVariable> vars = JavaPsiPatternUtil.getExposedPatternVariables(operand);
+      for (PsiPatternVariable var : vars) {
+        for (PsiReferenceExpression ref : VariableAccessUtils.getVariableReferences(var)) {
+          if (!PsiTreeUtil.isAncestor(operand, ref, false)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
     private void process(PsiPolyadicExpression context, List<PsiExpression> operands, boolean and) {
       int[] indices = getRedundantOperandIndices(context, operands, and);
       for (int index : indices) {
@@ -112,6 +127,7 @@ public final class ConditionCoveredByFurtherConditionInspection extends Abstract
         if (dependencies.isEmpty()) continue;
         PsiExpression stripped = PsiUtil.skipParenthesizedExprDown(operand);
         if (stripped == null) continue;
+        if (hasUsedPatternVariable(operand)) continue;
         DfaValueFactory factory = new DfaValueFactory(myHolder.getProject());
         Set<DfaVariableValue> notNullValues = getNotNullValues(factory, operand);
         if (notNullValues == null || !notNullValues.equals(getNotNullValues(factory, operands.get(index + 1)))) continue;
@@ -119,7 +135,7 @@ public final class ConditionCoveredByFurtherConditionInspection extends Abstract
         String description =
           InspectionGadgetsBundle.message("inspection.condition.covered.by.further.condition.descr",
                                           operandText, dependencies.size(), PsiExpressionTrimRenderer
-                                            .render(Objects.requireNonNull(PsiUtil.skipParenthesizedExprDown(dependencies.get(0)))));
+                                            .render(Objects.requireNonNull(PsiUtil.skipParenthesizedExprDown(dependencies.getFirst()))));
         myHolder.registerProblem(operand, description, new RemoveRedundantPolyadicOperandFix(operandText));
       }
     }
@@ -143,7 +159,7 @@ public final class ConditionCoveredByFurtherConditionInspection extends Abstract
     private static int[] getRedundantOperandIndices(PsiPolyadicExpression context, List<PsiExpression> operands, boolean and) {
       assert !operands.isEmpty();
       if (operands.size() == 1) {
-        Object value = CommonDataflow.computeValue(operands.get(0));
+        Object value = CommonDataflow.computeValue(operands.getFirst());
         return Boolean.valueOf(and).equals(value) ? new int[]{0} : ArrayUtilRt.EMPTY_INT_ARRAY;
       }
       String text = StreamEx.ofReversed(operands)

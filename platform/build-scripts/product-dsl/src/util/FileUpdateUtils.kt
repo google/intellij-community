@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build.productLayout.util
 
 import org.jetbrains.intellij.build.productLayout.model.error.FileChangeType
@@ -73,7 +73,7 @@ internal class DeferredFileUpdater(private val projectRoot: Path) : FileUpdateSt
 
     val changeType = if (oldContent.isEmpty()) FileChangeType.CREATE else FileChangeType.MODIFY
     val relativePath = projectRoot.relativize(path)
-    val context = "Generated file is out of sync: $relativePath\nRun 'Generate Product Layouts' or 'bazel run //platform/buildScripts:plugin-model-tool' to update."
+    val context = "Generated file is out of sync: $relativePath\n$CALL_TO_ACTION"
     _diffs.add(FileDiff(context = context, path = path, expectedContent = newContent, actualContent = oldContent, changeType = changeType))
     return if (oldContent.isEmpty()) FileChangeStatus.CREATED else FileChangeStatus.MODIFIED
   }
@@ -81,7 +81,7 @@ internal class DeferredFileUpdater(private val projectRoot: Path) : FileUpdateSt
   override fun delete(path: Path) {
     val existingContent = if (Files.exists(path)) Files.readString(path) else ""
     val relativePath = projectRoot.relativize(path)
-    val context = "File should be deleted: $relativePath\nRun 'Generate Product Layouts' or 'bazel run //platform/buildScripts:plugin-model-tool' to update."
+    val context = "File should be deleted: $relativePath\n$CALL_TO_ACTION"
     _diffs.add(FileDiff(
       context = context,
       path = path,
@@ -114,3 +114,9 @@ internal class DeferredFileUpdater(private val projectRoot: Path) : FileUpdateSt
     }
   }
 }
+
+private const val CALL_TO_ACTION = """
+Run 'Generate Product Layouts' or 'bazel run //platform/buildScripts:plugin-model-tool' to update.
+See additional details in Slack announcement https://jetbrains.slack.com/archives/C0CJS122E/p1770185043962209.
+"""
+

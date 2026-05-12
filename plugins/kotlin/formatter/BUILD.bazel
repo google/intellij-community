@@ -1,25 +1,19 @@
 ### auto-generated section `build intellij.kotlin.formatter` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "formatter_resources",
-  srcs = glob(["resources-en/**/*"]),
-  strip_prefix = "resources-en"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "formatter",
   module_name = "intellij.kotlin.formatter",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":formatter_resources"],
+  resources = glob(["resources-en/**/*"]),
+  resource_strip_prefix = "resources-en",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinc-kotlin-compiler-common",
     "//platform/code-style-api:codeStyle",
     "//platform/core-api:core",
     "//platform/projectModel-api:projectModel",
-    "//plugins/kotlin/base/frontend-agnostic",
     "//platform/util/jdom",
     "//platform/lang-api:lang",
     "//platform/core-impl",
@@ -32,6 +26,7 @@ jvm_library(
     "//platform/lang-impl",
     "//platform/code-style-impl:codeStyle-impl",
     "//platform/statistics",
+    "//platform/ide-core",
     "//plugins/kotlin/formatter/minimal",
   ],
   exports = ["//plugins/kotlin/formatter/minimal"]
@@ -39,6 +34,7 @@ jvm_library(
 
 jvm_library(
   name = "formatter_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.formatter",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -51,7 +47,6 @@ jvm_library(
     "//platform/code-style-api:codeStyle_test_lib",
     "//platform/core-api:core_test_lib",
     "//platform/projectModel-api:projectModel_test_lib",
-    "//plugins/kotlin/base/frontend-agnostic:frontend-agnostic_test_lib",
     "//platform/util/jdom:jdom_test_lib",
     "//platform/lang-api:lang_test_lib",
     "//platform/core-impl:core-impl_test_lib",
@@ -64,7 +59,14 @@ jvm_library(
     "//platform/lang-impl:lang-impl_test_lib",
     "//platform/code-style-impl:codeStyle-impl_test_lib",
     "//platform/statistics:statistics_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//plugins/kotlin/formatter/minimal:minimal_test_lib",
   ]
 )
 ### auto-generated section `build intellij.kotlin.formatter` end
+
+### auto-generated section `iml intellij.kotlin.formatter` start
+exports_files([
+  "intellij.kotlin.formatter.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.formatter` end

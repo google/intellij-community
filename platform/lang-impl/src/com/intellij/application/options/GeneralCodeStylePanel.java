@@ -106,7 +106,7 @@ public final class GeneralCodeStylePanel extends CodeStyleAbstractPanel {
     if (ourSelectedTabIndex >= 0) {
       myTabbedPane.setSelectedIndex(ourSelectedTabIndex);
     }
-    myTabbedPane.addChangeListener(__ -> {
+    myTabbedPane.addChangeListener(_ -> {
       //noinspection AssignmentToStaticFieldFromInstanceMethod
       ourSelectedTabIndex = myTabbedPane.getSelectedIndex();
     });

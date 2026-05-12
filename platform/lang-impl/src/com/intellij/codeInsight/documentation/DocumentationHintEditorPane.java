@@ -6,18 +6,15 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.popup.JBPopup;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.wm.ex.WindowManagerEx;
+import com.intellij.ui.WindowMoveListener;
 import com.intellij.ui.scale.JBUIScale;
 import org.jetbrains.annotations.ApiStatus.Internal;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.KeyStroke;
-import javax.swing.text.BadLocationException;
-import javax.swing.text.Element;
-import javax.swing.text.StyledDocument;
 import java.awt.Component;
 import java.awt.FontMetrics;
-import java.awt.Point;
 import java.awt.event.ActionListener;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
@@ -31,6 +28,7 @@ import static com.intellij.codeInsight.documentation.DocumentationHtmlUtil.getDo
 public final class DocumentationHintEditorPane extends DocumentationEditorPane {
 
   private final Project myProject;
+  private final WindowMoveListener moveListener = new DocumentationWindowMoveListener(this);
 
   public DocumentationHintEditorPane(
     @NotNull Project project,
@@ -56,7 +54,6 @@ public final class DocumentationHintEditorPane extends DocumentationEditorPane {
   }
 
   public void setHint(@NotNull JBPopup hint) {
-    myHint = hint;
     FocusListener focusAdapter = new FocusAdapter() {
       @Override
       public void focusLost(FocusEvent e) {
@@ -68,52 +65,36 @@ public final class DocumentationHintEditorPane extends DocumentationEditorPane {
     };
     addFocusListener(focusAdapter);
     Disposer.register(hint, () -> {
-      myHint = null;
       removeFocusListener(focusAdapter);
     });
   }
 
-  private JBPopup myHint; // lateinit
-  private Point myInitialPress;
-
   @Override
   protected void processMouseEvent(MouseEvent e) {
-    if (e.getID() == MouseEvent.MOUSE_PRESSED && myHint != null) {
-      myInitialPress = null;
-      StyledDocument document = (StyledDocument)getDocument();
-      int x = e.getX();
-      int y = e.getY();
-      if (!hasTextAt(document, x, y) &&
-          !hasTextAt(document, x + 3, y) &&
-          !hasTextAt(document, x - 3, y) &&
-          !hasTextAt(document, x, y + 3) &&
-          !hasTextAt(document, x, y - 3)) {
-        myInitialPress = e.getPoint();
-      }
+    // We can't use moveListener.installTo() because there are other listeners, and we can't depend on their order.
+    // The move listener must be invoked first, and if it consumes the event, then we must stop.
+    // Otherwise, it'll lead to weird effects like the text selection changing while the popup is being moved.
+    switch (e.getID()) {
+      case MouseEvent.MOUSE_PRESSED -> moveListener.mousePressed(e);
+      case MouseEvent.MOUSE_RELEASED -> moveListener.mouseReleased(e);
+      case MouseEvent.MOUSE_CLICKED -> moveListener.mouseClicked(e);
+      case MouseEvent.MOUSE_EXITED -> moveListener.mouseExited(e);
+      case MouseEvent.MOUSE_ENTERED -> moveListener.mouseEntered(e);
     }
-    super.processMouseEvent(e);
-  }
-
-  private boolean hasTextAt(StyledDocument document, int x, int y) {
-    Element element = document.getCharacterElement(viewToModel(new Point(x, y)));
-    try {
-      String text = document.getText(element.getStartOffset(), element.getEndOffset() - element.getStartOffset());
-      return !text.trim().isEmpty();
-    }
-    catch (BadLocationException ignored) {
-      return false;
+    if (!e.isConsumed()) {
+      super.processMouseEvent(e);
     }
   }
 
   @Override
   protected void processMouseMotionEvent(MouseEvent e) {
-    if (e.getID() == MouseEvent.MOUSE_DRAGGED && myHint != null && myInitialPress != null) {
-      Point location = myHint.getLocationOnScreen();
-      myHint.setLocation(new Point(location.x + e.getX() - myInitialPress.x, location.y + e.getY() - myInitialPress.y));
-      e.consume();
-      return;
+    switch (e.getID()) {
+      case MouseEvent.MOUSE_MOVED -> moveListener.mouseMoved(e);
+      case MouseEvent.MOUSE_DRAGGED -> moveListener.mouseDragged(e);
     }
-    super.processMouseMotionEvent(e);
+    if (!e.isConsumed()) {
+      super.processMouseMotionEvent(e);
+    }
   }
 
   @Override

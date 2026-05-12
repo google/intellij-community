@@ -20,7 +20,7 @@ public final class CombinedPopupLayout implements LayoutManager {
   private final @Nullable JComponent highlightInfoComponent;
   private final @Nullable JComponent quickDocComponent;
 
-  CombinedPopupLayout(@Nullable JComponent highlightInfoComponent, @Nullable JComponent quickDocComponent) {
+  public CombinedPopupLayout(@Nullable JComponent highlightInfoComponent, @Nullable JComponent quickDocComponent) {
     this.highlightInfoComponent = highlightInfoComponent;
     this.quickDocComponent = quickDocComponent;
   }

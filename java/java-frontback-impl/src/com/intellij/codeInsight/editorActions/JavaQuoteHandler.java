@@ -39,7 +39,7 @@ public class JavaQuoteHandler extends SimpleTokenSetQuoteHandler implements Java
   }
 
   @Override
-  public boolean isOpeningQuote(HighlighterIterator iterator, int offset) {
+  public boolean isOpeningQuote(@NotNull HighlighterIterator iterator, int offset) {
     boolean openingQuote = super.isOpeningQuote(iterator, offset);
     if (openingQuote) {
       // check escape next
@@ -55,7 +55,7 @@ public class JavaQuoteHandler extends SimpleTokenSetQuoteHandler implements Java
   }
 
   @Override
-  public boolean isClosingQuote(HighlighterIterator iterator, int offset) {
+  public boolean isClosingQuote(@NotNull HighlighterIterator iterator, int offset) {
     if (iterator.getTokenType() == JavaTokenType.TEXT_BLOCK_LITERAL) {
       int start = iterator.getStart(), end = iterator.getEnd();
       return end - start >= 5 && offset >= end - 3;
@@ -107,7 +107,7 @@ public class JavaQuoteHandler extends SimpleTokenSetQuoteHandler implements Java
   }
 
   @Override
-  public boolean hasNonClosedLiteral(Editor editor, HighlighterIterator iterator, int offset) {
+  public boolean hasNonClosedLiteral(@NotNull Editor editor, @NotNull HighlighterIterator iterator, int offset) {
     if (iterator.getTokenType() == JavaTokenType.TEXT_BLOCK_LITERAL || iterator.getTokenType() == JavaTokenType.TEXT_BLOCK_TEMPLATE_BEGIN) {
       Document document = editor.getDocument();
       Project project = editor.getProject();

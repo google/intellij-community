@@ -23,7 +23,7 @@ final class CoreJarVirtualFile extends VirtualFile {
 
   CoreJarVirtualFile(@NotNull CoreJarHandler handler, @NotNull CharSequence name, long length, long timestamp, @Nullable CoreJarVirtualFile parent) {
     myHandler = handler;
-    myName = name;
+    myName = parent == null ? handler.getPath().getFileName().toString() : name;
     myLength = length;
     myTimestamp = timestamp;
     myParent = parent;

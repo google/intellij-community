@@ -5,7 +5,7 @@ import com.intellij.ide.rpc.util.textRange
 import com.intellij.ide.rpc.util.toRpc
 import com.intellij.ide.vfs.rpcId
 import com.intellij.ide.vfs.virtualFile
-import com.intellij.openapi.application.runReadAction
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
@@ -17,8 +17,8 @@ import com.intellij.xdebugger.ui.ExecutionPointHighlighterProvider
 import org.jetbrains.annotations.ApiStatus
 
 @ApiStatus.Internal
-fun XSourcePosition.toRpc(): XSourcePositionDto {
-  return runReadAction {
+suspend fun XSourcePosition.toRpc(): XSourcePositionDto {
+  return readAction {
     val textRangeDto = (this as? ExecutionPointHighlighterProvider)?.highlightRange?.toRpc()
     XSourcePositionDto(line, offset, file.rpcId(), textRangeDto, this)
   }

@@ -3,6 +3,8 @@ package org.jetbrains.plugins.github.api
 
 object GHGQLQueries {
   const val findOrganizationTeams = "graphql/query/findOrganizationTeams.graphql"
+  const val getMentionableUsers = "graphql/query/findMentionableUsers.graphql"
+  const val getPullRequestParticipants = "graphql/query/pullRequestParticipants.graphql"
   const val findUser = "graphql/query/findUser.graphql"
   const val findRepository = "graphql/query/findRepository.graphql"
   const val getPullRequestTemplates = "graphql/query/getPullRequestTemplates.graphql"
@@ -39,4 +41,5 @@ object GHGQLQueries {
   const val removeReaction = "graphql/query/removeReaction.graphql"
   const val getRepositoryCommitStatus = "graphql/query/getRepositoryCommitStatusShort.graphql"
   const val getRepositoryCommitStatusContexts = "graphql/query/getRepositoryCommitStatusContexts.graphql"
+  const val getPullRequestsAuthors = "graphql/query/getPullRequestsAuthors.graphql"
 }

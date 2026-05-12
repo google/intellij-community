@@ -3,39 +3,47 @@ package com.intellij.ide.starter.report
 import com.intellij.ide.starter.ci.CIServer
 import com.intellij.ide.starter.report.ErrorReporter.Companion.MESSAGE_FILENAME
 import com.intellij.ide.starter.report.ErrorReporter.Companion.STACKTRACE_FILENAME
-import com.intellij.ide.starter.report.ErrorReporter.Companion.TESTNAME_FILENAME
+import com.intellij.ide.starter.report.ErrorReporter.Companion.SYNTHETIC_TESTNAME_FILENAME
+import com.intellij.ide.starter.report.ErrorReporter.Companion.ACTIVE_TESTNAME_FILENAME
 import com.intellij.ide.starter.runner.IDERunContext
-import com.intellij.ide.starter.utils.generifyErrorMessage
+import com.intellij.platform.testFramework.teamCity.TeamCityReporter
 import com.intellij.util.SystemProperties
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
+import kotlin.io.path.readText
 import kotlin.jvm.optionals.getOrNull
 
-object ErrorReporterToCI: ErrorReporter {
+object ErrorReporterToCI : ErrorReporter {
   /**
    * Read files from errors directories, written by performance testing plugin and report them as errors.
    * Read threadDumps folders and report them as freezes.
-   * Take a look at [com.jetbrains.performancePlugin.ProjectLoaded.reportErrorsFromMessagePool]
+   * Take a look at [com.jetbrains.performancePlugin.ScriptErrorReporter]
    */
   override fun reportErrorsAsFailedTests(runContext: IDERunContext) {
     reportErrors(runContext, collectErrors(runContext.logsDir) + collectScriptErrors(runContext.logsDir))
   }
 
   fun collectErrors(logsDir: Path): List<Error> {
-    //client has structure log/2024-04-11_at_11-06-10/script-errors so we need to look deeeper
-    val rootErrorsDir = Files.find(logsDir, 3, { path, _ -> path.name == ErrorReporter.ERRORS_DIR_NAME }).findFirst().getOrNull()
     if (SystemProperties.getBooleanProperty("DO_NOT_REPORT_ERRORS", false)) return listOf()
-    return collectExceptions(rootErrorsDir)
+    return collectExceptions(getErrorsDir(logsDir))
+  }
+
+  fun getErrorsDir(logsDir: Path): Path? {
+    //client has structure log/2024-04-11_at_11-06-10/script-errors so we need to look deeeper
+    return Files.find(logsDir, 3, { path, _ -> path.name == ErrorReporter.ERRORS_DIR_NAME }).findFirst().getOrNull()
   }
 
   /**
    * To support legacy formant of errors reporting in "script-errors" dir
    */
   fun collectScriptErrors(logsDir: Path): List<Error> {
-    val rootErrorsDir = Files.find(logsDir, 3, { path, _ -> path.name == "script-" + ErrorReporter.ERRORS_DIR_NAME }).findFirst().getOrNull()
+    val rootErrorsDir = Files.find(logsDir, 3, { path, _ -> path.name == "script-" + ErrorReporter.ERRORS_DIR_NAME })
+      .findFirst().getOrNull()
+
     if (SystemProperties.getBooleanProperty("DO_NOT_REPORT_ERRORS", false)) return listOf()
     return collectExceptions(rootErrorsDir)
   }
@@ -50,20 +58,23 @@ object ErrorReporterToCI: ErrorReporter {
     val errors = mutableListOf<Error>()
     val errorsDirectories = rootErrorsDir.listDirectoryEntries()
     for (errorDir in errorsDirectories) {
-      val messageFile = errorDir.resolve(MESSAGE_FILENAME).toFile()
+      val messageFile = errorDir.resolve(MESSAGE_FILENAME)
       if (!messageFile.exists()) continue
 
-      val messageText = generifyErrorMessage(messageFile.readText().trimIndent().trim())
-      val testNameFile = errorDir.resolve(TESTNAME_FILENAME).toFile()
-      val testName = if (testNameFile.exists()) testNameFile.readText().trim() else null
+      val messageText = messageFile.readText().trimIndent().trim()
+      val syntheticTestNameFile = errorDir.resolve(SYNTHETIC_TESTNAME_FILENAME)
+      val syntheticTestName = if (syntheticTestNameFile.exists()) syntheticTestNameFile.readText().trim() else null
 
       val errorType = ErrorType.fromMessage(messageText)
       if (errorType == ErrorType.ERROR) {
-        val stacktraceFile = errorDir.resolve(STACKTRACE_FILENAME).toFile()
+        val stacktraceFile = errorDir.resolve(STACKTRACE_FILENAME)
         if (!stacktraceFile.exists()) continue
         val stackTrace = stacktraceFile.readText().trimIndent().trim()
-        errors.add(Error(messageText, stackTrace, "", errorType, testName))
-      } else if (errorType == ErrorType.FREEZE) {
+        val activeTestNameFile = errorDir.resolve(ACTIVE_TESTNAME_FILENAME)
+        val activeTestName = if (activeTestNameFile.exists()) activeTestNameFile.readText().trim().takeIf { it.isNotEmpty() } else null
+        errors.add(Error(messageText, stackTrace, "", errorType, syntheticTestName, activeTestName))
+      }
+      else if (errorType == ErrorType.FREEZE) {
         errorDir.listDirectoryEntries("dump*").firstOrNull()?.let { threadDump ->
           val dumpContent = Files.readString(threadDump)
           val fallbackName = "Not analyzed freeze: " + (inferClassMethodNamesFromFolderName(threadDump)
@@ -109,45 +120,62 @@ object ErrorReporterToCI: ErrorReporter {
   }
 
   fun reportErrors(runContext: IDERunContext, errors: List<Error>) {
+    val failureDetailsProvider = FailureDetailsOnCI.instance
     for (error in errors) {
-      val messageText = error.messageText
-      val stackTraceContent = error.stackTraceContent
-      val testName = when (error.type) {
-        ErrorType.ERROR -> {
-          error.testName ?: generateTestNameFromException(stackTraceContent, messageText)
-        }
-        ErrorType.FREEZE, ErrorType.TIMEOUT -> {
-          messageText
-        }
-      }
+      reportError(
+        error = error,
+        failureDetailsMessage = failureDetailsProvider.getFailureDetails(runContext, error),
+        urlToLogs = failureDetailsProvider.getLinkToCIArtifacts(runContext),
+        allureContextName = runContext.contextName,
+      )
+    }
+  }
 
-      val failureDetailsProvider = FailureDetailsOnCI.instance
-      val failureDetailsMessage = failureDetailsProvider.getFailureDetails(runContext)
-      val urlToLogs = failureDetailsProvider.getLinkToCIArtifacts(runContext).toString()
-      if (CIServer.instance.isTestFailureShouldBeIgnored(messageText) || CIServer.instance.isTestFailureShouldBeIgnored(stackTraceContent)) {
-        CIServer.instance.ignoreTestFailure(testName = "(${generifyErrorMessage(testName)})",
-                                            message = failureDetailsMessage)
+  fun reportError(
+    error: Error,
+    failureDetailsMessage: String,
+    urlToLogs: String? = null,
+    allureContextName: String? = null,
+  ) {
+    val messageText = error.messageText
+    val stackTraceContent = error.stackTraceContent
+    val syntheticTestName = when (error.type) {
+      ErrorType.ERROR -> {
+        error.syntheticTestName ?: generateTestNameFromException(stackTraceContent, messageText)
       }
-      else {
-        CIServer.instance.reportTestFailure(testName = "(${generifyErrorMessage(testName)})",
-                                            message = failureDetailsMessage,
-                                            details = stackTraceContent,
-                                            linkToLogs = urlToLogs)
-        AllureReport.reportFailure(runContext.contextName, messageText,
+      ErrorType.FREEZE, ErrorType.TIMEOUT -> {
+        messageText
+      }
+    }
+
+    val linkToMuteArticle = "\nThis test fail is an exception! \n" +
+                            "You can find instructions about muting this error in this link https://youtrack.jetbrains.com/articles/IJPL-A-1185/How-to-create-a-new-mapping"
+    if (CIServer.instance.isTestFailureShouldBeIgnored(messageText) || CIServer.instance.isTestFailureShouldBeIgnored(stackTraceContent)) {
+      CIServer.instance.ignoreTestFailure(testName = syntheticTestName,
+                                          message = failureDetailsMessage,
+                                          kind = TeamCityReporter.SyntheticTestKind.IDE_EXCEPTION)
+    }
+    else {
+      CIServer.instance.reportTestFailure(testName = syntheticTestName,
+                                          message = failureDetailsMessage + linkToMuteArticle,
+                                          details = stackTraceContent,
+                                          linkToLogs = urlToLogs,
+                                          kind = TeamCityReporter.SyntheticTestKind.IDE_EXCEPTION)
+      if (allureContextName != null) {
+        AllureReport.reportFailure(allureContextName, messageText + linkToMuteArticle,
                                    stackTraceContent,
-                                   links = AllureLink.single("Link to Logs and artifacts", failureDetailsProvider.getLinkToCIArtifacts(runContext) ?: "fail to get link"))
+                                   links = AllureLink.single("Link to Logs and artifacts", urlToLogs ?: "fail to get link"))
       }
     }
   }
 
   private fun generateTestNameFromException(stackTraceContent: String, messageText: String): String {
-    return if (stackTraceContent.startsWith(messageText)) {
-      val maxLength = (ErrorReporter.MAX_TEST_NAME_LENGTH).coerceAtMost(stackTraceContent.length)
-      val extractedTestName = stackTraceContent.substring(0, maxLength).trim()
-      extractedTestName
+    val testName = if (stackTraceContent.startsWith(messageText)) {
+      stackTraceContent
     }
     else {
-      messageText.substring(0, ErrorReporter.MAX_TEST_NAME_LENGTH.coerceAtMost(messageText.length)).trim()
+      messageText
     }
+    return testName.trim()
   }
 }

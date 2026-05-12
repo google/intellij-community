@@ -2,8 +2,13 @@
 package org.jetbrains.kotlin.idea.k2.quickfix.tests
 
 import com.intellij.codeInsight.intention.IntentionAction
+import com.intellij.platform.ide.progress.runWithModalProgressBlocking
+import com.intellij.psi.PsiFile
 import com.intellij.testFramework.common.runAll
 import com.intellij.testFramework.runInEdtAndWait
+import kotlinx.coroutines.runBlocking
+import org.jetbrains.kotlin.idea.core.script.k2.configurations.KotlinScriptService
+import org.jetbrains.kotlin.idea.core.script.v1.alwaysVirtualFile
 import org.jetbrains.kotlin.idea.fir.K2DirectiveBasedActionUtils
 import org.jetbrains.kotlin.idea.quickfix.AbstractQuickFixTest
 import org.jetbrains.kotlin.idea.test.DirectiveBasedActionUtils
@@ -25,6 +30,14 @@ abstract class AbstractK2QuickFixTest : AbstractQuickFixTest() {
         return KotlinWithJdkAndRuntimeLightProjectDescriptor.getInstance()
     }
 
+    override fun loadScriptConfiguration(file: KtFile) {
+        if (!file.isScript()) return
+
+        runWithModalProgressBlocking(project, "AbstractK2QuickFixTest") {
+            KotlinScriptService.getInstance(project).load(file.alwaysVirtualFile)
+        }
+    }
+
     override fun tearDown() {
         runAll(
           { runInEdtAndWait { project.invalidateCaches() } },
@@ -34,6 +47,10 @@ abstract class AbstractK2QuickFixTest : AbstractQuickFixTest() {
 
     override val inspectionFileName: String
         get() = ".k2Inspection"
+
+    override fun checkForErrorsBefore(mainFile: File, ktFile: KtFile, fileText: String) {
+        K2DirectiveBasedActionUtils.checkForErrorsBefore(mainFile, ktFile, fileText)
+    }
 
     override fun checkForErrorsAfter(mainFile: File, ktFile: KtFile, fileText: String) {
         K2DirectiveBasedActionUtils.checkForErrorsAfter(mainFile, ktFile, fileText)

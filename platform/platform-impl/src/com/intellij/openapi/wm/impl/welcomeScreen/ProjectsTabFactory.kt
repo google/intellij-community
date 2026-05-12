@@ -113,7 +113,7 @@ internal class ProjectsTab(private val parentDisposable: Disposable) : DefaultWe
             .align(Align.FILL)
 
           val recentProjectsPanel = when {
-            Registry.`is`("station.enable.welcome.screen.promo") -> createTwoRowRecentProjectsPanel()
+            isStationWelcomeScreenPromoEnabled() -> createTwoRowRecentProjectsPanel()
             else -> createRecentProjectsPanel()
           }
           val emptyStatePanel = createEmptyStatePanel()

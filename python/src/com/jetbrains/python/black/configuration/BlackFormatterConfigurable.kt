@@ -11,7 +11,6 @@ import com.intellij.ide.actionsOnSave.ActionOnSaveInfoProvider
 import com.intellij.ide.actionsOnSave.ActionsOnSaveConfigurable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.IdeActions
-import com.intellij.openapi.application.EDT
 import com.intellij.openapi.editor.SpellCheckingEditorCustomizationProvider
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
@@ -26,10 +25,8 @@ import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.ui.emptyText
 import com.intellij.openapi.util.SystemInfo
-import com.intellij.platform.ide.progress.ModalTaskOwner
 import com.intellij.platform.ide.progress.runWithModalProgressBlocking
 import com.intellij.ui.EnumComboBoxModel
-import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.TextFieldWithAutoCompletionListProvider
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.BottomGap
@@ -40,6 +37,7 @@ import com.intellij.ui.dsl.builder.Row
 import com.intellij.ui.dsl.builder.RowLayout
 import com.intellij.ui.dsl.builder.columns
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import com.intellij.util.text.nullize
 import com.intellij.util.textCompletion.TextCompletionUtil
 import com.intellij.util.textCompletion.TextFieldWithCompletion
@@ -50,15 +48,12 @@ import com.jetbrains.python.black.BlackFormatterVersionService
 import com.jetbrains.python.black.BlackFormatterVersionService.Companion.UNKNOWN_VERSION
 import com.jetbrains.python.black.configuration.BlackFormatterConfiguration.BlackFormatterOption.Companion.toCliOptionFlags
 import com.jetbrains.python.packaging.management.ui.PythonPackageManagerUI
-import com.jetbrains.python.packaging.management.ui.installPackageBackground
 import com.jetbrains.python.sdk.pythonSdk
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.jetbrains.annotations.Nls
 import java.nio.file.Path
 import javax.swing.JButton
 import javax.swing.JCheckBox
 import javax.swing.JLabel
+import javax.swing.ListCellRenderer
 import kotlin.io.path.absolutePathString
 
 const val CONFIGURABLE_ID: String = "com.jetbrains.python.black.configuration.BlackFormatterConfigurable"
@@ -235,7 +230,7 @@ class BlackFormatterConfigurable(val project: Project) : BoundConfigurable(PyBun
         else UNKNOWN_VERSION
       }
       else {
-        BlackFormatterVersionService.getInstance(project).getVersionForPackage(selectedSdk!!, project)
+        BlackFormatterVersionService.getInstance(project).getVersionForPackage(selectedSdk, project)
       }
     }
 
@@ -307,16 +302,13 @@ class BlackFormatterConfigurable(val project: Project) : BoundConfigurable(PyBun
   }
 
   companion object {
-    private val executionModeComboBoxRenderer =
-      SimpleListCellRenderer.create<BlackFormatterConfiguration.ExecutionMode>(
-        SimpleListCellRenderer.Customizer { label, value, _ ->
-          val text: @Nls String = when (value) {
-            BlackFormatterConfiguration.ExecutionMode.PACKAGE -> PyBundle.message("black.execution.mode.package")
-            BlackFormatterConfiguration.ExecutionMode.BINARY -> PyBundle.message("black.execution.mode.binary")
-            null -> ""
-          }
-          label.text = text
-        })
+    private val executionModeComboBoxRenderer: ListCellRenderer<BlackFormatterConfiguration.ExecutionMode?> =
+      textListCellRenderer("") {
+        when (it) {
+          BlackFormatterConfiguration.ExecutionMode.PACKAGE -> PyBundle.message("black.execution.mode.package")
+          BlackFormatterConfiguration.ExecutionMode.BINARY -> PyBundle.message("black.execution.mode.binary")
+        }
+      }
   }
 
 

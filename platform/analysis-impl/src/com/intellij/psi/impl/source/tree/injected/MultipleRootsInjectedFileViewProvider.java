@@ -69,7 +69,7 @@ class MultipleRootsInjectedFileViewProvider extends MultiplePsiFilesPerDocumentF
 
   @Override
   public boolean isPhysical() {
-    return isPhysicalImpl();
+    return super.isPhysical() && isPhysicalImpl();
   }
 
   @Override

@@ -28,8 +28,10 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import org.jetbrains.annotations.NonNls
+import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.JLabel
@@ -38,6 +40,7 @@ internal class RunnerLayoutUiBridge(
   project: Project,
   private val disposable: Disposable,
 ) : RunnerLayoutUi, LayoutStateDefaults, LayoutViewOptions {
+  private val uniqueIdCounter = AtomicInteger(0)
   private val contentManager: ContentManager =
     ContentFactory.getInstance().createContentManager(true, project)
   private val eventsChannel = Channel<XDebugTabLayouterEvent>(Channel.UNLIMITED)
@@ -77,7 +80,7 @@ internal class RunnerLayoutUiBridge(
       }
     }
     val tabId = component.setupTransfer(edtDisposable)
-    val uniqueId = contents.size
+    val uniqueId = uniqueIdCounter.incrementAndGet()
     contents[fakeContent] = uniqueId
     contentsByUniqueId[uniqueId] = fakeContent
     eventsChannel.trySend(XDebugTabLayouterEvent.ContentCreated(uniqueId, contentId, tabId, displayName, icon?.rpcIdOrNull()))
@@ -112,6 +115,18 @@ internal class RunnerLayoutUiBridge(
       eventsChannel.trySend(XDebugTabLayouterEvent.TabRemoved(uniqueId))
     }
     return content != null && contentManager.removeContent(content, dispose)
+  }
+
+  fun hideContent(key: String) {
+    val content = findContent(key) ?: return
+    val uniqueId = contents[content] ?: return
+    eventsChannel.trySend(XDebugTabLayouterEvent.TabHidden(uniqueId))
+  }
+
+  fun restoreContent(key: String) {
+    val content = findContent(key) ?: return
+    val uniqueId = contents[content] ?: return
+    eventsChannel.trySend(XDebugTabLayouterEvent.TabRestored(uniqueId))
   }
 
   fun setSelection(contentUniqueId: Int, isSelected: Boolean) {
@@ -192,4 +207,23 @@ internal class RunnerLayoutUiBridge(
   override fun setAdditionalFocusActions(group: ActionGroup): LayoutViewOptions = this
   override fun getSettingsActions(): AnAction = DefaultActionGroup()
   override fun getSettingsActionsList(): Array<AnAction> = AnAction.EMPTY_ARRAY
+}
+
+@ApiStatus.Internal
+object DebuggerSplitTabUtils {
+  fun hideContent(ui: RunnerLayoutUi, key: String) {
+    when (ui) {
+      is RunnerLayoutUiImpl -> ui.contentUI.hideContent(key)
+      is RunnerLayoutUiBridge -> ui.hideContent(key)
+      else -> {}
+    }
+  }
+
+  fun restoreContent(ui: RunnerLayoutUi, key: String) {
+    when (ui) {
+      is RunnerLayoutUiImpl -> ui.contentUI.findOrRestoreContentIfNeeded(key)
+      is RunnerLayoutUiBridge -> ui.restoreContent(key)
+      else -> {}
+    }
+  }
 }

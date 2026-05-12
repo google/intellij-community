@@ -10,7 +10,6 @@
   "productVendor": "JetBrains",
   "launch": [
     {
-      "os": "Windows",
       "launcherPath": "bin/xplat64.exe",
       "javaExecutablePath": "jbr/bin/java.exe",
       "vmOptionsFilePath": "bin/xplat64.exe.vmoptions",
@@ -19,12 +18,14 @@
         "boot-windows.jar"
       ],
       "additionalJvmArguments": [
+        "--add-opens=java.base/java.io=ALL-UNNAMED",
         "-Didea.vendor.name=JetBrains",
         "-Didea.paths.selector=XPlatLauncherTest",
         "-Duser.home.macro.test=%USER_HOME%",
         "-Dide.home.macro.test=%IDE_HOME%",
         "-Dcache.dir.macro.test=%IDE_CACHE_DIR%"
       ],
+      "stdioRedirectArg": "--stdio",
       "mainClass": "com.intellij.idea.TestMain",
       "customCommands": [
         {

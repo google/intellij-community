@@ -12,6 +12,7 @@ import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import org.jetbrains.intellij.build.BuildContext
 import org.jetbrains.intellij.build.BuildMessages
 import org.jetbrains.intellij.build.OsFamily
+import org.jetbrains.intellij.build.isLanguageServer
 import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.Path
@@ -38,7 +39,9 @@ internal fun validateProductJson(jsonText: String, installationDirectories: List
   verifyJsonBySchema(jsonText, schemaPath, context.messages)
 
   val productJson = jsonEncoder.decodeFromString<ProductInfoData>(jsonText)
-  checkFileExists(productJson.svgIconPath, description = "svg icon", installationDirectories, installationArchives)
+  if (!context.isLanguageServer) {
+    checkFileExists(productJson.svgIconPath, description = "svg icon", installationDirectories, installationArchives)
+  }
   for (item in productJson.launch) {
     val os = item.os
     check(OsFamily.ALL.any { it.osName == os }) {

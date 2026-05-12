@@ -18,6 +18,7 @@ import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.VirtualFileVisitor;
+import com.intellij.openapi.vfs.impl.InputStreamSkippingBOM;
 import com.intellij.openapi.vfs.impl.ZipHandler;
 import com.intellij.openapi.vfs.impl.ZipHandlerBase;
 import com.intellij.openapi.vfs.impl.jar.JarFileSystemImpl;
@@ -43,6 +44,7 @@ import org.junit.Rule;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -294,9 +296,15 @@ public class JarFileSystemTest extends BareTestFixtureTestCase {
     var small2 = jarRoot.findChild("small2");
     var large = jarRoot.findChild("large");
     try (var is1 = small1.getInputStream(); var is2 = small2.getInputStream(); var il = large.getInputStream()) {
-      assertSame(is1.getClass(), is2.getClass());
-      assertNotSame(is1.getClass(), il.getClass());
+      assertSame(getSourceStream(is1).getClass(), getSourceStream(is2).getClass());
+      assertNotSame(getSourceStream(is1).getClass(), getSourceStream(il).getClass());
     }
+  }
+
+  private static InputStream getSourceStream(InputStream is) {
+    if (is instanceof InputStreamSkippingBOM)
+      return ((InputStreamSkippingBOM)is).getSourceStream();
+    return is;
   }
 
   @Test

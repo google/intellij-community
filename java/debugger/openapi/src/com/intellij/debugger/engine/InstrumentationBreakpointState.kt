@@ -16,3 +16,8 @@ interface InstrumentationBreakpointState {
 
 @ApiStatus.Internal
 interface InstrumentedTechnicalBreakpoint: Requestor
+
+@ApiStatus.Internal
+interface InstrumentedTechnicalBreakpointHit: InstrumentedTechnicalBreakpoint {
+  val originalRequestor: Requestor
+}

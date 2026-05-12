@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.service.task
 
 import com.intellij.execution.process.ProcessOutputType
@@ -8,6 +8,7 @@ import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotifica
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.platform.eel.provider.getEelDescriptor
 import com.intellij.testFramework.ExtensionTestUtil
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.UsefulTestCase
@@ -142,7 +143,7 @@ class GradleTaskManagerTest: UsefulTestCase() {
       }
     }
 
-    gradleExecSettings.javaHome = requireJdkHome(gradleVersion, JavaVersionRestriction.NO)
+    gradleExecSettings.javaHome = requireJdkHome(myProject, myProject.getEelDescriptor(), gradleVersion, JavaVersionRestriction.NO)
 
     val settings = GradleExecutionSettings(gradleExecSettings).apply {
       tasks = listOf("help")

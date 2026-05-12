@@ -1,4 +1,3 @@
-
 class Foo {
     companion object {
         fun foo(): Foo = Foo()

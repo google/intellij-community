@@ -13,7 +13,7 @@ internal sealed class UvPackageManagerAction : PythonPackageManagerAction<UvPack
 
 internal class UvSyncAction() : UvPackageManagerAction() {
   override suspend fun execute(e: AnActionEvent, manager: UvPackageManager): PyResult<Unit> {
-    return manager.sync().mapSuccess { }
+    return manager.syncLocked().mapSuccess { }
   }
 }
 

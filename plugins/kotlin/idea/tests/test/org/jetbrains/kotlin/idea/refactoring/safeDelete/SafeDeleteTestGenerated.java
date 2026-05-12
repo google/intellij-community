@@ -72,6 +72,16 @@ public abstract class SafeDeleteTestGenerated extends AbstractSafeDeleteTest {
             runTest("testData/refactoring/safeDelete/deleteClass/kotlinClass/interface2.kt");
         }
 
+        @TestMetadata("lastEnumEntry1.kt")
+        public void testLastEnumEntry1() throws Exception {
+            runTest("testData/refactoring/safeDelete/deleteClass/kotlinClass/lastEnumEntry1.kt");
+        }
+
+        @TestMetadata("lastEnumEntry2.kt")
+        public void testLastEnumEntry2() throws Exception {
+            runTest("testData/refactoring/safeDelete/deleteClass/kotlinClass/lastEnumEntry2.kt");
+        }
+
         @TestMetadata("localClass1.kt")
         public void testLocalClass1() throws Exception {
             runTest("testData/refactoring/safeDelete/deleteClass/kotlinClass/localClass1.kt");
@@ -929,6 +939,26 @@ public abstract class SafeDeleteTestGenerated extends AbstractSafeDeleteTest {
             runTest("testData/refactoring/safeDelete/deleteValueParameter/kotlinValueParameter/defaultParam2.kt");
         }
 
+        @TestMetadata("defaultParamWithNextArgs.kt")
+        public void testDefaultParamWithNextArgs() throws Exception {
+            runTest("testData/refactoring/safeDelete/deleteValueParameter/kotlinValueParameter/defaultParamWithNextArgs.kt");
+        }
+
+        @TestMetadata("defaultParamWithNextVarArgs.kt")
+        public void testDefaultParamWithNextVarArgs() throws Exception {
+            runTest("testData/refactoring/safeDelete/deleteValueParameter/kotlinValueParameter/defaultParamWithNextVarArgs.kt");
+        }
+
+        @TestMetadata("defaultParamWithTrailingLambda.kt")
+        public void testDefaultParamWithTrailingLambda() throws Exception {
+            runTest("testData/refactoring/safeDelete/deleteValueParameter/kotlinValueParameter/defaultParamWithTrailingLambda.kt");
+        }
+
+        @TestMetadata("defaultVarargsParam.kt")
+        public void testDefaultVarargsParam() throws Exception {
+            runTest("testData/refactoring/safeDelete/deleteValueParameter/kotlinValueParameter/defaultVarargsParam.kt");
+        }
+
         @TestMetadata("enumConstructor.kt")
         public void testEnumConstructor() throws Exception {
             runTest("testData/refactoring/safeDelete/deleteValueParameter/kotlinValueParameter/enumConstructor.kt");
@@ -1222,6 +1252,11 @@ public abstract class SafeDeleteTestGenerated extends AbstractSafeDeleteTest {
         @TestMetadata("usedContextParametersInFunctionInvoke.kt")
         public void testUsedContextParametersInFunctionInvoke() throws Exception {
             runTest("testData/refactoring/safeDelete/deleteValueParameter/kotlinValueParameter/usedContextParametersInFunctionInvoke.kt");
+        }
+
+        @TestMetadata("usedContextParametersInImplicitInvoke.kt")
+        public void testUsedContextParametersInImplicitInvoke() throws Exception {
+            runTest("testData/refactoring/safeDelete/deleteValueParameter/kotlinValueParameter/usedContextParametersInImplicitInvoke.kt");
         }
 
         @TestMetadata("usedContextParametersInNestedFunction.kt")

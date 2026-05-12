@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.syntax.parser
 
 import com.intellij.platform.syntax.CancellationProvider
@@ -9,13 +9,11 @@ import com.intellij.platform.syntax.impl.builder.SyntaxTreeBuilderImpl
 import com.intellij.platform.syntax.lexer.TokenList
 import com.intellij.platform.syntax.logger.noopLogger
 import com.intellij.platform.syntax.parser.SyntaxTreeBuilderFactory.Builder
-import org.jetbrains.annotations.ApiStatus
 import kotlin.jvm.JvmStatic
 
 /**
  * Factory for constructing a [SyntaxTreeBuilder]
  */
-@ApiStatus.Experimental
 object SyntaxTreeBuilderFactory {
   @JvmStatic
   fun builder(

@@ -1,10 +1,8 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.venv.sdk.configuration
 
-import com.intellij.openapi.application.EDT
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.projectRoots.Sdk
-import com.intellij.openapi.projectRoots.impl.SdkConfigurationUtil
 import com.intellij.openapi.vfs.refreshAndFindVirtualFile
 import com.intellij.platform.ide.progress.withBackgroundProgress
 import com.intellij.python.common.tools.ToolId
@@ -15,8 +13,7 @@ import com.jetbrains.python.errorProcessing.PyResult
 import com.jetbrains.python.projectCreation.createVenvAndSdk
 import com.jetbrains.python.sdk.ModuleOrProject
 import com.jetbrains.python.sdk.PythonSdkAdditionalData
-import com.jetbrains.python.sdk.PythonSdkType
-import com.jetbrains.python.sdk.baseDir
+import com.jetbrains.python.sdk.add.v2.PathHolder
 import com.jetbrains.python.sdk.configuration.CreateSdkInfo
 import com.jetbrains.python.sdk.configuration.EnvCheckerResult
 import com.jetbrains.python.sdk.configuration.EnvExists
@@ -25,16 +22,15 @@ import com.jetbrains.python.sdk.configuration.PyProjectTomlConfigurationExtensio
 import com.jetbrains.python.sdk.configuration.VENV_TOOL_ID
 import com.jetbrains.python.sdk.configuration.findEnvOrNull
 import com.jetbrains.python.sdk.configuration.prepareSdkCreator
+import com.jetbrains.python.sdk.createSdk
 import com.jetbrains.python.sdk.flavors.PyFlavorAndData
 import com.jetbrains.python.sdk.flavors.PyFlavorData
-import com.jetbrains.python.sdk.flavors.VirtualEnvSdkFlavor
+import com.intellij.python.venv.sdk.flavors.VirtualEnvSdkFlavor
 import com.jetbrains.python.sdk.impl.resolvePythonHome
-import com.jetbrains.python.sdk.legacy.PythonSdkUtil
 import com.jetbrains.python.sdk.persist
-import com.jetbrains.python.sdk.pyvenvContains
 import com.jetbrains.python.sdk.service.PySdkService.Companion.pySdkService
 import com.jetbrains.python.sdk.setAssociationToModule
-import com.jetbrains.python.sdk.suggestAssociatedSdkName
+import com.jetbrains.python.uv.sdk.configuration.isUvEnv
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.io.path.name
@@ -60,9 +56,7 @@ internal class PyVenvSdkConfiguration : PyProjectSdkConfigurationExtension {
     }
   }
 
-  private suspend fun getVirtualEnv(venvsInModule: List<PythonBinary>): PythonBinary? = venvsInModule.firstOrNull {
-    !it.pyvenvContains("uv = ")
-  }
+  private fun getVirtualEnv(venvsInModule: List<PythonBinary>): PythonBinary? = venvsInModule.firstOrNull { !it.isUvEnv() }
 
   private suspend fun setupVenv(module: Module, venvsInModule: List<PythonBinary>, envExists: EnvExists): PyResult<Sdk> =
     if (envExists) {
@@ -77,15 +71,13 @@ internal class PyVenvSdkConfiguration : PyProjectSdkConfigurationExtension {
       getVirtualEnv(venvsInModule)?.refreshAndFindVirtualFile()
     } ?: return PyResult.failure(MessageError(PyBundle.message("sdk.cannot.find.venv.for.module")))
 
-    val sdk = withContext(Dispatchers.EDT) {
-      SdkConfigurationUtil.setupSdk(
-        PythonSdkUtil.getAllSdks().toTypedArray(),
-        pythonBinary,
-        PythonSdkType.getInstance(),
+    val sdk = withContext(Dispatchers.IO) {
+      createSdk(
+        PathHolder.Eel(pythonBinary.toNioPath()),
+        null,
         PythonSdkAdditionalData(PyFlavorAndData(PyFlavorData.Empty, VirtualEnvSdkFlavor.getInstance())),
-        suggestAssociatedSdkName(pythonBinary.path, module.baseDir?.path)
       )
-    }
+    }.getOr { return it }
 
     sdk.persist()
     sdk.setAssociationToModule(module)

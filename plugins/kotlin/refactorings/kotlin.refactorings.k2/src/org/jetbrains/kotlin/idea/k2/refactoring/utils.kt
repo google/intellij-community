@@ -20,7 +20,6 @@ import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.components.containingSymbol
 import org.jetbrains.kotlin.analysis.api.components.declaredMemberScope
-import org.jetbrains.kotlin.analysis.api.components.expandedSymbol
 import org.jetbrains.kotlin.analysis.api.components.importableFqName
 import org.jetbrains.kotlin.analysis.api.components.semanticallyEquals
 import org.jetbrains.kotlin.analysis.api.resolution.KaExplicitReceiverValue
@@ -169,7 +168,6 @@ fun KtLambdaExpression.moveFunctionLiteralOutsideParenthesesIfPossible() {
 }
 
 context(_: KaSession)
-@OptIn(KaExperimentalApi::class)
 fun getThisQualifier(receiverValue: KaImplicitReceiverValue): String {
     val symbol = receiverValue.symbol
     return if ((symbol as? KaClassSymbol)?.classKind == KaClassKind.COMPANION_OBJECT) {
@@ -181,9 +179,9 @@ fun getThisQualifier(receiverValue: KaImplicitReceiverValue): String {
     }
     else if (symbol is KaClassifierSymbol && symbol !is KaAnonymousObjectSymbol) {
         (symbol.psi as? PsiClass)?.name ?: ("this@" + symbol.name!!.asString())
-    } else if (symbol is KaReceiverParameterSymbol && symbol.owningCallableSymbol is KaNamedSymbol) {
-        // refer to this@contextReceiverType but use this@funName for everything else, because another syntax is prohibited
-        (receiverValue.type.expandedSymbol?.takeIf { symbol.owningCallableSymbol.contextReceivers.isNotEmpty() }?.name ?: symbol.owningCallableSymbol.name)?.let { "this@$it" } ?: "this"
+    }
+    else if (symbol is KaReceiverParameterSymbol && symbol.owningCallableSymbol is KaNamedSymbol) {
+        symbol.owningCallableSymbol.name?.let { "this@$it" } ?: "this"
     } else {
         "this"
     }

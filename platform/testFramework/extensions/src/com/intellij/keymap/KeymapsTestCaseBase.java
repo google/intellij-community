@@ -17,16 +17,16 @@ import com.intellij.openapi.keymap.ex.KeymapManagerEx;
 import com.intellij.openapi.keymap.impl.MacOSDefaultKeymap;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.text.Strings;
-import com.intellij.testFramework.ApplicationExtension;
+import com.intellij.testFramework.TestApplicationManager;
 import com.intellij.testFramework.junit5.DynamicTests;
 import com.intellij.testFramework.junit5.NamedFailure;
 import com.intellij.ui.KeyStrokeAdapter;
 import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
-import org.junit.jupiter.api.extension.RegisterExtension;
 
 import javax.swing.KeyStroke;
 import java.awt.event.InputEvent;
@@ -68,8 +68,12 @@ public abstract class KeymapsTestCaseBase {
 
   protected abstract String getGroupForUnknownAction(@NotNull String actionId);
 
-  @RegisterExtension
-  static ApplicationExtension ourApplicationExtension = new ApplicationExtension();
+  @BeforeAll
+  static void initializeApplication() {
+    // This module doesn't depend on intellij.platform.testFramework.junit5,
+    // so @TestApplication isn't available on this classpath.
+    TestApplicationManager.getInstance();
+  }
 
   protected static Map<String, Map<String, List<String>>> parseDuplicates(Map<String, String[][]> duplicates) {
     Map<String, Map<String, List<String>>> result = new HashMap<>();
@@ -160,7 +164,8 @@ public abstract class KeymapsTestCaseBase {
         AnAction action = ActionManager.getInstance().getAction(cid);
         if (action == null) {
           failures.add(new NamedFailure("unknown action in keymap " + keymap.getName() + ": " + cid,
-                                        "Fix them or add them to the unknown actions list"));
+                                        "Unknown action id '" + cid + "' in keymap '" + keymap.getName() +
+                                        "'. Fix it or add it to the unknown actions list."));
         }
       }
     }
@@ -169,7 +174,7 @@ public abstract class KeymapsTestCaseBase {
       AnAction action = ActionManager.getInstance().getAction(id);
       if (action != null) {
         failures.add(new NamedFailure("reappeared action: " + id,
-                                      "The following actions have reappeared, remove them from unknown action list."));
+                                      "Action '" + id + "' has reappeared, remove it from the unknown actions list."));
       }
     }
 
@@ -240,7 +245,7 @@ public abstract class KeymapsTestCaseBase {
       Map<String, List<String>> duplicates = knownDuplicates.get(keymap);
       for (String shortcut : duplicates.keySet()) {
         Shortcut keyboardShortcut = parseShortcut(shortcut);
-        List<String> actions = duplicates.computeIfAbsent(shortcut, __ -> new ArrayList<>());
+        List<String> actions = duplicates.computeIfAbsent(shortcut, _ -> new ArrayList<>());
         keyDuplicates.put(keyboardShortcut, actions);
       }
     }
@@ -269,11 +274,11 @@ public abstract class KeymapsTestCaseBase {
         }
 
         for (Shortcut shortcut : keymap.getShortcuts(actionId)) {
-          map.computeIfAbsent(shortcut, __ -> new ArrayList<>()).add(actionId);
+          map.computeIfAbsent(shortcut, _ -> new ArrayList<>()).add(actionId);
 
           if (shortcut instanceof KeyboardShortcut && ((KeyboardShortcut)shortcut).getSecondKeyStroke() != null) {
             KeyboardShortcut firstStroke = new KeyboardShortcut(((KeyboardShortcut)shortcut).getFirstKeyStroke(), null);
-            List<String> firstStrokeActionList = map.computeIfAbsent(firstStroke, __ -> new ArrayList<>());
+            List<String> firstStrokeActionList = map.computeIfAbsent(firstStroke, _ -> new ArrayList<>());
             if (!firstStrokeActionList.contains(SECOND_STROKE)) {
               firstStrokeActionList.add(SECOND_STROKE);
             }
@@ -285,7 +290,7 @@ public abstract class KeymapsTestCaseBase {
     if (SystemInfo.isUnix && !SystemInfo.isMac) {
       // hack: add hardcoded shortcut from DefaultKeymapImpl to make keymaps identical under all OS
       result.get(KeymapManager.DEFAULT_IDEA_KEYMAP)
-        .computeIfAbsent(new MouseShortcut(MouseEvent.BUTTON2, 0, 1), __ -> new ArrayList<>())
+        .computeIfAbsent(new MouseShortcut(MouseEvent.BUTTON2, 0, 1), _ -> new ArrayList<>())
         .add(IdeActions.ACTION_GOTO_DECLARATION);
     }
 

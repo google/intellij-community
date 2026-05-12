@@ -13,9 +13,10 @@
 # limitations under the License.
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
+load("@rules_java//java:defs.bzl", "java_common")
 load("@rules_kotlin//kotlin/internal:defs.bzl", KotlinInfo = "KtJvmInfo")
 load("//:rules/impl/compiler-plugins.bzl", "compiler_plugins_from", "exported_compiler_plugins_from")
-load("//:rules/impl/kotlinc-options.bzl", "KotlincOptions", "kotlinc_options_to_flags")
+load("//:rules/impl/kotlinc-options.bzl", "KotlincExtraOptionsInfo", "KotlincOptions", "kotlinc_options_to_flags")
 
 visibility("private")
 
@@ -36,7 +37,7 @@ KtWasmJsBin = provider(
 )
 
 def _wasmjs_kotlinc_options(kotlinc_options):
-    jvm_specific_options = ["x_jvm_default", "jvm_target"]
+    jvm_specific_options = ["jvm_default", "jvm_target"]
     filtered_options = {
         k: getattr(kotlinc_options, k)
         for k in dir(kotlinc_options)
@@ -45,7 +46,9 @@ def _wasmjs_kotlinc_options(kotlinc_options):
     return KotlincOptions(**filtered_options)
 
 def _create_wasmjs_compilation_common_args(ctx):
-    kotlinc_options = _wasmjs_kotlinc_options(ctx.attr.kotlinc_opts[KotlincOptions])
+    kotlinc_opts_target = ctx.attr.kotlinc_opts
+    kotlinc_options = _wasmjs_kotlinc_options(kotlinc_opts_target[KotlincOptions])
+    kotlinc_extra_options = kotlinc_opts_target[KotlincExtraOptionsInfo]
 
     args = ctx.actions.args()
     args.set_param_file_format("multiline")
@@ -53,7 +56,7 @@ def _create_wasmjs_compilation_common_args(ctx):
     args.add("-Xwasm")
     args.add("-Xwasm-target=js")
     args.add("-Xmulti-platform")
-    args.add_all(kotlinc_options_to_flags(kotlinc_options))
+    args.add_all(kotlinc_options_to_flags(kotlinc_options, kotlinc_extra_options))
 
     args.add("-ir-output-name", "%s_%s" % (ctx.attr.module_name, ctx.label.name))
 
@@ -137,8 +140,8 @@ def wasmjs_produce_module_actions(ctx, rule_kind):
         tools = [ctx.file._wasmjs_builder_launcher, ctx.file._wasmjs_builder],
         executable = java_runtime.java_executable_exec_path,
         execution_requirements = {
-            "supports-workers": "0",  # TODO: [FL-34215] enable worker support
-            "supports-multiplex-workers": "0",  # TODO: [FL-34215] enable worker support
+            "supports-workers": "1",
+            "supports-multiplex-workers": "1",
             "supports-worker-cancellation": "1",
             "supports-path-mapping": "1",
             "supports-multiplex-sandboxing": "1",
@@ -159,7 +162,7 @@ def wasmjs_produce_module_actions(ctx, rule_kind):
     link_args.add("-Xir-produce-js")
     link_args.add("-Xinclude=%s" % klib_out.path)  # TODO: what is the `-Xinclude`, is that what will be linked? Do we need `runtime_deps_klibs` here?
     link_args.add("-Xir-dce")
-    link_args.add_joined("-libraries", [klib.path for klib in all_link_libraries.to_list()], join_with = ":", omit_if_empty = True)
+    link_args.add_joined("-libraries", [klib.path for klib in all_link_libraries.to_list()], join_with = ctx.configuration.host_path_separator, omit_if_empty = True)
 
     ctx.actions.run(
         mnemonic = "KotlinLinkWasmJs",
@@ -168,8 +171,8 @@ def wasmjs_produce_module_actions(ctx, rule_kind):
         tools = [ctx.file._wasmjs_builder_launcher, ctx.file._wasmjs_builder],
         executable = java_runtime.java_executable_exec_path,
         execution_requirements = {
-            "supports-workers": "0",  # TODO: [FL-34215] enable worker support
-            "supports-multiplex-workers": "0",  # TODO: [FL-34215] enable worker support
+            "supports-workers": "1",
+            "supports-multiplex-workers": "1",
             "supports-worker-cancellation": "1",
             "supports-path-mapping": "1",
             "supports-multiplex-sandboxing": "1",

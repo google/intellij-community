@@ -46,8 +46,8 @@ import com.intellij.ui.ColoredListCellRenderer;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.ScrollingUtil;
 import com.intellij.ui.SeparatorWithText;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.SimpleTextAttributes;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.ui.speedSearch.SpeedSearchUtil;
 import com.intellij.util.PlatformIcons;
 import com.intellij.util.containers.ContainerUtil;
@@ -411,7 +411,7 @@ public class CreateDirectoryOrPackageAction extends AnAction implements DumbAwar
     private boolean locked = false;
 
     private DirectoriesWithCompletionPopupPanel(@NotNull List<CompletionItem> items) {
-      super(items, SimpleListCellRenderer.create("", item -> item.displayText), true);
+      super(items, BuilderKt.textListCellRenderer("", item -> item.displayText), true);
       setupRenderers();
 
       // allow multi selection with Shift+Up/Down

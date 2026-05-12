@@ -104,6 +104,42 @@ object EventFields {
     StringListEventField.ValidatedByDictionary(name, dictionary, description)
 
   /**
+   * Creates a field validated by a dictionary, with optional required and default value rules.
+   * @param name name of the field
+   * @param dictionary name of the dictionary
+   * @param description optional description of the field
+   * @param required whether the field is required
+   * @param defaultValue optional default value applied when the field is missing or invalid
+   */
+  @JvmStatic
+  fun StringValidatedByDictionary(
+    name: String,
+    dictionary: String,
+    description: String? = null,
+    required: Boolean? = null,
+    defaultValue: String? = null,
+  ): StringEventField =
+    StringEventField.ValidatedByDictionaryExtended(name, dictionary, description, required, defaultValue)
+
+  /**
+   * Creates a list field where each element is validated by a dictionary, with optional required and default value rules.
+   * @param name name of the field
+   * @param dictionary name of the dictionary
+   * @param description optional description of the field
+   * @param required whether the field is required
+   * @param defaultValue optional default value applied when the field is missing or invalid
+   */
+  @JvmStatic
+  fun StringListValidatedByDictionary(
+    name: String,
+    dictionary: String,
+    description: String? = null,
+    required: Boolean? = null,
+    defaultValue: String? = null,
+  ): StringListEventField =
+    StringListEventField.ValidatedByDictionaryExtended(name, dictionary, description, required, defaultValue)
+
+  /**
    * Creates a field that allows only a specific list of values
    * @param name  name of the field
    * @param allowedValues list of allowed values, e.g [ "bool", "int", "float"]

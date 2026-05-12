@@ -5,26 +5,15 @@ import com.intellij.facet.FacetManager
 import com.intellij.facet.FacetManagerFactory
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.module.Module
-import com.intellij.openapi.project.ModuleListener
-import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.intellij.serviceContainer.AlreadyDisposedException
 import com.intellij.workspaceModel.ide.impl.legacyBridge.facet.FacetManagerBridge
 import org.jetbrains.annotations.ApiStatus
 import java.util.concurrent.ConcurrentHashMap
 
 @ApiStatus.Internal
-class FacetManagerFactoryImpl(
-  project: Project,
-): FacetManagerFactory {
+class FacetManagerFactoryImpl : FacetManagerFactory {
   private val facetManagerInstances = ConcurrentHashMap<Module, FacetManager>()
-
-  init {
-    project.messageBus.simpleConnect().subscribe(ModuleListener.TOPIC, object : ModuleListener {
-      override fun moduleRemoved(project: Project, module: Module) {
-        facetManagerInstances.remove(module)
-      }
-    })
-  }
 
   // must be used only during project init
   fun getAllFacets(): Collection<FacetManager> {
@@ -37,6 +26,11 @@ class FacetManagerFactoryImpl(
       thisLogger().error(exception)
       throw exception
     }
-    return facetManagerInstances.computeIfAbsent(module) { FacetManagerBridge(module) }
+    return facetManagerInstances.computeIfAbsent(module) {
+      Disposer.register(module) {
+        facetManagerInstances.remove(module)
+      }
+      FacetManagerBridge(module)
+    }
   }
 }

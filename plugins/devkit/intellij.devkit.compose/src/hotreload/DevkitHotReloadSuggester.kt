@@ -5,6 +5,7 @@ import com.intellij.devkit.compose.COMPOSE_HOT_RELOAD_ENABLED_MARKER
 import com.intellij.devkit.compose.DevkitComposeBundle
 import com.intellij.devkit.compose.hasCompose
 import com.intellij.devkit.compose.icons.DevkitComposeIcons
+import com.intellij.devkit.compose.isComposeToolingEnabled
 import com.intellij.facet.FacetManager
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.fileEditor.FileEditor
@@ -27,6 +28,7 @@ internal class DevkitHotReloadSuggester : EditorNotificationProvider, DumbAware 
   private val SUGGESTION_DISMISSED_KEY = "COMPOSE_HOT_RELOAD_GOT_IT"
 
   override fun collectNotificationData(project: Project, file: VirtualFile): Function<in FileEditor, out JComponent?>? {
+    if (!isComposeToolingEnabled()) return null
     if (!isIntelliJPlatformProject(project)) return null
     if (!hasCompose(project)) return null
 

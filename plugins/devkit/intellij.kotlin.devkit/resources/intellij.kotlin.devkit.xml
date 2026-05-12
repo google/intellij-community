@@ -1,7 +1,11 @@
 <idea-plugin package="org.jetbrains.idea.devkit.kotlin">
   <dependencies>
-    <module name="intellij.devkit.core"/>
     <plugin id="org.jetbrains.kotlin"/>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+    <module name="intellij.devkit.core"/>
+    <module name="intellij.xml.dom"/>
+    <module name="intellij.xml.psi"/>
+    <!-- endregion -->
   </dependencies>
 
   <resource-bundle>messages.DevKitKotlinBundle</resource-bundle>
@@ -109,6 +113,14 @@
                      implementationClass="org.jetbrains.idea.devkit.kotlin.inspections.PrivateExtensionClassInspection"
                      key="inspection.private.extension.class"/>
 
+    <localInspection language="kotlin" shortName="KotlinPolySymbolPropertyType"
+                     projectType="INTELLIJ_PLUGIN"
+                     groupBundle="messages.DevKitBundle"
+                     groupPathKey="inspections.group.path" groupKey="inspections.group.code"
+                     enabledByDefault="true" level="ERROR"
+                     implementationClass="org.jetbrains.idea.devkit.kotlin.inspections.KtPolySymbolPropertyTypeInspection"
+                     key="inspection.polySymbol.property.type.mismatch.display.name"/>
+
     <useScopeEnlarger implementation="org.jetbrains.idea.devkit.kotlin.driver.RemoteUseScopeEnlarger"/>
     <methodReferencesSearch implementation="org.jetbrains.idea.devkit.kotlin.driver.RemoteMethodReferenceSearcher"/>
     <overridingMethodsSearch implementation="org.jetbrains.idea.devkit.kotlin.driver.RemoteMethodImplementationSearcher"/>
@@ -132,6 +144,9 @@
     <cancellationCheckInLoopsFixProvider
       language="kotlin"
       implementationClass="org.jetbrains.idea.devkit.kotlin.inspections.KtCancellationCheckInLoopsFixProvider"/>
+    <useHtmlChunkToolTipFixProvider
+      language="kotlin"
+      implementationClass="org.jetbrains.idea.devkit.kotlin.inspections.KtUseHtmlChunkToolTipFixProvider"/>
     <visitorProviderForRBCInspection
       language="kotlin"
       implementationClass="org.jetbrains.idea.devkit.kotlin.inspections.KtCallingFunctionShouldBeRequiresBlockingContextVisitorProvider"/>

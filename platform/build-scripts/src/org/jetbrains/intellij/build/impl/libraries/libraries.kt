@@ -8,7 +8,8 @@ import org.jetbrains.jps.model.module.JpsModule
 /**
  * A library module is supposed to contain no source code and depend on Maven dependencies or another library module.
  * It is used to transform libraries into consumable content modules (V2 plugin model).
- * Won't be published as a Maven artifact, see [org.jetbrains.intellij.build.impl.maven.MavenArtifactsBuilder].
+ * Won't be published as a Maven artifact unless [org.jetbrains.intellij.build.MavenArtifactsProperties.publishLibraryModules] is `true`,
+ * see [org.jetbrains.intellij.build.impl.maven.MavenArtifactsBuilder].
  */
 @ApiStatus.Internal
 fun JpsModule.isLibraryModule(): Boolean {

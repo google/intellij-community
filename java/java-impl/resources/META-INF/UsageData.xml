@@ -18,6 +18,8 @@
     <fileTypeUsageSchemaDescriptor schema="micronaut" implementationClass="com.intellij.internal.statistic.MicronautFileTypeUsageDescriptor"/>
     <fileTypeUsageSchemaDescriptor schema="quarkus" implementationClass="com.intellij.internal.statistic.QuarkusFileTypeUsageDescriptor"/>
     <fileTypeUsageSchemaDescriptor schema="ktor" implementationClass="com.intellij.internal.statistic.KtorFileTypeUsageDescriptor"/>
+    <projectSettings service="com.intellij.internal.statistic.libraryUsage.LibraryUsageStatisticsStorageService"/>
+    <projectSettings service="com.intellij.internal.statistic.libraryUsage.ProcessedFilesStorageService"/>
   </extensions>
 
   <projectListeners>

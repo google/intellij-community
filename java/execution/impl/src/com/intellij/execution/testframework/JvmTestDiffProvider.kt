@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.testframework
 
 import com.intellij.execution.filters.ExceptionInfoCache
@@ -8,10 +8,13 @@ import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.psi.ElementManipulators
+import com.intellij.psi.PsiCompiledElement
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiLiteralExpression
 import com.intellij.psi.PsiType
 import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.util.PsiLiteralUtil
 import com.intellij.psi.util.startOffset
 import com.intellij.util.asSafely
 import com.siyeh.ig.testFrameworks.UAssertHint
@@ -31,8 +34,12 @@ import org.jetbrains.uast.toUElement
 
 class JvmTestDiffProvider : TestDiffProvider {
   override fun updateExpected(element: PsiElement, actual: String) {
-    ElementManipulators.getManipulator(element)?.handleContentChange(element, actual)
+    ElementManipulators.getManipulator(element)?.handleContentChange(element, element.prepareContent(actual))
   }
+
+  private fun PsiElement.prepareContent(content: String) =
+    if (this !is PsiLiteralExpression || !this.isTextBlock) content
+    else PsiLiteralUtil.escapeBackSlashesInTextBlock(content)
 
   /**
    * Finds the expected value from a [stackTrace]. To do this the following algorithm is used:
@@ -119,6 +126,7 @@ class JvmTestDiffProvider : TestDiffProvider {
   }
 
   private fun findFailedCall(file: PsiFile, lineNumber: Int, resolvedMethod: UMethod?): UCallExpression? {
+    if (file is PsiCompiledElement) return null
     val virtualFile = file.virtualFile ?: return null
     val document = FileDocumentManager.getInstance().getDocument(virtualFile) ?: return null
     if (lineNumber < 1 || lineNumber > document.lineCount) return null
@@ -147,11 +155,20 @@ class JvmTestDiffProvider : TestDiffProvider {
   }
 
   private fun getExpectedElement(expression: UExpression, expected: String): PsiElement? {
-    if (expression.asSafely<UInjectionHost>()?.evaluateString()?.withoutLineEndings() == expected) {
+    val value = expression.asSafely<UInjectionHost>()?.evaluateString() ?: return null
+    if (value == expected || value.withoutLineEndings() == expected.withoutLineEndings()) {
       return expression.sourcePsi
     }
     return null
   }
 
   private fun String.withoutLineEndings() = replace("\n", "").replace("\r", "")
+
+  override fun getExpectedValue(element: PsiElement): String {
+    if (element is PsiLiteralExpression) {
+      val value = element.value
+      if (value is String) return value
+    }
+    return ElementManipulators.getValueText(element)
+  }
 }

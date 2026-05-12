@@ -12,6 +12,7 @@
 
   <extensions defaultExtensionNs="com.intellij">
     <postStartupActivity implementation="com.intellij.python.community.services.systemPython.impl.SystemPythonInitialLoader"/>
+    <applicationSettings service="com.intellij.python.community.services.systemPython.SystemPythonServiceImpl"/>
   </extensions>
   <extensionPoints>
     <extensionPoint dynamic="false" qualifiedName="com.intellij.python.community.services.systemPython.impl.eelFilter"

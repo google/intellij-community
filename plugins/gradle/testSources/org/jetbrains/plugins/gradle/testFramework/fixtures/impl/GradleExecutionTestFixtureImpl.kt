@@ -12,10 +12,10 @@ import com.intellij.openapi.application.edtWriteAction
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.application.runWriteActionAndWait
 import com.intellij.openapi.externalSystem.util.ExternalSystemConstants
-import com.intellij.openapi.externalSystem.util.awaitProjectActivity
-import com.intellij.openapi.externalSystem.util.waitForProjectActivity
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.externalSystem.testFramework.ExternalSystemTestObservation.awaitProjectActivity
+import com.intellij.platform.externalSystem.testFramework.ExternalSystemTestObservation.waitForProjectActivity
 import com.intellij.testFramework.common.runAll
 import com.intellij.util.LocalTimeCounter
 import org.jetbrains.plugins.gradle.service.execution.GradleExternalTaskConfigurationType

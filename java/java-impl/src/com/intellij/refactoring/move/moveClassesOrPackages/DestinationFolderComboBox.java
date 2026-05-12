@@ -82,7 +82,7 @@ public abstract class DestinationFolderComboBox extends ComboboxWithBrowseButton
   }
 
   public void setData(@NotNull Project project, @Nullable PsiDirectory initialTargetDirectory, @NotNull EditorComboBox editorComboBox) {
-    setData(project, initialTargetDirectory, __ -> {}, editorComboBox);
+    setData(project, initialTargetDirectory, _ -> {}, editorComboBox);
   }
 
   public void setData(@NotNull Project project,

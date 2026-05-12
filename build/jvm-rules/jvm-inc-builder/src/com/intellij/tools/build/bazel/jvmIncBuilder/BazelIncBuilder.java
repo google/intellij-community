@@ -43,15 +43,18 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
 
 import static org.jetbrains.jps.util.Iterators.collect;
 import static org.jetbrains.jps.util.Iterators.contains;
 import static org.jetbrains.jps.util.Iterators.count;
 import static org.jetbrains.jps.util.Iterators.filter;
+import static org.jetbrains.jps.util.Iterators.find;
 import static org.jetbrains.jps.util.Iterators.flat;
 import static org.jetbrains.jps.util.Iterators.isEmpty;
 import static org.jetbrains.jps.util.Iterators.map;
@@ -81,6 +84,8 @@ public class BazelIncBuilder {
     ResourcesSnapshotDelta resourcesDelta = null;
     Iterable<NodeSource> modifiedLibraries = List.of();
     Iterable<NodeSource> deletedLibraries = List.of();
+    ConfigurationState pastState = null;
+    ConfigurationState presentState = null;
 
     try (StorageManager storageManager = new StorageManager(context)) {
 
@@ -95,8 +100,8 @@ public class BazelIncBuilder {
           srcSnapshotDelta.markRecompileAll(); // force rebuild
         }
         else {
-          ConfigurationState pastState = ConfigurationState.loadSavedState(context);
-          ConfigurationState presentState = new ConfigurationState(
+          pastState = ConfigurationState.loadSavedState(context);
+          presentState = new ConfigurationState(
             context.getPathMapper(), context.getSources(), context.getResources(), context.getBinaryDependencies(), context.getFlags(), context.getUntrackedInputsDigest()
           );
 
@@ -305,7 +310,7 @@ public class BazelIncBuilder {
           }
 
           NodeSourceSnapshotDelta nextSnapshotDelta = graphUpdater.updateAfterCompilation(
-            storageManager.getGraph(), srcSnapshotDelta, createGraphDelta(storageManager.getGraph(), srcSnapshotDelta, outSink), diagnostic.hasErrors(), diagnosticCollector
+            storageManager.getGraph(), srcSnapshotDelta, createGraphDelta(storageManager.getGraph(), srcSnapshotDelta, diagnostic.hasErrors(), outSink), diagnostic.hasErrors(), diagnosticCollector
           );
 
           if (!diagnostic.hasErrors()) {
@@ -354,7 +359,7 @@ public class BazelIncBuilder {
           ((PostponedDiagnosticSink) diagnostic).drainTo(context);
         }
         if (diagnosticCollector != null) {
-          diagnosticCollector.writeData();
+          diagnosticCollector.writeData(pastState, presentState);
         }
       }
 
@@ -463,21 +468,17 @@ public class BazelIncBuilder {
       Set<Path> presentPaths = collect(filter(map(modifiedLibraries, context.getPathMapper()::toPath), Files::exists), new HashSet<>());
       Set<Path> deletedPaths = collect(map(deletedLibraries, context.getPathMapper()::toPath), new HashSet<>());
       Path outputZip = context.getOutputZip();
-      if (Files.exists(outputZip)) {
-        presentPaths.add(outputZip);
-      }
-      else {
-        deletedPaths.add(outputZip);
-      }
       Path abiOut = context.getAbiOutputZip();
-      if (abiOut != null) {
-        if (Files.exists(abiOut)) {
-          presentPaths.add(abiOut);
+
+      Stream.of(outputZip, abiOut, context.getKotlinCriStoragePath()).filter(Objects::nonNull).forEach(path -> {
+        if (Files.exists(path)) {
+          presentPaths.add(path);
         }
         else {
-          deletedPaths.add(abiOut);
+          deletedPaths.add(path);
         }
-      }
+      });
+
       StorageManager.backupDependencies(context, deletedPaths, presentPaths);
 
       if (context.hasErrors()) {
@@ -554,9 +555,18 @@ public class BazelIncBuilder {
     }
   }
 
-  private static Delta createGraphDelta(DependencyGraph depGraph, NodeSourceSnapshotDelta snapshotDelta, OutputSinkImpl outSink) {
+  private static Delta createGraphDelta(DependencyGraph depGraph, NodeSourceSnapshotDelta snapshotDelta, boolean compiledWithErrors, OutputSinkImpl outSink) {
     Delta delta = depGraph.createDelta(snapshotDelta.getModified(), snapshotDelta.getDeleted(), false);
-    for (var pair : outSink.getNodes()) {
+    Iterable<OutputSink.NodeWithSources> toRegister;
+    if (compiledWithErrors) {
+      // register only the nodes, that correspond to sources with at least one 'JvmClass' node associated => meaning "compiled successfully"
+      Set<NodeSource> compiledSuccessfully = collect(flat(map(outSink.getNodes(), ns -> ns.node() instanceof JVMClassNode<?, ?>? ns.sources() : List.of())), new HashSet<>());
+      toRegister = filter(outSink.getNodes(), ns -> find(ns.sources(), compiledSuccessfully::contains) != null);
+    }
+    else {
+      toRegister = outSink.getNodes();
+    }
+    for (var pair : toRegister) {
       delta.associate(pair.node(), pair.sources());
     }
     return delta;

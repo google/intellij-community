@@ -103,6 +103,11 @@ public class DarculaButtonUI extends BasicButtonUI {
     return smallVariant || a != null && a.isSmallVariant();
   }
 
+  @ApiStatus.Internal
+  public static boolean isRootPaneBackgroundImage(Component c) {
+    return c instanceof AbstractButton b && b.getClientProperty("JButton.rootPaneBackgroundImage") == Boolean.TRUE;
+  }
+
   public static boolean isTag(Component c) {
     return c instanceof AbstractButton && ((AbstractButton)c).getClientProperty("styleTag") != null;
   }
@@ -357,8 +362,9 @@ public class DarculaButtonUI extends BasicButtonUI {
       Dimension minimumSize = JBUI.CurrentTheme.Button.minimumSize();
       int width = isComboAction(c) ? prefSize.width :
                   Math.max(HORIZONTAL_PADDING.get() * 2 + prefSize.width, minimumSize.width + i.left + i.right);
-      int height = Math.max(prefSize.height,
-                            (isSmallVariant(c) ? ActionToolbar.DEFAULT_MINIMUM_BUTTON_SIZE.height : JBUI.CurrentTheme.Button.minimumSize().height) + i.top + i.bottom);
+      int height = Math.max(prefSize.height, (isSmallVariant(c) && !isRootPaneBackgroundImage(c)
+                                              ? ActionToolbar.DEFAULT_MINIMUM_BUTTON_SIZE.height
+                                              : JBUI.CurrentTheme.Button.minimumSize().height) + i.top + i.bottom);
 
       return new Dimension(width, height);
     }

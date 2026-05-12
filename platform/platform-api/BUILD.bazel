@@ -1,5 +1,5 @@
 ### auto-generated section `build intellij.platform.ide` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "kt_javac_options", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "kt_javac_options")
 
 kt_javac_options(
   name = "custom-javac-options",
@@ -12,18 +12,13 @@ kt_javac_options(
   no_proc = True
 )
 
-resourcegroup(
-  name = "ide_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "ide",
   module_name = "intellij.platform.ide",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":ide_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   javac_opts = ":custom-javac-options",
   deps = [
     "//platform/util",
@@ -59,19 +54,15 @@ jvm_library(
     "//platform/util/diff",
     "//platform/runtime/product",
     "//platform/util/coroutines",
+    "//libraries/fastutil",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
   ],
-  exports = [
-    "//platform/util",
-    "//platform/editor-ui-api:editor-ui",
-    "//platform/util:util-ui",
-    "//platform/ide-core",
-    "//platform/welcome-screen",
-    "//platform/progress/shared:ide-progress",
-  ]
+  exports = ["//platform/util"]
 )
 
 jvm_library(
   name = "ide_test_lib",
+  testonly = True,
   module_name = "intellij.platform.ide",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -79,16 +70,6 @@ jvm_library(
   exports = [
     "//platform/util",
     "//platform/util:util_test_lib",
-    "//platform/editor-ui-api:editor-ui",
-    "//platform/editor-ui-api:editor-ui_test_lib",
-    "//platform/util:util-ui",
-    "//platform/util:util-ui_test_lib",
-    "//platform/ide-core",
-    "//platform/ide-core:ide-core_test_lib",
-    "//platform/welcome-screen",
-    "//platform/welcome-screen:welcome-screen_test_lib",
-    "//platform/progress/shared:ide-progress",
-    "//platform/progress/shared:ide-progress_test_lib",
   ],
   runtime_deps = [
     ":ide",
@@ -123,6 +104,14 @@ jvm_library(
     "//platform/util/diff:diff_test_lib",
     "//platform/runtime/product:product_test_lib",
     "//platform/util/coroutines:coroutines_test_lib",
+    "//libraries/fastutil:fastutil_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.ide` end
+
+### auto-generated section `iml intellij.platform.ide` start
+exports_files([
+  "intellij.platform.ide.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.ide` end

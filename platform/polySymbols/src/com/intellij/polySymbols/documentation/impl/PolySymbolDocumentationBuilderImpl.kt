@@ -3,13 +3,14 @@ package com.intellij.polySymbols.documentation.impl
 
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.text.Strings
+import com.intellij.polySymbols.PolySymbol.DocHideIconProperty
 import com.intellij.polySymbols.PolySymbol
-import com.intellij.polySymbols.PolySymbol.Companion.PROP_DOC_HIDE_ICON
 import com.intellij.polySymbols.PolySymbolApiStatus
 import com.intellij.polySymbols.documentation.PolySymbolDocumentation
 import com.intellij.polySymbols.documentation.PolySymbolDocumentationBuilder
 import com.intellij.polySymbols.documentation.PolySymbolDocumentationCustomizer
 import com.intellij.psi.PsiElement
+import com.intellij.util.asSafely
 import org.jetbrains.annotations.Nls
 import javax.swing.Icon
 
@@ -17,18 +18,19 @@ internal class PolySymbolDocumentationBuilderImpl(
   private val symbol: PolySymbol,
   private val location: PsiElement?,
 ) : PolySymbolDocumentationBuilder {
-  override var name: String = symbol.name
-  override var definition: String = Strings.escapeXmlEntities(symbol.name)
-  override var definitionDetails: String? = null
-  override var description: @Nls String? = null
-  override var docUrl: String? = null
-  override var apiStatus: PolySymbolApiStatus? = symbol.apiStatus
-  override var defaultValue: String? = null
-  override var library: String? = null
-  override var icon: Icon? = symbol.icon?.takeIf { symbol[PROP_DOC_HIDE_ICON] != true }
-  override var descriptionSections: MutableMap<@Nls String, @Nls String> = mutableMapOf()
-  override var footnote: @Nls String? = null
-  override var header: @Nls String? = null
+  private var name: String = symbol.name
+  private var definition: String = Strings.escapeXmlEntities(symbol.name)
+  private var definitionDetails: String? = null
+  private var description: @Nls String? = null
+  private var docUrl: String? = null
+  private var apiStatus: PolySymbolApiStatus? = symbol.apiStatus
+  private var defaultValue: String? = null
+  private var library: String? = null
+  private var icon: Icon? = symbol.icon?.takeIf { symbol[DocHideIconProperty] != true }
+  private val descriptionSections: MutableMap<@Nls String, @Nls String> = mutableMapOf()
+  private var footnote: @Nls String? = null
+  private var header: @Nls String? = null
+  private val iconProviders = mutableListOf<(String) -> Icon?>()
 
   override fun name(value: @NlsSafe String): PolySymbolDocumentationBuilder {
     name = value
@@ -95,11 +97,40 @@ internal class PolySymbolDocumentationBuilderImpl(
     return this
   }
 
+  override fun iconProvider(provider: (String) -> Icon?) {
+    iconProviders.add(provider)
+  }
+
+  override fun copyFrom(other: PolySymbol?): Boolean {
+    val target = other
+      ?.getDocumentationTarget(location)
+      ?.asSafely<PolySymbolDocumentationTargetImpl<PolySymbol>>()
+    if (target == null) return false
+    val defaultBuilder = PolySymbolDocumentationBuilderImpl(target.symbol, location)
+    name = defaultBuilder.name
+    definition = defaultBuilder.definition
+    definitionDetails = defaultBuilder.definitionDetails
+    description = defaultBuilder.description
+    docUrl = defaultBuilder.docUrl
+    apiStatus = defaultBuilder.apiStatus
+    defaultValue = defaultBuilder.defaultValue
+    library = defaultBuilder.library
+    icon = defaultBuilder.icon
+    descriptionSections.clear()
+    descriptionSections.putAll(defaultBuilder.descriptionSections)
+    footnote = defaultBuilder.footnote
+    header = defaultBuilder.header
+    iconProviders.clear()
+    iconProviders.addAll(defaultBuilder.iconProviders)
+    target.builder(this, target.symbol, location)
+    return true
+  }
+
   @Suppress("TestOnlyProblems")
-  override fun build(): PolySymbolDocumentation =
+  fun build(): PolySymbolDocumentation =
     PolySymbolDocumentationImpl(
       name, definition, definitionDetails, description, docUrl, apiStatus, defaultValue, library,
-      icon, descriptionSections, footnote, header
+      icon, descriptionSections, footnote, header, iconProviders
     ).let { doc: PolySymbolDocumentation ->
       PolySymbolDocumentationCustomizer.EP_NAME.extensionList.fold(doc) { documentation, customizer ->
         customizer.customize(symbol, location, documentation)

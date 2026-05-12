@@ -1,3 +1,4 @@
+fleet/util/UID
 java/awt/*
 java/awt/color/ColorSpace
 java/awt/datatransfer/*
@@ -64,6 +65,10 @@ kotlin/properties/ReadOnlyProperty
 kotlin/properties/ReadWriteProperty
 kotlin/ranges/ClosedRange
 kotlin/ranges/IntRange
+kotlin/reflect/KClass
+kotlin/reflect/KMutableProperty0
+kotlin/reflect/KProperty
+kotlin/reflect/KType
 kotlin/sequences/Sequence
 kotlinx/coroutines/*
 kotlinx/coroutines/channels/*

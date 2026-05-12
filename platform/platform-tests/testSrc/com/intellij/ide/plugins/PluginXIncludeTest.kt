@@ -257,6 +257,7 @@ internal class PluginXIncludeTest {
     var err: Throwable? = null
     LoggedErrorProcessor.executeWith<Throwable>(object : LoggedErrorProcessor() {
       override fun processWarn(category: String, message: String, t: Throwable?): Boolean {
+        if (t == null) return true
         assertThat(err).isNull()
         err = t
         return false

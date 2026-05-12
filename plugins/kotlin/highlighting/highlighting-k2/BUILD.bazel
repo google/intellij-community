@@ -1,6 +1,6 @@
 ### auto-generated section `build intellij.kotlin.highlighting` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_kotlin-highlighting",
@@ -13,18 +13,13 @@ create_kotlinc_options(
   x_context_parameters = True
 )
 
-resourcegroup(
-  name = "kotlin-highlighting_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "kotlin-highlighting",
   module_name = "intellij.kotlin.highlighting",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":kotlin-highlighting_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_kotlin-highlighting",
   deps = [
     "//java/java-indexing-api:indexing",
@@ -58,18 +53,15 @@ jvm_library(
     "//plugins/kotlin/kotlin.searching/base",
     "//plugins/kotlin/kotlin.searching",
     "//plugins/kotlin/base/analysis",
-    "//plugins/kotlin/base/scripting/scripting.k2:kotlin-base-scripting",
-    "@lib//:kotlinc-kotlin-scripting-common",
-    "@lib//:kotlinc-kotlin-scripting-compiler-impl",
     "//platform/util/coroutines",
     "//plugins/kotlin/code-insight/impl-base:kotlin-codeInsight-shared",
-    "//plugins/kotlin/base/scripting/scripting.shared",
     "//platform/platform-api:ide",
   ]
 )
 
 jvm_library(
   name = "kotlin-highlighting_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.highlighting",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -103,14 +95,18 @@ jvm_library(
     "//plugins/kotlin/kotlin.searching/base:base_test_lib",
     "//plugins/kotlin/kotlin.searching:kotlin.searching_test_lib",
     "//plugins/kotlin/base/analysis:analysis_test_lib",
-    "//plugins/kotlin/base/scripting/scripting.k2:kotlin-base-scripting_test_lib",
     "//platform/util/coroutines:coroutines_test_lib",
     "//plugins/kotlin/code-insight/impl-base:kotlin-codeInsight-shared_test_lib",
-    "//plugins/kotlin/base/scripting/scripting.shared:scripting.shared_test_lib",
     "//platform/platform-api:ide_test_lib",
   ]
 )
 ### auto-generated section `build intellij.kotlin.highlighting` end
+
+### auto-generated section `iml intellij.kotlin.highlighting` start
+exports_files([
+  "intellij.kotlin.highlighting.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.highlighting` end
 
 ### auto-generated section `build intellij.kotlin.highlighting.tests` start
 create_kotlinc_options(
@@ -126,12 +122,14 @@ create_kotlinc_options(
 
 jvm_library(
   name = "kotlin-highlighting-tests",
+  module_name = "intellij.kotlin.highlighting.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "kotlin-highlighting-tests_test_lib",
+  testonly = True,
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
   kotlinc_opts = ":custom_kotlin-highlighting-tests",
@@ -179,8 +177,8 @@ jvm_library(
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//plugins/kotlin/code-insight/api",
     "//plugins/kotlin/code-insight/api:api_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "@lib//:kotlinc-analysis-api-k2",
     "//platform/execution-impl",
     "//platform/execution-impl:execution-impl_test_lib",
@@ -217,28 +215,34 @@ jvm_library(
     "//platform/backend:backend_test_lib",
     "//plugins/kotlin/base/analysis",
     "//plugins/kotlin/base/analysis:analysis_test_lib",
-    "//plugins/kotlin/base/scripting/scripting.k2:kotlin-base-scripting",
-    "//plugins/kotlin/base/scripting/scripting.k2:kotlin-base-scripting_test_lib",
-    "@lib//:kotlinc-kotlin-scripting-common",
     "//plugins/kotlin/test-framework",
     "//plugins/kotlin/test-framework:test-framework_test_lib",
-    "@lib//:kotlinc-kotlin-scripting-compiler-impl",
     "//plugins/kotlin/gradle/gradle-java",
     "//plugins/kotlin/gradle/gradle-java:gradle-java_test_lib",
     "//platform/util/coroutines",
     "//platform/util/coroutines:coroutines_test_lib",
     "//plugins/kotlin/code-insight/impl-base:kotlin-codeInsight-shared",
     "//plugins/kotlin/code-insight/impl-base:kotlin-codeInsight-shared_test_lib",
-    "//plugins/kotlin/base/scripting/scripting.shared",
-    "//plugins/kotlin/base/scripting/scripting.shared:scripting.shared_test_lib",
     "//platform/platform-api:ide",
     "//platform/platform-api:ide_test_lib",
     "//plugins/kotlin/intellij.kotlin.base.test:base-test",
     "//plugins/kotlin/intellij.kotlin.base.test:base-test_test_lib",
+    "//plugins/kotlin/jvm-decompiler",
+    "//plugins/kotlin/jvm-decompiler:jvm-decompiler_test_lib",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework_test_lib",
+    "//platform/lang-api:lang",
+    "//platform/lang-api:lang_test_lib",
   ],
   runtime_deps = [":kotlin-highlighting-tests"]
 )
 ### auto-generated section `build intellij.kotlin.highlighting.tests` end
+
+### auto-generated section `iml intellij.kotlin.highlighting.tests` start
+exports_files([
+  "intellij.kotlin.highlighting.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.highlighting.tests` end
 
 ### auto-generated section `test intellij.kotlin.highlighting.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

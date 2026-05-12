@@ -36,7 +36,8 @@ internal class PluginVersionSerializer : StringSerializer<PluginVersion>({ it.ve
  * Serialize a [PluginVersion] using the string representation compatible with Marketplace compatibility range fields of the plugin descriptor's JSON
  */
 // TODO: remove this and its usages once Marketplace supports Nightly two digit versions in Fleet's compatibility ranges as well
-internal class PluginVersionForCompatibilityRangeSerializer : StringSerializer<PluginVersion>({ it.marketplaceCompatibilityRangeVersionString }, { PluginVersion.fromString(it) })
+internal class PluginVersionForFromCompatibilityRangeSerializer : StringSerializer<PluginVersion>({ it.marketplaceCompatibilityRangeVersionString(lowerBound = true) }, { PluginVersion.fromString(it) })
+internal class PluginVersionForToCompatibilityRangeSerializer : StringSerializer<PluginVersion>({ it.marketplaceCompatibilityRangeVersionString(lowerBound = false) }, { PluginVersion.fromString(it) })
 
 internal class LayerSelectorSerializer : StringSerializer<LayerSelector>(LayerSelector::selector, ::LayerSelector)
 

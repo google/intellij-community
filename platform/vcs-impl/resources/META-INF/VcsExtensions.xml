@@ -38,6 +38,8 @@
     <!-- preload only for performance reasons -->
     <projectService serviceInterface="com.intellij.openapi.vcs.ProjectLevelVcsManager"
                     serviceImplementation="com.intellij.openapi.vcs.impl.ProjectLevelVcsManagerImpl" preload="notHeadless"/>
+    <registryKey key="vcs.watch.roots" defaultValue="true" restartRequired="true"
+                 description="Add VCS repository roots as recursive VFS watch roots"/>
     <dependencyCollector kind="vcs" implementation="com.intellij.openapi.vcs.impl.MissingVcsPluginAdvertiser"/>
     <!--suppress LightServiceMigrationXML - see DefaultProjectStoreTest (IDE needs to know correct Storage without service being loaded) -->
     <projectService serviceImplementation="com.intellij.openapi.vcs.impl.OptionsAndConfirmationsHolder"/>
@@ -384,6 +386,17 @@
     <projectService
       serviceInterface="com.intellij.openapi.vcs.changes.ChangesListManagerStateProvider"
       serviceImplementation="com.intellij.openapi.vcs.changes.ChangesListManagerStateProviderImpl"/>
+    <projectSettings service="com.intellij.vcs.commit.message.CommitMessageInspectionProfile"/>
+    <projectSettings service="com.intellij.openapi.vcs.impl.OptionsAndConfirmationsHolder"/>
+    <projectSettings service="com.intellij.openapi.vcs.changes.ChangeListManagerImpl"/>
+    <projectSettings service="com.intellij.openapi.vcs.contentAnnotation.VcsContentAnnotationSettings"/>
+    <projectSettings service="com.intellij.openapi.vcs.impl.ProjectLevelVcsManagerImpl"/>
+    <projectSettings service="com.intellij.openapi.vcs.changes.committed.CommittedChangesCache"/>
+    <projectSettings service="com.intellij.openapi.vcs.changes.ignore.IgnoredFileGeneratorImpl$IgnoredFileRootStore"/>
+    <projectSettings service="com.intellij.openapi.vcs.changes.shelf.ShelveChangesManager"/>
+    <projectSettings service="com.intellij.openapi.vcs.update.RestoreUpdateTree"/>
+    <projectSettings service="com.intellij.openapi.vcs.impl.projectlevelman.VcsDirectoryMappingCache"/>
+    <applicationSettings service="com.intellij.openapi.vcs.changes.VcsEditorTabFilesManager"/>
   </extensions>
 
   <extensions defaultExtensionNs="org.jetbrains">

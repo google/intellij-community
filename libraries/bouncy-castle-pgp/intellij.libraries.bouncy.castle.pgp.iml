@@ -7,6 +7,23 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" exported="" name="bouncy-castle-pgp" level="project" />
+    <orderEntry type="module-library" exported="">
+      <library name="bouncy-castle-pgp" type="repository">
+        <properties include-transitive-deps="false" maven-id="org.bouncycastle:bcpg-jdk18on:1.84">
+          <verification>
+            <artifact url="file://$MAVEN_REPOSITORY$/org/bouncycastle/bcpg-jdk18on/1.84/bcpg-jdk18on-1.84.jar">
+              <sha256sum>c0e6303a0d7589040f400950ecee87a14b81312e84ed15e5390ebb0c4566ddab</sha256sum>
+            </artifact>
+          </verification>
+        </properties>
+        <CLASSES>
+          <root url="jar://$MAVEN_REPOSITORY$/org/bouncycastle/bcpg-jdk18on/1.84/bcpg-jdk18on-1.84.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES>
+          <root url="jar://$MAVEN_REPOSITORY$/org/bouncycastle/bcpg-jdk18on/1.84/bcpg-jdk18on-1.84-sources.jar!/" />
+        </SOURCES>
+      </library>
+    </orderEntry>
   </component>
 </module>

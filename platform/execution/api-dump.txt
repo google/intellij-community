@@ -49,7 +49,6 @@ com.intellij.execution.RunnerAndConfigurationSettings
 - a:isEditBeforeRun():Z
 - a:isFocusToolWindowBeforeRun():Z
 - isShared():Z
-- isSingleton():Z
 - a:isStoredInArbitraryFileInProject():Z
 - a:isStoredInDotIdeaFolder():Z
 - a:isStoredInLocalWorkspace():Z
@@ -239,6 +238,7 @@ com.intellij.execution.target.TargetProgressIndicator
 - a:stop():V
 - stopWithErrorMessage(java.lang.String):V
 f:com.intellij.execution.target.TargetedCommandLineBuilder
+- f:clearParameters():V
 - f:setEnvironmentVariables(java.util.Map):V
 - f:setParameters(java.util.List):V
 com.intellij.execution.target.java.JavaLanguageRuntimeUIFactory

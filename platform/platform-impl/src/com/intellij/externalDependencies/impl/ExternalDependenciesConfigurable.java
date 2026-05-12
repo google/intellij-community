@@ -24,12 +24,12 @@ import com.intellij.ui.CollectionListModel;
 import com.intellij.ui.ColoredListCellRenderer;
 import com.intellij.ui.ComboboxSpeedSearch;
 import com.intellij.ui.DoubleClickListener;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.SimpleTextAttributes;
 import com.intellij.ui.ToolbarDecorator;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBList;
 import com.intellij.ui.components.JBTextField;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.ArrayUtilRt;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.ui.FormBuilder;
@@ -202,7 +202,7 @@ public final class ExternalDependenciesConfigurable implements SearchableConfigu
     pluginIds.sort((o1, o2) -> getPluginNameById(o1).compareToIgnoreCase(getPluginNameById(o2)));
 
     ComboBox<String> pluginChooser = new ComboBox<>(ArrayUtilRt.toStringArray(pluginIds), 250);
-    pluginChooser.setRenderer(SimpleListCellRenderer.create("", this::getPluginNameById));
+    pluginChooser.setRenderer(BuilderKt.textListCellRenderer("", this::getPluginNameById));
     ComboboxSpeedSearch search = new ComboboxSpeedSearch(pluginChooser, null) {
       @Override
       protected String getElementText(Object element) {

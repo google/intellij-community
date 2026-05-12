@@ -33,8 +33,8 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.codeStyle.CodeStyleManager
 import com.intellij.psi.createSmartPointer
 import com.intellij.refactoring.util.CommonRefactoringUtil
-import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.awt.RelativePoint
+import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -58,7 +58,7 @@ internal class OpenInScratchClientGeneratorInlayAction : UrlPathInlayAction {
   override fun actionPerformed(file: PsiFile, editor: Editor, urlPathContext: UrlPathContext, mouseEvent: MouseEvent) {
     JBPopupFactory.getInstance().createPopupChooserBuilder(clients)
       .setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
-      .setRenderer(SimpleListCellRenderer.create("", ClientGenerator::title))
+      .setRenderer(textListCellRenderer("", ClientGenerator::title))
       .setTitle(MicroservicesBundle.message("client.generator.inlay.action.popup.title"))
       .setItemChosenCallback { selectedClient ->
         file.project.service<ClientGeneratorOpenInScratchService>()

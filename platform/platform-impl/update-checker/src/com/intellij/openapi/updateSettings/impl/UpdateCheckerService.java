@@ -289,7 +289,7 @@ public class UpdateCheckerService {
     //noinspection deprecation
     UpdateChecker.getNotificationGroupForPluginUpdateResults()
       .createNotification(title, text, NotificationType.INFORMATION)
-      .setListener((__, e) -> showPluginConfigurable(e, project))  // benign leak - notifications are disposed of on project close
+      .setListener((_, e) -> showPluginConfigurable(e, project))  // benign leak - notifications are disposed of on project close
       .setDisplayId("plugins.updated.after.restart")
       .notify(project);
   }

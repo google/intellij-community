@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.java.debugger.impl.frontend` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "frontend_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "frontend",
   module_name = "intellij.java.debugger.impl.frontend",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":frontend_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/util/concurrency",
@@ -30,11 +25,13 @@ jvm_library(
     "//platform/xdebugger-impl/frontend",
     "//platform/xdebugger-impl/shared",
     "//platform/xdebugger-impl/rpc",
+    "//fleet/rhizomedb",
   ]
 )
 
 jvm_library(
   name = "frontend_test_lib",
+  testonly = True,
   module_name = "intellij.java.debugger.impl.frontend",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -55,6 +52,13 @@ jvm_library(
     "//platform/xdebugger-impl/frontend:frontend_test_lib",
     "//platform/xdebugger-impl/shared:shared_test_lib",
     "//platform/xdebugger-impl/rpc:rpc_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.java.debugger.impl.frontend` end
+
+### auto-generated section `iml intellij.java.debugger.impl.frontend` start
+exports_files([
+  "intellij.java.debugger.impl.frontend.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.java.debugger.impl.frontend` end

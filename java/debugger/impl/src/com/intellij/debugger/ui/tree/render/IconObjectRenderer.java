@@ -13,10 +13,12 @@ import com.intellij.openapi.util.registry.Registry;
 import com.sun.jdi.Value;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.ApiStatus;
 
 import javax.swing.ImageIcon;
 
-final class IconObjectRenderer extends AbstractImageRenderer {
+@ApiStatus.Internal
+public class IconObjectRenderer extends AbstractImageRenderer {
   @Override
   protected String getName() {
     return "Icon";
@@ -38,8 +40,7 @@ final class IconObjectRenderer extends AbstractImageRenderer {
       ((EvaluationContextImpl)evaluationContext).getManagerThread().schedule(new SuspendContextCommandImpl(evalContext.getSuspendContext()) {
         @Override
         public void contextAction(@NotNull SuspendContextImpl suspendContext) {
-          String getterName = AllIcons.Debugger.Value.getIconHeight() <= 16 ? "iconToBytesPreviewNormal" : "iconToBytesPreviewRetina";
-          descriptor.setValueIcon(getImageIcon(evalContext, descriptor.getValue(), getterName));
+          descriptor.setValueIcon(getPreviewIcon(evalContext, descriptor.getValue()));
           listener.labelChanged();
         }
       });
@@ -47,16 +48,26 @@ final class IconObjectRenderer extends AbstractImageRenderer {
     };
   }
 
+  protected @Nullable ImageIcon getPreviewIcon(@NotNull EvaluationContextImpl evaluationContext, @NotNull Value obj) {
+    String getterName = AllIcons.Debugger.Value.getIconHeight() <= 16 ? "iconToBytesPreviewNormal" : "iconToBytesPreviewRetina";
+    return getImageIcon(evaluationContext, obj, getterName);
+  }
+
   @Override
   protected FullValueEvaluatorProvider getFullValueEvaluatorProvider() {
     return (evaluationContext, valueDescriptor) -> {
       return createImagePopupEvaluator(JavaDebuggerBundle.message("message.node.show.icon"), evaluationContext,
-                                       valueDescriptor.getValue(), "iconToBytes");
+                                       valueDescriptor.getValue());
     };
   }
 
-  static @Nullable ImageIcon getImageIcon(EvaluationContextImpl evaluationContext, Value obj, String methodName) {
-    byte[] data = getImageBytes(evaluationContext, obj, methodName);
+  @Override
+  protected byte @Nullable [] getImageBytes(@NotNull EvaluationContextImpl evaluationContext, Value obj) {
+    return getImageBytesFromHelper(evaluationContext, obj, "iconToBytes");
+  }
+
+  protected @Nullable ImageIcon getImageIcon(EvaluationContextImpl evaluationContext, Value obj, String methodName) {
+    byte[] data = getImageBytesFromHelper(evaluationContext, obj, methodName);
     return data != null ? new ImageIcon(data) : null;
   }
 }

@@ -14,7 +14,7 @@ import org.jetbrains.annotations.NonNls
 import java.awt.datatransfer.StringSelection
 import javax.swing.Icon
 
-class BrowserLink(icon: Icon?, text: @Nls String?, tooltip: @Nls String?, val url: @NonNls String) : ActionLink() {
+class BrowserLink(icon: Icon?, text: @Nls String?, tooltip: @Nls String?, var url: @NonNls String) : ActionLink() {
 
   constructor(url: @NonNls String) : this(null, url, null, url) // NON-NLS
 

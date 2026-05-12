@@ -1,6 +1,6 @@
 ### auto-generated section `build intellij.kotlin.devkit` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_kotlin-devkit",
@@ -12,18 +12,13 @@ create_kotlinc_options(
   x_context_parameters = True
 )
 
-resourcegroup(
-  name = "kotlin-devkit_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "kotlin-devkit",
   module_name = "intellij.kotlin.devkit",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":kotlin-devkit_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_kotlin-devkit",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -59,11 +54,14 @@ jvm_library(
     "//platform/eel",
     "//java/java-indexing-api:indexing",
     "//java/openapi:java",
+    "//java/java-frontback-psi-api:frontback-psi",
+    "//platform/polySymbols",
   ]
 )
 
 jvm_library(
   name = "kotlin-devkit_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.devkit",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -98,12 +96,20 @@ jvm_library(
     "//plugins/kotlin/uast/uast-kotlin-base:kotlin-uast-base_test_lib",
     "//platform/lang-impl:lang-impl_test_lib",
     "//platform/lang-api:lang_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/code-insight/impl-base:kotlin-codeInsight-shared_test_lib",
     "//platform/eel:eel_test_lib",
     "//java/java-indexing-api:indexing_test_lib",
     "//java/openapi:java_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
+    "//platform/polySymbols:polySymbols_test_lib",
   ]
 )
 ### auto-generated section `build intellij.kotlin.devkit` end
+
+### auto-generated section `iml intellij.kotlin.devkit` start
+exports_files([
+  "intellij.kotlin.devkit.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.devkit` end

@@ -1,9 +1,10 @@
-// PROBLEM: 'plus' call appends Path elements
-// FIX: Convert Path to explicit Collection
+// PROBLEM: 'plus' call iterates over the argument instead of adding it as a single element
+// FIX: Convert argument to explicit Collection
 // PRIORITY: LOW
 // IGNORE_K1
 // WITH_STDLIB
-package java.nio.file
+// RUNTIME_WITH_FULL_JDK
+import java.nio.file.Path
 
 class Path {
     fun toList(): List<Path> = TODO()

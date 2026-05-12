@@ -19,7 +19,7 @@ public final class MarkdownQuoteHandler implements QuoteHandler {
                                                               MarkdownTokenTypes.CODE_FENCE_START);
 
   @Override
-  public boolean isClosingQuote(HighlighterIterator iterator, int offset) {
+  public boolean isClosingQuote(@NotNull HighlighterIterator iterator, int offset) {
     final CharSequence charsSequence = iterator.getDocument().getCharsSequence();
     final TextRange current = getRangeOfThisType(charsSequence, offset);
 
@@ -38,7 +38,7 @@ public final class MarkdownQuoteHandler implements QuoteHandler {
   }
 
   @Override
-  public boolean isOpeningQuote(HighlighterIterator iterator, int offset) {
+  public boolean isOpeningQuote(@NotNull HighlighterIterator iterator, int offset) {
     final IElementType tokenType = iterator.getTokenType();
 
     if (!QUOTE_TYPES.contains(tokenType)) {
@@ -58,7 +58,7 @@ public final class MarkdownQuoteHandler implements QuoteHandler {
   }
 
   @Override
-  public boolean hasNonClosedLiteral(Editor editor, HighlighterIterator iterator, int offset) {
+  public boolean hasNonClosedLiteral(@NotNull Editor editor, @NotNull HighlighterIterator iterator, int offset) {
     final CharSequence charsSequence = editor.getDocument().getCharsSequence();
     final TextRange current = getRangeOfThisType(charsSequence, offset);
 
@@ -67,7 +67,7 @@ public final class MarkdownQuoteHandler implements QuoteHandler {
   }
 
   @Override
-  public boolean isInsideLiteral(HighlighterIterator iterator) {
+  public boolean isInsideLiteral(@NotNull HighlighterIterator iterator) {
     return false;
   }
 

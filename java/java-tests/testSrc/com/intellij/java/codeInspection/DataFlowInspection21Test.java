@@ -260,7 +260,7 @@ public class DataFlowInspection21Test extends DataFlowInspectionTestCase {
   public void testMatchExceptionSealedClass() { doTest(); }
 
   public void testMatchExceptionSealedClassOnlyNull() {
-    doTestWith((insp, __) -> insp.REPORT_UNSOUND_WARNINGS = false);
+    doTestWith((insp, _) -> insp.REPORT_UNSOUND_WARNINGS = false);
   }
 
   public void testNoMatchExceptionSealedClassDataFlow() { doTest(); }
@@ -281,5 +281,17 @@ public class DataFlowInspection21Test extends DataFlowInspectionTestCase {
 
   public void testOptionalInference() {
     doTestWith((dfi, cvi) -> dfi.SUGGEST_NULLABLE_ANNOTATIONS = false);
+  }
+  
+  public void testJSpecifyNullableFieldInLambda() {
+    addJSpecifyNullMarked(myFixture);
+    setupTypeUseAnnotations("org.jspecify.annotations", myFixture);
+    doTest(); 
+  }
+
+  public void testNullableArrayLocalVariable() {
+    addJSpecifyNullMarked(myFixture);
+    setupTypeUseAnnotations("org.jspecify.annotations", myFixture);
+    doTest();
   }
 }

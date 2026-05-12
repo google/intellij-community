@@ -48,6 +48,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 @Internal
 abstract class StateStorageBase<T : Any> : StateStorage {
+  @Volatile
   private var isSavingDisabled = false
 
   @JvmField

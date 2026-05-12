@@ -12,6 +12,7 @@ import com.intellij.openapi.util.NlsContexts.NotificationSubtitle
 import com.intellij.openapi.util.NlsContexts.NotificationTitle
 import org.jetbrains.annotations.ApiStatus
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import javax.swing.Icon
 
 /**
@@ -75,12 +76,27 @@ class NotificationGroup private constructor(val displayId: String,
       if (title == null) {
         title = registeredTitles[displayId]
       }
+
+      fireGroupEvent(displayId, true)
     }
   }
 
   companion object {
     private val registeredGroups = ConcurrentHashMap<String, NotificationGroup>()
     private val registeredTitles = ConcurrentHashMap<String, @NotificationTitle String>()
+    private val listeners = CopyOnWriteArrayList<(String, Boolean) -> Unit>()
+
+    @ApiStatus.Internal
+    @JvmStatic
+    fun addGroupListener(listener: (String, Boolean) -> Unit) {
+      listeners.add(listener)
+    }
+
+    @ApiStatus.Internal
+    @JvmStatic
+    fun fireGroupEvent(id: String, registered: Boolean) {
+      listeners.forEach { it(id, registered) }
+    }
 
     @ApiStatus.Internal
     @JvmStatic
@@ -120,13 +136,6 @@ class NotificationGroup private constructor(val displayId: String,
     fun logOnlyGroup(displayId: String, @NotificationTitle title: String?): NotificationGroup =
       findRegisteredNotificationGroup(displayId)
       ?: NotificationGroup(displayId, NotificationDisplayType.NONE, title = title, registerGroup = true)
-
-    @JvmStatic
-    @Deprecated("Use com.intellij.notification.impl.NotificationGroupEP and com.intellij.notification.NotificationGroupManager")
-    @ApiStatus.ScheduledForRemoval
-    fun logOnlyGroup(displayId: String, pluginId: PluginId): NotificationGroup =
-      findRegisteredNotificationGroup(displayId)
-      ?: NotificationGroup(displayId, NotificationDisplayType.NONE, pluginId = pluginId, registerGroup = true)
 
     @JvmOverloads
     @JvmStatic
@@ -189,13 +198,6 @@ class NotificationGroup private constructor(val displayId: String,
                          listener: NotificationListener? = null): Notification =
     createNotification(title, content, type)
       .also { if (listener != null) it.setListener(listener) }
-
-  @Deprecated("Use `createNotification(String, NotificationType)` or `createNotification(String, String, NotificationType)`")
-  @ApiStatus.ScheduledForRemoval
-  @Suppress("DeprecatedCallableAddReplaceWith")
-  @JvmOverloads
-  fun createNotification(type: NotificationType = NotificationType.INFORMATION): Notification =
-    Notification(displayId, "", type)
 
   @Deprecated("Use `createNotification(String, NotificationType)` or `createNotification(String, String, NotificationType)`" +
               " along with `Notification#setSubtitle` and `Notification#setListener`")

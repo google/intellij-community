@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.devkit.jps` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "jps_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "jps",
   module_name = "intellij.devkit.jps",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":jps_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = "@community//:k11",
   deps = [
     "//jps/model-api:model",
@@ -23,12 +18,14 @@ jvm_library(
     "//platform/util/jdom",
     "@community//build:build-javac-rt",
     "//platform/util",
+    "//platform/util/base",
     "@lib//:jetbrains-annotations",
   ]
 )
 
 jvm_library(
   name = "jps_test_lib",
+  testonly = True,
   module_name = "intellij.devkit.jps",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -43,13 +40,21 @@ jvm_library(
     "//platform/util/jdom:jdom_test_lib",
     "@community//build:build-javac-rt_test_lib",
     "//platform/util:util_test_lib",
+    "//platform/util/base:base_test_lib",
   ]
 )
 ### auto-generated section `build intellij.devkit.jps` end
 
+### auto-generated section `iml intellij.devkit.jps` start
+exports_files([
+  "intellij.devkit.jps.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.devkit.jps` end
+
 ### auto-generated section `build intellij.devkit.jps.tests` start
 jvm_library(
   name = "jps-tests",
+  module_name = "intellij.devkit.jps.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -60,6 +65,7 @@ jvm_library(
 
 jvm_library(
   name = "jps-tests_test_lib",
+  testonly = True,
   module_name = "intellij.devkit.jps.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
@@ -68,6 +74,8 @@ jvm_library(
     "//plugins/devkit/jps-plugin:jps_test_lib",
     "//platform/core-api:core",
     "//platform/core-api:core_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//jps/model-api:model",
     "//jps/model-api:model_test_lib",
     "//jps/model-impl",
@@ -90,6 +98,12 @@ jvm_library(
   runtime_deps = [":jps-tests"]
 )
 ### auto-generated section `build intellij.devkit.jps.tests` end
+
+### auto-generated section `iml intellij.devkit.jps.tests` start
+exports_files([
+  "intellij.devkit.jps.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.devkit.jps.tests` end
 
 ### auto-generated section `test intellij.devkit.jps.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

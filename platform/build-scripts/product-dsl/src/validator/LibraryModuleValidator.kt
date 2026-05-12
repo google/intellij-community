@@ -43,7 +43,6 @@ internal object LibraryModuleValidator : PipelineNode {
     val graph = model.pluginGraph
     val outputProvider = model.config.outputProvider
     val strategy = model.fileUpdater
-    val libraryModuleFilter = model.config.libraryModuleFilter
     val suppressionConfig = model.suppressionConfig
     val updateSuppressions = model.updateSuppressions
 
@@ -96,12 +95,6 @@ internal object LibraryModuleValidator : PipelineNode {
 
           val libName = libRef.libraryName
           val libraryModuleName = ContentModuleName(libraryToModuleMap.get(libName) ?: continue)
-
-          // Skip if filter says not to replace this library module
-          if (!libraryModuleFilter(libraryModuleName.value)) {
-            continue
-          }
-
           // Check the scope
           val scope = javaExtensionService.getDependencyExtension(dep)?.scope
           val isTestScope = scope == JpsJavaDependencyScope.TEST

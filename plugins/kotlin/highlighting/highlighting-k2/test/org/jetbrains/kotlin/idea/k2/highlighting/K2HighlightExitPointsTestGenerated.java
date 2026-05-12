@@ -40,6 +40,11 @@ public class K2HighlightExitPointsTestGenerated extends AbstractK2HighlightExitP
         runTest("../../idea/tests/testData/exitPoints/anonymousFunction2.kt");
     }
 
+    @TestMetadata("buildListForeignReceiver.kt")
+    public void testBuildListForeignReceiver() throws Exception {
+        runTest("../../idea/tests/testData/exitPoints/buildListForeignReceiver.kt");
+    }
+
     @TestMetadata("buildListNested.kt")
     public void testBuildListNested() throws Exception {
         runTest("../../idea/tests/testData/exitPoints/buildListNested.kt");
@@ -73,6 +78,11 @@ public class K2HighlightExitPointsTestGenerated extends AbstractK2HighlightExitP
     @TestMetadata("buildSetSimple.kt")
     public void testBuildSetSimple() throws Exception {
         runTest("../../idea/tests/testData/exitPoints/buildSetSimple.kt");
+    }
+
+    @TestMetadata("buildStringForeignReceiver.kt")
+    public void testBuildStringForeignReceiver() throws Exception {
+        runTest("../../idea/tests/testData/exitPoints/buildStringForeignReceiver.kt");
     }
 
     @TestMetadata("buildStringNested.kt")
@@ -350,6 +360,11 @@ public class K2HighlightExitPointsTestGenerated extends AbstractK2HighlightExitP
         runTest("../../idea/tests/testData/exitPoints/notReturnedLabeledExpression.kt");
     }
 
+    @TestMetadata("receiverResolution.kt")
+    public void testReceiverResolution() throws Exception {
+        runTest("../../idea/tests/testData/exitPoints/receiverResolution.kt");
+    }
+
     @TestMetadata("returnIfStatement.kt")
     public void testReturnIfStatement() throws Exception {
         runTest("../../idea/tests/testData/exitPoints/returnIfStatement.kt");
@@ -363,6 +378,11 @@ public class K2HighlightExitPointsTestGenerated extends AbstractK2HighlightExitP
     @TestMetadata("returnWhenStatement.kt")
     public void testReturnWhenStatement() throws Exception {
         runTest("../../idea/tests/testData/exitPoints/returnWhenStatement.kt");
+    }
+
+    @TestMetadata("sequenceForeignReceiver.kt")
+    public void testSequenceForeignReceiver() throws Exception {
+        runTest("../../idea/tests/testData/exitPoints/sequenceForeignReceiver.kt");
     }
 
     @TestMetadata("sequenceInLambda.kt")

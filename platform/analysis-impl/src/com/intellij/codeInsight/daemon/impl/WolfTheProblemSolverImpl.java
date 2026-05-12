@@ -10,6 +10,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.components.ComponentManagerEx;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.colors.EditorColorsUtil;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
@@ -33,6 +34,7 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.PsiTreeChangeEvent;
+import com.intellij.util.concurrency.ThreadingAssertions;
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
 import kotlinx.coroutines.CoroutineScope;
 import org.jetbrains.annotations.ApiStatus;
@@ -163,19 +165,18 @@ public final class WolfTheProblemSolverImpl extends WolfTheProblemSolver impleme
     CodeInsightContext context = CodeInsightContextUtil.getCodeInsightContext(psiFile);
 
     AtomicReference<HighlightInfo> error = new AtomicReference<>();
-    boolean hasErrorElement = false;
     //noinspection IncorrectCancellationExceptionHandling
     try {
       ProperTextRange visibleRange = new ProperTextRange(0, document.getTextLength());
-      HighlightingSessionImpl.getOrCreateHighlightingSession(psiFile, context, (DaemonProgressIndicator)progressIndicator, visibleRange);
-      GeneralHighlightingPass pass = new NasueousGeneralHighlightingPass(psiFile, document, visibleRange, error);
-      pass.setContext(context);
-      pass.collectInformation(progressIndicator);
-      hasErrorElement = pass.hasErrorElement();
+      DaemonCodeAnalyzerEx.getInstanceEx(myProject).runInsideAdditionalHighlightingSession(psiFile, EditorColorsUtil.getGlobalOrDefaultColorScheme(), visibleRange, false, _-> {
+        GeneralHighlightingPass pass = new NasueousGeneralHighlightingPass(psiFile, document, visibleRange, error);
+        pass.setContext(context);
+        pass.collectInformation(progressIndicator);
+      });
     }
     catch (ProcessCanceledException e) {
       if (error.get() != null) {
-        ProblemImpl problem = new ProblemImpl(virtualFile, error.get(), hasErrorElement);
+        ProblemImpl problem = new ProblemImpl(virtualFile, error.get(), false);
         reportProblems(virtualFile, Collections.singleton(problem));
       }
       return false;
@@ -226,7 +227,7 @@ public final class WolfTheProblemSolverImpl extends WolfTheProblemSolver impleme
 
   @Override
   public void queue(@NotNull VirtualFile suspiciousFile) {
-    ApplicationManager.getApplication().assertIsNonDispatchThread();
+    ThreadingAssertions.assertBackgroundThread();
     if (!isToBeHighlighted(suspiciousFile)) return;
     doQueue(suspiciousFile);
   }
@@ -251,7 +252,7 @@ public final class WolfTheProblemSolverImpl extends WolfTheProblemSolver impleme
   }
 
   boolean isToBeHighlighted(@NotNull VirtualFile virtualFile) {
-    return ReadAction.compute(() -> {
+    return ReadAction.computeBlocking(() -> {
       for (Condition<VirtualFile> filter : FILTER_EP_NAME.getExtensionList(myProject)) {
         ProgressManager.checkCanceled();
         if (filter.value(virtualFile)) {
@@ -265,7 +266,7 @@ public final class WolfTheProblemSolverImpl extends WolfTheProblemSolver impleme
 
   @Override
   public void weHaveGotProblems(@NotNull VirtualFile virtualFile, @NotNull List<? extends Problem> problems) {
-    ApplicationManager.getApplication().assertIsNonDispatchThread();
+    ThreadingAssertions.assertBackgroundThread();
     if (problems.isEmpty()) return;
     if (isToBeHighlighted(virtualFile)) {
       weHaveGotNonIgnorableProblems(virtualFile, problems);
@@ -274,9 +275,9 @@ public final class WolfTheProblemSolverImpl extends WolfTheProblemSolver impleme
 
   @Override
   public void weHaveGotNonIgnorableProblems(@NotNull VirtualFile virtualFile, @NotNull List<? extends Problem> problems) {
-    ApplicationManager.getApplication().assertIsNonDispatchThread();
+    ThreadingAssertions.assertBackgroundThread();
     if (problems.isEmpty()) return;
-    ProblemFileInfo storedProblems = myProblems.computeIfAbsent(virtualFile, __ -> new ProblemFileInfo());
+    ProblemFileInfo storedProblems = myProblems.computeIfAbsent(virtualFile, _ -> new ProblemFileInfo());
     boolean fireListener = storedProblems.problems.isEmpty();
     storedProblems.problems.addAll(problems);
     doQueue(virtualFile);
@@ -314,7 +315,7 @@ public final class WolfTheProblemSolverImpl extends WolfTheProblemSolver impleme
                                   int column,
                                   String @NotNull [] message) {
     if (virtualFile.isDirectory() || virtualFile.getFileType().isBinary()) return null;
-    HighlightInfo info = ReadAction.compute(() -> {
+    HighlightInfo info = ReadAction.computeBlocking(() -> {
       TextRange textRange = getTextRange(virtualFile, line, column);
       String description = StringUtil.join(message, "\n");
       return HighlightInfo.newHighlightInfo(HighlightInfoType.ERROR).range(textRange).descriptionAndTooltip(description).create();
@@ -325,7 +326,7 @@ public final class WolfTheProblemSolverImpl extends WolfTheProblemSolver impleme
 
   @Override
   public void reportProblems(@NotNull VirtualFile file, @NotNull Collection<? extends Problem> problems) {
-    ApplicationManager.getApplication().assertIsNonDispatchThread();
+    ThreadingAssertions.assertBackgroundThread();
 
     if (problems.isEmpty()) {
       clearProblems(file);
@@ -355,10 +356,10 @@ public final class WolfTheProblemSolverImpl extends WolfTheProblemSolver impleme
 
   @Override
   public void reportProblemsFromExternalSource(@NotNull VirtualFile file, @NotNull Object source) {
-    ApplicationManager.getApplication().assertIsNonDispatchThread();
+    ThreadingAssertions.assertBackgroundThread();
     if (!isToBeHighlighted(file)) return;
 
-    Set<Object> problems = myProblemsFromExternalSources.computeIfAbsent(file, __ -> ConcurrentCollectionFactory.createConcurrentSet());
+    Set<Object> problems = myProblemsFromExternalSources.computeIfAbsent(file, _ -> ConcurrentCollectionFactory.createConcurrentSet());
     boolean isNewFileForExternalSource = problems.isEmpty();
     problems.add(source);
 
@@ -373,9 +374,9 @@ public final class WolfTheProblemSolverImpl extends WolfTheProblemSolver impleme
 
   @Override
   public void clearProblemsFromExternalSource(@NotNull VirtualFile file, @NotNull Object source) {
-    ApplicationManager.getApplication().assertIsNonDispatchThread();
+    ThreadingAssertions.assertBackgroundThread();
     AtomicBoolean isLastExternalSource = new AtomicBoolean();
-    myProblemsFromExternalSources.compute(file, (__, problems) -> {
+    myProblemsFromExternalSources.compute(file, (_, problems) -> {
       if (problems == null) return null;
       problems.remove(source);
       boolean wasLastProblem = problems.isEmpty();

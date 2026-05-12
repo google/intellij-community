@@ -5,10 +5,18 @@ import com.intellij.codeInsight.editorActions.QuoteHandler
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.highlighter.HighlighterIterator
 import org.jetbrains.yaml.YAMLElementTypes
+import org.jetbrains.yaml.YAMLTokenTypes
 
 internal class YamlQuoteHandler : QuoteHandler {
 
   private fun isQuote(it: Char?) = it == '"' || it == '\''
+
+  private fun isQuotedToken(iterator: HighlighterIterator): Boolean {
+    with(iterator) {
+      if (!YAMLElementTypes.TEXT_SCALAR_ITEMS.contains(tokenType) && tokenType != YAMLTokenTypes.SCALAR_KEY) return false
+      return isQuote(document.charsSequence[start])
+    }
+  }
 
   private fun isOneQuote(iterator: HighlighterIterator): Boolean {
     with(iterator) {
@@ -17,7 +25,7 @@ internal class YamlQuoteHandler : QuoteHandler {
     }
   }
 
-  override fun isClosingQuote(iterator: HighlighterIterator, offset: Int): Boolean = isOneQuote(iterator) && iterator.end == offset
+  override fun isClosingQuote(iterator: HighlighterIterator, offset: Int): Boolean = isQuotedToken(iterator) && offset == iterator.end - 1 && offset != iterator.start
 
   override fun isOpeningQuote(iterator: HighlighterIterator, offset: Int): Boolean = isOneQuote(iterator) && with(iterator) { start == offset || end - start == 1 }
 

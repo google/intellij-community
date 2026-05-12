@@ -138,7 +138,7 @@ public class ArrayRenderer extends NodeRendererImpl {
                   }
                   return getElementAsString(v);
                 });
-                return CompletableFuture.allOf(futures).thenApply(__ -> {
+                return CompletableFuture.allOf(futures).thenApply(_ -> {
                   List<String> elements = ContainerUtil.map(futures, CompletableFuture::join);
                   if (descriptor instanceof ValueDescriptorImpl) {
                     int compactLength = Math.min(shownLength, isString ? 5 : 10);

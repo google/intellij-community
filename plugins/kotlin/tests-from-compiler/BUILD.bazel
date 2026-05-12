@@ -3,6 +3,7 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tests-from-compiler",
+  module_name = "kotlin.testsFromCompiler",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = ["//platform/util/trove"]
@@ -10,6 +11,7 @@ jvm_library(
 
 jvm_library(
   name = "tests-from-compiler_test_lib",
+  testonly = True,
   module_name = "kotlin.testsFromCompiler",
   visibility = ["//visibility:public"],
   srcs = glob(["tests/**/*.kt", "tests/**/*.java", "tests/**/*.form"], allow_empty = True),
@@ -21,20 +23,19 @@ jvm_library(
     "@lib//:kotlinc-kotlin-jps-plugin-classpath",
     "@lib//:kotlinc-kotlin-jps-plugin-tests",
     "@lib//:kotlinc-kotlin-compiler-tests",
+    "@lib//:kotlinc-incremental-compilation-impl-tests",
     "//plugins/kotlin/tests-common:common-tests",
     "//plugins/kotlin/tests-common:common-tests_test_lib",
     "//plugins/kotlin/test-framework",
     "//plugins/kotlin/test-framework:test-framework_test_lib",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//java/testFramework",
     "//java/testFramework:testFramework_test_lib",
     "//plugins/kotlin/base/plugin",
     "//plugins/kotlin/base/plugin:plugin_test_lib",
-    "//plugins/kotlin/util/compiler-dependencies",
-    "//plugins/kotlin/util/compiler-dependencies:compiler-dependencies_test_lib",
     "@lib//:kotlinc-kotlin-compiler-common",
     "//plugins/devkit/jps-plugin:jps",
     "//plugins/devkit/jps-plugin:jps_test_lib",
@@ -44,6 +45,10 @@ jvm_library(
     "//RegExpSupport:regexp-tests_test_lib",
     "//platform/xdebugger-impl:debugger-impl-tests",
     "//platform/xdebugger-impl:debugger-impl-tests_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework_test_lib",
   ],
   runtime_deps = [
     ":tests-from-compiler",
@@ -51,6 +56,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build kotlin.testsFromCompiler` end
+
+### auto-generated section `iml kotlin.testsFromCompiler` start
+exports_files([
+  "kotlin.testsFromCompiler.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.testsFromCompiler` end
 
 ### auto-generated section `test kotlin.testsFromCompiler` start
 load("@community//build:tests-options.bzl", "jps_test")

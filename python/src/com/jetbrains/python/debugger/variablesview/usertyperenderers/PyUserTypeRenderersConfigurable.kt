@@ -63,6 +63,7 @@ class PyUserTypeRenderersConfigurable : SearchableConfigurable {
   private var myCurrentRenderer: PyUserNodeRenderer? = null
 
   private val myProject: Project
+  private var disposed = false
   private val myRendererChooser: ElementsChooser<PyUserNodeRenderer>
   private var myRendererSettings: RendererSettings? = null
 
@@ -86,7 +87,7 @@ class PyUserTypeRenderersConfigurable : SearchableConfigurable {
 
   override fun createComponent(): JPanel {
     ApplicationManager.getApplication().invokeLater {
-      if (myProject.isDisposed) return@invokeLater
+      if (myProject.isDisposed || disposed) return@invokeLater
       myRendererSettings = RendererSettings()
       setupRendererSettings()
       setupRendererChooser()
@@ -282,8 +283,9 @@ class PyUserTypeRenderersConfigurable : SearchableConfigurable {
   override fun disposeUIResources() {
     super.disposeUIResources()
     myRendererSettings?.let {
-      ApplicationManager.getApplication().executeOnPooledThread { Disposer.dispose(it) }
+      Disposer.dispose(it)
     }
+    disposed = true
   }
 
   private inner class RendererSettings : JPanel(BorderLayout()), Disposable {

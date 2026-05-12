@@ -493,6 +493,29 @@ public class AutoStaticImportCompletionTest extends NormalCompletionTestCase {
     }
   }
 
+  @NeedsIndex.Full
+  public void testCallCompletionOutsideClass() {
+    try {
+      myFixture.addClass("""
+      public final class ClassWithStaticMethodsTwo {
+      	static void foo() {}
+      	static void foo2() {}
+      	static void foo3() {}
+      }""");
+      addStaticAutoImport("ClassWithStaticMethodsTwo.foo");
+      myFixture.configureByText("Foo.java", """
+                           public final class Foo {
+                             public static void bar() {}
+                           }
+                           <caret>""");
+      LookupElement[] elements = myFixture.completeBasic();
+      assertTrue(elements.length > 0);
+    }
+    finally {
+      clear();
+    }
+  }
+
   private void addStaticAutoImport(@NotNull String name) {
     JavaProjectCodeInsightSettings.getSettings(getProject()).includedAutoStaticNames.add(name);
   }

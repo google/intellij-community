@@ -78,12 +78,10 @@ class PsiSourcedPolySymbolReference(
         PsiTreeUtil.findElementOfClassAtRange(file, range.startOffset, range.endOffset, PsiElement::class.java)
         ?: file
       )
-      return NonCodeUsageInfo.create(file, range.startOffset, range.endOffset, target,
-                                     symbol.adjustNameForRefactoring(
-                                       queryExecutor,
-                                       symbolName,
-                                       newName,
-                                       file.text.substring(range.startOffset, range.endOffset)))
+      return NonCodeUsageInfo.create(
+        file, range.startOffset, range.endOffset, target,
+        queryExecutor.namesProvider.adjustRename(
+          symbolName, newName, file.text.substring(range.startOffset, range.endOffset)))
     }
   }
 }

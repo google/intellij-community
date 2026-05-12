@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.roots.ui.configuration.projectRoot;
 
+import com.intellij.execution.target.TargetBasedSdkAdditionalData;
 import com.intellij.execution.wsl.WslPath;
 import com.intellij.ide.DataManager;
 import com.intellij.openapi.Disposable;
@@ -135,6 +136,9 @@ public class ProjectSdksModel implements SdkModel {
 
   @ApiStatus.Internal
   public static boolean sdkMatchesEel(@NotNull EelMachine eelMachine, Sdk sdk) {
+    if (sdk.getSdkAdditionalData() instanceof TargetBasedSdkAdditionalData) {
+      return true;
+    }
     String sdkHomePath = sdk.getHomePath();
     return sdkMatchesEel(eelMachine, sdkHomePath);
   }
@@ -144,7 +148,7 @@ public class ProjectSdksModel implements SdkModel {
     if (sdkHomePath != null) {
       try {
         Path path = Path.of(sdkHomePath);
-        if (eelMachine.ownsPath(path)) {
+        if (EelProviderUtil.ownsPath(eelMachine, path)) {
           return true;
         }
       }
@@ -158,10 +162,7 @@ public class ProjectSdksModel implements SdkModel {
 
   public void reset(@Nullable Project project) {
     EelMachine eelMachine;
-    if (!Registry.is("java.home.finder.use.eel")) {
-      eelMachine = null;
-    }
-    else if (project != null && !project.isDefault()) {
+    if (project != null && !project.isDefault()) {
       eelMachine = EelProviderUtil.getEelMachine(project);
     }
     else {
@@ -173,7 +174,7 @@ public class ProjectSdksModel implements SdkModel {
     jdkTable.preconfigure();
     final Sdk[] projectSdks = jdkTable.getAllJdks();
     for (Sdk sdk : projectSdks) {
-      if (eelMachine != null && !sdkMatchesEel(eelMachine, sdk)) continue;
+      if (!sdkMatchesEel(eelMachine, sdk)) continue;
 
       try {
         Sdk editable = sdk.clone();
@@ -484,7 +485,7 @@ public class ProjectSdksModel implements SdkModel {
           else {
             Path pathToEnvironment = (project == null || project.getProjectFilePath() == null) ?
                                      Path.of(System.getProperty("user.home")) : Path.of(project.getProjectFilePath());
-            SdkConfigurationUtil.selectSdkHome(type, parent, pathToEnvironment, home -> addSdk(type, home, sdk -> callback.accept(sdk)));
+            SdkConfigurationUtil.selectSdkHome(type, parent, pathToEnvironment, project,home -> addSdk(type, home, sdk -> callback.accept(sdk)));
           }
         }
       };

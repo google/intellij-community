@@ -46,8 +46,8 @@ import org.jetbrains.kotlin.renderer.render
 
 internal object VariableLookupElementFactory {
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     fun createLookup(
         signature: KaVariableSignature<*>,
         options: CallableInsertionOptions,
@@ -134,8 +134,8 @@ internal object VariableLookupElementFactory {
         return lookupElement
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun markIfSyntheticJavaProperty(
         lookupElementBuilder: LookupElementBuilder,
         symbol: KaVariableSymbol

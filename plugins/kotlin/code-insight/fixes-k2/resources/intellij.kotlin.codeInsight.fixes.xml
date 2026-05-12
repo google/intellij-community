@@ -1,8 +1,13 @@
 <idea-plugin visibility="internal" package="org.jetbrains.kotlin.idea.k2.codeinsight.fixes">
   <dependencies>
-    <module name="intellij.kotlin.refactorings"/>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+    <module name="intellij.java.frontback.psi"/>
+    <module name="intellij.java.psi"/>
     <module name="intellij.kotlin.codeInsight"/>
+    <module name="intellij.kotlin.refactorings"/>
+    <module name="intellij.kotlin.refactorings.move"/>
     <module name="intellij.kotlin.searching"/>
+    <!-- endregion -->
   </dependencies>
   <extensions defaultExtensionNs="org.jetbrains.kotlin">
     <codeinsight.quickfix.registrar implementation="org.jetbrains.kotlin.idea.k2.codeinsight.fixes.KotlinK2QuickFixRegistrar"/>
@@ -12,12 +17,13 @@
     <applicationService
             serviceInterface="org.jetbrains.kotlin.idea.k2.codeinsight.fixes.imprt.KotlinAddImportActionFactory"
             serviceImplementation="org.jetbrains.kotlin.idea.k2.codeinsight.fixes.imprt.KotlinAddImportActionFactory$Classic"/>
+    <applicationService
+            serviceInterface="org.jetbrains.kotlin.idea.codeinsight.utils.KDocUnresolvedLinkQuickFixFactory"
+            serviceImplementation="org.jetbrains.kotlin.idea.k2.codeinsight.fixes.imprt.KDocUnresolvedLinkQuickFixFactoryImpl"/>
 
     <annotator language="kotlin" implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.fixes.MissingConstructorBracketsAnnotator"/>
     <codeInsight.unresolvedReferenceQuickFixProvider
             implementation="org.jetbrains.kotlin.idea.k2.codeinsight.fixes.KotlinFirUnresolvedReferenceQuickFixProvider"/>
-    <codeInsight.unresolvedReferenceQuickFixProvider 
-            implementation="org.jetbrains.kotlin.idea.k2.codeinsight.fixes.imprt.KDocUnresolvedReferenceQuickFixProvider"/>
     <errorQuickFixProvider implementation="org.jetbrains.kotlin.idea.k2.codeinsight.fixes.ReplaceAndWithWhenGuardFixProvider"/>
   </extensions>
 </idea-plugin>

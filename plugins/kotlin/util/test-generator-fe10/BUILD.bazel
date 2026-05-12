@@ -3,12 +3,14 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "test-generator-fe10",
+  module_name = "kotlin.util.test-generator-fe10",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "test-generator-fe10_test_lib",
+  testonly = True,
   module_name = "kotlin.util.test-generator-fe10",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -33,8 +35,6 @@ jvm_library(
     "//plugins/kotlin/jvm-debugger/testFramework:testFramework_test_lib",
     "//plugins/kotlin/idea/tests",
     "//plugins/kotlin/idea/tests:tests_test_lib",
-    "//plugins/kotlin/scripting-support",
-    "//plugins/kotlin/scripting-support:scripting-support_test_lib",
     "//java/testFramework",
     "//java/testFramework:testFramework_test_lib",
     "//plugins/kotlin/gradle/gradle-java/k1",
@@ -51,8 +51,6 @@ jvm_library(
     "//platform/testFramework:testFramework_test_lib",
     "//jps/jps-builders:build",
     "//jps/jps-builders:build_test_lib",
-    "//plugins/kotlin/compiler-plugins/parcelize/tests",
-    "//plugins/kotlin/compiler-plugins/parcelize/tests:tests_test_lib",
     "//plugins/kotlin/compiler-reference-index/tests",
     "//plugins/kotlin/compiler-reference-index/tests:tests_test_lib",
     "//plugins/kotlin/copyright/tests",
@@ -69,8 +67,6 @@ jvm_library(
     "//plugins/kotlin/completion/tests-shared:kotlin-completion-tests-shared_test_lib",
     "//plugins/kotlin/completion/tests-k1:kotlin-completion-tests-k1",
     "//plugins/kotlin/completion/tests-k1:kotlin-completion-tests-k1_test_lib",
-    "//plugins/kotlin/compiler-plugins/parcelize/tests/k1",
-    "//plugins/kotlin/compiler-plugins/parcelize/tests/k1:k1_test_lib",
     "//plugins/kotlin/gradle/gradle-java/tests.shared",
     "//plugins/kotlin/gradle/gradle-java/tests.shared:tests.shared_test_lib",
     "//plugins/gradle/tooling-extension-impl:toolingExtension-tests",
@@ -83,10 +79,26 @@ jvm_library(
     "//plugins/kotlin/gradle/gradle-java/k1:kotlin-gradle-gradle-java-k1-tests_test_lib",
     "//plugins/kotlin/gradle/scripting/kotlin.gradle.scripting.k1:kotlin-gradle-scripting-k1-tests",
     "//plugins/kotlin/gradle/scripting/kotlin.gradle.scripting.k1:kotlin-gradle-scripting-k1-tests_test_lib",
+    "//plugins/kotlin/base/scripting/scripting.k1",
+    "//plugins/kotlin/base/scripting/scripting.k1:scripting.k1_test_lib",
+    "//plugins/kotlin/jvm/k1",
+    "//plugins/kotlin/jvm/k1:k1_test_lib",
+    "//plugins/kotlin/jvm/k1:kotlin-jvm-k1-tests",
+    "//plugins/kotlin/jvm/k1:kotlin-jvm-k1-tests_test_lib",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework_test_lib",
+    "//plugins/kotlin/base/scripting/scripting.k1:kotlin-base-scripting-k1-tests",
+    "//plugins/kotlin/base/scripting/scripting.k1:kotlin-base-scripting-k1-tests_test_lib",
   ],
   runtime_deps = [":test-generator-fe10"]
 )
 ### auto-generated section `build kotlin.util.test-generator-fe10` end
+
+### auto-generated section `iml kotlin.util.test-generator-fe10` start
+exports_files([
+  "kotlin.util.test-generator-fe10.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.util.test-generator-fe10` end
 
 ### auto-generated section `test kotlin.util.test-generator-fe10` start
 load("@community//build:tests-options.bzl", "jps_test")

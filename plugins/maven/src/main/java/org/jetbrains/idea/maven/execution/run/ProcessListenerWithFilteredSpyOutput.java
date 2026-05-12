@@ -31,7 +31,6 @@ public class ProcessListenerWithFilteredSpyOutput implements ProcessListener {
 
   ProcessListenerWithFilteredSpyOutput(ProcessListener listener,
                                        ProcessHandler processHandler,
-                                       boolean withLoggingOutputStream,
                                        boolean isWindowsCmd) {
     myListener = listener;
     myProcessHandler = processHandler;
@@ -39,7 +38,6 @@ public class ProcessListenerWithFilteredSpyOutput implements ProcessListener {
     mySimpleConsoleEventsBuffer = new MavenSimpleConsoleEventsBuffer.Builder(
       (l, k) -> myListener.onTextAvailable(new ProcessEvent(processHandler, l), k))
       .withSpyOutput(Registry.is("maven.spy.events.debug"))
-      .withLoggingOutputStream(withLoggingOutputStream)
       .withHidingCmdExitQuestion(isWindowsCmd)
       .build();
   }

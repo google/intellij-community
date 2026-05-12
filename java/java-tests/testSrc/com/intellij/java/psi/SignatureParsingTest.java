@@ -1,6 +1,7 @@
 // Copyright 2000-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.java.psi;
 
+import com.intellij.idea.TestFor;
 import com.intellij.psi.impl.cache.TypeInfo;
 import com.intellij.psi.impl.compiled.SignatureParsing;
 import com.intellij.psi.impl.compiled.StubBuildingVisitor;
@@ -29,6 +30,21 @@ public class SignatureParsingTest {
   public void testDollarInPackageName() throws ClsFormatException {
     assertEquals("autovalue.shaded.com.google$.common.collect.$ImmutableSet<java.lang.String>",
                  parseTypeString("Lautovalue/shaded/com/google$/common/collect/$ImmutableSet<Ljava/lang/String;>;"));
+  }
+
+  @Test
+  public void testAnonymousClassName() {
+    //check regressions after fixing IDEA-386511
+    assertEquals("pkg.Outer.Inner",   StubBuildingVisitor.GUESSING_MAPPER.fun("pkg/Outer$Inner"));
+    assertEquals("pkg.A$.Lambda", StubBuildingVisitor.GUESSING_MAPPER.fun("pkg/A$$Lambda"));
+  }
+
+  @TestFor(issues = "IDEA-386511")
+  @Test
+  public void testAnonymousClassNameWithDigits() {
+    assertEquals("pkg.Outer$1",       StubBuildingVisitor.GUESSING_MAPPER.fun("pkg/Outer$1"));
+    assertEquals("pkg.Outer$1Helper", StubBuildingVisitor.GUESSING_MAPPER.fun("pkg/Outer$1Helper"));
+    assertEquals("pkg.Outer.Inner$1", StubBuildingVisitor.GUESSING_MAPPER.fun("pkg/Outer$Inner$1"));
   }
 
   @Test(expected = ClsFormatException.class)

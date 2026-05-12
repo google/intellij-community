@@ -1,11 +1,11 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diff.tools.util.side;
 
 import com.intellij.diff.DiffContext;
 import com.intellij.diff.EditorDiffViewer;
 import com.intellij.diff.actions.impl.FocusOppositePaneAction;
 import com.intellij.diff.actions.impl.OpenInEditorWithMouseAction;
-import com.intellij.diff.actions.impl.SetEditorSettingsAction;
+import com.intellij.diff.actions.impl.SetEditorSettingsActionGroup;
 import com.intellij.diff.contents.DocumentContent;
 import com.intellij.diff.requests.ContentDiffRequest;
 import com.intellij.diff.requests.DiffRequest;
@@ -53,7 +53,7 @@ public abstract class ThreesideTextDiffViewer extends ThreesideDiffViewer<TextEd
   private final @NotNull MyVisibleAreaListener myVisibleAreaListener = new MyVisibleAreaListener();
   protected @Nullable ThreesideSyncScrollSupport mySyncScrollSupport;
 
-  protected final @NotNull SetEditorSettingsAction myEditorSettingsAction;
+  protected final @NotNull SetEditorSettingsActionGroup myEditorSettingsAction;
 
   public ThreesideTextDiffViewer(@NotNull DiffContext context, @NotNull ContentDiffRequest request) {
     super(context, request, TextEditorHolder.TextEditorHolderFactory.INSTANCE);
@@ -61,7 +61,7 @@ public abstract class ThreesideTextDiffViewer extends ThreesideDiffViewer<TextEd
     new MyFocusOppositePaneAction(true).install(myPanel);
     new MyFocusOppositePaneAction(false).install(myPanel);
 
-    myEditorSettingsAction = new SetEditorSettingsAction(getTextSettings(), getEditors());
+    myEditorSettingsAction = new SetEditorSettingsActionGroup(getTextSettings(), getEditors());
     myEditorSettingsAction.applyDefaults();
 
     new MyOpenInEditorWithMouseAction().install(getEditors());

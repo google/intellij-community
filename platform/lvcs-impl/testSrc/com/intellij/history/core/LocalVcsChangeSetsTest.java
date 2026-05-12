@@ -7,7 +7,7 @@ import org.junit.Test;
 import java.util.List;
 
 public class LocalVcsChangeSetsTest extends LocalHistoryTestCase {
-  LocalHistoryFacade vcs = new InMemoryLocalHistoryFacade();
+  LocalHistoryFacade vcs = createInMemoryFacade();
 
   @Test
   public void testTreatingSeveralChangesDuringChangeSetAsOne() {

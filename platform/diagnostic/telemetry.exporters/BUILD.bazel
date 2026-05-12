@@ -1,6 +1,6 @@
 ### auto-generated section `build intellij.platform.diagnostic.telemetry.exporters` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_telemetry.exporters",
@@ -10,18 +10,13 @@ create_kotlinc_options(
   ]
 )
 
-resourcegroup(
-  name = "telemetry.exporters_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "telemetry.exporters",
   module_name = "intellij.platform.diagnostic.telemetry.exporters",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":telemetry.exporters_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_telemetry.exporters",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -33,6 +28,7 @@ jvm_library(
     "//platform/util/http",
     "//libraries/kotlinx/coroutines/core",
     "//platform/util",
+    "//platform/util/base",
     "//libraries/jackson3/jackson:libraries-jackson3",
     "//libraries/jackson3/databind",
     "//libraries/jackson3/module-kotlin:libraries-jackson3-module-kotlin",
@@ -43,6 +39,7 @@ jvm_library(
 
 jvm_library(
   name = "telemetry.exporters_test_lib",
+  testonly = True,
   module_name = "intellij.platform.diagnostic.telemetry.exporters",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -53,6 +50,7 @@ jvm_library(
     "//platform/util/http:http_test_lib",
     "//libraries/kotlinx/coroutines/core:core_test_lib",
     "//platform/util:util_test_lib",
+    "//platform/util/base:base_test_lib",
     "//libraries/jackson3/jackson:libraries-jackson3_test_lib",
     "//libraries/jackson3/databind:databind_test_lib",
     "//libraries/jackson3/module-kotlin:libraries-jackson3-module-kotlin_test_lib",
@@ -61,3 +59,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.diagnostic.telemetry.exporters` end
+
+### auto-generated section `iml intellij.platform.diagnostic.telemetry.exporters` start
+exports_files([
+  "intellij.platform.diagnostic.telemetry.exporters.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.diagnostic.telemetry.exporters` end

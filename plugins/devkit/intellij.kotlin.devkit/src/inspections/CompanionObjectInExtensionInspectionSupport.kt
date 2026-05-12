@@ -14,6 +14,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import org.jetbrains.idea.devkit.kotlin.DevKitKotlinBundle
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
@@ -59,8 +60,9 @@ abstract class CompanionObjectInExtensionInspectionSupport {
       analyze(property) {
         val propertyReturnType = property.returnType.withNullability(KaTypeNullability.NON_NULLABLE)
 
-        // FIXME: buildClassType(LOGGER_CLASS_ID) should also work, does not work in tests for some reason
-        val loggerType = findClass(LOGGER_CLASS_ID)?.let(::buildClassType)
+        // FIXME: typeCreator.classType(LOGGER_CLASS_ID) should also work, does not work in tests for some reason
+        @OptIn(KaExperimentalApi::class)
+        val loggerType = typeCreator.classType(LOGGER_CLASS_ID)
 
         if (propertyReturnType !is KaClassType || loggerType !is KaClassType) return false
 

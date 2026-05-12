@@ -6,6 +6,7 @@ import com.intellij.history.ActivityId;
 import com.intellij.history.LocalHistoryAction;
 import com.intellij.openapi.util.NlsContexts;
 import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 @ApiStatus.Internal
@@ -14,7 +15,7 @@ public final class LocalHistoryActionImpl implements LocalHistoryAction {
   private final @NlsContexts.Label String myName;
   private final @Nullable ActivityId myActivityId;
 
-  public LocalHistoryActionImpl(LocalHistoryEventDispatcher l, @NlsContexts.Label String name, @Nullable ActivityId activityId) {
+  public LocalHistoryActionImpl(@NotNull LocalHistoryEventDispatcher l, @NlsContexts.Label String name, @Nullable ActivityId activityId) {
     myDispatcher = l;
     myName = name;
     myActivityId = activityId;

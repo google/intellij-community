@@ -1,9 +1,32 @@
 load("@rules_java//java:defs.bzl", "java_binary")
 load("@rules_jvm//:jvm.bzl", "jvm_library")
+load("//build:jps_to_bazel_targets_json.bzl", "jps_to_bazel_targets_json")
 
 load("//build:intellij_dev_community.bzl", "intellij_dev_binary_community")
 load("//build:intellij_dev.bzl", "INTELLIJ_ADD_OPENS")
-load("@jps_dynamic_deps_community//:targets.bzl", "ALL_COMMUNITY_TARGETS")
+load("@jps_dynamic_deps_community//:targets.bzl", "ALL_COMMUNITY_IML_TARGETS", "ALL_COMMUNITY_TARGETS", "ALL_LIBRARY_COMMUNITY_TARGETS", "ALL_PRODUCTION_COMMUNITY_TARGETS", "ALL_TEST_COMMUNITY_TARGETS", "BAZEL_TARGETS_JSON_COMMUNITY", "JPS_TO_BAZEL_TREAT_KOTLIN_DEV_VERSION_AS_SNAPSHOT")
+
+load(":jps_library_derivation_test.bzl", "jps_library_derivation_test_suite")
+jps_library_derivation_test_suite(name = "jps_library_derivation_test")
+
+load(":jps_library_derivation_pipeline_test.bzl", "jps_library_derivation_pipeline_test_suite")
+jps_library_derivation_pipeline_test_suite(name = "jps_library_derivation_pipeline_test")
+
+# == BAZEL_TARGETS_JSON_COMMUNITY
+jps_to_bazel_targets_json(
+  name = "community_bazel_targets_json",
+  mode = "community",
+  srcs = [
+    "//:jps_to_bazel_community_model_root_files",
+  ] + ALL_COMMUNITY_IML_TARGETS,
+  visibility = ["//visibility:public"],
+  tool = "@jps_to_bazel//:jps-to-bazel-targets-only",
+  starlark_production_targets = ALL_PRODUCTION_COMMUNITY_TARGETS,
+  starlark_test_targets = ALL_TEST_COMMUNITY_TARGETS,
+  starlark_library_targets = ALL_LIBRARY_COMMUNITY_TARGETS,
+  starlark_iml_targets = ALL_COMMUNITY_IML_TARGETS,
+  jps_to_bazel_treat_kotlin_dev_version_as_snapshot = JPS_TO_BAZEL_TREAT_KOTLIN_DEV_VERSION_AS_SNAPSHOT,
+)
 
 # Can't name the target 'installers' since it triggers elevation in Windows
 java_binary(
@@ -11,7 +34,10 @@ java_binary(
   runtime_deps = [":build"],
   main_class = "OpenSourceCommunityInstallersBuildTarget",
   add_opens = INTELLIJ_ADD_OPENS,
-  data = ALL_COMMUNITY_TARGETS,
+  jvm_flags = [
+    "-Dintellij.build.bazel.targets.json.file=$(rlocationpath %s)" % BAZEL_TARGETS_JSON_COMMUNITY,
+  ],
+  data = ALL_COMMUNITY_TARGETS + [BAZEL_TARGETS_JSON_COMMUNITY],
 )
 
 java_binary(
@@ -25,9 +51,21 @@ java_binary(
     # Reduce output which is not strictly required to run tests, but keep it discoverable
     # it prints where all debug logs are in org.jetbrains.intellij.build.impl.logging.BuildMessagesImpl.setDebugLogPath
     "-Dintellij.build.console.messages.verbose=false",
+    "-Dintellij.build.bazel.targets.json.file=$(rlocationpath %s)" % BAZEL_TARGETS_JSON_COMMUNITY,
   ],
   add_opens = INTELLIJ_ADD_OPENS,
-  data = ALL_COMMUNITY_TARGETS,
+  data = ALL_COMMUNITY_TARGETS + [BAZEL_TARGETS_JSON_COMMUNITY],
+)
+
+java_binary(
+  name = "jewel_standalone_maven_artifacts",
+  runtime_deps = [":build"],
+  main_class = "JewelMavenArtifactsBuildTarget",
+  add_opens = INTELLIJ_ADD_OPENS,
+  jvm_flags = [
+    "-Dintellij.build.bazel.targets.json.file=$(rlocationpath %s)" % BAZEL_TARGETS_JSON_COMMUNITY,
+  ],
+  data = ALL_PRODUCTION_COMMUNITY_TARGETS + ALL_LIBRARY_COMMUNITY_TARGETS + [BAZEL_TARGETS_JSON_COMMUNITY],
 )
 
 # Dev-build targets for running IDEs locally via `bazel run //build:<target>`
@@ -53,6 +91,7 @@ jvm_library(
     "//platform/build-scripts",
     "@lib//:kotlin-stdlib",
     "//platform/util",
+    "//platform/util/base",
     "//jps/model-api:model",
     "//build/deps:dependencies",
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
@@ -70,6 +109,7 @@ jvm_library(
 
 jvm_library(
   name = "build_test_lib",
+  testonly = True,
   module_name = "intellij.idea.community.build",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -81,6 +121,7 @@ jvm_library(
     ":build",
     "//platform/build-scripts:build-scripts_test_lib",
     "//platform/util:util_test_lib",
+    "//platform/util/base:base_test_lib",
     "//jps/model-api:model_test_lib",
     "//build/deps:dependencies_test_lib",
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
@@ -92,6 +133,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.idea.community.build` end
+
+### auto-generated section `iml intellij.idea.community.build` start
+exports_files([
+  "intellij.idea.community.build.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.idea.community.build` end
 
 ### auto-generated section `build intellij.idea.community.build.zip` start
 jvm_library(
@@ -109,6 +156,7 @@ jvm_library(
 
 jvm_library(
   name = "zip_test_lib",
+  testonly = True,
   module_name = "intellij.idea.community.build.zip",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -121,13 +169,19 @@ jvm_library(
 )
 ### auto-generated section `build intellij.idea.community.build.zip` end
 
+### auto-generated section `iml intellij.idea.community.build.zip` start
+exports_files([
+  "jvm-rules/zip/intellij.idea.community.build.zip.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.idea.community.build.zip` end
+
 ### auto-generated section `build intellij.platform.jps.build.dependencyGraph` start
 jvm_library(
   name = "dependency-graph",
   module_name = "intellij.platform.jps.build.dependencyGraph",
   visibility = ["//visibility:public"],
   srcs = ["@rules_jvm//dependency-graph:dependency-graph_sources"],
-  resources = ["@rules_jvm//dependency-graph:dependency-graph_resources"],
+  resource_jars = ["@rules_jvm//dependency-graph:dependency-graph_resources"],
   kotlinc_opts = "@community//:k11",
   deps = [
     "@community//build:build-javac-rt",
@@ -143,6 +197,7 @@ jvm_library(
 
 jvm_library(
   name = "dependency-graph_test_lib",
+  testonly = True,
   module_name = "intellij.platform.jps.build.dependencyGraph",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -159,13 +214,19 @@ jvm_library(
 )
 ### auto-generated section `build intellij.platform.jps.build.dependencyGraph` end
 
+### auto-generated section `iml intellij.platform.jps.build.dependencyGraph` start
+exports_files([
+  "jvm-rules/dependency-graph/intellij.platform.jps.build.dependencyGraph.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.jps.build.dependencyGraph` end
+
 ### auto-generated section `build intellij.platform.jps.build.javac.rt` start
 jvm_library(
   name = "build-javac-rt",
   module_name = "intellij.platform.jps.build.javac.rt",
   visibility = ["//visibility:public"],
   srcs = ["@rules_jvm//jps-builders-6:build-javac-rt_sources"],
-  resources = ["@rules_jvm//jps-builders-6:build-javac-rt_resources"],
+  resource_jars = ["@rules_jvm//jps-builders-6:build-javac-rt_resources"],
   kotlinc_opts = "@community//:k8",
   deps = [
     "@lib//:jetbrains-annotations",
@@ -180,6 +241,7 @@ jvm_library(
 
 jvm_library(
   name = "build-javac-rt_test_lib",
+  testonly = True,
   module_name = "intellij.platform.jps.build.javac.rt",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -193,3 +255,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.jps.build.javac.rt` end
+
+### auto-generated section `iml intellij.platform.jps.build.javac.rt` start
+exports_files([
+  "jvm-rules/jps-builders-6/intellij.platform.jps.build.javac.rt.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.jps.build.javac.rt` end

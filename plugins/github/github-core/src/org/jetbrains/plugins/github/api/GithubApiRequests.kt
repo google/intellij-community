@@ -648,15 +648,6 @@ object GithubApiRequests {
           .withOperationName("rebase and merge pull request ${number}")
 
       @JvmStatic
-      fun getListETag(server: GithubServerPath, repoPath: GHRepositoryPath): GithubApiRequest<String?> =
-        object : Get<String?>(getUrl(server, Repos.urlSuffix, "/$repoPath", urlSuffix,
-                                     urlQuery { param(GithubRequestPagination(pageSize = 1)) })) {
-          override fun extractResult(response: GithubApiResponse) = response.findHeader("ETag")
-        }
-          .withOperation(GithubApiRequestOperation.RestGetPullRequestListETag)
-          .withOperationName("get pull request list ETag")
-
-      @JvmStatic
       fun getDiffFiles(repository: GHRepositoryCoordinates, id: GHPRIdentifier): GithubApiRequest<GithubResponsePage<GHCommitFile>> =
         getDiffFiles(getUrl(repository, urlSuffix, "/${id.number}", "/files"))
 

@@ -95,6 +95,7 @@
     <lang.floatingToolbar language="yaml" minimal="true"/>
 
     <pluginSuggestionProvider implementation="org.jetbrains.yaml.swagger.OpenApiSuggestionProvider"/>
+    <pluginSuggestionProvider implementation="org.jetbrains.yaml.openrewrite.OpenRewriteSuggestionProvider"/>
     <pluginSuggestionProvider implementation="org.jetbrains.yaml.helm.GoTemplatePluginSuggestionProvider"/>
     <intentionAction>
       <language>yaml</language>
@@ -134,7 +135,7 @@
   </extensions>
 
   <extensions defaultExtensionNs="com.intellij.spellchecker">
-    <support language="yaml" implementationClass="org.jetbrains.yaml.YAMLSpellcheckerStrategy"/>
+    <support language="yaml" id="yaml" implementationClass="org.jetbrains.yaml.YAMLSpellcheckerStrategy"/>
   </extensions>
 
   <extensions defaultExtensionNs="com.intellij">

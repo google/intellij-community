@@ -78,7 +78,7 @@ public class XValueMarkers<V extends XValue, M> {
     M m = myProvider.getMarker(v);
     if (m != null) {
       return myProvider.unmarkValueAsync(v, m)
-        .onSuccess(__ -> myMarkers.remove(m));
+        .onSuccess(_ -> myMarkers.remove(m));
     } else {
       return Promises.resolvedPromise();
     }

@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.stubs;
 
 import com.intellij.lang.Language;
@@ -18,6 +18,7 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiFileFactory;
 import com.intellij.psi.impl.DebugUtil;
+import com.intellij.psi.impl.PsiManagerEx;
 import com.intellij.psi.impl.source.PsiFileWithStubSupport;
 import com.intellij.util.Function;
 import org.jetbrains.annotations.ApiStatus;
@@ -41,9 +42,9 @@ public abstract class StubTreeLoader {
 
   public abstract @Nullable ObjectStubTree<?> readFromVFile(@NotNull Project project, @NotNull VirtualFile vFile);
 
-  public abstract void rebuildStubTree(VirtualFile virtualFile);
+  public abstract void rebuildStubTree(@NotNull VirtualFile virtualFile);
 
-  public abstract boolean canHaveStub(VirtualFile file);
+  public abstract boolean canHaveStub(@NotNull VirtualFile file);
 
   protected boolean hasPsiInManyProjects(@NotNull VirtualFile virtualFile) {
     return false;
@@ -212,6 +213,9 @@ public abstract class StubTreeLoader {
         }
         msg += "\n   debugInfo=" + stubTreeFromIndex.getDebugInfo();
       }
+
+      List<@NotNull PsiFile> files = PsiManagerEx.getInstanceEx(project).getFileManagerEx().getCachedPsiFiles(file);
+      msg += "\n   number of cached psi files=" + files.size();
 
       if (stubTreeFromIndex != null) {
         coarseAttachments.add(new Attachment("stubTreeFromIndex.txt", ((PsiFileStubImpl<?>)stubTreeFromIndex.getRoot()).printTree()));

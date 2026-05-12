@@ -43,7 +43,6 @@ abstract class AbstractKtExpressionPostfixTemplateSelector<CTX>(
         }
     }
 
-    @OptIn(KaAllowAnalysisOnEdt::class, KaAllowAnalysisFromWriteAction::class)
     private fun filterElement(element: PsiElement): Boolean {
         if (element !is KtExpression) return false
 
@@ -84,7 +83,7 @@ abstract class AbstractKtExpressionPostfixTemplateSelector<CTX>(
         get() = (this is KtIfExpression && this.elseKeyword == null)
 
     override fun getExpressions(context: PsiElement, document: Document, offset: Int): List<PsiElement> {
-        val originalFile = context.containingFile.originalFile
+        val originalFile = context.containingFile
         val textRange = context.textRange
         val originalElement = findElementOfClassAtRange(originalFile, textRange.startOffset, textRange.endOffset, context::class.java)
             ?: return emptyList()
@@ -95,7 +94,14 @@ abstract class AbstractKtExpressionPostfixTemplateSelector<CTX>(
 
         val boundExpression = expressions.firstOrNull { it.parent.endOffset > offset }
         val boundElementParent = boundExpression?.parent
-        val filteredByOffset = expressions.takeWhile { it != boundElementParent }.toMutableList()
+        val filteredByOffset = if (boundElementParent != null && boundElementParent !is KtExpression) {
+            // boundElementParent is not a KtExpression (e.g., KtClassBody), so it won't appear
+            // in the expressions list. Take elements up to and including boundExpression only —
+            // expressions above boundElementParent's level in the tree must not be included.
+            (expressions.takeWhile { it != boundExpression } + listOfNotNull(boundExpression)).toMutableList()
+        } else {
+            expressions.takeWhile { it != boundElementParent }.toMutableList()
+        }
         if (boundElementParent is KtDotQualifiedExpression && boundExpression == boundElementParent.receiverExpression) {
             val qualifiedExpressionEnd = boundElementParent.endOffset
             expressions

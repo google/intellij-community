@@ -37,7 +37,7 @@ public enum LombokCopyableAnnotations {
     shortNames = new HashMap<>(fqns.length);
     for (String fqn : fqns) {
       String shortName = StringUtil.getShortName(fqn);
-      shortNames.computeIfAbsent(shortName, __ -> new HashSet<>(5)).add(fqn);
+      shortNames.computeIfAbsent(shortName, _ -> new HashSet<>(5)).add(fqn);
     }
   }
 

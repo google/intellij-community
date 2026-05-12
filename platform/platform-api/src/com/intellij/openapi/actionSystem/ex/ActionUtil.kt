@@ -301,6 +301,10 @@ object ActionUtil {
       }
       presentation.putClientProperty(WOULD_BE_ENABLED_IF_NOT_DUMB_MODE, !allowed && presentation.isEnabled)
       presentation.putClientProperty(WOULD_BE_VISIBLE_IF_NOT_DUMB_MODE, !allowed && presentation.isVisible)
+      presentation.isEnabled = presentation.isEnabled && (allowed || !e.isFromContextMenu)
+      if (!allowed) {
+        presentation.putClientProperty(TOOLTIP_TEXT, IdeBundle.message("ide.action.waits.for.analysis.message", presentation.text))
+      }
       if (presentation.isEnabled && action is RequiresPermissions) {
         checkPermissionsGranted(*action.getRequiredPermissions().toTypedArray())
       }

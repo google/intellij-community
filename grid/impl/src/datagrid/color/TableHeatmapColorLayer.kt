@@ -9,6 +9,7 @@ import com.intellij.database.datagrid.GridRow
 import com.intellij.database.datagrid.ModelIndex
 import com.intellij.database.datagrid.ModelIndexSet
 import com.intellij.database.datagrid.mutating.ColumnDescriptor
+import com.intellij.database.datagrid.request
 import com.intellij.database.extractors.ObjectFormatterUtil
 import com.intellij.database.run.ui.DataAccessType
 import com.intellij.database.run.ui.table.TableResultView
@@ -104,7 +105,7 @@ class TableHeatmapColorLayer private constructor(private val dataGrid: DataGrid,
 
       if (column == null ||
           column.attributes.contains(ColumnDescriptor.Attribute.INDEX) ||
-          !ObjectFormatterUtil.isNumericCell(dataGrid, firstRow, columnIndex)) {
+          !ObjectFormatterUtil.isNumericCell(dataGrid.request(firstRow, columnIndex))) {
         return@forEach
       }
 
@@ -162,10 +163,10 @@ class TableHeatmapColorLayer private constructor(private val dataGrid: DataGrid,
   override fun getCellBackground(row: ModelIndex<GridRow>, column: ModelIndex<GridColumn>, grid: DataGrid, color: Color?): Color? {
     if (coloringMode == ColoringMode.OFF) return null
 
-    val dataModel = dataGrid.getDataModel(DataAccessType.DATA_WITH_MUTATIONS)
-
-    if (colorBooleanColumns && ObjectFormatterUtil.isBooleanCell(grid, row, column)) {
-      return if (dataModel.getValueAt(row, column).toString().lowercase() == "true") {
+    val request = grid.request(row, column)
+    val value = request.getValue()
+    if (colorBooleanColumns && ObjectFormatterUtil.isBooleanCell(request)) {
+      return if (value.toString().lowercase() == "true") {
         getColor(0.6, 0.0, 1.0)
       }
       else {
@@ -175,7 +176,7 @@ class TableHeatmapColorLayer private constructor(private val dataGrid: DataGrid,
 
     val columnRange = columns[column] ?: return null
 
-    val doubleValue = dataModel.getValueAt(row, column).toString().toDoubleOrNull() ?: return null
+    val doubleValue = value.toString().toDoubleOrNull() ?: return null
 
     return if (perColumn) getColor(doubleValue, columnRange.min, columnRange.max)
     else getColor(doubleValue, globalMin, globalMax)

@@ -8,7 +8,9 @@ import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiClassType;
 import com.intellij.psi.PsiDisjunctionType;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiErrorElement;
 import com.intellij.psi.PsiExpression;
+import com.intellij.psi.PsiExpressionStatement;
 import com.intellij.psi.PsiImportList;
 import com.intellij.psi.PsiImportStatementBase;
 import com.intellij.psi.PsiImportStaticStatement;
@@ -288,6 +290,7 @@ public final class IncompleteModelUtil {
     if (parent instanceof PsiMethodCallExpression) return false;
     if (!(ref instanceof PsiReferenceExpression)) return true;
     if (parent instanceof PsiReferenceExpression && ((PsiReferenceExpression)parent).getQualifierExpression() == ref) return true;
+    if (parent instanceof PsiExpressionStatement && ref.getNextSibling() instanceof PsiErrorElement) return true;
     return false;
   }
 

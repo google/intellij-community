@@ -8,12 +8,12 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.util.ProcessingContext
 import com.jetbrains.python.psi.PyCallable
-import com.jetbrains.python.psi.PyExpression
 import com.jetbrains.python.psi.PyTypedElement
 import org.jetbrains.annotations.ApiStatus
 
 abstract class TypeEvalContext protected constructor() {
-  abstract val usesExternalTypeProvider: Boolean
+  @get:ApiStatus.Internal
+  abstract val usesExternalTypeEngine: Boolean
   abstract val processingContext: ProcessingContext
   abstract val origin: PsiFile?
 
@@ -21,6 +21,8 @@ abstract class TypeEvalContext protected constructor() {
   abstract fun allowReturnTypes(element: PsiElement): Boolean
   abstract fun allowCallContext(element: PsiElement): Boolean
   abstract fun maySwitchToAST(element: PsiElement): Boolean
+  @ApiStatus.Internal
+  open fun isExternal(): Boolean = false
   abstract fun withTracing(): TypeEvalContext
 
   abstract fun trace(message: String, vararg args: Any?)
@@ -37,15 +39,12 @@ abstract class TypeEvalContext protected constructor() {
   @ApiStatus.Internal
   abstract fun hasAssumptions(): Boolean
 
-  @ApiStatus.Internal
-  abstract fun isKnown(element: PyTypedElement): Boolean
-
   abstract fun getType(element: PyTypedElement): PyType?
 
   abstract fun getReturnType(callable: PyCallable): PyType?
 
   @ApiStatus.Internal
-  abstract fun getContextTypeCache(): MutableMap<Pair<PyExpression?, Any?>, PyType?>
+  abstract fun getContextTypeCache(): MutableMap<Pair<Any, Any>, PyType?>
   abstract fun getKnownType(element: PyTypedElement): PyType?
   abstract fun getKnownReturnType(callable: PyCallable): PyType?
 
@@ -57,11 +56,8 @@ abstract class TypeEvalContext protected constructor() {
    */
   sealed class Key
 
-  private object KeyImpl : Key()
+  protected object KeyImpl : Key()
 
-  protected fun getKey(): Key = KeyImpl
-
-  @ApiStatus.Internal
   companion object {
     protected val logger: Logger = logger<TypeEvalContext>()
 
@@ -81,7 +77,7 @@ abstract class TypeEvalContext protected constructor() {
      * Create the most detailed type evaluation context for user-initiated actions.
      *
      *
-     * Should be used go to definition, find usages, refactorings, documentation.
+     * Should be used for "goto definition", "find usages", refactorings, documentation.
      *
      *
      * For code completion see [TypeEvalContext.codeCompletion].
@@ -113,6 +109,16 @@ abstract class TypeEvalContext protected constructor() {
     @JvmStatic
     fun codeInsightFallback(project: Project?): TypeEvalContext {
       return TypeEvalContextFactory.getInstance().codeInsightFallback(project)
+    }
+
+
+    /**
+     * Special context to converting types from an external type checker, more aggressive assumptions can be made.
+     */
+    @ApiStatus.Internal
+    @JvmStatic
+    fun externalContext(project: Project): TypeEvalContext {
+      return TypeEvalContextFactory.getInstance().externalContext(project)
     }
 
     /**

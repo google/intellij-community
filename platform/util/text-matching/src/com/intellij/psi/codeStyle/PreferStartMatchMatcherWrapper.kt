@@ -5,12 +5,14 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.util.containers.FList
 import com.intellij.util.text.matching.MatchedFragment
 import com.intellij.util.text.matching.undeprecate
+import org.jetbrains.annotations.ApiStatus
 
 class PreferStartMatchMatcherWrapper(private val myDelegateMatcher: MinusculeMatcher) : MinusculeMatcher() {
   override val pattern: String
     get() = myDelegateMatcher.pattern
 
   @Deprecated("use match(String)", replaceWith = ReplaceWith("match(name)"))
+  @ApiStatus.ScheduledForRemoval
   override fun matchingFragments(name: String): FList<TextRange>? {
     return myDelegateMatcher.matchingFragments(name)
   }
@@ -29,6 +31,7 @@ class PreferStartMatchMatcherWrapper(private val myDelegateMatcher: MinusculeMat
   }
 
   @Deprecated("use matchingDegree(String, Boolean, List<MatchedFragment>)", replaceWith = ReplaceWith("matchingDegree(name, valueStartCaseMatch, fragments.map { MatchedFragment(it.startOffset, it.endOffset) })"))
+  @ApiStatus.ScheduledForRemoval
   override fun matchingDegree(
     name: String,
     valueStartCaseMatch: Boolean,

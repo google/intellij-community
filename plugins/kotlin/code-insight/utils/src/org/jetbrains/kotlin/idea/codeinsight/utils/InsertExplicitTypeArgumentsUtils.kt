@@ -30,8 +30,8 @@ import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtTypeArgumentList
 import org.jetbrains.kotlin.types.Variance
 
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class, KaContextParameterApi::class)
+context(_: KaSession)
 fun getRenderedTypeArguments(element: KtCallElement): String? {
     val resolvedCall = element.resolveToCall()?.singleFunctionCallOrNull() ?: return null
     val typeParameterSymbols = resolvedCall.partiallyAppliedSymbol.symbol.typeParameters

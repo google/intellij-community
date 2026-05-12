@@ -35,7 +35,6 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.jsp.JspFile;
-import com.intellij.ui.LayeredIcon;
 import com.intellij.ui.classFilter.ClassFilter;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.SlowOperations;
@@ -216,7 +215,7 @@ public abstract class BreakpointWithHighlighter<P extends JavaBreakpointProperti
   @Override
   void scheduleReload() {
     try (AccessToken ignore = SlowOperations.knownIssue("IDEA-360452, EA-1479781")) {
-      resetSourcePosition(); // sync init source position just in case
+      ReadAction.runBlocking(() -> resetSourcePosition()); // sync init source position just in case
     }
     super.scheduleReload();
   }

@@ -1,4 +1,6 @@
-// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package org.jetbrains.plugins.gradle.model.projectModel.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
@@ -15,12 +17,11 @@ import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBas
 import com.intellij.platform.workspace.storage.impl.SoftLinkable
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
-import com.intellij.platform.workspace.storage.impl.extractOneToManyParent
 import com.intellij.platform.workspace.storage.impl.indices.WorkspaceMutableIndex
-import com.intellij.platform.workspace.storage.impl.updateOneToManyParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import org.jetbrains.plugins.gradle.model.projectModel.GradleBuildEntity
@@ -46,7 +47,8 @@ internal class GradleProjectEntityImpl(private val dataSource: GradleProjectEnti
   override val symbolicId: GradleProjectEntityId = super.symbolicId
 
   override val build: GradleBuildEntity
-    get() = snapshot.extractOneToManyParent(BUILD_CONNECTION_ID, this)!!
+    get() = snapshot.instrumentation.getParent(BUILD_CONNECTION_ID, this) as? GradleBuildEntity
+            ?: error("Parent build not found for GradleProjectEntity")
   override val buildId: GradleBuildEntityId
     get() {
       readField("buildId")
@@ -121,7 +123,7 @@ internal class GradleProjectEntityImpl(private val dataSource: GradleProjectEnti
         error("Field WorkspaceEntity#entitySource should be initialized")
       }
       if (_diff != null) {
-        if (_diff.extractOneToManyParent<WorkspaceEntityBase>(BUILD_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getParentBuilder(BUILD_CONNECTION_ID, this) == null) {
           error("Field GradleProjectEntity#build should be initialized")
         }
       }
@@ -180,12 +182,13 @@ internal class GradleProjectEntityImpl(private val dataSource: GradleProjectEnti
       get() {
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(BUILD_CONNECTION_ID, this) as? GradleBuildEntityBuilder)
-          ?: (this.entityLinks[EntityLink(false, BUILD_CONNECTION_ID)]!! as GradleBuildEntityBuilder)
+          ?: (this.entityLinks[EntityLink(false, BUILD_CONNECTION_ID)] as? GradleBuildEntityBuilder)
+          ?: error("build is null for GradleProjectEntity")
         }
         else {
-          this.entityLinks[EntityLink(false, BUILD_CONNECTION_ID)]!! as GradleBuildEntityBuilder
+          (this.entityLinks[EntityLink(false, BUILD_CONNECTION_ID)] as? GradleBuildEntityBuilder)
+          ?: error("build is null for GradleProjectEntity")
         }
       }
       set(value) {
@@ -201,7 +204,7 @@ internal class GradleProjectEntityImpl(private val dataSource: GradleProjectEnti
           _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
         }
         if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)) {
-          _diff.updateOneToManyParentOfChild(BUILD_CONNECTION_ID, this, value)
+          _diff.instrumentation.addChild(BUILD_CONNECTION_ID, value, this)
         }
         else {
 // Setting backref of the list
@@ -326,7 +329,6 @@ internal class GradleProjectEntityData : WorkspaceEntityData<GradleProjectEntity
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): GradleProjectEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {

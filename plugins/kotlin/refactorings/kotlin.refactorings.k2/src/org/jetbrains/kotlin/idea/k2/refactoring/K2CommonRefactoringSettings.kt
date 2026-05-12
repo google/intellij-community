@@ -27,7 +27,7 @@ internal class K2CommonRefactoringSettings : KotlinCommonRefactoringSettingsBase
             by delegateTo { it::RENAME_SEARCH_IN_COMMENTS_FOR_PROPERTY }
 
     override var RENAME_SEARCH_FOR_TEXT_FOR_PROPERTY: Boolean
-            by delegateTo { it::RENAME_SEARCH_IN_COMMENTS_FOR_PROPERTY }
+            by delegateTo { it::RENAME_SEARCH_FOR_TEXT_FOR_VARIABLE }
 
     override var MOVE_PREVIEW_USAGES: Boolean
             by delegateTo { it::MOVE_PREVIEW_USAGES }

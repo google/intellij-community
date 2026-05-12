@@ -10,7 +10,7 @@ import com.intellij.platform.eel.EelTunnelsWindowsApi
 import com.intellij.platform.eel.EelUserWindowsInfo
 import com.intellij.platform.eel.EelWindowsApi
 import com.intellij.platform.eel.fs.EelFileSystemApi
-import com.intellij.platform.eel.impl.fs.WindowsNioBasedEelFileSystemApi
+import com.intellij.platform.eel.impl.local.WindowsNioBasedEelFileSystemApi
 import com.intellij.platform.eel.impl.local.EelLocalExecWindowsApi
 import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.provider.asEelPath

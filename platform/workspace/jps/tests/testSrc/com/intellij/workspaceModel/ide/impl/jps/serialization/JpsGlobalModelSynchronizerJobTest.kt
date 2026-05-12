@@ -229,9 +229,21 @@ class JpsGlobalModelSynchronizerJobTest {
     val executionOrder = mutableListOf<String>()
     val project1JobCompleted = AtomicBoolean(false)
     val project2JobCompleted = AtomicBoolean(false)
+    val delayedGlobalLoadingStarted = AtomicBoolean(false)
+
+    // Use semaphores for precise synchronization instead of timing
+    val project1CanComplete = Semaphore(1, 1) // Initially acquired
+    val project2CanComplete = Semaphore(1, 1) // Initially acquired
 
     val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    val synchronizer = JpsGlobalModelSynchronizerImpl(coroutineScope)
+
+    val synchronizer = TestableJpsGlobalModelSynchronizer(
+      coroutineScope,
+      testDelayDuration = 50.milliseconds
+    ) {
+      delayedGlobalLoadingStarted.set(true)
+      executionOrder.add("delayed_loading_started")
+    }
 
     synchronizer.setVirtualFileUrlManager(IdeVirtualFileUrlManagerImpl())
 
@@ -240,17 +252,17 @@ class JpsGlobalModelSynchronizerJobTest {
     val mutableStorage = MutableEntityStorage.create()
     val entityStorage = VersionedEntityStorageImpl(mutableStorage.toSnapshot())
 
-    // Create two project synchronization jobs with different completion times
+    // Create two project synchronization jobs that wait for permission to complete
     val project1SyncJob = coroutineScope.launch {
       executionOrder.add("project1_sync_started")
-      delay(50.milliseconds)
+      project1CanComplete.acquire()
       project1JobCompleted.set(true)
       executionOrder.add("project1_sync_completed")
     }
 
     val project2SyncJob = coroutineScope.launch {
       executionOrder.add("project2_sync_started")
-      delay(150.milliseconds) // Takes longer than project1
+      project2CanComplete.acquire()
       project2JobCompleted.set(true)
       executionOrder.add("project2_sync_completed")
     }
@@ -270,25 +282,31 @@ class JpsGlobalModelSynchronizerJobTest {
 
     callback.invoke()
 
-    // Wait for the first project to complete but not the second
-    delay(100.milliseconds)
+    // Wait for the delay to expire
+    delay(80.milliseconds) // More than 50ms delay
+
+    // Allow project 1 to complete, but keep project 2 blocked
+    project1CanComplete.release()
+    project1SyncJob.join()
+
+    // Project 1 is done but project 2 is still blocked — delayed loading should not start
     assertThat(project1JobCompleted.get()).describedAs("Project 1 sync should be completed").isTrue()
     assertThat(project2JobCompleted.get()).describedAs("Project 2 sync should not be complete yet").isFalse()
+    assertThat(delayedGlobalLoadingStarted.get()).describedAs("Delayed loading should not have started yet - waiting for project 2").isFalse()
 
-    // Wait for both jobs to complete
-    project1SyncJob.join()
+    // Allow project 2 to complete
+    project2CanComplete.release()
     project2SyncJob.join()
 
-    // Give some time for the delayed loading to potentially start
-    delay(200.milliseconds)
+    // Now wait for the delayed loading to start
+    delay(50.milliseconds)
 
-    // Verify both projects completed
-    assertThat(project1JobCompleted.get()).describedAs("Project 1 sync should be completed").isTrue()
-    assertThat(project2JobCompleted.get()).describedAs("Project 2 sync should be completed").isTrue()
-
-    // Verify that both project syncs completed before any global loading could proceed
-    assertThat(executionOrder).describedAs("Both projects should have completed")
-      .contains("project1_sync_completed", "project2_sync_completed")
+    // Verify execution order: both projects complete before delayed loading starts
+    assertThat(delayedGlobalLoadingStarted.get()).describedAs("Delayed loading should have started after both projects completed").isTrue()
+    assertThat(executionOrder).describedAs("Both projects should complete before delayed loading")
+      .containsSubsequence("project1_sync_completed", "delayed_loading_started")
+    assertThat(executionOrder).describedAs("Both projects should complete before delayed loading")
+      .containsSubsequence("project2_sync_completed", "delayed_loading_started")
 
     coroutineScope.cancel()
   }

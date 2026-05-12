@@ -1,11 +1,12 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.terminal
 
-import com.intellij.openapi.util.SystemInfo
 import com.intellij.platform.eel.EelDescriptor
+import com.intellij.platform.eel.EelOsFamily
+import com.intellij.platform.eel.annotations.MultiRoutingFileSystemPath
+import com.intellij.platform.eel.isWindows
 import com.intellij.platform.eel.path.EelPath
-import com.intellij.platform.eel.path.EelPathException
-import com.intellij.platform.eel.provider.asEelPath
+import com.intellij.platform.eel.provider.asNioPath
 import com.intellij.terminal.ui.TerminalWidget
 import com.intellij.util.containers.CollectionFactory
 import com.jediterm.core.util.TermSize
@@ -16,11 +17,12 @@ import org.jetbrains.plugins.terminal.startup.ShellExecOptions
 import org.jetbrains.plugins.terminal.startup.ShellExecOptionsImpl
 import org.jetbrains.plugins.terminal.startup.TerminalProcessType
 import org.jetbrains.plugins.terminal.util.ShellIntegration
-import java.nio.file.InvalidPathException
 import java.nio.file.Path
+import kotlin.io.path.pathString
 
 class ShellStartupOptions private constructor(builder: Builder) {
-  val workingDirectory: String? = builder.workingDirectory
+  val workingDirectory: @MultiRoutingFileSystemPath String? = builder.workingDirectory
+  private val finalWorkingDirectoryEelPath: EelPath? = builder.getFinalWorkingDirectoryEelPath()
   val shellCommand: List<String>? = builder.shellCommand
   @ApiStatus.Internal
   val initialShellCommand: InitialShellCommand? = builder.initialShellCommand
@@ -32,9 +34,30 @@ class ShellStartupOptions private constructor(builder: Builder) {
   val envVariables: Map<String, String> = builder.envVariables
   internal val startupMoment: TerminalStartupMoment? = builder.startupMoment
 
+  @get:ApiStatus.Internal
+  val eelDescriptorNotNull: EelDescriptor
+    get() = workingDirectoryEelPathNotNull.descriptor
+
+  @get:ApiStatus.Internal
+  val workingDirectoryEelPathNotNull: EelPath
+    get() = checkNotNull(finalWorkingDirectoryEelPath) {
+      "Working directory has not been finalized by `setFinalWorkingDirectoryEelPath`."
+    }
+
   fun builder(): Builder {
-    return Builder(workingDirectory, shellCommand, initialShellCommand, processType, commandHistoryFileProvider, initialTermSize,
-                   widget, shellIntegration, envVariables, startupMoment)
+    return Builder(
+      workingDirectory,
+      finalWorkingDirectoryEelPath,
+      shellCommand,
+      initialShellCommand,
+      processType,
+      commandHistoryFileProvider,
+      initialTermSize,
+      widget,
+      shellIntegration,
+      envVariables,
+      startupMoment
+    )
   }
 
   override fun toString(): String {
@@ -50,32 +73,17 @@ class ShellStartupOptions private constructor(builder: Builder) {
 
   @ApiStatus.Internal
   @Throws(IllegalArgumentException::class)
-  fun toExecOptions(eelDescriptor: EelDescriptor): ShellExecOptions {
-    requireNotNull(shellCommand) { "Shell command is null" }
+  fun toExecOptions(): ShellExecOptions {
     return ShellExecOptionsImpl(
-      ShellExecCommandImpl(shellCommand),
-      findWorkingDirectoryEelPath(eelDescriptor),
+      ShellExecCommandImpl(checkNotNull(shellCommand) { "Shell command is null" }),
+      workingDirectoryEelPathNotNull,
       envVariables
     )
   }
 
-  @Throws(IllegalArgumentException::class)
-  private fun findWorkingDirectoryEelPath(eelDescriptor: EelDescriptor): EelPath {
-    requireNotNull(workingDirectory) { "Working directory is null" }
-    try {
-      val nioPath = Path.of(workingDirectory)
-      return nioPath.asEelPath(eelDescriptor)
-    }
-    catch (e: Exception) {
-      if (e is InvalidPathException || e is EelPathException) {
-        throw IllegalArgumentException("Cannot find working directory ($workingDirectory)", e)
-      }
-      throw e
-    }
-  }
-
   class Builder internal constructor(
-    var workingDirectory: String?,
+    private var workingDirectoryField: @MultiRoutingFileSystemPath String?,
+    private var finalWorkingDirectoryEelPath: EelPath?,
     var shellCommand: List<String>?,
     var initialShellCommand: InitialShellCommand?,
     var processType: TerminalProcessType = TerminalProcessType.SHELL,
@@ -83,13 +91,32 @@ class ShellStartupOptions private constructor(builder: Builder) {
     var initialTermSize: TermSize?,
     var widget: TerminalWidget?,
     var shellIntegration: ShellIntegration? = null,
-    var envVariables: Map<String, String> = createEnvVariablesMap(),
+    var envVariables: Map<String, String> = emptyMap(),
     internal var startupMoment: TerminalStartupMoment? = null,
   ) {
 
-    constructor() : this(null, null, null, TerminalProcessType.SHELL, null, null, null)
+    var workingDirectory: @MultiRoutingFileSystemPath String?
+      get() = workingDirectoryField
+      set(value) {
+        if (finalWorkingDirectoryEelPath != null) {
+          throw IllegalStateException("Cannot set workingDirectory: working directory has been finalized")
+        }
+        workingDirectoryField = value
+      }
 
-    fun workingDirectory(workingDirectory: String?) = also { this.workingDirectory = workingDirectory }
+    internal fun getFinalWorkingDirectoryEelPath(): EelPath? = finalWorkingDirectoryEelPath
+
+    fun setFinalWorkingDirectoryEelPath(finalWorkingDirectoryEelPath: EelPath): Builder = also {
+      if (this.finalWorkingDirectoryEelPath != null) {
+        throw IllegalStateException("Working directory has already been finalized and cannot be changed")
+      }
+      this.workingDirectory = finalWorkingDirectoryEelPath.asNioPath().pathString
+      this.finalWorkingDirectoryEelPath = finalWorkingDirectoryEelPath
+    }
+
+    constructor() : this(null, null, null, null, TerminalProcessType.SHELL, null, null, null)
+
+    fun workingDirectory(workingDirectory: @MultiRoutingFileSystemPath String?) = also { this.workingDirectory = workingDirectory }
     fun shellCommand(shellCommand: List<String>?) = also { this.shellCommand = shellCommand }
     fun envVariables(envs: Map<String, String>) = also { this.envVariables = envs }
     fun processType(processType: TerminalProcessType) = also { this.processType = processType }
@@ -111,11 +138,11 @@ class ShellStartupOptions private constructor(builder: Builder) {
 }
 
 @JvmOverloads
-fun shellStartupOptions(workingDirectory: String?, modifier: ((ShellStartupOptions.Builder) -> Unit)? = null): ShellStartupOptions {
+fun shellStartupOptions(workingDirectory: @MultiRoutingFileSystemPath String?, modifier: ((ShellStartupOptions.Builder) -> Unit)? = null): ShellStartupOptions {
   return ShellStartupOptions.Builder().workingDirectory(workingDirectory).modify(modifier ?: {}).build()
 }
 
 @JvmOverloads
-fun createEnvVariablesMap(content: Map<String, String> = emptyMap()): MutableMap<String, String> {
-  return if (SystemInfo.isWindows) CollectionFactory.createCaseInsensitiveStringMap(content) else HashMap(content)
+fun createEnvVariablesMap(osFamily: EelOsFamily, content: Map<String, String> = emptyMap()): MutableMap<String, String> {
+  return if (osFamily.isWindows) CollectionFactory.createCaseInsensitiveStringMap(content) else HashMap(content)
 }

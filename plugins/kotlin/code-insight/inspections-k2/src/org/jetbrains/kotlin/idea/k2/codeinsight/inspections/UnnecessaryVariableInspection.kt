@@ -2,13 +2,14 @@
 
 package org.jetbrains.kotlin.idea.k2.codeinsight.inspections
 
-import com.intellij.codeInspection.LocalQuickFix
 import com.intellij.codeInspection.ProblemDescriptor
 import com.intellij.codeInspection.ProblemHighlightType
 import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.codeInspection.options.OptPane
 import com.intellij.codeInspection.options.OptPane.checkbox
 import com.intellij.codeInspection.options.OptPane.pane
+import com.intellij.modcommand.ModCommand
+import com.intellij.modcommand.ModCommandQuickFix
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiComment
@@ -29,7 +30,6 @@ import org.jetbrains.kotlin.idea.base.psi.getLineNumber
 import org.jetbrains.kotlin.idea.base.psi.isMultiLine
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeinsight.api.classic.inspections.AbstractKotlinInspection
-import org.jetbrains.kotlin.idea.k2.refactoring.inline.KotlinInlinePropertyHandler
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtDeclaration
@@ -38,6 +38,7 @@ import org.jetbrains.kotlin.psi.KtNameReferenceExpression
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.KtPsiUtil
 import org.jetbrains.kotlin.psi.KtReturnExpression
+import org.jetbrains.kotlin.psi.KtWhenExpression
 import org.jetbrains.kotlin.psi.propertyVisitor
 import org.jetbrains.kotlin.psi.psiUtil.anyDescendantOfType
 import org.jetbrains.kotlin.psi.psiUtil.getNextSiblingIgnoringWhitespaceAndComments
@@ -89,7 +90,7 @@ internal class UnnecessaryVariableInspection : AbstractKotlinInspection() {
                 isOnTheFly,
                 highlightType,
                 range,
-                InlineVariableFix()
+                InlineVariableFix
             )
         }
     }
@@ -142,17 +143,6 @@ internal class UnnecessaryVariableInspection : AbstractKotlinInspection() {
         }
     }
 
-    private class InlineVariableFix : LocalQuickFix {
-        override fun getFamilyName(): String = KotlinBundle.message("inline.variable")
-
-        override fun startInWriteAction(): Boolean = false
-
-        override fun applyFix(project: Project, descriptor: ProblemDescriptor) {
-            val element = descriptor.psiElement.parent as? KtProperty ?: return
-            KotlinInlinePropertyHandler().inlineElement(project, null, element)
-        }
-    }
-
     private fun LeafPsiElement.startsMultilineBlock(): Boolean =
         node.elementType == KtTokens.LBRACE && parent.safeAs<KtExpression>()?.isMultiLine() == true
 
@@ -164,5 +154,35 @@ internal class UnnecessaryVariableInspection : AbstractKotlinInspection() {
           takeWhile { it is PsiWhiteSpace || it is PsiComment }.firstIsInstanceOrNull<PsiComment>()
         return prevLeafs.firstComment() != null ||
                initializer?.nextLeafs?.firstComment()?.takeIf { it.getLineNumber() == this.getLineNumber() } != null
+    }
+}
+
+private object InlineVariableFix : ModCommandQuickFix() {
+    override fun getFamilyName(): String = KotlinBundle.message("inline.variable")
+
+    override fun perform(project: Project, descriptor: ProblemDescriptor): ModCommand {
+        val property = (descriptor.psiElement as? KtProperty) ?: (descriptor.psiElement.parent as? KtProperty) ?: return ModCommand.nop()
+        val enclosingElement = KtPsiUtil.getEnclosingElementForLocalDeclaration(property) ?: return ModCommand.nop()
+
+        return ModCommand.psiUpdate(property) { writableProperty, updater ->
+            val initializer = writableProperty.initializer ?: return@psiUpdate
+            val replacementForWhenSubject =
+                if ((writableProperty.parent as? KtWhenExpression)?.subjectVariable == writableProperty) initializer.copy() else null
+            val writableEnclosingElement = updater.getWritable(enclosingElement)
+            val usages = ReferencesSearch.search(writableProperty, LocalSearchScope(writableEnclosingElement))
+                .findAll()
+                .mapNotNull { it.element as? KtNameReferenceExpression }
+
+            if (usages.isEmpty()) return@psiUpdate
+
+            usages.forEach { usage ->
+                usage.replace(initializer.copy())
+            }
+            if (replacementForWhenSubject != null) {
+                writableProperty.replace(replacementForWhenSubject)
+            } else {
+                writableProperty.delete()
+            }
+        }
     }
 }

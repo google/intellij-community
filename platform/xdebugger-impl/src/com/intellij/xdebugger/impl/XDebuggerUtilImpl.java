@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger.impl;
 
 import com.intellij.execution.ui.ConsoleView;
@@ -50,6 +50,7 @@ import com.intellij.xdebugger.breakpoints.XBreakpointManager;
 import com.intellij.xdebugger.breakpoints.XBreakpointProperties;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
+import com.intellij.xdebugger.breakpoints.XLineBreakpointVerticalPlacement;
 import com.intellij.xdebugger.breakpoints.XLineBreakpointType;
 import com.intellij.xdebugger.breakpoints.ui.XBreakpointGroupingRule;
 import com.intellij.xdebugger.evaluation.EvaluationMode;
@@ -164,7 +165,7 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
     List<XLineBreakpointType.XLineBreakpointVariant> allVariants = new SmartList<>();
     for (XLineBreakpointType type : types) {
       var variants = type.computeVariants(project, position);
-      if (variants.isEmpty() && multipleTypes) {
+      if (variants.isEmpty() && multipleTypes && type.isCreationOfDefaultBreakpointVariantAllowed()) {
         // We have multiple types, but no non-default variants for this type. So we just create one.
         allVariants.add(createDefaultBreakpointVariant(position, type));
       }
@@ -175,7 +176,8 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
 
     if (allVariants.isEmpty()) {
       assert !multipleTypes;
-      return Collections.singletonList(createDefaultBreakpointVariant(position, types.get(0)));
+      XLineBreakpointType type = types.getFirst();
+      return type.isCreationOfDefaultBreakpointVariantAllowed() ? Collections.singletonList(createDefaultBreakpointVariant(position, type)) : allVariants;
     } else {
       return allVariants;
     }
@@ -196,7 +198,7 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
     List<Promise<List<? extends XLineBreakpointType.XLineBreakpointVariant>>> promises = new SmartList<>();
     for (XLineBreakpointType type : types) {
       promises.add(type.computeVariantsAsync(project, position).then(o -> {
-        if (((List<?>)o).isEmpty() && multipleTypes) {
+        if (((List<?>)o).isEmpty() && multipleTypes && type.isCreationOfDefaultBreakpointVariantAllowed()) {
           // We have multiple types, but no non-default variants for this type. So we just create one.
           return Collections.singletonList(createDefaultBreakpointVariant(position, type));
         }
@@ -209,7 +211,8 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
       var variants = StreamEx.of(v).toFlatList(l -> l);
       if (variants.isEmpty()) {
         assert !multipleTypes;
-        return Collections.singletonList(createDefaultBreakpointVariant(position, types.get(0)));
+        XLineBreakpointType type = types.getFirst();
+        return type.isCreationOfDefaultBreakpointVariantAllowed() ? Collections.singletonList(createDefaultBreakpointVariant(position, type)) : variants;
       } else {
         return variants;
       }
@@ -291,9 +294,18 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
                                                                                        VirtualFile file,
                                                                                        int line,
                                                                                        Boolean temporary) {
+    return addLineBreakpoint(breakpointManager, variant, file, line, temporary, XLineBreakpointVerticalPlacement.ON_LINE);
+  }
+
+  public static <P extends XBreakpointProperties> XLineBreakpoint<P> addLineBreakpoint(XBreakpointManager breakpointManager,
+                                                                                       XLineBreakpointType<P>.XLineBreakpointVariant variant,
+                                                                                       VirtualFile file,
+                                                                                       int line,
+                                                                                       Boolean temporary,
+                                                                                       @NotNull XLineBreakpointVerticalPlacement placement) {
     var properties = variant.createProperties();
     var type = variant.getType();
-    var breakpoint = addLineBreakpoint(breakpointManager, type, properties, file, line, temporary);
+    var breakpoint = addLineBreakpoint(breakpointManager, type, properties, file, line, temporary, placement);
     if (!type.variantAndBreakpointMatch(breakpoint, variant)) {
       LOG.error("breakpoint doesn't match source variant, " + type + ", " + variant.getClass());
     }
@@ -305,8 +317,9 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
                                                                                         P properties,
                                                                                         VirtualFile file,
                                                                                         int line,
-                                                                                        Boolean temporary) {
-    return breakpointManager.addLineBreakpoint(type, file.getUrl(), line, properties, temporary);
+                                                                                        Boolean temporary,
+                                                                                        @NotNull XLineBreakpointVerticalPlacement placement) {
+    return breakpointManager.addLineBreakpoint(type, file.getUrl(), line, properties, temporary, placement);
   }
 
   @ApiStatus.Internal
@@ -575,7 +588,8 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
           DebuggerUIUtil.invokeLater(() -> view.print("Stack: ", ConsoleViewContentType.SYSTEM_OUTPUT));
           myFrames.forEach(f -> {
             SimpleColoredText text = new SimpleColoredText();
-            ReadAction.run(() -> f.customizeTextPresentation(text));
+            ReadAction.runBlocking(() -> f.customizeTextPresentation(text));
+
             XSourcePosition position = f.getSourcePosition();
             Navigatable navigatable = position != null ? position.createNavigatable(project) : null;
             DebuggerUIUtil.invokeLater(() -> {

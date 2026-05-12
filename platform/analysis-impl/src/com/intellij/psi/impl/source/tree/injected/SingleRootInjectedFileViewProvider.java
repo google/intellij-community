@@ -10,6 +10,7 @@ import com.intellij.psi.FileViewProvider;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.SingleRootFileViewProvider;
+import com.intellij.testFramework.LightVirtualFile;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 
@@ -19,6 +20,8 @@ class SingleRootInjectedFileViewProvider extends SingleRootFileViewProvider impl
   private final Object myLock = new Object();
   private final DocumentWindowImpl myDocumentWindow;
   private boolean myPatchingLeaves;
+  // used for overriding isPhysical method after clone
+  private volatile boolean myOverrideIsPhysical;
 
   SingleRootInjectedFileViewProvider(@NotNull PsiManager psiManager,
                                      @NotNull VirtualFileWindow virtualFile,
@@ -26,6 +29,7 @@ class SingleRootInjectedFileViewProvider extends SingleRootFileViewProvider impl
                                      @NotNull Language language) {
     super(psiManager, (VirtualFile)virtualFile, true, language);
     myDocumentWindow = documentWindow;
+    myOverrideIsPhysical = !(virtualFile.getDelegate() instanceof LightVirtualFile);
   }
 
   @Override
@@ -40,7 +44,11 @@ class SingleRootInjectedFileViewProvider extends SingleRootFileViewProvider impl
 
   @Override
   public FileViewProvider clone() {
-    return cloneImpl();
+    FileViewProvider clone = cloneImpl();
+    if (clone instanceof SingleRootInjectedFileViewProvider) {
+      ((SingleRootInjectedFileViewProvider) clone).myOverrideIsPhysical = false;
+    }
+    return clone;
   }
 
   @Override
@@ -56,7 +64,7 @@ class SingleRootInjectedFileViewProvider extends SingleRootFileViewProvider impl
 
   @Override
   public boolean isPhysical() {
-    return isPhysicalImpl();
+    return myOverrideIsPhysical && isPhysicalImpl();
   }
 
   @Override

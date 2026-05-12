@@ -12,6 +12,7 @@ jvm_library(
 
 jvm_library(
   name = "build-launcher_test_lib",
+  testonly = True,
   module_name = "intellij.platform.jps.build.launcher",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -19,3 +20,9 @@ jvm_library(
   runtime_deps = [":build-launcher"]
 )
 ### auto-generated section `build intellij.platform.jps.build.launcher` end
+
+### auto-generated section `iml intellij.platform.jps.build.launcher` start
+exports_files([
+  "intellij.platform.jps.build.launcher.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.jps.build.launcher` end

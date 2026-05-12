@@ -2,6 +2,7 @@
 package com.jetbrains.python.packaging.management
 
 import com.intellij.openapi.application.readAction
+import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.util.Key
@@ -15,9 +16,13 @@ import com.jetbrains.python.packaging.common.PythonPackageDetails
 import com.jetbrains.python.packaging.common.PythonRepositoryPackageSpecification
 import com.jetbrains.python.packaging.common.toPythonPackage
 import com.jetbrains.python.packaging.common.toPythonPackages
-import com.jetbrains.python.packaging.conda.environmentYml.format.CondaEnvironmentYmlParser
+import com.intellij.python.community.impl.conda.environmentYml.CondaEnvironmentYmlFile
+import com.intellij.python.community.impl.conda.environmentYml.format.CondaEnvironmentYmlParser
 import com.jetbrains.python.packaging.setupPy.SetupPyHelpers
 import com.jetbrains.python.psi.PyFile
+import com.jetbrains.python.requirements.PyDependenciesFile
+import com.jetbrains.python.requirements.RequirementsTxtFile
+import com.jetbrains.python.requirements.SetupPyFile
 import com.jetbrains.python.sdk.associatedModuleDir
 import org.jetbrains.annotations.TestOnly
 
@@ -41,11 +46,11 @@ class TestPythonPackageManager(project: Project, sdk: Sdk) : PythonPackageManage
     return PyResult.success(emptyList())
   }
 
-  override suspend fun syncCommand(): PyResult<Unit> {
+  override suspend fun syncLockedCommand(): PyResult<Unit> {
     return PyResult.success(Unit)
   }
 
-  override suspend fun installPackageCommand(installRequest: PythonPackageInstallRequest, options: List<String>): PyResult<Unit> {
+  override suspend fun installPackageCommand(installRequest: PythonPackageInstallRequest, options: List<String>, module: Module?): PyResult<Unit> {
     if (installRequest !is PythonPackageInstallRequest.ByRepositoryPythonPackageSpecifications) {
       return PyResult.localizedError("Test Manager supports only simple repository package specification")
     }
@@ -53,7 +58,7 @@ class TestPythonPackageManager(project: Project, sdk: Sdk) : PythonPackageManage
     val specification = installRequest.specifications.single()
     return if (repositoryManager.allPackages().contains(specification.name)) {
       val version = specification.versionSpec?.version.orEmpty()
-      installedPackages += PythonPackage(specification.name, version, false)
+      installedPackages = installedPackages?.plus(PythonPackage(specification.name, version, false))
       PyResult.success(Unit)
     }
     else {
@@ -69,28 +74,28 @@ class TestPythonPackageManager(project: Project, sdk: Sdk) : PythonPackageManage
     pythonPackages.forEach { pyPackage ->
       val packageToRemove = findPackageByName(pyPackage)
                             ?: return PyResult.localizedError(PACKAGE_UNINSTALL_FAILURE_MESSAGE)
-      installedPackages -= packageToRemove
+      installedPackages = installedPackages?.minus(packageToRemove)
     }
 
     return PyResult.success(Unit)
   }
 
   override suspend fun loadPackagesCommand(): PyResult<List<PythonPackage>> {
-    return PyResult.success(installedPackages)
+    return PyResult.success(listInstalledPackagesSnapshot())
   }
 
-  override fun getDependencyFile(): VirtualFile? {
+  override fun getDependencyFile(): PyDependenciesFile? {
     val providerType = sdk.getUserData(REQUIREMENTS_PROVIDER_KEY) ?: return null
     val moduleDir = sdk.associatedModuleDir ?: return null
 
     return when (providerType) {
-      RequirementsProviderType.REQUIREMENTS_TXT -> moduleDir.findChild("requirements.txt")
-      RequirementsProviderType.SETUP_PY -> moduleDir.findChild("setup.py")
-      RequirementsProviderType.ENVIRONMENT_YML -> moduleDir.findChild("environment.yml")
+      RequirementsProviderType.REQUIREMENTS_TXT -> moduleDir.findChild("requirements.txt")?.let { RequirementsTxtFile(it) }
+      RequirementsProviderType.SETUP_PY -> moduleDir.findChild("setup.py")?.let { SetupPyFile(it) }
+      RequirementsProviderType.ENVIRONMENT_YML -> moduleDir.findChild("environment.yml")?.let { CondaEnvironmentYmlFile(it) }
     }
   }
 
-  override suspend fun extractDependencies(): PyResult<List<PythonPackage>>? {
+  override suspend fun listDeclaredPackages(): PyResult<List<PythonPackage>>? {
     val providerType = sdk.getUserData(REQUIREMENTS_PROVIDER_KEY) ?: return null
     val moduleDir = sdk.associatedModuleDir ?: return null
 
@@ -131,7 +136,7 @@ class TestPythonPackageManager(project: Project, sdk: Sdk) : PythonPackageManage
   }
 
   private fun findPackageByName(name: String): PythonPackage? {
-    return installedPackages.find { it.name == name }
+    return listInstalledPackagesSnapshot().find { it.name == name }
   }
 
   fun withRepoPackagesVersions(packageVersions: Map<String, List<String>>): TestPythonPackageManager {

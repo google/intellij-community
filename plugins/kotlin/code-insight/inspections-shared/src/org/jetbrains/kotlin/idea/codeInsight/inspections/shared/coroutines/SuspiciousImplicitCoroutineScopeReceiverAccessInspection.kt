@@ -24,6 +24,7 @@ import org.jetbrains.kotlin.analysis.api.symbols.KaFunctionSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaReceiverParameterSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaSamConstructorSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.findClass
+import org.jetbrains.kotlin.analysis.api.symbols.receiverType
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.analysis.api.types.symbol
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
@@ -47,7 +48,7 @@ import org.jetbrains.kotlin.psi.psiUtil.getQualifiedExpressionForSelector
 import org.jetbrains.kotlin.psi.psiUtil.hasSuspendModifier
 import org.jetbrains.kotlin.resolve.calls.util.getCalleeExpressionIfAny
 
-internal class SuspiciousImplicitCoroutineScopeReceiverAccessInspection() :
+internal class SuspiciousImplicitCoroutineScopeReceiverAccessInspection :
     KotlinApplicableInspectionBase<KtExpression, SuspiciousImplicitCoroutineScopeReceiverAccessInspection.Context>() {
 
     class Context(val receiverLabelName: Name)
@@ -96,10 +97,15 @@ internal class SuspiciousImplicitCoroutineScopeReceiverAccessInspection() :
             return null
         }
 
-        // Check that the function has CoroutineScope as extension parameter (if present)        
-        val originalReceiverParameter = resolvedCall.symbol.receiverParameter
-        if (originalReceiverParameter?.returnType?.isCoroutineScopeType() == false) {
-            return null
+        // Check that the function has CoroutineScope as extension parameter (if present)
+        val originalReceiverType = resolvedCall.symbol.receiverType
+        if (originalReceiverType != null) {
+            if (!originalReceiverType.isCoroutineScopeType()) return null
+        } else {
+            // The function has no extension receiver — check that the containing class is a CoroutineScope (for member functions)
+            val containingSymbol = resolvedCall.symbol.fakeOverrideOriginal.containingSymbol as? KaClassLikeSymbol
+            val defaultType = containingSymbol?.defaultType
+            if (defaultType == null || !defaultType.isCoroutineScopeType()) return null
         }
 
         val receiverOwnerSymbol = when (val receiverSymbol = callReceiver.symbol) {
@@ -227,7 +233,7 @@ internal class SuspiciousImplicitCoroutineScopeReceiverAccessInspection() :
             /* descriptionTemplate = */ KotlinBundle.message("inspection.suspicious.implicit.coroutine.scope.receiver.description"),
             /* highlightType = */ ProblemHighlightType.GENERIC_ERROR_OR_WARNING,
             /* onTheFly = */ onTheFly,
-            /* fixes = */ AddExplicitLabeledReceiverFix(context),
+            /* ...fixes = */ AddExplicitLabeledReceiverFix(context),
         )
     }
 }

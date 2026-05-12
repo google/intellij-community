@@ -1,8 +1,8 @@
-
 class Foo {
     companion object {
         fun foo(): Foo = Foo()
         fun bar(): Foo = Foo()
+        val baz = Foo()
     }
 }
 
@@ -15,3 +15,4 @@ fun test() {
 
 // EXIST: { "lookupString":"foo", "itemText":"Foo.foo" }
 // EXIST: { "lookupString":"bar", "itemText":"Foo.bar" }
+// EXIST: { "lookupString":"baz", "itemText":"Foo.baz" }

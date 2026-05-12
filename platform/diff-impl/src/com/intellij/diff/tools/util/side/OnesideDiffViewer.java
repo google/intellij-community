@@ -112,6 +112,7 @@ public abstract class OnesideDiffViewer<T extends EditorHolder> extends Listener
   public void uiDataSnapshot(@NotNull DataSink sink) {
     super.uiDataSnapshot(sink);
     sink.set(DiffDataKeys.CURRENT_CONTENT, getContent());
+    sink.set(DiffDataKeys.DIFF_VIEWER, this);
   }
 
   //

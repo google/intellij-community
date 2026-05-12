@@ -22,12 +22,12 @@ class SeGitTabFactory : SeTabFactory {
     val providerId = SeProviderId(SeGitProviderIdUtils.GIT_OBJECTS_ID)
     if (!SeTabDelegate.shouldShowLegacyContributorInSeparateTab(project, providerId, initEvent, session)) return null
 
-    val delegate = SeTabDelegate(project,
-                                 session,
-                                 "Git",
-                                 listOf(providerId),
-                                 initEvent,
-                                 scope)
+    val delegate = SeTabDelegate.create(project,
+                                        session,
+                                        "Git",
+                                        listOf(providerId),
+                                        initEvent,
+                                        scope)
     return SeGitTab(delegate)
   }
 }

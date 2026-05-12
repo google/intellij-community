@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.vcs.git.shared` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "shared_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "shared",
   module_name = "intellij.vcs.git.shared",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":shared_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//libraries/kotlinx/serialization/core",
@@ -33,14 +28,18 @@ jvm_library(
     "//platform/analysis-api:analysis",
     "//platform/util/text-matching",
     "//platform/platform-impl/ui",
+    "//platform/ide-core",
     "//platform/diagnostic/telemetry",
     "@lib//:opentelemetry",
     "//platform/vcs-api/shared",
+    "//platform/util:util-ui",
+    "//fleet/rhizomedb",
   ]
 )
 
 jvm_library(
   name = "shared_test_lib",
+  testonly = True,
   module_name = "intellij.vcs.git.shared",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -64,8 +63,17 @@ jvm_library(
     "//platform/analysis-api:analysis_test_lib",
     "//platform/util/text-matching:text-matching_test_lib",
     "//platform/platform-impl/ui:ui_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/diagnostic/telemetry:telemetry_test_lib",
     "//platform/vcs-api/shared:shared_test_lib",
+    "//platform/util:util-ui_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.vcs.git.shared` end
+
+### auto-generated section `iml intellij.vcs.git.shared` start
+exports_files([
+  "intellij.vcs.git.shared.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.vcs.git.shared` end

@@ -12,14 +12,18 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.UnfairTextRange;
 import com.intellij.openapi.util.text.StringUtil;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMaps;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.Objects;
 
 final class FileStatus {
   static final TextRange WHOLE_FILE_TEXT_RANGE = new UnfairTextRange(-1, -1);
@@ -40,9 +44,10 @@ final class FileStatus {
 
   FileStatus(@NotNull Project project) {
     markWholeFileDirty(project);
+    LOG.debug("new FileStatus()");
   }
 
-  int @NotNull [] getAllKnownPassIds(@NotNull Project project) {
+  static int @NotNull [] getAllKnownPassIds(@NotNull Project project) {
     IntList r = IntArrayList.of(Pass.UPDATE_ALL, Pass.EXTERNAL_TOOLS, Pass.LOCAL_INSPECTIONS, Pass.LINE_MARKERS, Pass.SLOW_LINE_MARKERS, Pass.INJECTED_GENERAL);
     TextEditorHighlightingPassRegistrarEx registrar = (TextEditorHighlightingPassRegistrarEx)TextEditorHighlightingPassRegistrar.getInstance(project);
     for (DirtyScopeTrackingHighlightingPassFactory factory : registrar.getDirtyScopeTrackingFactories()) {
@@ -76,7 +81,7 @@ final class FileStatus {
       this.defensivelyMarked.remove(passId);
     }
   }
-  void markDefensivelyMarkedForAllPasses(@NotNull Project project) {
+  void markDefensivelyForAllPasses(@NotNull Project project) {
     for (int passId : getAllKnownPassIds(project)) {
       setDefensivelyMarked(true, passId);
     }
@@ -95,8 +100,17 @@ final class FileStatus {
     return true;
   }
 
-  void combineScopesWith(@NotNull TextRange scope, @NotNull Document document) {
-    dirtyScopes.replaceAll((__, oldScope) -> combineScopes(oldScope, scope, document));
+  // return true if myFileStatusMap has changed and we need restart
+  boolean combineScopesWith(@NotNull TextRange newScope, @NotNull Document document) {
+    boolean changed = false;
+    for (ObjectIterator<Int2ObjectMap.Entry<RangeMarker>> it = Int2ObjectMaps.fastIterator(dirtyScopes); it.hasNext(); ) {
+      Int2ObjectMap.Entry<RangeMarker> e = it.next();
+      RangeMarker oldScope = e.getValue();
+      RangeMarker newMarker = combineScopes(oldScope, newScope, document);
+      changed |= !Objects.equals(oldScope, newMarker);
+      e.setValue(newMarker);
+    }
+    return changed;
   }
 
   @Nullable RangeMarker getDirtyScope(int passId) {
@@ -154,10 +168,10 @@ final class FileStatus {
   }
 
   void setDirtyScope(int passId, @Nullable RangeMarker scope) {
-    RangeMarker marker = dirtyScopes.get(passId);
-    if (marker != scope) {
-      if (marker != null) {
-        marker.dispose();
+    RangeMarker oldMarker = dirtyScopes.get(passId);
+    if (oldMarker != scope) {
+      if (oldMarker != null) {
+        oldMarker.dispose();
       }
       if (LOG.isDebugEnabled()) {
         LOG.debug("FileStatus.setDirtyScope("+passId+", "+scope+")");

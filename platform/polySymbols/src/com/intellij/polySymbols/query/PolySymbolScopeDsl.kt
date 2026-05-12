@@ -1,0 +1,319 @@
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+package com.intellij.polySymbols.query
+
+import com.intellij.model.Pointer
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.UserDataHolder
+import com.intellij.polySymbols.PolySymbol
+import com.intellij.polySymbols.PolySymbolBuilder
+import com.intellij.polySymbols.PolySymbolKind
+import com.intellij.polySymbols.PolySymbolQualifiedName
+import com.intellij.polySymbols.completion.PolySymbolCodeCompletionItem
+import com.intellij.polySymbols.query.impl.ProjectPolySymbolScopeCachedBuilderImpl
+import com.intellij.polySymbols.query.impl.PsiPolySymbolScopeCachedBuilderImpl
+import com.intellij.polySymbols.query.impl.UserDataHolderPolySymbolScopeCachedBuilderImpl
+import com.intellij.polySymbols.query.impl.buildPolySymbolScope
+import com.intellij.psi.PsiElement
+import org.jetbrains.annotations.ApiStatus
+
+/**
+ * DSL marker for the `polySymbolScopeCached` builder hierarchy. Keeps the scope
+ * and initializer receivers separate from the [com.intellij.polySymbols.PolySymbolDsl]
+ * marker so that `polySymbol { }` can still be called inside an `initialize { }` body.
+ */
+@DslMarker
+@Target(AnnotationTarget.CLASS)
+annotation class PolySymbolScopeDsl
+
+/**
+ * Build a cached [PolySymbolScope] for an arbitrary [PsiElement] holder with a
+ * non-Unit discriminator [key]. The project is derived from the element; the
+ * internal pointer is created via `element.createSmartPointer()`.
+ */
+fun <T : PsiElement, K> polySymbolScopeCached(
+  element: T,
+  key: K,
+  configure: PsiPolySymbolScopeCachedBuilder<T, K>.() -> Unit,
+): PolySymbolScope =
+  PsiPolySymbolScopeCachedBuilderImpl(element, key, configure).build()
+
+/**
+ * Build a cached [PolySymbolScope] for a [PsiElement] holder where only one
+ * scope exists per element (key = `Unit`).
+ */
+fun <T : PsiElement> polySymbolScopeCached(
+  element: T,
+  configure: PsiPolySymbolScopeCachedBuilder<T, Unit>.() -> Unit,
+): PolySymbolScope =
+  PsiPolySymbolScopeCachedBuilderImpl(element, Unit, configure).build()
+
+/**
+ * Build a project-level cached [PolySymbolScope] where only one scope exists
+ * per project (key = `Unit`). The pointer is a hard pointer to [project].
+ */
+fun polySymbolScopeCached(
+  project: Project,
+  configure: ProjectPolySymbolScopeCachedBuilder<Unit>.() -> Unit,
+): PolySymbolScope =
+  ProjectPolySymbolScopeCachedBuilderImpl(project, Unit, configure).build()
+
+/**
+ * Build a cached [PolySymbolScope] for an arbitrary [UserDataHolder]. The
+ * caller must supply the [PolySymbolScopeCachedBuilder.pointer] strategy; the
+ * impl throws [IllegalStateException] at build time if it is missing.
+ */
+fun <T : UserDataHolder, K> polySymbolScopeCached(
+  project: Project,
+  dataHolder: T,
+  key: K,
+  configure: PolySymbolScopeCachedBuilder<T, K>.() -> Unit,
+): PolySymbolScope =
+  UserDataHolderPolySymbolScopeCachedBuilderImpl(project, dataHolder, key, configure).build()
+
+/**
+ * Build a cached [PolySymbolScope] for an arbitrary [UserDataHolder] where
+ * only one scope exists per holder (key = `Unit`).
+ */
+fun <T : UserDataHolder> polySymbolScopeCached(
+  project: Project,
+  dataHolder: T,
+  configure: PolySymbolScopeCachedBuilder<T, Unit>.() -> Unit,
+): PolySymbolScope =
+  UserDataHolderPolySymbolScopeCachedBuilderImpl(project, dataHolder, Unit, configure).build()
+
+/**
+ * Build a simple, non-cached [PolySymbolScope] for a small, fixed symbol set.
+ * In case of large [PolySymbol] scopes, which should be invalidated using
+ * specific ModificationTrackers, prefer [polySymbolScopeCached].
+ */
+fun polySymbolScope(
+  configure: PolySymbolScopeBuilder.() -> Unit,
+): PolySymbolScope =
+  buildPolySymbolScope(configure)
+
+@PolySymbolScopeDsl
+@ApiStatus.NonExtendable
+interface PolySymbolScopeCachedBuilderBase<K> {
+
+  val project: Project
+
+  val key: K
+
+  /**
+   * Restrict the scope to a fixed set of [PolySymbolKind]s. Multiple calls are
+   * additive. Combined with the predicate overload via logical OR.
+   */
+  fun provides(vararg kinds: PolySymbolKind)
+
+  /**
+   * Additive collection-form overload of [provides].
+   */
+  fun provides(kinds: Collection<PolySymbolKind>)
+
+  /**
+   * Restrict the scope via a predicate. Combined with the [provides] set via
+   * logical OR; overwrites any previous predicate-form call.
+   */
+  fun provides(predicate: (PolySymbolKind) -> Boolean)
+
+  fun requiresResolve(value: Boolean)
+
+  /**
+   * Mark this scope as exclusive for a fixed set of [PolySymbolKind]s. Multiple
+   * calls are additive. Mirrors [PolySymbolScope.isExclusiveFor].
+   */
+  fun exclusiveFor(vararg kinds: PolySymbolKind)
+
+  /**
+   * Additive collection-form overload of [exclusiveFor].
+   */
+  fun exclusiveFor(kinds: Collection<PolySymbolKind>)
+
+  /**
+   * Mark this scope as exclusive via a predicate. Combined with the
+   * [exclusiveFor] set via logical OR; overwrites any previous
+   * predicate-form call.
+   */
+  fun exclusiveFor(predicate: (PolySymbolKind) -> Boolean)
+
+  fun filterCodeCompletions(filter: (kind: PolySymbolKind, items: List<PolySymbolCodeCompletionItem>) -> List<PolySymbolCodeCompletionItem>)
+
+  fun filterNameMatches(filter: (qualifiedName: PolySymbolQualifiedName, matches: List<PolySymbol>) -> List<PolySymbol>)
+}
+
+@PolySymbolScopeDsl
+@ApiStatus.NonExtendable
+interface PsiPolySymbolScopeCachedBuilder<T : PsiElement, K> : PolySymbolScopeCachedBuilderBase<K> {
+
+  val element: T
+
+  fun initialize(body: PsiPolySymbolScopeCachedInitializer<T, K>.() -> Unit)
+}
+
+@PolySymbolScopeDsl
+@ApiStatus.NonExtendable
+interface ProjectPolySymbolScopeCachedBuilder<K> : PolySymbolScopeCachedBuilderBase<K> {
+
+  fun initialize(body: ProjectPolySymbolScopeCachedInitializer<K>.() -> Unit)
+}
+
+@PolySymbolScopeDsl
+@ApiStatus.NonExtendable
+interface PolySymbolScopeCachedBuilder<T : UserDataHolder, K> : PolySymbolScopeCachedBuilderBase<K> {
+
+  val dataHolder: T
+
+  /**
+   * Required. Describes how to recreate the [dataHolder] inside the pointer
+   * returned by [PolySymbolScope.createPointer]. Must be called exactly once.
+   */
+  fun pointer(provider: (T) -> Pointer<out T>)
+
+  fun initialize(body: PolySymbolScopeCachedInitializer<T, K>.() -> Unit)
+}
+
+@PolySymbolScopeDsl
+@ApiStatus.NonExtendable
+interface PolySymbolScopeCachedInitializerBase<K> {
+
+  val project: Project
+
+  val key: K
+
+  /**
+   * Register one or more cache dependency trackers. The accumulated set must
+   * end up non-empty — use [com.intellij.openapi.util.ModificationTracker.NEVER_CHANGED]
+   * for scopes that never change.
+   */
+  fun cacheDependencies(vararg dependencies: Any)
+
+  /** Emit a single symbol to the scope. */
+  fun add(symbol: PolySymbol)
+
+  /** Emit a collection of symbols to the scope. */
+  fun addAll(symbols: Iterable<PolySymbol>)
+
+  /** Operator form of [add]. */
+  operator fun PolySymbol.unaryPlus()
+
+  /** Operator form of [addAll]. */
+  operator fun Iterable<PolySymbol>.unaryPlus()
+
+  /**
+   * Convenience: build a [PolySymbol] with the existing
+   * [com.intellij.polySymbols.polySymbol] DSL and add it to this scope in
+   * one call. Equivalent to `add(polySymbol(kind, name) { ... })`.
+   */
+  fun addSymbol(
+    kind: PolySymbolKind,
+    name: String,
+    body: PolySymbolBuilder.() -> Unit = {},
+  )
+}
+
+@PolySymbolScopeDsl
+@ApiStatus.NonExtendable
+interface ProjectPolySymbolScopeCachedInitializer<K> : PolySymbolScopeCachedInitializerBase<K>
+
+@PolySymbolScopeDsl
+@ApiStatus.NonExtendable
+interface PsiPolySymbolScopeCachedInitializer<T : PsiElement, K> : PolySymbolScopeCachedInitializerBase<K> {
+
+  val element: T
+}
+
+@PolySymbolScopeDsl
+@ApiStatus.NonExtendable
+interface PolySymbolScopeCachedInitializer<T : UserDataHolder, K> : PolySymbolScopeCachedInitializerBase<K> {
+
+  val dataHolder: T
+}
+
+/**
+ * Builder receiver for the non-cached [polySymbolScope] factory. Declare the
+ * scope's provided kinds, filters, and — via [initialize] — its symbols. The
+ * [initialize] body runs lazily on first query or [PolySymbolScope.createPointer].
+ */
+@PolySymbolScopeDsl
+@ApiStatus.NonExtendable
+interface PolySymbolScopeBuilder {
+
+  /**
+   * Restrict the scope to a fixed set of [PolySymbolKind]s. Multiple calls are
+   * additive.
+   */
+  fun provides(vararg kinds: PolySymbolKind)
+
+  /**
+   * Additive collection-form overload of [provides].
+   */
+  fun provides(kinds: Collection<PolySymbolKind>)
+
+  /**
+   * Restrict the scope via a predicate. Combined with the [provides] set via
+   * logical OR; overwrites any previous predicate-form call.
+   */
+  fun provides(predicate: (PolySymbolKind) -> Boolean)
+
+  /**
+   * Mark this scope as exclusive for a fixed set of [PolySymbolKind]s. Multiple
+   * calls are additive. Mirrors [PolySymbolScope.isExclusiveFor].
+   */
+  fun exclusiveFor(vararg kinds: PolySymbolKind)
+
+  /**
+   * Additive collection-form overload of [exclusiveFor].
+   */
+  fun exclusiveFor(kinds: Collection<PolySymbolKind>)
+
+  /**
+   * Mark this scope as exclusive via a predicate. Combined with the
+   * [exclusiveFor] set via logical OR; overwrites any previous
+   * predicate-form call.
+   */
+  fun exclusiveFor(predicate: (PolySymbolKind) -> Boolean)
+
+  fun filterCodeCompletions(filter: (kind: PolySymbolKind, items: List<PolySymbolCodeCompletionItem>) -> List<PolySymbolCodeCompletionItem>)
+
+  fun filterNameMatches(filter: (name: PolySymbolQualifiedName, matches: List<PolySymbol>) -> List<PolySymbol>)
+
+  /**
+   * Declare the scope's symbols lazily. The [body] runs the first time the
+   * scope is queried (`getSymbols`, `getMatchingSymbols`, `getCodeCompletions`)
+   * or [PolySymbolScope.createPointer] is invoked.
+   */
+  fun initialize(body: PolySymbolScopeInitializer.() -> Unit)
+}
+
+/**
+ * Receiver of the [PolySymbolScopeBuilder.initialize] body. Collects the scope's
+ * symbols. No `project`/`key`/`dataHolder` context — the non-cached scope carries
+ * none.
+ */
+@PolySymbolScopeDsl
+@ApiStatus.NonExtendable
+interface PolySymbolScopeInitializer {
+
+  /** Emit a single symbol to the scope. */
+  fun add(symbol: PolySymbol)
+
+  /** Emit a collection of symbols to the scope. */
+  fun addAll(symbols: Iterable<PolySymbol>)
+
+  /** Operator form of [add]. */
+  operator fun PolySymbol.unaryPlus()
+
+  /** Operator form of [addAll]. */
+  operator fun Iterable<PolySymbol>.unaryPlus()
+
+  /**
+   * Convenience: build a [PolySymbol] with the existing
+   * [com.intellij.polySymbols.polySymbol] DSL and add it to this scope in
+   * one call. Equivalent to `add(polySymbol(kind, name) { ... })`.
+   */
+  fun addSymbol(
+    kind: PolySymbolKind,
+    name: String,
+    body: PolySymbolBuilder.() -> Unit = {},
+  )
+}

@@ -760,7 +760,7 @@ class KotlinPositionManager(private val debugProcess: DebugProcess) : MultiReque
             if (xBreakpoint == null || xSession == null) {
                 collectPrepareRequestsWithProgress(requestor, position, isInsideProjectWithCompose, file)
             } else {
-                cancelIfExpired({ readAction { xSession.isBreakpointActive(xBreakpoint) } }) {
+                cancelIfExpired({ xSession.isBreakpointActive(xBreakpoint) }) {
                     collectPrepareRequestsWithProgress(requestor, position, isInsideProjectWithCompose, file)
                 }
             }
@@ -1043,7 +1043,7 @@ private class IrLambdaDescriptor(name: String) : Comparable<IrLambdaDescriptor> 
     }
 }
 
-private suspend fun <T> CoroutineScope.cancelIfExpired(condition: suspend () -> Boolean, action: suspend () -> T): T {
+private suspend fun <T> CoroutineScope.cancelIfExpired(condition: () -> Boolean, action: suspend () -> T): T {
     val cancellationJob = cancelWhenExpired(this, condition)
     try {
         return action()
@@ -1052,8 +1052,8 @@ private suspend fun <T> CoroutineScope.cancelIfExpired(condition: suspend () -> 
     }
 }
 
-private suspend fun cancelWhenExpired(scope: CoroutineScope, condition: suspend () -> Boolean): Job {
-    suspend fun checkExpired() {
+private fun cancelWhenExpired(scope: CoroutineScope, condition: () -> Boolean): Job {
+    fun checkExpired() {
         if (!condition()) {
             scope.cancel()
         }

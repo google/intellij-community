@@ -1,4 +1,7 @@
 <idea-plugin>
+  <dependencies>
+    <module name="intellij.platform.structureView.backend"/>
+  </dependencies>
 
   <extensions defaultExtensionNs="com.intellij">
 <!--    <codeInsight.completion.command.provider language="kotlin"-->
@@ -10,7 +13,7 @@
                                              implementationClass="com.intellij.codeInsight.completion.command.commands.PsiElementCommentByLineCompletionCommandProvider"/>
     <codeInsight.completion.command.provider language="kotlin"
                                              implementationClass="com.intellij.codeInsight.completion.command.commands.PsiElementCommentByBlockCompletionCommandProvider"/>
-    <codeInsight.completion.command.provider language="kotlin" implementationClass="com.intellij.codeInsight.completion.command.commands.ViewStructureCompletionCommandProvider" order="last"/>
+    <codeInsight.completion.command.provider language="kotlin" implementationClass="com.intellij.platform.structureView.backend.completion.commands.ViewStructureCompletionCommandProvider" order="last"/>
   </extensions>
 
 </idea-plugin>

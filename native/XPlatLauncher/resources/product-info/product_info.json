@@ -8,7 +8,6 @@
   "productVendor": "JetBrains",
   "launch": [
     {
-      "os": "Linux",
       "launcherPath": "bin/xplat.sh",
       "javaExecutablePath": "jbr/bin/java",
       "vmOptionsFilePath": "bin/xplat64.vmoptions",

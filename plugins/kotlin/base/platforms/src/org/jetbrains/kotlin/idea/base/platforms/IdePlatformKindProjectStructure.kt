@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.cli.common.arguments.CommonCompilerArguments
 import org.jetbrains.kotlin.idea.compiler.configuration.IdeKotlinVersion
 import org.jetbrains.kotlin.idea.compiler.configuration.Kotlin2JsCompilerArgumentsHolder
 import org.jetbrains.kotlin.idea.compiler.configuration.Kotlin2JvmCompilerArgumentsHolder
+import org.jetbrains.kotlin.idea.compiler.configuration.KotlinWasmCompilerArgumentsHolder
 import org.jetbrains.kotlin.platform.CommonPlatforms
 import org.jetbrains.kotlin.platform.IdePlatformKind
 import org.jetbrains.kotlin.platform.impl.CommonIdePlatformKind
@@ -35,7 +36,7 @@ class IdePlatformKindProjectStructure(private val project: Project) {
             is CommonIdePlatformKind -> null
             is JvmIdePlatformKind -> Kotlin2JvmCompilerArgumentsHolder.getInstance(project).settings
             is JsIdePlatformKind -> Kotlin2JsCompilerArgumentsHolder.getInstance(project).settings
-            is WasmIdePlatformKind -> Kotlin2JsCompilerArgumentsHolder.getInstance(project).settings
+            is WasmIdePlatformKind -> KotlinWasmCompilerArgumentsHolder.getInstance(project).settings
             is NativeIdePlatformKind -> null
             else -> error("Unsupported platform kind: $platformKind")
         }
@@ -44,15 +45,20 @@ class IdePlatformKindProjectStructure(private val project: Project) {
     fun getLibraryVersionProvider(platformKind: IdePlatformKind): (Library) -> IdeKotlinVersion? {
         return when (platformKind) {
             is CommonIdePlatformKind -> { library ->
-                getLibraryKlibVersion(library, KOTLIN_STDLIB_COMMON_KLIB_PATTERN) ?:
-                getLibraryJarVersion(library, PathUtil.KOTLIN_STDLIB_COMMON_JAR_PATTERN)
+                getLibraryKlibVersion(library, KOTLIN_STDLIB_COMMON_KLIB_PATTERN) ?: getLibraryJarVersion(
+                    library,
+                    PathUtil.KOTLIN_STDLIB_COMMON_JAR_PATTERN
+                )
             }
+
             is JvmIdePlatformKind -> { library ->
                 getLibraryJarVersion(library, PathUtil.KOTLIN_RUNTIME_JAR_PATTERN)
             }
+
             is JsIdePlatformKind -> { library ->
                 KotlinJavaScriptStdlibDetectorFacility.getStdlibVersion(project, library)
             }
+
             is WasmIdePlatformKind, is NativeIdePlatformKind -> { _ -> null }
             else -> error("Unsupported platform kind: $platformKind")
         }

@@ -6,7 +6,6 @@ import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.java.JavaBundle;
 import com.intellij.pom.java.LanguageLevel;
 import com.intellij.psi.util.PsiUtil;
-import com.intellij.testFramework.IdeaTestUtil;
 import com.intellij.testFramework.IndexingTestUtil;
 import com.intellij.testFramework.builders.JavaModuleFixtureBuilder;
 import com.intellij.testFramework.fixtures.JavaCodeInsightFixtureTestCase;
@@ -20,7 +19,7 @@ public class IncreaseLanguageLevelFixTest extends JavaCodeInsightFixtureTestCase
   @Override
   protected void tuneFixture(JavaModuleFixtureBuilder moduleBuilder) {
     moduleBuilder.setLanguageLevel(LanguageLevel.JDK_1_6);
-    moduleBuilder.addJdk(IdeaTestUtil.getMockJdk18Path().getPath());
+    moduleBuilder.addJdkVersion(LanguageLevel.JDK_1_8);
   }
 
   public void testLambda() {

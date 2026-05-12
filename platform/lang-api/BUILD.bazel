@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.lang` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "lang_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "lang",
   module_name = "intellij.platform.lang",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":lang_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
@@ -32,24 +27,32 @@ jvm_library(
     "//platform/core-ui",
     "//platform/code-style-api:codeStyle",
     "//platform/platform-util-io:ide-util-io",
+    "//platform/ide-core",
     "//platform/execution",
     "//platform/refactoring",
     "//platform/forms_rt:java-guiForms-rt",
     "//platform/workspace/jps",
     "//platform/backend/workspace",
     "//platform/workspace/storage",
+    "//libraries/fastutil",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
   ],
-  exports = ["//platform/platform-api:ide"]
+  exports = [
+    "//platform/platform-api:ide",
+    "@lib//:kotlin-stdlib",
+  ]
 )
 
 jvm_library(
   name = "lang_test_lib",
+  testonly = True,
   module_name = "intellij.platform.lang",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   exports = [
     "//platform/platform-api:ide",
     "//platform/platform-api:ide_test_lib",
+    "@lib//:kotlin-stdlib",
   ],
   runtime_deps = [
     ":lang",
@@ -74,12 +77,21 @@ jvm_library(
     "//platform/core-ui:core-ui_test_lib",
     "//platform/code-style-api:codeStyle_test_lib",
     "//platform/platform-util-io:ide-util-io_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/execution:execution_test_lib",
     "//platform/refactoring:refactoring_test_lib",
     "//platform/forms_rt:java-guiForms-rt_test_lib",
     "//platform/workspace/jps:jps_test_lib",
     "//platform/backend/workspace:workspace_test_lib",
     "//platform/workspace/storage:storage_test_lib",
+    "//libraries/fastutil:fastutil_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.lang` end
+
+### auto-generated section `iml intellij.platform.lang` start
+exports_files([
+  "intellij.platform.lang.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.lang` end

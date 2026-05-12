@@ -43,4 +43,10 @@ class KotlinConditionsCoverageTest : AbstractPsiConditionsCoverageTest() {
 
     @Test
     fun `test kotlin jacoco line breaks`() = assertHints("KtLineBreaks", false)
+
+    @Test
+    fun `test kotlin special constructs`() = assertHints("KtSpecialConstructs", true)
+
+    @Test
+    fun `test kotlin jacoco special constructs`() = assertHints("KtSpecialConstructs", false)
 }

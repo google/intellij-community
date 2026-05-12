@@ -2,7 +2,7 @@
 package com.siyeh.ig.fixes.bugs;
 
 import com.intellij.codeInspection.CommonQuickFixBundle;
-import com.intellij.testFramework.IdeaTestUtil;
+import com.intellij.pom.java.LanguageLevel;
 import com.intellij.testFramework.builders.JavaModuleFixtureBuilder;
 import com.siyeh.ig.IGQuickFixesTestCase;
 import com.siyeh.ig.bugs.ClassNewInstanceInspection;
@@ -29,6 +29,6 @@ public class ClassNewInstanceFixTest extends IGQuickFixesTestCase {
   @Override
   protected void tuneFixture(JavaModuleFixtureBuilder builder) throws Exception {
     super.tuneFixture(builder);
-    builder.addJdk(IdeaTestUtil.getMockJdk18Path().getPath());
+    builder.addJdkVersion(LanguageLevel.JDK_1_8);
   }
 }

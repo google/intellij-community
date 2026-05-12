@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.updateSettings.impl
 
 import com.intellij.ide.IdeBundle
@@ -604,10 +604,8 @@ object UpdateChecker {
       PlatformUpdates.Loaded(newBuild, channel, patches)
     }
     else {
-      UpdateStrategy(
-        currentBuild,
-        parseUpdateData(updateDataText, productCode),
-      ).checkForUpdates()
+      UpdateStrategy(currentBuild, product = parseUpdateData(updateDataText, productCode), UpdateSettings.getInstance())
+        .checkForUpdates()
     }
 
     val dialog = when (checkForUpdateResult) {

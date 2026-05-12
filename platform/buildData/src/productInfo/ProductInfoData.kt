@@ -13,12 +13,12 @@ import java.time.format.DateTimeFormatter
 /**
  * Describes the product-info file containing meta-information about a product installation.
  * The schema of the file is also described in the `product-info.schema.json` file, so it must be kept consistent with it.
- * 
+ *
  * Data from product-info.json is used from code inside the IDE it's bundled with (e.g., XPlatLauncher), and such internal clients may
  * rely on the presence of properties added in the current version.
  * Also, it's used by external tools and from other IDE versions, so the schema and deserialization logic must be backward compatible.
  * It means that all newly added properties must be optional, and default values must be provided for them in the primary constructor.
- * If the new version always specifies values for these properties in the product-info.json, they can be marked as non-null in 
+ * If the new version always specifies values for these properties in the product-info.json, they can be marked as non-null in
  * [the factory method][ProductInfoData.create] to state that they are required in the current version and allow internal clients relying
  * on their presence.
  */
@@ -42,7 +42,7 @@ class ProductInfoData private constructor(
   val modules: List<String> = emptyList(),  // actually, it is not modules but plugin aliases
   val fileExtensions: List<String> = emptyList(),
   val flavors: List<ProductFlavorData> = emptyList(),
-  
+
   // not used by the launcher; must be at the end
   @ApiStatus.Internal
   @JvmField val layout: List<ProductInfoLayoutItem> = emptyList(),
@@ -50,8 +50,8 @@ class ProductInfoData private constructor(
   companion object {
     /**
      * Creates an instance of [ProductInfoData] for the current version.
-     * Some properties that are nullable in the primary constructor are deliberately marked as not-null in this function to state that they
-     * are required in the current version, and internal clients may rely on their presence.
+     * Some properties that are nullable in the primary constructor are deliberately marked as not-null in this function
+     * to state that they are required in the current version, and internal clients may rely on their presence.
      */
     @ApiStatus.Internal
     fun create(
@@ -87,6 +87,7 @@ class ProductFlavorData @ApiStatus.Internal constructor(@JvmField val id: String
  * Describes 'launch' section in [product-info.json][ProductInfoData] file.
  */
 @Serializable
+@Suppress("unused")
 class ProductInfoLaunchData private constructor(
   val os: String,
   val arch: String? = null,
@@ -97,13 +98,14 @@ class ProductInfoLaunchData private constructor(
   val bootClassPathJarNames: List<String> = emptyList(),
   val additionalJvmArguments: List<String> = emptyList(),
   val mainClass: String? = null,
+  val stdioRedirectArg: String? = null,
   val customCommands: List<CustomCommandLaunchData> = emptyList(),
 ) {
   companion object {
     /**
      * Creates an instance of [ProductInfoLaunchData] for the current version.
-     * Some properties that are nullable in the primary constructor are deliberately marked as not-null in this function to state that they
-     * are required in the current version, and internal clients may rely on their presence.
+     * Some properties that are nullable in the primary constructor are deliberately marked as not-null in this function
+     * to state that they are required in the current version, and internal clients may rely on their presence.
      */
     @ApiStatus.Internal
     @JvmStatic
@@ -116,11 +118,12 @@ class ProductInfoLaunchData private constructor(
       bootClassPathJarNames: List<String>,
       additionalJvmArguments: List<String>,
       mainClass: String,
+      stdioRedirectArg: String? = null,
       startupWmClass: String? = null,
       customCommands: List<CustomCommandLaunchData> = emptyList(),
     ): ProductInfoLaunchData = ProductInfoLaunchData(
       os, arch, launcherPath, javaExecutablePath, vmOptionsFilePath, startupWmClass, bootClassPathJarNames, additionalJvmArguments,
-      mainClass, customCommands
+      mainClass, stdioRedirectArg, customCommands
     )
   }
 }
@@ -133,6 +136,7 @@ class CustomCommandLaunchData @ApiStatus.Internal constructor(
   @JvmField val bootClassPathJarNames: List<String> = emptyList(),
   @JvmField val additionalJvmArguments: List<String> = emptyList(),
   @JvmField val mainClass: String? = null,
+  @JvmField val stdioRedirectArg: String? = null,
   @JvmField val envVarBaseName: String? = null,
   @JvmField val dataDirectoryName: String? = null,
 )

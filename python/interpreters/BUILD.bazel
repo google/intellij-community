@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.python.community.interpreters` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "interpreters_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "interpreters",
   module_name = "intellij.python.community.interpreters",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":interpreters_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//python/services/shared",
@@ -34,6 +29,7 @@ jvm_library(
 
 jvm_library(
   name = "interpreters_test_lib",
+  testonly = True,
   module_name = "intellij.python.community.interpreters",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -67,3 +63,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.python.community.interpreters` end
+
+### auto-generated section `iml intellij.python.community.interpreters` start
+exports_files([
+  "intellij.python.community.interpreters.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.python.community.interpreters` end

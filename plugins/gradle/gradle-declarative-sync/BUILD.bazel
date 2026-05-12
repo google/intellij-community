@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.gradle.declarativeSync` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "declarativeSync_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "declarativeSync",
   module_name = "intellij.gradle.declarativeSync",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":declarativeSync_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:jetbrains-annotations",
@@ -33,6 +28,7 @@ jvm_library(
 
 jvm_library(
   name = "declarativeSync_test_lib",
+  testonly = True,
   module_name = "intellij.gradle.declarativeSync",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -54,9 +50,16 @@ jvm_library(
 )
 ### auto-generated section `build intellij.gradle.declarativeSync` end
 
+### auto-generated section `iml intellij.gradle.declarativeSync` start
+exports_files([
+  "intellij.gradle.declarativeSync.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.gradle.declarativeSync` end
+
 ### auto-generated section `build intellij.gradle.declarativeSync.tests` start
 jvm_library(
   name = "declarativeSync-tests",
+  module_name = "intellij.gradle.declarativeSync.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = ["@lib//:kotlin-stdlib"]
@@ -64,6 +67,7 @@ jvm_library(
 
 jvm_library(
   name = "declarativeSync-tests_test_lib",
+  testonly = True,
   module_name = "intellij.gradle.declarativeSync.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["testSources/**/*.kt", "testSources/**/*.java", "testSources/**/*.form"], allow_empty = True),
@@ -111,6 +115,12 @@ jvm_library(
   runtime_deps = [":declarativeSync-tests"]
 )
 ### auto-generated section `build intellij.gradle.declarativeSync.tests` end
+
+### auto-generated section `iml intellij.gradle.declarativeSync.tests` start
+exports_files([
+  "intellij.gradle.declarativeSync.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.gradle.declarativeSync.tests` end
 
 ### auto-generated section `test intellij.gradle.declarativeSync.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

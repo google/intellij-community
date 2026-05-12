@@ -55,6 +55,7 @@ public abstract class JavaModuleFixtureBuilderImpl<T extends ModuleFixture> exte
   private final List<MavenLib> myMavenLibraries = new ArrayList<>();
 
   private String myJdk;
+  private @NotNull LanguageLevel myJdkVersion = LanguageLevel.JDK_1_7;
   private MockJdkLevel myMockJdkLevel = MockJdkLevel.jdk14;
   private LanguageLevel myLanguageLevel;
 
@@ -124,6 +125,15 @@ public abstract class JavaModuleFixtureBuilderImpl<T extends ModuleFixture> exte
   }
 
   @Override
+  public @NotNull JavaModuleFixtureBuilder addJdkVersion(@NotNull LanguageLevel jdkVersion) {
+    if (myJdk != null) {
+      throw new IllegalStateException("Cannot set JDK version after JDK path has been set");
+    }
+    myJdkVersion = jdkVersion;
+    return this;
+  }
+
+  @Override
   public void setMockJdkLevel(final @NotNull MockJdkLevel level) {
     myMockJdkLevel = level;
   }
@@ -183,7 +193,7 @@ public abstract class JavaModuleFixtureBuilderImpl<T extends ModuleFixture> exte
         }
       }
       else {
-        jdk = IdeaTestUtil.getMockJdk17();
+        jdk = IdeaTestUtil.getMockJdk(myJdkVersion);
       }
 
       registerJdk(jdk, module.getProject());

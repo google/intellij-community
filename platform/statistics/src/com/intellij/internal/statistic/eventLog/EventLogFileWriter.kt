@@ -2,6 +2,7 @@
 package com.intellij.internal.statistic.eventLog
 
 import com.intellij.openapi.util.text.StringUtil
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
 import java.io.BufferedOutputStream
 import java.io.File
@@ -25,8 +26,19 @@ open class EventLogFileWriter(
   private val dir: Path,
   private val maxFileSizeInBytes: Int,
   private val logFilePathProvider: (dir: Path) -> File,
-  private val maxFileAge: Duration = 7.days
-) : AutoCloseable {
+  private val maxFileAge: Duration = 7.days,
+  ) : AutoCloseable {
+  
+  @ApiStatus.Internal
+  constructor(
+    dir: Path,
+    maxFileSizeInBytes: Int,
+    logFilePathProvider: (dir: Path) -> File,
+    maxFileAge: Duration,
+    eventLogSystemCollector: EventLogSystemCollector?,
+  ) : this(dir, maxFileSizeInBytes, logFilePathProvider, maxFileAge) {
+    this.eventLogSystemCollector = eventLogSystemCollector
+  }
   private val lock = Any() // protects all mutable fields
   private val currentFileData: FileData by lazy { FileData(dir, logFilePathProvider) }
   private var closed = false
@@ -36,12 +48,17 @@ open class EventLogFileWriter(
     if (files == null || files.isEmpty()) emptyList() else files.toList()
   }
   private var lastCriticalFailureTimestamp = -1L
-
+  private var eventsCount: Int = 0
+  private var eventLogSystemCollector: EventLogSystemCollector? = null
   @TestOnly
-  constructor(dir: Path,
-              maxFileSize: Int,
-              logFilePathProvider: (dir: Path) -> File,
-              logFilesSupplier: Supplier<List<File>>) : this(dir, maxFileSize, logFilePathProvider) {
+  @ApiStatus.Internal
+  constructor(
+    dir: Path,
+    maxFileSize: Int,
+    logFilePathProvider: (dir: Path) -> File,
+    logFilesSupplier: Supplier<List<File>>,
+    eventLogSystemCollector: EventLogSystemCollector? = null,
+  ) : this(dir, maxFileSize, logFilePathProvider, 7.days, eventLogSystemCollector) {
     this.logFilesSupplier = logFilesSupplier
   }
 
@@ -61,7 +78,10 @@ open class EventLogFileWriter(
         val outputStream = currentFileData.getCountingOutputStream()
         outputStream.write(text.toByteArray())
         outputStream.write('\n'.code)
+        eventsCount++
         if (outputStream.bytesWritten > maxFileSizeInBytes) {
+          eventLogSystemCollector?.logFileMetricsCalculated(outputStream.bytesWritten, eventsCount)
+          eventsCount = 0
           rollOver()
           cleanUpOldFiles()
         }
@@ -116,12 +136,14 @@ open class EventLogFileWriter(
       }
       val activeLog = getActiveLogName()
       var oldestFile: Long = -1
+      var failedDeletingFiles = 0
       for (file in logs) {
         if (StringUtil.equals(file.name, activeLog)) continue
         val lastModified = file.lastModified()
         if (lastModified < oldestAcceptable) {
           if (!file.delete()) {
             System.err.println("Failed deleting old FUS file $file")
+            failedDeletingFiles ++
           }
         }
         else if (lastModified < oldestFile || oldestFile == -1L) {
@@ -129,18 +151,22 @@ open class EventLogFileWriter(
         }
       }
       oldestExistingFile = oldestFile
+      eventLogSystemCollector?.logDeletedFilesCalculated(logs.size, logs.size - failedDeletingFiles, failedDeletingFiles)
     }
   }
 
   fun cleanUp() {
     synchronized(lock) {
+      var failedDeletingFiles = 0
       currentFileData.close()
       val files = logFilesSupplier.get()
       for (file in files) {
         if (!file.delete()) {
           System.err.println("Failed deleting old FUS file $file")
+          failedDeletingFiles ++
         }
       }
+      eventLogSystemCollector?.logDeletedFilesCalculated(files.size, files.size - failedDeletingFiles, failedDeletingFiles)
       rollOver()
     }
   }

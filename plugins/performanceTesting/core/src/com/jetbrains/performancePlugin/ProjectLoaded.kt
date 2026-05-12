@@ -3,7 +3,6 @@
 
 package com.jetbrains.performancePlugin
 
-import com.intellij.diagnostic.AbstractMessage
 import com.intellij.diagnostic.MessagePool
 import com.intellij.diagnostic.ThreadDumper
 import com.intellij.ide.AppLifecycleListener
@@ -18,7 +17,6 @@ import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.components.service
 import com.intellij.openapi.components.serviceAsync
-import com.intellij.openapi.diagnostic.Attachment
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.extensions.ExtensionNotApplicableException
 import com.intellij.openapi.progress.impl.CoreProgressManager
@@ -56,7 +54,6 @@ import java.io.IOException
 import java.net.ConnectException
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardOpenOption
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.function.Function
@@ -221,8 +218,12 @@ class ProjectLoaded : ApplicationInitializedListener {
     // TODO: Under flag since a proper solution should be implemented in the platform later
     if (SystemProperties.getBooleanProperty("STARTER_TESTS_SUPPORT_TARGETS", false)
         || System.getenv("STARTER_TESTS_SUPPORT_TARGETS").toBoolean()) {
-      IntegrationTestApplicationLoadListener.projectPathFromCommandLine?.run {
-        EelInitialization.runEelInitialization(this)
+      IntegrationTestApplicationLoadListener.data?.let {
+        EelInitialization.runEelInitialization(it.projectPath)
+        // Re-evaluate AppMode flags: the first setFlags call in Main.kt runs before EPs are loaded,
+        // so MultiRoutingFileSystemBackend (Docker/WSL) isn't registered yet and mayHappenToBeAFile
+        // can't resolve remote paths, incorrectly setting isLightEdit=true.
+        AppMode.setFlags(it.args)
       }
     }
 
@@ -242,7 +243,8 @@ class ProjectLoaded : ApplicationInitializedListener {
       })
     }
     if (ApplicationManagerEx.isInIntegrationTest() && AppMode.isHeadless() && AppMode.isCommandLine()) {
-      MessagePool.getInstance().addListener { reportErrorsFromMessagePool() }
+      MessagePool.getInstance().addAdvisor(toErrorDirReporter)
+      sweepExistingErrors()
       LOG.info("Error watcher has started in headless mode")
     }
   }
@@ -257,13 +259,14 @@ class ProjectLoaded : ApplicationInitializedListener {
     override fun appFrameCreated(commandLineArgs: List<String>) {
       val messagePool = MessagePool.getInstance()
       LOG.info("Error watcher has started")
-      messagePool.addListener { reportErrorsFromMessagePool() }
+      messagePool.addAdvisor(toErrorDirReporter)
+      @Suppress("RAW_RUN_BLOCKING")
+      runBlocking { sweepExistingErrors() }
     }
 
     override fun appClosing() {
       ProjectLoadedService.screenshotJobs.forEach { it.cancel() }
       PerformanceTestSpan.endSpan()
-      reportErrorsFromMessagePool()
     }
   }
 
@@ -278,30 +281,6 @@ internal fun runPerformanceScript(project: Project?, script: String?, mustExitOn
   val scriptCallback = playback.run()
   CommandsRunner.setActionCallback(scriptCallback)
   registerOnFinishRunnables(scriptCallback, mustExitOnFailure)
-}
-
-internal fun generifyErrorMessage(originalMessage: String): String {
-  return originalMessage // text@3ba5aac, text => text<ID>, text
-    .replace("[$@#][A-Za-z0-9-_]+".toRegex(), "<ID>") // java-design-patterns-master.db451f59 => java-design-patterns-master.<HASH>
-    .replace("[.]([A-Za-z]+[0-9]|[0-9]+[A-Za-z])[A-Za-z0-9]*".toRegex(), ".<HASH>") // 0x01 => <HEX>
-    .replace("0x[0-9a-fA-F]+".toRegex(), "<HEX>") // text1234text => text<NUM>text
-    .replace("[0-9]+".toRegex(), "<NUM>")
-}
-
-fun reportErrorsFromMessagePool() {
-  val messagePool = MessagePool.getInstance()
-  val ideErrors = messagePool.getFatalErrors(false, true)
-  for (message in ideErrors) {
-    try {
-      reportScriptError(message)
-    }
-    catch (e: IOException) {
-      LOG.error(e)
-    }
-    finally {
-      message.isRead = true
-    }
-  }
 }
 
 private const val INDEXING_PROFILER_PREFIX = "%%profileIndexing"
@@ -328,104 +307,6 @@ private fun initializeProfilerSettingsForIndexing(): Pair<String, List<String>>?
     ApplicationManagerEx.getApplicationEx().exit(true, true, 1)
   }
   return null
-}
-
-@Throws(IOException::class)
-private fun reportScriptError(errorMessage: AbstractMessage) {
-  val throwable = errorMessage.throwable
-  var cause: Throwable? = throwable
-  var causeMessage: String? = ""
-  val maxTestNameLength = 250
-  var testName: String? = throwable.javaClass.name + ": " + throwable.message
-  while (cause!!.cause != null) {
-    cause = cause.cause
-    causeMessage = cause?.message?.let { "${cause.javaClass.name}: $it" } ?: causeMessage
-  }
-  if (!causeMessage.isNullOrEmpty()) {
-    testName = causeMessage
-  }
-  if (causeMessage.isNullOrEmpty()) {
-    causeMessage = errorMessage.message
-    if (causeMessage.isNullOrEmpty()) {
-      val throwableMessage = getNonEmptyThrowableMessage(throwable)
-      val index = throwableMessage.indexOf("\tat ")
-      causeMessage = if (index == -1) throwableMessage else throwableMessage.take(index)
-    }
-  }
-  val scriptErrorsDir = Path.of(PathManager.getLogPath(), "errors")
-  Files.createDirectories(scriptErrorsDir)
-  Files.walk(scriptErrorsDir).use { stream ->
-    val finalCauseMessage = causeMessage
-    val isDuplicated = stream
-      .filter { path -> path.fileName.toString() == "message.txt" }
-      .anyMatch { path ->
-        try {
-          return@anyMatch Files.readString(path) == finalCauseMessage
-        }
-        catch (e: IOException) {
-          LOG.error(e.message)
-          return@anyMatch false
-        }
-      }
-    if (isDuplicated) {
-      return
-    }
-  }
-
-  for (i in 1..999) {
-    val errorDir = scriptErrorsDir.resolve("error-$i")
-    if (Files.exists(errorDir)) {
-      continue
-    }
-
-    Files.createDirectories(errorDir)
-    Files.writeString(errorDir.resolve("message.txt"), causeMessage)
-    Files.writeString(errorDir.resolve("testName.txt"), (testName ?: causeMessage).take(maxTestNameLength))
-    Files.writeString(errorDir.resolve("stacktrace.txt"), errorMessage.throwableText)
-    val attachments = errorMessage.allAttachments
-    val nameConflicts = attachments.groupBy { it.name }.filter { it.value.size > 1 }.keys
-
-    for (j in attachments.indices) {
-      val attachment = attachments[j]
-      val fileName = if (attachment.name in nameConflicts) {
-        addSuffixBeforeExtension(attachment.name, "-$j")
-      } else {
-        attachment.name
-      }
-      writeAttachmentToErrorDir(attachment, errorDir.resolve(fileName))
-    }
-    return
-  }
-
-  LOG.error("Too many errors have been reported during script execution. See $scriptErrorsDir")
-}
-
-private fun addSuffixBeforeExtension(fileName: String, suffix: String): String {
-  val lastDotIndex = fileName.lastIndexOf('.')
-  return if (lastDotIndex != -1) {
-    fileName.take(lastDotIndex) + suffix + fileName.substring(lastDotIndex)
-  } else {
-    fileName + suffix
-  }
-}
-
-private fun writeAttachmentToErrorDir(attachment: Attachment, path: Path) {
-  try {
-    Files.writeString(path, attachment.displayText, StandardOpenOption.APPEND, StandardOpenOption.CREATE)
-    Files.writeString(path, System.lineSeparator(), StandardOpenOption.APPEND, StandardOpenOption.CREATE)
-  }
-  catch (e: Exception) {
-    LOG.warn("Failed to write attachment `display text`", e)
-  }
-}
-
-private fun getNonEmptyThrowableMessage(throwable: Throwable): String {
-  if (throwable.message != null && !throwable.message!!.isEmpty()) {
-    return throwable.message!!
-  }
-  else {
-    return throwable.javaClass.name
-  }
 }
 
 private fun runScriptFromFile(project: Project) {

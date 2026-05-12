@@ -91,19 +91,21 @@ internal class GitInMemoryInteractiveRebaseProcess(
     val SUPPORTED_ACTIONS = actionProcessors.keys
 
     private object PickActionProcessor : RebaseActionProcessor {
-      override fun process(objectRepo: GitObjectRepository, baseCommit: GitObject.Commit?, commitToRebase: GitObject.Commit, entry: GitRebaseEntry): GitObject.Commit {
+      override fun process(objectRepo: GitObjectRepository, baseCommit: GitObject.Commit?, commitToRebase: GitObject.Commit, entry: GitRebaseEntry): GitObject.Commit? {
         if (commitToRebase.parentsOids.singleOrNull() == baseCommit?.oid) {
           return commitToRebase
         }
-        return objectRepo.findCommit(objectRepo.rebaseCommit(commitToRebase, baseCommit))
+        val newOid = objectRepo.rebaseCommit(commitToRebase, baseCommit) ?: return baseCommit
+        return objectRepo.findCommit(newOid)
       }
     }
 
     private object RewordActionProcessor : RebaseActionProcessor {
-      override fun process(objectRepo: GitObjectRepository, baseCommit: GitObject.Commit?, commitToRebase: GitObject.Commit, entry: GitRebaseEntry): GitObject.Commit {
+      override fun process(objectRepo: GitObjectRepository, baseCommit: GitObject.Commit?, commitToRebase: GitObject.Commit, entry: GitRebaseEntry): GitObject.Commit? {
         val newMessage = (entry as GitRebaseRewordEntryWithMessage).newMessage
         val rewordedCommit = objectRepo.commitTreeWithOverrides(commitToRebase, message = newMessage.toByteArray())
-        return objectRepo.findCommit(objectRepo.rebaseCommit(objectRepo.findCommit(rewordedCommit), baseCommit))
+        val newOid = objectRepo.rebaseCommit(objectRepo.findCommit(rewordedCommit), baseCommit) ?: return baseCommit
+        return objectRepo.findCommit(newOid)
       }
     }
 
@@ -163,6 +165,7 @@ internal suspend fun performInMemoryRebase(
   objectRepo: GitObjectRepository,
   entries: List<GitRebaseEntry>,
   model: GitRebaseTodoModel<out GitRebaseEntry>,
+  origin: InMemoryRebaseOrigin,
   notifySuccess: Boolean = true,
 ): GitCommitEditingOperationResult {
   if (!isInMemoryRebaseSupported(objectRepo.repository)) {
@@ -172,24 +175,26 @@ internal suspend fun performInMemoryRebase(
 
   val rebaseData = createRebaseData(model, entries, objectRepo.repository, showFailureNotification)
                    ?: return GitCommitEditingOperationResult.Incomplete
-  val rebaseActivity = GitOperationsCollector.startInMemoryInteractiveRebase(objectRepo.repository.project)
+  val rebaseActivity = GitOperationsCollector.startInMemoryInteractiveRebase(objectRepo.repository.project, origin)
   val operationResult = executeRebase(objectRepo, rebaseData, showFailureNotification, rebaseActivity)
-                        ?: return GitCommitEditingOperationResult.Incomplete
 
-  if (operationResult is GitCommitEditingOperationResult.Complete) {
-    GitOperationsCollector.endInMemoryInteractiveRebase(rebaseActivity, InMemoryRebaseResult.SUCCESS)
-    if (notifySuccess) {
-      operationResult.notifySuccess(
-        GitBundle.message("in.memory.rebase.log.interactive.action.notification.successful"),
-        null,
-        GitBundle.message("in.memory.rebase.log.interactive.action.progress.indicator.undo.title"),
-        GitBundle.message("in.memory.rebase.log.interactive.action.notification.undo.not.allowed.title"),
-        GitBundle.message("in.memory.rebase.log.interactive.action.notification.undo.failed.title")
-      )
+  when (operationResult) {
+    is GitCommitEditingOperationResult.Complete -> {
+      GitOperationsCollector.endInMemoryInteractiveRebase(rebaseActivity, InMemoryRebaseResult.SUCCESS)
+      if (notifySuccess) {
+        operationResult.notifySuccess(
+          GitBundle.message("in.memory.rebase.log.interactive.action.notification.successful"),
+          null,
+          GitBundle.message("in.memory.rebase.log.interactive.action.progress.indicator.undo.title"),
+          GitBundle.message("in.memory.rebase.log.interactive.action.notification.undo.not.allowed.title"),
+          GitBundle.message("in.memory.rebase.log.interactive.action.notification.undo.failed.title")
+        )
+      }
     }
-  }
-  else {
-    GitOperationsCollector.endInMemoryInteractiveRebase(rebaseActivity, InMemoryRebaseResult.ERROR)
+    is GitCommitEditingOperationResult.Conflict ->
+      GitOperationsCollector.endInMemoryInteractiveRebase(rebaseActivity, InMemoryRebaseResult.CONFLICT)
+    is GitCommitEditingOperationResult.Incomplete ->
+      GitOperationsCollector.endInMemoryInteractiveRebase(rebaseActivity, InMemoryRebaseResult.ERROR)
   }
   return operationResult
 }
@@ -226,16 +231,15 @@ private suspend fun executeRebase(
   rebaseData: GitInMemoryRebaseData,
   showFailureNotification: Boolean,
   rebaseActivity: StructuredIdeActivity,
-): GitCommitEditingOperationResult? {
+): GitCommitEditingOperationResult {
   return try {
     GitInMemoryInteractiveRebaseProcess(objectRepo, rebaseData).execute(showFailureNotification)
   }
   catch (e: MergeConflictException) {
-    GitOperationsCollector.endInMemoryInteractiveRebase(rebaseActivity, InMemoryRebaseResult.CONFLICT)
     if (showFailureNotification) {
       notifyMergeConflict(objectRepo.repository, e)
     }
-    null
+    GitCommitEditingOperationResult.Conflict(e.description)
   }
   catch (e: CancellationException) {
     GitOperationsCollector.endInMemoryInteractiveRebase(rebaseActivity, InMemoryRebaseResult.CANCELED)
@@ -335,4 +339,11 @@ internal enum class InMemoryRebaseResult {
   CONFLICT,
   CANCELED,
   ERROR
+}
+
+internal enum class InMemoryRebaseOrigin {
+  INTERACTIVE_REBASE,
+  SQUASH,
+  DROP,
+  AMEND_COMMIT
 }

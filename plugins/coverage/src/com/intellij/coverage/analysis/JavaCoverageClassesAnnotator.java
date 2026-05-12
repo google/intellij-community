@@ -16,9 +16,10 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.rt.coverage.data.ProjectData;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.containers.ContainerUtil;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.File;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -33,6 +34,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+@ApiStatus.Internal
 public class JavaCoverageClassesAnnotator extends JavaCoverageClassesEnumerator {
   private static final Logger LOG = Logger.getInstance(JavaCoverageClassesAnnotator.class);
 
@@ -92,12 +94,12 @@ public class JavaCoverageClassesAnnotator extends JavaCoverageClassesEnumerator 
       collector.addPackage(packageFQName, info, true);
 
       while (!packageFQName.isEmpty()) {
-        packages.computeIfAbsent(packageFQName, k -> new PackageAnnotator.PackageCoverageInfo()).append(info);
+        packages.computeIfAbsent(packageFQName, _ -> new PackageAnnotator.PackageCoverageInfo()).append(info);
         final int index = packageFQName.lastIndexOf('.');
         if (index < 0) break;
         packageFQName = packageFQName.substring(0, index);
       }
-      packages.computeIfAbsent("", k -> new PackageAnnotator.PackageCoverageInfo()).append(info);
+      packages.computeIfAbsent("", _ -> new PackageAnnotator.PackageCoverageInfo()).append(info);
     }
     for (Map.Entry<String, PackageAnnotator.PackageCoverageInfo> entry : packages.entrySet()) {
       collector.addPackage(entry.getKey(), entry.getValue(), false);
@@ -151,7 +153,7 @@ public class JavaCoverageClassesAnnotator extends JavaCoverageClassesEnumerator 
 
   @Override
   protected void visitClassFiles(final String toplevelClassSrcFQName,
-                                 final List<File> files,
+                                 final List<Path> files,
                                  final String packageVMName) {
 
     if (isClassExcluded(toplevelClassSrcFQName)) return;
@@ -214,15 +216,15 @@ public class JavaCoverageClassesAnnotator extends JavaCoverageClassesEnumerator 
   }
 
   private PackageAnnotator.AtomicPackageCoverageInfo getOrCreateFlattenPackage(@NotNull String packageName) {
-    return myFlattenPackages.computeIfAbsent(packageName, k -> new PackageAnnotator.AtomicPackageCoverageInfo());
+    return myFlattenPackages.computeIfAbsent(packageName, _ -> new PackageAnnotator.AtomicPackageCoverageInfo());
   }
 
   private PackageAnnotator.AtomicPackageCoverageInfo getOrCreateFlattenDirectory(@NotNull VirtualFile file) {
-    return myFlattenDirectories.computeIfAbsent(file, k -> new PackageAnnotator.AtomicPackageCoverageInfo());
+    return myFlattenDirectories.computeIfAbsent(file, _ -> new PackageAnnotator.AtomicPackageCoverageInfo());
   }
 
 
-  private boolean ignoreClass(File child) {
+  private boolean ignoreClass(Path child) {
     for (JavaCoverageEngineExtension extension : JavaCoverageEngineExtension.EP_NAME.getExtensions()) {
       if (extension.ignoreCoverageForClass(mySuite, child)) {
         return true;

@@ -63,7 +63,7 @@ private suspend fun XBreakpointBase<*, *, *>.getDtoState(): XBreakpointDtoState 
     val completedRequestId = manager.requestCounter.getRequestId(breakpoint.breakpointId)
     XBreakpointDtoState(
       displayText = XBreakpointUtil.getShortText(breakpoint),
-      sourcePosition = readAction { sourcePosition?.toRpc() },
+      sourcePosition = sourcePosition?.toRpc(),
       isDefault = manager.isDefaultBreakpoint(breakpoint),
       logMessage = isLogMessage,
       logStack = isLogStack,
@@ -81,6 +81,7 @@ private suspend fun XBreakpointBase<*, *, *>.getDtoState(): XBreakpointDtoState 
       timestamp = timeStamp,
       lineBreakpointInfo = readAction { (breakpoint as? XLineBreakpointImpl<*>)?.getInfo() },
       requestId = completedRequestId,
+      hasCustomCondition = XBreakpointUtil.hasCustomCondition(breakpoint)
     )
   }
 }
@@ -88,5 +89,5 @@ private suspend fun XBreakpointBase<*, *, *>.getDtoState(): XBreakpointDtoState 
 private fun XLineBreakpointImpl<*>.getInfo(): XLineBreakpointInfo {
   val range = highlightRange
   val highlightingRange = range?.toRpc()
-  return XLineBreakpointInfo(isTemporary, line, fileUrl, highlightingRange, file?.rpcId())
+  return XLineBreakpointInfo(isTemporary, line, fileUrl, placement, highlightingRange, file?.rpcId())
 }

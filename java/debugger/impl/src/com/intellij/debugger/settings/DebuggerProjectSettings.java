@@ -32,4 +32,9 @@ public class DebuggerProjectSettings implements PersistentStateComponent<Debugge
   public void loadState(@NotNull DebuggerProjectSettings state) {
     XmlSerializerUtil.copyBean(state, this);
   }
+
+  @Override
+  public void noStateLoaded() {
+    loadState(new DebuggerProjectSettings());
+  }
 }

@@ -19,7 +19,7 @@ data class RootKindFilter(
 ) {
     companion object {
         @JvmField
-        val everything = RootKindFilter(
+        val everything: RootKindFilter = RootKindFilter(
             includeProjectSourceFiles = true,
             includeLibraryClassFiles = true,
             includeLibrarySourceFiles = true,
@@ -29,7 +29,7 @@ data class RootKindFilter(
         )
 
         @JvmField
-        val projectSourcesAndLibraryClasses = RootKindFilter(
+        val projectSourcesAndLibraryClasses: RootKindFilter = RootKindFilter(
             includeProjectSourceFiles = true,
             includeLibraryClassFiles = true,
             includeLibrarySourceFiles = false,
@@ -39,7 +39,7 @@ data class RootKindFilter(
         )
 
         @JvmField
-        val projectFiles = RootKindFilter(
+        val projectFiles: RootKindFilter = RootKindFilter(
             includeProjectSourceFiles = true,
             includeLibraryClassFiles = true,
             includeLibrarySourceFiles = false,
@@ -49,7 +49,7 @@ data class RootKindFilter(
         )
 
         @JvmField
-        val projectSources = RootKindFilter(
+        val projectSources: RootKindFilter = RootKindFilter(
             includeProjectSourceFiles = true,
             includeLibraryClassFiles = false,
             includeLibrarySourceFiles = false,
@@ -59,7 +59,7 @@ data class RootKindFilter(
         )
 
         @JvmField
-        val projectSourcesAndResources = RootKindFilter(
+        val projectSourcesAndResources: RootKindFilter = RootKindFilter(
             includeProjectSourceFiles = true,
             includeLibraryClassFiles = false,
             includeLibrarySourceFiles = false,
@@ -69,7 +69,7 @@ data class RootKindFilter(
         )
 
         @JvmField
-        val libraryClasses = RootKindFilter(
+        val libraryClasses: RootKindFilter = RootKindFilter(
             includeProjectSourceFiles = false,
             includeLibraryClassFiles = true,
             includeLibrarySourceFiles = false,
@@ -79,7 +79,7 @@ data class RootKindFilter(
         )
 
         @JvmField
-        val librarySources = RootKindFilter(
+        val librarySources: RootKindFilter = RootKindFilter(
             includeProjectSourceFiles = false,
             includeLibraryClassFiles = false,
             includeLibrarySourceFiles = true,
@@ -89,7 +89,7 @@ data class RootKindFilter(
         )
 
         @JvmField
-        val libraryFiles = RootKindFilter(
+        val libraryFiles: RootKindFilter = RootKindFilter(
             includeProjectSourceFiles = false,
             includeLibraryClassFiles = true,
             includeLibrarySourceFiles = true,
@@ -99,7 +99,7 @@ data class RootKindFilter(
         )
 
         @JvmField
-        val projectAndLibrarySources = RootKindFilter(
+        val projectAndLibrarySources: RootKindFilter = RootKindFilter(
             includeProjectSourceFiles = true,
             includeLibraryClassFiles = false,
             includeLibrarySourceFiles = true,
@@ -109,7 +109,7 @@ data class RootKindFilter(
         )
 
         @JvmField
-        val projectAndLibrarySourcesWithScripts = RootKindFilter(
+        val projectAndLibrarySourcesWithScripts: RootKindFilter = RootKindFilter(
             includeProjectSourceFiles = true,
             includeLibraryClassFiles = false,
             includeLibrarySourceFiles = true,
@@ -136,7 +136,7 @@ interface RootKindMatcher {
                 else -> element.containingFile?.virtualFile
             }
 
-            return if (virtualFile != null) matches(element.project, virtualFile, filter) else false
+            return virtualFile != null && matches(element.project, virtualFile, filter)
         }
     }
 

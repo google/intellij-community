@@ -1,18 +1,1 @@
-{
-	"comments": {
-		"blockComment": [ "{#", "#}" ]
-	},
-	"brackets": [
-		["{", "}"],
-		["[", "]"],
-		["(", ")"]
-	],
-	"surroundingPairs": [
-		{ "open": "'", "close": "'" },
-		{ "open": "\"", "close": "\"" },
-		{ "open": "{", "close": "}"},
-		{ "open": "[", "close": "]"},
-		{ "open": "(", "close": ")" },
-		{ "open": "<", "close": ">" }
-	]
-}
+{"comments":{"blockComment":["{#","#}"]},"brackets":[["{","}"],["[","]"],["(",")"]],"surroundingPairs":[{"open":"'","close":"'"},{"open":"\"","close":"\""},{"open":"{","close":"}"},{"open":"[","close":"]"},{"open":"(","close":")"},{"open":"<","close":">"}]}

@@ -524,7 +524,7 @@ public final class ResolveUtil {
 
       boolean isDominated = false;
 
-      List<GroovyResolveResult> existingCandidates = cache.computeIfAbsent(getKey(currentMethod), (__) -> new SmartList<>());
+      List<GroovyResolveResult> existingCandidates = cache.computeIfAbsent(getKey(currentMethod), (_) -> new SmartList<>());
       for (Iterator<GroovyResolveResult> iterator = existingCandidates.listIterator(); iterator.hasNext();) {
         GroovyResolveResult candidateResult = iterator.next();
         final PsiMethod otherMethod;

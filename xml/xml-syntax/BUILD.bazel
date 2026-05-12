@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.xml.syntax` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "syntax_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "syntax",
   module_name = "intellij.xml.syntax",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
-  resources = [":syntax_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/syntax/syntax-api:syntax",
@@ -25,6 +20,7 @@ jvm_library(
 
 jvm_library(
   name = "syntax_test_lib",
+  testonly = True,
   module_name = "intellij.xml.syntax",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -37,3 +33,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.xml.syntax` end
+
+### auto-generated section `iml intellij.xml.syntax` start
+exports_files([
+  "intellij.xml.syntax.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.xml.syntax` end

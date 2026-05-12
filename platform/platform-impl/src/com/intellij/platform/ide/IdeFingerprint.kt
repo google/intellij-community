@@ -68,7 +68,6 @@ private fun computeIdeFingerprint(debugHelperToken: Int): IdeFingerprint {
     hasher.putLong(appInfo.buildTime.toEpochSecond())
   }
   hasher.putString(appInfo.build.asString())
-  hasher.putString(System.getProperty("idea.kotlin.plugin.use.k1") ?: "k2") // IJPL-156028
 
   // the loadedPlugins list is sorted
   val loadedPlugins = PluginManagerCore.loadedPlugins
@@ -124,7 +123,7 @@ private fun hashByFileContent(descriptor: IdeaPluginDescriptorImpl, hasher: Hash
 
   ProgressManager.checkCanceled()
 
-  val files = descriptor.jarFiles!!
+  val files = descriptor.ownClassPath!!
   hasher.putInt(files.size)
   for (file in files) {
     // if the path is not a directory, only "this" file will be visited

@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.application;
 
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.EventListener;
@@ -31,5 +32,10 @@ public interface WriteIntentReadActionListener extends EventListener {
    * Is called after {@code action} is finished and the write-intent read lock is released.
    */
   default void afterWriteIntentReadActionFinished(@NotNull Class<?> action) {
+  }
+
+
+  @ApiStatus.Internal
+  default void beforeWriteLockParallelizationEnds(boolean isWriteActionPending) {
   }
 }

@@ -14,8 +14,8 @@ import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiClass;
 import com.intellij.refactoring.JavaRefactoringSettings;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBCheckBox;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.IncorrectOperationException;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.indexing.DumbModeAccessType;
@@ -112,7 +112,7 @@ public abstract class GenerateGetterSetterHandlerBase extends GenerateMembersHan
     panel.add(templateChooserLabel, BorderLayout.WEST);
     final ComboBox<TemplateResource> comboBox = new ComboBox<>();
     templateChooserLabel.setLabelFor(comboBox);
-    comboBox.setRenderer(SimpleListCellRenderer.create("", TemplateResource::getName));
+    comboBox.setRenderer(BuilderKt.textListCellRenderer("", TemplateResource::getName));
     final ComponentWithBrowseButton<ComboBox<?>> comboBoxWithBrowseButton =
       new ComponentWithBrowseButton<>(comboBox, new ActionListener() {
         @Override

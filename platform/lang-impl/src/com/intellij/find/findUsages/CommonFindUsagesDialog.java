@@ -7,6 +7,7 @@ import com.intellij.lang.findUsages.DescriptiveNameUtil;
 import com.intellij.openapi.application.AccessToken;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiElement;
@@ -19,10 +20,13 @@ import com.intellij.usageView.UsageViewUtil;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.SlowOperations;
 import com.intellij.util.concurrency.AppExecutorUtil;
+import com.intellij.util.concurrency.annotations.RequiresReadLock;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class CommonFindUsagesDialog extends AbstractFindUsagesDialog {
+  private static final @NotNull Logger LOG = Logger.getInstance(CommonFindUsagesDialog.class);
   protected final @NotNull PsiElement myPsiElement;
   private final @Nullable String myHelpId;
   protected final @NotNull FindUsagesHandlerBase myUsagesHandler;
@@ -48,16 +52,45 @@ public class CommonFindUsagesDialog extends AbstractFindUsagesDialog {
     return FindUsagesUtil.isSearchForTextOccurrencesAvailable(element, isSingleFile, handler);
   }
 
+  /**
+   * Precomputes the data needed to show the Find Usages dialog.
+   * <p>
+   *   This function can be very slow, so it's recommended to call it in background or under a modal progress.
+   *   The necessary data will be stored inside the given handler and will later be used when the handler
+   *   is passed to a new dialog instance, typically by calling {@link FindUsagesHandler#getFindUsagesDialog(boolean, boolean, boolean)}.
+   * </p>
+   * <p>
+   *   If this function isn't used, then the necessary data will be computed in the dialog's constructor,
+   *   which can lead to serious UI freezes.
+   * </p>
+   * @param handler the handler that will be used to show the dialog (if {@code null}, this function does nothing)
+   */
+  @ApiStatus.Experimental
+  @RequiresReadLock
+  public static void precomputeFindUsagesDialogData(@Nullable FindUsagesHandlerBase handler) {
+    if (handler == null) return;
+    if (handler.precomputedIsInFileOnly == null) {
+      handler.precomputedIsInFileOnly = isInFileOnly(handler.getPsiElement());
+    }
+  }
+
   @Override
   protected boolean isInFileOnly() {
     if (super.isInFileOnly()) return true;
+    if (myUsagesHandler.precomputedIsInFileOnly != null) return myUsagesHandler.precomputedIsInFileOnly;
+    LOG.warn("Computing isInFileOnly is very slow. " +
+             "Consider calling precomputeFindUsagesDialogData in advance either under a modal progress or in background");
     try (AccessToken ignore = SlowOperations.knownIssue("IDEA-347939, EA-976313")) {
-      return ReadAction.compute(() -> {
-        Project project = myPsiElement.getProject();
-        SearchScope useScope = PsiSearchHelper.getInstance(project).getUseScope(myPsiElement);
-        return useScope instanceof LocalSearchScope;
+      return ReadAction.computeBlocking(() -> {
+        return isInFileOnly(myPsiElement);
       });
     }
+  }
+
+  private static boolean isInFileOnly(PsiElement psiElement) {
+    Project project = psiElement.getProject();
+    SearchScope useScope = PsiSearchHelper.getInstance(project).getUseScope(psiElement);
+    return useScope instanceof LocalSearchScope;
   }
 
   @Override

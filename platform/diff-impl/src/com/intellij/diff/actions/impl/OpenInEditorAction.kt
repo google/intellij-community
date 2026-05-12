@@ -50,12 +50,21 @@ open class OpenInEditorAction : EditSourceAction(), DumbAware, ActionPromoter {
     openEditor(project, navigatables, callback)
   }
 
-  override fun promote(actions: List<AnAction>, context: DataContext): List<AnAction>? {
+  final override fun promote(actions: List<AnAction>, context: DataContext): List<AnAction>? {
     if (isManuallyHidden(context)) return null
     if (context.getData(DiffDataKeys.NAVIGATABLE_ARRAY) != null) {
       return listOf(this)
     }
     return null
+  }
+
+  final override fun suppress(actions: List<AnAction>, context: DataContext): List<AnAction>? {
+    return if (context.getData(DiffDataKeys.DIFF_CONTEXT) != null) {
+      actions.filterNot { it === this }
+    }
+    else {
+      super.suppress(actions, context)
+    }
   }
 
   companion object {

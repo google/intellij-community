@@ -91,6 +91,8 @@ import com.jetbrains.python.sdk.PySdkExtKt;
 import com.jetbrains.python.sdk.PySdkUtil;
 import com.jetbrains.python.sdk.PythonEnvUtil;
 import com.jetbrains.python.sdk.PythonSdkAdditionalData;
+import com.jetbrains.python.sdk.PyRichSdk;
+import com.jetbrains.python.sdk.PyRichSdkKt;
 import com.jetbrains.python.sdk.flavors.PythonSdkFlavor;
 import com.jetbrains.python.sdk.flavors.conda.CondaPythonExecKt;
 import com.jetbrains.python.sdk.legacy.PythonSdkUtil;
@@ -768,25 +770,29 @@ public abstract class PythonCommandLineState extends CommandLineState {
     }
     addCommonEnvironmentVariables(getInterpreterPath(project, runParams), env, addPyCharmHosted);
 
-    setupVirtualEnvVariables(runParams, env, runParams.getSdkHome());
+    setupVirtualEnvVariables(runParams, env);
     return env;
   }
 
-  private static void setupVirtualEnvVariables(PythonRunParams myConfig, Map<String, String> env, String sdkHome) {
-    Sdk sdk = PythonSdkUtil.findSdkByPath(sdkHome);
-    if (sdk != null &&
-        (Registry.is("python.activate.virtualenv.on.run") && PythonSdkUtil.isVirtualEnv(sdkHome) || PythonSdkUtil.isConda(sdk))) {
-      Map<String, String> environment = PySdkUtil.activateVirtualEnv(sdk);
-      env.putAll(environment);
+  private static void setupVirtualEnvVariables(PythonRunParams runParams, Map<String, String> env) {
+    Sdk sdk = runParams.getSdk();
+    if (sdk == null) return;
 
-      for (Map.Entry<String, String> e : myConfig.getEnvs().entrySet()) {
-        if (environment.containsKey(e.getKey())) {
-          if ("PATH".equals(e.getKey())) {
-            env.put(e.getKey(), PythonEnvUtil.addToPathEnvVar(env.get("PATH"), e.getValue(), true));
-          }
-          else {
-            env.put(e.getKey(), e.getValue());
-          }
+    PyRichSdk pyRichSdk = PyRichSdkKt.pyRichSdk(sdk, false);
+    boolean shouldActivate = (Registry.is("python.activate.virtualenv.on.run") && pyRichSdk.isActivatable());
+    if (!shouldActivate) return;
+
+    Map<String, String> activated = PySdkUtil.activateVirtualEnv(sdk);
+    env.putAll(activated);
+
+    // User-specified env vars override activated ones, with special PATH merging
+    for (Map.Entry<String, String> entry : runParams.getEnvs().entrySet()) {
+      if (activated.containsKey(entry.getKey())) {
+        if ("PATH".equals(entry.getKey())) {
+          env.put(entry.getKey(), PythonEnvUtil.addToPathEnvVar(env.get("PATH"), entry.getValue(), true));
+        }
+        else {
+          env.put(entry.getKey(), entry.getValue());
         }
       }
     }
@@ -875,7 +881,8 @@ public abstract class PythonCommandLineState extends CommandLineState {
   }
 
   @ApiStatus.Internal
-  public static @NotNull Map<String, String> buildPythonPath(@NotNull AbstractPythonRunConfiguration<?> configuration, boolean passParentEnvs) {
+  public static @NotNull Map<String, String> buildPythonPath(@NotNull AbstractPythonRunConfiguration<?> configuration,
+                                                             boolean passParentEnvs) {
     Map<String, String> envs = new HashMap<>(configuration.getEnvs());
     Module module = configuration.getModule();
     Sdk sdk = configuration.getSdk();
@@ -1142,7 +1149,7 @@ public abstract class PythonCommandLineState extends CommandLineState {
   }
 
   protected @NotNull UrlFilter createUrlFilter(ProcessHandler handler) {
-    return new UrlFilter();
+    return new UrlFilter(myConfig.getProject());
   }
 
   protected @NotNull Function<TargetEnvironment, String> getTargetPath(@NotNull TargetEnvironmentRequest targetEnvironmentRequest,

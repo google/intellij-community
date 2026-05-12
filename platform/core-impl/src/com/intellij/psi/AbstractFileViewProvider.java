@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi;
 
 import com.intellij.codeInsight.multiverse.CodeInsightContextUtil;
@@ -37,7 +37,7 @@ import com.intellij.psi.impl.file.PsiBinaryFileImpl;
 import com.intellij.psi.impl.file.PsiLargeBinaryFileImpl;
 import com.intellij.psi.impl.file.PsiLargeTextFileImpl;
 import com.intellij.psi.impl.file.impl.FileManager;
-import com.intellij.psi.impl.file.impl.FileManagerImpl;
+import com.intellij.psi.impl.file.impl.PossibleInvalidationKt;
 import com.intellij.psi.impl.source.PsiFileImpl;
 import com.intellij.psi.impl.source.PsiPlainTextFileImpl;
 import com.intellij.psi.impl.source.SourceTreeToPsiMap;
@@ -49,6 +49,7 @@ import com.intellij.util.LocalTimeCounter;
 import com.intellij.util.containers.CollectionFactory;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.JBTreeTraverser;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -81,7 +82,7 @@ public abstract class AbstractFileViewProvider extends UserDataHolderBase implem
     myVirtualFile = virtualFile;
     myEventSystemEnabled = eventSystemEnabled;
     setContent(new VirtualFileContent());
-    myPhysical = isEventSystemEnabled() &&
+    myPhysical = eventSystemEnabled &&
                  !(virtualFile instanceof LightVirtualFile) &&
                  !(virtualFile.getFileSystem() instanceof NonPhysicalFileSystem);
     virtualFile.putUserData(FREE_THREADED, isFreeThreaded(this));
@@ -411,10 +412,11 @@ public abstract class AbstractFileViewProvider extends UserDataHolderBase implem
     }
   }
 
+  @ApiStatus.Internal
   public final void markPossiblyInvalidated() {
     invalidateCachedPsi();
     for (AbstractFileViewProvider copy : getKnownCopies()) {
-      FileManagerImpl.markPossiblyInvalidated(copy);
+      PossibleInvalidationKt.markPossiblyInvalidated(copy);
     }
   }
 

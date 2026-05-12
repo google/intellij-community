@@ -1,9 +1,14 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceGetOrSet")
 
 package org.jetbrains.intellij.build.impl.sbom
 
 import com.intellij.openapi.util.SystemInfoRt
+import com.intellij.platform.buildScripts.licenses.LibraryLicense
+import com.intellij.platform.buildScripts.licenses.LibraryUpstream
+import com.intellij.platform.buildScripts.licenses.SoftwareBillOfMaterials
+import com.intellij.platform.buildScripts.licenses.SoftwareBillOfMaterials.Companion.Suppliers
+import com.intellij.platform.buildScripts.licenses.SoftwareBillOfMaterials.Options
 import com.intellij.util.io.DigestUtil.sha1Hex
 import com.intellij.util.io.sha256Hex
 import io.ktor.client.plugins.ClientRequestException
@@ -13,10 +18,7 @@ import io.opentelemetry.api.trace.Span
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import org.apache.maven.model.Model
@@ -25,12 +27,7 @@ import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.intellij.build.BuildContext
 import org.jetbrains.intellij.build.JvmArchitecture
 import org.jetbrains.intellij.build.LibcImpl
-import org.jetbrains.intellij.build.LibraryLicense
-import org.jetbrains.intellij.build.LibraryUpstream
 import org.jetbrains.intellij.build.OsFamily
-import org.jetbrains.intellij.build.SoftwareBillOfMaterials
-import org.jetbrains.intellij.build.SoftwareBillOfMaterials.Companion.Suppliers
-import org.jetbrains.intellij.build.SoftwareBillOfMaterials.Options
 import org.jetbrains.intellij.build.downloadAsText
 import org.jetbrains.intellij.build.impl.BundledRuntime
 import org.jetbrains.intellij.build.impl.Checksums
@@ -45,9 +42,10 @@ import org.jetbrains.intellij.build.impl.projectStructureMapping.LibraryFileEntr
 import org.jetbrains.intellij.build.impl.projectStructureMapping.ModuleLibraryFileEntry
 import org.jetbrains.intellij.build.impl.projectStructureMapping.ProjectLibraryEntry
 import org.jetbrains.intellij.build.impl.projectStructureMapping.getIncludedModules
+import org.jetbrains.intellij.build.impl.suspendingLazy
 import org.jetbrains.intellij.build.io.ZipEntryProcessorResult
 import org.jetbrains.intellij.build.io.readZipFile
-import org.jetbrains.intellij.build.productLayout.util.mapConcurrent
+import org.jetbrains.intellij.build.mapConcurrent
 import org.jetbrains.intellij.build.retryWithExponentialBackOff
 import org.jetbrains.jps.model.jarRepository.JpsRemoteRepositoryService
 import org.jetbrains.jps.model.java.JpsJavaClasspathKind
@@ -104,7 +102,7 @@ import kotlin.io.path.outputStream
 class SoftwareBillOfMaterialsImpl(
   private val context: BuildContext,
   private val distributions: List<DistributionForOsTaskResult>,
-  private val distributionFiles: List<DistributionFileEntry>
+  private val distributionFiles: List<DistributionFileEntry>,
 ) : SoftwareBillOfMaterials {
   private companion object {
     /**
@@ -144,10 +142,12 @@ class SoftwareBillOfMaterialsImpl(
   private val jetBrainsOwnLicense: Options.DistributionLicense by lazy {
     val eula = context.paths.communityHomeDir
       .resolve("platform/platform-resources/src")
-      .resolve(when {
-                 context.applicationInfo.isEAP -> "euaEap.html"
-                 else -> "eua.html"
-               })
+      .resolve(
+        when {
+          context.applicationInfo.isEAP -> "euaEap.html"
+          else -> "eua.html"
+        }
+      )
     check(Files.exists(eula)) {
       "$eula is missing"
     }
@@ -237,14 +237,9 @@ class SoftwareBillOfMaterialsImpl(
   }
 
   private suspend fun generateFromDistributions(): List<Path> {
-    return withContext(Dispatchers.IO) {
-      distributions.associateWith { distribution ->
-        getFiles(distribution)
-          .mapConcurrent { file ->
-            withContext(CoroutineName("checksums for $file")) {
-              Checksums(file)
-            }
-          }
+    return distributions.associateWith { distribution ->
+      getFiles(distribution).mapConcurrent { file ->
+        Checksums.compute(file)
       }
     }.flatMap { (distribution, filesWithChecksums) ->
       filesWithChecksums.map {
@@ -277,7 +272,7 @@ class SoftwareBillOfMaterialsImpl(
    * then should be replaced with [addRuntimeDocumentRef]
    */
   private suspend fun SpdxDocument.runtimePackage(os: OsFamily, arch: JvmArchitecture, libc: LibcImpl): SpdxPackage {
-    val checksums = Checksums(context.bundledRuntime.findArchive(os = os, arch = arch, libc = libc))
+    val checksums = Checksums.compute(context.bundledRuntime.findArchive(os = os, arch = arch, libc = libc))
     val version = context.bundledRuntime.build
     val runtimeArchivePackage = spdxPackageForFile(
       this,
@@ -305,6 +300,7 @@ class SoftwareBillOfMaterialsImpl(
 
   private fun SpdxDocument.addRuntimeUpstreams(runtimeArchivePackage: SpdxPackage, os: OsFamily, arch: JvmArchitecture) {
     val cefVersion = context.dependenciesProperties["cef.version"]
+
     @Suppress("SpellCheckingInspection")
     val cefSuffix = when (os) {
       OsFamily.LINUX -> when (arch) {
@@ -373,7 +369,7 @@ class SoftwareBillOfMaterialsImpl(
   private suspend fun generateFromContentReport(): List<Path> {
     return SUPPORTED_DISTRIBUTIONS
       .filter { (os, arch) -> context.shouldBuildDistributionForOS(os, arch) }
-      .map { (os, arch, libc ) ->
+      .map { (os, arch, libc) ->
         val distributionDir = getOsAndArchSpecificDistDirectory(osFamily = os, arch = arch, libc = libc, context = context)
         val name = context.productProperties.getBaseArtifactName(context) + "-${distributionDir.name}"
         val document = spdxDocument(name)
@@ -399,7 +395,7 @@ class SoftwareBillOfMaterialsImpl(
     rootPackage: SpdxPackage,
     runtimePackage: SpdxPackage?,
     distributionDir: Path,
-    claimContainedFiles: Boolean = true
+    claimContainedFiles: Boolean = true,
   ): Path {
     val filePackages = generatePackagesForDistributionFiles(document, distributionDir)
     if (claimContainedFiles) {
@@ -451,21 +447,22 @@ class SoftwareBillOfMaterialsImpl(
     return document.outputFile
   }
 
-  private val distributionFilesChecksums: List<Checksums> by lazy {
-    runBlocking(Dispatchers.IO) {
+  private val distributionFilesChecksums = suspendingLazy("distribution files checksums") {
+    withContext(Dispatchers.IO) {
       distributionFiles.asSequence()
         .filterIsInstance<LibraryFileEntry>()
         .map { it.path }.distinct()
         // non-bundled plugins, for example
         .filterNot { it.startsWith(context.paths.tempDir) }
-        .toList().map {
-          async(CoroutineName("checksums for $it")) { Checksums(it) }
-        }.awaitAll()
+        .toList()
+        .mapConcurrent {
+          Checksums.compute(it)
+        }
     }
   }
 
-  private fun generatePackagesForDistributionFiles(document: SpdxDocument, distributionDir: Path): Map<Path, SpdxPackage?> {
-    return distributionFilesChecksums.associate {
+  private suspend fun generatePackagesForDistributionFiles(document: SpdxDocument, distributionDir: Path): Map<Path, SpdxPackage?> {
+    return distributionFilesChecksums.await().associate {
       val filePath = when {
         it.path.startsWith(distributionDir) -> distributionDir.relativize(it.path)
         it.path.startsWith(context.paths.distAllDir) -> context.paths.distAllDir.relativize(it.path)
@@ -538,7 +535,7 @@ class SoftwareBillOfMaterialsImpl(
     mavenDescriptor: JpsMavenRepositoryLibraryDescriptor,
     libraryFile: Path,
     libraryEntry: LibraryFileEntry,
-    libraryLicense: LibraryLicense
+    libraryLicense: LibraryLicense,
   ): MavenLibrary {
     val coordinates = MavenCoordinates(mavenDescriptor.groupId, mavenDescriptor.artifactId, mavenDescriptor.version)
     val repositoryUrl = if (mavenDescriptor.jarRepositoryId != null) {
@@ -609,9 +606,11 @@ class SoftwareBillOfMaterialsImpl(
       "https://repo1.maven.org/maven2" -> "maven-central" to "$groupId:$artifactId:$version"
       else -> "purl" to "pkg:maven/$groupId/$artifactId@$version" + (repositoryUrl?.let { "?repository_url=$it" } ?: "")
     }
-    return document.createExternalRef(ReferenceCategory.PACKAGE_MANAGER,
-                                      ReferenceType(SpdxConstants.SPDX_LISTED_REFERENCE_TYPES_PREFIX + refType),
-                                      locator, null)
+    return document.createExternalRef(
+      ReferenceCategory.PACKAGE_MANAGER,
+      ReferenceType(SpdxConstants.SPDX_LISTED_REFERENCE_TYPES_PREFIX + refType),
+      locator, null
+    )
   }
 
   private fun translateSupplier(supplier: String): String {
@@ -879,14 +878,16 @@ class SoftwareBillOfMaterialsImpl(
     spdxDocument: SpdxDocument,
     name: String,
     sha256sum: String, sha1sum: String,
-    init: SpdxPackageBuilder.() -> Unit
+    init: SpdxPackageBuilder.() -> Unit,
   ): SpdxPackage {
     return spdxPackage(spdxDocument, name) {
-      addFile(spdxDocument.createSpdxFile(
+      addFile(
+        spdxDocument.createSpdxFile(
           spdxDocument.modelStore.getNextId(IdType.SpdxId, spdxDocument.documentUri),
           name, SpdxNoAssertionLicense(), null, SpdxConstants.NONE_VALUE,
           spdxDocument.createChecksum(ChecksumAlgorithm.SHA1, sha1sum)
-        ).addChecksum(spdxDocument.createChecksum(ChecksumAlgorithm.SHA256, sha256sum)).build())
+        ).addChecksum(spdxDocument.createChecksum(ChecksumAlgorithm.SHA256, sha256sum)).build()
+      )
       init()
     }
   }
@@ -966,7 +967,7 @@ class SoftwareBillOfMaterialsImpl(
     name: String,
     licenseDeclared: AnyLicenseInfo = SpdxNoAssertionLicense(),
     copyrightText: String? = null,
-    init: SpdxPackageBuilder.() -> Unit
+    init: SpdxPackageBuilder.() -> Unit,
   ): SpdxPackage {
     return spdxDocument.createPackage(
       spdxDocument.modelStore.getNextId(IdType.SpdxId, spdxDocument.documentUri), name,
@@ -1019,11 +1020,13 @@ class SoftwareBillOfMaterialsImpl(
             throw e
           }
           catch (e: Exception) {
-            context.messages.logErrorAndThrow("""
+            context.messages.logErrorAndThrow(
+              """
              Generated SBOM $document is not NTIA-conformant. 
              Please look for 'Components missing a supplier' in the suppressed exceptions and specify all missing suppliers.
              You may use https://package-search.jetbrains.com/ to search for them.
-            """.trimIndent(), e)
+            """.trimIndent(), e
+            )
           }
         }
       }
@@ -1034,21 +1037,15 @@ class SoftwareBillOfMaterialsImpl(
     val sortedLibraries = mavenLibraries.sortedBy {
       it.library.name ?: it.library.libraryName
     }
-    val errors = supervisorScope {
-      sortedLibraries.slice(50..100).map {
-        async {
-          it.checkCopyrightText()
-        }
-      }.mapNotNull {
-        try {
-          it.await()
-          null
-        }
-        catch (e: IllegalStateException) {
-          e.message
-        }
+    val errors = sortedLibraries.slice(50..100).mapConcurrent {
+      try {
+        it.checkCopyrightText()
+        null
       }
-    }
+      catch (e: IllegalStateException) {
+        e.message
+      }
+    }.filterNotNull()
     if (errors.any()) {
       throw RuntimeException(
         errors.joinToString(

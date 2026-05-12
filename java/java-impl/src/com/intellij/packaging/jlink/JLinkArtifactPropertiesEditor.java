@@ -4,7 +4,7 @@ package com.intellij.packaging.jlink;
 import com.intellij.java.JavaBundle;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.packaging.ui.ArtifactPropertiesEditor;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.ui.FormBuilder;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
@@ -43,7 +43,7 @@ final class JLinkArtifactPropertiesEditor extends ArtifactPropertiesEditor {
     myCompressionLevel = new ComboBox<>(CompressionLevel.values());
     myCompressionLevel.setItem(myProperties.compressionLevel);
     myCompressionLevel.setRenderer(
-      SimpleListCellRenderer.create(myCompressionLevelText.get(CompressionLevel.ZERO),
+      BuilderKt.textListCellRenderer(myCompressionLevelText.get(CompressionLevel.ZERO),
                                     level -> myCompressionLevelText.getOrDefault(level, String.valueOf(level.myValue))));
     builder.addLabeledComponent(JavaBundle.message("packaging.jlink.compression.level"), myCompressionLevel);
 

@@ -21,7 +21,7 @@
       "phpstorm/php/src/com/jetbrains/php/lang/psi/resolve/types/PhpTypeAnalyserVisitor.java",
       "phpstorm/php/src/com/jetbrains/php/lang/psi/resolve/types/PhpTypeInfo.java",
       "phpstorm/php/src/com/jetbrains/php/mockery/PhpMockeryExpectedMethodReferenceContributor.java",
-      "plugins/JavaScriptLanguage/src/com/intellij/lang/javascript/linter/jshint/JSHintUtil.java",
+      "plugins/JavaScriptLanguage/javascript-backend/src/com/intellij/lang/javascript/linter/jshint/JSHintUtil.java",
       "plugins/async/intellij.performanceTesting.async.core/src/com/jetbrains/performancePlugin/profilers/async/core/AsyncProfilerCommandBuilder.java"
     ]
   },

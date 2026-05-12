@@ -7,22 +7,23 @@ val EelPlatform.executableName: String
   get() = when (this) {
     is EelPlatform.Darwin -> {
       when (arch) {
-        EelPlatform.Arch.ARM_64 ->  "ijent-aarch64-apple-darwin-release"
+        EelPlatform.Arch.ARM_64 -> "ijent-aarch64-apple-darwin-release"
         EelPlatform.Arch.X86_64 -> "ijent-x86_64-apple-darwin-release"
         else -> throw IllegalArgumentException("Unsupported darwin arch: $arch")
       }
     }
     is EelPlatform.Linux -> {
       when (arch) {
-        EelPlatform.Arch.ARM_64 ->  "ijent-aarch64-unknown-linux-musl-release"
+        EelPlatform.Arch.ARM_64 -> "ijent-aarch64-unknown-linux-musl-release"
         EelPlatform.Arch.X86_64 -> "ijent-x86_64-unknown-linux-musl-release"
+        EelPlatform.Arch.ARM_32 -> "ijent-armv7-unknown-linux-musleabihf-release"
         else -> throw IllegalArgumentException("Unsupported linux arch: $arch")
       }
     }
     is EelPlatform.Windows -> {
       when (arch) {
-        EelPlatform.Arch.ARM_64 -> "ijent-aarch64-pc-windows-gnu-release" // todo: refine later when we support windows
-        EelPlatform.Arch.X86_64 -> "ijent-x86_64-pc-windows-gnu-release.exe"
+        EelPlatform.Arch.ARM_64 -> "ijent-aarch64-pc-windows-gnullvm-release.exe"
+        EelPlatform.Arch.X86_64 -> "ijent-x86_64-pc-windows-gnullvm-release.exe"
         else -> throw IllegalArgumentException("Unsupported windows arch: $arch")
       }
     }

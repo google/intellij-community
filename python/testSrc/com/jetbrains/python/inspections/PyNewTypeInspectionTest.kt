@@ -71,5 +71,17 @@ class PyNewTypeInspectionTest : PyInspectionTestCase() {
     )
   }
 
+  // PY-88802
+  fun testFloatAndComplexClassReferencesAsNewTypeBases() {
+    doTestByText(
+      """
+        from typing import NewType
+
+        UserId = NewType("UserId", float)
+        ComplexId = NewType("ComplexId", complex)
+      """.trimIndent()
+    )
+  }
+
   override fun getInspectionClass(): Class<out PyInspection> = PyNewTypeInspection::class.java
 }

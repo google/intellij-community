@@ -8,11 +8,6 @@
                     serviceImplementation="com.intellij.configurationStore.ProjectWithModulesStoreReloadManagerImpl"
                     overrides="true"/>
 
-    <projectPreInit
-      id="moduleBridgeLoaderService"
-      implementation="com.intellij.workspaceModel.ide.impl.legacyBridge.module.ModuleBridgeLoaderService"
-      order="before workspaceFileIndexInitializer"/>
-    <backgroundPostStartupActivity implementation="com.intellij.workspaceModel.ide.impl.jps.serialization.DelayedProjectSynchronizer"/>
     <projectService serviceInterface="com.intellij.openapi.module.AutomaticModuleUnloader"
                     serviceImplementation="com.intellij.openapi.module.impl.AutomaticModuleUnloaderImpl" overrides="true"/>
     <notificationGroup id="Automatic Module Unloading" displayType="BALLOON" bundle="messages.ProjectBundle"
@@ -31,7 +26,6 @@
                         serviceImplementation="com.intellij.openapi.roots.ui.configuration.SdkLookupImpl"/>
 
     <registryKey key="sdk.detector.enabled" defaultValue="true" description="Toggles SDK detection features"/>
-    <registryKey key="java.home.finder.use.eel" defaultValue="true" description="Use new API for OS abstraction in Project SDKs"/>
 
     <testSourcesFilter implementation="com.intellij.openapi.roots.ProjectRootTestSourcesFilter"/>
     <projectService serviceInterface="com.intellij.openapi.roots.ProjectRootModificationTracker"
@@ -101,8 +95,6 @@
     <projectStructure.sourceRootEditHandler implementation="com.intellij.openapi.roots.ui.configuration.JavaModuleSourceRootEditHandler"/>
     <projectStructure.sourceRootEditHandler implementation="com.intellij.openapi.roots.ui.configuration.JavaTestSourceRootEditHandler"/>
 
-    <indexableEntityProvider implementation="com.intellij.util.indexing.roots.ModuleDependencyEntitiesIndexableEntityProvider"/>
-    <indexableIteratorBuilderHandler implementation="com.intellij.util.indexing.roots.builders.ModuleRootsIndexableIteratorHandler"/>
 
     <applicationService serviceInterface="com.intellij.openapi.projectRoots.ProjectJdkTable" open="true"
                         serviceImplementation="com.intellij.openapi.projectRoots.impl.ProjectJdkTableImpl"/>
@@ -125,6 +117,10 @@
                  description="Use WSM listeners to invalidate PSI caches (new) in addition to legacy ModuleRootListener"/>
 
     <editorNotificationProvider implementation="com.intellij.openapi.projectRoots.impl.UnknownSdkEditorNotificationsProvider"/>
+    <projectSettings service="com.intellij.framework.detection.impl.exclude.DetectionExcludesConfigurationImpl"/>
+    <projectSettings service="com.intellij.facet.impl.invalid.InvalidFacetManagerImpl"/>
+    <projectSettings service="com.intellij.openapi.module.impl.AutomaticModuleUnloaderImpl"/>
+    <projectSettings service="com.intellij.facet.impl.ProjectFacetManagerImpl"/>
   </extensions>
   <projectListeners>
     <listener class="com.intellij.psi.impl.file.impl.PsiVFSModuleRootListener"

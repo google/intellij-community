@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.markdown.images` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "images_resources",
-  srcs = glob(["src/main/resources/**/*"]),
-  strip_prefix = "src/main/resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "images",
   module_name = "intellij.markdown.images",
   visibility = ["//visibility:public"],
   srcs = glob(["src/main/kotlin/**/*.kt", "src/main/kotlin/**/*.java", "src/main/kotlin/**/*.form"], allow_empty = True),
-  resources = [":images_resources"],
+  resources = glob(["src/main/resources/**/*"]),
+  resource_strip_prefix = "src/main/resources",
   deps = [
     "//plugins/markdown/core:markdown",
     "//platform/analysis-api:analysis",
@@ -26,16 +21,19 @@ jvm_library(
     "//xml/xml-psi-impl:psi-impl",
     "//platform/core-ui",
     "//platform/platform-impl:ide-impl",
+    "//platform/ide-core",
     "//platform/lang-impl",
     "//images",
     "//xml/xml-parser:parser",
     "@lib//:kotlin-stdlib",
+    "//platform/util:util-ui",
   ],
   runtime_deps = ["//platform/backend"]
 )
 
 jvm_library(
   name = "images_test_lib",
+  testonly = True,
   module_name = "intellij.markdown.images",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -53,10 +51,18 @@ jvm_library(
     "//xml/xml-psi-impl:psi-impl_test_lib",
     "//platform/core-ui:core-ui_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/lang-impl:lang-impl_test_lib",
     "//images:images_test_lib",
     "//xml/xml-parser:parser_test_lib",
     "//platform/backend:backend_test_lib",
+    "//platform/util:util-ui_test_lib",
   ]
 )
 ### auto-generated section `build intellij.markdown.images` end
+
+### auto-generated section `iml intellij.markdown.images` start
+exports_files([
+  "intellij.markdown.images.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.markdown.images` end

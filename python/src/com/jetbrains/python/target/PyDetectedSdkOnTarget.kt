@@ -4,6 +4,7 @@ package com.jetbrains.python.target
 import com.intellij.execution.target.TargetBasedSdkAdditionalData
 import com.intellij.execution.target.TargetEnvironmentConfiguration
 import com.intellij.execution.target.saveTargetConfiguration
+import com.intellij.openapi.projectRoots.Sdk
 import com.jetbrains.python.sdk.PyDetectedSdk
 import com.jetbrains.python.sdk.PyRemoteSdkAdditionalDataMarker
 import com.jetbrains.python.sdk.PythonSdkAdditionalData
@@ -36,7 +37,7 @@ internal class PyDetectedSdkAdditionalData(override var targetEnvironmentConfigu
  *
  * @see com.jetbrains.python.sdk.PySdkExtKt.isValid
  */
-internal fun createDetectedSdk(name: String, isLocal: Boolean): PyDetectedSdk {
+internal fun createDetectedSdk(name: String, isLocal: Boolean): Sdk {
   val sdk = PyDetectedSdk(name)
   if (!isLocal) {
     val sdkModificator = sdk.sdkModificator

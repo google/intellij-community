@@ -1,8 +1,7 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.lookup.impl;
 
 import com.intellij.codeInsight.CodeInsightSettings;
-import com.intellij.codeInsight.completion.BaseCompletionService;
 import com.intellij.codeInsight.completion.CompletionContributor;
 import com.intellij.codeInsight.lookup.Lookup;
 import com.intellij.codeInsight.lookup.LookupElement;
@@ -50,6 +49,7 @@ import static com.intellij.codeInsight.completion.FusCompletionKeys.LOOKUP_ELEME
 import static com.intellij.codeInsight.completion.FusCompletionKeys.LOOKUP_ELEMENT_RESULT_ADD_TIMESTAMP_MILLIS;
 import static com.intellij.codeInsight.completion.FusCompletionKeys.LOOKUP_ELEMENT_RESULT_SET_ORDER;
 import static com.intellij.codeInsight.completion.FusCompletionKeys.LOOKUP_ELEMENT_SHOW_TIMESTAMP_MILLIS;
+import static com.intellij.codeInsight.completion.FusCompletionKeys.LOOKUP_SYNC_PHASE_DURATION_MILLIS;
 import static com.intellij.codeInsight.lookup.impl.LookupTypedHandler.CANCELLATION_CHAR;
 import static com.intellij.ide.actions.ToolwindowFusEventFields.TOOLWINDOW;
 
@@ -57,7 +57,7 @@ import static com.intellij.ide.actions.ToolwindowFusEventFields.TOOLWINDOW;
 public final class LookupUsageTracker extends CounterUsagesCollector {
   public static final String FINISHED_EVENT_ID = "finished";
   public static final String GROUP_ID = "completion";
-  public static final EventLogGroup GROUP = new EventLogGroup(GROUP_ID, 40);
+  public static final EventLogGroup GROUP = new EventLogGroup(GROUP_ID, 43);
   private static final EventField<String> SCHEMA = EventFields.StringValidatedByCustomRule("schema", FileTypeSchemaValidator.class);
   private static final BooleanEventField ALPHABETICALLY = EventFields.Boolean("alphabetically");
   private static final EnumEventField<EditorKind> EDITOR_KIND = EventFields.Enum("editor_kind", EditorKind.class);
@@ -73,6 +73,7 @@ public final class LookupUsageTracker extends CounterUsagesCollector {
   private static final ClassEventField CONTRIBUTOR = EventFields.Class("contributor");
   private static final ClassEventField PSI_REFERENCE = EventFields.Class("psi_reference");
   private static final LongEventField TIME_TO_SHOW = EventFields.Long("time_to_show");
+  private static final LongEventField SYNC_PHASE_DURATION = EventFields.Long("sync_phase_duration");
   private static final LongEventField TIME_TO_SHOW_CORRECT_ELEMENT = EventFields.Long("time_to_show_correct_element");
   private static final LongEventField TIME_TO_SHOW_FIRST_ELEMENT = EventFields.Long("time_to_show_first_element");
   private static final LongEventField TIME_TO_COMPUTE_CORRECT_ELEMENT = EventFields.Long("time_to_compute_correct_element");
@@ -105,6 +106,7 @@ public final class LookupUsageTracker extends CounterUsagesCollector {
                                                                          QUERY_LENGTH,
                                                                          CONTRIBUTOR,
                                                                          PSI_REFERENCE,
+                                                                         SYNC_PHASE_DURATION,
                                                                          TIME_TO_SHOW,
                                                                          TIME_TO_SHOW_CORRECT_ELEMENT,
                                                                          TIME_TO_SHOW_FIRST_ELEMENT,
@@ -243,7 +245,7 @@ public final class LookupUsageTracker extends CounterUsagesCollector {
 
     private void triggerLookupUsed(@NotNull FinishType finishType, @Nullable LookupElement currentItem,
                                    char completionChar) {
-      final List<EventPair<?>> data = ReadAction.compute(() -> getCommonUsageInfo(finishType, currentItem, completionChar));
+      List<EventPair<?>> data = ReadAction.computeBlocking(() -> getCommonUsageInfo(finishType, currentItem, completionChar));
 
       final List<EventPair<?>> additionalData = new ArrayList<>();
       LookupUsageDescriptor.EP_NAME.forEachExtensionSafe(usageDescriptor -> {
@@ -315,6 +317,9 @@ public final class LookupUsageTracker extends CounterUsagesCollector {
 
       // Performance
       data.add(TIME_TO_SHOW.with(myTimeToShow));
+
+      Long syncPhaseDuration = myLookup.getUserData(LOOKUP_SYNC_PHASE_DURATION_MILLIS);
+      data.add(SYNC_PHASE_DURATION.with(syncPhaseDuration != null ? syncPhaseDuration : -1));
 
       convertTimestampToDuration(data, TIME_TO_SHOW_CORRECT_ELEMENT, myTimestampCorrectElementShown);
       convertTimestampToDuration(data, TIME_TO_SHOW_FIRST_ELEMENT, myTimestampFirstElementShown);

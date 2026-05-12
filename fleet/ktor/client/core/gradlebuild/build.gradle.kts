@@ -23,6 +23,13 @@ fleetModule {
 @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
 kotlin {
   // KOTLIN__MARKER_START
+  compilerOptions.freeCompilerArgs = listOf(
+    "-Xlambdas=class",
+    "-Xconsistent-data-class-copy-visibility",
+    "-Xcontext-parameters",
+    "-XXLanguage:+AllowEagerSupertypeAccessibilityChecks",
+    "-progressive",
+  )
   jvm {}
   wasmJs {
     browser {}

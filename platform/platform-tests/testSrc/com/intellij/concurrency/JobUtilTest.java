@@ -135,7 +135,7 @@ public class JobUtilTest extends LightPlatformTestCase {
     int N = Timings.adjustAccordingToMySpeed(20_000, true);
     AtomicBoolean finished = new AtomicBoolean();
 
-    boolean ok = JobLauncher.getInstance().invokeConcurrentlyUnderProgress(Collections.<String>nCopies(N, null), null, __ -> {
+    boolean ok = JobLauncher.getInstance().invokeConcurrentlyUnderProgress(Collections.<String>nCopies(N, null), null, _ -> {
       try {
         if (finished.get()) {
           throw new RuntimeException();
@@ -161,7 +161,7 @@ public class JobUtilTest extends LightPlatformTestCase {
     for (int i = 0; i<10 && checkTestTimeout(i); i++) {
       COUNT.set(0);
       logElapsed(()->
-      JobLauncher.getInstance().invokeConcurrentlyUnderProgress(list, null, __ -> {
+      JobLauncher.getInstance().invokeConcurrentlyUnderProgress(list, null, _ -> {
         busySleepAndIncrement(1);
         return true;
       }));
@@ -181,8 +181,8 @@ public class JobUtilTest extends LightPlatformTestCase {
     for (int i = 0; i<10 && checkTestTimeout(i); i++) {
       COUNT.set(0);
       logElapsed(()->
-      JobLauncher.getInstance().invokeConcurrentlyUnderProgress(list, null, __ -> {
-        JobLauncher.getInstance().invokeConcurrentlyUnderProgress(list, null, ___ -> {
+      JobLauncher.getInstance().invokeConcurrentlyUnderProgress(list, null, _ -> {
+        JobLauncher.getInstance().invokeConcurrentlyUnderProgress(list, null, _ -> {
           COUNT.incrementAndGet();
           return true;
         });
@@ -205,7 +205,7 @@ public class JobUtilTest extends LightPlatformTestCase {
   private void checkProgressAndReadAction(@NotNull List<Object> objects,
                                           @Nullable DaemonProgressIndicator progress,
                                           boolean runInReadAction) throws Throwable {
-    JobLauncher.getInstance().invokeConcurrentlyUnderProgress(objects, progress, __ -> {
+    JobLauncher.getInstance().invokeConcurrentlyUnderProgress(objects, progress, _ -> {
       ThrowableRunnable<RuntimeException> runnable = () -> {
           try {
             if (objects.size() <= 1 || JobSchedulerImpl.getJobPoolParallelism() <= JobLauncherImpl.CORES_FORK_THRESHOLD) {
@@ -259,7 +259,7 @@ public class JobUtilTest extends LightPlatformTestCase {
     assertTrue(ex.getMessage().contains("myMsg"));
     List<Object> objects = Collections.nCopies(100_000, null);
     UsefulTestCase.assertThrows(ex.getClass(), "myMsg", () ->
-      JobLauncher.getInstance().invokeConcurrentlyUnderProgress(objects, null, __ -> {
+      JobLauncher.getInstance().invokeConcurrentlyUnderProgress(objects, null, _ -> {
         if (COUNT.incrementAndGet() == 10_000) {
           LOG.debug("PCE");
           if (ex instanceof Error) {
@@ -276,7 +276,7 @@ public class JobUtilTest extends LightPlatformTestCase {
   public void testIndicatorCancelMustEnsuePCE() {
     ProgressIndicator progress = new DaemonProgressIndicator();
     UsefulTestCase.assertThrows(ProcessCanceledException.class, () ->
-      JobLauncher.getInstance().invokeConcurrentlyUnderProgress(Collections.nCopies(100_000, null), progress, __ -> {
+      JobLauncher.getInstance().invokeConcurrentlyUnderProgress(Collections.nCopies(100_000, null), progress, _ -> {
         if (COUNT.incrementAndGet() == 10_000) {
           progress.cancel();
         }
@@ -287,14 +287,14 @@ public class JobUtilTest extends LightPlatformTestCase {
 
   public void testReturnFalseFromProcessorMustLeadToReturningFalseFromInvokeConcurrently() {
     List<Object> objects = Collections.nCopies(100_000, null);
-    boolean success = JobLauncher.getInstance().invokeConcurrentlyUnderProgress(objects, null, __ -> COUNT.incrementAndGet() != 10_000);
+    boolean success = JobLauncher.getInstance().invokeConcurrentlyUnderProgress(objects, null, _ -> COUNT.incrementAndGet() != 10_000);
     assertFalse(success);
   }
 
   public void testCompletesEvenIfCannotGrabReadAction() {
     List<Object> objects = Collections.nCopies(1_000_000, null);
     ApplicationManager.getApplication().runWriteAction(() -> {
-      boolean success = JobLauncher.getInstance().invokeConcurrentlyUnderProgress(objects, null, true, false, __ -> {
+      boolean success = JobLauncher.getInstance().invokeConcurrentlyUnderProgress(objects, null, true, false, _ -> {
         COUNT.incrementAndGet();
         return true;
       });
@@ -368,7 +368,7 @@ public class JobUtilTest extends LightPlatformTestCase {
 
   public void testProcessorReturningFalseDoesNotCrashTheOtherThreadStress() {
     AtomicInteger processed = new AtomicInteger();
-    Processor<String> processor = __ -> {
+    Processor<String> processor = _ -> {
       int next = processed.incrementAndGet();
       busySleepAndIncrement(next % 4, ProgressManager::checkCanceled);
       return next % 100 != 0;
@@ -384,7 +384,7 @@ public class JobUtilTest extends LightPlatformTestCase {
   }
 
   public void testTasksRunEvenWhenReadActionIsHardToGetStress() throws Exception {
-    Processor<String> processor = __ -> {
+    Processor<String> processor = _ -> {
       ApplicationManager.getApplication().assertReadAccessAllowed();
       return true;
     };
@@ -457,7 +457,7 @@ public class JobUtilTest extends LightPlatformTestCase {
           }
         });
         // use wrapper here to cancel early when write action start but do not affect the original indicator
-        ((JobLauncherImpl)JobLauncher.getInstance()).processQueue(queue, failedQueue, wrapper, TOMB_STONE, __ -> {
+        ((JobLauncherImpl)JobLauncher.getInstance()).processQueue(queue, failedQueue, wrapper, TOMB_STONE, _ -> {
           ReadAction.run(() -> {
             ProgressManager.checkCanceled();
             //TimeoutUtil.sleep(1);
@@ -574,7 +574,7 @@ public class JobUtilTest extends LightPlatformTestCase {
     ProgressIndicator indicator = new DaemonProgressIndicator();
 
     Job job = JobLauncher.getInstance().submitToJobThread(
-      () -> JobLauncher.getInstance().invokeConcurrentlyUnderProgress(Collections.nCopies(N_JOBS, null), indicator, __ -> {
+      () -> JobLauncher.getInstance().invokeConcurrentlyUnderProgress(Collections.nCopies(N_JOBS, null), indicator, _ -> {
         jobsStarted.incrementAndGet();
         TimeoutUtil.sleep(10);
         return true;
@@ -614,7 +614,7 @@ public class JobUtilTest extends LightPlatformTestCase {
     // check that invokeConcurrentlyUnderProgress() gets canceled immediately
     CountDownLatch cancelCalled = new CountDownLatch(1);
     Job job = JobLauncher.getInstance().submitToJobThread(() -> ProgressManager.getInstance().runProcess(()->
-        assertFalse(JobLauncher.getInstance().invokeConcurrentlyUnderProgress(Collections.nCopies(N, null), indicator, __->{
+        assertFalse(JobLauncher.getInstance().invokeConcurrentlyUnderProgress(Collections.nCopies(N, null), indicator, _->{
           TimeoutUtil.sleep(1);
           counter.incrementAndGet();
           try {
@@ -745,7 +745,7 @@ public class JobUtilTest extends LightPlatformTestCase {
 
     // N tests in parallel
     int N = 100;
-    JobLauncher.getInstance().invokeConcurrentlyUnderProgress(Collections.nCopies(N, null), new EmptyProgressIndicator(), __ -> {
+    JobLauncher.getInstance().invokeConcurrentlyUnderProgress(Collections.nCopies(N, null), new EmptyProgressIndicator(), _ -> {
       AtomicInteger executed = new AtomicInteger();
       boolean result = JobLauncher.getInstance().invokeConcurrentlyUnderProgress(ints, new DaemonProgressIndicator(), n -> {
         executed.incrementAndGet();

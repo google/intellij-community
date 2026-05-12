@@ -1,9 +1,13 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.searchEverywhere.frontend.resultsProcessing
 
+import com.intellij.ide.rpc.DataContextId
 import com.intellij.ide.rpc.rpcId
+import com.intellij.idea.AppMode
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DataContext
+import com.intellij.openapi.actionSystem.DataKey
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.project.Project
@@ -32,7 +36,11 @@ import com.intellij.platform.searchEverywhere.presentations.SeItemPresentation
 import com.intellij.platform.searchEverywhere.providers.SeLocalItemDataProvider
 import com.intellij.platform.searchEverywhere.providers.SeLog
 import com.intellij.platform.searchEverywhere.providers.SeLog.ITEM_EMIT
+import com.intellij.platform.searchEverywhere.providers.areCommandsSupported
+import com.intellij.platform.searchEverywhere.providers.isExtendedInfoEnabled
+import com.intellij.platform.searchEverywhere.providers.isPreviewEnabled
 import com.intellij.platform.searchEverywhere.providers.target.SeTypeVisibilityStatePresentation
+import com.intellij.platform.searchEverywhere.providers.topHit.SeTopHitItemsProvider
 import com.intellij.platform.searchEverywhere.toProviderId
 import com.intellij.platform.searchEverywhere.utils.SeResultsCountBalancer
 import com.intellij.platform.searchEverywhere.utils.initAsync
@@ -66,11 +74,11 @@ class SeTabDelegate(
   private val session: SeSession,
   private val logLabel: String,
   private val providerIds: List<SeProviderId>,
-  private val initEvent: AnActionEvent,
+  private val dataContextId: DataContextId,
   val scope: CoroutineScope,
 ) : Disposable {
   private val providers = initAsync(scope) {
-    initializeProviders(project, providerIds, initEvent, session, logLabel)
+    initializeProviders(project, providerIds, dataContextId, session, logLabel)
   }
 
   suspend fun getProvidersIdToName(): Map<SeProviderId, @Nls String> = providers.getValue().getProvidersIdToName()
@@ -158,15 +166,11 @@ class SeTabDelegate(
   suspend fun openInFindToolWindow(
     session: SeSession,
     params: SeParams,
-    initEvent: AnActionEvent,
     isAllTab: Boolean,
     disabledProviders: List<SeProviderId>? = null,
   ): Boolean {
     if (project == null) return false
 
-    val dataContextId = readAction {
-      initEvent.dataContext.rpcId()
-    }
     return SeRemoteApi.getInstance().openInFindToolWindow(project.projectId(),
                                                           session,
                                                           dataContextId,
@@ -232,8 +236,9 @@ class SeTabDelegate(
 
     fun getItems(params: SeParams, disabledProviders: List<SeProviderId>, mapToResultEvent: suspend (SeEqualityChecker?, SeTransferEvent) -> SeResultEvent?): Flow<SeResultEvent> {
       return channelFlow {
+        val frontendEqualityChecker = SeEqualityChecker()
+
         launch {
-          val equalityChecker = SeEqualityChecker()
           val localProviders = localProviders.filterKeys { !disabledProviders.contains(it) }.values
 
           localProviders.asFlow().flatMapMerge { provider ->
@@ -243,7 +248,7 @@ class SeTabDelegate(
               emit(SeTransferEnd(provider.id))
             }
           }.buffer(0, onBufferOverflow = BufferOverflow.SUSPEND).mapNotNull { transferEvent ->
-            mapToResultEvent(equalityChecker, transferEvent)
+            mapToResultEvent(frontendEqualityChecker, transferEvent)
           }.collect {
             send(it)
           }
@@ -252,7 +257,15 @@ class SeTabDelegate(
         if (frontendProvidersFacade != null) {
           launch {
             frontendProvidersFacade.getItems(params, disabledProviders).mapNotNull {
-              mapToResultEvent(null, it)
+              val isHostTopHitInMonolith = AppMode.isMonolith()
+                                           && (it as? SeTransferItem)?.itemData?.providerId?.value == SeTopHitItemsProvider.id(true)
+
+              if (isHostTopHitInMonolith) {
+                // Actions provider is on the frontend, and host topHit provider is on the backend.
+                // This equality check helps to avoid duplicated actions.
+                mapToResultEvent(frontendEqualityChecker, it)
+              }
+              else mapToResultEvent(null, it)
             }.collect {
               send(it)
             }
@@ -304,15 +317,15 @@ class SeTabDelegate(
     }
 
     suspend fun isPreviewEnabled(): Boolean {
-      return localProviders.values.any { it.isPreviewEnabled() } || frontendProvidersFacade?.isPreviewEnabled() == true
+      return localProviders.values.any { it.provider.isPreviewEnabled() } || frontendProvidersFacade?.isPreviewEnabled() == true
     }
 
     suspend fun isExtendedInfoEnabled(): Boolean {
-      return localProviders.values.any { it.isExtendedInfoEnabled() } || frontendProvidersFacade?.isExtendedInfoEnabled() == true
+      return localProviders.values.any { it.provider.isExtendedInfoEnabled() } || frontendProvidersFacade?.isExtendedInfoEnabled() == true
     }
 
     suspend fun isCommandsSupported(): Boolean {
-      return localProviders.values.any { it.isCommandsSupported() } || frontendProvidersFacade?.isCommandsSupported() == true
+      return localProviders.values.any { it.provider.areCommandsSupported() } || frontendProvidersFacade?.isCommandsSupported() == true
     }
   }
 
@@ -331,31 +344,32 @@ class SeTabDelegate(
   }
 
   companion object {
+    suspend fun create(
+      project: Project?,
+      session: SeSession,
+      logLabel: String,
+      providerIds: List<SeProviderId>,
+      initEvent: AnActionEvent,
+      scope: CoroutineScope,
+    ): SeTabDelegate = SeTabDelegate(project, session, logLabel, providerIds, initEvent.dataContextId(), scope)
+
     suspend fun shouldShowLegacyContributorInSeparateTab(
       project: Project,
       providerId: SeProviderId,
       initEvent: AnActionEvent,
       session: SeSession,
-    ): Boolean {
-      val dataContextId = readAction {
-        initEvent.dataContext.rpcId()
-      }
-      return SeFrontendService.getInstance(project).localProvidersHolder?.getLegacyContributor(providerId, false)?.isShownInSeparateTab == true ||
-             SeRemoteApi.getInstance().isShownInSeparateTab(project.projectId(), session, dataContextId, providerId)
-    }
+    ): Boolean =
+      SeFrontendService.getInstance(project).localProvidersHolder?.getLegacyContributor(providerId, false)?.isShownInSeparateTab == true ||
+      SeRemoteApi.getInstance().isShownInSeparateTab(project.projectId(), session, initEvent.dataContextId(), providerId)
 
     private suspend fun initializeProviders(
       project: Project?,
       providerIds: List<SeProviderId>,
-      initEvent: AnActionEvent,
+      dataContextId: DataContextId,
       session: SeSession,
       logLabel: String,
     ): Providers = coroutineScope {
       val projectId = project?.projectId()
-      val dataContextId = readAction {
-        initEvent.dataContext.rpcId()
-      }
-
 
       ensureActive()
       val localProvidersHolder = SeFrontendService.getInstance(project).localProvidersHolder
@@ -426,4 +440,20 @@ class SeTabDelegate(
       Providers(localProviders, frontendProvidersFacade, allEssentials)
     }
   }
+}
+
+private suspend fun AnActionEvent.dataContextId(): DataContextId =
+  (dataContext as? DataContextWithRpcId)?.dataContextId
+  ?: run {
+    SeLog.warn("DataContextWithRpcId is expected in the action event to get the data context id immediately. Using rpcId instead.")
+    readAction {
+      dataContext.rpcId()
+    }
+  }
+
+@ApiStatus.Internal
+class DataContextWithRpcId(val dataContext: DataContext, val dataContextId: DataContextId): DataContext {
+  @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")
+  override fun getData(dataId: String): Any? = dataContext.getData(dataId)
+  override fun <T> getData(key: DataKey<T?>): T? = dataContext.getData(key)
 }

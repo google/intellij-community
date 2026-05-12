@@ -9,6 +9,7 @@ import com.intellij.psi.PsiWhiteSpace
 import com.intellij.util.containers.stopAfter
 import org.jetbrains.kotlin.idea.util.isLineBreak
 import org.jetbrains.kotlin.psi.KtBlockExpression
+import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtReturnExpression
@@ -66,6 +67,33 @@ class CommentHolder(val leadingComments: List<CommentNode>, val trailingComments
             .map { CommentNode.create(it) }
             .toList()
     }
+}
+
+fun <TElement : KtElement> TElement.saveCommentsFromSurroundings(): TElement {
+    val surroundingComments = CommentHolder(
+        collectSurroundingComments(before = true).map(CommentHolder.CommentNode::create),
+        collectSurroundingComments(before = false).map(CommentHolder.CommentNode::create)
+    )
+    if (!surroundingComments.isEmpty) {
+        val existingComments = getCopyableUserData(CommentHolder.COMMENTS_TO_RESTORE_KEY)
+        putCopyableUserData(CommentHolder.COMMENTS_TO_RESTORE_KEY, existingComments?.merge(surroundingComments) ?: surroundingComments)
+    }
+    return this
+}
+
+private fun PsiElement.collectSurroundingComments(before: Boolean): List<PsiComment> {
+    val result = ArrayList<PsiComment>()
+    var sibling = if (before) prevSibling else nextSibling
+    while (sibling is PsiComment || sibling is PsiWhiteSpace) {
+        if (sibling is PsiComment) {
+            result.add(sibling)
+        }
+        sibling = if (before) sibling.prevSibling else sibling.nextSibling
+    }
+    if (before) {
+        result.reverse()
+    }
+    return result
 }
 
 private fun indentBefore(comment: PsiComment): String {

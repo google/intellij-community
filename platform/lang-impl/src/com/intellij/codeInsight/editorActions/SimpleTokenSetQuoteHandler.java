@@ -7,6 +7,7 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.highlighter.HighlighterIterator;
 import com.intellij.psi.tree.IElementType;
 import com.intellij.psi.tree.TokenSet;
+import org.jetbrains.annotations.NotNull;
 
 public class SimpleTokenSetQuoteHandler implements QuoteHandler {
   protected final TokenSet myLiteralTokenSet;
@@ -20,7 +21,7 @@ public class SimpleTokenSetQuoteHandler implements QuoteHandler {
   }
 
   @Override
-  public boolean isClosingQuote(HighlighterIterator iterator, int offset) {
+  public boolean isClosingQuote(@NotNull HighlighterIterator iterator, int offset) {
     final IElementType tokenType = iterator.getTokenType();
 
     if (myLiteralTokenSet.contains(tokenType)){
@@ -33,7 +34,7 @@ public class SimpleTokenSetQuoteHandler implements QuoteHandler {
   }
 
   @Override
-  public boolean isOpeningQuote(HighlighterIterator iterator, int offset) {
+  public boolean isOpeningQuote(@NotNull HighlighterIterator iterator, int offset) {
     if (myLiteralTokenSet.contains(iterator.getTokenType())){
       int start = iterator.getStart();
       return offset == start;
@@ -43,7 +44,7 @@ public class SimpleTokenSetQuoteHandler implements QuoteHandler {
   }
 
   @Override
-  public boolean hasNonClosedLiteral(Editor editor, HighlighterIterator iterator, int offset) {
+  public boolean hasNonClosedLiteral(@NotNull Editor editor, @NotNull HighlighterIterator iterator, int offset) {
     int start = iterator.getStart();
     try {
       Document doc = editor.getDocument();
@@ -75,7 +76,7 @@ public class SimpleTokenSetQuoteHandler implements QuoteHandler {
   }
 
   @Override
-  public boolean isInsideLiteral(HighlighterIterator iterator) {
+  public boolean isInsideLiteral(@NotNull HighlighterIterator iterator) {
     return myLiteralTokenSet.contains(iterator.getTokenType());
   }
 }

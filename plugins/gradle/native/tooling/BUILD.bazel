@@ -1,6 +1,6 @@
 ### auto-generated section `build intellij.gradle.native.tooling` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_tooling",
@@ -11,18 +11,13 @@ create_kotlinc_options(
   ]
 )
 
-resourcegroup(
-  name = "tooling_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "tooling",
   module_name = "intellij.gradle.native.tooling",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":tooling_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_tooling",
   deps = [
     "@lib//:jetbrains-annotations",
@@ -36,6 +31,7 @@ jvm_library(
 
 jvm_library(
   name = "tooling_test_lib",
+  testonly = True,
   module_name = "intellij.gradle.native.tooling",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -50,15 +46,23 @@ jvm_library(
 )
 ### auto-generated section `build intellij.gradle.native.tooling` end
 
+### auto-generated section `iml intellij.gradle.native.tooling` start
+exports_files([
+  "intellij.gradle.native.tooling.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.gradle.native.tooling` end
+
 ### auto-generated section `build intellij.gradle.native.tooling.tests` start
 jvm_library(
   name = "gradle-native-tooling-tests",
+  module_name = "intellij.gradle.native.tooling.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "gradle-native-tooling-tests_test_lib",
+  testonly = True,
   module_name = "intellij.gradle.native.tooling.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["testSources/**/*.kt", "testSources/**/*.java", "testSources/**/*.form"], allow_empty = True),
@@ -77,6 +81,12 @@ jvm_library(
   runtime_deps = [":gradle-native-tooling-tests"]
 )
 ### auto-generated section `build intellij.gradle.native.tooling.tests` end
+
+### auto-generated section `iml intellij.gradle.native.tooling.tests` start
+exports_files([
+  "intellij.gradle.native.tooling.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.gradle.native.tooling.tests` end
 
 ### auto-generated section `test intellij.gradle.native.tooling.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

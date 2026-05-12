@@ -64,9 +64,9 @@ public class VFSContentStorageOverMMappedFile implements VFSContentStorage, Unma
 
 
   /**
-   * Version of storage format itself: headers sizes, fields meaning, etc.
+   * Version of the storage format itself: headers sizes, fields' meaning, etc.
    * Ctor adds to this some params (compression algo ID).
-   * Ctor fails if file-to-open has this version different from current value
+   * Ctor fails if file-to-open has this version different from the current value
    */
   private static final byte STORAGE_FORMAT_VERSION_BASE = 1;
 
@@ -157,6 +157,7 @@ public class VFSContentStorageOverMMappedFile implements VFSContentStorage, Unma
           || !contentStorage.wasClosedProperly()
           || contentStorage.wasRecoveryNeeded()) {
         //ensure map is also empty
+        //noinspection UseOptimizedEelFunctions: mmapped files are always local, never Eel's
         NioFiles.deleteRecursively(mapPath);
       }
 
@@ -176,11 +177,11 @@ public class VFSContentStorageOverMMappedFile implements VFSContentStorage, Unma
       this.otelCallback = setupOTelMonitoring(this, TelemetryManager.getInstance().getMeter(VFS));
     }
     catch (Throwable th) {
-      //on any exception we _must_ close all the storages, since MMappedFileStorage keep track of opened storages, and doesn't
-      // allow to re-open storage not properly closed before
+      //on any exception we _must_ close all the storages, since MMappedFileStorage keep track of opened storages and
+      // doesn't allow re-opening storage not properly closed before
       if (contentStorage != null) {
         try {
-          contentStorage.close();
+          contentStorage.closeAndUnsafelyUnmap();
         }
         catch (Throwable closeEx) {
           th.addSuppressed(closeEx);
@@ -189,7 +190,7 @@ public class VFSContentStorageOverMMappedFile implements VFSContentStorage, Unma
 
       if (hashToContentRecordIdMap != null) {
         try {
-          hashToContentRecordIdMap.close();
+          hashToContentRecordIdMap.closeAndUnsafelyUnmap();
         }
         catch (Throwable closeEx) {
           th.addSuppressed(closeEx);
@@ -235,7 +236,7 @@ public class VFSContentStorageOverMMappedFile implements VFSContentStorage, Unma
           ByteArraySequence bytesToStore;
           int uncompressedSize;
           if (compressingAlgo.shouldCompress(bytes)) {
-            //Since returned ByteArraySequence may wrap _reusable_ buffer => bytesToStore must NOT be used outside of this method
+            //Since returned ByteArraySequence may wrap _reusable_ buffer => bytesToStore must NOT be used outside this method
             bytesToStore = compressingAlgo.compress(bytes, /* mayReturnReusableBuffer: */ true);
             uncompressedSize = -bytes.length();//sign bit indicates 'compressed data'
 

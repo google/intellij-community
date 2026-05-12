@@ -3,6 +3,7 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "kotlin-compilerReferenceIndex-tests",
+  module_name = "intellij.kotlin.compilerReferenceIndex.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -13,6 +14,7 @@ jvm_library(
 
 jvm_library(
   name = "kotlin-compilerReferenceIndex-tests_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.compilerReferenceIndex.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -22,8 +24,8 @@ jvm_library(
     "//plugins/kotlin/plugin/k2",
     "//plugins/kotlin/plugin/k2:k2_test_lib",
     "@lib//:kotlinc-kotlin-compiler-tests",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//java/java-tests:tests",
     "//java/java-tests:tests_test_lib",
     "//platform/core-api:core",
@@ -49,6 +51,12 @@ jvm_library(
   runtime_deps = [":kotlin-compilerReferenceIndex-tests"]
 )
 ### auto-generated section `build intellij.kotlin.compilerReferenceIndex.tests` end
+
+### auto-generated section `iml intellij.kotlin.compilerReferenceIndex.tests` start
+exports_files([
+  "intellij.kotlin.compilerReferenceIndex.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.compilerReferenceIndex.tests` end
 
 ### auto-generated section `test intellij.kotlin.compilerReferenceIndex.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

@@ -17,7 +17,7 @@ package com.intellij.java.codeInsight.intention;
 
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.java.JavaBundle;
-import com.intellij.testFramework.IdeaTestUtil;
+import com.intellij.pom.java.LanguageLevel;
 import com.intellij.testFramework.builders.JavaModuleFixtureBuilder;
 import com.intellij.testFramework.fixtures.JavaCodeInsightFixtureTestCase;
 
@@ -26,7 +26,7 @@ public class AddExplicitTypeArgumentsIntentionTest extends JavaCodeInsightFixtur
   @Override
   protected void tuneFixture(JavaModuleFixtureBuilder moduleBuilder) throws Exception {
     super.tuneFixture(moduleBuilder);
-    moduleBuilder.addJdk(IdeaTestUtil.getMockJdk18Path().getPath());
+    moduleBuilder.addJdkVersion(LanguageLevel.JDK_1_8);
   }
 
   public void testNoStaticQualifier() {

@@ -247,9 +247,6 @@ public class XBreakpointActionsPanel extends XBreakpointPropertiesSubPanel {
     }
     boolean isLineBreakpoint = breakpoint instanceof XLineBreakpointProxy;
     myTemporaryCheckBox.setVisible(isLineBreakpoint);
-    if (isLineBreakpoint) {
-      myTemporaryCheckBox.addActionListener(e -> ((XLineBreakpointProxy)myBreakpoint).setTemporary(myTemporaryCheckBox.isSelected()));
-    }
   }
 
   void setSourcePosition(XSourcePosition sourcePosition) {

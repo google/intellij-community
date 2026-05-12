@@ -23,6 +23,10 @@ class PythonCodeCompletionConfigurable: UiDslUnnamedConfigurable.Simple(), Confi
           .bindSelected(settings::INCLUDE_IMPORTABLE_NAMES_IN_BASIC_COMPLETION)
           .contextHelp(PyBundle.message("configurable.PythonCodeCompletionConfigurable.checkbox.suggest.importable.names.help"))
       }
+      row {
+        checkBox(PyBundle.message("configurable.PythonCodeCompletionConfigurable.checkbox.copy.annotations.from.stubs"))
+          .bindSelected(settings::COPY_TYPE_ANNOTATIONS_FROM_STUBS)
+      }
     }
   }
 }

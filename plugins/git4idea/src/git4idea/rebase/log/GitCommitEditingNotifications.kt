@@ -3,7 +3,6 @@ package git4idea.rebase.log
 
 import com.intellij.notification.NotificationAction
 import com.intellij.notification.NotificationType
-import com.intellij.openapi.progress.util.BackgroundTaskUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.vcs.VcsNotifier
@@ -58,14 +57,14 @@ internal fun List<GitCommitEditingOperationResult.Complete>.notifySuccess(
 
   val connection = project.messageBus.connect()
   notification.whenExpired { connection.disconnect() }
-  connection.subscribe(GitRepository.GIT_REPO_CHANGE, GitRepositoryChangeListener {
-    BackgroundTaskUtil.executeOnPooledThread(it, Runnable {
-      resultsByRepository[it]?.let { completeResult ->
+  connection.subscribe(GitRepository.GIT_REPO_CHANGE, GitRepositoryChangeListener { changedRepository ->
+    GitDisposable.getInstance(project).coroutineScope.launch {
+      resultsByRepository[changedRepository]?.let { completeResult ->
         if (completeResult.checkUndoPossibility() !== UndoPossibility.Possible) {
           notification.expire()
         }
       }
-    })
+    }
   })
 
   VcsNotifier.getInstance(project).notify(notification)

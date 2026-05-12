@@ -3,7 +3,6 @@ package com.intellij.psi.codeStyle
 
 import com.intellij.openapi.util.TextRange
 import com.intellij.util.containers.FList
-import com.intellij.util.text.NameUtilCore
 import com.intellij.util.text.NameUtilCore.isWordStart
 import com.intellij.util.text.matching.AsciiUtils
 import com.intellij.util.text.matching.MatchedFragment
@@ -11,14 +10,15 @@ import com.intellij.util.text.matching.MatchingMode
 import com.intellij.util.text.matching.deprecated
 import com.intellij.util.text.matching.indexOf
 import com.intellij.util.text.matching.indexOfAny
-import com.intellij.util.text.matching.regionMatches
 import com.intellij.util.text.matching.undeprecate
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
+import kotlin.math.min
 
 /**
  * Tells whether a string matches a specific pattern. Allows for lowercase camel-hump matching.
  * Used in navigation, code completion, speed search etc.
- * 
+ *
  * @see NameUtil.buildMatcher
  */
 internal class MinusculeMatcherImpl(pattern: String, private val myMatchingMode: MatchingMode, hardSeparators: String) :
@@ -29,13 +29,12 @@ internal class MinusculeMatcherImpl(pattern: String, private val myMatchingMode:
   private val isWordSeparator: BooleanArray = BooleanArray(myPattern.size)
   private val toUpperCase: CharArray = CharArray(myPattern.size)
   private val toLowerCase: CharArray = CharArray(myPattern.size)
-private val myHardSeparators: CharArray = hardSeparators.toCharArray()
+  private val myHardSeparators: CharArray = hardSeparators.toCharArray()
 
   private val myMixedCase: Boolean
   private val myHasSeparators: Boolean
   private val myHasDots: Boolean
   private val myMeaningfulCharacters: CharArray
-  private val myMinNameLength: Int
 
   /**
    * Constructs a matcher by a given pattern.
@@ -87,14 +86,22 @@ private val myHardSeparators: CharArray = hardSeparators.toCharArray()
     myHasSeparators = hasSeparators
 
     myMeaningfulCharacters = meaningful.toCharArray()
-    myMinNameLength = myMeaningfulCharacters.size / 2
   }
 
   override fun matchingDegree(name: String, valueStartCaseMatch: Boolean, fragments: List<MatchedFragment>?): Int {
-    return NameUtil.calculateHumpedMatchingScore(myPattern, name, valueStartCaseMatch, fragments, isLowerCase, isUpperCase, myHardSeparators)
+    return calculateHumpedMatchingScore(
+      myPattern,
+      name,
+      valueStartCaseMatch,
+      fragments,
+      isLowerCase,
+      isUpperCase,
+      myHardSeparators
+    )
   }
 
   @Deprecated("use matchingDegree(String, Boolean, List<MatchedFragment>)", replaceWith = ReplaceWith("matchingDegree(name, valueStartCaseMatch, fragments.map { MatchedFragment(it.startOffset, it.endOffset) })"))
+  @ApiStatus.ScheduledForRemoval
   override fun matchingDegree(name: String, valueStartCaseMatch: Boolean, fragments: FList<out TextRange>?): Int {
     return matchingDegree(name, valueStartCaseMatch, fragments?.undeprecate())
   }
@@ -103,7 +110,7 @@ private val myHardSeparators: CharArray = hardSeparators.toCharArray()
     get() = myPattern.concatToString()
 
   override fun match(name: String): List<MatchedFragment>? {
-    if (name.length < myMinNameLength) {
+    if (name.length < myMeaningfulCharacters.size / 2) {
       return null
     }
 
@@ -111,45 +118,60 @@ private val myHardSeparators: CharArray = hardSeparators.toCharArray()
       return matchBySubstring(name)
     }
 
-    val length = name.length
-    var patternIndex = 0
-    var i = 0
-    while (i < length && patternIndex < myMeaningfulCharacters.size) {
-      val c = name[i]
-      if (c == myMeaningfulCharacters[patternIndex] || c == myMeaningfulCharacters[patternIndex + 1]) {
-        patternIndex += 2
-      }
-      ++i
-    }
-    if (patternIndex < myMinNameLength * 2) {
+    if (!nameContainsAllMeaningfulCharsInOrder(name, myMeaningfulCharacters)) {
       return null
     }
     return matchWildcards(name, 0, 0)?.asReversed()
   }
 
   @Deprecated("use match(String)", replaceWith = ReplaceWith("match(name)"))
+  @ApiStatus.ScheduledForRemoval
   override fun matchingFragments(name: String): FList<TextRange>? {
     return match(name)?.deprecated()
   }
 
   private fun matchBySubstring(name: String): List<MatchedFragment>? {
-    val infix = isPatternChar(0, '*')
-    val patternWithoutWildChar = filterWildcard(myPattern)
-    if (name.length < patternWithoutWildChar.length) {
+    val meaningfulCharactersCount = myMeaningfulCharacters.size / 2
+    if (name.length < meaningfulCharactersCount) {
       return null
     }
-    if (infix) {
-      val index = name.indexOf(patternWithoutWildChar, ignoreCase = true)
-      if (index >= 0) {
-        return listOf(MatchedFragment(index, index + patternWithoutWildChar.length - 1))
-      }
-      return null
+    if (isPatternChar(0, '*')) {
+        for (i in 0..name.length - meaningfulCharactersCount) {
+          val meaningfulCharsMatchLength = meaningfulCharsMatchAt(name, i)
+          if (meaningfulCharsMatchLength != 0) {
+            return listOf(MatchedFragment(i, i + meaningfulCharsMatchLength))
+          }
+        }
+        return null
     }
+    val meaningfulCharsMatchLength = meaningfulCharsMatchAt(name, 0)
+    return if (meaningfulCharsMatchLength != 0) {
+      listOf(MatchedFragment(0, meaningfulCharsMatchLength))
+    }
+    else {
+      null
+    }
+  }
 
-    if (regionMatches(patternWithoutWildChar, 0, patternWithoutWildChar.length, name)) {
-      return listOf(MatchedFragment(0, patternWithoutWildChar.length))
+  private fun meaningfulCharsMatchAt(name: String, nameIndex: Int): Int {
+    var meaningfulCharIndex = 0
+    var namePos = nameIndex
+    while (namePos < name.length && meaningfulCharIndex + 1 < myMeaningfulCharacters.size) {
+      val c = name[namePos]
+      when {
+          c == myMeaningfulCharacters[meaningfulCharIndex] || c == myMeaningfulCharacters[meaningfulCharIndex + 1] -> {
+              meaningfulCharIndex += 2
+              namePos += 1
+          }
+          isWildcard(c) -> {
+              namePos += 1
+          }
+          else -> {
+              return 0
+          }
+      }
     }
-    return null
+    return namePos - nameIndex
   }
 
   /**
@@ -484,13 +506,6 @@ private val myHardSeparators: CharArray = hardSeparators.toCharArray()
       return c.isWhitespace() || c == '_' || c == '-' || c == ':' || c == '+' || c == '.'
     }
 
-    private fun nextWord(name: String, start: Int): Int {
-      if (start < name.length && name[start].isDigit()) {
-        return start + 1 //treat each digit as a separate hump
-      }
-      return NameUtilCore.nextWord(name, start)
-    }
-
     private fun appendRange(ranges: List<MatchedFragment>, from: Int, length: Int): List<MatchedFragment> {
       if (ranges.isEmpty()) {
         return mutableListOf(MatchedFragment(from, from + length))
@@ -507,12 +522,5 @@ private val myHardSeparators: CharArray = hardSeparators.toCharArray()
       return ranges
     }
 
-    private fun filterWildcard(source: CharArray): String {
-      return buildString(capacity = source.size) {
-        for (c in source) {
-          if (c != '*') append(c)
-        }
-      }
-    }
   }
 }

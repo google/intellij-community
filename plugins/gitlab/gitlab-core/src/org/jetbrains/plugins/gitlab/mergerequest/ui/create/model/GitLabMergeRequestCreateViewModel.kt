@@ -393,6 +393,7 @@ internal class GitLabMergeRequestCreateViewModelImpl(
       }
       catch (e: Throwable) {
         _reviewCreatingError.value = e
+        LOG.warn("Failed to create merge request", e)
         val errorCode = (e as? HttpStatusErrorException)?.statusCode ?: -1
         GitLabStatistics.logMrCreationFailed(project, errorCode)
       }

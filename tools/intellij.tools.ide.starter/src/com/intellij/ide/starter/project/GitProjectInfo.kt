@@ -35,11 +35,10 @@ data class GitProjectInfo(
   val commitHash: String = "",
 
   /**
-   * Branch name is a must to specify because there is no easy way to decipher it from git.
-   * And if you're switching between branches in tests you may encounter problem,
-   * that tests can execute on the branch, that you're not expected.
+   * Branch to check out. If empty, the remote default branch (HEAD) is used.
+   * When switching between branches in tests, specify this explicitly to avoid running on an unexpected branch.
    */
-  val branchName: String,
+  val branchName: String = "",
 
   override val isReusable: Boolean = false,
   override val downloadTimeout: Duration = 10.minutes,
@@ -100,9 +99,19 @@ data class GitProjectInfo(
     }
 
     if (commitHash.isNotEmpty() && Git.getLocalCurrentCommitHash(projectHome) != commitHash) {
-      val hasCommit = Git.getLocalBranches(projectHome, commitHash).contains(branchName)
+      // When branchName is empty, getLocalBranches returns [""] on empty output, so contains("") would
+      // be a false positive. Guard with branchName.isNotEmpty() so we always pull when branch is unknown.
+      val hasCommit = branchName.isNotEmpty() && Git.getLocalBranches(projectHome, commitHash).contains(branchName)
       if (!hasCommit) Git.pull(projectHome)
       Git.reset(repositoryDirectory = projectHome, commitHash = commitHash)
+    }
+    else if (commitHash.isEmpty() && branchName.isNotEmpty()) {
+      Git.fetch(projectHome)
+      Git.reset(repositoryDirectory = projectHome, commitHash = "origin/$branchName")
+    }
+    else if (commitHash.isEmpty() && branchName.isEmpty()) {
+      Git.fetch(projectHome)
+      Git.reset(repositoryDirectory = projectHome, commitHash = "FETCH_HEAD")
     }
   }
 
@@ -175,7 +184,7 @@ data class GitProjectInfo(
     }
     catch (ex: Exception) {
       logError(buildString {
-        appendLine("Failed to setup the test project git repository state as: $this")
+        appendLine("Failed to setup the test project git repository state as: ${this@GitProjectInfo}")
         appendLine("Trying one more time from clean checkout")
       }, ex)
 

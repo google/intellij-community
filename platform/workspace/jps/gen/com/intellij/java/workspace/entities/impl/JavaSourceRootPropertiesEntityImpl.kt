@@ -1,4 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.java.workspace.entities.impl
 
 import com.intellij.java.workspace.entities.JavaSourceRootPropertiesEntity
@@ -16,11 +18,10 @@ import com.intellij.platform.workspace.storage.impl.EntityLink
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
-import com.intellij.platform.workspace.storage.impl.extractOneToManyParent
-import com.intellij.platform.workspace.storage.impl.updateOneToManyParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
 @GeneratedCodeApiVersion(3)
@@ -39,7 +40,8 @@ internal class JavaSourceRootPropertiesEntityImpl(private val dataSource: JavaSo
   }
 
   override val sourceRoot: SourceRootEntity
-    get() = snapshot.extractOneToManyParent(SOURCEROOT_CONNECTION_ID, this)!!
+    get() = snapshot.instrumentation.getParent(SOURCEROOT_CONNECTION_ID, this) as? SourceRootEntity
+            ?: error("Parent sourceRoot not found for JavaSourceRootPropertiesEntity")
   override val generated: Boolean
     get() {
       readField("generated")
@@ -94,7 +96,7 @@ internal class JavaSourceRootPropertiesEntityImpl(private val dataSource: JavaSo
         error("Field WorkspaceEntity#entitySource should be initialized")
       }
       if (_diff != null) {
-        if (_diff.extractOneToManyParent<WorkspaceEntityBase>(SOURCEROOT_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getParentBuilder(SOURCEROOT_CONNECTION_ID, this) == null) {
           error("Field JavaSourceRootPropertiesEntity#sourceRoot should be initialized")
         }
       }
@@ -134,12 +136,13 @@ internal class JavaSourceRootPropertiesEntityImpl(private val dataSource: JavaSo
       get() {
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(SOURCEROOT_CONNECTION_ID, this) as? SourceRootEntityBuilder)
-          ?: (this.entityLinks[EntityLink(false, SOURCEROOT_CONNECTION_ID)]!! as SourceRootEntityBuilder)
+          ?: (this.entityLinks[EntityLink(false, SOURCEROOT_CONNECTION_ID)] as? SourceRootEntityBuilder)
+          ?: error("sourceRoot is null for JavaSourceRootPropertiesEntity")
         }
         else {
-          this.entityLinks[EntityLink(false, SOURCEROOT_CONNECTION_ID)]!! as SourceRootEntityBuilder
+          (this.entityLinks[EntityLink(false, SOURCEROOT_CONNECTION_ID)] as? SourceRootEntityBuilder)
+          ?: error("sourceRoot is null for JavaSourceRootPropertiesEntity")
         }
       }
       set(value) {
@@ -155,7 +158,7 @@ internal class JavaSourceRootPropertiesEntityImpl(private val dataSource: JavaSo
           _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
         }
         if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)) {
-          _diff.updateOneToManyParentOfChild(SOURCEROOT_CONNECTION_ID, this, value)
+          _diff.instrumentation.addChild(SOURCEROOT_CONNECTION_ID, value, this)
         }
         else {
 // Setting backref of the list
@@ -204,7 +207,6 @@ internal class JavaSourceRootPropertiesEntityData : WorkspaceEntityData<JavaSour
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): JavaSourceRootPropertiesEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {

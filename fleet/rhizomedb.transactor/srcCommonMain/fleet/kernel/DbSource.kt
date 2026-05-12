@@ -11,8 +11,11 @@ import fleet.kernel.rete.UnsatisfiedMatchException
 import fleet.kernel.rete.impl.ObservableMatch
 import kotlinx.coroutines.ThreadContextElement
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.yield
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
@@ -98,6 +101,68 @@ class ConstantDBSource(private val db: DB) : DbSource {
     get() = "ConstantDbSource($db)"
 }
 
+class MutableDbSource(override val debugName: String, initial: DB) : DbSource {
+  private sealed interface State {
+    data class NotTerminated(val db: DB) : State
+    data class Terminated(val cause: Throwable) : State
+  }
+
+  private val state = MutableStateFlow<State>(State.NotTerminated(initial))
+
+  override val flow: Flow<DB>
+    get() = state.map {
+      when (it) {
+        is State.NotTerminated -> it.db
+        is State.Terminated -> throw it.cause
+      }
+    }
+
+  override val latest: DB
+    get() = when (val s = state.value) {
+      is State.NotTerminated -> s.db
+      is State.Terminated -> throw s.cause
+    }
+
+  fun set(db: DB) {
+    state.update {
+      check(it is State.NotTerminated) { "db source is already terminated" }
+      State.NotTerminated(db)
+    }
+  }
+
+  fun close(ex: Throwable? = null) {
+    state.update {
+      when (it) {
+        is State.Terminated -> it
+        else -> State.Terminated(ex ?: RuntimeException("DbSource is terminated"))
+      }
+    }
+  }
+
+  fun readOnly(): DbSource {
+    val source = this
+    return object : DbSource {
+      override val latest: DB get() = source.latest
+      override val flow: Flow<DB> get() = source.flow
+      override val debugName: String get() = source.debugName
+    }
+  }
+}
+
+inline fun <T> MutableDbSource.use(body: () -> T): T {
+  var cause: Throwable? = null
+  return try {
+    body()
+  }
+  catch (ex: Throwable) {
+    cause = ex
+    throw ex
+  }
+  finally {
+    close(cause)
+  }
+}
+
 class FlowDbSource(
   internal val stateFlow: StateFlow<DB>,
   override val debugName: String,
@@ -109,7 +174,7 @@ class FlowDbSource(
     get() = stateFlow.value
 
   override fun toString(): String =
-    "FlowDbSource(${debugName})"
+    "FlowDbSource@${hashCode().toString(16)}(${debugName})"
 }
 
 
@@ -118,7 +183,7 @@ fun KernelContextElement(
   dbSource: DbSource = FlowDbSource(transactor.dbState, "kernel $transactor")
 ): CoroutineContext =
   transactor + DbSource.ContextElement(dbSource) + (asOf(transactor.dbState.value) { ReteEntity.forKernel(transactor) }
-    ?: EmptyCoroutineContext)
+                                                    ?: EmptyCoroutineContext)
 
 fun ConstantDbContext(db: DB): CoroutineContext =
   DbSource.ContextElement(ConstantDBSource(db))

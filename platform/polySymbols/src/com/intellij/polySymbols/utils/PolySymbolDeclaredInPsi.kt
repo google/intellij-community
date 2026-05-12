@@ -12,10 +12,32 @@ import com.intellij.platform.backend.navigation.NavigationTarget
 import com.intellij.platform.backend.presentation.TargetPresentation
 import com.intellij.polySymbols.PolySymbol
 import com.intellij.polySymbols.declarations.PolySymbolDeclaration
+import com.intellij.polySymbols.search.PsiSourcedPolySymbol
 import com.intellij.psi.PsiElement
 import com.intellij.psi.search.SearchScope
 import com.intellij.refactoring.rename.api.RenameTarget
 
+/**
+ * This interface servers as a boilerplate to define symbols that are declared somewhere in PSI.
+ * It provides out-of-the-box support for navigation to the declaration,
+ * for find usages, for rename and for building [PolySymbolDeclaration] object.
+ *
+ * You need to override [sourceElement] and [textRangeInSourceElement] to provide
+ * the PSI element within which the symbol is declared and the range of the declaration within that element.
+ * You should also implement [`PolySymbolDeclarationProvider`](com.intellij.polySymbols.declarations.PolySymbolDeclarationProvider),
+ * which would instantiate (or find) the symbol object and return the [declaration].
+ * Providing a declaration through the provider is important because it allows the platform
+ * to recognize the symbol declaration for the specified code range and provide functionality
+ * (documentation, find usages, rename, etc.).
+ *
+ * In contrast to [PsiSourcedPolySymbol], implementing this interface
+ * does not link the symbol to the PSI element, so any usage or rename
+ * searches for the [PsiElement] returned by the [sourceElement] will not
+ * result in the symbol being recognized as a usage or rename target.
+ *
+ * @see [PsiSourcedPolySymbol]
+ *
+ */
 interface PolySymbolDeclaredInPsi : PolySymbol, SearchTarget, RenameTarget {
 
   val sourceElement: PsiElement?

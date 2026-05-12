@@ -138,9 +138,9 @@ public abstract class AbstractSafeDeleteTest extends KotlinLightCodeInsightFixtu
         IgnoreTests.INSTANCE.runTestIfNotDisabledByFileDirective(
           dataFile().toPath(),
           IgnoreTests.DIRECTIVES.of(getPluginMode()),
-          __ -> Collections.emptyList(),
+          _ -> Collections.emptyList(),
           IgnoreTests.DirectivePosition.LAST_LINE_IN_FILE,
-          __ -> {
+          _ -> {
               return KotlinLightCodeInsightFixtureTestCaseKt.withCustomCompilerOptions(myFixture.getFile().getText(), getProject(), getModule(), () -> {
                   try {
                       SafeDeleteHandler.invoke(getProject(), new PsiElement[] {element}, null, true, null);

@@ -79,8 +79,6 @@ f:git4idea.GitNavigateRevisionResolver
 - resolve(com.intellij.openapi.project.Project,java.lang.String,java.lang.String):com.intellij.openapi.vfs.VirtualFile
 f:git4idea.GitProtectedBranchesKt
 - sf:findProtectedRemoteBranch(git4idea.repo.GitRepository,java.util.Collection):java.lang.String
-- sf:findProtectedRemoteBranchContainingCommit(git4idea.repo.GitRepository,com.intellij.vcs.log.Hash):java.lang.String
-- sf:isCommitPublished(git4idea.repo.GitRepository,com.intellij.vcs.log.Hash):Z
 - sf:isRemoteBranchProtected(java.util.Collection,java.lang.String):Z
 f:git4idea.GitPushUtil
 - sf:INSTANCE:git4idea.GitPushUtil
@@ -1181,7 +1179,7 @@ git4idea.commands.Git
 - a:createNewTag(git4idea.repo.GitRepository,java.lang.String,git4idea.commands.GitLineHandlerListener,java.lang.String):git4idea.commands.GitCommandResult
 - a:createWorkingTree(git4idea.repo.GitRepository,com.intellij.openapi.vcs.FilePath,git4idea.GitBranch,java.lang.String):git4idea.commands.GitCommandResult
 - a:deleteTag(git4idea.repo.GitRepository,java.lang.String,git4idea.commands.GitLineHandlerListener[]):git4idea.commands.GitCommandResult
-- a:deleteWorkingTree(com.intellij.openapi.project.Project,git4idea.GitWorkingTree):git4idea.commands.GitCommandResult
+- a:deleteWorkingTree(git4idea.repo.GitRepository,git4idea.GitWorkingTree):git4idea.commands.GitCommandResult
 - a:diff(git4idea.repo.GitRepository,java.util.List,java.lang.String):git4idea.commands.GitCommandResult
 - a:fetch(git4idea.repo.GitRepository,git4idea.repo.GitRemote,java.util.List,java.lang.String[]):git4idea.commands.GitCommandResult
 - s:getInstance():git4idea.commands.Git
@@ -1192,7 +1190,7 @@ git4idea.commands.Git
 - a:ignoredFilePaths(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.Collection):java.util.Set
 - a:ignoredFilePathsNoChunk(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.List):java.util.Set
 - a:init(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,git4idea.commands.GitLineHandlerListener[]):git4idea.commands.GitCommandResult
-- a:listWorktrees(git4idea.repo.GitRepository,git4idea.commands.GitLineHandlerListener[]):git4idea.commands.GitCommandResult
+- a:listWorktrees(git4idea.repo.GitRepository):java.util.List
 - a:lsRemote(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,git4idea.repo.GitRemote,java.lang.String[]):git4idea.commands.GitCommandResult
 - lsRemote(com.intellij.openapi.project.Project,java.io.File,java.lang.String):git4idea.commands.GitCommandResult
 - a:lsRemote(com.intellij.openapi.project.Project,java.nio.file.Path,java.lang.String):git4idea.commands.GitCommandResult
@@ -1425,7 +1423,7 @@ c:git4idea.commands.GitImpl
 - p:createRebaseEditor(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,git4idea.commands.GitLineHandler,Z):git4idea.rebase.GitRebaseEditorHandler
 - createWorkingTree(git4idea.repo.GitRepository,com.intellij.openapi.vcs.FilePath,git4idea.GitBranch,java.lang.String):git4idea.commands.GitCommandResult
 - deleteTag(git4idea.repo.GitRepository,java.lang.String,git4idea.commands.GitLineHandlerListener[]):git4idea.commands.GitCommandResult
-- deleteWorkingTree(com.intellij.openapi.project.Project,git4idea.GitWorkingTree):git4idea.commands.GitCommandResult
+- deleteWorkingTree(git4idea.repo.GitRepository,git4idea.GitWorkingTree):git4idea.commands.GitCommandResult
 - diff(git4idea.repo.GitRepository,java.util.List,java.lang.String):git4idea.commands.GitCommandResult
 - fetch(git4idea.repo.GitRepository,git4idea.repo.GitRemote,java.util.List,java.lang.String[]):git4idea.commands.GitCommandResult
 - getObjectType(git4idea.repo.GitRepository,java.lang.String):git4idea.commands.GitCommandResult
@@ -1435,7 +1433,7 @@ c:git4idea.commands.GitImpl
 - ignoredFilePaths(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.Collection):java.util.Set
 - ignoredFilePathsNoChunk(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.List):java.util.Set
 - init(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,git4idea.commands.GitLineHandlerListener[]):git4idea.commands.GitCommandResult
-- listWorktrees(git4idea.repo.GitRepository,git4idea.commands.GitLineHandlerListener[]):git4idea.commands.GitCommandResult
+- listWorktrees(git4idea.repo.GitRepository):java.util.List
 - lsRemote(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,git4idea.repo.GitRemote,java.lang.String[]):git4idea.commands.GitCommandResult
 - lsRemote(com.intellij.openapi.project.Project,java.nio.file.Path,java.lang.String):git4idea.commands.GitCommandResult
 - lsRemoteRefs(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,git4idea.repo.GitRemote,java.util.List,java.lang.String[]):git4idea.commands.GitCommandResult
@@ -2641,20 +2639,6 @@ f:git4idea.index.GitStageCommitWorkflow
 - com.intellij.vcs.commit.NonModalCommitWorkflow
 - <init>(com.intellij.openapi.project.Project):V
 - isDefaultCommitEnabled():Z
-f:git4idea.index.GitStageCommitWorkflowHandler
-- com.intellij.vcs.commit.NonModalCommitWorkflowHandler
-- sf:Companion:git4idea.index.GitStageCommitWorkflowHandler$Companion
-- <init>(git4idea.index.GitStageCommitWorkflow,git4idea.index.ui.GitStageCommitPanel):V
-- beforeCommitChecksEnded(com.intellij.vcs.commit.CommitSessionInfo,com.intellij.vcs.commit.CommitChecksResult):V
-- getAmendCommitHandler():com.intellij.vcs.commit.NonModalAmendCommitHandler
-- getCommitAuthorTracker():com.intellij.vcs.commit.CommitAuthorTracker
-- f:getState():git4idea.index.GitStageTracker$State
-- getUi():git4idea.index.ui.GitStageCommitPanel
-- getWorkflow():git4idea.index.GitStageCommitWorkflow
-- isCommitEmpty():Z
-- isExecutorEnabled(com.intellij.openapi.vcs.changes.CommitExecutor):Z
-- f:setState(git4idea.index.GitStageTracker$State):V
-f:git4idea.index.GitStageCommitWorkflowHandler$Companion
 f:git4idea.index.GitStageContentProviderKt
 - sf:showStagingArea(com.intellij.openapi.project.Project,java.lang.String):V
 f:git4idea.index.GitStageDiffUtilKt
@@ -3082,30 +3066,6 @@ f:git4idea.index.ui.GitFileStatusNode
 - f:getRoot():com.intellij.openapi.vfs.VirtualFile
 - f:getStatus():git4idea.index.GitFileStatus
 - hashCode():I
-f:git4idea.index.ui.GitStageCommitPanel
-- com.intellij.vcs.commit.NonModalCommitPanel
-- <init>(com.intellij.openapi.project.Project,git4idea.index.ui.GitStageUiSettings):V
-- activate():Z
-- getCommitProgressUi():git4idea.index.ui.GitStageCommitProgressPanel
-- f:getConflictedRoots():java.util.Set
-- getDisplayedChanges():java.util.List
-- getDisplayedUnversionedFiles():java.util.List
-- getIncludedChanges():java.util.List
-- f:getIncludedRoots():java.util.Set
-- getIncludedUnversionedFiles():java.util.List
-- f:getRootsToCommit():java.util.Set
-- f:isCommitAll():Z
-- f:setIncludedRoots(java.util.Collection):V
-- f:setTrackerState(git4idea.index.GitStageTracker$State):V
-f:git4idea.index.ui.GitStageCommitProgressPanel
-- com.intellij.vcs.commit.CommitProgressPanel
-- <init>(com.intellij.openapi.project.Project,com.intellij.openapi.Disposable):V
-- f:isCommitAll():Z
-- f:isEmptyRoots():Z
-- f:isUnmerged():Z
-- f:setCommitAll(Z):V
-- f:setEmptyRoots(Z):V
-- f:setUnmerged(Z):V
 f:git4idea.index.ui.GitStageDataKeys
 - sf:GIT_FILE_STATUS_NODES:com.intellij.openapi.actionSystem.DataKey
 - sf:GIT_STAGE_TREE:com.intellij.openapi.actionSystem.DataKey
@@ -3256,12 +3216,6 @@ f:git4idea.index.vfs.GitIndexVirtualFileStatusProvider
 - <init>(com.intellij.openapi.project.Project):V
 - getFileStatus(com.intellij.openapi.vfs.VirtualFile):com.intellij.openapi.vcs.FileStatus
 - f:getProject():com.intellij.openapi.project.Project
-f:git4idea.index.vfs.GitIndexVirtualFileTabTitleProvider
-- com.intellij.openapi.vcs.vfs.CustomisableUniqueNameEditorTabTitleProvider
-- <init>():V
-- getEditorTabTitle(com.intellij.openapi.vfs.VirtualFile,java.lang.String):java.lang.String
-- getEditorTabTooltipText(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):java.lang.String
-- isApplicable(com.intellij.openapi.vfs.VirtualFile):Z
 f:git4idea.light.LightGitPresentationKt
 - sf:getColor(git4idea.index.LightFileStatus):java.awt.Color
 - sf:getPresentation(git4idea.index.LightFileStatus):java.lang.String
@@ -5334,26 +5288,6 @@ f:git4idea.util.CollectionUtilKt
 - sf:without(java.util.Map,java.lang.Object):java.util.Map
 f:git4idea.util.GitFileUtils
 - sf:READ_CONTENT_WITH:java.lang.String
-- s:addFiles(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.Collection):V
-- s:addFiles(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.vfs.VirtualFile[]):V
-- s:addFilesForce(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.Collection):V
-- s:addPaths(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.Collection):V
-- s:addPaths(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.Collection,Z):V
-- s:addPaths(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.Collection,Z,Z):V
-- s:addPaths(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.Collection,Z,Z,java.lang.String[]):V
-- s:addPathsForce(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.Collection):V
-- s:addPathsToIndex(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.Collection):V
-- s:addTextConvParameters(com.intellij.openapi.project.Project,git4idea.commands.GitBinaryHandler,Z):V
-- s:addTextConvParameters(git4idea.config.GitVersion,git4idea.commands.GitBinaryHandler,Z):V
-- s:deleteFiles(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.Collection,java.lang.String[]):V
-- s:deleteFiles(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.vfs.VirtualFile[]):V
-- s:deleteFilesFromCache(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.Collection):V
-- s:deletePaths(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.Collection,java.lang.String[]):V
-- s:getFileContent(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.lang.String,java.lang.String):B[]
-- s:resetPaths(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.Collection):V
-- s:restoreStagedAndWorktree(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.List,java.lang.String):V
-- s:revertUnstagedPaths(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.List):V
-- s:stageForCommit(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,java.util.Collection,java.util.Collection,java.util.List):V
 f:git4idea.util.GitFreezingProcess
 - com.intellij.openapi.vcs.changes.VcsFreezingProcess
 - <init>(com.intellij.openapi.project.Project,java.lang.String,java.lang.Runnable):V

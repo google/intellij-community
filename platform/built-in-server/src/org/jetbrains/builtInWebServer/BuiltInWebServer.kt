@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.builtInWebServer
 
 import com.google.common.net.InetAddresses
@@ -329,6 +329,7 @@ internal fun isOwnHostName(host: String): Boolean {
   }
 }
 
+@Suppress("SplitModeApiUsage")
 internal fun redirectToDirectory(request: HttpRequest, channel: Channel, extraHeaders: HttpHeaders?) {
   val response = HttpResponseStatus.MOVED_PERMANENTLY.response(request)
   val url = VfsUtil.toUri("${channel.uriScheme}://${request.host!!}${URI(request.uri()).path}/")!!

@@ -19,7 +19,7 @@ import com.intellij.util.ArrayUtilRt
 import org.jetbrains.kotlin.asJava.toLightClass
 import org.jetbrains.kotlin.idea.base.projectStructure.scope.KotlinSourceFilterScope
 import org.jetbrains.kotlin.idea.base.util.excludeKotlinSources
-import org.jetbrains.kotlin.idea.findUsages.KotlinFindUsagesSupport
+import org.jetbrains.kotlin.idea.k2.codeinsight.hierarchy.collectInheritors
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.idea.stubindex.KotlinAnnotationsIndex
 import org.jetbrains.kotlin.name.StandardClassIds
@@ -55,17 +55,16 @@ open class KotlinSubtypesHierarchyTreeStructure : HierarchyTreeStructure {
 
         if (element.name == null) return ArrayUtilRt.EMPTY_OBJECT_ARRAY
 
-        val searchScope = element.getUseScope().intersectWith(getSearchScope(myCurrentScopeType, element))
-        val directInheritors = searchInheritors(element, searchScope)
-        val descriptors = mutableListOf<HierarchyNodeDescriptor>()
-        for (inheritor in directInheritors) {
-            descriptors.add(KotlinTypeHierarchyNodeDescriptor.createTypeHierarchyDescriptor(inheritor, descriptor))
-        }
-        return descriptors.toTypedArray()
+        val baseScope = getSearchScope(myCurrentScopeType, element)
+        val searchScope = element.getUseScope().intersectWith(baseScope)
+        val directInheritors = searchInheritors(element, searchScope, baseScope)
+        return directInheritors
+            .map { KotlinTypeHierarchyNodeDescriptor.createTypeHierarchyDescriptor(it, descriptor) }
+            .toTypedArray()
     }
 
     companion object {
-        private fun searchInheritors(klass: PsiElement, searchScope: SearchScope): Sequence<PsiElement> {
+        private fun searchInheritors(klass: PsiElement, searchScope: SearchScope, baseScope: SearchScope): List<PsiElement> {
             val psiClass = when (klass) {
                 is KtClass -> klass.toLightClass()
                 is PsiClass -> klass
@@ -76,8 +75,8 @@ open class KotlinSubtypesHierarchyTreeStructure : HierarchyTreeStructure {
                 val javaAnnotations = if (psiClass != null) {
                     AnnotatedElementsSearch.searchPsiClasses(psiClass, searchScope.excludeKotlinSources(klass.project))
                         .asIterable()
-                        .filter { it.isAnnotationType }.asSequence()
-                } else emptySequence()
+                        .filter { it.isAnnotationType }
+                } else emptyList()
 
                 val candidates =  when (searchScope) {
                       is GlobalSearchScope -> {
@@ -92,14 +91,14 @@ open class KotlinSubtypesHierarchyTreeStructure : HierarchyTreeStructure {
                     entry.getStrictParentOfType<KtClass>()?.takeIf {
                             it.isAnnotation() && it.annotationEntries.contains(entry) && entry.calleeExpression?.constructorReferenceExpression?.mainReference?.resolve() == klass
                         }
-                }.asSequence() + javaAnnotations
+                } + javaAnnotations
             }
 
             if (klass is PsiClass && klass.isAnnotationType) {
-                return AnnotatedElementsSearch.searchPsiClasses(klass, searchScope).asIterable().filter { it.isAnnotationType }.asSequence()
+                return AnnotatedElementsSearch.searchPsiClasses(klass, searchScope).asIterable().filter { it.isAnnotationType }
             }
 
-            val inheritors = KotlinFindUsagesSupport.searchInheritors(klass, searchScope, searchDeeply = false)
+            val inheritors = collectInheritors(klass, searchScope = searchScope, baseScope = baseScope)
 
             if (psiClass == null || !LambdaUtil.isFunctionalClass(psiClass)) {
                 return inheritors

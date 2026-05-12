@@ -1,14 +1,14 @@
-<node text="A.testField  ()" base="true">
-  <node text="A.main1(String[])  ()">
-    <node text="A.superMain(String[])  ()"/>
+<node text="testField (A)" base="true">
+  <node text="main1(String[]) (A)">
+    <node text="superMain(String[]) (A)"/>
   </node>
-  <node text="A.main2(String[])  ()">
-    <node text="A.superMain(String[])  ()"/>
+  <node text="main2(String[]) (A)">
+    <node text="superMain(String[]) (A)"/>
   </node>
-  <node text="A.main2(String[])  ()">
-    <node text="A.superMain(String[])  ()"/>
+  <node text="main2(String[]) (A)">
+    <node text="superMain(String[]) (A)"/>
   </node>
-  <node text="A.main3(String[])  ()">
-    <node text="A.superMain(String[])  ()"/>
+  <node text="main3(String[]) (A)">
+    <node text="superMain(String[]) (A)"/>
   </node>
 </node>

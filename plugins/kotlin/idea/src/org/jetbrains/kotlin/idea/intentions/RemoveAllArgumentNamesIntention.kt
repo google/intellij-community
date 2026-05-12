@@ -24,9 +24,19 @@ class RemoveAllArgumentNamesIntention : SelfTargetingIntention<KtCallElement>(
 ) {
     override fun isApplicableTo(element: KtCallElement, caretOffset: Int): Boolean {
         val arguments = element.valueArgumentList?.arguments ?: return false
-        if (arguments.count { it.isNamed() } < 2) return false
+        val totalNamedCount = arguments.count { it.isNamed() }
+
         val resolvedCall = element.resolveToCall() ?: return false
-        return collectAllArgumentsThatCanBeUsedWithoutName(resolvedCall).any()
+        val argumentsThatCanBeUnnamed = collectAllArgumentsThatCanBeUsedWithoutName(resolvedCall)
+        if (argumentsThatCanBeUnnamed.isEmpty()) return false
+        val removableCount = argumentsThatCanBeUnnamed.count { it.argument.isNamed() }
+
+        // there is RemoveSingleArgumentNameIntention for cases with only one named argument
+        if (removableCount < 2) return false
+
+        val messageKey = if (removableCount == totalNamedCount) "remove.all.argument.names" else "remove.all.possible.argument.names"
+        setTextGetter(KotlinBundle.messagePointer(messageKey))
+        return true
     }
 
     override fun applyTo(element: KtCallElement, editor: Editor?) {

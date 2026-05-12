@@ -28,6 +28,7 @@ interface ShellDataGeneratorProcessBuilder {
 
   /**
    * Executes the process taking into account specified options.
+   * @see ProcessExecutionResult
    */
-  suspend fun execute(): ShellCommandResult
+  suspend fun execute(): ProcessExecutionResult
 }

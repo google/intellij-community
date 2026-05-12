@@ -156,7 +156,6 @@ class KotlinNoActualForExpectInspection : AbstractKotlinInspection() {
 
                         is KaClassSymbol -> generateClassWithMembers(
                             project = project,
-                            ktClassMember = null,
                             symbol = declarationSymbol,
                             targetClass = null,
                             mode = MemberGenerateMode.ACTUAL

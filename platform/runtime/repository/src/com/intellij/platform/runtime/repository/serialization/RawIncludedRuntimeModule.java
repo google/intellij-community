@@ -2,14 +2,16 @@
 package com.intellij.platform.runtime.repository.serialization;
 
 import com.intellij.platform.runtime.repository.IncludedRuntimeModule;
-import com.intellij.platform.runtime.repository.RuntimeModuleLoadingRule;
-import com.intellij.platform.runtime.repository.impl.IncludedRuntimeModuleImpl;
 import com.intellij.platform.runtime.repository.RuntimeModuleDescriptor;
 import com.intellij.platform.runtime.repository.RuntimeModuleId;
+import com.intellij.platform.runtime.repository.RuntimeModuleLoadingRule;
 import com.intellij.platform.runtime.repository.RuntimeModuleRepository;
+import com.intellij.platform.runtime.repository.impl.IncludedRuntimeModuleImpl;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.Objects;
 
 public final class RawIncludedRuntimeModule {
   private final RuntimeModuleId myModuleId;
@@ -36,18 +38,39 @@ public final class RawIncludedRuntimeModule {
   }
 
   @Override
+  public boolean equals(Object o) {
+    if (o == null || getClass() != o.getClass()) return false;
+
+    RawIncludedRuntimeModule module = (RawIncludedRuntimeModule)o;
+    return myModuleId.equals(module.myModuleId) && myLoadingRule == module.myLoadingRule
+           && Objects.equals(myRequiredIfAvailableId, module.myRequiredIfAvailableId);
+  }
+
+  @Override
+  public int hashCode() {
+    return 31 * (31 * myModuleId.hashCode() + myLoadingRule.hashCode()) + Objects.hashCode(myRequiredIfAvailableId);
+  }
+
+  @Override
   public String toString() {
     return "RawIncludedRuntimeModule{moduleId=" + myModuleId + '}';
   }
 
   public @Nullable IncludedRuntimeModule resolve(@NotNull RuntimeModuleRepository repository) {
     RuntimeModuleDescriptor descriptor;
+    RuntimeModuleId moduleId = getModuleId();
+    if (moduleId.getNamespace().equals(RuntimeModuleId.DEFAULT_NAMESPACE) && repository.resolveModule(moduleId).getResolvedModule() == null) {
+      /* there are cases when the same module is included as a content module in one product, and as JPS module to another,
+         e.g., `intellij.kotlin.base.codeInsight.minimal` is included as a content module in 'com.intellij.kotlin.frontend' and as a JPS
+         module in `org.jetbrains.kotlin` plugin; so until IJPL-240871 is implemented, let's try resolving with a different namespace */
+      moduleId = RuntimeModuleId.contentModule(moduleId.getName(), RuntimeModuleId.LEGACY_JPS_MODULE_NAMESPACE);
+    }
     if (getLoadingRule() == RuntimeModuleLoadingRule.REQUIRED || getLoadingRule() == RuntimeModuleLoadingRule.EMBEDDED) {
-      descriptor = repository.getModule(getModuleId());
+      descriptor = repository.getModule(moduleId);
     }
     else {
       //todo print something to the log if optional module is missing
-      descriptor = repository.resolveModule(getModuleId()).getResolvedModule();
+      descriptor = repository.resolveModule(moduleId).getResolvedModule();
     }
     if (descriptor != null) {
       return new IncludedRuntimeModuleImpl(descriptor, myLoadingRule);

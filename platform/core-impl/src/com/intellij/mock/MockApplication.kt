@@ -43,6 +43,7 @@ open class MockApplication(parentDisposable: Disposable) : MockComponentManager(
     @TestOnly
     @JvmStatic
     fun setUp(parentDisposable: Disposable): MockApplication {
+      Thread.sleep(50) // MRI-3204: help BackendProjectEntitiesStorage.removeProjectEntity win the race
       val app = MockApplication(parentDisposable)
       ApplicationManager.setApplication(app, parentDisposable)
       return app

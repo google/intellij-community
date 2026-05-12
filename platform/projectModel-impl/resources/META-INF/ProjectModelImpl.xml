@@ -29,6 +29,8 @@
                         serviceImplementation="com.intellij.workspaceModel.ide.legacyBridge.WorkspaceModelLegacyBridgeImpl"/>
     <projectService serviceInterface="com.intellij.openapi.roots.TestModulePropertiesProvider"
                     serviceImplementation="com.intellij.workspaceModel.ide.impl.legacyBridge.module.roots.TestModulePropertiesBridgeProvider"/>
+    <projectService serviceInterface="com.intellij.workspaceModel.ide.ProjectSynchronizerUtil"
+                    serviceImplementation="com.intellij.workspaceModel.ide.impl.jps.serialization.ProjectSynchronizerUtilImpl"/>
     <!-- Global Workspace Model -->
     <applicationService serviceInterface="com.intellij.workspaceModel.ide.JpsGlobalModelSynchronizer"
                         serviceImplementation="com.intellij.workspaceModel.ide.impl.jps.serialization.JpsGlobalModelSynchronizerImpl"
@@ -37,7 +39,7 @@
     <workspace.bridgeInitializer
       implementation="com.intellij.workspaceModel.ide.impl.legacyBridge.library.GlobalAndCustomLibraryTableBridgeInitializer"/>
 
-    <projectService serviceInterface="com.intellij.openapi.roots.FileIndexFacade" open="true"
+    <projectService serviceInterface="com.intellij.openapi.roots.FileIndexFacade"
                     serviceImplementation="com.intellij.openapi.roots.impl.ProjectFileIndexFacade"/>
     <projectService serviceInterface="com.intellij.openapi.roots.ProjectFileIndex" open="true"
                     serviceImplementation="com.intellij.openapi.roots.impl.ProjectFileIndexImpl"/>
@@ -60,7 +62,7 @@
     <workspaceModel.preUpdateHandler implementation="com.intellij.workspaceModel.ide.impl.ModulePreUpdateHandler"/>
     <workspaceModel.serializerHook implementation="com.intellij.workspaceModel.ide.impl.RemoveTransientJpsEntities"/>
 
-    <projectService serviceInterface="com.intellij.openapi.roots.impl.DirectoryIndex" open="true"
+    <projectService serviceInterface="com.intellij.openapi.roots.impl.DirectoryIndex"
                     serviceImplementation="com.intellij.openapi.roots.impl.DirectoryIndexImpl" preload="true"/>
 
     <moduleService serviceInterface="com.intellij.openapi.roots.ModuleFileIndex"

@@ -16,6 +16,8 @@ import com.jetbrains.python.packaging.common.PythonPackageManagementListener
 import com.jetbrains.python.packaging.management.PythonPackageManager
 import com.jetbrains.python.packaging.utils.PyPackageCoroutine
 import com.jetbrains.python.sdk.skeleton.PySkeletonUtil.getSitePackagesDirectory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 
 @ApiStatus.Internal
@@ -25,6 +27,19 @@ class PythonSdkUpdateProjectActivity : ProjectActivity, DumbAware {
 
     val messageBusConnection = project.messageBus.connect()
     messageBusConnection.subscribe(PythonPackageManager.PACKAGE_MANAGEMENT_TOPIC, object : PythonPackageManagementListener {
+      override fun packagesChanged(sdk: Sdk) {
+        // Restarts the daemon when the installed-packages snapshot is (re)populated. Without
+        // this, inspections that consult `listInstalledPackagesSnapshot()` (notably
+        // [com.jetbrains.python.requirements.inspections.tools.RequirementInspection])
+        // can run on file open before the package manager has finished its first load,
+        // capture an empty snapshot, and report every declared dependency as
+        // "not installed". The previously-existing `outdatedPackagesChanged` hook only
+        // fires when the outdated map actually changes — for a freshly opened project with
+        // zero outdated packages the map stays empty, no event fires, and the stale
+        // inspection results persist until the next file edit.
+        DaemonCodeAnalyzer.getInstance(project).restart("PythonSdkUpdateProjectActivity.packagesChanged")
+      }
+
       override fun outdatedPackagesChanged(sdk: Sdk) {
         DaemonCodeAnalyzer.getInstance(project).restart("PythonSdkUpdateProjectActivity.outdatedPackagesChanged")
       }
@@ -42,7 +57,7 @@ class PythonSdkUpdateProjectActivity : ProjectActivity, DumbAware {
 }
 
 @ApiStatus.Internal
-suspend fun refreshPaths(project: Project, sdk: Sdk) {
+suspend fun refreshPaths(project: Project, sdk: Sdk) = withContext(Dispatchers.IO) {
   // Background refreshing breaks structured concurrency: there is a some activity in background that locks files.
   // Temporary folders can't be deleted on Windows due to that.
   // That breaks tests.

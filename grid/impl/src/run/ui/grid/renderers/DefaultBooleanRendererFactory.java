@@ -1,13 +1,12 @@
 package com.intellij.database.run.ui.grid.renderers;
 
 import com.intellij.database.datagrid.DataGrid;
+import com.intellij.database.datagrid.GridCellRequest;
 import com.intellij.database.datagrid.GridColumn;
-import com.intellij.database.datagrid.GridModel;
 import com.intellij.database.datagrid.GridRow;
 import com.intellij.database.datagrid.ModelIndex;
 import com.intellij.database.datagrid.ViewIndex;
 import com.intellij.database.extractors.ObjectFormatterUtil;
-import com.intellij.database.run.ui.DataAccessType;
 import com.intellij.database.run.ui.grid.editors.GridCellEditorHelper;
 import com.intellij.database.settings.DataGridAppearanceSettings;
 import com.intellij.openapi.util.Disposer;
@@ -31,20 +30,19 @@ public class DefaultBooleanRendererFactory implements GridCellRendererFactory {
   }
 
   @Override
-  public boolean supports(@NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
-    return isBooleanCell(myGrid, row, column);
+  public boolean supports(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    return isBooleanCell(request);
   }
 
-  private static boolean isBooleanCell(@NotNull DataGrid grid, @NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
-    if (column.asInteger() == -1) return false; // DBE-17013
-    int type = GridCellEditorHelper.get(grid).guessJdbcTypeForEditing(grid, row, column);
-    GridModel<GridRow, GridColumn> model = grid.getDataModel(DataAccessType.DATA_WITH_MUTATIONS);
-    GridColumn c = Objects.requireNonNull(model.getColumn(column));
+  private static boolean isBooleanCell(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    if (request.getColumnIdx().asInteger() == -1) return false; // DBE-17013
+    int type = GridCellEditorHelper.get(request.getGrid()).guessJdbcTypeForEditing(request);
+    GridColumn c = Objects.requireNonNull(request.getColumn());
     return ObjectFormatterUtil.isBooleanColumn(c, type);
   }
 
   @Override
-  public @NotNull GridCellRenderer getOrCreateRenderer(@NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
+  public @NotNull GridCellRenderer getOrCreateRenderer(@NotNull GridCellRequest<GridRow, GridColumn> request) {
     if (myGrid.getAppearance().getBooleanMode() == DataGridAppearanceSettings.BooleanMode.TEXT) {
       if (myTextRenderer == null) {
         myTextRenderer = new TextBooleanRenderer(myGrid);
@@ -89,8 +87,8 @@ public class DefaultBooleanRendererFactory implements GridCellRendererFactory {
     }
 
     @Override
-    public int getSuitability(@NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
-      return isBooleanCell(myGrid, row, column) ? SUITABILITY_MIN : SUITABILITY_UNSUITABLE;
+    public int getSuitability(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+      return isBooleanCell(request) ? SUITABILITY_MIN : SUITABILITY_UNSUITABLE;
     }
   }
 
@@ -107,8 +105,8 @@ public class DefaultBooleanRendererFactory implements GridCellRendererFactory {
     }
 
     @Override
-    public int getSuitability(@NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
-      return isBooleanCell(myGrid, row, column) ? SUITABILITY_MIN : SUITABILITY_UNSUITABLE;
+    public int getSuitability(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+      return isBooleanCell(request) ? SUITABILITY_MIN : SUITABILITY_UNSUITABLE;
     }
 
     @Override

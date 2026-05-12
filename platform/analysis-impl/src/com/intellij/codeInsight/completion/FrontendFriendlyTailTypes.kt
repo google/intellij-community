@@ -16,9 +16,8 @@ internal data class FrontendFriendlyCharTailType(
     return insertChar(navigator, tailOffset, char, overwrite)
   }
 
-  @Suppress("OVERRIDE_DEPRECATION")
-  override fun isApplicable(context: InsertionContext): Boolean {
-    return !context.shouldAddCompletionChar() || context.completionChar != char
+  override fun isApplicableForCompletionCharacter(c: Char): Boolean {
+    return c != char
   }
 }
 
@@ -29,6 +28,10 @@ internal object NoneTailType : ModNavigatorTailType(), FrontendFriendlyTailType 
 
 @Serializable
 internal object HumbleSpaceBeforeWordTailType : ModNavigatorTailType(), FrontendFriendlyTailType {
+  override fun isApplicableForCompletionCharacter(c: Char): Boolean {
+    return c != ' '
+  }
+
   override fun processTail(navigator: ModNavigator, tailOffset: Int): Int {
     val text = navigator.document.charsSequence
     if (text.length > tailOffset + 1 && text[tailOffset] == ' ') {

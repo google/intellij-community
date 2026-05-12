@@ -105,7 +105,7 @@ public final class InvokeTemplateAction extends DefaultActionGroup {
 
   public void performInCommand() {
     final Document document = myEditor.getDocument();
-    myEditor.getCaretModel().runForEachCaret(__ -> {
+    myEditor.getCaretModel().runForEachCaret(_ -> {
       // adjust the selection so that it starts with a non-whitespace character (to make sure that the template is inserted
       // at a meaningful position rather than at indent 0)
       if (myEditor.getSelectionModel().hasSelection() && myTemplate.isToReformat()) {

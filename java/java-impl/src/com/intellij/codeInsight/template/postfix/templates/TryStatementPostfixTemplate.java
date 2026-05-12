@@ -2,6 +2,11 @@
 package com.intellij.codeInsight.template.postfix.templates;
 
 import com.intellij.codeInsight.generation.surroundWith.JavaWithTryCatchSurrounder;
+import com.intellij.codeInsight.template.CustomTemplateCallback;
+import com.intellij.codeInsight.template.postfix.util.JavaPostfixTemplatesUtils;
+import com.intellij.modcommand.ActionContext;
+import com.intellij.modcommand.ModCommand;
+import com.intellij.modcommand.ModPsiUpdater;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.DumbAware;
@@ -10,6 +15,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiCodeBlock;
 import com.intellij.psi.PsiDeclarationStatement;
+import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiExpression;
 import com.intellij.psi.PsiExpressionStatement;
@@ -28,9 +34,13 @@ public class TryStatementPostfixTemplate extends PostfixTemplate implements Dumb
 
   @Override
   public boolean isApplicable(@NotNull PsiElement context, @NotNull Document copyDocument, int newOffset) {
+    if (JavaPostfixTemplatesUtils.isInExpressionFile(context)) return false;
+
     PsiStatement statementParent = PsiTreeUtil.getNonStrictParentOfType(context, PsiStatement.class);
     if (statementParent == null ||
-        newOffset != statementParent.getTextRange().getEndOffset()) return false;
+        newOffset != statementParent.getTextRange().getEndOffset()) {
+      return false;
+    }
 
     if (statementParent instanceof PsiDeclarationStatement) return true;
 
@@ -40,6 +50,43 @@ public class TryStatementPostfixTemplate extends PostfixTemplate implements Dumb
     }
 
     return false;
+  }
+
+  @Override
+  public PostfixModExpander createModExpander() {
+    return (ActionContext actionContext, PostfixTemplateProvider provider, TextRange keyRange) ->
+      ModCommand.psiUpdate(actionContext.withSelection(new TextRange(keyRange.getStartOffset(), keyRange.getStartOffset()))
+                             .withOffset(keyRange.getStartOffset()),
+                           document -> document.deleteString(actionContext.selection().getStartOffset(), actionContext.selection().getEndOffset()),
+                           updater -> expandModImpl(actionContext, provider, keyRange, updater));
+  }
+
+  @Override
+  public boolean isApplicableForModCommand() {
+    return true;
+  }
+
+  private static void expandModImpl(@NotNull ActionContext actionContext, @NotNull PostfixTemplateProvider provider,
+                                    @NotNull TextRange keyRange, @NotNull ModPsiUpdater updater) {
+    updater.getDocument().deleteString(PostfixLiveTemplate.positiveOffset(keyRange.getStartOffset()), actionContext.selection().getStartOffset());
+    PsiDocumentManager.getInstance(actionContext.project()).commitDocument(updater.getDocument());
+    PsiFile file = updater.getPsiFile();
+    provider.prepareCopyForModCommand(file, PostfixLiveTemplate.positiveOffset(keyRange.getStartOffset()));
+    PsiElement context =
+      CustomTemplateCallback.getContext(file, PostfixLiveTemplate.positiveOffset(keyRange.getStartOffset() - 1));
+    PsiStatement statement = PsiTreeUtil.getNonStrictParentOfType(context, PsiStatement.class);
+    JavaWithTryCatchSurrounder surrounder = new JavaWithTryCatchSurrounder();
+    surrounder.doSurround(actionContext, statement, updater);
+    updater.select(new TextRange(keyRange.getStartOffset(), keyRange.getStartOffset()));
+    PsiElement element = file.findElementAt(updater.getCaretOffset());
+    PsiTryStatement tryStatement = PsiTreeUtil.getParentOfType(element, PsiTryStatement.class);
+    assert tryStatement != null;
+    PsiCodeBlock block = tryStatement.getTryBlock();
+    assert block != null;
+    PsiStatement statementInTry = ArrayUtil.getFirstElement(block.getStatements());
+    if (null != statementInTry) {
+      updater.moveCaretTo(statementInTry.getTextRange().getEndOffset());
+    }
   }
 
   @Override

@@ -120,6 +120,14 @@ class FileChannelBackedWriteBuffer(
     position += remaining
   }
 
+  fun writeBytes(bytes: HProfReadBufferSlidingWindow) {
+    while (bytes.hasRemaining()) {
+      val window = bytes.currentWindow()
+      val remaining = window.remaining()
+      writeBytes(window)
+      bytes.skip(remaining.toLong())
+    }
+  }
 
   fun position(): Int {
     return position

@@ -30,4 +30,6 @@ interface SerializationContext {
   val customModuleRootsSerializers: List<CustomModuleRootsSerializer>
   
   val customFacetRelatedEntitySerializers: List<CustomFacetRelatedEntitySerializer<*>>
+
+  val customImpComponentNameContributors: List<CustomImlComponentNameContributor>
 }

@@ -6,6 +6,7 @@ import com.intellij.internal.statistic.eventLog.FilesToSendProvider;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -16,6 +17,7 @@ public class EventLogFileListProvider implements FilesToSendProvider {
     myFiles = paths.stream().
       map(path -> new File(path)).
       filter(file -> file.exists()).
+      sorted(Comparator.comparingLong(File::lastModified)).
       map(file -> new EventLogFile(file)).
       collect(Collectors.toList());
   }

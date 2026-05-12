@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.k2.refactoring.rename
 
 import com.intellij.codeInsight.CodeInsightUtilCore
@@ -11,6 +11,7 @@ import com.intellij.psi.search.searches.MethodReferencesSearch
 import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.usageView.UsageInfo
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
@@ -59,6 +60,7 @@ import org.jetbrains.kotlin.psi.createExpressionByPattern
 import org.jetbrains.kotlin.psi.psiUtil.getQualifiedElementSelector
 import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
 import org.jetbrains.kotlin.utils.addIfNotNull
+import org.jetbrains.kotlin.utils.addToStdlib.runUnless
 
 fun checkClassNameShadowing(
     declaration: KtClassLikeDeclaration,
@@ -293,7 +295,14 @@ private fun KtPsiFactory.createCodeFragmentWithNewName(
 
 private data class QualifiedState(val expression: KtExpression?, val explicitlyQualified: Boolean)
 
+@OptIn(KaExperimentalApi::class)
 private fun createQualifiedExpression(callExpression: KtExpression, newName: String): QualifiedState? {
+    val callableReferenceExpression = callExpression.takeIf { it is KtNameReferenceExpression }?.parent as? KtCallableReferenceExpression
+    if (callableReferenceExpression?.callableReference == callExpression) {
+        // Callable reference cannot be qualified
+        return null
+    }
+
     val psiFactory = KtPsiFactory(callExpression.project)
     analyze(callExpression) {
         val appliedSymbol = callExpression.resolveToCall()?.successfulCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol
@@ -314,7 +323,7 @@ private fun createQualifiedExpression(callExpression: KtExpression, newName: Str
         }
 
         val qualifierText = when (receiver) {
-            is KaImplicitReceiverValue -> getThisQualifier(receiver)
+            is KaImplicitReceiverValue -> runUnless(appliedSymbol?.symbol?.isCompanion == true) { getThisQualifier(receiver) }
 
             is KaExplicitReceiverValue -> {
                 getExplicitQualifier(receiver) ?: return QualifiedState(null, true)

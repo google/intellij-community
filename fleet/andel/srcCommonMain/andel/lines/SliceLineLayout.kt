@@ -69,7 +69,17 @@ fun LinesLayout.slice(
     }
 
     override fun nth(lineId: Long): Line {
-      TODO("Not yet implemented")
+      var index = indices.binarySearch { i ->
+        val start = startLineIndices[i]
+        val end = start + slices[i].first.linesCount() - 1
+        when {
+          lineId < start -> 1
+          lineId > end -> -1
+          else -> 0
+        }
+      }
+      if (index < 0) index = kotlin.math.min(-index - 1, slices.size - 1)
+      return slices[index].first.nth(lineId - startLineIndices[index]).toMyLine(index)
     }
 
     override fun linesCount(): Long {

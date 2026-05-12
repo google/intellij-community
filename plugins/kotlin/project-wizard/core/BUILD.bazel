@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.kotlin.projectWizard.core` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "core_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "core",
   module_name = "intellij.kotlin.projectWizard.core",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "generated/**/*.kt", "generated/**/*.java"], allow_empty = True),
-  resources = [":core_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//libraries/kotlin/reflect",
@@ -21,8 +16,8 @@ jvm_library(
     "//libraries/velocity",
     "//libraries/gson",
     "//platform/lang-core",
-    "//plugins/kotlin/base/frontend-agnostic",
     "//platform/core-api:core",
+    "//platform/core-impl",
     "//plugins/kotlin/base/plugin",
     "//plugins/kotlin/base/resources:kotlin-base-resources",
     "//platform/editor-ui-api:editor-ui",
@@ -32,6 +27,7 @@ jvm_library(
     "//plugins/gradle:gradle-common",
     "//java/idea-ui:ui",
     "//platform/platform-impl:ide-impl",
+    "//platform/ide-core",
     "@lib//:kotlinc-kotlin-compiler-common",
     "//java/java-psi-api:psi",
     "//java/java-impl:impl",
@@ -43,9 +39,63 @@ jvm_library(
 
 jvm_library(
   name = "core_test_lib",
+  testonly = True,
+  module_name = "intellij.kotlin.projectWizard.core",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True),
+  runtime_deps = [
+    ":core",
+    "//libraries/kotlin/reflect:reflect_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/observable:observable_test_lib",
+    "//libraries/velocity:velocity_test_lib",
+    "//libraries/gson:gson_test_lib",
+    "@lib//:junit4",
+    "@lib//:kotlin-test-junit",
+    "@lib//:kotlin-test",
+    "//platform/lang-core:lang-core_test_lib",
+    "//platform/core-api:core_test_lib",
+    "//platform/core-impl:core-impl_test_lib",
+    "//plugins/kotlin/base/plugin:plugin_test_lib",
+    "//plugins/kotlin/base/resources:kotlin-base-resources_test_lib",
+    "//platform/editor-ui-api:editor-ui_test_lib",
+    "//platform/projectModel-api:projectModel_test_lib",
+    "//platform/projectModel-impl:projectModel-impl_test_lib",
+    "//plugins/gradle:gradle-common_test_lib",
+    "//java/idea-ui:ui_test_lib",
+    "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
+    "//java/java-psi-api:psi_test_lib",
+    "//java/java-impl:impl_test_lib",
+    "//plugins/kotlin/project-configuration:project-configuration_test_lib",
+    "//plugins/kotlin/base/project-structure:project-structure_test_lib",
+  ]
+)
+### auto-generated section `build intellij.kotlin.projectWizard.core` end
+
+### auto-generated section `iml intellij.kotlin.projectWizard.core` start
+exports_files([
+  "intellij.kotlin.projectWizard.core.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.projectWizard.core` end
+
+### auto-generated section `build intellij.kotlin.projectWizard.core.tests` start
+jvm_library(
+  name = "kotlin-projectWizard-core-tests",
+  module_name = "intellij.kotlin.projectWizard.core.tests",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
+)
+
+jvm_library(
+  name = "kotlin-projectWizard-core-tests_test_lib",
+  testonly = True,
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
-  associates = [":core"],
+  associates = [
+    "//plugins/kotlin/project-wizard/core",
+    "//plugins/kotlin/project-wizard/core:core_test_lib",
+  ],
   deps = [
     "@lib//:kotlin-stdlib",
     "//libraries/kotlin/reflect",
@@ -62,8 +112,6 @@ jvm_library(
     "@lib//:kotlin-test",
     "//platform/lang-core",
     "//platform/lang-core:lang-core_test_lib",
-    "//plugins/kotlin/base/frontend-agnostic",
-    "//plugins/kotlin/base/frontend-agnostic:frontend-agnostic_test_lib",
     "//platform/core-api:core",
     "//platform/core-api:core_test_lib",
     "//plugins/kotlin/base/plugin",
@@ -94,17 +142,24 @@ jvm_library(
     "@lib//:kotlinc-kotlin-jps-plugin-classpath",
   ],
   runtime_deps = [
+    ":kotlin-projectWizard-core-tests",
     "//platform/observable:observable_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
   ]
 )
-### auto-generated section `build intellij.kotlin.projectWizard.core` end
+### auto-generated section `build intellij.kotlin.projectWizard.core.tests` end
 
-### auto-generated section `test intellij.kotlin.projectWizard.core` start
+### auto-generated section `iml intellij.kotlin.projectWizard.core.tests` start
+exports_files([
+  "intellij.kotlin.projectWizard.core.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.projectWizard.core.tests` end
+
+### auto-generated section `test intellij.kotlin.projectWizard.core.tests` start
 load("@community//build:tests-options.bzl", "jps_test")
 
 jps_test(
-  name = "core_test",
-  runtime_deps = [":core_test_lib"]
+  name = "kotlin-projectWizard-core-tests_test",
+  runtime_deps = [":kotlin-projectWizard-core-tests_test_lib"]
 )
-### auto-generated section `test intellij.kotlin.projectWizard.core` end
+### auto-generated section `test intellij.kotlin.projectWizard.core.tests` end

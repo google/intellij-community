@@ -27,7 +27,6 @@ import com.intellij.ui.BrowserHyperlinkListener
 import com.intellij.ui.ExperimentalUI
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.gridLayout.UnscaledGaps
-import com.intellij.util.asSafely
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UI
 import com.intellij.util.ui.UIUtil
@@ -119,21 +118,25 @@ class RepositoryAndAccountSelectorComponentFactory<M : HostedGitRepositoryMappin
 
         bindTextIn(scope, vm.errorState.map { error: RepositoryAndAccountSelectorViewModel.Error? ->
           if (error == null) return@map ""
-          if (errorPresenter !is ErrorStatusPresenter.Text) {
-            return@map error.asSafely<RepositoryAndAccountSelectorViewModel.Error.SubmissionError>()?.exception?.localizedMessage.orEmpty()
+          val errorAction = errorPresenter.getErrorAction(error)
+          actionLinkListener.action = errorAction
+          when (errorPresenter) {
+            is ErrorStatusPresenter.HTML -> HtmlBuilder().appendRaw(errorPresenter.getHTMLBody(error)).apply {
+              if (errorAction != null) {
+                br()
+                append(HtmlChunk.link(ActionLinkListener.ERROR_ACTION_HREF, errorAction.name.orEmpty()))
+              }
+            }.toString()
+            is ErrorStatusPresenter.Text -> HtmlBuilder().append(errorPresenter.getErrorTitle(error)).br().apply {
+              val errorDescription = errorPresenter.getErrorDescription(error)
+              if (errorDescription != null) {
+                append("$errorDescription ")
+              }
+              if (errorAction != null) {
+                append(HtmlChunk.link(ActionLinkListener.ERROR_ACTION_HREF, errorAction.name.orEmpty()))
+              }
+            }.toString()
           }
-          HtmlBuilder().append(errorPresenter.getErrorTitle(error)).br().apply {
-            val errorDescription = errorPresenter.getErrorDescription(error)
-            if (errorDescription != null) {
-              append("$errorDescription ")
-            }
-
-            val errorAction = errorPresenter.getErrorAction(error)
-            actionLinkListener.action = errorAction
-            if (errorAction != null) {
-              append(HtmlChunk.link(ActionLinkListener.ERROR_ACTION_HREF, errorAction.name.orEmpty()))
-            }
-          }.toString()
         })
       }
 

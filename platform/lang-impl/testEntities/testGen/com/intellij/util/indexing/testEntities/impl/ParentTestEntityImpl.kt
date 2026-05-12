@@ -1,4 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.util.indexing.testEntities.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
@@ -13,11 +15,10 @@ import com.intellij.platform.workspace.storage.impl.EntityLink
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
-import com.intellij.platform.workspace.storage.impl.extractOneToOneChild
-import com.intellij.platform.workspace.storage.impl.updateOneToOneChildOfParent
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import com.intellij.util.indexing.testEntities.ChildTestEntity
@@ -42,9 +43,9 @@ internal class ParentTestEntityImpl(private val dataSource: ParentTestEntityData
   }
 
   override val child: ChildTestEntity?
-    get() = snapshot.extractOneToOneChild(CHILD_CONNECTION_ID, this)
+    get() = snapshot.instrumentation.getOneChild(CHILD_CONNECTION_ID, this) as? ChildTestEntity
   override val secondChild: SiblingEntity?
-    get() = snapshot.extractOneToOneChild(SECONDCHILD_CONNECTION_ID, this)
+    get() = snapshot.instrumentation.getOneChild(SECONDCHILD_CONNECTION_ID, this) as? SiblingEntity
   override val customParentProperty: String
     get() {
       readField("customParentProperty")
@@ -132,12 +133,11 @@ internal class ParentTestEntityImpl(private val dataSource: ParentTestEntityData
       get() {
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getOneChildBuilder(CHILD_CONNECTION_ID, this) as? ChildTestEntityBuilder)
           ?: (this.entityLinks[EntityLink(true, CHILD_CONNECTION_ID)] as? ChildTestEntityBuilder)
         }
         else {
-          this.entityLinks[EntityLink(true, CHILD_CONNECTION_ID)] as? ChildTestEntityBuilder
+          (this.entityLinks[EntityLink(true, CHILD_CONNECTION_ID)] as? ChildTestEntityBuilder)
         }
       }
       set(value) {
@@ -151,7 +151,7 @@ internal class ParentTestEntityImpl(private val dataSource: ParentTestEntityData
           _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
         }
         if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)) {
-          _diff.updateOneToOneChildOfParent(CHILD_CONNECTION_ID, this, value)
+          _diff.instrumentation.replaceChildren(CHILD_CONNECTION_ID, this, listOfNotNull(value))
         }
         else {
           if (value is ModifiableWorkspaceEntityBase<*, *>) {
@@ -167,12 +167,11 @@ internal class ParentTestEntityImpl(private val dataSource: ParentTestEntityData
       get() {
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getOneChildBuilder(SECONDCHILD_CONNECTION_ID, this) as? SiblingEntityBuilder)
           ?: (this.entityLinks[EntityLink(true, SECONDCHILD_CONNECTION_ID)] as? SiblingEntityBuilder)
         }
         else {
-          this.entityLinks[EntityLink(true, SECONDCHILD_CONNECTION_ID)] as? SiblingEntityBuilder
+          (this.entityLinks[EntityLink(true, SECONDCHILD_CONNECTION_ID)] as? SiblingEntityBuilder)
         }
       }
       set(value) {
@@ -186,7 +185,7 @@ internal class ParentTestEntityImpl(private val dataSource: ParentTestEntityData
           _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
         }
         if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)) {
-          _diff.updateOneToOneChildOfParent(SECONDCHILD_CONNECTION_ID, this, value)
+          _diff.instrumentation.replaceChildren(SECONDCHILD_CONNECTION_ID, this, listOfNotNull(value))
         }
         else {
           if (value is ModifiableWorkspaceEntityBase<*, *>) {
@@ -235,7 +234,6 @@ internal class ParentTestEntityData : WorkspaceEntityData<ParentTestEntity>() {
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): ParentTestEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {

@@ -1,5 +1,5 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:JvmName("ModuleMavenCoordinateEntityModifications")
+@file:JvmName("ModuleMavenCoordinateEntityModifications") @file:Experimental
 
 package com.intellij.java.impl.dependencySubstitution
 
@@ -8,13 +8,14 @@ import com.intellij.platform.workspace.jps.entities.ModuleEntityBuilder
 import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
+import org.jetbrains.annotations.ApiStatus.Experimental
 
 @GeneratedCodeApiVersion(3)
 public interface ModuleMavenCoordinateEntityBuilder : WorkspaceEntityBuilder<ModuleMavenCoordinateEntity> {
-  override var entitySource: EntitySource
+  public override var entitySource: EntitySource
   public var module: ModuleEntityBuilder
   public var coordinates: MavenCoordinates
 }

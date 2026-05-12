@@ -5,7 +5,7 @@ import com.intellij.openapi.application.PluginPathManager
 import com.intellij.testFramework.TestDataPath
 import java.nio.file.Path
 
-@TestDataPath("\$CONTENT_ROOT/testData")
+@TestDataPath("\$CONTENT_ROOT/../testData")
 object TestDataUtil {
   @JvmStatic
   val basePath: Path by lazy {

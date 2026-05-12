@@ -63,17 +63,17 @@ abstract class ClientAwareComponentManager: ComponentManagerImpl {
   }
 
   final override fun registerComponents(
-    modules: List<IdeaPluginDescriptorImpl>,
+    descriptors: Sequence<IdeaPluginDescriptorImpl>,
     app: Application?,
     listenerCallbacks: MutableList<ExtensionPointDeferredListenersNotification>?
   ) {
-    super.registerComponents(modules = modules,
+    super.registerComponents(descriptors = descriptors,
                              app = app,
                              listenerCallbacks = listenerCallbacks)
 
     val sessionsManager = super.getService(ClientSessionsManager::class.java)!!
     for (session in sessionsManager.getSessions(ClientKind.ALL)) {
-      (session as? ClientSessionImpl)?.registerComponents(modules = modules,
+      (session as? ClientSessionImpl)?.registerComponents(descriptors = descriptors,
                                                           app = app,
                                                           listenerCallbacks = listenerCallbacks)
     }

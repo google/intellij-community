@@ -1,6 +1,6 @@
 ### auto-generated section `build fleet.build.license` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_license",
@@ -14,28 +14,26 @@ create_kotlinc_options(
   x_lambdas = "class"
 )
 
-resourcegroup(
-  name = "license_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "license",
   module_name = "fleet.build.license",
   visibility = ["//visibility:public"],
   srcs = glob(["srcCommonMain/**/*.kt", "srcCommonMain/**/*.java", "srcCommonMain/**/*.form"], allow_empty = True),
-  resources = [":license_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_license",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinx-serialization-core",
     "@lib//:kotlinx-serialization-json",
+    "@lib//:fleet-jetbrains-amper-async-processes",
+    "@lib//:slf4j-api",
   ]
 )
 
 jvm_library(
   name = "license_test_lib",
+  testonly = True,
   module_name = "fleet.build.license",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -43,3 +41,9 @@ jvm_library(
   runtime_deps = [":license"]
 )
 ### auto-generated section `build fleet.build.license` end
+
+### auto-generated section `iml fleet.build.license` start
+exports_files([
+  "fleet.build.license.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml fleet.build.license` end

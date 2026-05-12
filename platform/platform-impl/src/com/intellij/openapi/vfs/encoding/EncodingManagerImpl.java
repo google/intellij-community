@@ -20,6 +20,7 @@ import com.intellij.openapi.editor.event.EditorFactoryListener;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.impl.LoadTextUtil;
+import com.intellij.openapi.project.BaseProjectDirectories;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectLocator;
 import com.intellij.openapi.project.ProjectManager;
@@ -164,7 +165,7 @@ public final class EncodingManagerImpl extends EncodingManager implements Persis
     }
 
     final Project project = ProjectLocator.getInstance().guessProjectForFile(virtualFile);
-    return ReadAction.compute(() -> {
+    return ReadAction.computeBlocking(() -> {
       Charset charsetFromContent = LoadTextUtil.charsetFromContentOrNull(project, virtualFile, document.getImmutableCharSequence());
       if (charsetFromContent != null) {
         setCachedCharsetFromContent(charsetFromContent, null, document);
@@ -275,20 +276,21 @@ public final class EncodingManagerImpl extends EncodingManager implements Persis
   }
 
   private static @Nullable Project guessProject(@Nullable VirtualFile virtualFile) {
-    Project project = virtualFile == null ? null : ProjectLocator.getInstance().guessProjectForFile(virtualFile);
-    if (project != null) {
-      return project;
-    }
     ProjectManager projectManager = ProjectManager.getInstanceIfCreated();
     if (projectManager == null) {
       return null;
     }
-
     Project[] openProjects = projectManager.getOpenProjects();
-    if (openProjects.length == 1) {
-      return openProjects[0];
+    if (virtualFile != null) {
+      for (Project project : openProjects) {
+        // use less precise method but that doesn't require read lock IJPL-242172
+        VirtualFile projectBaseDir = BaseProjectDirectories.getInstance(project).getBaseDirectoryFor(virtualFile);
+        if (projectBaseDir != null) {
+          return project;
+        }
+      }
     }
-    return null;
+    return openProjects.length == 1 ? openProjects[0] : null;
   }
 
   @Override

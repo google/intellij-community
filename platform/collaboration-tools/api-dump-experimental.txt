@@ -102,6 +102,7 @@ f:com.intellij.collaboration.api.json.JsonHttpApiHelperKt
 - <init>(kotlinx.coroutines.CoroutineScope,com.intellij.collaboration.auth.AccountManager,com.intellij.collaboration.auth.ui.AccountsListModel):V
 - f:accountsPanelCell(com.intellij.ui.dsl.builder.Row,com.intellij.collaboration.auth.ui.LoadingAccountsDetailsProvider,com.intellij.collaboration.auth.ui.AccountsPanelActionsController):com.intellij.ui.dsl.builder.Cell
 *f:com.intellij.collaboration.auth.ui.AccountsPanelFactory$Companion
+- f:addWarningForEnabledCredentialHelper(Z,kotlin.jvm.functions.Function1):com.intellij.ui.dsl.builder.CellBase
 - f:addWarningForMemoryOnlyPasswordSafe(kotlinx.coroutines.CoroutineScope,kotlinx.coroutines.flow.Flow,kotlin.jvm.functions.Function1):V
 - f:addWarningForMemoryOnlyPasswordSafeAndGet(kotlinx.coroutines.CoroutineScope,kotlinx.coroutines.flow.Flow,kotlin.jvm.functions.Function1):com.intellij.ui.dsl.builder.CellBase
 - f:addWarningForPersistentCredentials(kotlinx.coroutines.CoroutineScope,kotlinx.coroutines.flow.Flow,kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function1):com.intellij.ui.dsl.builder.CellBase
@@ -331,6 +332,17 @@ f:com.intellij.collaboration.api.json.JsonHttpApiHelperKt
 - f:create(kotlinx.coroutines.CoroutineScope,javax.swing.JComponent,kotlinx.coroutines.flow.Flow,kotlin.jvm.functions.Function2):javax.swing.JComponent
 - f:wrapTextComponent(kotlinx.coroutines.CoroutineScope,javax.swing.JComponent,kotlinx.coroutines.flow.Flow,kotlin.jvm.functions.Function0):javax.swing.JComponent
 - bs:wrapTextComponent$default(com.intellij.collaboration.ui.EditableComponentFactory,kotlinx.coroutines.CoroutineScope,javax.swing.JComponent,kotlinx.coroutines.flow.Flow,kotlin.jvm.functions.Function0,I,java.lang.Object):javax.swing.JComponent
+*:com.intellij.collaboration.ui.Either
+- *sf:Companion:com.intellij.collaboration.ui.Either$Companion
+- asLeftOrNull():java.lang.Object
+- asRightOrNull():java.lang.Object
+- bimap(kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function1):com.intellij.collaboration.ui.Either
+- fold(kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function1):java.lang.Object
+- isLeft():Z
+- isRight():Z
+*f:com.intellij.collaboration.ui.Either$Companion
+- f:left(java.lang.Object):com.intellij.collaboration.ui.Either
+- f:right(java.lang.Object):com.intellij.collaboration.ui.Either
 *f:com.intellij.collaboration.ui.ExceptionUtil
 - sf:INSTANCE:com.intellij.collaboration.ui.ExceptionUtil
 - f:getPresentableMessage(java.lang.Throwable):java.lang.String
@@ -343,7 +355,9 @@ f:com.intellij.collaboration.api.json.JsonHttpApiHelperKt
 - bs:inlineIconExtension$default(com.intellij.collaboration.ui.HtmlEditorPaneUtil,java.lang.Class,I,java.lang.Object):com.intellij.util.ui.ExtendableHTMLViewFactory$Extension
 *f:com.intellij.collaboration.ui.HtmlEditorPaneUtilKt
 - sf:SimpleHtmlPane(java.lang.String):javax.swing.JEditorPane
+- sf:SimpleHtmlPane(javax.swing.text.html.StyleSheet,kotlin.jvm.functions.Function1,Z,com.intellij.collaboration.ui.html.AsyncHtmlImageLoader,java.net.URL,java.lang.Class):javax.swing.JEditorPane
 - sf:SimpleHtmlPane(javax.swing.text.html.StyleSheet,Z,com.intellij.collaboration.ui.html.AsyncHtmlImageLoader,java.net.URL,java.lang.Class):javax.swing.JEditorPane
+- bs:SimpleHtmlPane$default(javax.swing.text.html.StyleSheet,kotlin.jvm.functions.Function1,Z,com.intellij.collaboration.ui.html.AsyncHtmlImageLoader,java.net.URL,java.lang.Class,I,java.lang.Object):javax.swing.JEditorPane
 - bs:SimpleHtmlPane$default(javax.swing.text.html.StyleSheet,Z,com.intellij.collaboration.ui.html.AsyncHtmlImageLoader,java.net.URL,java.lang.Class,I,java.lang.Object):javax.swing.JEditorPane
 - sf:onHyperlinkActivated(javax.swing.JEditorPane,kotlin.jvm.functions.Function1):V
 - sf:setHtmlBody(javax.swing.JEditorPane,java.lang.String):V
@@ -1055,6 +1069,7 @@ f:com.intellij.collaboration.ui.codereview.diff.viewer.DiffViewerUtilKt
 - java.lang.Enum
 - sf:SINGLE_COMMIT_REVIEW:com.intellij.collaboration.ui.codereview.editor.CodeReviewInlayModel$Ranged$Adjustable$AdjustmentDisabledReason
 - sf:SUGGESTED_CHANGE:com.intellij.collaboration.ui.codereview.editor.CodeReviewInlayModel$Ranged$Adjustable$AdjustmentDisabledReason
+- sf:UNSUPPORTED_VERSION:com.intellij.collaboration.ui.codereview.editor.CodeReviewInlayModel$Ranged$Adjustable$AdjustmentDisabledReason
 - s:getEntries():kotlin.enums.EnumEntries
 - s:valueOf(java.lang.String):com.intellij.collaboration.ui.codereview.editor.CodeReviewInlayModel$Ranged$Adjustable$AdjustmentDisabledReason
 - s:values():com.intellij.collaboration.ui.codereview.editor.CodeReviewInlayModel$Ranged$Adjustable$AdjustmentDisabledReason[]
@@ -1228,6 +1243,8 @@ f:com.intellij.collaboration.ui.codereview.diff.viewer.DiffViewerUtilKt
 - sf:ERROR_ACTION_HREF:java.lang.String
 - f:simple(java.lang.String,kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function1):com.intellij.collaboration.ui.codereview.list.error.ErrorStatusPresenter$Text
 - bs:simple$default(com.intellij.collaboration.ui.codereview.list.error.ErrorStatusPresenter$Companion,java.lang.String,kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function1,I,java.lang.Object):com.intellij.collaboration.ui.codereview.list.error.ErrorStatusPresenter$Text
+- f:simpleHTML(java.lang.String,kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function1):com.intellij.collaboration.ui.codereview.list.error.ErrorStatusPresenter$HTML
+- bs:simpleHTML$default(com.intellij.collaboration.ui.codereview.list.error.ErrorStatusPresenter$Companion,java.lang.String,kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function1,I,java.lang.Object):com.intellij.collaboration.ui.codereview.list.error.ErrorStatusPresenter$HTML
 *:com.intellij.collaboration.ui.codereview.list.error.ErrorStatusPresenter$HTML
 - com.intellij.collaboration.ui.codereview.list.error.ErrorStatusPresenter
 - a:getHTMLBody(java.lang.Object):java.lang.String
@@ -1624,7 +1641,8 @@ f:com.intellij.collaboration.ui.codereview.diff.viewer.DiffViewerUtilKt
 - sf:bindSelected(com.intellij.ui.dsl.builder.Cell,kotlinx.coroutines.flow.Flow,kotlin.jvm.functions.Function1):com.intellij.ui.dsl.builder.Cell
 - sf:bindSelected(javax.swing.JToggleButton,kotlinx.coroutines.flow.Flow,kotlin.jvm.functions.Function1):V
 - sf:bindSelectedIn(com.intellij.ui.dsl.builder.Cell,kotlinx.coroutines.CoroutineScope,kotlinx.coroutines.flow.MutableStateFlow):com.intellij.ui.dsl.builder.Cell
-- sf:bindSelectedIn(javax.swing.JCheckBox,kotlinx.coroutines.CoroutineScope,kotlinx.coroutines.flow.MutableStateFlow):V
+- bsf:bindSelectedIn(javax.swing.JCheckBox,kotlinx.coroutines.CoroutineScope,kotlinx.coroutines.flow.MutableStateFlow):V
+- sf:bindSelectedIn(javax.swing.JToggleButton,kotlinx.coroutines.CoroutineScope,kotlinx.coroutines.flow.MutableStateFlow):V
 - sf:bindSelectedItemIn(com.intellij.ui.dsl.builder.Cell,kotlinx.coroutines.CoroutineScope,kotlinx.coroutines.flow.MutableStateFlow):com.intellij.ui.dsl.builder.Cell
 - sf:bindSelectedItemIn(javax.swing.ComboBoxModel,kotlinx.coroutines.CoroutineScope,kotlinx.coroutines.flow.MutableStateFlow):V
 - sf:bindText(javax.swing.JLabel,java.lang.String,kotlinx.coroutines.flow.Flow):V

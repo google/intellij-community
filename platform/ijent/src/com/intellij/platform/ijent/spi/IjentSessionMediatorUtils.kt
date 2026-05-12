@@ -6,13 +6,15 @@ import com.intellij.openapi.diagnostic.Attachment
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.progress.Cancellation
+import com.intellij.platform.eel.channels.EelDelicateApi
 import com.intellij.platform.ijent.IjentLogger
+import com.intellij.platform.ijent.IjentScope
 import com.intellij.platform.ijent.IjentUnavailableException
+import com.intellij.platform.ijent.ParentOfIjentScopes
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.util.containers.ContainerUtil
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.NonCancellable
@@ -41,7 +43,7 @@ import kotlin.time.toKotlinDuration
 object IjentSessionMediatorUtils {
   private val loggedErrors = Collections.newSetFromMap(ContainerUtil.createConcurrentWeakMap<Throwable, Boolean>())
 
-  fun createProcessScope(parentScope: CoroutineScope, ijentLabel: String, logger: Logger): CoroutineScope {
+  fun createProcessScope(parentScope: ParentOfIjentScopes, ijentLabel: String, logger: Logger): IjentScope {
     val context = IjentThreadPool.coroutineContext
     // Prevents from logging the error by the default exception handler.
     // Errors are logged explicitly in this function.
@@ -49,7 +51,7 @@ object IjentSessionMediatorUtils {
 
     // This supervisor scope exists only to prevent automatic propagation of IjentUnavailableException to the parent scope.
     // Instead, there's a logic below that decides if a specific IjentUnavailableException should be propagated to the parent scope.
-    val trickySupervisorScope = parentScope.childScope(ijentLabel, context + dummyExceptionHandler, supervisor = true)
+    val trickySupervisorScope = parentScope.s.childScope(ijentLabel, context + dummyExceptionHandler, supervisor = true)
 
     val ijentProcessScope = trickySupervisorScope.childScope(ijentLabel, supervisor = false)
 
@@ -68,7 +70,7 @@ object IjentSessionMediatorUtils {
         if (propagateToParentScope) {
           try {
             err.addSuppressed(Throwable("Rethrown from here"))
-            parentScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            parentScope.s.launch(start = CoroutineStart.UNDISPATCHED) {
               throw err
             }
           }
@@ -81,7 +83,8 @@ object IjentSessionMediatorUtils {
         logIjentError(logger, ijentLabel, err)
       }
     }
-    return ijentProcessScope
+    @OptIn(EelDelicateApi::class)
+    return IjentScope(parentScope, ijentProcessScope)
   }
 
   fun logIjentError(logger: Logger, ijentLabel: String, exception: Throwable) {
@@ -116,15 +119,12 @@ object IjentSessionMediatorUtils {
     lastStderrMessages: MutableSharedFlow<String?>,
     logger: Logger,
   ) {
+    val lineConsumer = createIjentStderrLineConsumer(ijentLabel, lastStderrMessages, logger)
     try {
       errorStream.reader().useLines { lines ->
-        val logIjentStderr = LogIjentStderr(logger)
         for (line in lines) {
           yield()
-          if (line.isNotEmpty()) {
-            logIjentStderr(ijentLabel, line)
-            lastStderrMessages.emit(line)
-          }
+          lineConsumer.consume(line)
         }
       }
     }
@@ -132,6 +132,33 @@ object IjentSessionMediatorUtils {
       logger.debug { "$ijentLabel bootstrap got an error: $err" }
     }
     finally {
+      lineConsumer.complete()
+    }
+  }
+
+  fun createIjentStderrLineConsumer(
+    ijentLabel: String,
+    lastStderrMessages: MutableSharedFlow<String?>,
+    logger: Logger,
+  ): IjentStderrLineConsumer {
+    val logIjentStderr = LogIjentStderr(logger)
+    return IjentStderrLineConsumer(lastStderrMessages) { line ->
+      logIjentStderr(ijentLabel, line)
+    }
+  }
+
+  class IjentStderrLineConsumer internal constructor(
+    private val lastStderrMessages: MutableSharedFlow<String?>,
+    private val lineLogger: (String) -> Unit,
+  ) {
+    suspend fun consume(line: String) {
+      if (line.isNotEmpty()) {
+        lineLogger(line)
+        lastStderrMessages.emit(line)
+      }
+    }
+
+    suspend fun complete() {
       lastStderrMessages.emit(null)
     }
   }
@@ -222,18 +249,13 @@ object IjentSessionMediatorUtils {
     }
   }
 
-  suspend fun ijentProcessExitAwaiter(
+  suspend fun ijentProcessExitCodeHandler(
     ijentLabel: String,
     lastStderrMessages: MutableSharedFlow<String?>,
     logger: Logger,
-    isExitExpected: suspend (exitCode: Int) -> Boolean = { it == 0 },
-    waitFunction: suspend () -> Int,
+    exitCode: Int,
+    isExitExpected: Boolean,
   ): Nothing {
-    val exitCode = waitFunction()
-    logger.debug { "IJent process $ijentLabel exited with code $exitCode" }
-
-    val isExitExpected = isExitExpected(exitCode)
-
     val error = if (isExitExpected) {
       IjentUnavailableException.CommunicationFailure("IJent process exited successfully").apply { exitedExpectedly = true }
     }

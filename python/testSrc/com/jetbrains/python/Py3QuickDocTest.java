@@ -1,7 +1,8 @@
-// Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python;
 
 import com.intellij.codeInsight.documentation.DocumentationManager;
+import com.intellij.idea.TestFor;
 import com.intellij.openapi.util.RecursionManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
@@ -15,6 +16,7 @@ import com.jetbrains.python.psi.PyDocStringOwner;
 import com.jetbrains.python.psi.PyFile;
 import com.jetbrains.python.psi.PyFunction;
 import com.jetbrains.python.psi.PyStringLiteralExpression;
+import com.jetbrains.python.psi.PyTargetExpression;
 import com.jetbrains.python.psi.impl.PyBuiltinCache;
 import com.jetbrains.python.sdk.PythonSdkType;
 import com.jetbrains.python.sdk.legacy.PythonSdkUtil;
@@ -327,7 +329,7 @@ public class Py3QuickDocTest extends LightMarkedTestCase {
             Return the number of items of a sequence or collection.
             ""\"
             return 0""",
-      (__) -> checkHTMLOnly()
+      (_) -> checkHTMLOnly()
     );
   }
 
@@ -368,7 +370,7 @@ public class Py3QuickDocTest extends LightMarkedTestCase {
             def count(self, value): # real signature unknown; restored from __doc__
                 ""\" L.count(value) -> integer -- return number of occurrences of value ""\"
                 return 0""",
-      (__) -> checkHTMLOnly()
+      (_) -> checkHTMLOnly()
     );
   }
 
@@ -474,6 +476,16 @@ public class Py3QuickDocTest extends LightMarkedTestCase {
 
   // PY-29339
   public void testAsyncFunctionTooltip() {
+    checkHover();
+  }
+
+  @TestFor(issues="PY-88621")
+  public void testHoverOverFunctionWithTypeParameters() {
+    checkHover();
+  }
+
+  @TestFor(issues="PY-88621")
+  public void testHoverOverClassWithTypeParameters() {
     checkHover();
   }
 
@@ -908,6 +920,16 @@ public class Py3QuickDocTest extends LightMarkedTestCase {
     checkHTMLOnly();
   }
 
+  @TestFor(issues = "PY-88277")
+  public void testType_variable_tuple() {
+    checkHTMLOnly();
+  }
+
+  @TestFor(issues = "PY-88277")
+  public void testParameter_specification() {
+    checkHTMLOnly();
+  }
+
   // PY-64074
   public void testTypeKeyword() {
     checkHTMLOnly();
@@ -952,6 +974,26 @@ public class Py3QuickDocTest extends LightMarkedTestCase {
   public void testIntersectionType() {
     checkHTMLOnly();
   }
+
+  // PY-85799
+  public void testPyiStubFallbackForTargetExpression() {
+    myFixture.copyDirectoryToProject(getTestName(false), "");
+    myFixture.configureByText("test.py", "");
+
+    VirtualFile virtualFile = myFixture.findFileInTempDir("pkg/mod.py");
+    assertNotNull(virtualFile);
+    PyFile modPy = as(PsiManager.getInstance(myFixture.getProject()).findFile(virtualFile), PyFile.class);
+    assertNotNull(modPy);
+
+    PyTargetExpression aliasTarget = modPy.findTopLevelAttribute("alias");
+    assertNotNull(aliasTarget);
+
+    String doc = myProvider.generateDoc(aliasTarget, aliasTarget);
+    assertNotNull(doc);
+    assertTrue("Should resolve to function documentation from .pyi", doc.contains("Key"));
+    assertTrue("Should have 'Assigned to' section", doc.contains("Assigned to"));
+  }
+
 
   @Override
   protected String getTestDataPath() {

@@ -2,7 +2,6 @@
 package com.intellij.coverage;
 
 import com.intellij.coverage.actions.ExternalReportImportManager;
-import com.intellij.coverage.actions.ExternalReportImportManagerKt;
 import com.intellij.icons.AllIcons;
 import com.intellij.java.coverage.JavaCoverageBundle;
 import com.intellij.openapi.fileTypes.INativeFileType;
@@ -10,7 +9,6 @@ import com.intellij.openapi.fileTypes.ex.FileTypeIdentifiableByVirtualFile;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.NlsSafe;
-import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -60,10 +58,9 @@ final class JaCoCoCoverageFileType implements INativeFileType, FileTypeIdentifia
 
   @Override
   public boolean isMyFileType(@NotNull VirtualFile file) {
-    var coverageRunner = ExternalReportImportManagerKt.getCoverageRunner(file);
-    if (coverageRunner instanceof JaCoCoCoverageRunner jaCoCoCoverageRunner) {
-      return jaCoCoCoverageRunner.canBeLoaded(VfsUtilCore.virtualToIoFile(file));
-    }
-    return false;
+    var jaCoCoCoverageRunner = CoverageRunner.EP_NAME.findExtension(JaCoCoCoverageRunner.class);
+    if (jaCoCoCoverageRunner == null) return false;
+    if (!jaCoCoCoverageRunner.getDataFileExtension().equals(file.getExtension())) return false;
+    return jaCoCoCoverageRunner.canBeLoaded(file.toNioPath());
   }
 }

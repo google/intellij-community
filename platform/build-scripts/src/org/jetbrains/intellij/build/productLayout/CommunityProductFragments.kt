@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build.productLayout
 
 /**
@@ -34,17 +34,17 @@ object CommunityProductFragments {
   }
 
   /**
-     * PyCharm Core fragment: provides PyCharm-specific platform extensions.
-     *
-     * Includes:
-     * - PlatformLangPlugin.xml for platform language support
-     * - Module capability alias for PyCharm
-     * - Optional remote servers support
-     * - PyCharm-specific extensions and actions (via pycharm-core.xml)
-     *
-     * Use this fragment for products that include PyCharm functionality (PyCharm Community, PyCharm Professional, DataSpell).
-     * Note: The extensions and actions blocks remain in pycharm-core.xml as they cannot be represented in the product content DSL.
-     */
+   * PyCharm Core fragment: provides PyCharm-specific platform extensions.
+   *
+   * Includes:
+   * - PlatformLangPlugin.xml for platform language support
+   * - Module capability alias for PyCharm
+   * - Optional remote servers support
+   * - PyCharm-specific extensions and actions (via pycharm-core.xml)
+   *
+   * Use this fragment for products that include PyCharm functionality (PyCharm Community, PyCharm Professional, DataSpell).
+   * Note: The extensions and actions blocks remain in pycharm-core.xml as they cannot be represented in the product content DSL.
+   */
   fun pycharmCoreFragment(): ProductModulesContentSpec = productModules {
     // Include platform lang base (PyCharm requires platform language support)
     deprecatedInclude("intellij.platform.resources", "META-INF/PlatformLangPlugin.xml")

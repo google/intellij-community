@@ -1,9 +1,8 @@
 package com.intellij.database.run.ui.grid.editors;
 
-import com.intellij.database.datagrid.DataGrid;
+import com.intellij.database.datagrid.GridCellRequest;
 import com.intellij.database.datagrid.GridColumn;
 import com.intellij.database.datagrid.GridRow;
-import com.intellij.database.datagrid.ModelIndex;
 import com.intellij.util.ui.CalendarView;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -29,7 +28,7 @@ public class GridCellEditorFactoryImpl implements GridCellEditorFactoryProvider 
   }
 
   @Override
-  public @Nullable GridCellEditorFactory getEditorFactory(@NotNull DataGrid grid, @NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
-    return GridCellEditorFactoryProvider.getEditorFactory(myDefaultFactories, factory -> factory.getSuitability(grid, row, column), GridCellEditorFactory.class);
+  public @Nullable GridCellEditorFactory getEditorFactory(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    return GridCellEditorFactoryProvider.getEditorFactory(myDefaultFactories, factory -> factory.getSuitability(request), GridCellEditorFactory.class);
   }
 }

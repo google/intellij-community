@@ -6,26 +6,15 @@
     <module name="intellij.libraries.pty4j"/>
     <module name="intellij.platform.core"/>
     <module name="intellij.platform.core.impl"/>
+    <module name="intellij.platform.editor.ui"/>
     <module name="intellij.platform.ide.core"/>
+    <module name="intellij.platform.util.coroutines"/>
   </dependencies>
   <!-- endregion -->
   <extensions defaultExtensionNs="com.intellij">
-    <applicationService serviceInterface="com.intellij.platform.eel.provider.LocalWindowsEelApi"
-                        serviceImplementation="com.intellij.platform.eel.impl.local.LocalWindowsEelApiImpl"/>
-    <applicationService serviceInterface="com.intellij.platform.eel.provider.LocalPosixEelApi"
-                        serviceImplementation="com.intellij.platform.eel.impl.local.LocalPosixEelApiImpl"/>
-
-    <applicationService serviceInterface="com.intellij.platform.eel.provider.MultiRoutingFileSystemBackend$InitializationService"
-                        serviceImplementation="com.intellij.platform.eel.impl.fs.EelMultiRoutingFileSystemBackendInitializationService"/>
-    <registryKey
-      description="Using incremental walking transfer for IJent"
-      key="ijent.incremental.walking.transfer"
-      restartRequired="false"
-      defaultValue="true"/>
-
     <advancedSetting
       id="container.environments.env.var.shell.mode"
-      enumClass="com.intellij.platform.eel.impl.settings.EnvVarShellMode"
+      enumClass="com.intellij.platform.eel.impl.settings.LoginShellEnvVarModeProviderImpl$EnvVarShellMode"
       default="LOGIN_INTERACTIVE"
       bundle="messages.EelImplBundle"
       groupKey="advanced.settings.container.environments"
@@ -34,8 +23,8 @@
   <extensionPoints>
     <extensionPoint qualifiedName="com.intellij.platform.eel.impl.portAccessibleLocally"
                     dynamic="false"
-                    interface="com.intellij.platform.eel.impl.portAccessibleLocally.EelPortAccessibleLocally"/>
-    <extensionPoint name="multiRoutingFileSystemBackend" interface="com.intellij.platform.eel.provider.MultiRoutingFileSystemBackend"
-                    dynamic="true"/>
+                    interface="com.intellij.platform.eel.provider.portAccessibleLocally.EelPortAccessibleLocally"/>
+    <extensionPoint qualifiedName="com.intellij.eelMachineResolver"
+                    interface="com.intellij.platform.eel.provider.EelMachineResolver" dynamic="true"/>
   </extensionPoints>
 </idea-plugin>

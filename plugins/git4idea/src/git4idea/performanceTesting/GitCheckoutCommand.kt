@@ -24,6 +24,8 @@ import org.jetbrains.concurrency.toPromise
  * Syntax: %gitCheckout
  * Example: %gitCheckout master
  * Example: %gitCheckout origin/1.1.11 1.1.11
+ * Example: %gitCheckout master --alwaysSmartCheckout
+ * Example: %gitCheckout origin/1.1.11 1.1.11 --alwaysSmartCheckout
  */
 @ApiStatus.Internal
 class GitCheckoutCommand(text: String, line: Int) : AbstractCommand(text, line, true) {
@@ -35,9 +37,10 @@ class GitCheckoutCommand(text: String, line: Int) : AbstractCommand(text, line, 
   @Suppress("UNUSED")
   constructor() : this(text = "", line = 0)
 
-  fun checkout(branchName: String, newBranchName: String = branchName): Boolean {
+  fun checkout(branchName: String, newBranchName: String = branchName, alwaysSmartCheckout: Boolean = false): Boolean {
     val promise: Promise<Any?> = runBlocking(Dispatchers.EDT) {
-      checkout(project = ProjectManager.getInstance().openProjects.first(), branchName = branchName, newBranchName = newBranchName)
+      checkout(project = ProjectManager.getInstance().openProjects.first(), branchName = branchName,
+               newBranchName = newBranchName, alwaysSmartCheckout = alwaysSmartCheckout)
     }
 
     runBlocking(Dispatchers.IO) { promise.await() }
@@ -47,7 +50,8 @@ class GitCheckoutCommand(text: String, line: Int) : AbstractCommand(text, line, 
 
   fun checkout(project: Project,
                branchName: String,
-               newBranchName: String = branchName): Promise<Any?> {
+               newBranchName: String = branchName,
+               alwaysSmartCheckout: Boolean = false): Promise<Any?> {
     val actionCallback: ActionCallback = ActionCallbackProfilerStopper()
 
     try {
@@ -56,8 +60,8 @@ class GitCheckoutCommand(text: String, line: Int) : AbstractCommand(text, line, 
       val dataContext = DataManager.getInstance().getDataContext(focusedComponent)
       val gitRepository = GitBranchUtil.guessRepositoryForOperation(project, dataContext)
       requireNotNull(gitRepository) { "GitRepository for $project not found" }
-      brancher.checkoutNewBranchStartingFrom(newBranchName, branchName, true, mutableListOf(gitRepository),
-                                             Runnable { actionCallback.setDone() })
+      brancher.checkoutNewBranchStartingFrom(newBranchName, branchName, true, alwaysSmartCheckout,
+                                             mutableListOf(gitRepository), Runnable { actionCallback.setDone() })
     }
     catch (e: Throwable) {
       actionCallback.reject(e.message)
@@ -67,9 +71,12 @@ class GitCheckoutCommand(text: String, line: Int) : AbstractCommand(text, line, 
   }
 
   override fun _execute(context: PlaybackContext): Promise<Any?> {
-    val split = extractCommandArgument(PREFIX).replace("\"".toRegex(), "").split(" ")
-    val branchName = split[0]
-    val newBranchName = if (split.size == 2) split[1] else branchName
-    return checkout(project = context.project, branchName = branchName, newBranchName = newBranchName)
+    val tokens = extractCommandArgument(PREFIX).replace("\"".toRegex(), "").split(" ")
+    val alwaysSmartCheckout = tokens.contains("--alwaysSmartCheckout")
+    val positional = tokens.filter { !it.startsWith("--") }
+    val branchName = positional[0]
+    val newBranchName = if (positional.size >= 2) positional[1] else branchName
+    return checkout(project = context.project, branchName = branchName, newBranchName = newBranchName,
+                    alwaysSmartCheckout = alwaysSmartCheckout)
   }
 }

@@ -9,6 +9,7 @@ import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ex.ActionContextElement
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.Interactive
+import com.intellij.openapi.application.UnhandledExceptionLoggingMode
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.UnhandledException
 import com.intellij.openapi.diagnostic.fileLogger
@@ -70,13 +71,21 @@ private fun logExceptionSafely(message: String, exception: UnhandledException) {
  */
 private fun interactiveMode(coroutineContext: CoroutineContext?): Mode {
 
+  // kept just in case for binary compatibility
+  val deprecatedInteractive = coroutineContext?.get(Interactive.Key)
+  if (deprecatedInteractive != null) {
+    return Mode.Interactive(deprecatedInteractive.action)
+  }
+
   val action = coroutineContext?.get(ActionContextElement)
-  val interactive = coroutineContext?.get(Interactive.Key)
+  val loggingMode = coroutineContext?.get(UnhandledExceptionLoggingMode.Key)
 
-
-  // interactive mode set explicitly
-  if (interactive != null) {
-    return Mode.Interactive(interactive.action)
+  // logging mode set explicitly
+  if (loggingMode != null) {
+    return when (loggingMode) {
+      is UnhandledExceptionLoggingMode.Interactive -> Mode.Interactive(loggingMode.action)
+      UnhandledExceptionLoggingMode.NonInteractive -> Mode.NonInteractive
+    }
   }
   else if (action != null) {
     val text = ActionManager.getInstance().getAction(action.actionId)?.templatePresentation?.text

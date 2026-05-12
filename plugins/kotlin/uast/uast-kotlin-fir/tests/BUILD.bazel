@@ -3,6 +3,7 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tests",
+  module_name = "intellij.kotlin.uast.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -29,10 +30,15 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.uast.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
   deps = [
+    "//platform/refactoring",
+    "//platform/refactoring:refactoring_test_lib",
+    "//platform/editor-ui-api:editor-ui",
+    "//platform/editor-ui-api:editor-ui_test_lib",
     "//plugins/kotlin/plugin/k2",
     "//plugins/kotlin/plugin/k2:k2_test_lib",
     "@lib//:kotlin-stdlib",
@@ -51,9 +57,8 @@ jvm_library(
     "@lib//:kotlinc-analysis-api",
     "@lib//:kotlinc-analysis-api-k2",
     "@lib//:kotlinc-analysis-api-impl-base",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
-    "@lib//:kotlinc-analysis-api-impl-base-tests",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/base/plugin",
     "//plugins/kotlin/base/plugin:plugin_test_lib",
     "//plugins/kotlin/frontend-independent",
@@ -68,6 +73,10 @@ jvm_library(
     "//uast/uast-common:uast_test_lib",
     "//platform/core-api:core",
     "//platform/core-api:core_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
+    "//java/java-psi-api:psi",
+    "//java/java-psi-api:psi_test_lib",
     "//java/java-psi-impl:psi-impl",
     "//java/java-psi-impl:psi-impl_test_lib",
     "//uast/uast-java:java-uast",
@@ -78,6 +87,10 @@ jvm_library(
     "@lib//:kotlinc-symbol-light-classes",
     "//uast/testFramework",
     "//uast/testFramework:testFramework_test_lib",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework_test_lib",
+    "//jps/model-api:model",
+    "//jps/model-api:model_test_lib",
   ],
   runtime_deps = [
     ":tests",
@@ -86,6 +99,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.kotlin.uast.tests` end
+
+### auto-generated section `iml intellij.kotlin.uast.tests` start
+exports_files([
+  "intellij.kotlin.uast.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.uast.tests` end
 
 ### auto-generated section `test intellij.kotlin.uast.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

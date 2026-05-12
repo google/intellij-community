@@ -6,6 +6,8 @@ import com.intellij.openapi.diagnostic.fileLogger
 import com.intellij.openapi.externalSystem.autoimport.ExternalSystemProjectId
 import com.intellij.openapi.externalSystem.autoimport.ExternalSystemProjectTracker
 import com.intellij.openapi.project.Project
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
 
@@ -14,7 +16,7 @@ import org.jetbrains.annotations.TestOnly
  */
 @Service(Service.Level.PROJECT)
 @ApiStatus.Internal
-class PyProjectAutoImportService(private val project: Project) : Disposable {
+class PyProjectAutoImportService(private val project: Project, private val scope: CoroutineScope) : Disposable {
   private val m = Any()
 
   init {
@@ -22,6 +24,7 @@ class PyProjectAutoImportService(private val project: Project) : Disposable {
   }
 
   private var projectId: ExternalSystemProjectId? = null
+  private var wsmTrackerJob: Job? = null
 
   @get:TestOnly
   internal val initialized: Boolean get() = synchronized(m) { projectId != null }
@@ -45,6 +48,11 @@ class PyProjectAutoImportService(private val project: Project) : Disposable {
       tracker.activate(projectId)
       tracker.markDirty(projectId)
       tracker.scheduleProjectRefresh()
+      // Trigger rebuild when excluded folders change — pyproject.toml inside excluded folders should be ignored.
+      wsmTrackerJob = scope.createWsmTracker(project) {
+        tracker.markDirty(projectId)
+        tracker.scheduleProjectRefresh()
+      }
       log.info("PyProject started")
     }
   }
@@ -54,6 +62,8 @@ class PyProjectAutoImportService(private val project: Project) : Disposable {
    */
   fun stop(): Unit = synchronized(m) {
     log.info("PyProject stopped")
+    wsmTrackerJob?.cancel()
+    wsmTrackerJob = null
     projectId?.let {
       getTracker().remove(it)
       projectId = null

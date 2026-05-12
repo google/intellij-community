@@ -51,7 +51,7 @@ public final class ManagedHighlighterRecycler {
       UpdateHighlightersUtil.LOG.debug("MHR.recycleHighlighter " + highlighter + HighlightInfoUpdaterImpl.currentProgressInfo());
     }
     long range = ((RangeMarkerImpl)highlighter).getScalarRange();
-    incinerator.computeIfAbsent(range, __ -> new ArrayList<>()).add(new InvalidPsi(psiElement, info));
+    incinerator.computeIfAbsent(range, _ -> new ArrayList<>()).add(new InvalidPsi(psiElement, info));
   }
 
   // null means no highlighter found in the cache

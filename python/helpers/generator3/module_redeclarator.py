@@ -59,7 +59,7 @@ class ClassBuf(Buf):
 
 #noinspection PyBroadException
 class ModuleRedeclarator(object):
-    def __init__(self, module, mod_qname, mod_filename, cache_dir, indent_size=4, doing_builtins=False):
+    def __init__(self, module, mod_qname, mod_filename, output_dir, indent_size=4, doing_builtins=False):
         """
         @param module: module object
         @param mod_qname: module qualified name
@@ -74,7 +74,7 @@ class ModuleRedeclarator(object):
         self.gen_version = generator3.core.version()
         self.module = module
         self.qname = mod_qname
-        self.cache_dir = cache_dir
+        self.output_dir = output_dir
         self.mod_filename = mod_filename
         # we write things into buffers out-of-order
         self.header_buf = Buf(self)
@@ -127,7 +127,7 @@ class ModuleRedeclarator(object):
     def flush(self):
         qname_parts = self.qname.split('.')
         if self.split_modules:
-            last_pkg_dir = build_pkg_structure(self.cache_dir, self.qname)
+            last_pkg_dir = build_pkg_structure(self.output_dir, self.qname)
             with fopen(os.path.join(last_pkg_dir, "__init__.py"), "w") as init:
                 for buf in (self.header_buf, self.imports_buf, self.functions_buf, self.classes_buf):
                     buf.flush(init)
@@ -143,7 +143,7 @@ class ModuleRedeclarator(object):
                 init.write(data)
                 self.footer_buf.flush(init)
         else:
-            last_pkg_dir = build_pkg_structure(self.cache_dir, '.'.join(qname_parts[:-1]))
+            last_pkg_dir = build_pkg_structure(self.output_dir, '.'.join(qname_parts[:-1]))
             # In some rare cases submodules of a binary might have been generated earlier than the module
             # for the binary itself. For instance, it happens for "pyexpat" built-in module which
             # submodules "pyexpat.errors" and "pyexpat.model" are processed together with "_elementtree"
@@ -677,8 +677,10 @@ class ModuleRedeclarator(object):
                     continue # in all other cases must be skipped
             elif keyword.iskeyword(item_name):  # for example, PyQt4 contains definitions of methods named 'exec'
                 continue
+            elif item_name in PURE_PYTHON_CLASS_ATTRS:
+                continue
             elif item_qname in CLASS_ATTR_BLACKLIST:
-                note('skipping blacklisted attribute ' + item_qname)
+                trace('skipping blacklisted attribute ' + item_qname)
                 item = field_source.get(item_name)
             else:
                 try:
@@ -701,7 +703,7 @@ class ModuleRedeclarator(object):
             # add fake __init__s to have the right sig
         if p_class in FAKE_BUILTIN_INITS:
             methods["__init__"] = self.fake_builtin_init
-            note("Faking init of %s", p_name)
+            trace("Faking init of %s", p_name)
         elif '__init__' not in methods:
             init_method = getattr(p_class, '__init__', None)
             if init_method:
@@ -857,14 +859,18 @@ class ModuleRedeclarator(object):
         if inspect_dir:
             module_dict = dir(self.module)
         for item_name in module_dict:
-            note("looking at %s", item_name)
+            trace("looking at %s", item_name)
             # Python/C API can declare a symbol with an arbitrary name
             if not is_identifier(item_name):  # noqa
                 continue
             if item_name in (
                 "__dict__", "__doc__", "__module__", "__file__", "__name__", "__builtins__", "__package__"):
                 continue # handled otherwise
-            if self.test_mode and item_name in ('__loader__', '__spec__', '__cached__'):
+            if self.test_mode and (
+                    item_name in ('__loader__', '__spec__', '__cached__') or
+                    # In tests some modules are simulated with normal class objects
+                    item_name in PURE_PYTHON_CLASS_ATTRS
+            ):
                 continue
             try:
                 item = getattr(self.module, item_name) # let getters do the magic
@@ -888,7 +894,7 @@ class ModuleRedeclarator(object):
                 # we assume that module foo.bar never imports foo; foo may import foo.bar. (see pygame and pygame.rect)
             maybe_import_mod_name = mod_name if isinstance(mod_name, type(p_name)) else ''
             import_is_from_top = len(p_name) > len(maybe_import_mod_name) and p_name.startswith(maybe_import_mod_name)
-            note("mod_name = %s, prospective = %s,  from top = %s", mod_name, maybe_import_mod_name, import_is_from_top)
+            trace("mod_name = %s, prospective = %s,  from top = %s", mod_name, maybe_import_mod_name, import_is_from_top)
             want_to_import = False
             if (mod_name
                 and mod_name != BUILTIN_MOD_NAME
@@ -911,7 +917,7 @@ class ModuleRedeclarator(object):
                         imported_name = getattr(imported, "__name__", None)
                         if imported_name == p_name:
                             want_to_import = False
-                        note("path of %r is %r, want? %s", mod_name, imported_path, want_to_import)
+                        trace("path of %r is %r, want? %s", mod_name, imported_path, want_to_import)
                 except ImportError:
                     want_to_import = False
                     # NOTE: if we fail to import, we define 'imported' names here lest we lose them at all

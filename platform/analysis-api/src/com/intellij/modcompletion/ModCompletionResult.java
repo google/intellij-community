@@ -5,6 +5,9 @@ import org.jetbrains.annotations.NotNullByDefault;
 
 import java.util.function.Consumer;
 
+/**
+ * Consumer for {@link ModCompletionItem}s created by completion providers. 
+ */
 @NotNullByDefault
 public interface ModCompletionResult extends Consumer<ModCompletionItem> {
   

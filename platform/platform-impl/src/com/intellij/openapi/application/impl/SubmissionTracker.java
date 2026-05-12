@@ -77,7 +77,7 @@ public final class SubmissionTracker {
     myCount.decrementAndGet();
     Map<String, Integer> traces = myTraces;
     if (startTrace != null && traces != null) {
-      traces.compute(startTrace, (__, i) -> i == null || i.intValue() == 1 ? null : i - 1);
+      traces.compute(startTrace, (_, i) -> i == null || i.intValue() == 1 ? null : i - 1);
     }
   }
 

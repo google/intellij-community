@@ -105,11 +105,6 @@ public final class KotlinTestUtilsImpl {
 
         JvmContentRootsKt.addJvmClasspathRoots(configuration, classpath);
 
-        configuration.put(
-                CLIConfigurationKeys.INTELLIJ_PLUGIN_ROOT,
-                TestKotlinArtifacts.getKotlinCompiler().toFile().getAbsolutePath()
-        );
-
         setupIdeaStandaloneExecution();
 
         return configuration;

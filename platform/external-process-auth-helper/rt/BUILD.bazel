@@ -11,9 +11,16 @@ jvm_library(
 
 jvm_library(
   name = "rt_test_lib",
+  testonly = True,
   module_name = "intellij.platform.externalProcessAuthHelper.rt",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [":rt"]
 )
 ### auto-generated section `build intellij.platform.externalProcessAuthHelper.rt` end
+
+### auto-generated section `iml intellij.platform.externalProcessAuthHelper.rt` start
+exports_files([
+  "intellij.platform.externalProcessAuthHelper.rt.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.externalProcessAuthHelper.rt` end

@@ -20,6 +20,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.CoroutineSupport.UiDispatcherKind
 import com.intellij.openapi.application.UI
 import com.intellij.openapi.application.impl.InternalUICustomization
+import com.intellij.openapi.application.impl.islands.isColorIslandGradientAvailable
 import com.intellij.openapi.application.ui
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
@@ -301,7 +302,7 @@ class ProjectWindowCustomizerService internal constructor(private val coroutineS
 
   @Internal
   fun setIconMainColorAsProjectColor(project: Project): Boolean {
-    if (!RecentProjectsManagerBase.getInstanceEx().hasCustomIcon(project)) return false
+    if (!RecentProjectsManagerBase.getInstanceEx().hasCustomIcon(project) || isColorIslandGradientAvailable()) return false
 
     val icon = project.service<ProjectWindowCustomizerIconCache>().cachedIcon.get()
     if (icon is AvatarIcon) {

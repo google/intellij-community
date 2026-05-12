@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.java.codeserver.highlighting;
 
 import com.intellij.codeInsight.ExceptionUtil;
@@ -32,6 +32,7 @@ import com.intellij.psi.PsiArrayType;
 import com.intellij.psi.PsiAssignmentExpression;
 import com.intellij.psi.PsiBreakStatement;
 import com.intellij.psi.PsiCall;
+import com.intellij.psi.PsiCallExpression;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiClassObjectAccessExpression;
 import com.intellij.psi.PsiClassType;
@@ -424,7 +425,7 @@ final class ExpressionChecker {
   }
 
   void checkInferredTypeArguments(@NotNull PsiTypeParameterListOwner listOwner,
-                                  @NotNull PsiMethodCallExpression call,
+                                  @NotNull PsiCallExpression call,
                                   @NotNull PsiSubstitutor substitutor) {
     PsiTypeParameter[] typeParameters = listOwner.getTypeParameters();
     Pair<PsiTypeParameter, PsiType> inferredTypeArgument = GenericsUtil.findTypeParameterWithBoundError(
@@ -816,20 +817,23 @@ final class ExpressionChecker {
 
   void checkVariableExpected(@NotNull PsiExpression expression) {
     PsiExpression lValue;
+    JavaErrorKind.Simple<PsiExpression> errorKind;
     if (expression instanceof PsiAssignmentExpression assignment) {
       lValue = assignment.getLExpression();
+      errorKind = JavaErrorKinds.LVALUE_VARIABLE_EXPECTED;
     }
     else if (PsiUtil.isIncrementDecrementOperation(expression)) {
       lValue = ((PsiUnaryExpression)expression).getOperand();
+      errorKind = JavaErrorKinds.UNARY_OPERATION_VARIABLE_EXPECTED;
     }
     else {
-      lValue = null;
+      return;
     }
     if (lValue != null && !TypeConversionUtil.isLValue(lValue) && !PsiTreeUtil.hasErrorElements(expression) &&
         !(myVisitor.isIncompleteModel() &&
           PsiUtil.skipParenthesizedExprDown(lValue) instanceof PsiReferenceExpression ref &&
           IncompleteModelUtil.canBePendingReference(ref))) {
-      myVisitor.report(JavaErrorKinds.LVALUE_VARIABLE_EXPECTED.create(lValue));
+      myVisitor.report(errorKind.create(lValue));
     }
   }
 
@@ -1204,7 +1208,8 @@ final class ExpressionChecker {
       if (classes.size() == 1 && classes.contains(containingClass)) return;
     }
 
-    myVisitor.report(JavaErrorKinds.CALL_STATIC_INTERFACE_METHOD_QUALIFIER.create(referenceToMethod));
+    PsiElement nameElement = referenceToMethod.getReferenceNameElement();
+    if (nameElement != null) myVisitor.report(JavaErrorKinds.CALL_STATIC_INTERFACE_METHOD_QUALIFIER.create(nameElement));
   }
 
   private static boolean shouldHighlightUnhandledException(@NotNull PsiElement element) {
@@ -1268,24 +1273,15 @@ final class ExpressionChecker {
 
     PsiMethod constructor = result == null ? null : result.getElement();
 
-    boolean applicable = true;
     try {
       PsiDiamondType diamondType =
         constructorCall instanceof PsiNewExpression newExpression ? PsiDiamondType.getDiamondType(newExpression) : null;
       JavaResolveResult staticFactory = diamondType != null ? diamondType.getStaticFactory() : null;
-      if (staticFactory instanceof MethodCandidateInfo info) {
-        if (info.isApplicable()) {
-          result = info;
-          if (constructor == null) {
-            constructor = info.getElement();
-          }
+      if (staticFactory instanceof MethodCandidateInfo info && info.isApplicable()) {
+        result = info;
+        if (constructor == null) {
+          constructor = info.getElement();
         }
-        else {
-          applicable = false;
-        }
-      }
-      else {
-        applicable = result != null && result.isApplicable();
       }
     }
     catch (IndexNotReadyException ignored) {
@@ -1300,24 +1296,39 @@ final class ExpressionChecker {
         constructorCall, new JavaErrorKinds.UnresolvedConstructorContext(aClass, results)));
       return;
     }
+
+    if (constructorCall instanceof PsiNewExpression newExpression) {
+      PsiReferenceParameterList typeArgumentList = newExpression.getTypeArgumentList();
+      myVisitor.myGenericsChecker.checkReferenceTypeArgumentList(constructor, typeArgumentList, result.getSubstitutor());
+    }
+
     if (classReference != null && !constructor.isDefaultConstructor() &&
         (!result.isAccessible() ||
          constructor.hasModifierProperty(PsiModifier.PROTECTED) && callingProtectedConstructorFromDerivedClass(constructorCall, aClass))) {
       myVisitor.myModifierChecker.reportAccessProblem(classReference, constructor, result);
       return;
     }
-    if (!applicable) {
-      checkIncompatibleCall(list, result);
+    if (myVisitor.hasErrorResults()) return;
+
+    if (result.isApplicable()) {
+      checkVarargParameterErasureToBeAccessible(result, constructorCall);
       if (myVisitor.hasErrorResults()) return;
+      checkIncompatibleType(constructorCall, result, constructorCall);
+    }
+    else if (result.isTypeArgumentsApplicable()) {
+      checkIncompatibleCall(list, result);
     }
     else if (constructorCall instanceof PsiNewExpression newExpression) {
+
       PsiReferenceParameterList typeArgumentList = newExpression.getTypeArgumentList();
-      myVisitor.myGenericsChecker.checkReferenceTypeArgumentList(constructor, typeArgumentList, result.getSubstitutor());
-      if (myVisitor.hasErrorResults()) return;
+      PsiSubstitutor applicabilitySubstitutor = result.getSubstitutor(false);
+      if (typeArgumentList.getTypeArguments().length == 0 && constructor.hasTypeParameters()) {
+        checkInferredTypeArguments(constructor, newExpression, applicabilitySubstitutor);
+      }
+      else {
+        myVisitor.myGenericsChecker.checkReferenceTypeArgumentList(constructor, typeArgumentList, applicabilitySubstitutor);
+      }
     }
-    checkVarargParameterErasureToBeAccessible(result, constructorCall);
-    if (myVisitor.hasErrorResults()) return;
-    checkIncompatibleType(constructorCall, result, constructorCall);
   }
 
   private static boolean callingProtectedConstructorFromDerivedClass(@NotNull PsiConstructorCall place,
@@ -1668,9 +1679,12 @@ final class ExpressionChecker {
     PsiClass parentClass = constructor.getContainingClass();
     if (parentClass == null) return;
 
-    // references to private methods from the outer class are not calls to super methods
+    // references to private methods and fields from the outer class are not calls to super methods
     // even if the outer class is the superclass
-    if (resolved instanceof PsiMember member && member.hasModifierProperty(PsiModifier.PRIVATE) && referencedClass != parentClass) return;
+    if (resolved instanceof PsiMember member && member.hasModifierProperty(PsiModifier.PRIVATE) && 
+        referencedClass != parentClass && !(member instanceof PsiClass)) {
+      return;
+    }
     // field or method should be declared in this class or super
     if (!InheritanceUtil.isInheritorOrSelf(parentClass, referencedClass, true)) return;
     // and point to our instance
@@ -1695,6 +1709,10 @@ final class ExpressionChecker {
       if (parent instanceof PsiNewExpression newExpression &&
           newExpression.isArrayCreation() &&
           newExpression.getClassOrAnonymousClassReference() == expression) {
+        return;
+      }
+      if (parent instanceof PsiNewExpression newExpression && newExpression.getQualifier() != null) {
+        // The qualifier will be checked instead
         return;
       }
       if (parent instanceof PsiThisExpression || parent instanceof PsiSuperExpression) return;

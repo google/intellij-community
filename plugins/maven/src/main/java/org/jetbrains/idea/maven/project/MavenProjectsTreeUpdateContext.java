@@ -22,7 +22,7 @@ class MavenProjectsTreeUpdateContext {
 
   public void updated(MavenProject project, @NotNull MavenProjectChanges changes) {
     deletedProjects.remove(project);
-    updatedProjectsWithChanges.compute(project, (__, previousChanges) ->
+    updatedProjectsWithChanges.compute(project, (_, previousChanges) ->
       previousChanges == null ? changes : MavenProjectChangesBuilder.merged(changes, previousChanges)
     );
   }

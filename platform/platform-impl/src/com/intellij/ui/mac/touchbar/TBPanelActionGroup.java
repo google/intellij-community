@@ -448,7 +448,7 @@ final class TBPanelActionGroup extends TBPanel {
     myLastUpdate = Utils.expandActionGroupAsync(
       myActionGroup, myFactory, dataContext,
       ActionPlaces.TOUCHBAR_GENERAL, ActionUiKind.TOOLBAR, false);
-    myLastUpdate.onSuccess(actions -> _applyPresentationChanges(actions)).onProcessed(__ -> myLastUpdate = null);
+    myLastUpdate.onSuccess(actions -> _applyPresentationChanges(actions)).onProcessed(_ -> myLastUpdate = null);
     if (myStats != null) {
       myStats.incrementCounter(StatsCounters.totalUpdateDurationNs, System.nanoTime() - timeNs);
     }

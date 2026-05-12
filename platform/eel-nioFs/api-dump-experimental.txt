@@ -1,0 +1,20 @@
+*:com.intellij.platform.eel.EelPathBoundDescriptor
+- com.intellij.platform.eel.EelDescriptor
+- a:getRootPath():java.nio.file.Path
+*f:com.intellij.platform.eel.fs.EelFileUtils
+- sf:INSTANCE:com.intellij.platform.eel.fs.EelFileUtils
+- sf:deleteRecursively(java.nio.file.Path):V
+*f:com.intellij.platform.eel.fs.EelFiles
+- sf:INSTANCE:com.intellij.platform.eel.fs.EelFiles
+- sf:readAllBytes(java.nio.file.Path):B[]
+- sf:readString(java.nio.file.Path):java.lang.String
+- sf:readString(java.nio.file.Path,java.nio.charset.Charset):java.lang.String
+*f:com.intellij.platform.eel.provider.EelPathConversionsKt
+- *sf:asEelPath(java.nio.file.Path):com.intellij.platform.eel.path.EelPath
+- *sf:asEelPath(java.nio.file.Path,com.intellij.platform.eel.EelDescriptor):com.intellij.platform.eel.path.EelPath
+- *sf:asNioPath(com.intellij.platform.eel.path.EelPath):java.nio.file.Path
+- *sf:asNioPathOrNull(com.intellij.platform.eel.path.EelPath):java.nio.file.Path
+f:com.intellij.platform.eel.provider.EelPathDescriptorKt
+- *sf:getEelDescriptor(java.nio.file.Path):com.intellij.platform.eel.EelDescriptor
+- *sf:getOsFamily(java.nio.file.Path):com.intellij.platform.eel.EelOsFamily
+- *sf:ownsPath(com.intellij.platform.eel.EelMachine,java.nio.file.Path):Z

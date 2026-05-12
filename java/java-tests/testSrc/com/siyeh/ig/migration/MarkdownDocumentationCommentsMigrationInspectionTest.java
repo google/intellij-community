@@ -10,14 +10,19 @@ import org.jetbrains.annotations.Nullable;
  */
 public class MarkdownDocumentationCommentsMigrationInspectionTest extends LightJavaInspectionTestCase {
 
-  public void testMarkdownDocumentationCommentsMigration() {
-    doTest();
-    checkQuickFixAll();
-  }
+  public void testMarkdownDocumentationCommentsMigration() { check(); }
+  public void testReferencesNoEscape() { check(); }
+  public void testCodeBlocks() { check(); }
 
 
   @Override
   protected @Nullable InspectionProfileEntry getInspection() {
     return new MarkdownDocumentationCommentsMigrationInspection();
   }
+  
+  private void check() {
+    doTest();
+    checkQuickFixAll();
+  }
+  
 }

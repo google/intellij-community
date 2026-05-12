@@ -11,7 +11,7 @@
   <xi:include href="refactorings.xml"/>
   <xi:include href="file-types.xml"/>
   <xi:include href="resolution-fe10.xml"/>
-  <xi:include href="kotlin.highlighting.shared.xml"/>
+  <xi:include href="highlighting-shared.xml"/>
   <xi:include href="highlighting-fe10.xml"/>
   <xi:include href="language.xml"/>
   <xi:include href="light-classes.xml"/>
@@ -35,7 +35,7 @@
   <xi:include href="platform-kind-resolution-fe10.xml"/>
   <xi:include href="jvm.xml"/>
   <xi:include href="actions-fe10.xml"/>
-  <xi:include href="intellij.kotlin.base.codeInsight.minimal.xml"/>
+  <xi:include href="base-codeInsight-minimal.xml"/>
 
   <!--suppress XmlPathReference -->
   <xi:include href="ultimate-plugin.xml">
@@ -79,24 +79,17 @@
     <module name="intellij.kotlin.git"/>
     <module name="intellij.kotlin.grazie"/>
     <module name="intellij.kotlin.completion.ml"/>
-    <module name="kotlin.compiler-plugins.compiler-plugin-support.gradle"/>
     <module name="intellij.kotlin.compilerPlugins.support.maven"/>
-    <module name="kotlin.compiler-plugins.allopen.gradle"/>
     <module name="intellij.kotlin.compilerPlugins.allopen.maven"/>
-    <module name="kotlin.compiler-plugins.noarg.gradle"/>
     <module name="intellij.kotlin.compilerPlugins.noarg.maven"/>
-    <module name="kotlin.compiler-plugins.sam-with-receiver.gradle"/>
     <module name="intellij.kotlin.compilerPlugins.samWithReceiver.maven"/>
     <module name="kotlin.compiler-plugins.parcelize.gradle"/>
     <module name="intellij.kotlin.compilerPlugins.scripting"/>
     <module name="intellij.kotlin.compilerPlugins.kapt"/>
-    <module name="kotlin.compiler-plugins.kotlinx-serialization.gradle"/>
     <module name="intellij.kotlin.compilerPlugins.serialization.maven"/>
     <module name="intellij.kotlin.compilerPlugins.dataframe.maven"/>
-    <module name="kotlin.compiler-plugins.lombok.gradle"/>
     <module name="intellij.kotlin.compilerPlugins.lombok.maven"/>
     <module name="kotlin.compiler-plugins.assignment.common.k1"/>
-    <module name="kotlin.compiler-plugins.assignment.gradle"/>
     <module name="intellij.kotlin.compilerPlugins.assignment.maven"/>
 
     <module name="kotlin.jvm.shared"/>

@@ -17,7 +17,7 @@ abstract class RefreshSession {
   abstract fun launch()
 
   @ApiStatus.Internal
-  abstract suspend fun executeInBackgroundWriteAction()
+  abstract suspend fun executeInBackgroundWriteAction(highPriority: Boolean)
 
   @ApiStatus.Internal
   abstract fun addEvents(events: List<VFileEvent>)

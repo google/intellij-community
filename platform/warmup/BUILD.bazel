@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.warmup` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "warmup_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "warmup",
   module_name = "intellij.platform.warmup",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":warmup_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/util/concurrency",
@@ -40,6 +35,7 @@ jvm_library(
 
 jvm_library(
   name = "warmup_test_lib",
+  testonly = True,
   module_name = "intellij.platform.warmup",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -68,3 +64,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.warmup` end
+
+### auto-generated section `iml intellij.platform.warmup` start
+exports_files([
+  "intellij.platform.warmup.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.warmup` end

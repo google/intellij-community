@@ -1,4 +1,5 @@
 // "Import extension function 'Other.defaultFun'" "true"
+// K2_ERROR: Unresolved reference 'defaultFun' on receiver of type 'Other'.
 package p
 
 class Other

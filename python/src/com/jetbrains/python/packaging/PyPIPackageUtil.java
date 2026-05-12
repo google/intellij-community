@@ -36,6 +36,8 @@ import javax.swing.text.html.HTMLEditorKit;
 import javax.swing.text.html.parser.ParserDelegator;
 import java.io.IOException;
 import java.io.Reader;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -313,7 +315,8 @@ public final class PyPIPackageUtil {
    * Project API uses not normalized names (e.g. /project/Flask is correct, GET /project/flask redirects (HTTP 301) to /project/Flask)
    */
   public static @NotNull String buildProjectUrl(@NotNull String packageName) {
-    final String projectUrl = PYPI_BASE_URL + PYPI_PROJECT_API + packageName + "/";
+    final var encoded = URLEncoder.encode(packageName, StandardCharsets.UTF_8);
+    final String projectUrl = PYPI_BASE_URL + PYPI_PROJECT_API + encoded + "/";
     return projectUrl;
   }
 

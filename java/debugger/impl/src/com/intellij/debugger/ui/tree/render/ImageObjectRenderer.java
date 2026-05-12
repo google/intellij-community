@@ -3,8 +3,14 @@ package com.intellij.debugger.ui.tree.render;
 
 import com.intellij.debugger.JavaDebuggerBundle;
 import com.intellij.debugger.engine.FullValueEvaluatorProvider;
+import com.intellij.debugger.engine.evaluation.EvaluationContextImpl;
+import com.sun.jdi.Value;
+import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-final class ImageObjectRenderer extends AbstractImageRenderer {
+@ApiStatus.Internal
+public class ImageObjectRenderer extends AbstractImageRenderer {
   @Override
   protected String getName() {
     return "Image";
@@ -19,6 +25,11 @@ final class ImageObjectRenderer extends AbstractImageRenderer {
   protected FullValueEvaluatorProvider getFullValueEvaluatorProvider() {
     return (evaluationContext, valueDescriptor) ->
       createImagePopupEvaluator(JavaDebuggerBundle.message("message.node.show.image"), evaluationContext,
-                                valueDescriptor.getValue(), "imageToBytes");
+                                valueDescriptor.getValue());
+  }
+
+  @Override
+  protected byte @Nullable [] getImageBytes(@NotNull EvaluationContextImpl evaluationContext, Value obj) {
+    return getImageBytesFromHelper(evaluationContext, obj, "imageToBytes");
   }
 }

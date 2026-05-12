@@ -163,6 +163,7 @@ public final class JsonTypedHandler extends TypedHandlerDelegate {
                                                     @NotNull PsiFile file) {
     if (c != ':' || !JsonDialectUtil.isStandardJson(file) || !JsonEditorOptions.getInstance().AUTO_QUOTE_PROP_NAME) return;
     int offset = editor.getCaretModel().getOffset();
+    PsiDocumentManager.getInstance(file.getProject()).commitDocument(editor.getDocument());
     PsiElement element = PsiTreeUtil.skipWhitespacesBackward(file.findElementAt(offset));
     if (!(element instanceof JsonProperty)) return;
     final JsonValue nameElement = ((JsonProperty)element).getNameElement();

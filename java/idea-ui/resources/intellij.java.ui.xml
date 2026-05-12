@@ -6,16 +6,14 @@
     <module name="intellij.platform.diff"/>
     <module name="intellij.platform.externalSystem"/>
     <module name="intellij.platform.externalSystem.impl"/>
-    <module name="intellij.xml.dom"/>
-    <module name="intellij.xml.psi"/>
     <module name="intellij.platform.backend"/>
+    <module name="intellij.java.syntax"/>
     <module name="intellij.java"/>
     <module name="intellij.java.aetherDependencyResolver"/>
     <module name="intellij.java.compiler"/>
     <module name="intellij.java.compiler.impl"/>
     <module name="intellij.java.impl"/>
     <module name="intellij.java.impl.refactorings"/>
-    <module name="intellij.java.syntax"/>
     <module name="intellij.libraries.maven.resolver.provider"/>
     <module name="intellij.platform.vcs.impl"/>
   </dependencies>
@@ -63,4 +61,10 @@
     <extensionPoint qualifiedName="com.intellij.jarRepositoryAuthenticationDataProvider"
                     interface="com.intellij.jarRepository.JarRepositoryAuthenticationDataProvider" dynamic="true"/>
   </extensionPoints>
+  <extensions defaultExtensionNs="com.intellij">
+    <applicationService
+      serviceInterface="com.intellij.codeInsight.options.JavaInspectionButtonProvider"
+      serviceImplementation="com.intellij.java.ui.inspections.JavaInspectionDialogButtonProvider"/>
+    <inspectionCustomComponent implementation="com.intellij.java.ui.inspections.JavaInspectionButtons"/>
+  </extensions>
 </idea-plugin>

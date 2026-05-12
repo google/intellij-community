@@ -387,8 +387,8 @@ fun ExtractableCodeDescriptor.validate(target: ExtractionTarget = ExtractionTarg
     }
 }
 
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class)
+context(_: KaSession)
 private fun ExtractableCodeDescriptor.validateTempResult(
     result: ExtractionResult,
 ): ExtractableCodeDescriptorWithConflicts {

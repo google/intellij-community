@@ -14,6 +14,7 @@ import com.intellij.testFramework.ExpectedHighlightingData
 import org.jetbrains.kotlin.idea.base.test.IgnoreTests
 import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCase
 import org.jetbrains.kotlin.idea.test.extractMarkerOffset
+import org.jetbrains.kotlin.idea.test.withCustomCompilerOptions
 
 abstract class AbstractUsageHighlightingTest : KotlinLightCodeInsightFixtureTestCase() {
     companion object {
@@ -34,11 +35,7 @@ abstract class AbstractUsageHighlightingTest : KotlinLightCodeInsightFixtureTest
         HighlightUsagesHandler.invoke(project, editor, myFixture.file)
 
         val ranges =
-            myFixture.editor.markupModel.allHighlighters.filter { isUsageHighlighting(it) }.mapNotNull { it.asTextRange } +
-                    (myFixture.file.findElementAt(myFixture.editor.caretModel.offset - 1)?.parent?.let {
-                        val usages = IdentifierHighlightingComputer.Companion.getUsages(it, myFixture.file, false)
-            usages
-        } ?: emptyList())
+            myFixture.editor.markupModel.allHighlighters.filter { isUsageHighlighting(it) }.mapNotNull { it.asTextRange }
 
         val infos = ranges.toHashSet()
             .map {
@@ -57,7 +54,9 @@ abstract class AbstractUsageHighlightingTest : KotlinLightCodeInsightFixtureTest
             IgnoreTests.DIRECTIVES.of(pluginMode),
             directivePosition = IgnoreTests.DirectivePosition.LAST_LINE_IN_FILE
         ) {
-            data.checkResult(myFixture.file, infos, StringBuilder(document.text).insert(caret, CARET_TAG).toString())
+            withCustomCompilerOptions(myFixture.file.text, project, module) {
+                data.checkResult(myFixture.file, infos, StringBuilder(document.text).insert(caret, CARET_TAG).toString())
+            }
         }
     }
 

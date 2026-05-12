@@ -113,4 +113,9 @@ public abstract class GridDataHookUpBase<Row, Column> implements GridDataHookUp<
     ApplicationManager.getApplication()
       .invokeLater(() -> myRequestEventDispatcher.getMulticaster().updateCountReceived(source, updateCount));
   }
+
+  public void notifyDropModelDependentCache(final @NotNull GridRequestSource source) {
+    ApplicationManager.getApplication()
+      .invokeLater(() -> myRequestEventDispatcher.getMulticaster().dropModelDependentCache(source));
+  }
 }

@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.execution.dashboard.frontend` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "frontend_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "frontend",
   module_name = "intellij.platform.execution.dashboard.frontend",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":frontend_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//libraries/kotlinx/coroutines/core",
@@ -37,11 +32,13 @@ jvm_library(
     "//platform/kernel/shared:kernel",
     "//platform/platform-frontend:frontend",
     "//platform/util",
+    "//fleet/rhizomedb",
   ]
 )
 
 jvm_library(
   name = "frontend_test_lib",
+  testonly = True,
   module_name = "intellij.platform.execution.dashboard.frontend",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -69,6 +66,13 @@ jvm_library(
     "//platform/kernel/shared:kernel_test_lib",
     "//platform/platform-frontend:frontend_test_lib",
     "//platform/util:util_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.execution.dashboard.frontend` end
+
+### auto-generated section `iml intellij.platform.execution.dashboard.frontend` start
+exports_files([
+  "intellij.platform.execution.dashboard.frontend.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.execution.dashboard.frontend` end

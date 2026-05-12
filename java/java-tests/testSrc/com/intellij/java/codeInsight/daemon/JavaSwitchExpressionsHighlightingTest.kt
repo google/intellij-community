@@ -53,6 +53,7 @@ class JavaSwitchExpressionsHighlightingTest : LightJavaCodeInsightFixtureTestCas
     myFixture.launchAction(availableIntentions.first().asIntention())
     myFixture.checkResultByFile("${getTestName(false)}_after.java")
   }
+  fun testDeeplyNested() = IdeaTestUtil.withLevel(module, LanguageLevel.JDK_21) { doTest() }
 
   private fun doTest() {
     myFixture.configureByFile("${getTestName(false)}.java")

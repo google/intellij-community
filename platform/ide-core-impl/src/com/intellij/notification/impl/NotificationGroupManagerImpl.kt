@@ -30,6 +30,7 @@ internal class NotificationGroupManagerImpl() : NotificationGroupManager {
         val group = registeredGroups[extension.id]!!
         if (group.pluginId == pluginDescriptor.pluginId) {
           registeredGroups.remove(extension.id)
+          NotificationGroup.fireGroupEvent(extension.id, false)
         }
         if (extension.notificationIds != null) {
           registeredNotificationIds = null
@@ -91,6 +92,7 @@ private fun registerNotificationGroup(extension: NotificationGroupEP,
     registeredGroups.put(groupId, notificationGroup)?.let { old ->
       LOG.warn("Notification group $groupId is already registered (group=$old). Plugin descriptor: $pluginDescriptor")
     }
+    NotificationGroup.fireGroupEvent(groupId, true)
   }
   catch (e: Exception) {
     LOG.warn("Cannot create notification group: $extension", e)

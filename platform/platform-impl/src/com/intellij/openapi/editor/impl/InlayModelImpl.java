@@ -5,6 +5,7 @@ import com.intellij.diagnostic.Dumpable;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.diagnostic.Attachment;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.editor.CustomWrap;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.EditorCustomElementRenderer;
 import com.intellij.openapi.editor.EditorThreading;
@@ -18,6 +19,7 @@ import com.intellij.openapi.editor.ex.InlayModelEx;
 import com.intellij.openapi.editor.ex.PrioritizedDocumentListener;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
 import com.intellij.openapi.editor.impl.view.EditorView;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.Predicates;
 import com.intellij.openapi.util.Ref;
 import com.intellij.util.DocumentEventUtil;
@@ -45,6 +47,7 @@ import java.util.function.Supplier;
 import static com.intellij.openapi.editor.impl.InlayKeys.OFFSET_BEFORE_DISPOSAL;
 
 //@ApiStatus.Internal
+@SuppressWarnings("SuspiciousPackagePrivateAccess")
 public final class InlayModelImpl implements InlayModel, InlayModelEx, PrioritizedDocumentListener, Disposable, Dumpable {
   private static final Logger LOG = Logger.getInstance(InlayModelImpl.class);
 
@@ -72,6 +75,11 @@ public final class InlayModelImpl implements InlayModel, InlayModelEx, Prioritiz
     return true;
   };
 
+  private static final Processor<InlayImpl<?, ?>> DISPOSE_PROCESSOR = inlay -> {
+    Disposer.dispose(inlay);
+    return true;
+  };
+
   private final EditorImpl myEditor;
   private final DocumentEx myDocument;
   private final EventDispatcher<Listener> myDispatcher = EventDispatcher.create(Listener.class);
@@ -89,7 +97,7 @@ public final class InlayModelImpl implements InlayModel, InlayModelEx, Prioritiz
 
   InlayModelImpl(@NotNull EditorImpl editor) {
     myEditor = editor;
-    myDocument = editor.getUiDocument();
+    myDocument = editor.getElfDocument();
     myInlineElementsTree = new InlineElementsTree(myDocument);
     myBlockElementsTree = new BlockElementsTree(myDocument);
     myAfterLineEndElementsTree = new AfterLineEndElementTree(myDocument);
@@ -112,11 +120,43 @@ public final class InlayModelImpl implements InlayModel, InlayModelEx, Prioritiz
       if (inlayCount > 0) {
         VisualPosition inlaysStartPosition = myEditor.offsetToVisualPosition(offset, false, false);
         VisualPosition caretPosition = myEditor.getCaretModel().getVisualPosition();
-        if (inlaysStartPosition.line == caretPosition.line &&
-            caretPosition.column >= inlaysStartPosition.column && caretPosition.column <= inlaysStartPosition.column + inlayCount) {
-          myInlaysAtCaret = inlays;
-          for (int i = 0; i < inlayCount; i++) {
-            ((InlayImpl<?, ?>)inlays.get(i)).setStickingToRight(i >= caretPosition.column - inlaysStartPosition.column);
+        List<CustomWrap> customWraps = myEditor.getCustomWrapModel().getWrapsAtOffset(offset);
+        if (customWraps.isEmpty()) {
+          if (inlaysStartPosition.line == caretPosition.line &&
+              caretPosition.column >= inlaysStartPosition.column && caretPosition.column <= inlaysStartPosition.column + inlayCount) {
+            myInlaysAtCaret = inlays;
+            for (int i = 0; i < inlayCount; i++) {
+              ((InlayImpl<?, ?>)inlays.get(i)).setStickingToRight(i >= caretPosition.column - inlaysStartPosition.column);
+            }
+          }
+        }
+        else {
+          // inlays at the same offset are sorted by their relatesToPrecedingText
+          int firstRelatedToPrecedingIndex = ContainerUtil.indexOf(inlays, inlay -> inlay.isRelatedToPrecedingText());
+          firstRelatedToPrecedingIndex = firstRelatedToPrecedingIndex >= 0 ? firstRelatedToPrecedingIndex : inlays.size();
+          if (inlaysStartPosition.line == caretPosition.line &&
+              caretPosition.column >= inlaysStartPosition.column &&
+              caretPosition.column <= inlaysStartPosition.column + firstRelatedToPrecedingIndex) {
+            myInlaysAtCaret = inlays;
+            for (int i = 0; i < firstRelatedToPrecedingIndex; i++) {
+              ((InlayImpl<?, ?>)inlays.get(i)).setStickingToRight(i >= caretPosition.column - inlaysStartPosition.column);
+            }
+            for (int i = firstRelatedToPrecedingIndex; i < inlayCount; i++) {
+              ((InlayImpl<?, ?>)inlays.get(i)).setStickingToRight(false);
+            }
+          }
+          else if (inlaysStartPosition.line - 1 == caretPosition.line) {
+            inlaysStartPosition = myEditor.offsetToVisualPosition(offset, false, true);
+            if (caretPosition.column >= inlaysStartPosition.column &&
+                caretPosition.column <= inlaysStartPosition.column + inlayCount - firstRelatedToPrecedingIndex) {
+              myInlaysAtCaret = inlays;
+              for (int i = 0; i < firstRelatedToPrecedingIndex; i++) {
+                ((InlayImpl<?, ?>)inlays.get(i)).setStickingToRight(true);
+              }
+              for (int i = firstRelatedToPrecedingIndex; i < inlayCount; i++) {
+                ((InlayImpl<?, ?>)inlays.get(i)).setStickingToRight(i - firstRelatedToPrecedingIndex >= caretPosition.column - inlaysStartPosition.column);
+              }
+            }
           }
         }
       }
@@ -147,6 +187,11 @@ public final class InlayModelImpl implements InlayModel, InlayModelEx, Prioritiz
 
   @Override
   public void dispose() {
+    // the tree will not remove nodes on disposal, we have to dispose remaining inlays manually
+    myInlineElementsTree.processAll(DISPOSE_PROCESSOR);
+    myBlockElementsTree.processAll(DISPOSE_PROCESSOR);
+    myAfterLineEndElementsTree.processAll(DISPOSE_PROCESSOR);
+
     myInlineElementsTree.dispose(myDocument);
     myBlockElementsTree.dispose(myDocument);
     myAfterLineEndElementsTree.dispose(myDocument);
@@ -167,9 +212,12 @@ public final class InlayModelImpl implements InlayModel, InlayModelEx, Prioritiz
     EditorImpl.assertIsDispatchThread();
     Document document = myDocument;
     if (DocumentUtil.isInsideSurrogatePair(document, offset)) return null;
-    offset = Math.max(0, Math.min(document.getTextLength(), offset));
+    offset = Math.clamp(offset, 0, document.getTextLength());
     InlineInlayImpl<T> inlay = new InlineInlayImpl<>(myEditor, offset, relatesToPrecedingText, priority, renderer);
     notifyAdded(inlay);
+    if (myEditor.isDisposed()) {
+      Disposer.dispose(inlay);
+    }
     return inlay;
   }
 
@@ -208,9 +256,12 @@ public final class InlayModelImpl implements InlayModel, InlayModelEx, Prioritiz
                                                                            int priority,
                                                                            @NotNull T renderer) {
     EditorImpl.assertIsDispatchThread();
-    offset = Math.max(0, Math.min(myDocument.getTextLength(), offset));
+    offset = Math.clamp(offset, 0, myDocument.getTextLength());
     BlockInlayImpl<T> inlay = new BlockInlayImpl<>(myEditor, offset, relatesToPrecedingText, showAbove, showWhenFolded, priority, renderer);
     notifyAdded(inlay);
+    if (myEditor.isDisposed()) {
+      Disposer.dispose(inlay);
+    }
     return inlay;
   }
 
@@ -236,11 +287,13 @@ public final class InlayModelImpl implements InlayModel, InlayModelEx, Prioritiz
                                                                                            int priority,
                                                                                            @NotNull T renderer) {
     EditorImpl.assertIsDispatchThread();
-    Document document = myDocument;
-    offset = Math.max(0, Math.min(document.getTextLength(), offset));
+    offset = Math.clamp(offset, 0, myDocument.getTextLength());
     AfterLineEndInlayImpl<T> inlay = new AfterLineEndInlayImpl<>(myEditor, offset, relatesToPrecedingText, softWrappable, priority,
                                                                  renderer);
     notifyAdded(inlay);
+    if (myEditor.isDisposed()) {
+      Disposer.dispose(inlay);
+    }
     return inlay;
   }
 
@@ -381,12 +434,7 @@ public final class InlayModelImpl implements InlayModel, InlayModelEx, Prioritiz
 
   @Override
   public boolean hasInlineElementAt(@NotNull VisualPosition visualPosition) {
-    int offset = myEditor.visualPositionToOffset(visualPosition);
-    int inlayCount = getInlineElementsInRange(offset, offset).size();
-    if (inlayCount == 0) return false;
-    VisualPosition inlayStartPosition = myEditor.offsetToVisualPosition(offset, false, false);
-    return visualPosition.line == inlayStartPosition.line &&
-           visualPosition.column >= inlayStartPosition.column && visualPosition.column < inlayStartPosition.column + inlayCount;
+    return getInlineElementAt(visualPosition) != null;
   }
 
   @Override
@@ -395,9 +443,31 @@ public final class InlayModelImpl implements InlayModel, InlayModelEx, Prioritiz
     List<Inlay<?>> inlays = getInlineElementsInRange(offset, offset);
     if (inlays.isEmpty()) return null;
     VisualPosition inlayStartPosition = myEditor.offsetToVisualPosition(offset, false, false);
-    if (visualPosition.line != inlayStartPosition.line) return null;
-    int inlayIndex = visualPosition.column - inlayStartPosition.column;
-    return inlayIndex >= 0 && inlayIndex < inlays.size() ? inlays.get(inlayIndex) : null;
+    List<CustomWrap> customWraps = myEditor.getCustomWrapModel().getWrapsAtOffset(offset);
+    if (customWraps.isEmpty()) {
+      if (visualPosition.line != inlayStartPosition.line) return null;
+      int inlayIndex = visualPosition.column - inlayStartPosition.column;
+      return inlayIndex >= 0 && inlayIndex < inlays.size() ? inlays.get(inlayIndex) : null;
+    }
+    else {
+      // inlays at the same offset are sorted by their relatesToPrecedingText
+      int firstRelatedToPrecedingIndex = ContainerUtil.indexOf(inlays, inlay -> inlay.isRelatedToPrecedingText());
+      firstRelatedToPrecedingIndex = firstRelatedToPrecedingIndex >= 0 ? firstRelatedToPrecedingIndex : inlays.size();
+      if (inlayStartPosition.line == visualPosition.line) {
+        // visualPosition is after wrap
+        int inlayIndex = visualPosition.column - inlayStartPosition.column;
+        return inlayIndex >= 0 && inlayIndex < firstRelatedToPrecedingIndex ? inlays.get(inlayIndex) : null;
+      }
+      else if (inlayStartPosition.line - 1 == visualPosition.line) {
+        // visualPosition is before wrap
+        VisualPosition beforeWrapPosition = myEditor.offsetToVisualPosition(offset, false, true);
+        int inlayIndex = visualPosition.column - beforeWrapPosition.column + firstRelatedToPrecedingIndex;
+        return inlayIndex >= firstRelatedToPrecedingIndex && inlayIndex < inlays.size() ? inlays.get(inlayIndex) : null;
+      }
+      else {
+        return null;
+      }
+    }
   }
 
   @Override
@@ -458,11 +528,33 @@ public final class InlayModelImpl implements InlayModel, InlayModelEx, Prioritiz
           int offset = location.getOffset();
           List<Inlay<?>> inlays = getInlineElementsInRange(offset, offset);
           if (!inlays.isEmpty()) {
-            VisualPosition startVisualPosition = myEditor.offsetToVisualPosition(offset);
+            VisualPosition startVisualPosition = myEditor.offsetToVisualPosition(offset, false, false);
             Point inlayPoint = myEditor.visualPositionToXY(startVisualPosition);
-            if (point.y < inlayPoint.y || point.y >= inlayPoint.y + myEditor.getLineHeight()) return null;
-            Inlay<?> inlay = findInlay(inlays, point.x, inlayPoint.x);
-            if (inlay != null) return inlay;
+            List<CustomWrap> customWraps = myEditor.getCustomWrapModel().getWrapsAtOffset(offset);
+            if (customWraps.isEmpty()) {
+              if (point.y < inlayPoint.y || point.y >= inlayPoint.y + myEditor.getLineHeight()) return null;
+              Inlay<?> inlay = findInlay(inlays, point.x, inlayPoint.x);
+              if (inlay != null) return inlay;
+            }
+            else {
+              // inlays at the same offset are sorted by their relatesToPrecedingText
+              int firstRelatedToPrecedingIndex = ContainerUtil.indexOf(inlays, inlay -> inlay.isRelatedToPrecedingText());
+              firstRelatedToPrecedingIndex = firstRelatedToPrecedingIndex >= 0 ? firstRelatedToPrecedingIndex : inlays.size();
+              if (point.y >= inlayPoint.y + myEditor.getLineHeight()) return null;
+              if (point.y >= inlayPoint.y) {
+                // points after wrap
+                Inlay<?> inlay = findInlay(inlays, 0, firstRelatedToPrecedingIndex, point.x, inlayPoint.x);
+                if (inlay != null) return inlay;
+              }
+              else {
+                // points before wrap
+                startVisualPosition = myEditor.offsetToVisualPosition(offset, false, true);
+                inlayPoint = myEditor.visualPositionToXY(startVisualPosition);
+                if (point.y < inlayPoint.y || point.y >= inlayPoint.y + myEditor.getLineHeight()) return null;
+                Inlay<?> inlay = findInlay(inlays, firstRelatedToPrecedingIndex, inlays.size(), point.x, inlayPoint.x);
+                if (inlay != null) return inlay;
+              }
+            }
           }
         }
       }
@@ -472,7 +564,7 @@ public final class InlayModelImpl implements InlayModel, InlayModelEx, Prioritiz
         if (offset == myDocument.getLineEndOffset(logicalLine) && location.getCollapsedRegion() == null) {
           List<Inlay<?>> inlays = myEditor.getInlayModel().getAfterLineEndElementsForLogicalLine(logicalLine);
           if (!inlays.isEmpty()) {
-            Rectangle bounds = inlays.get(0).getBounds();
+            Rectangle bounds = inlays.getFirst().getBounds();
             assert bounds != null;
             if (point.y < bounds.y || point.y >= bounds.y + bounds.height) return null;
             Inlay<?> inlay = findInlay(inlays, point.x, bounds.x);
@@ -485,7 +577,12 @@ public final class InlayModelImpl implements InlayModel, InlayModelEx, Prioritiz
   }
 
   private static Inlay<?> findInlay(List<? extends Inlay<?>> inlays, int x, int startX) {
-    for (Inlay<?> inlay : inlays) {
+    return findInlay(inlays, 0, inlays.size(), x, startX);
+  }
+
+  private static Inlay<?> findInlay(List<? extends Inlay<?>> inlays, int startIndex, int endIndex, int x, int startX) {
+    for (; startIndex < endIndex; startIndex++) {
+      Inlay<?> inlay = inlays.get(startIndex);
       int endX = startX + inlay.getWidthInPixels();
       if (x >= startX && x < endX) return inlay;
       startX = endX;
@@ -662,6 +759,13 @@ public final class InlayModelImpl implements InlayModel, InlayModelEx, Prioritiz
         }
       }
     }
+
+    @Override
+    protected void fireAfterRemoved(@NotNull InlineInlayImpl<?> marker) {
+      super.fireAfterRemoved(marker);
+
+      Disposer.dispose(marker);
+    }
   }
 
   private final class BlockElementsTree extends MarkerTreeWithPartialSums<BlockInlayImpl<?>> {
@@ -675,6 +779,13 @@ public final class InlayModelImpl implements InlayModel, InlayModelEx, Prioritiz
         notifyRemoved(inlay);
       }
     }
+
+    @Override
+    protected void fireAfterRemoved(@NotNull BlockInlayImpl<?> marker) {
+      super.fireAfterRemoved(marker);
+
+      Disposer.dispose(marker);
+    }
   }
 
   private final class AfterLineEndElementTree extends HardReferencingRangeMarkerTree<AfterLineEndInlayImpl<?>> {
@@ -687,6 +798,13 @@ public final class InlayModelImpl implements InlayModel, InlayModelEx, Prioritiz
       if (inlay.getUserData(OFFSET_BEFORE_DISPOSAL) == null) {
         notifyRemoved(inlay);
       }
+    }
+
+    @Override
+    protected void fireAfterRemoved(@NotNull AfterLineEndInlayImpl<?> marker) {
+      super.fireAfterRemoved(marker);
+
+      Disposer.dispose(marker);
     }
   }
 }

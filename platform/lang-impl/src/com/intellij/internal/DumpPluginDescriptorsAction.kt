@@ -5,13 +5,11 @@ package com.intellij.internal
 
 import com.intellij.ide.ApplicationActivity
 import com.intellij.ide.plugins.ClassLoaderConfigurator
-import com.intellij.ide.plugins.IdeaPluginDescriptor
 import com.intellij.ide.plugins.IdeaPluginDescriptorImpl
-import com.intellij.ide.plugins.PluginManager
+import com.intellij.ide.plugins.PluginMainDescriptor
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.ide.plugins.cl.PluginClassLoader
 import com.intellij.ide.plugins.contentModuleName
-import com.intellij.ide.plugins.contentModules
 import com.intellij.internal.PluginDescriptionDumper.Companion.getDumpFileLocation
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.remoting.ActionRemoteBehaviorSpecification
@@ -26,14 +24,17 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.util.SystemProperties
+import com.intellij.util.io.jackson.createGenerator
 import com.intellij.util.lang.UrlClassLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import tools.jackson.core.JsonGenerator
-import tools.jackson.core.ObjectWriteContext
 import tools.jackson.core.json.JsonFactory
+import tools.jackson.core.util.DefaultIndenter
+import tools.jackson.core.util.DefaultPrettyPrinter
 import java.nio.file.Path
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -41,6 +42,12 @@ import kotlin.io.path.bufferedWriter
 import kotlin.io.path.relativeTo
 
 private const val DUMP_DESCRIPTORS_PROPERTY = "idea.dump.plugin.descriptors"
+
+/**
+ * By default, the dump adds a hashcode to the names of all classloaders to help identifying them in case of errors reported by the JVM.
+ * Set this system property to `false` to disable this if you want to compare two dumps and hashcodes bring unexpected differences.
+ */
+private const val INCLUDE_CLASSLOADER_HASHCODE = "intellij.dump.plugin.descriptor.include.classloader.hashcode"
 
 internal class DumpPluginDescriptorsAction : DumbAwareAction(), ActionRemoteBehaviorSpecification.Duplicated {
   override fun actionPerformed(e: AnActionEvent) {
@@ -74,7 +81,8 @@ private class PluginDescriptionDumper(val coroutineScope: CoroutineScope) {
     coroutineScope.launch {
       withContext(Dispatchers.IO) {
         dumpPath.bufferedWriter().use { out ->
-          val writer = JsonFactory().createGenerator(ObjectWriteContext.empty(), out)
+          val prettyPrinter = DefaultPrettyPrinter().withArrayIndenter(DefaultIndenter())
+          val writer = JsonFactory().createGenerator(out, prettyPrinter)
           writer.writeStartArray()
           writer.writePlugins()
           writer.writeEndArray()
@@ -95,21 +103,30 @@ private class PluginDescriptionDumper(val coroutineScope: CoroutineScope) {
   }
 
   private fun JsonGenerator.writePlugins() {
-    val allPlugins = PluginManager.getPlugins()
+    val allPlugins = PluginManagerCore.getPluginSet().allPlugins
+    val allModules = allPlugins.asSequence().flatMap { sequenceOf(it) + it.contentModules }
 
-    val pluginClassLoaders = allPlugins.mapNotNullTo(HashSet()) { it.pluginClassLoader }
-    allPlugins.flatMapTo(pluginClassLoaders) {
-      (it as? IdeaPluginDescriptorImpl)?.contentModules?.mapNotNull { it.pluginClassLoader } ?: emptyList()
-    }
-    @Suppress("TestOnlyProblems")
-    val parentClassLoaders = pluginClassLoaders.filterIsInstance<PluginClassLoader>()
-      .flatMapTo(HashSet()) { classLoader -> classLoader._getParents().mapNotNull { it.pluginClassLoader } }
+    val moduleClassLoadersToCount =
+      allModules.groupBy { it.pluginClassLoader }.mapValues { it.value.size }
+    val allReferencedClassLoaders = LinkedHashSet<ClassLoader>()
+    moduleClassLoadersToCount.entries.filter { it.value > 1 }.mapNotNullTo(allReferencedClassLoaders) { it.key }
+    moduleClassLoadersToCount.keys.filterIsInstance<PluginClassLoader>()
+      .flatMapTo(allReferencedClassLoaders) { classLoader ->
+        @Suppress("TestOnlyProblems")
+        classLoader._getParents().mapNotNull { it.pluginClassLoader }
+      }
     val coreClassLoader = ClassLoaderConfigurator::class.java.classLoader
-    parentClassLoaders.add(coreClassLoader)
-    parentClassLoaders.add(ClassLoader.getSystemClassLoader())
-    parentClassLoaders.add(ClassLoader.getPlatformClassLoader())
-    val nonPluginClassLoaders = parentClassLoaders.filterNot { it is PluginClassLoader }.withIndex().associateBy({ it.value }, { it.index })
-    val classLoaderIds = parentClassLoaders.associateWith { classLoader ->
+    allReferencedClassLoaders.add(coreClassLoader)
+    allReferencedClassLoaders.add(ClassLoader.getSystemClassLoader())
+    allReferencedClassLoaders.add(ClassLoader.getPlatformClassLoader())
+
+    val includeClassLoaderHashCode = SystemProperties.getBooleanProperty(INCLUDE_CLASSLOADER_HASHCODE, true)
+    val nonPluginClassLoaders = allReferencedClassLoaders.filterNot { it is PluginClassLoader }.withIndex().associateBy({ it.value }, { it.index })
+    val classLoaderIds = allReferencedClassLoaders.associateWith { classLoader ->
+      val hashcodeSuffix =
+        if (includeClassLoaderHashCode) " @${Integer.toHexString(System.identityHashCode(classLoader))}"
+        else ""
+
       when (classLoader) {
         is PluginClassLoader -> {
           val moduleSuffix = (classLoader.pluginDescriptor as? IdeaPluginDescriptorImpl)?.contentModuleName?.let { ":$it" } ?: ""
@@ -119,36 +136,37 @@ private class PluginDescriptionDumper(val coroutineScope: CoroutineScope) {
         ClassLoader.getPlatformClassLoader() -> "java.PlatformClassLoader"
         coreClassLoader -> "ij.CoreClassLoader"
         else -> "${classLoader.javaClass.simpleName}[${nonPluginClassLoaders[classLoader]}]"
-      } + " @${Integer.toHexString(System.identityHashCode(classLoader))}" // errors reported by the JVM don't use classloader's `toString`, but instead only put the address tag
+      } + hashcodeSuffix
     }
 
     val printedClassLoaders = HashSet<ClassLoader>()
-    PluginManager.getLoadedPlugins().forEach { plugin ->
-      writePluginData(plugin, classLoaderIds, printedClassLoaders)
+    val enabledPlugins = PluginManagerCore.getPluginSet().enabledPlugins
+    enabledPlugins.forEach { plugin ->
+      writePluginData(plugin, enabled = true, classLoaderIds, printedClassLoaders)
     }
-    allPlugins.filterNot { it.isEnabled }.sortedBy { it.pluginId.idString }.forEach { plugin ->
-      writePluginData(plugin, classLoaderIds, printedClassLoaders)
+    (allPlugins - enabledPlugins.toSet()).sortedBy { it.pluginId.idString }.forEach { plugin ->
+      writePluginData(plugin, enabled = false, classLoaderIds, printedClassLoaders)
     }
   }
 
-  private fun JsonGenerator.writePluginData(plugin: IdeaPluginDescriptor,
+  private fun JsonGenerator.writePluginData(plugin: PluginMainDescriptor,
+                                            enabled: Boolean,
                                             classLoaderIds: Map<ClassLoader, String>,
                                             printedClassLoaders: MutableSet<ClassLoader>) {
     writeStartObject()
     writeStringProperty("id", plugin.pluginId.idString)
-    writeBooleanProperty("enabled", plugin.isEnabled)
+    writeBooleanProperty("enabled", enabled)
     writeBooleanProperty("bundled", plugin.isBundled)
-    if (plugin.isEnabled) {
-      writeClassLoaderData(plugin.classLoader, classLoaderIds, printedClassLoaders)
+    if (enabled) {
+      writeClassLoaderData(plugin.pluginClassLoader, classLoaderIds, printedClassLoaders)
     }
     writePluginModulesData(plugin, classLoaderIds, printedClassLoaders)
     writeEndObject()
   }
 
-  private fun JsonGenerator.writePluginModulesData(plugin: IdeaPluginDescriptor,
+  private fun JsonGenerator.writePluginModulesData(plugin: PluginMainDescriptor,
                                                    classLoaderIds: Map<ClassLoader, String>,
                                                    printedClassLoaders: MutableSet<ClassLoader>) {
-    if (plugin !is IdeaPluginDescriptorImpl) return
     val modules = plugin.contentModules
     if (modules.isEmpty()) return
 
@@ -156,17 +174,18 @@ private class PluginDescriptionDumper(val coroutineScope: CoroutineScope) {
     for (module in modules) {
       writeStartObject()
       writeStringProperty("name", module.moduleId.name)
+      writeStringProperty("namespace", module.moduleId.namespace)
       val isEnabled = module in PluginManagerCore.getPluginSet().getEnabledModules()
       writeBooleanProperty("enabled", isEnabled)
       if (isEnabled) {
-        writeClassLoaderData(module.classLoader, classLoaderIds, printedClassLoaders)
+        writeClassLoaderData(module.pluginClassLoader, classLoaderIds, printedClassLoaders)
       }
       writeEndObject()
     }
     writeEndArray()
   }
 
-  private fun JsonGenerator.writeClassLoaderData(classLoader: ClassLoader,
+  private fun JsonGenerator.writeClassLoaderData(classLoader: ClassLoader?,
                                                  classLoaderIds: Map<ClassLoader, String>,
                                                  printedClassLoaders: MutableSet<ClassLoader>) {
     writeName("classLoader")
@@ -174,7 +193,7 @@ private class PluginDescriptionDumper(val coroutineScope: CoroutineScope) {
     classLoaderIds[classLoader]?.let {
       writeStringProperty("id", it)
     }
-    if (printedClassLoaders.add(classLoader)) {
+    if (classLoader != null && printedClassLoaders.add(classLoader)) {
       @Suppress("TestOnlyProblems")
       val parents = when (classLoader) {
         is PluginClassLoader -> classLoader.getAllParentsClassLoaders().toList()
@@ -187,10 +206,11 @@ private class PluginDescriptionDumper(val coroutineScope: CoroutineScope) {
       writeEndArray()
 
       writeArrayPropertyStart("classpath")
-      val homePath = Path.of(PathManager.getHomePath())
+      val homeDir = PathManager.getHomeDir()
       if (classLoader is UrlClassLoader) {
-        for (path in classLoader.baseUrls) {
-          val relativePath = if (path.startsWith(homePath)) path.relativeTo(homePath) else path
+        for (path in classLoader.files) {
+          val absolutePath = path.toAbsolutePath()
+          val relativePath = if (absolutePath.startsWith(homeDir)) absolutePath.relativeTo(homeDir) else absolutePath
           writeString(relativePath.toString())
         }
       }

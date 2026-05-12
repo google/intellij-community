@@ -5,7 +5,6 @@ import com.intellij.codeInspection.CommonQuickFixBundle;
 import com.intellij.java.syntax.parser.JavaKeywords;
 import com.intellij.openapi.roots.ModuleRootModificationUtil;
 import com.intellij.pom.java.LanguageLevel;
-import com.intellij.testFramework.IdeaTestUtil;
 import com.intellij.testFramework.builders.JavaModuleFixtureBuilder;
 import com.intellij.testFramework.fixtures.DefaultLightProjectDescriptor;
 import com.siyeh.ig.IGQuickFixesTestCase;
@@ -27,7 +26,7 @@ public class IfCanBePatternSwitchFixTest extends IGQuickFixesTestCase {
   protected void tuneFixture(JavaModuleFixtureBuilder builder) throws Exception {
     super.tuneFixture(builder);
     builder.setLanguageLevel(LanguageLevel.JDK_21);
-    builder.addJdk(IdeaTestUtil.getMockJdk18Path().getPath());
+    builder.addJdkVersion(LanguageLevel.JDK_1_8);
   }
 
   public void testPatternType(){ doTest(); }

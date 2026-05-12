@@ -23,9 +23,9 @@ import com.intellij.diagnostic.hprof.parser.StaticFieldEntry
 import com.intellij.diagnostic.hprof.parser.Type
 import com.intellij.diagnostic.hprof.util.FileBackedHashMap
 import com.intellij.diagnostic.hprof.util.IDMapper
+import com.intellij.diagnostic.hprof.util.HProfReadBufferSlidingWindow
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap
 import org.jetbrains.annotations.ApiStatus
-import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 
 @ApiStatus.Internal
@@ -42,7 +42,7 @@ abstract class RemapIDsVisitor : HProfVisitor() {
     currentID = 1
   }
 
-  override fun visitPrimitiveArrayDump(arrayObjectId: Long, stackTraceSerialNumber: Long, numberOfElements: Long, elementType: Type, primitiveArrayData: ByteBuffer) {
+  override fun visitPrimitiveArrayDump(arrayObjectId: Long, stackTraceSerialNumber: Long, numberOfElements: Long, elementType: Type, primitiveArrayData: HProfReadBufferSlidingWindow) {
     addMapping(arrayObjectId, currentID++)
   }
 
@@ -63,7 +63,7 @@ abstract class RemapIDsVisitor : HProfVisitor() {
     addMapping(arrayObjectId, currentID++)
   }
 
-  override fun visitInstanceDump(objectId: Long, stackTraceSerialNumber: Long, classObjectId: Long, bytes: ByteBuffer) {
+  override fun visitInstanceDump(objectId: Long, stackTraceSerialNumber: Long, classObjectId: Long, bytes: HProfReadBufferSlidingWindow) {
     addMapping(objectId, currentID++)
   }
 

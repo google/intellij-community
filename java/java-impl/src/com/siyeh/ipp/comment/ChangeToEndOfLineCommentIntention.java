@@ -68,6 +68,10 @@ public final class ChangeToEndOfLineCommentIntention extends MCIntention impleme
     // newline followed by space convinces formatter to indent line
     final PsiElement ws = PsiParserFacade.getInstance(project).createWhiteSpaceFromText("\n ");
     final PsiElementFactory factory = JavaPsiFacade.getInstance(project).getElementFactory();
+    if (lines.length == 0) {
+      oldComment.replace(factory.createCommentFromText("//", parent));
+      return;
+    }
     final int last = lines[lines.length - 1].trim().isEmpty() ? lines.length - 2 : lines.length - 1;
     final int first = lines[0].trim().isEmpty() ? 1 : 0;
     for (int i = last; i > first; i--) {

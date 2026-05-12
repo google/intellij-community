@@ -7,6 +7,26 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" exported="" name="icu4j" level="project" />
+    <orderEntry type="module-library" exported="">
+      <library name="icu4j" type="repository">
+        <properties maven-id="com.ibm.icu:icu4j:78.3">
+          <verification>
+            <artifact url="file://$MAVEN_REPOSITORY$/com/ibm/icu/icu4j/78.3/icu4j-78.3.jar">
+              <sha256sum>e962c1758d9659ea1e1fbab99c58683f654d304e1126ace19aaabfe39e0edb25</sha256sum>
+            </artifact>
+          </verification>
+        </properties>
+        <ANNOTATIONS>
+          <root url="file://$MODULE_DIR$/../../lib/annotations/icu4j" />
+        </ANNOTATIONS>
+        <CLASSES>
+          <root url="jar://$MAVEN_REPOSITORY$/com/ibm/icu/icu4j/78.3/icu4j-78.3.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES>
+          <root url="jar://$MAVEN_REPOSITORY$/com/ibm/icu/icu4j/78.3/icu4j-78.3-sources.jar!/" />
+        </SOURCES>
+      </library>
+    </orderEntry>
   </component>
 </module>

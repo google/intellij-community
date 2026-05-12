@@ -13,10 +13,10 @@ import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Ref
 import com.intellij.ui.CollectionComboBoxModel
-import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.TextAccessor
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.components.TextComponentEmptyText
+import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import org.jetbrains.annotations.Nls
 import java.util.EnumSet
 import javax.swing.JComboBox
@@ -72,7 +72,7 @@ inline fun <S, reified V : Enum<V>> SettingsEditorFragmentContainer<S>.addVarian
   crossinline getText: (V) -> @Nls String
 ): SettingsEditorFragment<S, SettingsEditorLabeledComponent<ComboBox<V>>> {
   val component = ComboBox(CollectionComboBoxModel(EnumSet.allOf(V::class.java).toList()))
-  component.setRenderer(SimpleListCellRenderer.create("") { getText(it) })
+  component.setRenderer(textListCellRenderer("") { getText(it) })
   return addLabeledSettingsEditorFragment(
     settingsFragmentInfo,
     { component },

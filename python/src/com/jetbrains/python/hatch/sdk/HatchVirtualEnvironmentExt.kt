@@ -3,11 +3,9 @@ package com.jetbrains.python.hatch.sdk
 
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.projectRoots.Sdk
-import com.intellij.openapi.util.NlsSafe
 import com.intellij.python.hatch.BasePythonExecutableNotFoundHatchError
 import com.intellij.python.hatch.HatchVirtualEnvironment
 import com.intellij.python.hatch.PythonVirtualEnvironment
-import com.intellij.python.hatch.getHatchEnvVirtualProjectPath
 import com.jetbrains.python.Result
 import com.jetbrains.python.errorProcessing.PyResult
 import com.jetbrains.python.sdk.add.v2.PathHolder
@@ -18,12 +16,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import java.nio.file.Path
-import kotlin.io.path.name
 
 @ApiStatus.Internal
 suspend fun HatchVirtualEnvironment.createSdk(workingDirectoryPath: Path): PyResult<Sdk> {
-  val existingPythonEnvironment = pythonVirtualEnvironment as? PythonVirtualEnvironment.Existing
-                                  ?: return Result.failure(BasePythonExecutableNotFoundHatchError(null as String?))
+  if (pythonVirtualEnvironment !is PythonVirtualEnvironment.Existing) {
+    return Result.failure(BasePythonExecutableNotFoundHatchError(null as String?))
+  }
   val pythonHomePath = pythonVirtualEnvironment?.pythonHomePath
   val pythonBinary = pythonHomePath?.let {
     withContext(Dispatchers.IO) { it.resolvePythonBinary() }
@@ -32,8 +30,6 @@ suspend fun HatchVirtualEnvironment.createSdk(workingDirectoryPath: Path): PyRes
   val hatchSdkAdditionalData = HatchSdkAdditionalData(workingDirectoryPath, this.hatchEnvironment.name)
   val sdk = createSdk(
     pythonBinaryPath = PathHolder.Eel(pythonBinary),
-    associatedModulePath = workingDirectoryPath.toString(),
-    suggestedSdkName = existingPythonEnvironment.suggestHatchSdkName(),
     sdkAdditionalData = hatchSdkAdditionalData
   ).getOr { return it }
 
@@ -42,13 +38,4 @@ suspend fun HatchVirtualEnvironment.createSdk(workingDirectoryPath: Path): PyRes
   }
 
   return Result.success(sdk)
-}
-
-private fun PythonVirtualEnvironment.Existing.suggestHatchSdkName(): @NlsSafe String {
-  val normalizedProjectName = pythonHomePath.getHatchEnvVirtualProjectPath().name
-  val nonDefaultEnvName = pythonHomePath.name.takeIf { it != normalizedProjectName }
-
-  val envNamePrefix = nonDefaultEnvName?.let { "$it@" } ?: ""
-  val sdkName = "Hatch ($envNamePrefix$normalizedProjectName) [${pythonInfo.languageLevel}]"
-  return sdkName
 }

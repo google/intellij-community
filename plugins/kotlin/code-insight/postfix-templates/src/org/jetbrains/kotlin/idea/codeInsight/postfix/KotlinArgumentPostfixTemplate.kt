@@ -22,4 +22,5 @@ internal class KotlinArgumentPostfixTemplate : StringBasedPostfixTemplate, DumbA
     override fun setVariables(template: Template, element: PsiElement) {
         template.addVariable("call", "", "", true)
     }
+    override fun isApplicableForModCommand(): Boolean = true
 }

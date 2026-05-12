@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.groovy.byteCodeViewer` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "byteCodeViewer_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "byteCodeViewer",
   module_name = "intellij.groovy.byteCodeViewer",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":byteCodeViewer_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/core-api:core",
     "//plugins/groovy/groovy-psi:psi",
@@ -20,11 +15,13 @@ jvm_library(
     "//plugins/ByteCodeViewer:java-byteCodeViewer",
     "@lib//:jetbrains-annotations",
     "//platform/util",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
   ]
 )
 
 jvm_library(
   name = "byteCodeViewer_test_lib",
+  testonly = True,
   module_name = "intellij.groovy.byteCodeViewer",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -35,6 +32,13 @@ jvm_library(
     "//java/java-psi-api:psi_test_lib",
     "//plugins/ByteCodeViewer:java-byteCodeViewer_test_lib",
     "//platform/util:util_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
   ]
 )
 ### auto-generated section `build intellij.groovy.byteCodeViewer` end
+
+### auto-generated section `iml intellij.groovy.byteCodeViewer` start
+exports_files([
+  "intellij.groovy.byteCodeViewer.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.groovy.byteCodeViewer` end

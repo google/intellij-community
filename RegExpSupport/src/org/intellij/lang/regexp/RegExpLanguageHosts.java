@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.intellij.lang.regexp;
 
 import com.intellij.lang.Language;
@@ -208,7 +208,7 @@ public final class RegExpLanguageHosts extends ClassExtension<RegExpLanguageHost
   }
 
   @Nullable
-  String getPropertyDescription(final @NotNull PsiElement element, final @Nullable String name) {
+  public String getPropertyDescription(@NotNull PsiElement element, @Nullable String name) {
     final RegExpLanguageHost host = findRegExpHost(element);
     return host != null ?  host.getPropertyDescription(name) : myDefaultProvider.getPropertyDescription(name);
   }

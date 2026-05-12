@@ -26,6 +26,7 @@ jvm_library(
     "@lib//:opentelemetry",
     "@lib//:opentelemetry-semconv",
     "//platform/util",
+    "//platform/util/base",
     "//libraries/kotlinx/coroutines/core",
     "//libraries/kotlinx/serialization/core",
     "//libraries/kotlinx/serialization/protobuf",
@@ -37,6 +38,7 @@ jvm_library(
 
 jvm_library(
   name = "startUpPerformanceReporter_test_lib",
+  testonly = True,
   module_name = "intellij.platform.diagnostic.startUpPerformanceReporter",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -52,6 +54,7 @@ jvm_library(
     "//platform/util-class-loader:util-classLoader_test_lib",
     "//platform/platform-util-io-impl:ide-util-io-impl_test_lib",
     "//platform/util:util_test_lib",
+    "//platform/util/base:base_test_lib",
     "//libraries/kotlinx/coroutines/core:core_test_lib",
     "//libraries/kotlinx/serialization/core:core_test_lib",
     "//libraries/kotlinx/serialization/protobuf:protobuf_test_lib",
@@ -61,3 +64,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.diagnostic.startUpPerformanceReporter` end
+
+### auto-generated section `iml intellij.platform.diagnostic.startUpPerformanceReporter` start
+exports_files([
+  "intellij.platform.diagnostic.startUpPerformanceReporter.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.diagnostic.startUpPerformanceReporter` end

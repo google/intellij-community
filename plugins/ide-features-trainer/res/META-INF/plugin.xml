@@ -84,6 +84,10 @@
     <!--suppress PluginXmlCapitalization -->
     <notificationGroup displayType="STICKY_BALLOON" id="IDE Features Trainer" isLogByDefault="false"
         bundle="messages.LearnBundle" key="notification.group.feature.trainer"/>
+    <applicationSettings service="training.lang.LangManager"/>
+    <applicationSettings service="training.learn.lesson.LessonStateBase"/>
+    <applicationSettings service="training.statistic.LearnProjectState"/>
+    <applicationSettings service="training.featuresSuggester.settings.FeatureSuggesterSettings"/>
   </extensions>
 
   <actions>

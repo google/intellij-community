@@ -8,6 +8,9 @@ import java.util.HashMap;
  * {@link java.util.ArrayList}
  * {@link java.util.HashMap description}
  * @author Bas
+ *
+ * @see <a href="https://jetbrains.com">Check out our cool website !</a>
+ * and our even better <a href="https://www.jetbrainsmerchandise.com">merch</a> !
  */
 public class MarkdownDocumentationCommentsMigration {
   <warning descr="Javadoc comment can be Markdown documentation comment">/**</warning>
@@ -579,16 +582,6 @@ class Matcher {
    * methods.  The following code, for example, writes {@code one dog two dogs
    * in the yard} to the standard-output stream: </p>
    *
-   * <blockquote><pre>
-   * Pattern p = Pattern.compile("cat");
-   * Matcher m = p.matcher("one cat two cats in the yard");
-   * StringBuffer sb = new StringBuffer();
-   * while (m.find()) {
-   *     m.appendReplacement(sb, "dog");
-   * }
-   * m.appendTail(sb);
-   * System.out.println(sb.toString());</pre></blockquote>
-   *
    * @param  sb
    *         The target string buffer
    *
@@ -612,43 +605,6 @@ class Matcher {
   void appendReplacement(){}
 }
 
-class File {
-  <warning descr="Javadoc comment can be Markdown documentation comment">/**</warning>
-   * Finds the definition expression of a given variable or reference expression within the provided context.
-   * <p>
-   * Consider the following code:
-   * <pre>{@code
-   * class A {
-   *   void sample() {
-   *     String[] names = {"charlie", "joe"};
-   *     Assert.assertEquals(Arrays.asList(names), List.of("charlie", "joe"));
-   *   }
-   * }
-   * }</pre>
-   *
-   * <pre><code>Single line</code></pre>
-   * <pre><code>
-   *     Single line but tags at different lines
-   *  </code></pre>
-   *
-   *  <pre><code>Single line but end tags at different lines
-   *  </code></pre>
-   *
-   *  <pre><code>
-   *    Single line but start tags at different lines</code></pre>
-   *
-   * The usage of {@code names} in a call to {@code assertEquals} is a {@link PsiReferenceExpression}.
-   * <p>
-   * When this method is called on that {@link PsiReferenceExpression}, it returns {@link PsiExpression} that defined {@code names}.
-   * In our example, it will be an instance of {@link PsiArrayInitializerExpression}.
-   *
-   * @param referenceExpression the reference expression whose definition is to be found.
-   * @param variable the optional variable that is associated with the reference expression.
-   * @return the definition expression if found, otherwise null.
-   */
-  public void find() {}
-}
-
 class indentHandling {
   
   <warning descr="Javadoc comment can be Markdown documentation comment">/**</warning>
@@ -662,3 +618,14 @@ class indentHandling {
    */
   void weloveSpace(){}
 }
+
+
+<warning descr="Javadoc comment can be Markdown documentation comment">/**</warning>
+ * <pre>
+ *   {@link String LeString}
+ *   {@linkplain String LePlainString}
+ *   {@literal KILL<String>}
+ *   {@systemProperty I don't know how this one works}
+ * </pre>
+ */
+interface PreTagHell {}

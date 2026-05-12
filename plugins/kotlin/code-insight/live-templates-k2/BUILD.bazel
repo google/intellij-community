@@ -1,6 +1,6 @@
 ### auto-generated section `build intellij.kotlin.codeInsight.liveTemplates` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_kotlin-codeInsight-liveTemplates",
@@ -11,18 +11,13 @@ create_kotlinc_options(
   x_context_parameters = True
 )
 
-resourcegroup(
-  name = "kotlin-codeInsight-liveTemplates_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "kotlin-codeInsight-liveTemplates",
   module_name = "intellij.kotlin.codeInsight.liveTemplates",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":kotlin-codeInsight-liveTemplates_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_kotlin-codeInsight-liveTemplates",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -43,6 +38,7 @@ jvm_library(
 
 jvm_library(
   name = "kotlin-codeInsight-liveTemplates_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.codeInsight.liveTemplates",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -63,6 +59,12 @@ jvm_library(
 )
 ### auto-generated section `build intellij.kotlin.codeInsight.liveTemplates` end
 
+### auto-generated section `iml intellij.kotlin.codeInsight.liveTemplates` start
+exports_files([
+  "intellij.kotlin.codeInsight.liveTemplates.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.codeInsight.liveTemplates` end
+
 ### auto-generated section `build intellij.kotlin.codeInsight.liveTemplates.tests` start
 create_kotlinc_options(
   name = "custom_kotlin-codeInsight-liveTemplates-tests",
@@ -75,12 +77,14 @@ create_kotlinc_options(
 
 jvm_library(
   name = "kotlin-codeInsight-liveTemplates-tests",
+  module_name = "intellij.kotlin.codeInsight.liveTemplates.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "kotlin-codeInsight-liveTemplates-tests_test_lib",
+  testonly = True,
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
   kotlinc_opts = ":custom_kotlin-codeInsight-liveTemplates-tests",
@@ -120,15 +124,25 @@ jvm_library(
     "//plugins/kotlin/base/plugin:plugin_test_lib",
     "//platform/util",
     "//platform/util:util_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/base/util",
     "//plugins/kotlin/base/util:util_test_lib",
     "@lib//:kotlinc-kotlin-compiler-tests",
+    "//plugins/kotlin/code-insight/live-templates-shared:kotlin-code-insight-live-templates-shared-tests",
+    "//plugins/kotlin/code-insight/live-templates-shared:kotlin-code-insight-live-templates-shared-tests_test_lib",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework_test_lib",
   ],
   runtime_deps = [":kotlin-codeInsight-liveTemplates-tests"]
 )
 ### auto-generated section `build intellij.kotlin.codeInsight.liveTemplates.tests` end
+
+### auto-generated section `iml intellij.kotlin.codeInsight.liveTemplates.tests` start
+exports_files([
+  "intellij.kotlin.codeInsight.liveTemplates.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.codeInsight.liveTemplates.tests` end
 
 ### auto-generated section `test intellij.kotlin.codeInsight.liveTemplates.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

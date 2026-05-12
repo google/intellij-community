@@ -1,3 +1,5 @@
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.workspaceModel.test.api.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
@@ -13,13 +15,10 @@ import com.intellij.platform.workspace.storage.impl.EntityLink
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
-import com.intellij.platform.workspace.storage.impl.extractOneToManyChildren
-import com.intellij.platform.workspace.storage.impl.extractOneToManyParent
-import com.intellij.platform.workspace.storage.impl.updateOneToManyChildrenOfParent
-import com.intellij.platform.workspace.storage.impl.updateOneToManyParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.workspaceModel.test.api.EntityWithSelfRef
 import com.intellij.workspaceModel.test.api.EntityWithSelfRefBuilder
@@ -42,9 +41,9 @@ readField("name")
 return dataSource.name
 }
 override val parentRef: EntityWithSelfRef?
-get() = snapshot.extractOneToManyParent(PARENTREF_CONNECTION_ID, this)           
+get() = snapshot.instrumentation.getParent(PARENTREF_CONNECTION_ID, this) as? EntityWithSelfRef           
 override val children: List<EntityWithSelfRef>
-get() = snapshot.extractOneToManyChildren<EntityWithSelfRef>(CHILDREN_CONNECTION_ID, this)!!.toList()
+get() = (snapshot.instrumentation.getManyChildren(CHILDREN_CONNECTION_ID, this) as? Sequence<EntityWithSelfRef>)?.toList() ?: error("Children children not found for EntityWithSelfRef")
 
 override val entitySource: EntitySource
 get() {
@@ -91,7 +90,7 @@ error("Field EntityWithSelfRef#name should be initialized")
 }
 // Check initialization for list with ref type
 if (_diff != null){
-if (_diff.extractOneToManyChildren<WorkspaceEntityBase>(CHILDREN_CONNECTION_ID, this) == null){
+if (_diff.instrumentation.getManyChildrenBuilders(CHILDREN_CONNECTION_ID, this) == null){
 error("Field EntityWithSelfRef#children should be initialized")
 }
 }
@@ -132,10 +131,9 @@ override var parentRef: EntityWithSelfRefBuilder?
 get(){
 val _diff = diff
 return if (_diff != null) {
-@OptIn(EntityStorageInstrumentationApi::class)
 ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(PARENTREF_CONNECTION_ID, this) as? EntityWithSelfRefBuilder) ?: (this.entityLinks[EntityLink(false, PARENTREF_CONNECTION_ID)] as? EntityWithSelfRefBuilder)
 } else {
-this.entityLinks[EntityLink(false, PARENTREF_CONNECTION_ID)] as? EntityWithSelfRefBuilder
+(this.entityLinks[EntityLink(false, PARENTREF_CONNECTION_ID)] as? EntityWithSelfRefBuilder)
 }
 }
 set(value){
@@ -151,7 +149,7 @@ value.entityLinks[EntityLink(true, PARENTREF_CONNECTION_ID)] = data
 _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
 }
 if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)){
-_diff.updateOneToManyParentOfChild(PARENTREF_CONNECTION_ID, this, value)
+_diff.instrumentation.addChild(PARENTREF_CONNECTION_ID, value, this)
 }
 else{
 // Setting backref of the list
@@ -172,7 +170,6 @@ get(){
 // Getter of the list of non-abstract referenced types
 val _diff = diff
 return if (_diff != null) {
-@OptIn(EntityStorageInstrumentationApi::class)
 ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(CHILDREN_CONNECTION_ID, this)!!.toList() as List<EntityWithSelfRefBuilder>) + (this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<EntityWithSelfRefBuilder> ?: emptyList())
 } else {
 this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<EntityWithSelfRefBuilder> ?: emptyList()
@@ -193,7 +190,7 @@ item_value.entityLinks[EntityLink(false, CHILDREN_CONNECTION_ID)] = this
 _diff.addEntity(item_value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
 }
 }
-_diff.updateOneToManyChildrenOfParent(CHILDREN_CONNECTION_ID, this, value)
+_diff.instrumentation.replaceChildren(CHILDREN_CONNECTION_ID, this, value)
 }
 else{
 for (item_value in value){
@@ -225,7 +222,6 @@ modifiable.id = createEntityId()
 return modifiable
 }
 
-@OptIn(EntityStorageInstrumentationApi::class)
 override fun createEntity(snapshot: EntityStorageInstrumentation): EntityWithSelfRef{
 val entityId = createEntityId()
 return snapshot.initializeEntity(entityId){

@@ -311,7 +311,7 @@ public final class DuplicateBranchesInSwitchInspection extends LocalInspectionTo
           element = collectCommentsUntilNewLine(commentTexts, element);
           Rule rule = new Rule(ruleStatement, ruleStatement, body, ArrayUtilRt.toStringArray(commentTexts));
           commentTexts.clear();
-          rulesByHash.computeIfAbsent(rule.hash(), __ -> new ArrayList<>()).add(rule);
+          rulesByHash.computeIfAbsent(rule.hash(), _ -> new ArrayList<>()).add(rule);
         }
       }
     }

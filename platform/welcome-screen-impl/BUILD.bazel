@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.welcomeScreen.impl` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "welcomeScreen-impl_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "welcomeScreen-impl",
   module_name = "intellij.platform.welcomeScreen.impl",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":welcomeScreen-impl_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/core-api:core",
@@ -30,6 +25,7 @@ jvm_library(
 
 jvm_library(
   name = "welcomeScreen-impl_test_lib",
+  testonly = True,
   module_name = "intellij.platform.welcomeScreen.impl",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -48,3 +44,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.welcomeScreen.impl` end
+
+### auto-generated section `iml intellij.platform.welcomeScreen.impl` start
+exports_files([
+  "intellij.platform.welcomeScreen.impl.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.welcomeScreen.impl` end

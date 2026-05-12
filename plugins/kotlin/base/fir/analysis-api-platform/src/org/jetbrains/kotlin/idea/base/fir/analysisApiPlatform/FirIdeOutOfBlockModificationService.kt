@@ -23,7 +23,6 @@ import com.intellij.psi.impl.source.tree.injected.InjectedLanguageUtilBase
 import com.intellij.psi.util.parentOfType
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.analysis.api.platform.KotlinAnalysisInWriteActionListener
-import org.jetbrains.kotlin.analysis.api.platform.analysisMessageBus
 import org.jetbrains.kotlin.analysis.api.platform.modification.KaElementModificationType
 import org.jetbrains.kotlin.analysis.api.platform.modification.KaSourceModificationLocality
 import org.jetbrains.kotlin.analysis.api.platform.modification.KaSourceModificationService
@@ -56,30 +55,32 @@ class FirIdeOutOfBlockModificationService(private val project: Project) : Dispos
         Registry.intValue(FILE_PROCESSING_LIMIT_KEY, DEFAULT_FILE_PROCESSING_LIMIT)
     }
 
-    private val threadLocalContext = ThreadLocal.withInitial { TreeChangeHandlingContext() }
+    /**
+     * Tracks the [TreeChangeProcessingState] between tree change events.
+     *
+     * The state is only accessed during write actions, so it is not used concurrently. However, it might be accessed from multiple threads
+     * in sequence, so it should still be volatile.
+     */
+    @Volatile
+    private var treeChangeProcessingState: TreeChangeProcessingState = TreeChangeProcessingState.Idle
 
     init {
-        ApplicationManagerEx.getApplicationEx().addWriteActionListener(ContextRemovalWriteActionListener(), this)
-
-        project.analysisMessageBus
-            .connect(this)
-            .subscribe(KotlinAnalysisInWriteActionListener.TOPIC, ContextRemovalAnalysisInWriteActionListener())
+        ApplicationManagerEx.getApplicationEx().addWriteActionListener(StateResetWriteActionListener(), this)
     }
 
     private fun handleTreeChangeEvent(event: PsiTreeChangeEventImpl) {
-        val context = threadLocalContext.get()
-        if (context.state == TreeChangeProcessingState.GlobalEventPublished) {
+        if (treeChangeProcessingState == TreeChangeProcessingState.GlobalEventPublished) {
             return
         }
 
-        val hasEventBeenHandled = preprocessEvent(event, context)
+        val hasEventBeenHandled = preprocessEvent(event)
         if (hasEventBeenHandled) {
             return
         }
 
         val rootElement = event.parent ?: return
 
-        val hasEventBeenHandledByRootElement = preprocessRootElement(event, rootElement, context)
+        val hasEventBeenHandledByRootElement = preprocessRootElement(event, rootElement)
         if (hasEventBeenHandledByRootElement) {
             return
         }
@@ -98,39 +99,53 @@ class FirIdeOutOfBlockModificationService(private val project: Project) : Dispos
             return
         }
 
-        when (val currentState = context.state) {
+        when (val currentState = treeChangeProcessingState) {
+            is TreeChangeProcessingState.Idle -> {
+                val acceptingState = TreeChangeProcessingState.Accepting().also { treeChangeProcessingState = it }
+                acceptEvent(acceptingState, event, rootElement, containingFile)
+            }
+
             is TreeChangeProcessingState.Accepting -> {
-                val currentFileState = currentState.fileStates[containingFile]
-                when (currentFileState) {
-                    null -> {
-                        // We've encountered a new file and need to decide if we're still in the bounds of the processing limit.
-                        if (currentState.fileCount < FILE_PROCESSING_LIMIT) {
-                            currentState.fileStates[containingFile] = TreeChangeFileState.Processing
-                            currentState.fileCount += 1
-
-                            processElementModification(event, rootElement, containingFile, currentState)
-                        } else {
-                            publishGlobalModificationEvent(context)
-                        }
-                    }
-
-                    TreeChangeFileState.Processing -> {
-                        processElementModification(event, rootElement, containingFile, currentState)
-                    }
-
-                    // There has already been an OOBM for the file's module, so we can skip the tree change event.
-                    TreeChangeFileState.ModuleEventPublished -> {}
-                }
+                acceptEvent(currentState, event, rootElement, containingFile)
             }
 
             TreeChangeProcessingState.GlobalEventPublished -> {}
         }
     }
 
+    private fun acceptEvent(
+        currentState: TreeChangeProcessingState.Accepting,
+        event: PsiTreeChangeEventImpl,
+        rootElement: PsiElement,
+        containingFile: PsiFile,
+    ) {
+        val currentFileState = currentState.fileStates[containingFile]
+        when (currentFileState) {
+            null -> {
+                // We've encountered a new file and need to decide if we're still in the bounds of the processing limit.
+                if (currentState.fileCount < FILE_PROCESSING_LIMIT) {
+                    currentState.fileStates[containingFile] = TreeChangeFileState.Processing
+                    currentState.fileCount += 1
+
+                    processElementModification(event, rootElement, containingFile, currentState)
+                } else {
+                    publishGlobalModificationEvent()
+                }
+            }
+
+            TreeChangeFileState.Processing -> {
+                processElementModification(event, rootElement, containingFile, currentState)
+            }
+
+            // There has already been an OOBM for the file's module, so we can skip the tree change event.
+            TreeChangeFileState.ModuleEventPublished -> {}
+        }
+    }
+
     /**
      * @return Whether the given event has been handled.
      */
-    private fun preprocessEvent(event: PsiTreeChangeEventImpl, context: TreeChangeHandlingContext): Boolean {
+    private fun preprocessEvent(event: PsiTreeChangeEventImpl): Boolean {
         val eventCode = event.code
         if (!PsiModificationTrackerImpl.canAffectPsi(event) ||
             event.isGenericChange ||
@@ -140,7 +155,7 @@ class FirIdeOutOfBlockModificationService(private val project: Project) : Dispos
         }
 
         if (event.isGlobalChange()) {
-            publishGlobalModificationEvent(context)
+            publishGlobalModificationEvent()
             return true
         }
 
@@ -153,7 +168,6 @@ class FirIdeOutOfBlockModificationService(private val project: Project) : Dispos
     private fun preprocessRootElement(
         event: PsiTreeChangeEventImpl,
         rootElement: PsiElement,
-        context: TreeChangeHandlingContext
     ): Boolean {
         val eventCode = event.code
 
@@ -163,7 +177,7 @@ class FirIdeOutOfBlockModificationService(private val project: Project) : Dispos
                 // Finding the exact `KtFile` for the injection is expensive and can lead to freezes (see KTIJ-36275). A global modification
                 // event can be published without a `KtFile`/`KaModule`. Since changes in injected files should be rare, such an event
                 // should be fine performance-wise.
-                publishGlobalModificationEvent(context)
+                publishGlobalModificationEvent()
                 return true
             }
         }
@@ -234,11 +248,11 @@ class FirIdeOutOfBlockModificationService(private val project: Project) : Dispos
     private fun DocumentWindow.containsInjectionAt(textRange: TextRange): Boolean =
         this.hostRanges.any { textRange.intersects(it) }
 
-    private fun publishGlobalModificationEvent(context: TreeChangeHandlingContext) {
+    private fun publishGlobalModificationEvent() {
         // We should only invalidate source module content here because global PSI tree changes have no effect on binary modules.
         project.publishGlobalSourceOutOfBlockModificationEvent()
 
-        context.state = TreeChangeProcessingState.GlobalEventPublished
+        treeChangeProcessingState = TreeChangeProcessingState.GlobalEventPublished
     }
 
     override fun dispose() {
@@ -261,16 +275,30 @@ class FirIdeOutOfBlockModificationService(private val project: Project) : Dispos
         }
     }
 
-    private inner class ContextRemovalWriteActionListener : WriteActionListener {
+    private inner class StateResetWriteActionListener : WriteActionListener {
+        /**
+         * Tracks the depth of the current write action so that states are only reset when entering/exiting the outermost write action.
+         *
+         * The counter is only accessed during write actions, so it is not used concurrently. However, it might be accessed from multiple
+         * threads in sequence, so it should still be volatile.
+         */
+        @Volatile
+        private var writeActionDepth = 0
+
         override fun writeActionStarted(action: Class<*>) {
-            // Cleaning up on write action start is not strictly necessary because the context should have been cleaned up at the end of
-            // the previous write action. But it's good to ensure that we start a write action with a clean context in case something went
-            // wrong.
-            threadLocalContext.remove()
+            if (writeActionDepth == 0) {
+                treeChangeProcessingState = TreeChangeProcessingState.Idle
+            }
+
+            writeActionDepth += 1
         }
 
         override fun writeActionFinished(action: Class<*>) {
-            threadLocalContext.remove()
+            writeActionDepth -= 1
+
+            if (writeActionDepth == 0) {
+                treeChangeProcessingState = TreeChangeProcessingState.Idle
+            }
         }
     }
 
@@ -281,16 +309,19 @@ class FirIdeOutOfBlockModificationService(private val project: Project) : Dispos
      *
      * To ensure that further modifications can correctly clean caches *again*, we have to reset the state of the tree change preprocessor.
      */
-    private inner class ContextRemovalAnalysisInWriteActionListener : KotlinAnalysisInWriteActionListener {
+    internal class StateResetAnalysisInWriteActionListener(private val project: Project) : KotlinAnalysisInWriteActionListener {
+        private val modificationService: FirIdeOutOfBlockModificationService
+            get() = getInstance(project)
+
         override fun onEnteringAnalysisInWriteAction() {
             // Resetting the state when *entering* analysis in a write action is not strictly necessary because we don't expect any
             // modifications to happen during the `analyze` call. However, if we do have some modifications during the `analyze` call, we
             // might miss them without the state reset. As it's technically possible, it's better to be safe.
-            threadLocalContext.remove()
+            modificationService.treeChangeProcessingState = TreeChangeProcessingState.Idle
         }
 
         override fun afterLeavingAnalysisInWriteAction() {
-            threadLocalContext.remove()
+            modificationService.treeChangeProcessingState = TreeChangeProcessingState.Idle
         }
     }
 
@@ -303,13 +334,6 @@ class FirIdeOutOfBlockModificationService(private val project: Project) : Dispos
             project.getService(FirIdeOutOfBlockModificationService::class.java)
     }
 }
-
-/**
- * [TreeChangeHandlingContext] memorizes information between tree change events. It lives for the duration of the write action.
- */
-private class TreeChangeHandlingContext(
-    var state: TreeChangeProcessingState = TreeChangeProcessingState.Accepting(),
-)
 
 /**
  * For each [PsiFile], [TreeChangeFileState] tracks the current progress of tree change processing. This allows us to stop tree change
@@ -345,6 +369,13 @@ private sealed class TreeChangeFileState {
  */
 private sealed class TreeChangeProcessingState {
     /**
+     * The tree change preprocessor is currently not in a state of processing tree change events. This is the state outside write actions.
+     *
+     * [Idle] is automatically transitioned into [Accepting] when the tree change preprocessor receives events.
+     */
+    data object Idle : TreeChangeProcessingState()
+
+    /**
      * The tree change preprocessor is accepting tree change events. It memorizes a [TreeChangeFileState] for each [PsiFile] in [fileStates]
      * to track which files have been encountered and whether an out-of-block modification event has already been published for the file's
      * module.
@@ -374,7 +405,7 @@ private sealed class TreeChangeProcessingState {
          * The [TreeChangeFileState]s memorized for each encountered [PsiFile].
          *
          * The map must have weak references to its [PsiFile] keys to avoid PSI leaks. It does not have to be thread safe because the
-         * processing state is held in a thread-local variable.
+         * processing state is only accessed during write actions.
          */
         val fileStates: MutableMap<PsiFile, TreeChangeFileState> = WeakHashMap()
     }

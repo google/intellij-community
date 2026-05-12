@@ -47,8 +47,8 @@ internal object NumberConversionFixFactory {
     }
 }
 
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class)
+context(_: KaSession)
 internal fun prepareNumberConversionElementContext(
     fromType: KaType,
     toType: KaType,

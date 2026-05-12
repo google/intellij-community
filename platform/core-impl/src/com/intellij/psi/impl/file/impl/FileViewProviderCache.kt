@@ -1,10 +1,12 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.impl.file.impl
 
 import com.intellij.codeInsight.multiverse.CodeInsightContext
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.AbstractFileViewProvider
 import com.intellij.psi.FileViewProvider
+import com.intellij.util.concurrency.annotations.RequiresReadLock
+import com.intellij.util.concurrency.annotations.RequiresWriteLock
 
 /**
  * Storage for mapping from ([VirtualFile], [CodeInsightContext]) to [FileViewProvider]s.
@@ -18,14 +20,28 @@ import com.intellij.psi.FileViewProvider
 internal sealed interface FileViewProviderCache {
 
   /**
-   * Returns the cached view provider for given [file] and [context]. Can be null if the cache does not contain the entry.
+   * Returns the cached view provider for given [file] and [context].
+   * Can be null if the cache does not contain the entry.
+   * Can return a cached view provider that is possibly invalidated. See doc of [FileManagerEx.possiblyInvalidatePhysicalPsi]
    *
    * @param file The virtual file for which the view provider is being retrieved or cached.
    * @param context The code insight context associated with the requested view provider.
    *
    * @return The cached view provider for the given [file] and [context].
    */
-  fun get(file: VirtualFile, context: CodeInsightContext): FileViewProvider?
+  fun getRaw(file: VirtualFile, context: CodeInsightContext): FileViewProvider?
+
+  /**
+   * Returns the cached view provider for given [vFile] and [context]. Can be null if the cache does not contain the entry.
+   *
+   * If the cached view provider has a possibly invalidated state, it will be reanimated before being returned (can result in `null`).
+   *
+   * @param vFile The virtual file for which the view provider is being retrieved or cached.
+   * @param context The code insight context associated with the requested view provider.
+   *
+   * @return The cached view provider for the given [vFile] and [context].
+   */
+  fun getAndReanimateIfNecessary(vFile: VirtualFile, context: CodeInsightContext): FileViewProvider?
 
   /**
    * Returns the cached view provider for the specified [file] and [context], or caches and returns the provided [provider]
@@ -40,20 +56,32 @@ internal sealed interface FileViewProviderCache {
   fun cacheOrGet(file: VirtualFile, context: CodeInsightContext, provider: FileViewProvider): FileViewProvider
 
   /**
-   * Returns all existing view providers of [vFile]. The returned collection is thread-safe and cannot be collected by GC.
+   * Returns all existing view providers of [vFile].
+   * Can return cached view providers that are possibly invalidated. See doc of [FileManagerEx.possiblyInvalidatePhysicalPsi]
+   *
    * [ClassicFileViewProviderCache] always returns a collection of sizes 1 or 0.
    * [MultiverseFileViewProviderCache] returns all existing providers for the given [vFile] which are cached for different contexts.
    */
-  fun getAllProviders(vFile: VirtualFile): List<FileViewProvider>
+  fun getAllProvidersRaw(vFile: VirtualFile): List<FileViewProvider>
 
   /**
-   * Removes all existing view providers of [file] and returns them.
-   * @see [getAllProviders]
+   * Returns all existing view providers of [vFile].
+   * If the view providers have possibly invalidated state. they are reanimated before being returned.
+   *
+   * [ClassicFileViewProviderCache] always returns a collection of sizes 1 or 0.
+   * [MultiverseFileViewProviderCache] returns all existing providers for the given [vFile] which are cached for different contexts.
+   */
+  fun getAllProvidersAndReanimateIfNecessary(vFile: VirtualFile): List<FileViewProvider>
+
+  /**
+   * Removes all existing view providers of [file] and returns them. Returns null if there are no existing view providers.
+   * @see [getAllProvidersRaw]
    */
   fun remove(file: VirtualFile): Iterable<FileViewProvider>?
 
   /**
    * Removes cached value for ([file], [context]) pair only if the cached value equals [viewProvider]
+   * @return `true` if the value was removed
    */
   fun remove(file: VirtualFile, context: CodeInsightContext, viewProvider: AbstractFileViewProvider): Boolean
 
@@ -107,6 +135,28 @@ internal sealed interface FileViewProviderCache {
    * @return updated context of viewProvider, or `null` if viewProvider is missing in the cache.
    */
   fun trySetContext(viewProvider: FileViewProvider, context: CodeInsightContext): CodeInsightContext?
+
+  /**
+   * see documentation of [FileManagerEx.possiblyInvalidatePhysicalPsi]
+   */
+  @RequiresWriteLock
+  fun markPossiblyInvalidated()
+
+  /**
+   * Checks if [viewProvider] is still valid or not after it was marked as possibly invalidated.
+   *
+   * @return true if [viewProvider] is still valid, false otherwise.
+   */
+  @RequiresReadLock
+  fun evaluateValidity(viewProvider: AbstractFileViewProvider): Boolean
+
+  /**
+   * Return a file view provider of [vFile] and [context]. Creates it if it doesn't exist yet.
+   */
+  fun findViewProvider(
+    vFile: VirtualFile,
+    context: CodeInsightContext,
+  ): FileViewProvider
 
   fun interface CacheEntryConsumer {
     fun consume(file: VirtualFile, context: CodeInsightContext, provider: FileViewProvider)

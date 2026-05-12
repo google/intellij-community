@@ -16,7 +16,6 @@ import com.intellij.openapi.util.Condition
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.util.SlowOperations
-import com.intellij.util.text.trimMiddle
 import com.intellij.util.ui.SwingHelper
 import com.jetbrains.python.PyBundle
 import com.jetbrains.python.configuration.PyConfigurableInterpreterList
@@ -24,20 +23,15 @@ import com.jetbrains.python.inspections.interpreter.InterpreterSettingsQuickFix
 import com.jetbrains.python.psi.LanguageLevel
 import com.jetbrains.python.run.PythonInterpreterTargetEnvironmentFactory
 import com.jetbrains.python.run.codeCouldProbablyBeRunWithConfig
+import org.jetbrains.annotations.ApiStatus
 
 class PySdkPopupFactory(val module: Module) {
 
   companion object {
-    private fun nameInPopup(sdk: Sdk): String {
-      val (_, primary, secondary) = name(sdk)
-      return if (secondary == null) primary else "$primary [$secondary]"
-    }
+    @Deprecated("")
+    fun shortenNameInPopup(sdk: Sdk, maxLength: Int): @NlsSafe String = sdk.pyInterpreterPresentation().compactName(maxLength, keepPrefix = false)
 
-    @NlsSafe
-    fun shortenNameInPopup(sdk: Sdk, maxLength: Int) = nameInPopup(sdk).trimMiddle(maxLength)
-
-    fun descriptionInPopup(sdk: Sdk) = "${nameInPopup(sdk)} [${path(sdk)}]".trimMiddle(150)
-
+    @ApiStatus.Internal
     fun createAndShow(module: Module) {
       DataManager.getInstance()
         .dataContextFromFocusAsync
@@ -55,40 +49,42 @@ class PySdkPopupFactory(val module: Module) {
     }
   }
 
+  @ApiStatus.Internal
   fun createPopup(context: DataContext): ListPopup {
     val group = DefaultActionGroup()
 
     val interpreterList = PyConfigurableInterpreterList.getInstance(module.project)
     val moduleSdksByTypes = SlowOperations.knownIssue("PY-76167").use {
-      groupModuleSdksByTypes(interpreterList.getAllPythonSdks(module.project, module, false), module) {
-        !it.sdkSeemsValid || !LanguageLevel.SUPPORTED_LEVELS.contains(PythonSdkType.getLanguageLevelForSdk(it))
+      groupModuleSdksByTypes(interpreterList.getAllPythonSdks(module), module) {
+        !it.isSdkSeemsValid || !LanguageLevel.SUPPORTED_LEVELS.contains(PythonSdkType.getLanguageLevelForSdk(it))
       }
     }
 
     val currentSdk = module.pythonSdk
-    val model = interpreterList.model
     val targetModuleSitsOn = PythonInterpreterTargetEnvironmentFactory.getTargetModuleResidesOn(module)
     PyRenderedSdkType.entries.forEachIndexed { index, type ->
-      if (type in moduleSdksByTypes) {
-        if (index != 0) group.addSeparator()
-        group.addAll(moduleSdksByTypes
-                       .getValue(type)
-                       .filter {
-                         targetModuleSitsOn == null ||
-                         targetModuleSitsOn.codeCouldProbablyBeRunWithConfig(it.targetAdditionalData?.targetEnvironmentConfiguration)
-                       }
-                       .mapNotNull { model.findSdk(it) }
-                       .map { SwitchToSdkAction(it, currentSdk) })
+      if (index != 0) group.addSeparator()
+      val sdksByType = moduleSdksByTypes[type]?.distinctBy {
+        it.sdkAdditionalData?.javaClass to it.homePath
+      } ?: return@forEachIndexed
+
+      val uniqueSdks = if (type == PyRenderedSdkType.REMOTE) {
+        sdksByType.filter {
+          targetModuleSitsOn == null ||
+          targetModuleSitsOn.codeCouldProbablyBeRunWithConfig(it.targetAdditionalData?.targetEnvironmentConfiguration)
+        }
       }
+      else {
+        sdksByType.distinctBy { it.sdkAdditionalData?.javaClass to it.homePath }
+      }
+
+      val actions = uniqueSdks.map { SwitchToSdkAction(it) }
+      group.addAll(actions)
     }
 
     if (moduleSdksByTypes.isNotEmpty()) group.addSeparator()
     val addNewInterpreterPopupGroup = DefaultActionGroup(PyBundle.message("python.sdk.action.add.new.interpreter.text"), true)
-    addNewInterpreterPopupGroup.addAll(collectAddInterpreterActions(ModuleOrProject.ModuleAndProject(module)) { sdk ->
-      SlowOperations.knownIssue("PY-76167").use {
-        switchToSdk(module, sdk, currentSdk)
-      }
-    })
+    addNewInterpreterPopupGroup.addAll(collectAddInterpreterActions(ModuleOrProject.ModuleAndProject(module)) { })
     ActionManager.getInstance().getAction("Python.NewInterpreter.Extra")?.let {
       addNewInterpreterPopupGroup.add(it)
     }
@@ -114,16 +110,18 @@ class PySdkPopupFactory(val module: Module) {
     ).apply { setHandleAutoSelectionBeforeShow(true) }
   }
 
-  private inner class SwitchToSdkAction(val sdk: Sdk, val currentSdk: Sdk?) : DumbAwareAction() {
+  private inner class SwitchToSdkAction(val sdk: Sdk) : DumbAwareAction() {
 
     init {
-      val presentation = templatePresentation
-      presentation.setText(shortenNameInPopup(sdk, 100), false)
-      presentation.description = PyBundle.message("python.sdk.switch.to", descriptionInPopup(sdk))
-      presentation.icon = icon(sdk)
+      val presentation = sdk.pyInterpreterPresentation()
+      with (templatePresentation) {
+        setText(presentation.longName, false)
+        description = PyBundle.message("python.sdk.switch.to", presentation.description)
+        icon = presentation.icon
+      }
     }
 
-    override fun actionPerformed(e: AnActionEvent) = switchToSdk(module, sdk, currentSdk)
+    override fun actionPerformed(e: AnActionEvent) = runWithSdkConfigurationLock(module.project) { module.pythonSdk = sdk }
   }
 
   private inner class InterpreterSettingsAction : DumbAwareAction(PyBundle.messagePointer("python.sdk.popup.interpreter.settings")) {

@@ -70,6 +70,7 @@ import com.intellij.openapi.ui.popup.PopupStep
 import com.intellij.openapi.ui.popup.StackingPopupDispatcher
 import com.intellij.openapi.ui.popup.util.PopupUtil
 import com.intellij.openapi.util.Key
+import com.intellij.openapi.util.NlsActions
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VirtualFile
@@ -78,8 +79,10 @@ import com.intellij.openapi.vfs.projectFilesWrite
 import com.intellij.openapi.wm.ToolWindowId
 import com.intellij.platform.ide.core.permissions.Permission
 import com.intellij.platform.ide.core.permissions.RequiresPermissions
+import com.intellij.ui.ClientProperty
 import com.intellij.ui.ColorUtil
 import com.intellij.ui.GroupedElementsRenderer
+import com.intellij.ui.PopupBorder
 import com.intellij.ui.components.JBList
 import com.intellij.ui.popup.ActionPopupOptions
 import com.intellij.ui.popup.ActionPopupStep
@@ -91,6 +94,9 @@ import com.intellij.ui.popup.list.PopupListElementRenderer
 import com.intellij.util.messages.Topic
 import com.intellij.util.ui.JBDimension
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.JLabelUtil
+import com.intellij.util.ui.SwingTextTrimmer
+import com.intellij.util.ui.SwingTextTrimmerStrategy
 import com.intellij.util.xmlb.annotations.Attribute
 import com.intellij.util.xmlb.annotations.OptionTag
 import com.intellij.util.xmlb.annotations.Tag
@@ -98,10 +104,14 @@ import com.intellij.util.xmlb.annotations.XCollection
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import java.awt.Component
+import java.awt.Dimension
+import java.awt.FontMetrics
 import java.awt.Point
 import java.util.WeakHashMap
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.function.Predicate
+import javax.swing.GroupLayout
+import javax.swing.JComponent
 import javax.swing.JList
 import kotlin.concurrent.read
 import kotlin.concurrent.write
@@ -268,6 +278,7 @@ internal class RunConfigurationsActionGroupPopup(actionGroup: ActionGroup,
 
   private val pinnedSize: Int
   private val serviceState: RunConfigurationStartHistory
+  internal var maxWidth: Int = JBUI.scale(MAXIMAL_POPUP_WIDTH)
 
   init {
     serviceState = RunConfigurationStartHistory.getInstance(project)
@@ -310,6 +321,14 @@ internal class RunConfigurationsActionGroupPopup(actionGroup: ActionGroup,
     })
   }
 
+  override fun createContentPanel(
+    resizable: Boolean,
+    border: PopupBorder,
+    isToDrawMacCorner: Boolean,
+  ): MyContentPanel {
+    return ContentPanelWithMaxWidth(border)
+  }
+
   override fun createPopup(parent: WizardPopup?, step: PopupStep<*>?, parentValue: Any?): WizardPopup {
     val popup = super.createPopup(parent, step, parentValue)
     popup.minimumSize = JBDimension(MINIMAL_POPUP_WIDTH, 0)
@@ -317,11 +336,7 @@ internal class RunConfigurationsActionGroupPopup(actionGroup: ActionGroup,
   }
 
   override fun getListElementRenderer(): PopupListElementRenderer<PopupFactoryImpl.ActionItem> {
-    return object : PopupListElementRenderer<PopupFactoryImpl.ActionItem>(this) {
-      override fun isShowSecondaryText(): Boolean = mySpeedSearch.isHoldingFilter
-
-      override fun isShowSecondaryIcon(): Boolean = mySpeedSearch.isHoldingFilter
-    }
+    return MyListElementRenderer()
   }
 
   override fun shouldBeShowing(value: Any?): Boolean {
@@ -355,6 +370,77 @@ internal class RunConfigurationsActionGroupPopup(actionGroup: ActionGroup,
       c.separator.preferredSize.height
     }
     else 0
+  }
+
+  private inner class ContentPanelWithMaxWidth(border: PopupBorder) : MyContentPanel(border) {
+    // AbstractPopup only uses the preferred size, so we coerce it instead of overriding the max size.
+    override fun getPreferredSize(): Dimension? {
+      return super.getPreferredSize().also {
+        it.width = it.width.coerceAtMost(maxWidth)
+      }
+    }
+  }
+
+  private inner class MyListElementRenderer : PopupListElementRenderer<PopupFactoryImpl.ActionItem>(this) {
+    private lateinit var mainPanel: JComponent
+    private lateinit var mainPanelLayout: GroupLayout
+    
+    override fun isShowSecondaryText(): Boolean = mySpeedSearch.isHoldingFilter
+
+    override fun isShowSecondaryIcon(): Boolean = mySpeedSearch.isHoldingFilter
+
+    override fun customizeComponent(
+      list: JList<out PopupFactoryImpl.ActionItem?>?,
+      value: PopupFactoryImpl.ActionItem?,
+      isSelected: Boolean,
+    ) {
+      isReserveSpaceForExtraButtons = false // otherwise the name won't fit if the popup has the same width as the button
+      mainPanelLayout.invalidateLayout(mainPanel) // clear the cached preferred size
+      super.customizeComponent(list, value, isSelected)
+      ClientProperty.put(myTextLabel, SwingTextTrimmer.KEY, SwingTextTrimmer.createCustomTrimmer(object : SwingTextTrimmerStrategy {
+        override fun trim(text: @NlsActions.ActionText String, metrics: FontMetrics, availableWidth: Int): String {
+          return trimRunConfigurationName(text, availableWidth, metrics)
+        }
+      }))
+      JLabelUtil.setTrimOverflow(myTextLabel, true)
+    }
+
+    override fun layoutComponent(middleItemComponent: JComponent): JComponent {
+      return super.layoutComponent(middleItemComponent.also { relayoutMainPanel(it) })
+    }
+
+    /**
+     * A hack to fix the default layout of the renderer.
+     * 
+     * It uses `BorderLayout` by default, which doesn't support shrinking of the west and east components.
+     */
+    private fun relayoutMainPanel(panel: JComponent) {
+      mainPanel = panel
+      val components = panel.components.toList()
+      panel.removeAll()
+      val layout = GroupLayout(panel).also { mainPanelLayout = it }
+      val hg = layout.createSequentialGroup()
+      val vg = layout.createParallelGroup(GroupLayout.Alignment.BASELINE)
+      layout.setHorizontalGroup(hg)
+      layout.setVerticalGroup(vg)
+      val height = JBUI.CurrentTheme.List.rowHeight()
+
+      for ((i, c) in components.withIndex()) {
+        // The first component expand, pushing the others (the secondary text and the shortcut) to the right.
+        if (i == 0) {
+          hg.addComponent(c, GroupLayout.DEFAULT_SIZE, GroupLayout.DEFAULT_SIZE, 99999)
+        }
+        else {
+          hg.addComponent(c)
+        }
+      }
+      for (c in components) {
+        // Vertically, they all should be the same size as the rest of the renderer, otherwise alignment issues will occur.
+        vg.addComponent(c, height, height, height)
+      }
+
+      panel.layout = layout
+    }
   }
 
   private inner class MyDnDTarget : DnDTarget {
@@ -482,6 +568,8 @@ private fun createRunConfigurationWithInlines(project: Project,
 
     override fun update(e: AnActionEvent) {
       super.update(e)
+      // This popup has its own truncation logic, so we replace the shortened name set by super().
+      e.presentation.setText(configuration.name, false)
       val filtered = filterOutRunIfDebugResumeIsPresent(
         e, ActionGroupUtil.getVisibleActions(inlineActionGroup, e).toList())
       e.presentation.putClientProperty(ActionUtil.INLINE_ACTIONS, filtered)

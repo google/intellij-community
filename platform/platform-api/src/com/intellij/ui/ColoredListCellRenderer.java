@@ -1,9 +1,10 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui;
 
-import com.intellij.ui.list.ListCellBackgroundSupplier;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.ui.UIUtil;
+import kotlin.jvm.functions.Function1;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.JList;
@@ -15,10 +16,8 @@ import java.awt.Font;
 import java.awt.Rectangle;
 
 /**
- * SimpleColoredComponent-based list cell renderer.
- *
- * @see SimpleListCellRenderer for a simpler JBLabel-based variant.
- * @see ListCellBackgroundSupplier for different background color.
+ * SimpleColoredComponent-based list cell renderer. Will be replaced by {@link BuilderKt#listCellRenderer(Function1)} and
+ * {@link BuilderKt#textListCellRenderer(Function1)} in the future.
  */
 public abstract class ColoredListCellRenderer<T> extends SimpleColoredComponent implements ListCellRenderer<T> {
 
@@ -48,6 +47,10 @@ public abstract class ColoredListCellRenderer<T> extends SimpleColoredComponent 
 
     setPaintFocusBorder(hasFocus);
     customizeCellRenderer(list, value, index, selected, hasFocus);
+
+    if (!selected) {
+      UIUtil.applyDeprecatedBackground(this);
+    }
 
     return this;
   }

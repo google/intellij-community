@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.importing
 
 import com.intellij.concurrency.IdeaForkJoinWorkerThreadFactory
@@ -6,6 +6,7 @@ import com.intellij.execution.RunManagerEx
 import com.intellij.execution.process.ProcessOutputType
 import com.intellij.gradle.toolingExtension.util.GradleVersionUtil
 import com.intellij.java.testFramework.backend.CompilerTestUtil
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.externalSystem.importing.ImportSpec
@@ -38,6 +39,8 @@ import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.text.Strings
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess
+import com.intellij.platform.eel.EelDescriptor
 import com.intellij.platform.eel.provider.getEelDescriptor
 import com.intellij.platform.testFramework.eelJava.EelTestJdkProvider
 import com.intellij.platform.testFramework.eelJava.EelTestUtil
@@ -259,7 +262,7 @@ abstract class GradleImportingTestCase : JavaExternalSystemImportingTestCase() {
   }
 
   open fun requireJdkHome(): String {
-    return requireJdkHome(this.currentGradleVersion, myTargetJavaVersionWatcher.restriction)
+    return requireJdkHome(myTestDisposable, myProject.getEelDescriptor(), this.currentGradleVersion, myTargetJavaVersionWatcher.restriction)
   }
 
   protected open fun configureGradleVmOptions(options: MutableSet<String>) {
@@ -406,6 +409,11 @@ abstract class GradleImportingTestCase : JavaExternalSystemImportingTestCase() {
     GradleSettings.getInstance(myProject).setServiceDirectoryPath(gradleUserHome.toString())
   }
 
+  @Deprecated("Inline me. This method is introduced only to avoid pre-push review approvals.")
+  protected fun requireJdkHome(currentGradleVersion: GradleVersion, javaVersionRestriction: JavaVersionRestriction): String {
+    return requireJdkHome(myProject, myProject.getEelDescriptor(), currentGradleVersion, javaVersionRestriction)
+  }
+
   protected fun resetGradleUserHomeIfNeeded() {
     if (originalGradleUserHome != this.gradleUserHome) {
       val normalizedOldGradleUserHome = originalGradleUserHome!!.normalize().toString()
@@ -492,10 +500,13 @@ abstract class GradleImportingTestCase : JavaExternalSystemImportingTestCase() {
 
     @JvmStatic
     fun requireJdkHome(
+      testDisposable: Disposable,
+      eelDescriptor: EelDescriptor,
       gradleVersion: GradleVersion,
       javaVersionRestriction: JavaVersionRestriction,
     ): String {
-      val eelJdkPath = EelTestJdkProvider.getJdkPath()
+      val eelJdkPath = EelTestJdkProvider.getJdkPath(eelDescriptor)
+      VfsRootAccess.allowRootAccess(testDisposable, eelJdkPath.toString())
       if (eelJdkPath != null) {
         val eelJdkPathString = eelJdkPath.toString()
         val eelJdk = JavaSdk.getInstance().createJdk("Gradle Test JDK", eelJdkPathString)

@@ -1,0 +1,9 @@
+// WITH_STDLIB
+fun test() {
+    listOf(1, 2, 3).onEach { item ->
+        if (item == 2) return@onEach
+        println(item)
+    }
+}
+
+// IGNORE_K1

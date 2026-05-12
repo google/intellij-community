@@ -57,8 +57,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
 
-import static com.jetbrains.python.PyNames.TYPE_ENUM_FLAG;
 import static com.jetbrains.python.psi.PyUtil.as;
+import static com.jetbrains.python.psi.types.PyTypeUtilKt.widenTupleLiterals;
 
 
 public final class PyStdlibTypeProvider extends PyTypeProviderBase {
@@ -130,7 +130,7 @@ public final class PyStdlibTypeProvider extends PyTypeProviderBase {
     }
     if (referenceTarget instanceof PyQualifiedNameOwner qualifiedNameOwner) {
       final String name = qualifiedNameOwner.getQualifiedName();
-      if ((PyNames.TYPE_ENUM + ".name").equals(name) || (TYPE_ENUM_FLAG + ".name").equals(name)) {
+      if ((PyNames.TYPE_ENUM + ".name").equals(name) || (PyNames.TYPE_ENUM_FLAG + ".name").equals(name)) {
         return Ref.create(PyBuiltinCache.getInstance(referenceTarget).getStrType());
       }
       else if ("enum.IntEnum.value".equals(name) && anchor instanceof PyReferenceExpression) {
@@ -237,13 +237,14 @@ public final class PyStdlibTypeProvider extends PyTypeProviderBase {
     assert isCustomEnum(enumClass, context);
 
     String name = targetExpression.getName();
-    if (name == null || PyUtil.isClassPrivateName(name)) return null;
+    if (name == null || PyUtil.isClassPrivateName(name) || "_ignore_".equals(name)) return null;
 
     if (context.maySwitchToAST(targetExpression)) {
       PyExpression value = targetExpression.findAssignedValue();
       if (value == null) return null;
 
-      PyType type = context.getType(value);
+      // until heterogeneous enums are supported, we must widen tuple types
+      PyType type = widenTupleLiterals(context.getType(value));
       return getEnumAttributeInfo(enumClass, type, context);
     }
     else {
@@ -375,7 +376,8 @@ public final class PyStdlibTypeProvider extends PyTypeProviderBase {
   }
 
   // Handle IntEnum/IntFlag, StrEnum, and fall back to assigned type or unknown
-  private static @Nullable PyType getEnumValueType(@NotNull PyClass enumClass, @NotNull TypeEvalContext context) {
+  @ApiStatus.Internal
+  public static @Nullable PyType getEnumValueType(@NotNull PyClass enumClass, @NotNull TypeEvalContext context) {
     PyBuiltinCache cache = PyBuiltinCache.getInstance(enumClass);
 
     if (enumClass.isSubclass("enum.IntEnum", context) ||
@@ -431,6 +433,7 @@ public final class PyStdlibTypeProvider extends PyTypeProviderBase {
         return getTupleMultiplicationResultType((PyBinaryExpression)callSite, context);
       }
       else if ("object.__new__".equals(qname) && callSite instanceof PyCallExpression) {
+        // TODO (PY-89087): remove
         final PyExpression firstArgument = ((PyCallExpression)callSite).getArgument(0, PyExpression.class);
         final PyClassLikeType classLikeType = as(firstArgument != null ? context.getType(firstArgument) : null, PyClassLikeType.class);
         return classLikeType != null ? Ref.create(classLikeType.toInstance()) : null;

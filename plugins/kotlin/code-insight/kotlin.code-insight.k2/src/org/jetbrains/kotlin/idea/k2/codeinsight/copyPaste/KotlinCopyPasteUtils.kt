@@ -34,8 +34,8 @@ internal fun <T> Collection<T>.toSortedStringSet(): Set<String> = map { it.toStr
 /**
  * In the resulting map symbols that cannot be imported (e.g., local symbols) are associated with `null` key.
  */
-context(_: KaSession)
 @OptIn(KaIdeApi::class)
+context(_: KaSession)
 internal fun KtReference.getResolvedSymbolsGroupedByImportableFqName(): Map<FqName?, List<KaSymbol>> = resolveToImportableSymbols()
     .groupBy { symbol -> symbol.importableFqName }
 

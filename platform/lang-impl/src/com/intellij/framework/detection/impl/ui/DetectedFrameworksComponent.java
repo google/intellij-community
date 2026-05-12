@@ -9,7 +9,7 @@ import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.CheckedTreeNode;
 import com.intellij.ui.EnumComboBoxModel;
 import com.intellij.ui.ScrollPaneFactory;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.uiDesigner.core.GridLayoutManager;
 import com.intellij.uiDesigner.core.Spacer;
@@ -85,7 +85,7 @@ public final class DetectedFrameworksComponent {
     };
     myTreePanel.add(ScrollPaneFactory.createScrollPane(myTree), BorderLayout.CENTER);
     myGroupByComboBox.setModel(new EnumComboBoxModel<>(GroupByOption.class));
-    myGroupByComboBox.setRenderer(SimpleListCellRenderer.create("", GroupByOption::getPresentableName));
+    myGroupByComboBox.setRenderer(BuilderKt.textListCellRenderer("", GroupByOption::getPresentableName));
     myGroupByComboBox.addActionListener(new ActionListener() {
       @Override
       public void actionPerformed(ActionEvent e) {

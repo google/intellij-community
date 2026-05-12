@@ -19,9 +19,11 @@ jvm_library(
     "//platform/statistics",
     "//platform/editor-ui-ex:editor-ex",
     "//platform/core-ui",
+    "//platform/util:util-ui",
     "//platform/util/coroutines",
     "//platform/analysis-impl",
     "//platform/platform-impl/ui",
+    "//platform/ide-core",
     "//platform/lang-api:lang",
     "//fleet/util/core",
     "//libraries/kotlinx/serialization/core",
@@ -30,6 +32,7 @@ jvm_library(
 
 jvm_library(
   name = "ide-codeinsight-inline_test_lib",
+  testonly = True,
   module_name = "intellij.platform.ide.codeinsight.inline",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -47,12 +50,20 @@ jvm_library(
     "//platform/statistics:statistics_test_lib",
     "//platform/editor-ui-ex:editor-ex_test_lib",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//platform/util/coroutines:coroutines_test_lib",
     "//platform/analysis-impl:analysis-impl_test_lib",
     "//platform/platform-impl/ui:ui_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/lang-api:lang_test_lib",
     "//fleet/util/core:core_test_lib",
     "//libraries/kotlinx/serialization/core:core_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.ide.codeinsight.inline` end
+
+### auto-generated section `iml intellij.platform.ide.codeinsight.inline` start
+exports_files([
+  "intellij.platform.ide.codeinsight.inline.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.ide.codeinsight.inline` end

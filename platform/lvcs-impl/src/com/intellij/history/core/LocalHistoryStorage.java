@@ -1,7 +1,6 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.history.core;
 
-import com.intellij.openapi.util.Clock;
 import com.intellij.openapi.util.Pair;
 import com.intellij.util.io.StorageLockContext;
 import com.intellij.util.io.storage.AbstractRecordsTable;
@@ -85,7 +84,7 @@ public final class LocalHistoryStorage extends AbstractStorage {
     });
   }
 
-  public int createNextRecord() throws IOException {
+  public int createNextRecord(long timestamp) throws IOException {
     return withWriteLock(() -> {
       LocalHistoryRecordsTable table = (LocalHistoryRecordsTable)myRecordsTable;
       int id = table.createNewRecord();
@@ -100,7 +99,7 @@ public final class LocalHistoryStorage extends AbstractStorage {
       }
       table.setLastRecord(id);
 
-      table.setTimestamp(id, Clock.getTime());
+      table.setTimestamp(id, timestamp);
 
       return id;
     });

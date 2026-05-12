@@ -18,7 +18,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiMethodCallExpression
-import com.intellij.psi.PsiNameHelper
 import com.intellij.psi.SmartPsiElementPointer
 import com.intellij.psi.createSmartPointer
 import org.jetbrains.kotlin.analysis.api.analyze
@@ -32,14 +31,19 @@ import org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage.Creat
 import org.jetbrains.kotlin.idea.quickfix.createFromUsage.CreateFromUsageUtil
 import org.jetbrains.kotlin.idea.refactoring.getContainer
 import org.jetbrains.kotlin.idea.refactoring.getExtractionContainers
+import org.jetbrains.kotlin.psi.KtBinaryExpression
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.KtCallElement
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtSimpleNameExpression
+import org.jetbrains.kotlin.psi.psiUtil.isIdentifier
+import org.jetbrains.kotlin.psi.psiUtil.quoteIfNeeded
+import org.jetbrains.kotlin.types.expressions.OperatorConventions
 
 /**
  * This class is an IntentionAction that creates Kotlin callables based on the given [request]. To create Kotlin
@@ -69,6 +73,7 @@ internal class CreateKotlinCallableAction(
 
     private fun hasReferenceName(): Boolean {
         return ((call as? KtCallElement)?.calleeExpression as? KtSimpleNameExpression)?.getReferencedName() != null
+                || (call as? KtBinaryExpression)?.operationReference?.getReferencedName()?.isNotEmpty() == true
                 || (call as? PsiMethodCallExpression)?.methodExpression?.referenceName != null
     }
 
@@ -107,7 +112,7 @@ internal class CreateKotlinCallableAction(
     override fun isAvailable(project: Project, editor: Editor?, file: PsiFile?): Boolean {
         return pointerToContainer.element != null
                 && (callPointer == null || callPointer.element != null && hasReferenceName())
-                && PsiNameHelper.getInstance(project).isIdentifier(methodName)
+                && methodName.quoteIfNeeded().isIdentifier()
                 && callableDefinitionAsString != null
     }
 
@@ -144,11 +149,16 @@ internal class CreateKotlinCallableAction(
         )
         val passedContainerElement = pointerToContainer.element ?: return
         val anchor = call ?: passedContainerElement
-        val shouldComputeContainerFromAnchor = if (call == null) false
-        else if (passedContainerElement is PsiFile) !passedContainerElement.isWritable
-            else passedContainerElement.getContainer() == anchor.getContainer()
+        val isScript = CreateFromUsageUtil.isTopLevelScriptContainer(passedContainerElement)
+        val shouldComputeContainerFromAnchor = if (call == null) {
+            false
+        } else if (passedContainerElement is PsiFile) {
+            !passedContainerElement.isWritable || isScript
+        } else {
+            passedContainerElement.getContainer() == anchor.getContainer()
+        }
         val insertContainer: PsiElement = if (shouldComputeContainerFromAnchor) {
-            anchor.getExtractionContainers().firstOrNull() ?:return
+            anchor.getExtractionContainers(acceptScript = isScript).firstOrNull() ?:return
         } else {
             passedContainerElement
         }
@@ -188,6 +198,12 @@ internal class CreateKotlinCallableAction(
                 if (isNotEmpty()) append(" ")
                 append("abstract")
             }
+            if ((request as? CreateMethodFromKotlinUsageRequest)?.operatorFunction == true) {
+                if (isNotEmpty()) append(" ")
+                val operationToken =
+                    if (OperatorConventions.isConventionName(Name.identifier(methodName))) KtTokens.OPERATOR_KEYWORD else KtTokens.INFIX_KEYWORD
+                append(operationToken)
+            }
             if (isNotEmpty()) append(" ")
             append(KtTokens.FUN_KEYWORD)
             append(" ")
@@ -202,7 +218,7 @@ internal class CreateKotlinCallableAction(
                     append(receiver)
                 }
             }
-            append(request.methodName)
+            append(request.methodName.quoteIfNeeded())
             append("(")
             append(renderParameterList())
             append(")")

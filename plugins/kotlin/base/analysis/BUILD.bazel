@@ -1,6 +1,6 @@
 ### auto-generated section `build intellij.kotlin.base.analysis` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_analysis",
@@ -13,18 +13,13 @@ create_kotlinc_options(
   x_context_parameters = True
 )
 
-resourcegroup(
-  name = "analysis_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "analysis",
   module_name = "intellij.kotlin.base.analysis",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":analysis_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_analysis",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -32,10 +27,13 @@ jvm_library(
     "@lib//:kotlinc-analysis-api",
     "//java/java-indexing-api:indexing",
     "//platform/analysis-api:analysis",
+    "//platform/lang-api:lang",
     "//platform/util/concurrency",
     "//platform/core-api:core",
+    "//platform/core-impl",
     "//platform/editor-ui-api:editor-ui",
     "//platform/platform-impl:ide-impl",
+    "//platform/ide-core",
     "@lib//:kotlinc-kotlin-scripting-common",
     "@lib//:kotlinc-kotlin-scripting-jvm",
     "@lib//:kotlinc-kotlin-scripting-compiler-impl",
@@ -47,7 +45,6 @@ jvm_library(
     "//jps/model-api:model",
     "//platform/projectModel-api:projectModel",
     "//platform/workspace/storage",
-    "//plugins/kotlin/base/frontend-agnostic",
     "//plugins/kotlin/base/util",
     "//plugins/kotlin/base/plugin",
     "//plugins/kotlin/base/psi",
@@ -65,16 +62,19 @@ jvm_library(
     "//java/openapi:java",
     "//java/manifest",
     "//java/java-impl:impl",
+    "//java/java-psi-api:psi",
     "//xml/xml-psi-impl:psi-impl",
     "//platform/workspace/jps",
     "//platform/backend/workspace",
     "//java/java-analysis-api:analysis",
+    "//java/java-frontback-psi-api:frontback-psi",
     "//plugins/kotlin/base/scripting/scripting.shared",
   ]
 )
 
 jvm_library(
   name = "analysis_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.base.analysis",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -83,17 +83,19 @@ jvm_library(
     ":analysis",
     "//java/java-indexing-api:indexing_test_lib",
     "//platform/analysis-api:analysis_test_lib",
+    "//platform/lang-api:lang_test_lib",
     "//platform/util/concurrency:concurrency_test_lib",
     "//platform/core-api:core_test_lib",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//libraries/kotlinx/coroutines/core:core_test_lib",
     "//libraries/guava:guava_test_lib",
     "//platform/indexing-api:indexing_test_lib",
     "//jps/model-api:model_test_lib",
     "//platform/projectModel-api:projectModel_test_lib",
     "//platform/workspace/storage:storage_test_lib",
-    "//plugins/kotlin/base/frontend-agnostic:frontend-agnostic_test_lib",
     "//plugins/kotlin/base/util:util_test_lib",
     "//plugins/kotlin/base/plugin:plugin_test_lib",
     "//plugins/kotlin/base/psi:psi_test_lib",
@@ -111,11 +113,19 @@ jvm_library(
     "//java/openapi:java_test_lib",
     "//java/manifest:manifest_test_lib",
     "//java/java-impl:impl_test_lib",
+    "//java/java-psi-api:psi_test_lib",
     "//xml/xml-psi-impl:psi-impl_test_lib",
     "//platform/workspace/jps:jps_test_lib",
     "//platform/backend/workspace:workspace_test_lib",
     "//java/java-analysis-api:analysis_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
     "//plugins/kotlin/base/scripting/scripting.shared:scripting.shared_test_lib",
   ]
 )
 ### auto-generated section `build intellij.kotlin.base.analysis` end
+
+### auto-generated section `iml intellij.kotlin.base.analysis` start
+exports_files([
+  "intellij.kotlin.base.analysis.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.base.analysis` end

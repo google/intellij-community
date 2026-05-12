@@ -5,6 +5,7 @@ import com.intellij.codeInsight.daemon.DaemonAnalyzerTestCase
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl
 import com.intellij.lang.annotation.HighlightSeverity
+import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.module.ModuleManager
@@ -217,8 +218,10 @@ open class CodeMetaInfoTestCase(
             if (it.attributes.isNotEmpty() && OSKind.Companion.current.toString() !in it.attributes)
                 codeMetaInfoForCheck.add(it)
         }
-        val textWithCodeMetaInfo = CodeMetaInfoRenderer.renderTagsToText(codeMetaInfoForCheck, myEditor.document.text)
-        val postprocessedText = postprocessActualTestData(textWithCodeMetaInfo.toString(), myEditor)
+        val postprocessedText = ActionUtil.underModalProgress(project, "") {
+            val textWithCodeMetaInfo = CodeMetaInfoRenderer.renderTagsToText(codeMetaInfoForCheck, myEditor.document.text)
+            postprocessActualTestData(textWithCodeMetaInfo.toString(), myEditor)
+        }
         KotlinTestUtils.assertEqualsToFile(
             expectedFile,
             postprocessedText

@@ -3,14 +3,12 @@ package com.intellij.xdebugger.impl.mixedmode
 
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.editor.markup.GutterIconRenderer
-import com.intellij.platform.debugger.impl.rpc.XSourcePositionDto
 import com.intellij.xdebugger.XDebugSession
 import com.intellij.xdebugger.frame.XDescriptor
 import com.intellij.xdebugger.frame.XExecutionStack
 import com.intellij.xdebugger.frame.XStackFrame
 import com.intellij.xdebugger.impl.XDebugSessionImpl
 import com.intellij.xdebugger.impl.frame.XStackFrameContainerEx
-import com.intellij.xdebugger.impl.rpc.toRpc
 import com.intellij.xdebugger.impl.util.notifyOnFrameChanged
 import com.intellij.xdebugger.mixedMode.MixedModeStackBuilder
 import com.intellij.xdebugger.mixedMode.XExecutionStackWithNativeThreadId
@@ -55,13 +53,7 @@ class XMixedModeExecutionStack(
 
     // getTopFrame method is not adequate for us since in the split debugger the first call of getTopFrame will be cached forever,
     // but RiderJumpToStatementHandler needs a real position
-    val topFramePositionDeferred = CompletableDeferred<XSourcePositionDto?>()
-    computedFramesMap.invokeOnCompletion { topFramePositionDeferred.complete(getCalculatedTopFrame()?.sourcePosition?.toRpc()) }
-    val descriptor = XMixedModeExecutionStackDescriptor(
-      highStackDescriptor,
-      lowStackDescriptor,
-      topFramePositionDeferred
-    )
+    val descriptor = XMixedModeExecutionStackDescriptor(highStackDescriptor, lowStackDescriptor)
     //FrontendDescriptorStateManager.getInstance(session.project).registerDescriptor(descriptor, coroutineScope)
     descriptor
   }
@@ -82,6 +74,11 @@ class XMixedModeExecutionStack(
     return if (!computedFramesMap.isCompleted) lowLevelExecutionStack.topFrame else getCalculatedTopFrame()
   }
 
+  override fun getTopFrameAsync(): CompletableFuture<XStackFrame?> = coroutineScope.future {
+    computedFramesMap.await()
+    getCalculatedTopFrame()
+  }
+
   @OptIn(ExperimentalCoroutinesApi::class)
   private fun getCalculatedTopFrame(): XStackFrame? {
     assert(computedFramesMap.isCompleted)
@@ -93,14 +90,9 @@ class XMixedModeExecutionStack(
 
   override fun computeStackFrames(firstFrameIndex: Int, container: XStackFrameContainer) {
     if (computedFramesMap.isCompleted) {
+      container as XStackFrameContainerEx
       val combinedFrames = filterIfNeeded(computedFramesMap.getCompleted().map { /*High frame*/it.value ?: /*Low frame*/it.key })
-      if (container is XStackFrameContainerEx)
-        container.addStackFrames(combinedFrames, currentFrame, true)
-      else {
-        // Split debugger case, we have to set the frame manually since the XStackFrameContainerEx unavailable
-        container.addStackFrames(combinedFrames, true)
-        currentFrame?.let { frame -> session.setCurrentStackFrame(this, frame) }
-      }
+      container.addStackFrames(combinedFrames, currentFrame, true)
       return
     }
 
@@ -168,17 +160,11 @@ class XMixedModeExecutionStack(
       }
       else {
         val builtResult = mixFramesResult.getOrThrow()
+        container as XStackFrameContainerEx
 
         val combinedFrames = builtResult.lowLevelToHighLevelFrameMap.map { /*High frame*/it.value ?: /*Low frame*/it.key }
         val filterIfNeededCombinedFrames = filterIfNeeded(combinedFrames)
-        if (container is XStackFrameContainerEx)
-          container.addStackFrames(filterIfNeededCombinedFrames, builtResult.highestHighLevelFrame, true)
-        else {
-          // Split debugger case, we have to set the frame manually since the XStackFrameContainerEx unavailable
-          container.addStackFrames(filterIfNeededCombinedFrames, true)
-          // TODO: it is not correct for mono
-          filterIfNeededCombinedFrames.firstOrNull()?.let { frame -> session.setCurrentStackFrame(this, frame) }
-        }
+        container.addStackFrames(filterIfNeededCombinedFrames, builtResult.highestHighLevelFrame, true)
         computedFramesMap.complete(builtResult.lowLevelToHighLevelFrameMap)
       }
     }

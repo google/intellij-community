@@ -124,7 +124,9 @@ class MarkdownPreviewSecurityTest: MarkdownJcefTestCase() {
       }
     }
 
-    assertTrue(message.contains("Refused to load the script 'https://evil.example.com/some-script.js'"))
+    val blocked = message.contains("Refused to load the script 'https://evil.example.com/some-script.js'") ||
+                  message.contains("The action has been blocked.")
+    assertTrue(blocked, "Expected blocked script message but got: '$message'")
   }
 
   @Timeout(TIMEOUT)
@@ -164,7 +166,12 @@ class MarkdownPreviewSecurityTest: MarkdownJcefTestCase() {
       }
     }
 
-    assertTrue(message.contains("Refused to execute inline script because it violates the following Content Security Policy directive"))
+    val blocked =
+      // CEF 137
+      message.contains("Refused to execute inline script because it violates the following Content Security Policy directive") ||
+      // CEF 144
+      message.contains("The action has been blocked.")
+    assertTrue(blocked, "Expected blocked script message but got: '$message'")
   }
 
   companion object {

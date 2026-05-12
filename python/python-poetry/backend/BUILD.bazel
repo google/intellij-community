@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.python.community.impl.poetry.backend` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "backend_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "backend",
   module_name = "intellij.python.community.impl.poetry.backend",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":backend_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:jetbrains-annotations",
@@ -26,6 +21,7 @@ jvm_library(
 
 jvm_library(
   name = "backend_test_lib",
+  testonly = True,
   module_name = "intellij.python.community.impl.poetry.backend",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -39,3 +35,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.python.community.impl.poetry.backend` end
+
+### auto-generated section `iml intellij.python.community.impl.poetry.backend` start
+exports_files([
+  "intellij.python.community.impl.poetry.backend.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.python.community.impl.poetry.backend` end

@@ -1,0 +1,12 @@
+// "Apply all 'Remove unnecessary non-null assertion (!!)' fixes in file" "true"
+
+class Foo {
+    val bar: String = "hello"
+
+    fun a() = println(bar)
+    fun b() = println(bar)
+    fun c() = println(bar)
+}
+
+// IGNORE_K1
+// FUS_K2_QUICKFIX_NAME: com.intellij.codeInsight.daemon.impl.actions.FixAllHighlightingProblems

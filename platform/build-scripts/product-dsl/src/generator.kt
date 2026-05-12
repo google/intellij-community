@@ -23,6 +23,7 @@ import org.jetbrains.intellij.build.productLayout.xml.includesPlatformLangPlugin
 import org.jetbrains.intellij.build.productLayout.xml.withEditorFold
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.io.path.invariantSeparatorsPathString
 
 internal fun appendDefaultProductPluginMetadata(sb: StringBuilder, spec: ProductModulesContentSpec) {
   // Add id/name/vendor if NOT getting them from xi:include (e.g., PlatformLangPlugin.xml)
@@ -47,8 +48,8 @@ internal fun appendDefaultProductPluginMetadata(sb: StringBuilder, spec: Product
  * Generates an XML file for a module set.
  * Used to maintain backward compatibility with XML-based module set loading.
  * 
- * Module set XML files ALWAYS contain inlined module definitions - all direct modules
- * and nested module sets are expanded into `<module>` elements. The `inlineModuleSets`
+ * For non-pluginized module sets, XML files contain inlined module definitions - all direct
+ * modules and nested module sets are expanded into `<module>` elements. The `inlineModuleSets`
  * parameter (used in product XML generation) only affects whether PRODUCT XMLs reference
  * these files via xi:include or inline them directly.
  *
@@ -68,7 +69,6 @@ internal fun generateModuleSetXml(moduleSet: ModuleSet, outputDir: Path, label: 
 /**
  * Generates complete product plugin.xml file from programmatic specification.
  *
- * @param isUltimateBuild Whether this is an Ultimate build (vs. Community build)
  * @return Result containing file status and statistics
  */
 internal fun generateProductXml(
@@ -78,12 +78,11 @@ internal fun generateProductXml(
   productPropertiesClass: String,
   outputProvider: ModuleOutputProvider,
   projectRoot: Path,
-  isUltimateBuild: Boolean,
   strategy: FileUpdateStrategy,
 ): ProductFileResult {
   // Determine which generator to recommend based on plugin.xml file location
   // Community products are under community/ directory, Ultimate products are not
-  val generatorCommand = (if (pluginXmlPath.toString().contains("/community/")) "CommunityModuleSets" else "UltimateGenerator") + GENERATOR_SUFFIX
+  val generatorCommand = (if (pluginXmlPath.invariantSeparatorsPathString.contains("/community/")) "CommunityModuleSets" else "UltimateGenerator") + GENERATOR_SUFFIX
 
   // Build complete plugin.xml file
   // inlineModuleSets = false means: use xi:include to reference module set XML files in product XML
@@ -99,7 +98,6 @@ internal fun generateProductXml(
     metadataBuilder = { sb ->
       appendDefaultProductPluginMetadata(sb = sb, spec = spec)
     },
-    isUltimateBuild = isUltimateBuild
   )
 
   val originalContent = Files.readString(pluginXmlPath)
@@ -186,7 +184,6 @@ internal fun generateTestPluginXml(
       }
       sb.append("\n")
     },
-    isUltimateBuild = true,
     moduleCommentProvider = moduleCommentProvider,
   )
 
@@ -249,7 +246,6 @@ private fun sortModuleSet(moduleSet: ModuleSet): ModuleSet {
  *                         - false (default): Use xi:include directives to reference module set XML files
  *                         - true: Inline all module set content directly into XML
  * @param metadataBuilder Lambda that generates the metadata after opening tag (comments, id/name/vendor)
- * @param isUltimateBuild Whether this is an Ultimate build
  * @return Build result containing generated XML and metadata
  */
 fun buildProductContentXml(
@@ -259,7 +255,6 @@ fun buildProductContentXml(
   inlineModuleSets: Boolean,
   headerBuilder: ((StringBuilder) -> Unit)? = null,
   metadataBuilder: (StringBuilder) -> Unit,
-  isUltimateBuild: Boolean,
   bodyBuilder: ((StringBuilder) -> Unit)? = null,
   moduleCommentProvider: ((ContentModuleName, List<String>?) -> String?)? = null,
 ): ProductContentBuildResult {
@@ -288,11 +283,12 @@ fun buildProductContentXml(
 
     // Generate xi:include directives or inline content
     if (outputProvider != null && spec.deprecatedXmlIncludes.isNotEmpty()) {
-      generateXIncludes(spec = spec, outputProvider = outputProvider, inlineXmlIncludes = inlineXmlIncludes, sb = this, isUltimateBuild = isUltimateBuild)
+      generateXIncludes(spec = spec, outputProvider = outputProvider, inlineXmlIncludes = inlineXmlIncludes, sb = this)
     }
 
     // Generate module sets as xi:includes or inline content blocks
-    if (spec.moduleSets.isNotEmpty()) {
+    val hasRenderableModuleSets = spec.moduleSets.any { it.moduleSet.pluginSpec == null }
+    if (hasRenderableModuleSets) {
       if (inlineModuleSets) {
         // Generate single content block with all module sets inlined
         append("  <content namespace=\"$JETBRAINS_NAMESPACE\">\n")
@@ -314,7 +310,9 @@ fun buildProductContentXml(
       else {
         // Build set of module set names that are referenced at top-level WITH overrides
         // These cannot be brought in via `xi:include` from parent sets (would lose overrides)
-        val overriddenModuleSetNames = spec.moduleSets
+        val moduleSetsForProductContent = spec.moduleSets.filter { it.moduleSet.pluginSpec == null }
+
+        val overriddenModuleSetNames = moduleSetsForProductContent
           .filter { it.hasOverrides }
           .map { ModuleSetName(it.moduleSet.name) }
           .toSet()
@@ -322,7 +320,7 @@ fun buildProductContentXml(
         appendModuleSetsStrategyComment(spec, overriddenModuleSetNames)
 
         // Generate content for each top-level module set
-        for (moduleSetWithOverrides in spec.moduleSets) {
+        for (moduleSetWithOverrides in moduleSetsForProductContent) {
           appendModuleSetXml(
             moduleSetWithOverrides.moduleSet,
             moduleSetWithOverrides.loadingOverrides,

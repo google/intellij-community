@@ -6,6 +6,7 @@ import com.intellij.openapi.util.RecursionManager
 import com.intellij.openapi.util.StackOverflowPreventedException
 import com.jetbrains.python.documentation.PythonDocumentationProvider
 import com.jetbrains.python.fixtures.PyTestCase
+import com.jetbrains.python.fixtures.fixme
 import com.jetbrains.python.psi.PyBinaryExpression
 import com.jetbrains.python.psi.PyCallExpression
 import com.jetbrains.python.psi.PyExpression
@@ -261,7 +262,7 @@ class PyExpectedTypeJudgmentTest : PyTestCase() {
   }
 
   fun testExpressionInsideLambdaOfGenericFunction() {
-    fixme("PY-85922", StackOverflowPreventedException::class.java) {
+    fixme<StackOverflowPreventedException>("PY-85922", "") {
       doTest("expr", "int", """
       from collections.abc import Callable, Iterable
       
@@ -273,7 +274,7 @@ class PyExpectedTypeJudgmentTest : PyTestCase() {
   }
 
   fun testExpressionInsideGenericClassAsReturnValue1() {
-    fixme("PY-85922", StackOverflowPreventedException::class.java) {
+    fixme<StackOverflowPreventedException>("PY-85922", "") {
       doTest("expr", "int", """
         from typing import Callable
         
@@ -286,7 +287,7 @@ class PyExpectedTypeJudgmentTest : PyTestCase() {
   }
 
   fun testExpressionInsideGenericClassAsReturnValue2() {
-    fixme("PY-85922", StackOverflowPreventedException::class.java) {
+    fixme<StackOverflowPreventedException>("PY-85922", "") {
       doTest("expr", "int", """
         from typing import Callable
         
@@ -437,7 +438,7 @@ class PyExpectedTypeJudgmentTest : PyTestCase() {
   }
 
   fun testExpressionInVariadicTupleMiddle3() {
-    doTest("expr", "float", """
+    doTest("expr", "float | int", """
       x: tuple[str, *tuple[int, ...], float] = "s", 2, expr
       """)
   }
@@ -580,7 +581,7 @@ class PyExpectedTypeJudgmentTest : PyTestCase() {
   }
 
   fun testNestedLambda() {
-    doTest("yy", "float", """
+    doTest("yy", "float | int", """
       from typing import Callable
       
       func: Callable[[int], Callable[[float], str]] = lambda xx: lambda yy: "Hi"
@@ -624,7 +625,7 @@ class PyExpectedTypeJudgmentTest : PyTestCase() {
   }
 
   fun testNestedLambda_PreviouslyTyped() {
-    doTest("yy", "float", """
+    doTest("yy", "float | int", """
       from typing import Callable
       
       func: Callable[[int], Callable[[float], str]]
@@ -677,7 +678,7 @@ class PyExpectedTypeJudgmentTest : PyTestCase() {
   }
 
   fun testNestedLambda_TypedAsAttribute() {
-    doTest("yy", "float", """
+    doTest("yy", "float | int", """
       from typing import Callable
       
       class C:
@@ -882,6 +883,19 @@ class PyExpectedTypeJudgmentTest : PyTestCase() {
   fun testDoubleStarredExpressionElementAsArgumentCombiningUnpackedTypedDictAndOtherParameterTypes() {
     doTest("expr", "str", """
       from typing import TypedDict, Unpack
+
+      class FArgs(TypedDict):
+          s: str
+          n: int
+
+      def f(a: str, **kwargs: Unpack[FArgs]):
+          pass
+
+      f(**{"s": "foo", "n": 123, "a": expr})
+      """)
+
+    doTest("expr", "int", """
+      from typing import TypedDict, Unpack
       
       class FArgs(TypedDict):
           s: str
@@ -890,17 +904,25 @@ class PyExpectedTypeJudgmentTest : PyTestCase() {
       def f(a: str, **kwargs: Unpack[FArgs]):
           pass
       
-      f(**{"s": "foo", "n": 123, "a": expr})
+      f(**{"s": "foo", "n": expr, "a": "bar"})
       """)
   }
 
   fun testDoubleStarredExpressionElementAsArgumentBothKwargsAndNamedParameter() {
-    fixme("Requires constructing an anonymous TypedDict with `extra_items=int`", ComparisonFailure::class.java) {
-      doTest("expr", "str", """
+    doTest("expr", "str", """
       def f(a: str, **kwargs: int):
           pass
       
       f(**{"a": expr, "n": 123})
+      """)
+
+    // also: Requires constructing an anonymous TypedDict with `extra_items=int`
+    fixme<ComparisonFailure>("PY-85421 Requires constructing an anonymous TypedDict with `extra_items=int`", "Any") {
+      doTest("expr", "int", """
+      def f(a: str, **kwargs: int):
+          pass
+      
+      f(**{"a": "foo", "n": expr})
       """)
     }
   }
@@ -1010,7 +1032,7 @@ class PyExpectedTypeJudgmentTest : PyTestCase() {
   }
 
   fun testArgumentOfOverloadedFunctionsBoundedByReturn() {
-    fixme("Depends on correct function overload matching", ComparisonFailure::class.java) {
+    fixme<ComparisonFailure>("Depends on correct function overload matching", "int") {
       doTest("expr", "str", """
       from typing import overload
       
@@ -1028,7 +1050,7 @@ class PyExpectedTypeJudgmentTest : PyTestCase() {
   }
 
   fun testReturnOfOverloadedFunctions() {
-    fixme("Depends on correct function overload matching", ComparisonFailure::class.java) {
+    fixme<ComparisonFailure>("Depends on correct function overload matching", "Any") {
       doTest("expr", "int", """
       from typing import overload
       
@@ -1063,7 +1085,7 @@ class PyExpectedTypeJudgmentTest : PyTestCase() {
   }
 
   fun testReturnInTypedGenerator() {
-    doTest("result", "float", """
+    doTest("result", "float | int", """
       from typing import Generator
       
       def f() -> Generator[int, str, float]:

@@ -3,12 +3,13 @@ package com.intellij.workspaceModel.ide.impl.legacyBridge.module
 
 import com.intellij.ide.plugins.IdeaPluginDescriptorImpl
 import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.ide.plugins.getMainDescriptor
+import com.intellij.ide.plugins.shortLogDescription
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.application.asContextElement
-import com.intellij.openapi.application.edtWriteAction
+import com.intellij.openapi.application.backgroundWriteAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.components.serviceOrNull
@@ -28,6 +29,7 @@ import com.intellij.openapi.module.impl.UnloadedModulesListStorage
 import com.intellij.openapi.module.impl.createGrouper
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.impl.CoreProgressManager
+import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.RootsChangeRescanningInfo
 import com.intellij.openapi.roots.ModuleRootManager
@@ -76,9 +78,9 @@ import com.intellij.platform.workspace.storage.query.entities
 import com.intellij.platform.workspace.storage.query.map
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import com.intellij.serviceContainer.PrecomputedExtensionModel
-import com.intellij.serviceContainer.executeRegisterTaskForOldContent
 import com.intellij.serviceContainer.precomputeModuleLevelExtensionModel
 import com.intellij.util.concurrency.ThreadingAssertions
+import com.intellij.util.concurrency.annotations.RequiresWriteLock
 import com.intellij.util.graph.CachingSemiGraph
 import com.intellij.util.graph.DFSTBuilder
 import com.intellij.util.graph.Graph
@@ -95,11 +97,9 @@ import com.intellij.workspaceModel.ide.toPath
 import io.opentelemetry.api.metrics.Meter
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import java.nio.file.Path
 import java.util.Arrays
@@ -324,6 +324,7 @@ abstract class ModuleManagerBridgeImpl(
     return ModifiableModuleModelBridgeImpl(project = project, moduleManager = this, diff = diff, cacheStorageResult = false)
   }
 
+  @RequiresWriteLock
   override fun newModule(filePath: String, moduleTypeId: String): Module = newModuleTimeMs.addMeasuredTime {
     incModificationCount()
     val modifiableModel = getModifiableModel()
@@ -448,15 +449,13 @@ abstract class ModuleManagerBridgeImpl(
     }
 
     val workspaceModel = project.serviceAsync<WorkspaceModel>() as WorkspaceModelInternal
-    withContext(Dispatchers.EDT) {
-      edtWriteAction {
-        ProjectRootManagerEx.getInstanceEx(project).withRootsChange(RootsChangeRescanningInfo.NO_RESCAN_NEEDED).use {
-          workspaceModel.updateProjectModel("Update unloaded modules") { builder ->
-            addAndRemoveModules(builder, moduleEntitiesToLoad, moduleEntitiesToUnload, unloadedEntityStorage)
-          }
-          workspaceModel.updateUnloadedEntities("Update unloaded modules") { builder ->
-            addAndRemoveModules(builder, moduleEntitiesToUnload, moduleEntitiesToLoad, mainStorage)
-          }
+    backgroundWriteAction {
+      ProjectRootManagerEx.getInstanceEx(project).withRootsChange(RootsChangeRescanningInfo.NO_RESCAN_NEEDED).use {
+        workspaceModel.updateProjectModel("Update unloaded modules") { builder ->
+          addAndRemoveModules(builder, moduleEntitiesToLoad, moduleEntitiesToUnload, unloadedEntityStorage)
+        }
+        workspaceModel.updateUnloadedEntities("Update unloaded modules") { builder ->
+          addAndRemoveModules(builder, moduleEntitiesToUnload, moduleEntitiesToLoad, mainStorage)
         }
       }
     }
@@ -490,9 +489,7 @@ abstract class ModuleManagerBridgeImpl(
     }
 
     ProgressManager.getInstance().runProcessWithProgressSynchronously(Runnable {
-      val modalityState = CoreProgressManager.getCurrentThreadProgressModality()
-      @Suppress("RAW_RUN_BLOCKING")
-      runBlocking(modalityState.asContextElement()) {
+      runBlockingCancellable {
         setUnloadedModules(unloadedModuleNames)
       }
     }, "", true, project)
@@ -667,24 +664,17 @@ abstract class ModuleManagerBridgeImpl(
 }
 
 private fun checkModuleLevelServiceAndExtensionRegistration() {
-  val plugins = PluginManagerCore.getPluginSet().enabledPlugins
-  for (plugin in plugins) {
-    for (content in plugin.contentModules) {
-      checkModuleLevel(plugin = plugin, child = content, forbid = false)
-    }
-
-    executeRegisterTaskForOldContent(plugin) {
-      checkModuleLevel(plugin = plugin, child = it, forbid = true)
-    }
+  for (module in PluginManagerCore.getPluginSet().sequenceResolvedSortedDescriptorsForRegistration()) {
+    checkModuleLevel(plugin = module.getMainDescriptor(), child = module)
   }
 }
 
-private fun checkModuleLevel(plugin: IdeaPluginDescriptorImpl, child: IdeaPluginDescriptorImpl, forbid: Boolean) {
-  fun check(list: List<*>, asWarn: Boolean = false) {
+private fun checkModuleLevel(plugin: IdeaPluginDescriptorImpl, child: IdeaPluginDescriptorImpl) {
+  fun check(list: List<*>, debugLevel: Boolean = false) {
     if (list.isNotEmpty()) {
-      val message = "Plugin $plugin is trying to register $list in a content module ($child). " +
-                    "Module-level services and extensions are deprecated, and support is scheduled to be removed."
-      if (!asWarn || forbid) {
+      val message = "Module-level elements are deprecated, and support is scheduled to be removed: " +
+                    "${child.shortLogDescription} of ${plugin.shortLogDescription} registers $list"
+      if (!debugLevel) {
         LOG.warn(message)
       }
       else {
@@ -693,7 +683,7 @@ private fun checkModuleLevel(plugin: IdeaPluginDescriptorImpl, child: IdeaPlugin
     }
   }
 
-  check(child.moduleContainerDescriptor.services, asWarn = true)
+  check(child.moduleContainerDescriptor.services, debugLevel = true) // IJPL-243276
   check(child.moduleContainerDescriptor.components)
   check(child.moduleContainerDescriptor.extensionPoints)
   check(child.moduleContainerDescriptor.listeners)

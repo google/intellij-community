@@ -1,13 +1,15 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.storage.testEntities.entities.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
 import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
-import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
@@ -21,14 +23,12 @@ import com.intellij.platform.workspace.storage.testEntities.entities.OptionalStr
 @GeneratedCodeApiVersion(3)
 @GeneratedCodeImplVersion(7)
 @OptIn(WorkspaceEntityInternalApi::class)
-internal class OptionalStringEntityImpl(private val dataSource: OptionalStringEntityData) : OptionalStringEntity, WorkspaceEntityBase(
-  dataSource) {
+internal class OptionalStringEntityImpl(private val dataSource: OptionalStringEntityData) : OptionalStringEntity,
+                                                                                            WorkspaceEntityBase(dataSource) {
 
   private companion object {
 
-
-    private val connections = listOf<ConnectionId>(
-    )
+    private val connections = listOf<ConnectionId>()
 
   }
 
@@ -49,8 +49,8 @@ internal class OptionalStringEntityImpl(private val dataSource: OptionalStringEn
   }
 
 
-  internal class Builder(result: OptionalStringEntityData?) : ModifiableWorkspaceEntityBase<OptionalStringEntity, OptionalStringEntityData>(
-    result), OptionalStringEntityBuilder {
+  internal class Builder(result: OptionalStringEntityData?) :
+    ModifiableWorkspaceEntityBase<OptionalStringEntity, OptionalStringEntityData>(result), OptionalStringEntityBuilder {
     internal constructor() : this(OptionalStringEntityData())
 
     override fun applyToBuilder(builder: MutableEntityStorage) {
@@ -63,15 +63,13 @@ internal class OptionalStringEntityImpl(private val dataSource: OptionalStringEn
           error("Entity OptionalStringEntity is already created in a different builder")
         }
       }
-
       this.diff = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
-      // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
-      // Builder may switch to snapshot at any moment and lock entity data to modification
+// After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
+// Builder may switch to snapshot at any moment and lock entity data to modification
       this.currentEntityData = null
-
-      // Process linked entities that are connected without a builder
+// Process linked entities that are connected without a builder
       processLinkedEntities(builder)
       checkInitialization() // TODO uncomment and check failed tests
     }
@@ -104,7 +102,6 @@ internal class OptionalStringEntityImpl(private val dataSource: OptionalStringEn
         changedProperty.add("entitySource")
 
       }
-
     override var data: String?
       get() = getEntityData().data
       set(value) {
@@ -115,6 +112,7 @@ internal class OptionalStringEntityImpl(private val dataSource: OptionalStringEn
 
     override fun getEntityClass(): Class<OptionalStringEntity> = OptionalStringEntity::class.java
   }
+
 }
 
 @OptIn(WorkspaceEntityInternalApi::class)
@@ -129,7 +127,6 @@ internal class OptionalStringEntityData : WorkspaceEntityData<OptionalStringEnti
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): OptionalStringEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {
@@ -141,8 +138,7 @@ internal class OptionalStringEntityData : WorkspaceEntityData<OptionalStringEnti
   }
 
   override fun getMetadata(): EntityMetadata {
-    return MetadataStorageImpl.getMetadataByTypeFqn(
-      "com.intellij.platform.workspace.storage.testEntities.entities.OptionalStringEntity") as EntityMetadata
+    return MetadataStorageImpl.getMetadataByTypeFqn("com.intellij.platform.workspace.storage.testEntities.entities.OptionalStringEntity") as EntityMetadata
   }
 
   override fun getEntityInterface(): Class<out WorkspaceEntity> {
@@ -163,9 +159,7 @@ internal class OptionalStringEntityData : WorkspaceEntityData<OptionalStringEnti
   override fun equals(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as OptionalStringEntityData
-
     if (this.entitySource != other.entitySource) return false
     if (this.data != other.data) return false
     return true
@@ -174,9 +168,7 @@ internal class OptionalStringEntityData : WorkspaceEntityData<OptionalStringEnti
   override fun equalsIgnoringEntitySource(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as OptionalStringEntityData
-
     if (this.data != other.data) return false
     return true
   }

@@ -108,7 +108,7 @@ public final class AttachExternalProjectAction extends DumbAwareAction {
   private static Predicate<VirtualFile> getSelectedFileValidator(@NotNull Project project, @NotNull ProjectSystemId externalSystemId) {
     ExternalSystemUnlinkedProjectAware unlinkedProjectAware = ExternalSystemUnlinkedProjectAware.getInstance(externalSystemId);
     if (unlinkedProjectAware == null) {
-      return __ -> true;
+      return _ -> true;
     }
     Predicate<VirtualFile> isSelectedFile = virtualFile -> {
       return virtualFile.isDirectory()

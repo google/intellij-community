@@ -1,6 +1,6 @@
 UTypeReferenceExpression (name = java.lang.String) -> USimpleNameReferenceExpression (identifier = String) -> PsiClass:String: String
-UTypeReferenceExpression (name = <ErrorType>) -> USimpleNameReferenceExpression (identifier = A) -> KtUltraLightClass:class A(param: String): A
-UTypeReferenceExpression (name = <ErrorType>) -> USimpleNameReferenceExpression (identifier = AA) -> KtUltraLightClass:class A(param: String): A
-UCallExpression (kind = UastCallKind(name='constructor_call'), argCount = 1))(resolves to KtUltraLightMethodForSourceDeclaration:A) -> USimpleNameReferenceExpression (identifier = AA) -> KtUltraLightClass:class A(param: String): A
-UCallExpression (kind = UastCallKind(name='constructor_call'), argCount = 1))(resolves to KtUltraLightMethodForSourceDeclaration:A) -> USimpleNameReferenceExpression (identifier = A) -> KtUltraLightMethodForSourceDeclaration:A: A
-UCallExpression (kind = UastCallKind(name='constructor_call'), argCount = 1))(resolves to KtUltraLightMethodForSourceDeclaration:A) -> USimpleNameReferenceExpression (identifier = AAA) -> KtUltraLightClass:class A(param: String): A
+UTypeReferenceExpression (name = A) -> USimpleNameReferenceExpression (identifier = A) -> SymbolLightClassForClassOrObject: A
+UTypeReferenceExpression (name = A) -> USimpleNameReferenceExpression (identifier = AA) -> SymbolLightClassForClassOrObject: A
+UCallExpression (kind = UastCallKind(name='constructor_call'), argCount = 1))(resolves to SymbolLightConstructor of SymbolLightClassForClassOrObject) -> USimpleNameReferenceExpression (identifier = AA) -> SymbolLightConstructor of SymbolLightClassForClassOrObject: A
+UCallExpression (kind = UastCallKind(name='constructor_call'), argCount = 1))(resolves to SymbolLightConstructor of SymbolLightClassForClassOrObject) -> USimpleNameReferenceExpression (identifier = A) -> SymbolLightConstructor of SymbolLightClassForClassOrObject: A
+UCallExpression (kind = UastCallKind(name='constructor_call'), argCount = 1))(resolves to SymbolLightConstructor of SymbolLightClassForClassOrObject) -> USimpleNameReferenceExpression (identifier = AAA) -> SymbolLightConstructor of SymbolLightClassForClassOrObject: A

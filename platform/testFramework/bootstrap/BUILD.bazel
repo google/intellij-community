@@ -1,11 +1,5 @@
 ### auto-generated section `build intellij.tools.testsBootstrap` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_provided_library", "resourcegroup")
-
-resourcegroup(
-  name = "tools-testsBootstrap_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_provided_library")
 
 jvm_provided_library(
   name = "libraries_junit5-vintage_provided",
@@ -17,8 +11,10 @@ jvm_library(
   module_name = "intellij.tools.testsBootstrap",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":tools-testsBootstrap_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
+    "@lib//:kotlin-stdlib",
     "//libraries/junit4",
     "@lib//:junit5Launcher-provided",
     "@lib//:junit5-provided",
@@ -26,6 +22,7 @@ jvm_library(
     "@lib//:opentest4j",
     "//platform/core-nio-fs",
     "//libraries/asm-tools",
+    "//platform/bazel-runfiles",
     ":libraries_junit5-vintage_provided",
   ],
   runtime_deps = [
@@ -36,6 +33,7 @@ jvm_library(
 
 jvm_library(
   name = "tools-testsBootstrap_test_lib",
+  testonly = True,
   module_name = "intellij.tools.testsBootstrap",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -50,6 +48,13 @@ jvm_library(
     "//libraries/junit5-jupiter:junit5-jupiter_test_lib",
     "//platform/core-nio-fs:core-nio-fs_test_lib",
     "//libraries/asm-tools:asm-tools_test_lib",
+    "//platform/bazel-runfiles:bazel-runfiles_test_lib",
   ]
 )
 ### auto-generated section `build intellij.tools.testsBootstrap` end
+
+### auto-generated section `iml intellij.tools.testsBootstrap` start
+exports_files([
+  "intellij.tools.testsBootstrap.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.tools.testsBootstrap` end

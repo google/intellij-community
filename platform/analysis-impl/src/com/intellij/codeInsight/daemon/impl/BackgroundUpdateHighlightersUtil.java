@@ -5,7 +5,6 @@ import com.intellij.codeHighlighting.HighlightingPass;
 import com.intellij.codeInsight.daemon.GutterMark;
 import com.intellij.codeInsight.multiverse.CodeInsightContext;
 import com.intellij.codeInsight.multiverse.CodeInsightContextHighlightingUtil;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.RangeMarker;
@@ -18,6 +17,7 @@ import com.intellij.openapi.editor.impl.SweepProcessor;
 import com.intellij.openapi.editor.markup.GutterIconRenderer;
 import com.intellij.openapi.editor.markup.HighlighterTargetArea;
 import com.intellij.openapi.editor.markup.MarkupModel;
+import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
@@ -27,6 +27,7 @@ import com.intellij.openapi.util.TextRangeScalarUtil;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.Consumer;
 import com.intellij.util.Processor;
+import com.intellij.util.concurrency.ThreadingAssertions;
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
 import com.intellij.util.concurrency.annotations.RequiresReadLock;
 import com.intellij.util.containers.ContainerUtil;
@@ -60,7 +61,7 @@ public final class BackgroundUpdateHighlightersUtil {
                                              int endOffset,
                                              @NotNull Collection<? extends @NotNull HighlightInfo> highlights,
                                              int group) {
-    HighlightingSession session = HighlightingSessionImpl.getFromCurrentIndicator(psiFile);
+    HighlightingSession session = DaemonCodeAnalyzerEx.getInstanceEx(project).getHighlightSessionFromCurrentIndicator(psiFile);
     MarkupModelEx markup = (MarkupModelEx)DocumentMarkupModel.forDocument(document, project, true);
     TextRange range = new TextRange(startOffset, endOffset);
     setHighlightersInRange(range, new ArrayList<>(highlights), markup, group, session);
@@ -70,13 +71,15 @@ public final class BackgroundUpdateHighlightersUtil {
    * Sets highlights inside restrictedRange (it's the range we're updating), but outside priorityRange.
    * This method is usually called after {@link #setHighlightersInRange} where we set highlights inside priorityRange.
    */
+  @RequiresBackgroundThread
+  @RequiresReadLock
   static void setHighlightersOutsideRange(@NotNull List<? extends @NotNull HighlightInfo> infos,
                                           @NotNull TextRange restrictedRange,
                                           @NotNull TextRange priorityRange,
                                           int group,
                                           @NotNull HighlightingSession session) {
-    ApplicationManager.getApplication().assertIsNonDispatchThread();
-    ApplicationManager.getApplication().assertReadAccessAllowed();
+    ThreadingAssertions.assertBackgroundThread();
+    ThreadingAssertions.assertReadAccess();
     PsiFile psiFile = session.getPsiFile();
     Project project = session.getProject();
     // ignore annotators/inspections, they are applied via HighlightInfoUpdater
@@ -113,7 +116,7 @@ public final class BackgroundUpdateHighlightersUtil {
       List<HighlightInfo> infosToCreateHighlightersFor = new ArrayList<>(filteredInfos.size());
 
       DaemonCodeAnalyzerEx.processHighlightsOverlappingOutside((MarkupModelEx)markup, priorityRange.getStartOffset(), priorityRange.getEndOffset(), session.getCodeInsightContext(), processor);
-      SweepProcessor.sweep(generator, (offset, info, atStart, overlappingIntervals) -> {
+      SweepProcessor.sweep(generator, (_, info, atStart, overlappingIntervals) -> {
         if (!atStart) return true;
         if (!info.isFromInjection() && info.getEndOffset() < document.getTextLength() && !restrictedRange.contains(info)) {
           return true; // injections are oblivious to restricting range
@@ -139,11 +142,27 @@ public final class BackgroundUpdateHighlightersUtil {
         createOrReuseHighlighterFor(info, document, group, psiFile, (MarkupModelEx)markup, toReuse, range2markerCache, severityRegistrar, session);
       }
       boolean shouldClean = restrictedRange.getStartOffset() == 0 && restrictedRange.getEndOffset() == document.getTextLength();
-      ((HighlightingSessionImpl)session).updateFileLevelHighlights(fileLevelHighlights, group, shouldClean, toReuse);
+      updateFileLevelHighlights(fileLevelHighlights, group, shouldClean, toReuse, psiFile, session);
       changed[0] |= !toReuse.isEmpty();
     });
     if (changed[0]) {
       UpdateHighlightersUtil.clearWhiteSpaceOptimizationFlag(document);
+    }
+  }
+
+  private static void updateFileLevelHighlights(@NotNull List<? extends HighlightInfo> fileLevelHighlights,
+                                                int group,
+                                                boolean cleanOldHighlights,
+                                                @NotNull HighlighterRecycler recycler,
+                                                @NotNull PsiFile psiFile,
+                                                @NotNull HighlightingSession session) {
+    DaemonCodeAnalyzerEx codeAnalyzer = DaemonCodeAnalyzerEx.getInstanceEx(psiFile.getProject());
+    boolean shouldUpdate = !fileLevelHighlights.isEmpty() || codeAnalyzer.hasFileLevelHighlights(group, psiFile);
+    if (shouldUpdate) {
+      List<RangeHighlighter> reusedHighlighters = ContainerUtil.map(fileLevelHighlights, info->recycler.pickupFileLevelRangeHighlighter(
+        psiFile.getTextLength(), info.getDescription()));
+
+      session.updateFileLevelHighlights(fileLevelHighlights, reusedHighlighters, group, cleanOldHighlights, psiFile);
     }
   }
 
@@ -166,8 +185,7 @@ public final class BackgroundUpdateHighlightersUtil {
       DaemonCodeAnalyzerEx.processHighlights(markup, project, null, range.getStartOffset(), range.getEndOffset(), session.getCodeInsightContext(), info -> {
         if (info.getGroup() == group) {
           int hiEnd = info.getEndOffset();
-          boolean willBeRemoved = range.contains(info)
-                                  || hiEnd == document.getTextLength() && range.getEndOffset() == hiEnd;
+          boolean willBeRemoved = range.contains(info) || hiEnd == document.getTextLength() && range.getEndOffset() == hiEnd;
           if (willBeRemoved) {
             RangeHighlighterEx highlighter = info.getHighlighter();
             if (highlighter != null) {
@@ -183,7 +201,7 @@ public final class BackgroundUpdateHighlightersUtil {
       SweepProcessor.Generator<HighlightInfo> generator = processor -> ContainerUtil.process(filteredInfos, processor);
       List<HighlightInfo> fileLevelHighlights = new ArrayList<>();
       List<HighlightInfo> infosToCreateHighlightersFor = new ArrayList<>(filteredInfos.size());
-      SweepProcessor.sweep(generator, (__, info, atStart, overlappingIntervals) -> {
+      SweepProcessor.sweep(generator, (_, info, atStart, overlappingIntervals) -> {
         if (!atStart) {
           return true;
         }
@@ -205,7 +223,7 @@ public final class BackgroundUpdateHighlightersUtil {
         assert !info.isFromInspection() && !info.isFromAnnotator() && !info.isFromHighlightVisitor() && !info.isInjectionRelated(): info; // all these types are handled in GHP/LHP separately
         createOrReuseHighlighterFor(info, document, group, psiFile, markup, recycler, range2markerCache, severityRegistrar, session);
       }
-      ((HighlightingSessionImpl)session).updateFileLevelHighlights(fileLevelHighlights, group, range.equalsToRange(0, document.getTextLength()), recycler);
+      updateFileLevelHighlights(fileLevelHighlights, group, range.equalsToRange(0, document.getTextLength()), recycler, psiFile, session);
       changed[0] |= !recycler.isEmpty();
       if (changed[0]) {
         UpdateHighlightersUtil.clearWhiteSpaceOptimizationFlag(document);
@@ -266,10 +284,10 @@ public final class BackgroundUpdateHighlightersUtil {
     if (info.isFileLevelAnnotation()) {
       HighlightInfo oldFileInfo = salvagedHighlighter == null ? null : HighlightInfo.fromRangeHighlighter(salvagedHighlighter);
       if (oldFileInfo == null) {
-        ((HighlightingSessionImpl)session).addFileLevelHighlight(info, salvagedHighlighter);
+        session.addFileLevelHighlight(info, salvagedHighlighter);
       }
       else {
-        ((HighlightingSessionImpl)session).replaceFileLevelHighlight(oldFileInfo, info, salvagedHighlighter);
+        session.replaceFileLevelHighlight(oldFileInfo, info, salvagedHighlighter);
       }
     }
 

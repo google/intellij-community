@@ -20,6 +20,7 @@ jvm_library(
 
 jvm_library(
   name = "rt_test_lib",
+  testonly = True,
   module_name = "intellij.groovy.rt",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -35,3 +36,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.groovy.rt` end
+
+### auto-generated section `iml intellij.groovy.rt` start
+exports_files([
+  "intellij.groovy.rt.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.groovy.rt` end

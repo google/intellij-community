@@ -70,6 +70,7 @@ internal object MarkdownSpacingBuilder {
       }
 
       //LINKS
+      .between(MarkdownElementTypes.LINK_DEFINITION, MarkdownElementTypes.LINK_DEFINITION).blankLines(0)
       .before(MarkdownElementTypes.LINK_DEFINITION).blankLines(1)
 
       // Ensure there is a single line after frontmatter header
@@ -81,7 +82,13 @@ internal object MarkdownSpacingBuilder {
       .blankLinesRange(markdown.MIN_LINES_BETWEEN_PARAGRAPHS, markdown.MAX_LINES_BETWEEN_PARAGRAPHS)
       .apply {
         val spaces = if (markdown.FORCE_ONE_SPACE_BETWEEN_WORDS) 1 else Integer.MAX_VALUE
-        between(MarkdownTokenTypes.TEXT, MarkdownTokenTypes.TEXT).spacing(1, spaces, 0, markdown.KEEP_LINE_BREAKS_INSIDE_TEXT_BLOCKS, 0)
+        between(MarkdownTokenTypes.TEXT, MarkdownTokenTypes.TEXT)
+          .spacing(1, spaces, 0, markdown.KEEP_LINE_BREAKS_INSIDE_TEXT_BLOCKS && !markdown.WRAP_TEXT_IF_LONG, 0)
+        between(MarkdownTokenTypes.TEXT, MarkdownElementTypes.STRONG).spacing(1, spaces, 0, false, 0)
+        between(MarkdownTokenTypes.TEXT, MarkdownElementTypes.EMPH).spacing(1, spaces, 0, false, 0)
+        between(MarkdownTokenTypes.TEXT, MarkdownElementTypes.STRIKETHROUGH).spacing(1, spaces, 0, false, 0)
+        between(MarkdownTokenTypes.TEXT, MarkdownTokenTypes.LPAREN).spacing(1, spaces, 0, false, 0)
+        between(MarkdownTokenTypes.LPAREN, MarkdownTokenTypes.TEXT).spacing(0, 0, 0, false, 0)
       }
   }
 

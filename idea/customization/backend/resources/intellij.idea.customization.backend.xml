@@ -8,5 +8,6 @@
     <applicationService serviceInterface="com.intellij.ide.RecentProjectsManager"
                         serviceImplementation="com.intellij.ide.RecentProjectsManagerBase"
                         overrides="true" preload="notHeadless"/>
+    <applicationSettings service="com.intellij.ide.RecentProjectsManagerBase"/>
   </extensions>
 </idea-plugin>

@@ -7,6 +7,7 @@ import com.intellij.ide.IdeBundle;
 import com.intellij.ide.nls.NlsMessages;
 import com.intellij.ide.plugins.newui.PluginModelAsyncOperationsExecutor;
 import com.intellij.ide.plugins.newui.PluginUiModel;
+import com.intellij.ide.ui.laf.darcula.ui.DarculaButtonUI;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.notification.NotificationAction;
 import com.intellij.notification.NotificationType;
@@ -24,10 +25,13 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.DialogBackgroundImageProvider;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.NlsContexts;
+import com.intellij.openapi.util.SystemInfoRt;
 import com.intellij.openapi.util.io.NioFiles;
 import com.intellij.openapi.util.registry.Registry;
+import com.intellij.openapi.wm.impl.IdeBackgroundUtil;
 import com.intellij.ui.LicensingFacade;
 import com.intellij.util.Restarter;
 import com.intellij.util.SystemProperties;
@@ -41,8 +45,15 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
+import javax.swing.JButton;
 import javax.swing.JComponent;
+import javax.swing.JRootPane;
+import java.awt.Graphics;
 import java.awt.event.ActionEvent;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -150,7 +161,7 @@ public final class PlatformUpdateDialog extends AbstractUpdateDialog {
                           myAddConfigureUpdatesLink,
                           myPlatformUpdate.getUpdatedChannel(),
                           this.myDisposable);
-    return Registry.is("ide.update.dialog.new.ui.enabled") ? infoPanel.createNew() : infoPanel.create();
+    return Registry.is("ide.update.dialog.new.ui.enabled") ? infoPanel.createNew(this) : infoPanel.create();
   }
 
   @Override
@@ -163,6 +174,70 @@ public final class PlatformUpdateDialog extends AbstractUpdateDialog {
     var component = super.createSouthPanel();
     component.setBorder(JBUI.Borders.empty(8));
     return component;
+  }
+
+  @Override
+  protected JButton createJButtonForAction(Action action) {
+    if (DialogBackgroundImageProvider.getInstance().hasBackgroundImage(this)) {
+      JButton button = new JButton(action) {
+        @Override
+        protected Graphics getComponentGraphics(Graphics g) {
+          return IdeBackgroundUtil.getOriginalGraphics(g);
+        }
+      };
+      button.setOpaque(false);
+      button.putClientProperty(DarculaButtonUI.AVOID_EXTENDING_BORDER_GRAPHICS, Boolean.TRUE);
+      if (SystemInfoRt.isMac) {
+        button.putClientProperty("JButton.buttonType", "text");
+      }
+      if (action.getValue(DEFAULT_ACTION) != null) {
+        JRootPane rootPane = getRootPane();
+        if (rootPane != null) {
+          rootPane.setDefaultButton(button);
+        }
+      }
+      else {
+        button.putClientProperty("ActionToolbar.smallVariant", Boolean.TRUE);
+        button.putClientProperty("JButton.rootPaneBackgroundImage", Boolean.TRUE);
+        button.setContentAreaFilled(false);
+      }
+      if (action.getValue(FOCUSED_ACTION) != null) {
+        myPreferredFocusedComponent = button;
+      }
+      button.addFocusListener(new FocusListener() {
+        @Override
+        public void focusGained(FocusEvent event) {
+          update();
+        }
+
+        @Override
+        public void focusLost(FocusEvent event) {
+          update();
+        }
+      });
+      if (!SystemInfoRt.isMac) {
+        button.addMouseListener(new MouseAdapter() {
+          @Override
+          public void mouseEntered(MouseEvent e) {
+            update();
+          }
+
+          @Override
+          public void mouseExited(MouseEvent e) {
+            update();
+          }
+        });
+      }
+      return button;
+    }
+    return super.createJButtonForAction(action);
+  }
+
+  private void update() {
+    JRootPane rootPane = getRootPane();
+    if (rootPane != null) {
+      rootPane.repaint();
+    }
   }
 
   @Override

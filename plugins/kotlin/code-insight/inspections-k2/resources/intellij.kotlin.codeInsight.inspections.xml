@@ -1,12 +1,16 @@
-<idea-plugin package="org.jetbrains.kotlin.idea.k2.codeinsight.inspections">
+<idea-plugin package="org.jetbrains.kotlin.idea.k2.codeinsight.inspections" visibility="internal">
   <dependencies>
     <module name="intellij.kotlin.base.externalSystem"/>
     <module name="intellij.kotlin.codeInsight.intentions"/>
-    <module name="kotlin.code-insight.inspections.shared"/>
-    <module name="intellij.kotlin.searching"/>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+    <module name="intellij.java.frontback.psi"/>
+    <module name="intellij.java.psi"/>
+    <module name="intellij.kotlin.codeInsight"/>
     <module name="intellij.kotlin.highlighting"/>
     <module name="intellij.kotlin.refactorings"/>
-    <module name="intellij.kotlin.codeInsight"/>
+    <module name="intellij.kotlin.searching"/>
+    <module name="kotlin.code-insight.inspections.shared"/>
+    <!-- endregion -->
   </dependencies>
   <extensions defaultExtensionNs="com.intellij">
     <projectService
@@ -103,6 +107,15 @@
                      language="kotlin"
                      key="inspection.can.convert.to.multi.dollar.string.display.name" bundle="messages.KotlinBundle"/>
 
+
+    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.KotlinInternalInJavaInspection"
+                     groupPath="Kotlin"
+                     groupBundle="messages.KotlinBundle" groupKey="group.names.java.interop.issues"
+                     enabledByDefault="true"
+                     level="ERROR"
+                     language="JAVA"
+                     key="inspection.kotlin.internal.in.java.display.name" bundle="messages.KotlinBundle"/>
+
     <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.KotlinSealedInheritorsInJavaInspection"
                      groupPath="Kotlin"
                      groupBundle="messages.KotlinBundle" groupKey="group.names.java.interop.issues"
@@ -110,6 +123,14 @@
                      level="ERROR"
                      language="JAVA"
                      key="inspection.kotlin.sealed.in.java.display.name" bundle="messages.KotlinBundle"/>
+
+    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.KotlinJvmAnnotationInJavaInspection"
+                     groupPath="Kotlin"
+                     groupBundle="messages.KotlinBundle" groupKey="group.names.java.interop.issues"
+                     enabledByDefault="true"
+                     level="WARNING"
+                     language="JAVA"
+                     key="inspection.kotlin.jvm.annotation.in.java.display.name" bundle="messages.KotlinBundle"/>
 
     <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.diagnosticBased.RedundantModalityModifierInspection"
                      groupPath="Kotlin"
@@ -151,6 +172,14 @@
                      level="WARNING"
                      language="kotlin"
                      key="inspection.empty.range.display.name" bundle="messages.KotlinBundle"/>
+
+    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.CanSealedSubClassBeObjectInspection"
+                     groupPath="Kotlin"
+                     groupBundle="messages.KotlinBundle" groupKey="group.names.probable.bugs"
+                     enabledByDefault="true"
+                     level="WEAK WARNING"
+                     language="kotlin"
+                     key="inspection.can.sealed.subclass.be.object.display.name" bundle="messages.KotlinBundle"/>
 
     <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.ConvertNameBasedDestructuringShortFormToFullInspection"
                      groupPath="Kotlin"
@@ -227,6 +256,15 @@
                      language="kotlin"
                      key="inspection.nullable.boolean.elvis.display.name" bundle="messages.KotlinBundle"/>
 
+    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.NullableHashCodeInspection"
+                     groupPath="Kotlin"
+                     groupBundle="messages.KotlinBundle" groupKey="group.names.style.issues"
+                     enabledByDefault="true"
+                     cleanupTool="true"
+                     level="WEAK WARNING"
+                     language="kotlin"
+                     key="inspection.nullable.hash.code.display.name" bundle="messages.KotlinBundle"/>
+
     <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.ReplaceContainsInspection"
                      groupPath="Kotlin"
                      groupBundle="messages.KotlinBundle" groupKey="group.names.style.issues"
@@ -287,14 +325,6 @@
                      level="WEAK WARNING"
                      language="kotlin" editorAttributes="NOT_USED_ELEMENT_ATTRIBUTES"
                      key="inspection.remove.to.string.in.string.template.display.name" bundle="messages.KotlinBundle"/>
-
-    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.declarations.DestructuringWrongNameInspection"
-                     groupPath="Kotlin"
-                     groupBundle="messages.KotlinBundle" groupKey="group.names.probable.bugs"
-                     enabledByDefault="true"
-                     level="WARNING"
-                     language="kotlin"
-                     key="inspection.destructuring.wrong.name.display.name" bundle="messages.KotlinBundle"/>
 
     <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.EqualsOrHashCodeInspection"
                      groupPath="Kotlin"
@@ -377,6 +407,14 @@
                      language="kotlin"
                      key="inspection.convert.secondary.constructor.to.primary.display.name" bundle="messages.KotlinBundle"/>
 
+    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.ConvertReferenceToLambdaInspection"
+                     groupPath="Kotlin"
+                     groupBundle="messages.KotlinBundle" groupKey="group.names.style.issues"
+                     enabledByDefault="true"
+                     level="INFORMATION"
+                     language="kotlin"
+                     key="inspection.convert.reference.to.lambda.display.name" bundle="messages.KotlinBundle"/>
+
 
     <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.CascadeIfInspection"
                      groupPath="Kotlin"
@@ -385,6 +423,14 @@
                      level="WEAK WARNING"
                      language="kotlin"
                      key="inspection.cascade.if.display.name" bundle="messages.KotlinBundle"/>
+
+    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.NullChecksToSafeCallInspection"
+                     groupPath="Kotlin"
+                     groupBundle="messages.KotlinBundle" groupKey="group.names.redundant.constructs"
+                     enabledByDefault="true"
+                     level="WEAK WARNING"
+                     language="kotlin"
+                     key="inspection.null.checks.to.safe.call.display.name" bundle="messages.KotlinBundle"/>
 
     <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.SuspiciousCascadingIfInspection"
                      groupPath="Kotlin"
@@ -417,6 +463,14 @@
                      level="WARNING"
                      language="kotlin"
                      key="inspection.array.hash.code.display.name" bundle="messages.KotlinBundle"/>
+
+    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.KotlinMisorderedAssertEqualsArgumentsInspection"
+                     groupPath="Kotlin"
+                     groupBundle="messages.KotlinBundle" groupKey="group.names.probable.bugs"
+                     enabledByDefault="true"
+                     level="WARNING"
+                     language="kotlin"
+                     key="inspection.misordered.assert.equals.arguments.display.name" bundle="messages.KotlinBundle"/>
 
     <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.KotlinArrayToStringInspection"
                      groupPath="Kotlin"
@@ -574,6 +628,20 @@
                      language="kotlin"
                      key="inspection.redundant.call.on.flow.display.name" bundle="messages.KotlinBundle"/>
 
+    <externalAnnotator language="kotlin" implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.kdoc.KDocUnresolvedLinkAnnotator"/>
+
+    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.kdoc.KDocUnresolvedReferenceInspection"
+                     language="kotlin"
+                     groupPath="Kotlin"
+                     groupBundle="messages.KotlinBundle" groupKey="group.names.probable.bugs"
+                     enabledByDefault="true" unfair="true"
+                     level="WARNING" key="inspection.k.doc.unresolved.link.display.name" bundle="messages.KotlinBundle"/>
+
+    <registryKey key="kotlin.kdoc.should.report.samples"
+                 description="Whether `KDoc unresolved link` inspection should report unresolved samples"
+                 defaultValue="true"
+                 restartRequired="false"/>
+
     <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.KDocResolutionResultHasChangedInspection"
                      groupPath="Kotlin"
                      groupBundle="messages.KotlinBundle" groupKey="group.names.probable.bugs"
@@ -650,6 +718,14 @@
                      enabledByDefault="true"
                      level="WEAK WARNING" key="floating.point.literal.precision.inspection.display.name" bundle="messages.KotlinBundle"/>
 
+    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.DeprecatedCallableAddReplaceWithInspection"
+                     groupPath="Kotlin"
+                     groupBundle="messages.KotlinBundle" groupKey="group.names.other.problems"
+                     enabledByDefault="true"
+                     level="WEAK WARNING"
+                     language="kotlin"
+                     key="inspection.deprecated.callable.add.replace.with.display.name" bundle="messages.KotlinBundle"/>
+
     <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.ConvertTryFinallyToUseCallInspection"
                      groupPath="Kotlin"
                      groupBundle="messages.KotlinBundle" groupKey="group.names.style.issues"
@@ -698,6 +774,16 @@
                      enabledByDefault="true"
                      level="WEAK WARNING"
                      key="inspection.simplifiable.call.chain.display.name" bundle="messages.KotlinBundle"
+                     />
+
+    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.ReplaceMapKeysCallChainWithKeysInspection"
+                     language="kotlin"
+                     groupPath="Kotlin"
+                     cleanupTool="true"
+                     groupBundle="messages.KotlinBundle" groupKey="group.names.style.issues"
+                     enabledByDefault="true"
+                     level="INFORMATION"
+                     key="inspection.replace.map.keys.call.chain.with.keys.display.name" bundle="messages.KotlinBundle"
                      />
 
     <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.MapToForEachInspection"
@@ -775,6 +861,15 @@
                      level="INFORMATION"
                      language="kotlin"
                      key="inspection.map.get.with.not.null.assertion.operator.display.name" bundle="messages.KotlinBundle"/>
+
+    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.DoubleBangInspection"
+                     groupPath="Kotlin"
+                     groupBundle="messages.KotlinBundle" groupKey="group.names.style.issues"
+                     enabledByDefault="true"
+                     cleanupTool="true"
+                     level="INFORMATION"
+                     language="kotlin"
+                     key="inspection.double.bang.display.name" bundle="messages.KotlinBundle"/>
 
     <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.PublicApiImplicitTypeInspection"
                      groupPath="Kotlin"
@@ -1245,6 +1340,14 @@
                      language="kotlin"
                      key="inspection.simplify.assert.not.null.display.name" bundle="messages.KotlinBundle"/>
 
+    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.SimplifyNestedEachInScopeFunctionInspection"
+                     groupPath="Kotlin"
+                     groupBundle="messages.KotlinBundle" groupKey="group.names.style.issues"
+                     enabledByDefault="true"
+                     level="WEAK WARNING"
+                     language="kotlin"
+                     key="inspection.simplifiable.scope.function.display.name" bundle="messages.KotlinBundle"/>
+
     <localInspection
             implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.AddVarianceModifierInspection"
             groupPath="Kotlin"
@@ -1333,5 +1436,58 @@
                      language="kotlin"
                      key="inspection.kotlin.convert.to.explicit.backing.fields.display.name" bundle="messages.KotlinBundle"/>
 
-    </extensions>
+    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.RevertExplicitBackingFieldsInspection"
+                     groupPath="Kotlin"
+                     groupBundle="messages.KotlinBundle" groupKey="group.names.style.issues"
+                     enabledByDefault="true"
+                     level="INFO"
+                     language="kotlin"
+                     key="replace.explicit.backing.field.with.private.property" bundle="messages.KotlinBundle"/>
+
+    <localInspection
+            implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.ConvertSealedClassToSealedInterfaceInspection"
+            shortName="ConvertSealedClassToSealedInterface"
+            groupPath="Kotlin"
+            groupBundle="messages.KotlinBundle"
+            groupKey="group.names.style.issues"
+            enabledByDefault="true"
+            level="INFORMATION"
+            language="kotlin"
+            bundle="messages.KotlinBundle"
+            key="inspection.convert.sealed.class.to.interface.display.name"
+            />
+
+    <localInspection
+            implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.ConvertSealedInterfaceToSealedClassInspection"
+            shortName="ConvertSealedInterfaceToSealedClass"
+            groupPath="Kotlin"
+            groupBundle="messages.KotlinBundle"
+            groupKey="group.names.style.issues"
+            enabledByDefault="true"
+            level="INFORMATION"
+            language="kotlin"
+            bundle="messages.KotlinBundle"
+            key="inspection.convert.sealed.interface.to.class.display.name"
+    />
+
+    <localInspection
+            implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.UnnecessaryOptInAnnotationInspection"
+            groupPath="Kotlin"
+            groupBundle="messages.KotlinBundle" groupKey="group.names.redundant.constructs"
+            enabledByDefault="true"
+            level="WEAK WARNING"
+            language="kotlin"
+            runForWholeFile="true"
+            editorAttributes="NOT_USED_ELEMENT_ATTRIBUTES"
+            key="inspection.unnecessary.opt_in.annotation.display.name" bundle="messages.KotlinBundle"/>
+
+    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.LazyWithoutDelegationInspection"
+                     groupPath="Kotlin"
+                     groupBundle="messages.KotlinBundle" groupKey="group.names.probable.bugs"
+                     enabledByDefault="true"
+                     level="WEAK WARNING"
+                     language="kotlin"
+                     key="inspection.lazy.without.delegation.display.name" bundle="messages.KotlinBundle"/>
+
+  </extensions>
 </idea-plugin>

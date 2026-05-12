@@ -241,8 +241,8 @@ class JBCefOsrComponent extends JPanel {
         e.getClickCount(),
         e.isPopupTrigger(),
         e.getScrollType(),
-        e.getScrollAmount(),
-        (int)val,
+        e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL ? e.getScrollAmount() : 1,
+        (int)Math.round(val),
         val));
     }
   }

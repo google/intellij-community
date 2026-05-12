@@ -45,6 +45,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.function.BiConsumer;
 
+import static com.intellij.psi.impl.source.tree.injected.InjectionBackgroundSuppressor.SUPPRESS_INJECTION_BACKGROUND;
+
 public final class InjectedLanguageUtil extends InjectedLanguageUtilBase {
   static final class ImplServiceImpl implements InjectedLanguageEditorUtil.ImplService {
     @Override
@@ -274,7 +276,8 @@ public final class InjectedLanguageUtil extends InjectedLanguageUtilBase {
   }
 
   public static boolean isHighlightInjectionBackground(@Nullable PsiLanguageInjectionHost host) {
-    return !(host instanceof InjectionBackgroundSuppressor);
+    return !(host instanceof InjectionBackgroundSuppressor
+             || host != null && host.getUserData(SUPPRESS_INJECTION_BACKGROUND) != null);
   }
 
   public static int getInjectedStart(@NotNull List<? extends PsiLanguageInjectionHost.Shred> places) {

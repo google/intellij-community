@@ -1,0 +1,16 @@
+// COMPILER_ARGUMENTS: -Xcontext-parameters -XXLanguage:+ExplicitContextArguments
+// PRIORITY: LOW
+// INTENTION_TEXT: "Add 'x =' to argument"
+// AFTER-WARNING: Parameter 'x' is never used
+// AFTER-WARNING: Parameter 'a' is never used
+// K2_ERROR: Too many arguments for 'context(x: String) fun foo(a: String): String'.
+// IGNORE_K1
+
+context(x: String)
+fun foo(a: String): String = x + a
+
+fun main() {
+    with("context") {
+        foo(a = "World", <caret>"Hello")
+    }
+}

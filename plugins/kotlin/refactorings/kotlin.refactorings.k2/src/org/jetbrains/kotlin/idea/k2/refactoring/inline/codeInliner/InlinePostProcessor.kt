@@ -241,7 +241,9 @@ object InlinePostProcessor: AbstractInlinePostProcessor() {
                     if (argument.isNamed()) continue
                     if (argument is KtLambdaArgument) continue
                     val argumentExpression = argument.getArgumentExpression() ?: continue
-                    val name = resolvedCall.argumentMapping[argumentExpression]?.symbol?.name
+                    val name = resolvedCall.argumentMapping[argumentExpression]?.symbol?.let { symbol ->
+                        symbol.name.takeIf { symbol.psi is KtElement }
+                    }
                     //TODO: not always correct for vararg's
                     val newArgument = psiFactory.createArgument(argument.getArgumentExpression()!!, name, argument.getSpreadElement() != null)
 

@@ -653,7 +653,7 @@ public abstract class ChooseByNameBase implements ChooseByNameViewModel {
       }
     }
 
-    myCheckBox.addItemListener(__ -> rebuildList(false));
+    myCheckBox.addItemListener(_ -> rebuildList(false));
     myCheckBox.setFocusable(ScreenReader.isActive());
 
     myTextField.getDocument().addDocumentListener(new DocumentAdapter() {
@@ -722,7 +722,7 @@ public abstract class ChooseByNameBase implements ChooseByNameViewModel {
       }
     });
 
-    myTextField.addActionListener(__ -> {
+    myTextField.addActionListener(_ -> {
       if (!getChosenElements().isEmpty()) {
         doClose(true);
       }
@@ -766,7 +766,7 @@ public abstract class ChooseByNameBase implements ChooseByNameViewModel {
     myList.setVisibleRowCount(16);
     myList.setFont(editorFont);
 
-    myList.addListSelectionListener(__ -> {
+    myList.addListSelectionListener(_ -> {
       if (checkDisposed()) {
         return;
       }
@@ -1702,7 +1702,7 @@ public abstract class ChooseByNameBase implements ChooseByNameViewModel {
             ensureNamesLoaded(everywhere);
             indicator.setIndeterminate(true);
             final TooManyUsagesStatus tooManyUsagesStatus = TooManyUsagesStatus.createFor(indicator);
-            myCalcUsagesThread = new CalcElementsThread(text, everywhere, ModalityState.nonModal(), PreserveSelection.INSTANCE, __->{}) {
+            myCalcUsagesThread = new CalcElementsThread(text, everywhere, ModalityState.nonModal(), PreserveSelection.INSTANCE, _->{}) {
               @Override
               protected boolean isOverflow(@NotNull Set<Object> elementsArray) {
                 tooManyUsagesStatus.pauseProcessingIfTooManyUsages();

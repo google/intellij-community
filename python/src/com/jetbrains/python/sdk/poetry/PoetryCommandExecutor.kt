@@ -18,12 +18,14 @@ import com.jetbrains.python.getOrNull
 import com.jetbrains.python.isSuccess
 import com.jetbrains.python.onFailure
 import com.jetbrains.python.packaging.PyPackage
+import com.jetbrains.python.packaging.PyPackageName
 import com.jetbrains.python.packaging.PyRequirement
 import com.jetbrains.python.packaging.PyRequirementParser
 import com.jetbrains.python.packaging.common.PythonOutdatedPackage
 import com.jetbrains.python.packaging.common.PythonPackage
 import com.jetbrains.python.sdk.ToolCommandExecutor
 import com.jetbrains.python.sdk.associatedModulePath
+import com.jetbrains.python.sdk.pyRichSdkAsync
 import com.jetbrains.python.sdk.runTool
 import com.jetbrains.python.venvReader.VirtualEnvReader
 import io.github.z4kn4fein.semver.Version
@@ -33,6 +35,7 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.Nls
 import java.nio.file.Path
+import kotlin.io.path.name
 import kotlin.io.path.pathString
 
 /**
@@ -55,7 +58,17 @@ private val POETRY_TOOL: ToolCommandExecutor = ToolCommandExecutor(
 private val POETRY_EXCLUDE_NON_DIGITS_REGEX = Regex("""\D+$""")
 
 @Internal
-suspend fun runPoetry(projectPath: Path?, vararg args: String): PyResult<String> = POETRY_TOOL.runTool(projectPath, *args)
+suspend fun runPoetry(
+  projectPath: Path?,
+  vararg args: String,
+  inProjectEnv: Boolean? = null,
+  baseEnv: Map<String, String> = emptyMap(),
+): PyResult<String> {
+  val env = baseEnv.toMutableMap().apply {
+    if (inProjectEnv != null) put("POETRY_VIRTUALENVS_IN_PROJECT", inProjectEnv.toString())
+  }
+  return POETRY_TOOL.runTool(projectPath, *args, env = env)
+}
 
 
 /**
@@ -74,8 +87,14 @@ suspend fun getPoetryExecutable(eel: EelApi = localEel): Path? = POETRY_TOOL.get
 suspend fun runPoetryWithSdk(sdk: Sdk, vararg args: String): PyResult<String> {
   val projectPath = sdk.associatedModulePath?.let { Path.of(it) }
                     ?: return PyResult.localizedError(poetryNotFoundException) // Choose a correct sdk
-  runPoetry(projectPath, "env", "use", sdk.homePath!!)
-  return runPoetry(projectPath, *args)
+  val pythonHomePath = sdk.pyRichSdkAsync().pythonHomePath
+                       ?: return PyResult.localizedError(PyBundle.message("python.sdk.broken.configuration", sdk.name))
+  val env = buildMap {
+    put("POETRY_VIRTUALENVS_IN_PROJECT", "false")
+    put("POETRY_VIRTUALENVS_PREFER_ACTIVE_PYTHON", "true")
+    put("VIRTUAL_ENV", pythonHomePath.toAbsolutePath().toString())
+  }
+  return runPoetry(projectPath, *args, baseEnv = env)
 }
 
 
@@ -91,10 +110,17 @@ suspend fun setupPoetry(
   installPackages: Boolean,
   init: Boolean,
   errorSink: ErrorSink,
+  inProjectEnv: Boolean = false,
 ): PyResult<PythonHomePath> {
   if (init) {
     // Build poetry init command with Python version constraint if available
     val initArgs = mutableListOf("init", "-n")
+
+    val projectName = PyPackageName.normalizeProjectName(projectPath.name)
+    if (projectName.isNotBlank()) {
+      initArgs.add("--name")
+      initArgs.add(projectName)
+    }
 
     // Validate Python and get version info
     val pythonInfo = basePythonBinaryPath.validatePythonAndGetInfo().getOr { return it }
@@ -104,16 +130,16 @@ suspend fun setupPoetry(
     initArgs.add("--python")
     initArgs.add("^$major.$minor")
 
-    runPoetry(projectPath, *initArgs.toTypedArray()).getOr { return it }
+    runPoetry(projectPath, *initArgs.toTypedArray(), inProjectEnv = inProjectEnv).getOr { return it }
   }
 
-  runPoetry(projectPath, "env", "use", basePythonBinaryPath.pathString).getOr { return it }
+  runPoetry(projectPath, "env", "use", basePythonBinaryPath.pathString, inProjectEnv = inProjectEnv).getOr { return it }
 
   if (installPackages) {
-    runPoetry(projectPath, "install", "--no-root").onFailure { errorSink.emit(it) }
+    runPoetry(projectPath, "install", "--no-root", inProjectEnv = inProjectEnv).onFailure { errorSink.emit(it) }
   }
 
-  return runPoetry(projectPath, "env", "info", "-p").mapSuccess { Path.of(it) }
+  return runPoetry(projectPath, "env", "info", "-p", inProjectEnv = inProjectEnv).mapSuccess { Path.of(it) }
 }
 
 internal suspend fun detectPoetryEnvs(searchPath: Path): List<PythonBinary> = getPoetryEnvs(searchPath).mapNotNull { getPythonExecutable(it) }

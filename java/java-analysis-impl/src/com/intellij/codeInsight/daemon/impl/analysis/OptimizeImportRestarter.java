@@ -122,7 +122,7 @@ public final class OptimizeImportRestarter implements Disposable {
                               CodeInsightBundle.message("process.optimize.imports"), null))
           .submit(AppExecutorUtil.getAppExecutorService());
       scheduledFutures.add(future);
-      future.onProcessed(__->scheduledFutures.remove(future));
+      future.onProcessed(_->scheduledFutures.remove(future));
     }
   }
 

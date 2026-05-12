@@ -6,9 +6,9 @@ import com.intellij.jarRepository.RemoteRepositoryDescription
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.CollectionComboBoxModel
-import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.dsl.builder.Align
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import javax.swing.JComponent
 
 /**
@@ -33,7 +33,7 @@ internal class RepositoryRemoveDialog(project: Project,
   override fun createCenterPanel(): JComponent {
     return panel {
       row {
-        comboBox(model, SimpleListCellRenderer.create(JavaUiBundle.message("repository.library.bind.repository.not.selected")) { it.url })
+        comboBox(model, textListCellRenderer(JavaUiBundle.message("repository.library.bind.repository.not.selected")) { it.url })
           .align(Align.FILL)
       }
       row {

@@ -1,15 +1,20 @@
 package com.intellij.database.run.ui
 
 import com.intellij.database.DataGridBundle
+import com.intellij.database.datagrid.ActualGridCellRequest
 import com.intellij.database.datagrid.DataGrid
+import com.intellij.database.datagrid.GridCellRequest
 import com.intellij.database.datagrid.GridColumn
 import com.intellij.database.datagrid.GridHelper
 import com.intellij.database.datagrid.GridRequestSource
 import com.intellij.database.datagrid.GridRow
 import com.intellij.database.datagrid.GridUtil
 import com.intellij.database.datagrid.ModelIndex
+import com.intellij.database.datagrid.actual
 import com.intellij.database.datagrid.color.ColorLayer
 import com.intellij.database.datagrid.color.MutationsColorLayer
+import com.intellij.database.datagrid.overrideValue
+import com.intellij.database.datagrid.request
 import com.intellij.database.run.ui.grid.editors.GridCellEditorFactoryProvider
 import com.intellij.database.run.ui.treetable.TreeTableResultView
 import com.intellij.icons.AllIcons
@@ -286,7 +291,7 @@ class RecordView(
               }
             })
 
-            isEditable = isCellEditable(grid, rowIdx, columnInfo.idx)
+            isEditable = isCellEditable(grid.request(rowIdx, columnInfo.idx))
 
             if (!isEditable) {
               val reason = GridEditGuard.get(grid)?.getReasonText(grid)
@@ -343,8 +348,8 @@ class RecordView(
     }
     fun updateConvertor(columnIdx: ModelIndex<GridColumn>) {
       val currentConvertor = textConvertors[columnIdx]
-      if (currentConvertor == null || currentConvertor.rowIdx != rowIdx || currentConvertor.columnIdx != columnIdx) {
-        textConvertors[columnIdx] = Convertor(rowIdx, columnIdx)
+      if (currentConvertor == null || currentConvertor.request.rowIdx != rowIdx || currentConvertor.request.columnIdx != columnIdx) {
+        textConvertors[columnIdx] = Convertor(grid.request(rowIdx, columnIdx))
       }
     }
     fun setTextInGrid(columnIdx: ModelIndex<GridColumn>) = textFields[columnIdx]?.let { textField ->
@@ -404,12 +409,13 @@ class RecordView(
       }
     }
 
-    inner class Convertor(val rowIdx: ModelIndex<GridRow>, val columnIdx: ModelIndex<GridColumn>) {
-      private val factory = GridCellEditorFactoryProvider.get(grid)?.getEditorFactory(grid, rowIdx, columnIdx)
-      private val valueParser = factory?.getValueParser(grid, rowIdx, columnIdx)
+    inner class Convertor(request: GridCellRequest<GridRow, GridColumn>) {
+      val request: ActualGridCellRequest<GridRow, GridColumn> = request.actual()
+      private val factory = GridCellEditorFactoryProvider.provideEditorFactory(request)
+      private val valueParser = factory?.getValueParser(request)
 
-      fun toText(value: Any?): String = factory?.getValueFormatter(grid, rowIdx, columnIdx, value)?.format()?.text
-                                        ?: GridUtil.getText(grid, rowIdx, columnIdx)
+      fun toText(value: Any?): String = factory?.getValueFormatter(request.overrideValue(value))?.format()?.text
+                                        ?: GridUtil.getText(request.grid as DataGrid, request.rowIdx, request.columnIdx)
 
       fun fromText(text: String): Any? = valueParser?.parse(text, null)
     }
@@ -418,13 +424,12 @@ class RecordView(
   companion object {
 
     @JvmStatic
-    private fun isCellEditable(grid: DataGrid, rowIdx: ModelIndex<GridRow>, columnIdx: ModelIndex<GridColumn>): Boolean {
-      if (!grid.isEditable) {
+    private fun isCellEditable(request: GridCellRequest<GridRow, GridColumn>): Boolean {
+      if (!request.grid.isEditable) {
         return false
       }
-      val factory = GridCellEditorFactoryProvider.get(grid)?.getEditorFactory(grid, rowIdx, columnIdx) ?: return false
-      val value = grid.getDataModel(DataAccessType.DATA_WITH_MUTATIONS).getValueAt(rowIdx, columnIdx)
-      return factory.isEditableChecker.isEditable(value, grid, columnIdx)
+      val factory = GridCellEditorFactoryProvider.provideEditorFactory(request) ?: return false
+      return factory.isEditableChecker.isEditable(request.getValue(), request.grid, request.columnIdx)
     }
   }
 }

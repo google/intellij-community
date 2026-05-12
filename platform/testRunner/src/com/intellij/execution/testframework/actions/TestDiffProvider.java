@@ -1,9 +1,10 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.testframework.actions;
 
 import com.intellij.lang.Language;
 import com.intellij.lang.LanguageExtension;
 import com.intellij.openapi.project.Project;
+import com.intellij.psi.ElementManipulators;
 import com.intellij.psi.PsiElement;
 import com.intellij.util.concurrency.annotations.RequiresReadLock;
 import com.intellij.util.concurrency.annotations.RequiresWriteLock;
@@ -32,6 +33,17 @@ public interface TestDiffProvider {
   @Nullable
   @RequiresReadLock
   PsiElement findExpected(@NotNull Project project, @NotNull String stackTrace, @NotNull String expected);
+
+  /**
+   * Returns the current decoded string value of the expected literal element, suitable for display in the diff viewer.
+   * Override to correctly decode language-specific string escape sequences (e.g., {@code \n} -> newline).
+   * The default implementation returns the raw value text from {@link ElementManipulators}.
+   */
+  @NotNull
+  @RequiresReadLock
+  default String getExpectedValue(@NotNull PsiElement element) {
+    return ElementManipulators.getValueText(element);
+  }
 
   /**
    * Retrieves the TestDiffProvider implementation based on the specified language.

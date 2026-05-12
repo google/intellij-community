@@ -1,14 +1,9 @@
 ### auto-generated section `build intellij.python.test.env.junit5` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "junit5_test_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "junit5",
+  module_name = "intellij.python.test.env.junit5",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   exports = ["//python/python-test-env/core"],
@@ -27,10 +22,12 @@ jvm_library(
 
 jvm_library(
   name = "junit5_test_lib",
+  testonly = True,
   module_name = "intellij.python.test.env.junit5",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
-  resources = [":junit5_test_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:jetbrains-annotations",
     "//python/python-test-env/core",
@@ -85,6 +82,12 @@ jvm_library(
   runtime_deps = [":junit5"]
 )
 ### auto-generated section `build intellij.python.test.env.junit5` end
+
+### auto-generated section `iml intellij.python.test.env.junit5` start
+exports_files([
+  "intellij.python.test.env.junit5.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.python.test.env.junit5` end
 
 ### auto-generated section `test intellij.python.test.env.junit5` start
 load("@community//build:tests-options.bzl", "jps_test")

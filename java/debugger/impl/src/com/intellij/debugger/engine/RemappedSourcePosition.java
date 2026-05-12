@@ -37,8 +37,8 @@ public abstract class RemappedSourcePosition extends SourcePosition {
 
   private void checkRemap() {
     if (!myMapped) {
-      myMapped = true;
       myDelegate = mapDelegate(myDelegate);
+      myMapped = true;
     }
   }
 

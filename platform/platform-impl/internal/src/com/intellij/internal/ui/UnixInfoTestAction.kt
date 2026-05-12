@@ -14,11 +14,11 @@ import com.intellij.openapi.wm.impl.IdeFrameImpl
 import com.intellij.openapi.wm.impl.WindowButtonsConfiguration
 import com.intellij.openapi.wm.impl.X11UiUtil
 import com.intellij.platform.util.coroutines.childScope
-import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.dsl.builder.Panel
 import com.intellij.ui.dsl.builder.RowLayout
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.selected
+import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import com.intellij.util.concurrency.ThreadingAssertions
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.system.OS
@@ -154,7 +154,7 @@ private class UnixInfoDialog(val project: Project?, dialogTitle: String) :
           lbFrameExtendedState = label("").component
 
           val cb = comboBox(listOf(Frame::MAXIMIZED_VERT, Frame::MAXIMIZED_HORIZ, Frame::MAXIMIZED_BOTH),
-                            SimpleListCellRenderer.create("") { it.name }).component
+                            textListCellRenderer("") { it.name }).component
 
           button("Set `state or value`") {
             getFrame()?.let {

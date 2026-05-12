@@ -39,6 +39,7 @@ import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.actionSystem.UiCompatibleDataProvider
 import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.actionSystem.UpdateSession
+import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.actionSystem.impl.ActionMenu.Companion.isAligned
 import com.intellij.openapi.actionSystem.impl.ActionMenu.Companion.isAlignedInGroup
 import com.intellij.openapi.actionSystem.util.ActionSystem
@@ -528,6 +529,7 @@ object Utils {
     }
   }
 
+  @Throws(MenuCancelledControlFlowException::class)
   fun fillPopupMenu(
     uiKind: ActionUiKind.Popup,
     group: ActionGroup,
@@ -540,6 +542,7 @@ object Utils {
              presentationFactory, context, place, progressPoint, null)
   }
 
+  @Throws(MenuCancelledControlFlowException::class)
   internal fun fillMenu(
     uiKind: ActionUiKind.Popup,
     group: ActionGroup,
@@ -560,11 +563,11 @@ object Utils {
       })
     }
     if (shallAbortActionUpdateDueToProhibitingWriteAction(listOf(group))) {
-      throw ProcessCanceledException()
+      throw MenuCancelledControlFlowException()
     }
     val menuComponent = (uiKind as? ActualActionUiKind)?.component
     if (Thread.holdsLock((menuComponent ?: JLabel()).treeLock)) {
-      throw ProcessCanceledException()
+      throw MenuCancelledControlFlowException()
     }
     val asyncDataContext = createAsyncDataContext(context)
     checkAsyncDataContext(asyncDataContext, place)
@@ -587,6 +590,10 @@ object Utils {
                                  presentationFactory, asyncDataContext, place)
         }
       }
+    }
+    catch (e: CancellationException) {
+      ProgressManager.checkCanceled()
+      throw MenuCancelledControlFlowException(e)
     }
     finally {
       val elapsed = TimeoutUtil.getDurationMillis(start)
@@ -660,6 +667,7 @@ object Utils {
         else ->
           ActionMenuItem(action, context, place, uiKind, enableMnemonics, checked, useDarkIcons).apply {
             updateFromPresentation(presentation)
+            toolTipText = presentation.getClientProperty(ActionUtil.TOOLTIP_TEXT)
           }
       }
       component.add(childComponent)

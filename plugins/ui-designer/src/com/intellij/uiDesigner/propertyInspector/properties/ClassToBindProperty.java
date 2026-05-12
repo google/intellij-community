@@ -16,11 +16,9 @@ import com.intellij.openapi.ui.ComponentWithBrowseButton;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.IdeFocusManager;
 import com.intellij.psi.JavaCodeFragmentFactory;
-import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiCodeFragment;
 import com.intellij.psi.PsiDocumentManager;
-import com.intellij.psi.PsiPackage;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.ui.EditorTextField;
 import com.intellij.uiDesigner.FormEditingUtil;
@@ -126,8 +124,7 @@ public final class ClassToBindProperty extends Property<RadRootContainer, String
 
     private void setEditorText(final String s) {
       final JavaCodeFragmentFactory factory = JavaCodeFragmentFactory.getInstance(myProject);
-      PsiPackage defaultPackage = JavaPsiFacade.getInstance(myProject).findPackage("");
-      final PsiCodeFragment fragment = factory.createReferenceCodeFragment(s, defaultPackage, true, true);
+      final PsiCodeFragment fragment = factory.createReferenceCodeFragmentInPackage(s, "", true);
       myDocument = PsiDocumentManager.getInstance(myProject).getDocument(fragment);
       myEditorTextField.setDocument(myDocument);
     }

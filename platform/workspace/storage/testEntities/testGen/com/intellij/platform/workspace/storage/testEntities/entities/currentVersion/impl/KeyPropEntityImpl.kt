@@ -1,13 +1,15 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
 import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
-import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
@@ -26,9 +28,7 @@ internal class KeyPropEntityImpl(private val dataSource: KeyPropEntityData) : Ke
 
   private companion object {
 
-
-    private val connections = listOf<ConnectionId>(
-    )
+    private val connections = listOf<ConnectionId>()
 
   }
 
@@ -42,7 +42,6 @@ internal class KeyPropEntityImpl(private val dataSource: KeyPropEntityData) : Ke
       readField("text")
       return dataSource.text
     }
-
   override val url: VirtualFileUrl
     get() {
       readField("url")
@@ -60,8 +59,8 @@ internal class KeyPropEntityImpl(private val dataSource: KeyPropEntityData) : Ke
   }
 
 
-  internal class Builder(result: KeyPropEntityData?) : ModifiableWorkspaceEntityBase<KeyPropEntity, KeyPropEntityData>(
-    result), KeyPropEntityBuilder {
+  internal class Builder(result: KeyPropEntityData?) : ModifiableWorkspaceEntityBase<KeyPropEntity, KeyPropEntityData>(result),
+                                                       KeyPropEntityBuilder {
     internal constructor() : this(KeyPropEntityData())
 
     override fun applyToBuilder(builder: MutableEntityStorage) {
@@ -74,16 +73,14 @@ internal class KeyPropEntityImpl(private val dataSource: KeyPropEntityData) : Ke
           error("Entity KeyPropEntity is already created in a different builder")
         }
       }
-
       this.diff = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
-      // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
-      // Builder may switch to snapshot at any moment and lock entity data to modification
+// After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
+// Builder may switch to snapshot at any moment and lock entity data to modification
       this.currentEntityData = null
-
       index(this, "url", this.url)
-      // Process linked entities that are connected without a builder
+// Process linked entities that are connected without a builder
       processLinkedEntities(builder)
       checkInitialization() // TODO uncomment and check failed tests
     }
@@ -124,7 +121,6 @@ internal class KeyPropEntityImpl(private val dataSource: KeyPropEntityData) : Ke
         changedProperty.add("entitySource")
 
       }
-
     override var someInt: Int
       get() = getEntityData().someInt
       set(value) {
@@ -132,7 +128,6 @@ internal class KeyPropEntityImpl(private val dataSource: KeyPropEntityData) : Ke
         getEntityData(true).someInt = value
         changedProperty.add("someInt")
       }
-
     override var text: String
       get() = getEntityData().text
       set(value) {
@@ -140,7 +135,6 @@ internal class KeyPropEntityImpl(private val dataSource: KeyPropEntityData) : Ke
         getEntityData(true).text = value
         changedProperty.add("text")
       }
-
     override var url: VirtualFileUrl
       get() = getEntityData().url
       set(value) {
@@ -153,6 +147,7 @@ internal class KeyPropEntityImpl(private val dataSource: KeyPropEntityData) : Ke
 
     override fun getEntityClass(): Class<KeyPropEntity> = KeyPropEntity::class.java
   }
+
 }
 
 @OptIn(WorkspaceEntityInternalApi::class)
@@ -172,7 +167,6 @@ internal class KeyPropEntityData : WorkspaceEntityData<KeyPropEntity>() {
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): KeyPropEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {
@@ -184,8 +178,7 @@ internal class KeyPropEntityData : WorkspaceEntityData<KeyPropEntity>() {
   }
 
   override fun getMetadata(): EntityMetadata {
-    return MetadataStorageImpl.getMetadataByTypeFqn(
-      "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.KeyPropEntity") as EntityMetadata
+    return MetadataStorageImpl.getMetadataByTypeFqn("com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.KeyPropEntity") as EntityMetadata
   }
 
   override fun getEntityInterface(): Class<out WorkspaceEntity> {
@@ -193,8 +186,7 @@ internal class KeyPropEntityData : WorkspaceEntityData<KeyPropEntity>() {
   }
 
   override fun createDetachedEntity(parents: List<WorkspaceEntityBuilder<*>>): WorkspaceEntityBuilder<*> {
-    return KeyPropEntity(someInt, text, url, entitySource) {
-    }
+    return KeyPropEntity(someInt, text, url, entitySource)
   }
 
   override fun getRequiredParents(): List<Class<out WorkspaceEntity>> {
@@ -205,9 +197,7 @@ internal class KeyPropEntityData : WorkspaceEntityData<KeyPropEntity>() {
   override fun equals(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as KeyPropEntityData
-
     if (this.entitySource != other.entitySource) return false
     if (this.someInt != other.someInt) return false
     if (this.text != other.text) return false
@@ -218,9 +208,7 @@ internal class KeyPropEntityData : WorkspaceEntityData<KeyPropEntity>() {
   override fun equalsIgnoringEntitySource(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as KeyPropEntityData
-
     if (this.someInt != other.someInt) return false
     if (this.text != other.text) return false
     if (this.url != other.url) return false

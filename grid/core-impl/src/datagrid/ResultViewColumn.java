@@ -19,4 +19,6 @@ public interface ResultViewColumn extends UserDataHolder {
   default int getAdditionalWidth() {
     return ADDITIONAL_COLUMN_WIDTH;
   }
+
+  default void dropModelDependentCache() {}
 }

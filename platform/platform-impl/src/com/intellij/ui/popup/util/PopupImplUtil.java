@@ -45,7 +45,7 @@ public final class PopupImplUtil {
       // a chance to quit in case the focus event is created right inside `dispatchEvents` code
       ApplicationManager.getApplication().invokeLater(() -> {
         LOG.error(throwable);
-      }, ModalityState.any(), __ -> !insideOnChosen[0]);
+      }, ModalityState.any(), _ -> !insideOnChosen[0]);
       return null;
     });
     return new AccessToken() {

@@ -48,5 +48,5 @@ fun f(x: A) {}
 
 fun test(x: Foo) {
     val a = x.foo()
-    a<caret>?.let { f(it) }
+    a?<caret>.let { f(it) }
 }

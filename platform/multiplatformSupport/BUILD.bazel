@@ -16,6 +16,7 @@ jvm_library(
 
 jvm_library(
   name = "multiplatformSupport_test_lib",
+  testonly = True,
   module_name = "intellij.platform.multiplatformSupport",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -23,3 +24,9 @@ jvm_library(
   runtime_deps = [":multiplatformSupport"]
 )
 ### auto-generated section `build intellij.platform.multiplatformSupport` end
+
+### auto-generated section `iml intellij.platform.multiplatformSupport` start
+exports_files([
+  "intellij.platform.multiplatformSupport.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.multiplatformSupport` end

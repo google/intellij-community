@@ -203,6 +203,22 @@ public class ConditionCoveredByFurtherCondition {
         if ((<error descr="Inconvertible types; cannot cast 'java.lang.String' to 'java.lang.Integer'">arg instanceof Integer</error>) || <error descr="Inconvertible types; cannot cast 'java.lang.String' to 'java.lang.Long'">arg instanceof Long</error>) {}
         if (<error descr="Inconvertible types; cannot cast 'java.lang.String' to 'java.lang.Integer'">arg instanceof Integer</error> || <error descr="Inconvertible types; cannot cast 'java.lang.String' to 'java.lang.Long'">arg instanceof Long</error>) {}
     }
+
+    interface Bar { void bar(); }
+    interface Baz extends Bar {}
+    interface Bam extends Bar {}
+
+    void testPatternVariableUsed(Object o) {
+        if ((o instanceof Bar bar) && (o instanceof Baz) && (o instanceof Bam)) {
+            bar.bar();
+        }
+    }
+
+    void testPatternVariableUnused(Object o) {
+        if (<warning descr="Condition 'o instanceof Bar bar' covered by subsequent condition 'o instanceof Baz'">(o instanceof Bar bar)</warning> && (o instanceof Baz) && (o instanceof Bam)) {
+            System.out.println("no use of bar");
+        }
+    }
 }
 enum X {A, B, C}
 class UnterminatedLiteral {

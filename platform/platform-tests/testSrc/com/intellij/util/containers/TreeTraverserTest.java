@@ -931,9 +931,9 @@ public class TreeTraverserTest extends TestCase {
 
   public void testTraverserOpsOrder() {
     int[] count = {0};
-    Condition<Integer> c1 = __ -> { assertEquals("incorrect order (1)", 1, count[0]++ % 3 + 1); return true; };
-    Condition<Integer> c2 = __ -> { assertEquals("incorrect order (2)", 2, count[0]++ % 3 + 1); return true; };
-    Condition<Integer> c3 = __ -> { assertEquals("incorrect order (3)", 3, count[0]++ % 3 + 1); return true; };
+    Condition<Integer> c1 = _ -> { assertEquals("incorrect order (1)", 1, count[0]++ % 3 + 1); return true; };
+    Condition<Integer> c2 = _ -> { assertEquals("incorrect order (2)", 2, count[0]++ % 3 + 1); return true; };
+    Condition<Integer> c3 = _ -> { assertEquals("incorrect order (3)", 3, count[0]++ % 3 + 1); return true; };
     List<Integer> all = numTraverser().toList();
 
     // expand

@@ -1,14 +1,9 @@
 ### auto-generated section `build intellij.platform.workspace.jps.tests` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "tests_test_resources",
-  srcs = glob(["testResources/**/*"]),
-  strip_prefix = "testResources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tests",
+  module_name = "intellij.platform.workspace.jps.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -23,9 +18,11 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form", "testGen/**/*.kt", "testGen/**/*.java"], allow_empty = True),
-  resources = [":tests_test_resources"],
+  resources = glob(["testResources/**/*"]),
+  resource_strip_prefix = "testResources",
   associates = [
     "//platform/workspace/jps",
     "//platform/workspace/jps:jps_test_lib",
@@ -55,9 +52,12 @@ jvm_library(
     "//platform/lang-impl:lang-tests_test_lib",
     "//platform/workspace/storage/tests",
     "//platform/workspace/storage/tests:tests_test_lib",
-    "@lib//:assert_j",
+    "//libraries/assertj-core",
+    "//libraries/assertj-core:assertj-core_test_lib",
     "//platform/core-ui",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//libraries/commons/lang3",
     "//libraries/commons/lang3:lang3_test_lib",
     "//platform/util/jdom",
@@ -75,6 +75,10 @@ jvm_library(
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark_test_lib",
     "//platform/util/coroutines",
     "//platform/util/coroutines:coroutines_test_lib",
+    "//platform/util:util-ui",
+    "//platform/util:util-ui_test_lib",
+    "//platform/util-ex",
+    "//platform/util-ex:util-ex_test_lib",
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
     "//java/java-impl:impl",
@@ -86,10 +90,20 @@ jvm_library(
     "@lib//:jet_check",
     "//platform/testFramework/junit5/projectStructure",
     "//platform/testFramework/junit5/projectStructure:projectStructure_test_lib",
+    "//platform/ide-core",
   ],
-  runtime_deps = [":tests"]
+  runtime_deps = [
+    ":tests",
+    "//platform/ide-core:ide-core_test_lib",
+  ]
 )
 ### auto-generated section `build intellij.platform.workspace.jps.tests` end
+
+### auto-generated section `iml intellij.platform.workspace.jps.tests` start
+exports_files([
+  "intellij.platform.workspace.jps.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.workspace.jps.tests` end
 
 ### auto-generated section `test intellij.platform.workspace.jps.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

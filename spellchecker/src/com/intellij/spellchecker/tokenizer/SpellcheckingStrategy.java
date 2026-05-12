@@ -29,6 +29,7 @@ import com.intellij.spellchecker.quickfixes.SpellCheckerQuickFixFactory;
 import com.intellij.spellchecker.settings.SpellCheckerSettings;
 import com.intellij.spellchecker.statistics.SpellcheckerRateTracker;
 import com.intellij.util.KeyedLazyInstance;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -39,12 +40,15 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Defines spellchecking support for a custom language.
+ * Defines spellchecking support for a custom programming language.
  * <p>
  * Register via extension point {@code com.intellij.spellchecker.support}
- * and override {@link #getTokenizer(PsiElement)} to skip/handle specific elements.
+ * and override {@link #getTokenizer(PsiElement)} to skip/handle specific code elements.
  * <p>
- * Mark your strategy as {@link com.intellij.openapi.project.DumbAware} if it does not need indexes to perform
+ * To define spellchecking support for non-code-like texts, read the documentation of {@link SpellcheckingStrategy#useTextLevelSpellchecking()}
+ * <p>
+ * Mark your strategy as {@link com.intellij.openapi.project.DumbAware} if it does not need indexes to perform.
+ * <p>
  */
 public class SpellcheckingStrategy implements PossiblyDumbAware {
   // Consider literals that look like typical programming language identifier to be code contexts
@@ -76,7 +80,9 @@ public class SpellcheckingStrategy implements PossiblyDumbAware {
   }
 
   /**
-   * @return {@link #EMPTY_TOKENIZER} to skip spellchecking, {@link #TEXT_TOKENIZER} for full element text or custom Tokenizer implementation.
+   * Defines {@link Tokenizer} to handle spellchecking for code constructs (methods, classes, variables etc.).
+   * Use {@link #EMPTY_TOKENIZER} to skip spellchecking, {@link #TEXT_TOKENIZER} for full element text or custom Tokenizer implementation.
+   * For text fragments in natural language, see {@link #useTextLevelSpellchecking()}
    */
   public @NotNull Tokenizer getTokenizer(PsiElement element) {
     if (isInjectedLanguageFragment(element)) {
@@ -138,17 +144,73 @@ public class SpellcheckingStrategy implements PossiblyDumbAware {
   }
 
   /**
-   * Controls whether to use text-level spellchecking provided by {@link com.intellij.grazie.spellcheck.GrazieTextLevelSpellCheckingExtension}.
+   * Defines if the strategy should delegate spellchecking of non-code like fragments to text level approach for the programming language.
+   *
+   * <h2>Text-level spellchecking</h2>
+   *
+   * <p>The strategy works with individual words split by CamelCase heuristics.
+   * While simple, this approach often causes false positives in technical contexts.</p>
+   *
+   * <p>Text-level spellchecking addresses these issues by utilizing text tokenization and
+   * analyzing the text as a whole before processing, leading to better results overall.</p>
+   *
+   * <h2>Migration Guide</h2>
+   *
+   * <h3>1. Enable text-level checking</h3>
+   * The strategy must override this method to return {@code true}. It is recommended to keep it under existing registry key,
+   * which is enabled by default:
+   * <pre>{@code
+   * @Override
+   * public boolean useTextLevelSpellchecking() {
+   *     return Registry.is("spellchecker.grazie.enabled", false);
+   * }
+   * }</pre>
+   *
+   * <h3>2. Ensure you have a {@code TextExtractor} for your language</h3>
+   *
+   * <h3>3. Update the strategy</h3>
+   * Ensure that the strategy returns the {@link #EMPTY_TOKENIZER} from {@link #getTokenizer(PsiElement)}
+   * for text-containing elements
+   *
+   * @see <a href="https://github.com/JetBrains/intellij-community/commit/24b3c418df8aa8ca6659c89a580753dad9871ee1">Kotlin Migration Example</a>
+   * @see <a href="https://github.com/JetBrains/intellij-community/commit/3b26b8c52ff0483bf76ed7bdea47177afef37978">Python Migration Example</a>
+   * @see <a href="https://github.com/JetBrains/intellij-community/commit/c5d3c3b87e3d75eafca7a1d503ce33977e91d803">Removing {@code @author} false positives</a>
    */
   public boolean useTextLevelSpellchecking() {
     return false;
   }
 
   /**
-   * Controls whether to use text-level spellchecking provided by {@link com.intellij.grazie.spellcheck.GrazieTextLevelSpellCheckingExtension}.
+   * Defines if the strategy should delegate spellchecking of given {@link PsiElement} to text-level approach.
+   * <p>
+   * This method was introduced to support text-level checking in complicated cases when one file
+   * contains multiple languages at the same time. The most common case is of combination of JS / XML / HTML / Vue in a single file.
+   * <p>
+   * In simple cases, this method shouldn't be overridden.
+   * <p>
+   * If {@link SpellcheckingStrategy#useTextLevelSpellchecking()} returns false, this method must always return false too.
    */
   public boolean useTextLevelSpellchecking(PsiElement element) {
     return useTextLevelSpellchecking();
+  }
+
+  /**
+   * Returns the file-relative range of the identifier text that should participate in the rename quick fix.
+   * <p>
+   * {@code nameIdentifier} is the PSI element used as the rename anchor, not an arbitrary descendant.
+   * <p>
+   * {@link PsiNameIdentifierOwner#getNameIdentifier()} of the enclosing {@link PsiNamedElement} when it is available;
+   * otherwise it falls back to the original PSI element on which spellchecking reported the typo.
+   * <p>
+   * The range is expected to cover the full logical name, even if the underlying PSI element contains
+   * language-specific symbols / constructs or non-editable fragments. For example, in PHP for the element {@code $lengthMinutes} the method should
+   * return the range of {@code lengthMinutes}, i.e. {@code [1; 14]}.
+   * <p>
+   * Return {@code null} when the strategy cannot determine such a range for the supplied rename anchor.
+   */
+  @ApiStatus.Experimental
+  public @Nullable TextRange getRenameIdentifierRange(@NotNull PsiElement nameIdentifier) {
+    return null;
   }
 
   protected static boolean isInjectedLanguageFragment(@Nullable PsiElement element) {

@@ -269,7 +269,7 @@ class KotlinLanguageCodeStyleSettingsProvider : LanguageCodeStyleSettingsProvide
                 showCustomOption(
                     KotlinCodeStyleSettings::WRAP_EXPRESSION_BODY_FUNCTIONS,
                     KotlinBundle.message("formatter.title.expression.body.functions"),
-                    options = *arrayOf(
+                    options = *arrayOf<Any>(
                         codeStyleSettingsCustomizableOptions.WRAP_OPTIONS_FOR_SINGLETON,
                         CodeStyleSettingsCustomizable.WRAP_VALUES_FOR_SINGLETON
                     )
@@ -284,7 +284,7 @@ class KotlinLanguageCodeStyleSettingsProvider : LanguageCodeStyleSettingsProvide
                 showCustomOption(
                     KotlinCodeStyleSettings::WRAP_ELVIS_EXPRESSIONS,
                     KotlinBundle.message("formatter.title.elvis.expressions"),
-                    options = *arrayOf(
+                    options = *arrayOf<Any>(
                         codeStyleSettingsCustomizableOptions.WRAP_OPTIONS_FOR_SINGLETON,
                         CodeStyleSettingsCustomizable.WRAP_VALUES_FOR_SINGLETON
                     )

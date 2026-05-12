@@ -230,12 +230,13 @@ class HProfEventBasedParser(fileChannel: FileChannel) : AutoCloseable {
     val objectId = readId()
     val stackTraceSerialNumber = readUnsignedInt()
     val classObjectId = readId()
-    val remainingBytes = readInt()
-    val byteBuffer = buffer.getByteBuffer(remainingBytes)
-    visitor.visitInstanceDump(objectId,
-                              stackTraceSerialNumber,
-                              classObjectId,
-                              byteBuffer)
+    val remainingBytes = readUnsignedInt()
+    buffer.getByteBuffer(remainingBytes).use { bytes ->
+      visitor.visitInstanceDump(objectId,
+                                stackTraceSerialNumber,
+                                classObjectId,
+                                bytes)
+    }
   }
 
   private fun acceptObjectArrayDump(visitor: HProfVisitor) {
@@ -259,14 +260,16 @@ class HProfEventBasedParser(fileChannel: FileChannel) : AutoCloseable {
     val numberOfElements = readUnsignedInt()
     val elementTypeId = readUnsignedByte()
     val elementType = Type.getType(elementTypeId)
-    val primitiveArrayData = buffer.getByteBuffer((numberOfElements * elementType.size).toInt())
-    visitor.visitPrimitiveArrayDump(
-      arrayObjectId,
-      stackTraceSerialNumber,
-      numberOfElements,
-      elementType,
-      primitiveArrayData
-    )
+    val primitiveArraySize = Math.multiplyExact(numberOfElements, elementType.size.toLong())
+    buffer.getByteBuffer(primitiveArraySize).use { primitiveArrayData ->
+      visitor.visitPrimitiveArrayDump(
+        arrayObjectId,
+        stackTraceSerialNumber,
+        numberOfElements,
+        elementType,
+        primitiveArrayData
+      )
+    }
   }
 
   private fun acceptClassDump(visitor: HProfVisitor) {

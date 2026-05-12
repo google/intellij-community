@@ -17,7 +17,7 @@ import com.jetbrains.python.psi.LanguageLevel;
 import com.jetbrains.python.sdk.PythonSdkAdditionalData;
 import com.jetbrains.python.sdk.flavors.PyFlavorAndData;
 import com.jetbrains.python.sdk.flavors.PyFlavorData;
-import com.jetbrains.python.sdk.flavors.VirtualEnvSdkFlavor;
+import com.intellij.python.venv.sdk.flavors.VirtualEnvSdkFlavor;
 import com.jetbrains.python.sdk.legacy.PythonSdkUtil;
 import org.jdom.Element;
 import org.jetbrains.annotations.NonNls;

@@ -1,24 +1,20 @@
 ### auto-generated section `build intellij.platform.debugger.impl.shared` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "shared_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "shared",
   module_name = "intellij.platform.debugger.impl.shared",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":shared_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
     "//platform/core-impl",
     "//platform/core-ui",
+    "//platform/util:util-ui",
     "//platform/platform-api:ide",
     "//platform/kernel/shared:kernel",
     "//platform/util/concurrency",
@@ -40,11 +36,14 @@ jvm_library(
     "//platform/execution",
     "//platform/statistics",
     "//platform/platform-impl/internal",
+    "//platform/ide-core",
+    "//fleet/rhizomedb",
   ]
 )
 
 jvm_library(
   name = "shared_test_lib",
+  testonly = True,
   module_name = "intellij.platform.debugger.impl.shared",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -54,6 +53,7 @@ jvm_library(
     "//platform/core-api:core_test_lib",
     "//platform/core-impl:core-impl_test_lib",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//platform/platform-api:ide_test_lib",
     "//platform/kernel/shared:kernel_test_lib",
     "//platform/util/concurrency:concurrency_test_lib",
@@ -75,6 +75,14 @@ jvm_library(
     "//platform/execution:execution_test_lib",
     "//platform/statistics:statistics_test_lib",
     "//platform/platform-impl/internal:internal_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.debugger.impl.shared` end
+
+### auto-generated section `iml intellij.platform.debugger.impl.shared` start
+exports_files([
+  "intellij.platform.debugger.impl.shared.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.debugger.impl.shared` end

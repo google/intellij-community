@@ -45,6 +45,6 @@ public class AnnotatorStatisticsCollector {
   }
 
   private @NotNull DaemonCodeAnalyzer.DaemonListener.AnnotatorStatistics createStatistics(@NotNull Annotator annotator) {
-    return myAnnotatorStats.computeIfAbsent(annotator.getClass(), __ -> new DaemonCodeAnalyzer.DaemonListener.AnnotatorStatistics(annotator));
+    return myAnnotatorStats.computeIfAbsent(annotator.getClass(), _ -> new DaemonCodeAnalyzer.DaemonListener.AnnotatorStatistics(annotator));
   }
 }

@@ -4,6 +4,7 @@ package org.jetbrains.plugins.groovy.lang.folding;
 
 import com.intellij.codeInsight.folding.JavaCodeFoldingSettings;
 import com.intellij.codeInsight.folding.impl.JavaFoldingBuilderBase;
+import com.intellij.codeInsight.folding.impl.JavaFoldingUtil;
 import com.intellij.lang.ASTNode;
 import com.intellij.lang.folding.CustomFoldingBuilder;
 import com.intellij.lang.folding.FoldingDescriptor;
@@ -243,7 +244,7 @@ public final class GroovyFoldingBuilder extends CustomFoldingBuilder implements 
         int start = first.getTextRange().getStartOffset();
         int end = marker.getTextRange().getEndOffset();
         int tail = "import ".length();
-        if (start + tail < end && !JavaFoldingBuilderBase.hasErrorElementsNearby(first.getContainingFile(), start, end)) {
+        if (start + tail < end && !JavaFoldingUtil.hasErrorElementsNearby(first.getContainingFile(), start, end)) {
           FoldingDescriptor descriptor = new FoldingDescriptor(first.getNode(), new TextRange(start + tail, end), null, "...",
                                                                JavaCodeFoldingSettings.getInstance().isCollapseImports(),
                                                                Collections.emptySet());

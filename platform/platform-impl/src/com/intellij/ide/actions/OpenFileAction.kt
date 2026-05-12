@@ -66,7 +66,7 @@ open class OpenFileAction : AnAction(), DumbAware, LightEditCompatible, ActionRe
       NonProjectFileWritingAccessProvider.allowWriting(listOf(file))
       if (LightEdit.owns(project)) {
         LightEditService.getInstance().openFile(file)
-        LightEditFeatureUsagesUtil.logFileOpen(project, LightEditFeatureUsagesUtil.OpenPlace.LightEditOpenAction)
+        LightEditFeatureUsagesUtil.logFileOpen(project, file, LightEditFeatureUsagesUtil.OpenPlace.LightEditOpenAction)
       }
       else {
         PsiNavigationSupport.getInstance().createNavigatable(project, file, -1).navigate(true)
@@ -209,7 +209,7 @@ open class OpenFileAction : AnAction(), DumbAware, LightEditCompatible, ActionRe
       NonProjectFileWritingAccessProvider.allowWriting(listOf(virtualFile))
       if (LightEdit.owns(project)) {
         LightEditService.getInstance().openFile(virtualFile)
-        LightEditFeatureUsagesUtil.logFileOpen(project, LightEditFeatureUsagesUtil.OpenPlace.LightEditOpenAction)
+        LightEditFeatureUsagesUtil.logFileOpen(project, virtualFile, LightEditFeatureUsagesUtil.OpenPlace.LightEditOpenAction)
       }
       else {
         val navigatable = PsiNavigationSupport.getInstance().createNavigatable(project, virtualFile, -1)

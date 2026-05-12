@@ -85,9 +85,9 @@ public final class JUnitTestDiscoveryConfigurationProducer extends TestDiscovery
         for (Module usedModule : usedModules) {
           List<Module> rootModules = ModuleUtilCore.getAllDependentModules(usedModule);
           for (Module rootModule : rootModules) {
-            allDeps.computeIfAbsent(rootModule, __ -> new LinkedHashSet<>()).add(usedModule);
+            allDeps.computeIfAbsent(rootModule, _ -> new LinkedHashSet<>()).add(usedModule);
           }
-          allDeps.computeIfAbsent(usedModule, __ -> new LinkedHashSet<>()).add(usedModule);
+          allDeps.computeIfAbsent(usedModule, _ -> new LinkedHashSet<>()).add(usedModule);
         }
 
 

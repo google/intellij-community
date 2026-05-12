@@ -10,7 +10,6 @@ import com.intellij.codeInsight.multiverse.EditorContextManager;
 import com.intellij.codeInspection.ex.GlobalInspectionContextBase;
 import com.intellij.diagnostic.Activity;
 import com.intellij.diagnostic.StartUpMeasurer;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
@@ -26,6 +25,7 @@ import com.intellij.psi.impl.PsiDocumentManagerEx;
 import com.intellij.psi.impl.PsiFileEx;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.concurrency.ThreadingAssertions;
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -54,6 +54,7 @@ public final class TextEditorBackgroundHighlighter implements BackgroundEditorHi
     this.editor = editor;
   }
 
+  @RequiresBackgroundThread
   private @NotNull List<TextEditorHighlightingPass> createPasses() {
     ThreadingAssertions.assertBackgroundThread();
     if (project.isDisposed()) {
@@ -69,18 +70,19 @@ public final class TextEditorBackgroundHighlighter implements BackgroundEditorHi
     CodeInsightContext context = EditorContextManager.getEditorContext(editor, project);
 
     PsiFile psiFile = renewFile(project, document, context);
-    if (psiFile == null) return List.of();
+    if (psiFile == null) {
+      return List.of();
+    }
 
-    int[] effectivePassesToIgnore =
-    psiFile.getOriginalFile() instanceof PsiCompiledFile ? IGNORE_FOR_COMPILED:
-    DaemonCodeAnalyzer.getInstance(project).isHighlightingAvailable(psiFile) ?
-    ArrayUtil.EMPTY_INT_ARRAY : null;
+    int[] effectivePassesToIgnore = psiFile.getOriginalFile() instanceof PsiCompiledFile ? IGNORE_FOR_COMPILED:
+                                    DaemonCodeAnalyzer.getInstance(project).isHighlightingAvailable(psiFile) ?
+                                    ArrayUtil.EMPTY_INT_ARRAY : null;
     if (effectivePassesToIgnore == null) {
       return List.of();
     }
 
     try {
-      HighlightingSessionImpl.getFromCurrentIndicator(psiFile);
+      DaemonCodeAnalyzerEx.getInstanceEx(project).getHighlightSessionFromCurrentIndicator(psiFile);
     }
     catch (IllegalStateException e) {
       // could not find the session for this psi file;
@@ -107,9 +109,10 @@ public final class TextEditorBackgroundHighlighter implements BackgroundEditorHi
     });
   }
 
+  @RequiresBackgroundThread
   @Override
   public @NotNull TextEditorHighlightingPass @NotNull [] createPassesForEditor() {
-    ApplicationManager.getApplication().assertIsNonDispatchThread();
+    ThreadingAssertions.assertBackgroundThread();
     GlobalInspectionContextBase.assertUnderDaemonProgress();
     List<TextEditorHighlightingPass> passes = createPasses();
     return passes.isEmpty() ? TextEditorHighlightingPass.EMPTY_ARRAY : passes.toArray(TextEditorHighlightingPass.EMPTY_ARRAY);
@@ -121,8 +124,9 @@ public final class TextEditorBackgroundHighlighter implements BackgroundEditorHi
     if (psiFile instanceof PsiCompiledFile compiled) {
       psiFile = compiled.getDecompiledPsiFile();
     }
-    if (psiFile == null) return null;
-    psiFile.putUserData(PsiFileEx.BATCH_REFERENCE_PROCESSING, true);
+    if (psiFile != null) {
+      psiFile.putUserData(PsiFileEx.BATCH_REFERENCE_PROCESSING, true);
+    }
     return psiFile;
   }
 
@@ -134,12 +138,13 @@ public final class TextEditorBackgroundHighlighter implements BackgroundEditorHi
   public static @Nullable PsiFile getCachedFileToHighlight(@NotNull Project project,
                                                            @NotNull VirtualFile virtualFile,
                                                            @NotNull CodeInsightContext context) {
-    PsiDocumentManagerEx psiDocumentManager = (PsiDocumentManagerEx)PsiDocumentManager.getInstance(project);
-    PsiFile psiFile = psiDocumentManager.getRawCachedFile(virtualFile, context);
+    PsiFile psiFile = ((PsiDocumentManagerEx)PsiDocumentManager.getInstance(project)).getRawCachedFile(virtualFile, context);
     if (psiFile instanceof PsiCompiledFile compiled) {
       psiFile = (PsiFile)compiled.getCachedMirror();
     }
-    if (psiFile == null) return null;
+    if (psiFile == null) {
+      return null;
+    }
     psiFile.putUserData(PsiFileEx.BATCH_REFERENCE_PROCESSING, true);
     return psiFile;
   }

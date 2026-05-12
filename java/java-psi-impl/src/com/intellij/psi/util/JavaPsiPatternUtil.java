@@ -470,9 +470,26 @@ public final class JavaPsiPatternUtil {
            isUnconditionallyExactForType(who, overWhomType, whoType);
   }
 
+  /**
+   * Determines if the value-based conversion for the given expression is unconditionally exact.
+   *
+   * @param overWhomExpression the expression being analyzed; may be null.
+   * @param whoType the type against which the expression is being checked.
+   * @return true if the value-based conversion is unconditionally exact, false otherwise.
+   */
   private static boolean isValueBasedUnconditionallyExact(@Nullable PsiExpression overWhomExpression, PsiType whoType) {
     if (overWhomExpression == null) return false;
     if (!PsiUtil.isAvailable(JavaFeature.PATTERNS_WITH_TIGHTENED_DOMINANCE, overWhomExpression)) return false;
+    return isUnconditionalConversion(overWhomExpression, whoType);
+  }
+
+  /**
+   * Determines if the given expression can be unconditionally converted to the specified type without loss of precision
+   * or behavior inconsistencies. It doesn't check PATTERNS_WITH_TIGHTENED_DOMINANCE feature
+   *
+   * @param overWhomExpression the expression to evaluate for conversion; must not be null.
+   * @param whoType the target type to which the expression's value is being evaluated for possible*/
+  public static boolean isUnconditionalConversion(@NotNull PsiExpression overWhomExpression, PsiType whoType) {
     PsiType overWhomExpressionType = overWhomExpression.getType();
     if (overWhomExpressionType == null) return false;
     Object constant = evaluateConstant(overWhomExpression);

@@ -12,6 +12,7 @@ import org.jetbrains.intellij.build.dependencies.BuildDependenciesLogging.verbos
 import org.jetbrains.intellij.build.dependencies.BuildDependenciesLogging.warn
 import org.jetbrains.intellij.build.dependencies.BuildDependenciesUtil.cleanDirectory
 import org.jetbrains.intellij.build.dependencies.DotNetPackagesCredentials.setupSystemCredentials
+import org.jetbrains.jps.api.CanceledStatus
 import org.jetbrains.jps.api.CmdlineRemoteProto.Message.ControllerMessage.ParametersMessage.TargetTypeBuildScope
 import org.jetbrains.jps.api.GlobalOptions
 import org.jetbrains.jps.build.Standalone
@@ -23,6 +24,7 @@ import org.jetbrains.jps.model.java.JpsJavaExtensionService
 import org.jetbrains.jps.model.module.JpsModule
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Collections
 import java.util.Properties
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicReference
@@ -88,10 +90,12 @@ class JpsBuild(communityRoot: BuildDependenciesCommunityRoot, private val myMode
     }
     Standalone.runBuild(
       { myModel },
-      myDataStorageRoot.toFile(),
+      myDataStorageRoot,
+      Collections.emptyMap(),
       messageHandler,
       scopes,
-      false
+      false,
+      CanceledStatus.NULL
     )
     info("Finished resolving project dependencies in " + (System.currentTimeMillis() - buildStart) + " ms")
     messageHandler.assertNoErrors()

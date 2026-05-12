@@ -13,6 +13,9 @@ jvm_library(
     "//libraries/fastutil",
     "@lib//:kotlin-stdlib",
     "//platform/util/xmlDom",
+    "//platform/util/multiplatform",
+    "//platform/util/base/multiplatform",
+    "//platform/util/base",
     "//libraries/kotlinx/coroutines/core",
     "//platform/diagnostic",
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
@@ -25,6 +28,7 @@ jvm_library(
 
 jvm_library(
   name = "extensions_test_lib",
+  testonly = True,
   module_name = "intellij.platform.extensions",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -38,9 +42,13 @@ jvm_library(
     "//platform/util/jdom:jdom_test_lib",
     "//platform/util:util_test_lib",
     "@lib//:junit4",
-    "@lib//:assert_j",
+    "//libraries/assertj-core",
+    "//libraries/assertj-core:assertj-core_test_lib",
     "//libraries/fastutil:fastutil_test_lib",
     "//platform/util/xmlDom:xmlDom_test_lib",
+    "//platform/util/multiplatform:multiplatform_test_lib",
+    "//platform/util/base/multiplatform:multiplatform_test_lib",
+    "//platform/util/base:base_test_lib",
     "//libraries/kotlinx/coroutines/core:core_test_lib",
     "//platform/diagnostic:diagnostic_test_lib",
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
@@ -51,3 +59,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.extensions` end
+
+### auto-generated section `iml intellij.platform.extensions` start
+exports_files([
+  "intellij.platform.extensions.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.extensions` end

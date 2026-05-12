@@ -23,15 +23,6 @@ QT_API_PYQT5 = 'pyqt5'
 QT_API_PYQT6 = 'pyqt6'
 
 
-def find_module(module_name, path=None, parent_name=None):
-    spec = importlib.util.find_spec(module_name, path)
-    if spec is None:
-        if parent_name is not None:
-            spec = importlib.util.find_spec(parent_name + '.' + module_name, path)
-        if spec is None:
-            raise ImportError
-
-
 class ImportDenier(object):
     """Import Hook that will guard against bad Qt imports
     once IPython commits to a specific binding
@@ -125,9 +116,9 @@ def has_binding(api):
         #importing top level PyQt4/PySide6 module is ok...
         mod = __import__(module_name)
         #...importing submodules is not
-        find_module('QtCore', mod.__path__, mod.__name__)
-        find_module('QtGui', mod.__path__, mod.__name__)
-        find_module('QtSvg', mod.__path__, mod.__name__)
+        for check in ('QtCore', 'QtGui', 'QtSvg'):
+            if importlib.util.find_spec('%s.%s' % (module_name, check)) is None:
+                return False
 
         #we can also safely check PySide6 version
         if api == QT_API_PYSIDE:

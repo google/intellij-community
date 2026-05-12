@@ -1,5 +1,6 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:JvmName("StartupUtil")
+@file:OptIn(LowLevelLocalMachineAccess::class)
 package com.intellij.platform.ide.bootstrap
 
 import com.intellij.BundleBase
@@ -45,6 +46,7 @@ import com.intellij.util.ShellEnvironmentReader
 import com.intellij.util.containers.Java11Shim
 import com.intellij.util.lang.ZipFilePool
 import com.intellij.util.singleProduct.migrateCommunityToSingleProductIfNeeded
+import com.intellij.util.system.LowLevelLocalMachineAccess
 import com.intellij.util.system.OS
 import com.jetbrains.JBR
 import kotlinx.collections.immutable.toImmutableMap
@@ -120,7 +122,7 @@ fun startApplication(
   val appInfoDeferred = scope.async {
     mainClassLoaderDeferred?.await()
     coroutineScope {
-      // required for log essential info about IDE, Wayland app id
+      // required for logging essential info about the IDE
       async(CoroutineName("app name info")) {
         ApplicationNamesInfo.getInstance()
       }
@@ -151,9 +153,9 @@ fun startApplication(
     }
   }
 
-  val initAwtToolkitJob = scheduleInitAwtToolkit(scope, lockSystemDirsJob, busyThread)
+  val initAwtToolkitJob = scheduleInitAwtToolkit(scope = scope, lockSystemDirsJob = lockSystemDirsJob, busyThread = busyThread)
   val initBaseLafJob = scope.launch {
-    initUi(initAwtToolkitJob, isHeadless, asyncScope = scope)
+    initUi(initAwtToolkitJob = initAwtToolkitJob, isHeadless = isHeadless, asyncScope = scope)
   }
 
   var initUiScale: Job? = null
@@ -171,9 +173,9 @@ fun startApplication(
       }
     }
 
-    scheduleUpdateFrameClassAndWindowIconAndPreloadSystemFonts(scope, initAwtToolkitJob, initUiScale, appInfoDeferred)
+    scheduleUpdateFrameClassAndWindowIconAndPreloadSystemFonts(scope = scope, initAwtToolkitJob = initAwtToolkitJob, initUiScale = initUiScale, appInfoDeferred = appInfoDeferred)
 
-    scheduleShowSplashIfNeeded(scope, lockSystemDirsJob, initUiScale, appInfoDeferred, args)
+    scheduleShowSplashIfNeeded(scope = scope, lockSystemDirsJob = lockSystemDirsJob, initUiScale = initUiScale, appInfoDeferred = appInfoDeferred, args = args)
   }
 
   val initLafJob = scope.launch {
@@ -222,23 +224,41 @@ fun startApplication(
     logDeferred.join()
     span("environment loading", Dispatchers.IO) {
       val log = logger<AppStarter>()
-      if (shouldLoadShellEnv(log)) loadEnvironment(coroutineContext.job, log) else null
+      if (shouldLoadShellEnv(log)) {
+        loadEnvironment(coroutineContext.job, log)
+      }
+      else null
     }
   }
 
-  scheduleLoadSystemLibsAndLogInfoAndInitMacApp(scope, logDeferred, appInfoDeferred, initLafJob, args, mainScope)
+  scheduleLoadSystemLibsAndLogInfoAndInitMacApp(
+    scope = scope,
+    logDeferred = logDeferred,
+    appInfoDeferred = appInfoDeferred,
+    initUiDeferred = initLafJob,
+    args = args,
+    mainScope = mainScope,
+  )
 
   val euaDocumentDeferred = scope.async { loadEuaDocument(appInfoDeferred) }
 
   val configImportDeferred = scope.async {
     importConfigIfNeeded(
-      scope, isHeadless, configImportNeededDeferred, lockSystemDirsJob, logDeferred, args,
-      customTargetDirectoryToImportConfig, appStarterDeferred, euaDocumentDeferred, initLafJob
+      scope = scope,
+      isHeadless = isHeadless,
+      configImportNeededDeferred = configImportNeededDeferred,
+      lockSystemDirsJob = lockSystemDirsJob,
+      logDeferred = logDeferred,
+      args = args,
+      customTargetDirectoryToImportConfig = customTargetDirectoryToImportConfig,
+      appStarterDeferred = appStarterDeferred,
+      euaDocumentDeferred = euaDocumentDeferred,
+      initLafJob = initLafJob,
     )
   }
 
   configImportDeferred.invokeOnCompletion {
-    // after updating from a Community Edition to a single product we need to rename the macOS app bundle
+    // after updating from a Community Edition to a single product, we need to rename the macOS app bundle
     migrateCommunityToSingleProductIfNeeded(args)
   }
 
@@ -253,7 +273,7 @@ fun startApplication(
     // action.script and auto-update data are located in the system directory, it must be first locked before accessing
     lockSystemDirsJob.join()
     // command line starters should opt in to apply plugin updates
-    if (!AppMode.isCommandLine() || java.lang.Boolean.getBoolean(AppMode.FORCE_PLUGIN_UPDATES)) {
+    if (!AppMode.isCommandLine() || System.getProperty(AppMode.FORCE_PLUGIN_UPDATES).toBoolean()) {
       span("run action.script") {
         // Consider following steps:
         // - user opens settings, and installs some plugins;
@@ -270,10 +290,15 @@ fun startApplication(
       }
     }
 
-    PluginManagerCore.scheduleDescriptorLoading(coroutineScope = this, zipPoolDeferred, mainClassLoaderDeferred, logDeferred)
+    PluginManagerCore.scheduleDescriptorLoading(
+      coroutineScope = this,
+      zipPoolDeferred = zipPoolDeferred,
+      mainClassLoaderDeferred = mainClassLoaderDeferred,
+      logDeferred = logDeferred,
+    )
   }
 
-  val isInternal = java.lang.Boolean.getBoolean(ApplicationManagerEx.IS_INTERNAL_PROPERTY)
+  val isInternal = System.getProperty(ApplicationManagerEx.IS_INTERNAL_PROPERTY).toBoolean()
   if (isInternal) {
     scope.launch(CoroutineName("assert on missed keys enabling")) {
       BundleBase.assertOnMissedKeys(true)
@@ -316,7 +341,18 @@ fun startApplication(
     }
 
     val args = ApplicationStartArguments.stripKnownArguments(args)
-    loadApp(app, pluginSetDeferred, appInfoDeferred, euaDocumentDeferred, scope, initLafJob, logDeferred, appRegisteredJob, args, initEventQueueJob)
+    loadApp(
+      app = app,
+      pluginSetDeferred = pluginSetDeferred,
+      appInfoDeferred = appInfoDeferred,
+      euaDocumentDeferred = euaDocumentDeferred,
+      asyncScope = scope,
+      initLafJob = initLafJob,
+      logDeferred = logDeferred,
+      appRegisteredJob = appRegisteredJob,
+      args = args,
+      initAwtToolkitAndEventQueueJob = initEventQueueJob,
+    )
   }
 
   scope.launch {
@@ -581,7 +617,7 @@ private fun setupLogger(scope: CoroutineScope, consoleLoggerJob: Job, checkSyste
     val log = logger<AppStarter>()
     log.info(IDE_STARTED)
     ShutDownTracker.getInstance().registerShutdownTask { log.info(IDE_SHUTDOWN) }
-    if (java.lang.Boolean.parseBoolean(System.getProperty("intellij.log.stdout", "true"))) {
+    if (System.getProperty("intellij.log.stdout", "true").toBoolean()) {
       System.setOut(PrintStreamLogger("STDOUT", System.out))
       System.setErr(PrintStreamLogger("STDERR", System.err))
     }

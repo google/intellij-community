@@ -33,8 +33,8 @@ import org.jetbrains.kotlin.psi.psiUtil.getReceiverExpression
 import org.jetbrains.kotlin.psi.psiUtil.isCallee
 import org.jetbrains.kotlin.psi.psiUtil.parents
 
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class)
+context(_: KaSession)
 internal fun createRenameUnresolvedReferenceFix(element: KtNameReferenceExpression): IntentionAction? {
 
     val isCallee = element.isCallee()

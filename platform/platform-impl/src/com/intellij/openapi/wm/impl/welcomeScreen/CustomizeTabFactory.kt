@@ -48,7 +48,6 @@ import com.intellij.openapi.wm.WelcomeScreen
 import com.intellij.openapi.wm.WelcomeScreenTab
 import com.intellij.openapi.wm.WelcomeTabFactory
 import com.intellij.openapi.wm.impl.welcomeScreen.TabbedWelcomeScreen.DefaultWelcomeScreenTab
-import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.UIBundle
 import com.intellij.ui.components.AnActionLink
 import com.intellij.ui.components.JBLabel
@@ -63,6 +62,7 @@ import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.selected
+import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import com.intellij.ui.layout.ComponentPredicate
 import com.intellij.ui.layout.and
 import com.intellij.ui.layout.not
@@ -346,8 +346,8 @@ private class CustomizeTab(val parentDisposable: Disposable) : DefaultWelcomeScr
           val checkBox = checkBox(UIBundle.message("welcome.screen.color.blindness.combobox.text"))
             .bindSelected(adjustColorsProperty)
             .applyToComponent { isOpaque = false }.component
-          comboBox(DefaultComboBoxModel(supportedColorBlindness.toTypedArray()), SimpleListCellRenderer.create("") {
-            PlatformEditorBundle.message(it?.key ?: "")
+          comboBox(DefaultComboBoxModel(supportedColorBlindness.toTypedArray()), textListCellRenderer("") {
+            PlatformEditorBundle.message(it.key ?: "")
           })
             .bindItem(colorBlindnessProperty)
             .comment(UIBundle.message("color.blindness.combobox.comment"))

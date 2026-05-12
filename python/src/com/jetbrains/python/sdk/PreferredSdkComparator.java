@@ -10,7 +10,7 @@ import com.jetbrains.python.sdk.legacy.PythonSdkUtil;
 import java.util.Comparator;
 
 import static com.jetbrains.python.SdkUiUtilKt.isCondaVirtualEnv;
-import static com.jetbrains.python.SdkUiUtilKt.isVirtualEnv;
+import static com.jetbrains.python.SdkUiUtilKt.isNonToolVirtualEnv;
 
 public final class PreferredSdkComparator implements Comparator<Sdk> {
   public static final PreferredSdkComparator INSTANCE = new PreferredSdkComparator();
@@ -25,14 +25,14 @@ public final class PreferredSdkComparator implements Comparator<Sdk> {
     if (remote1Weight != remote2Weight) {
       return remote2Weight - remote1Weight;
     }
-    int detectedWeight1 = o1 instanceof PyDetectedSdk ? 0 : 1;
-    int detectedWeight2 = o2 instanceof PyDetectedSdk ? 0 : 1;
+    int detectedWeight1 = PyDetectedSdk.asPyDetectedSdk(o1) != null ? 0 : 1;
+    int detectedWeight2 = PyDetectedSdk.asPyDetectedSdk(o2) != null ? 0 : 1;
     if (detectedWeight1 != detectedWeight2) {
       return detectedWeight2 - detectedWeight1;
     }
 
-    int venv1weight = isVirtualEnv(o1) || isCondaVirtualEnv(o1) ? 0 : 1;
-    int venv2weight = isVirtualEnv(o2) || isCondaVirtualEnv(o2) ? 0 : 1;
+    int venv1weight = isNonToolVirtualEnv(o1) || isCondaVirtualEnv(o1) ? 0 : 1;
+    int venv2weight = isNonToolVirtualEnv(o2) || isCondaVirtualEnv(o2) ? 0 : 1;
     if (venv1weight != venv2weight) {
       return venv2weight - venv1weight;
     }

@@ -9,6 +9,7 @@ import org.jetbrains.annotations.ApiStatus.Internal;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
+import java.nio.file.NoSuchFileException;
 
 @Internal
 public final class CachedFileContent {
@@ -26,8 +27,18 @@ public final class CachedFileContent {
   public byte @NotNull [] getBytes() throws IOException {
     if (myCachedBytes == null) {
       if (myVirtualFile.isValid()) {
-        myCachedTimeStamp = myVirtualFile.getTimeStamp();
-        myCachedBytes = myVirtualFile.contentsToByteArray(false);
+        try {
+          myCachedTimeStamp = myVirtualFile.getTimeStamp();
+          myCachedBytes = myVirtualFile.contentsToByteArray(/*cacheContent: */false);
+        }
+        catch (NoSuchFileException e) {
+          //We can't fully avoid scenarios there e.g. a third party (git) removes the file that is already queued for
+          // indexing -- and VFS haven't captured it's new state yet.
+          // So it is not an error, and we must be ready for this scenario:
+          LOG.info("File [" + myVirtualFile + "] is deleted while indexing is running", e);
+          myCachedTimeStamp = -1;
+          myCachedBytes = ArrayUtilRt.EMPTY_BYTE_ARRAY;
+        }
       }
       else {
         myCachedTimeStamp = -1;

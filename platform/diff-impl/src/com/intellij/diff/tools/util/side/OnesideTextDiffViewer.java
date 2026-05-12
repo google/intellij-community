@@ -1,10 +1,10 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diff.tools.util.side;
 
 import com.intellij.diff.DiffContext;
 import com.intellij.diff.EditorDiffViewer;
 import com.intellij.diff.actions.impl.OpenInEditorWithMouseAction;
-import com.intellij.diff.actions.impl.SetEditorSettingsAction;
+import com.intellij.diff.actions.impl.SetEditorSettingsActionGroup;
 import com.intellij.diff.contents.DocumentContent;
 import com.intellij.diff.requests.ContentDiffRequest;
 import com.intellij.diff.requests.DiffRequest;
@@ -36,14 +36,14 @@ import java.util.List;
 public abstract class OnesideTextDiffViewer extends OnesideDiffViewer<TextEditorHolder> implements EditorDiffViewer {
   private final @NotNull List<? extends EditorEx> myEditableEditors;
 
-  protected final @NotNull SetEditorSettingsAction myEditorSettingsAction;
+  protected final @NotNull SetEditorSettingsActionGroup myEditorSettingsAction;
 
   public OnesideTextDiffViewer(@NotNull DiffContext context, @NotNull ContentDiffRequest request) {
     super(context, request, TextEditorHolder.TextEditorHolderFactory.INSTANCE);
 
     myEditableEditors = TextDiffViewerUtil.getEditableEditors(getEditors());
 
-    myEditorSettingsAction = new SetEditorSettingsAction(getTextSettings(), getEditors());
+    myEditorSettingsAction = new SetEditorSettingsActionGroup(getTextSettings(), getEditors());
     myEditorSettingsAction.applyDefaults();
 
     new MyOpenInEditorWithMouseAction().install(getEditors());

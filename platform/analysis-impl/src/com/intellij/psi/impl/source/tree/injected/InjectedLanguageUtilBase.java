@@ -44,6 +44,7 @@ import com.intellij.psi.util.PsiUtilCore;
 import com.intellij.psi.util.ReadActionCache;
 import com.intellij.reference.SoftReference;
 import com.intellij.testFramework.LightVirtualFile;
+import com.intellij.util.ObjectUtils;
 import com.intellij.util.containers.ConcurrentList;
 import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.ApiStatus;
@@ -246,7 +247,8 @@ public class InjectedLanguageUtilBase {
     element = skipNonInjectablePsi(element, probeUp);
     if (element == null) return;
 
-    InjectedLanguageManagerImpl injectedManager = InjectedLanguageManagerImpl.getInstanceImpl(hostPsiFile.getProject());
+    InjectedLanguageManagerImpl injectedManager = ObjectUtils.tryCast(InjectedLanguageManager.getInstance(hostPsiFile.getProject()), InjectedLanguageManagerImpl.class) ;
+    if (injectedManager == null) return;
     InjectionResult result = null;
     PsiElement current;
 

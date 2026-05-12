@@ -1,13 +1,15 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.storage.testEntities.entities.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
 import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
-import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
@@ -28,9 +30,7 @@ internal class VFUEntity2Impl(private val dataSource: VFUEntity2Data) : VFUEntit
 
   private companion object {
 
-
-    private val connections = listOf<ConnectionId>(
-    )
+    private val connections = listOf<ConnectionId>()
 
   }
 
@@ -39,19 +39,16 @@ internal class VFUEntity2Impl(private val dataSource: VFUEntity2Data) : VFUEntit
       readField("data")
       return dataSource.data
     }
-
   override val filePath: VirtualFileUrl?
     get() {
       readField("filePath")
       return dataSource.filePath
     }
-
   override val directoryPath: VirtualFileUrl
     get() {
       readField("directoryPath")
       return dataSource.directoryPath
     }
-
   override val notNullRoots: List<VirtualFileUrl>
     get() {
       readField("notNullRoots")
@@ -82,18 +79,16 @@ internal class VFUEntity2Impl(private val dataSource: VFUEntity2Data) : VFUEntit
           error("Entity VFUEntity2 is already created in a different builder")
         }
       }
-
       this.diff = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
-      // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
-      // Builder may switch to snapshot at any moment and lock entity data to modification
+// After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
+// Builder may switch to snapshot at any moment and lock entity data to modification
       this.currentEntityData = null
-
       index(this, "filePath", this.filePath)
       index(this, "directoryPath", this.directoryPath)
       index(this, "notNullRoots", this.notNullRoots)
-      // Process linked entities that are connected without a builder
+// Process linked entities that are connected without a builder
       processLinkedEntities(builder)
       checkInitialization() // TODO uncomment and check failed tests
     }
@@ -145,7 +140,6 @@ internal class VFUEntity2Impl(private val dataSource: VFUEntity2Data) : VFUEntit
         changedProperty.add("entitySource")
 
       }
-
     override var data: String
       get() = getEntityData().data
       set(value) {
@@ -153,7 +147,6 @@ internal class VFUEntity2Impl(private val dataSource: VFUEntity2Data) : VFUEntit
         getEntityData(true).data = value
         changedProperty.add("data")
       }
-
     override var filePath: VirtualFileUrl?
       get() = getEntityData().filePath
       set(value) {
@@ -163,7 +156,6 @@ internal class VFUEntity2Impl(private val dataSource: VFUEntity2Data) : VFUEntit
         val _diff = diff
         if (_diff != null) index(this, "filePath", value)
       }
-
     override var directoryPath: VirtualFileUrl
       get() = getEntityData().directoryPath
       set(value) {
@@ -173,7 +165,6 @@ internal class VFUEntity2Impl(private val dataSource: VFUEntity2Data) : VFUEntit
         val _diff = diff
         if (_diff != null) index(this, "directoryPath", value)
       }
-
     private val notNullRootsUpdater: (value: List<VirtualFileUrl>) -> Unit = { value ->
       val _diff = diff
       if (_diff != null) index(this, "notNullRoots", value)
@@ -199,6 +190,7 @@ internal class VFUEntity2Impl(private val dataSource: VFUEntity2Data) : VFUEntit
 
     override fun getEntityClass(): Class<VFUEntity2> = VFUEntity2::class.java
   }
+
 }
 
 @OptIn(WorkspaceEntityInternalApi::class)
@@ -219,7 +211,6 @@ internal class VFUEntity2Data : WorkspaceEntityData<VFUEntity2>() {
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): VFUEntity2 {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {
@@ -231,8 +222,7 @@ internal class VFUEntity2Data : WorkspaceEntityData<VFUEntity2>() {
   }
 
   override fun getMetadata(): EntityMetadata {
-    return MetadataStorageImpl.getMetadataByTypeFqn(
-      "com.intellij.platform.workspace.storage.testEntities.entities.VFUEntity2") as EntityMetadata
+    return MetadataStorageImpl.getMetadataByTypeFqn("com.intellij.platform.workspace.storage.testEntities.entities.VFUEntity2") as EntityMetadata
   }
 
   override fun clone(): VFUEntity2Data {
@@ -260,9 +250,7 @@ internal class VFUEntity2Data : WorkspaceEntityData<VFUEntity2>() {
   override fun equals(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as VFUEntity2Data
-
     if (this.entitySource != other.entitySource) return false
     if (this.data != other.data) return false
     if (this.filePath != other.filePath) return false
@@ -274,9 +262,7 @@ internal class VFUEntity2Data : WorkspaceEntityData<VFUEntity2>() {
   override fun equalsIgnoringEntitySource(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as VFUEntity2Data
-
     if (this.data != other.data) return false
     if (this.filePath != other.filePath) return false
     if (this.directoryPath != other.directoryPath) return false

@@ -31,6 +31,7 @@ import com.intellij.util.ui.JBInsets
 import com.intellij.util.ui.JBUI.Borders.empty
 import com.intellij.util.ui.JBUI.Panels.simplePanel
 import com.intellij.util.ui.UIUtil.getRegularPanelInsets
+import git4idea.config.GitVcsApplicationSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -145,6 +146,9 @@ internal class CloneDialogLoginPanel(
           .addWarningForPersistentCredentials(cs, accountManager.canPersistCredentials, ::panel)
           .align(AlignX.RIGHT)
       }
+      AccountsPanelFactory
+        .addWarningForEnabledCredentialHelper(GitVcsApplicationSettings.getInstance().isUseCredentialHelper, ::panel)
+        .align(AlignX.RIGHT)
     }
 
   fun cancelLogin() {

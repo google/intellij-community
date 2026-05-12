@@ -254,7 +254,7 @@ public class MethodDuplicatesHandler implements RefactoringActionHandler, Contex
             }
           }
           if (!matchList.isEmpty()) {
-            duplicates.computeIfAbsent(member, __ -> new ArrayList<>()).addAll(matchList);
+            duplicates.computeIfAbsent(member, _ -> new ArrayList<>()).addAll(matchList);
           }
         }
       }

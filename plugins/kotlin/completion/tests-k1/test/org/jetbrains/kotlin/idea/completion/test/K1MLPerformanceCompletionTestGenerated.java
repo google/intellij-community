@@ -728,9 +728,19 @@ public abstract class K1MLPerformanceCompletionTestGenerated extends AbstractK1M
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
+            @TestMetadata("CompanionObjectAsFactory.kt")
+            public void testCompanionObjectAsFactory() throws Exception {
+                runTest("../testData/basic/common/companionObject/CompanionObjectAsFactory.kt");
+            }
+
             @TestMetadata("ForArguments.kt")
             public void testForArguments() throws Exception {
                 runTest("../testData/basic/common/companionObject/ForArguments.kt");
+            }
+
+            @TestMetadata("ForArgumentsNamedCompanion.kt")
+            public void testForArgumentsNamedCompanion() throws Exception {
+                runTest("../testData/basic/common/companionObject/ForArgumentsNamedCompanion.kt");
             }
 
             @TestMetadata("FunctionsForExpectedType.kt")
@@ -738,14 +748,94 @@ public abstract class K1MLPerformanceCompletionTestGenerated extends AbstractK1M
                 runTest("../testData/basic/common/companionObject/FunctionsForExpectedType.kt");
             }
 
+            @TestMetadata("FunctionsForExpectedTypeNamedCompanion.kt")
+            public void testFunctionsForExpectedTypeNamedCompanion() throws Exception {
+                runTest("../testData/basic/common/companionObject/FunctionsForExpectedTypeNamedCompanion.kt");
+            }
+
+            @TestMetadata("InheritedMembersExpectedType.kt")
+            public void testInheritedMembersExpectedType() throws Exception {
+                runTest("../testData/basic/common/companionObject/InheritedMembersExpectedType.kt");
+            }
+
+            @TestMetadata("InheritedMembersExpectedTypeNamedCompanion.kt")
+            public void testInheritedMembersExpectedTypeNamedCompanion() throws Exception {
+                runTest("../testData/basic/common/companionObject/InheritedMembersExpectedTypeNamedCompanion.kt");
+            }
+
+            @TestMetadata("InheritedMembersInNestedScope.kt")
+            public void testInheritedMembersInNestedScope() throws Exception {
+                runTest("../testData/basic/common/companionObject/InheritedMembersInNestedScope.kt");
+            }
+
+            @TestMetadata("InheritedMembersInSubclass.kt")
+            public void testInheritedMembersInSubclass() throws Exception {
+                runTest("../testData/basic/common/companionObject/InheritedMembersInSubclass.kt");
+            }
+
+            @TestMetadata("InterfaceCompanionExpectedType.kt")
+            public void testInterfaceCompanionExpectedType() throws Exception {
+                runTest("../testData/basic/common/companionObject/InterfaceCompanionExpectedType.kt");
+            }
+
+            @TestMetadata("LambdaReturnValue.kt")
+            public void testLambdaReturnValue() throws Exception {
+                runTest("../testData/basic/common/companionObject/LambdaReturnValue.kt");
+            }
+
             @TestMetadata("NoUnrelatedValues.kt")
             public void testNoUnrelatedValues() throws Exception {
                 runTest("../testData/basic/common/companionObject/NoUnrelatedValues.kt");
             }
 
+            @TestMetadata("NullableExpectedType.kt")
+            public void testNullableExpectedType() throws Exception {
+                runTest("../testData/basic/common/companionObject/NullableExpectedType.kt");
+            }
+
+            @TestMetadata("PrivateMembers.kt")
+            public void testPrivateMembers() throws Exception {
+                runTest("../testData/basic/common/companionObject/PrivateMembers.kt");
+            }
+
+            @TestMetadata("SmartCastIsCheck.kt")
+            public void testSmartCastIsCheck() throws Exception {
+                runTest("../testData/basic/common/companionObject/SmartCastIsCheck.kt");
+            }
+
+            @TestMetadata("SmartCastNamedArgument.kt")
+            public void testSmartCastNamedArgument() throws Exception {
+                runTest("../testData/basic/common/companionObject/SmartCastNamedArgument.kt");
+            }
+
+            @TestMetadata("SmartCastNullCheck.kt")
+            public void testSmartCastNullCheck() throws Exception {
+                runTest("../testData/basic/common/companionObject/SmartCastNullCheck.kt");
+            }
+
+            @TestMetadata("SmartCastSafeCast.kt")
+            public void testSmartCastSafeCast() throws Exception {
+                runTest("../testData/basic/common/companionObject/SmartCastSafeCast.kt");
+            }
+
+            @TestMetadata("TypeAliasToUnderlyingClass.kt")
+            public void testTypeAliasToUnderlyingClass() throws Exception {
+                runTest("../testData/basic/common/companionObject/TypeAliasToUnderlyingClass.kt");
+            }
+
             @TestMetadata("ValuesForExpectedType.kt")
             public void testValuesForExpectedType() throws Exception {
                 runTest("../testData/basic/common/companionObject/ValuesForExpectedType.kt");
+            }
+
+            @TestMetadata("ValuesForExpectedTypeNamedCompanion.kt")
+            public void testValuesForExpectedTypeNamedCompanion() throws Exception {
+                runTest("../testData/basic/common/companionObject/ValuesForExpectedTypeNamedCompanion.kt");
+            }
+
+            @TestMetadata("WhenBranchResult.kt")
+            public void testWhenBranchResult() throws Exception {
+                runTest("../testData/basic/common/companionObject/WhenBranchResult.kt");
             }
 
             @TestMetadata("WithinCompanionObject.kt")
@@ -3363,9 +3453,14 @@ public abstract class K1MLPerformanceCompletionTestGenerated extends AbstractK1M
                 runTest("../testData/basic/common/AfterIntSeparatedWithComments.kt");
             }
 
-            @TestMetadata("AlwaysCompleteNonSubPackages.kt")
-            public void testAlwaysCompleteNonSubPackages() throws Exception {
-                runTest("../testData/basic/common/AlwaysCompleteNonSubPackages.kt");
+            @TestMetadata("AlwaysCompleteNonSubPackagesInExpression.kt")
+            public void testAlwaysCompleteNonSubPackagesInExpression() throws Exception {
+                runTest("../testData/basic/common/AlwaysCompleteNonSubPackagesInExpression.kt");
+            }
+
+            @TestMetadata("AlwaysCompleteNonSubPackagesInType.kt")
+            public void testAlwaysCompleteNonSubPackagesInType() throws Exception {
+                runTest("../testData/basic/common/AlwaysCompleteNonSubPackagesInType.kt");
             }
 
             @TestMetadata("AlwaysCompleteTopLevelPackagesInImport.kt")
@@ -4108,9 +4203,14 @@ public abstract class K1MLPerformanceCompletionTestGenerated extends AbstractK1M
                 runTest("../testData/basic/common/NoTopLevelCompletionInQualifiedUserTypes.kt");
             }
 
-            @TestMetadata("NoTopLevelPackagesIfDisabled.kt")
-            public void testNoTopLevelPackagesIfDisabled() throws Exception {
-                runTest("../testData/basic/common/NoTopLevelPackagesIfDisabled.kt");
+            @TestMetadata("NoTopLevelPackagesInExpressionIfDisabled.kt")
+            public void testNoTopLevelPackagesInExpressionIfDisabled() throws Exception {
+                runTest("../testData/basic/common/NoTopLevelPackagesInExpressionIfDisabled.kt");
+            }
+
+            @TestMetadata("NoTopLevelPackagesInTypeIfDisabled.kt")
+            public void testNoTopLevelPackagesInTypeIfDisabled() throws Exception {
+                runTest("../testData/basic/common/NoTopLevelPackagesInTypeIfDisabled.kt");
             }
 
             @TestMetadata("ObjectInTypePosition.kt")
@@ -4151,6 +4251,11 @@ public abstract class K1MLPerformanceCompletionTestGenerated extends AbstractK1M
             @TestMetadata("PreferExceptionsInThrow.kt")
             public void testPreferExceptionsInThrow() throws Exception {
                 runTest("../testData/basic/common/PreferExceptionsInThrow.kt");
+            }
+
+            @TestMetadata("PreferInstantiationOverAnonymousObject.kt")
+            public void testPreferInstantiationOverAnonymousObject() throws Exception {
+                runTest("../testData/basic/common/PreferInstantiationOverAnonymousObject.kt");
             }
 
             @TestMetadata("PreferLessParameters.kt")
@@ -4761,6 +4866,71 @@ public abstract class K1MLPerformanceCompletionTestGenerated extends AbstractK1M
             @TestMetadata("TypeAlias.kt")
             public void testTypeAlias() throws Exception {
                 runTest("../testData/basic/java/importAliases/TypeAlias.kt");
+            }
+        }
+
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../testData/basic/java/SAM")
+        @PerformanceUnitTest
+        public static class SAM extends AbstractK1MLPerformanceCompletionTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K1;
+            }
+
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("GenericKotlinFunInterface.kt")
+            public void testGenericKotlinFunInterface() throws Exception {
+                runTest("../testData/basic/java/SAM/GenericKotlinFunInterface.kt");
+            }
+
+            @TestMetadata("JavaConsumer.kt")
+            public void testJavaConsumer() throws Exception {
+                runTest("../testData/basic/java/SAM/JavaConsumer.kt");
+            }
+
+            @TestMetadata("KotlinFunInterface.kt")
+            public void testKotlinFunInterface() throws Exception {
+                runTest("../testData/basic/java/SAM/KotlinFunInterface.kt");
+            }
+
+            @TestMetadata("KotlinFunInterfaceMultiParam.kt")
+            public void testKotlinFunInterfaceMultiParam() throws Exception {
+                runTest("../testData/basic/java/SAM/KotlinFunInterfaceMultiParam.kt");
+            }
+
+            @TestMetadata("KotlinFunInterfaceWithDefaultMethod.kt")
+            public void testKotlinFunInterfaceWithDefaultMethod() throws Exception {
+                runTest("../testData/basic/java/SAM/KotlinFunInterfaceWithDefaultMethod.kt");
+            }
+
+            @TestMetadata("KotlinFunInterfaceWithParam.kt")
+            public void testKotlinFunInterfaceWithParam() throws Exception {
+                runTest("../testData/basic/java/SAM/KotlinFunInterfaceWithParam.kt");
+            }
+
+            @TestMetadata("SAMExpected1.kt")
+            public void testSAMExpected1() throws Exception {
+                runTest("../testData/basic/java/SAM/SAMExpected1.kt");
+            }
+
+            @TestMetadata("SAMExpected2.kt")
+            public void testSAMExpected2() throws Exception {
+                runTest("../testData/basic/java/SAM/SAMExpected2.kt");
+            }
+
+            @TestMetadata("SamAsArgument.kt")
+            public void testSamAsArgument() throws Exception {
+                runTest("../testData/basic/java/SAM/SamAsArgument.kt");
+            }
+
+            @TestMetadata("SamInReturnStatement.kt")
+            public void testSamInReturnStatement() throws Exception {
+                runTest("../testData/basic/java/SAM/SamInReturnStatement.kt");
             }
         }
 

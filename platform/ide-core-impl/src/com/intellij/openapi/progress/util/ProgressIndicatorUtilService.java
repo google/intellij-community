@@ -4,7 +4,7 @@ package com.intellij.openapi.progress.util;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationListener;
-import com.intellij.openapi.application.WriteLockReacquisitionListener;
+import com.intellij.openapi.application.WriteIntentReadActionListener;
 import com.intellij.openapi.application.ex.ApplicationEx;
 import com.intellij.openapi.application.ex.ApplicationManagerEx;
 import com.intellij.openapi.components.Service;
@@ -36,10 +36,12 @@ final class ProgressIndicatorUtilService implements Disposable {
         cancelActionsToBeCancelledBeforeWrite();
       }
     }, this);
-    myApplication.addSuspendingWriteActionListener(new WriteLockReacquisitionListener() {
+    myApplication.addWriteIntentReadActionListener(new WriteIntentReadActionListener() {
       @Override
-      public void beforeWriteLockReacquired() {
-        cancelActionsToBeCancelledBeforeWrite();
+      public void beforeWriteLockParallelizationEnds(boolean isWriteActionPending) {
+        if (isWriteActionPending) {
+          cancelActionsToBeCancelledBeforeWrite();
+        }
       }
     }, this);
   }

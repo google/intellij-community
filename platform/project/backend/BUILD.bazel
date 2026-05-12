@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.project.backend` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "backend_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "backend",
   module_name = "intellij.platform.project.backend",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":backend_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/util",
     "@lib//:kotlin-stdlib",
@@ -25,12 +20,14 @@ jvm_library(
     "//platform/platform-api:ide",
     "//platform/analysis-api:analysis",
     "//platform/platform-impl/rpc",
+    "//fleet/rhizomedb",
   ],
   runtime_deps = ["//platform/backend"]
 )
 
 jvm_library(
   name = "backend_test_lib",
+  testonly = True,
   module_name = "intellij.platform.project.backend",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -47,6 +44,13 @@ jvm_library(
     "//platform/platform-api:ide_test_lib",
     "//platform/analysis-api:analysis_test_lib",
     "//platform/platform-impl/rpc:rpc_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.project.backend` end
+
+### auto-generated section `iml intellij.platform.project.backend` start
+exports_files([
+  "intellij.platform.project.backend.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.project.backend` end

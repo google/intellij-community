@@ -1,4 +1,4 @@
-<node text="Value.name  ()" base="true">
-  <node text="User.main(String[])  ()"/>
-  <node text="Value.x(Value)  ()"/>
+<node text="name (Value)" base="true">
+  <node text="main(String[]) (User)"/>
+  <node text="x(Value) (Value)"/>
 </node>

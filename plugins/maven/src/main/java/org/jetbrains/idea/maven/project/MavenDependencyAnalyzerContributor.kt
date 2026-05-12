@@ -17,7 +17,6 @@ import com.intellij.openapi.externalSystem.dependency.analyzer.DependencyAnalyze
 import com.intellij.openapi.externalSystem.util.ExternalSystemBundle.message
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
-import com.intellij.openapi.util.Pair
 import org.jetbrains.annotations.Nls
 import org.jetbrains.idea.maven.model.MavenArtifactNode
 import org.jetbrains.idea.maven.model.MavenArtifactState
@@ -29,12 +28,11 @@ import com.intellij.openapi.externalSystem.dependency.analyzer.DependencyAnalyze
 class MavenDependencyAnalyzerContributor(private val project: Project) : DependencyAnalyzerContributor {
 
   override fun whenDataChanged(listener: () -> Unit, parentDisposable: Disposable) {
-    val projectsManager = MavenProjectsManager.getInstance(project)
-    projectsManager.addProjectsTreeListener(object : MavenProjectsTree.Listener {
-      override fun projectResolved(projectWithChanges: Pair<MavenProject, MavenProjectChanges>) {
+    project.messageBus.connect(parentDisposable).subscribe(MavenProjectsTree.Listener.TOPIC, object : MavenProjectsTree.Listener {
+      override fun projectsResolved(projects: List<MavenProject>) {
         listener()
       }
-    }, parentDisposable)
+    })
   }
 
   override fun getProjects(): List<DependencyAnalyzerProject> {

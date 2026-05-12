@@ -6,7 +6,7 @@ import com.intellij.ide.util.newProjectWizard.impl.FrameworkSupportModelBase;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.VerticalFlowLayout;
 import com.intellij.openapi.util.NlsContexts;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.ui.FormBuilder;
 
 import javax.swing.JPanel;
@@ -30,7 +30,7 @@ public class FrameworkVersionComponent {
     myMainPanel = new JPanel(new VerticalFlowLayout(VerticalFlowLayout.TOP, 0, 3, true, false));
     myFrameworkOrGroupId = frameworkOrGroupId;
     myVersionsBox = new ComboBox<>();
-    myVersionsBox.setRenderer(SimpleListCellRenderer.create("", PresentableVersion::getPresentableName));
+    myVersionsBox.setRenderer(BuilderKt.textListCellRenderer("", PresentableVersion::getPresentableName));
     myVersionsBox.addActionListener(new ActionListener() {
       @Override
       public void actionPerformed(ActionEvent e) {

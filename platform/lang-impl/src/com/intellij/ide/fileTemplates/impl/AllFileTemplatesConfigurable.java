@@ -281,7 +281,7 @@ public final class AllFileTemplatesConfigurable implements SearchableConfigurabl
     }
 
     editor = new FileTemplateConfigurable(myProject);
-    editor.addChangeListener(__ -> onEditorChanged());
+    editor.addChangeListener(_ -> onEditorChanged());
     myEditorComponent = editor.createComponent();
     myEditorComponent.setBorder(JBUI.Borders.empty(10, 0, 10, 10));
 
@@ -296,7 +296,7 @@ public final class AllFileTemplatesConfigurable implements SearchableConfigurabl
       myTabbedPane.addTab(tab.getTitle(), fakePanel);
     }
 
-    myTabbedPane.addChangeListener(__ -> onTabChanged());
+    myTabbedPane.addChangeListener(_ -> onTabChanged());
 
     DefaultActionGroup group = new DefaultActionGroup();
     AnAction removeAction = new DumbAwareAction(IdeBundle.message("action.remove.template"), null, AllIcons.General.Remove) {

@@ -2,6 +2,7 @@
 package git4idea.rebase.log
 
 import com.intellij.openapi.util.NlsContexts
+import com.intellij.openapi.util.NlsSafe
 import com.intellij.vcs.log.Hash
 import com.intellij.vcs.log.impl.HashImpl
 import git4idea.GitUtil
@@ -12,6 +13,8 @@ import git4idea.history.GitLogUtil
 import git4idea.rebase.GitRebaseUtils.getCommitsRangeToRebase
 import git4idea.repo.GitRepository
 import git4idea.reset.GitResetMode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal sealed class GitCommitEditingOperationResult {
   class Complete(
@@ -30,8 +33,8 @@ internal sealed class GitCommitEditingOperationResult {
       return changedCommits.lastOrNull()?.id
     }
 
-    fun checkUndoPossibility(): UndoPossibility {
-      repository.update()
+    suspend fun checkUndoPossibility(): UndoPossibility {
+      withContext(Dispatchers.IO) { repository.update() }
       if (repository.currentRevision != newHead) {
         return UndoPossibility.Impossible.HeadMoved
       }
@@ -79,6 +82,10 @@ internal sealed class GitCommitEditingOperationResult {
       object Possible : UndoPossibility()
     }
   }
+
+  data class Conflict(
+    val description: @NlsSafe String, // git output describing the merge conflict
+  ) : GitCommitEditingOperationResult()
 
   object Incomplete : GitCommitEditingOperationResult()
 }

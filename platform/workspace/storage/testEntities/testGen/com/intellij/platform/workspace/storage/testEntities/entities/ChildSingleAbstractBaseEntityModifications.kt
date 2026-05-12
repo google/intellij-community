@@ -15,7 +15,8 @@ interface ChildSingleAbstractBaseEntityBuilder<T : ChildSingleAbstractBaseEntity
   var parentEntity: ParentSingleAbEntityBuilder
 }
 
-internal object ChildSingleAbstractBaseEntityType : EntityType<ChildSingleAbstractBaseEntity, ChildSingleAbstractBaseEntityBuilder<ChildSingleAbstractBaseEntity>>() {
+internal object ChildSingleAbstractBaseEntityType :
+  EntityType<ChildSingleAbstractBaseEntity, ChildSingleAbstractBaseEntityBuilder<ChildSingleAbstractBaseEntity>>() {
   override val entityClass: Class<ChildSingleAbstractBaseEntity> get() = ChildSingleAbstractBaseEntity::class.java
   operator fun invoke(
     commonData: String,

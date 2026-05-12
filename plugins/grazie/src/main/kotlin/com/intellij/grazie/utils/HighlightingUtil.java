@@ -18,6 +18,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.ModificationTracker;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vcs.ui.CommitMessage;
@@ -26,6 +27,7 @@ import com.intellij.psi.FileViewProvider;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.util.CachedValueProvider;
 import com.intellij.psi.util.CachedValuesManager;
+import com.intellij.util.ConcurrencyUtil;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.text.StringOperation;
 import one.util.streamex.StreamEx;
@@ -43,6 +45,7 @@ import static com.intellij.grazie.text.TextExtractor.findAllTextContents;
 public final class HighlightingUtil {
 
   private final static Logger LOGGER = Logger.getInstance(HighlightingUtil.class);
+  private static final Key<Object> LOCK = Key.create("grazie reliable language detection cache lock");
 
   public static final Comparator<TextContent> BY_TEXT_START = Comparator.comparing(tc -> tc.textOffsetToFile(0));
 
@@ -60,6 +63,10 @@ public final class HighlightingUtil {
 
   public static boolean isTooLargeText(List<TextContent> texts) {
     return texts.stream().mapToInt(t -> t.length()).sum() > MAX_TEXT_LENGTH_IN_PSI_ELEMENT;
+  }
+
+  public static boolean isTooLargeText(TextContent text) {
+    return text.length() > MAX_TEXT_LENGTH_IN_PSI_ELEMENT;
   }
 
   public static void applyTextChanges(Document document, List<StringOperation> changes) {
@@ -91,13 +98,16 @@ public final class HighlightingUtil {
   }
 
   public static List<TextContent> getAllFileTexts(FileViewProvider vp) {
-    return CachedValuesManager.getManager(vp.getManager().getProject()).getCachedValue(vp, () -> {
-      List<TextContent> contents = ContainerUtil.sorted(findAllTextContents(vp, TextDomain.ALL), BY_TEXT_START);
-      PsiFile file = vp.getAllFiles().getFirst();
-      TextContentRelatedData contentRelatedData = new TextContentRelatedData(file, contents);
-      LOGGER.debug("Evaluating texts of:", contentRelatedData);
-      return CachedValueProvider.Result.create(contentRelatedData, file, grazieConfigTracker());
-    }).getContents();
+    Object lock = ConcurrencyUtil.computeIfAbsent(vp, LOCK, Object::new);
+    synchronized (lock) {
+      return CachedValuesManager.getManager(vp.getManager().getProject()).getCachedValue(vp, () -> {
+        List<TextContent> contents = ContainerUtil.sorted(findAllTextContents(vp, TextDomain.ALL), BY_TEXT_START);
+        PsiFile file = vp.getAllFiles().getFirst();
+        TextContentRelatedData contentRelatedData = new TextContentRelatedData(file, contents);
+        LOGGER.debug("Evaluating texts of:", contentRelatedData);
+        return CachedValueProvider.Result.create(contentRelatedData, file, grazieConfigTracker());
+      }).getContents();
+    }
   }
 
   public static boolean isSpace(Character symbol) {

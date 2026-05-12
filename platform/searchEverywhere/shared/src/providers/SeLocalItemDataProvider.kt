@@ -5,6 +5,7 @@ import com.intellij.ide.SearchTopHitProvider
 import com.intellij.ide.actions.searcheverywhere.statistics.SearchEverywhereUsageTriggerCollector
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.EDT
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.platform.scopes.SearchScopesInfo
@@ -19,6 +20,7 @@ import com.intellij.platform.searchEverywhere.SeItemsPreviewProvider
 import com.intellij.platform.searchEverywhere.SeItemsProvider
 import com.intellij.platform.searchEverywhere.SeItemsProviderWithPossibleOperationDisposable
 import com.intellij.platform.searchEverywhere.SeParams
+import com.intellij.platform.searchEverywhere.SePossibleInternalCommandsHandling
 import com.intellij.platform.searchEverywhere.SePreviewInfo
 import com.intellij.platform.searchEverywhere.SeProviderId
 import com.intellij.platform.searchEverywhere.SeSearchScopesProvider
@@ -29,6 +31,7 @@ import com.intellij.platform.searchEverywhere.providers.target.SeTypeVisibilityS
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.channelFlow
@@ -38,12 +41,52 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import java.util.UUID
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.incrementAndFetch
+
+private fun SeItemsProvider.shouldTreatQueryAsCommand(query: String): Boolean {
+  if (this !is SePossibleInternalCommandsHandling) return query.mightBeACommandQuery
+  return shouldTreatAsACommandQuery(query) ?: query.mightBeACommandQuery
+}
+
+private fun SeItemsProvider.shouldTreatQueryAsCommandWithArg(query: String): Boolean {
+  if (this !is SePossibleInternalCommandsHandling) return query.mightBeACommandWithArg
+  return shouldTreatAsACommandQueryWithArg(query) ?: query.mightBeACommandWithArg
+}
+
+private val String.mightBeACommandQuery get() = startsWith(SearchTopHitProvider.getTopHitAccelerator()) && !contains(" ")
+private val String.mightBeACommandWithArg get() = startsWith(SearchTopHitProvider.getTopHitAccelerator()) && contains(" ")
+
+@ApiStatus.Internal
+fun SeItemsProvider.isPreviewEnabled(): Boolean {
+  return this is SeItemsPreviewProvider
+}
+
+@ApiStatus.Internal
+fun SeItemsProvider.isExtendedInfoEnabled(): Boolean {
+  return this is SeExtendedInfoProvider
+}
+
+@ApiStatus.Internal
+fun SeItemsProvider.areCommandsSupported(): Boolean {
+  if (this is SeAdaptedItemsProvider) {
+    return this.isCommandsSupported()
+  }
+  return this is SeCommandsProviderInterface
+}
+
+@ApiStatus.Internal
+fun SeItemsProvider.getSupportedCommands(): List<SeCommandInfo> {
+  if (this is SeAdaptedItemsProvider) {
+    return this.getSupportedCommands()
+  }
+  return (this as? SeCommandsProviderInterface)?.getSupportedCommands() ?: emptyList()
+}
 
 @ApiStatus.Internal
 class SeLocalItemDataProvider(
@@ -81,7 +124,7 @@ class SeLocalItemDataProvider(
     params: SeParams,
     counter: AtomicInt,
   ): Flow<SeItemData> = channelFlow {
-    val supportedCommands = getSupportedCommands()
+    val supportedCommands = provider.getSupportedCommands()
     val commandItems = getCommandItems(params, supportedCommands)
 
     for (item in commandItems) {
@@ -101,7 +144,7 @@ class SeLocalItemDataProvider(
 
   private fun getCommandItems(params: SeParams, supportedCommands: List<SeCommandInfo>): List<SeCommandItem> {
     val inputQuery = params.inputQuery
-    if (!inputQuery.isCommandQuery) return emptyList()
+    if (!provider.shouldTreatQueryAsCommand(inputQuery)) return emptyList()
 
     val commandPrefix = SearchTopHitProvider.getTopHitAccelerator()
     val typedCommand = inputQuery.removePrefix(commandPrefix)
@@ -132,17 +175,9 @@ class SeLocalItemDataProvider(
   private fun itemsRawChannelFlow(params: SeParams, operationDisposable: Disposable?): Flow<SeItem> {
     return channelFlow {
       try {
-        if (provider is SeItemsProviderWithPossibleOperationDisposable && operationDisposable != null) {
-          provider.collectItemsWithOperationLifetime(params, operationDisposable) { item ->
-            send(item)
-            coroutineContext.isActive
-          }
-        }
-        else {
-          provider.collectItems(params) { item ->
-            send(item)
-            coroutineContext.isActive
-          }
+        collectItemsWithRetry(params, operationDisposable) { item ->
+          send(item)
+          coroutineContext.isActive
         }
       }
       catch (e: Throwable) {
@@ -154,12 +189,56 @@ class SeLocalItemDataProvider(
     }
   }
 
+  private suspend fun collectItemsWithRetry(
+    params: SeParams,
+    operationDisposable: Disposable?,
+    collector: SeItemsProvider.Collector,
+  ) {
+    val context = currentCoroutineContext()
+    var attempt = 0
+    while (true) {
+      attempt++
+      try {
+        collectItemsOnce(params, operationDisposable, collector)
+        return
+      }
+      catch (e: ProcessCanceledException) {
+        if (!context.isActive) {
+          throw e
+        }
+      }
+      catch (e: CancellationException) {
+        if (!context.isActive) {
+          throw e
+        }
+      }
+
+      SeLog.log(SeLog.ITEM_EMIT) {
+        "Retrying item collection from ${provider.id}($logLabel) after canceled attempt #$attempt"
+      }
+      yield()
+    }
+  }
+
+  private suspend fun collectItemsOnce(
+    params: SeParams,
+    operationDisposable: Disposable?,
+    collector: SeItemsProvider.Collector,
+  ) {
+    if (provider is SeItemsProviderWithPossibleOperationDisposable && operationDisposable != null) {
+      provider.collectItemsWithOperationLifetime(params, operationDisposable, collector)
+    }
+    else {
+      provider.collectItems(params, collector)
+    }
+  }
+
   //// Rider ShowInUsagesView needs to prolong a union lifetime in its internals so that it could display the
   //// usages in the find tool window :( sorry, the code is very legacy and hard to redesign
   @ApiStatus.Internal
   @OptIn(ExperimentalAtomicApi::class)
   fun getRawItemsWithOperationLifetime(params: SeParams, operationDisposable: Disposable): Flow<SeItem> {
-    if (params.inputQuery.isCommandWithArgs && !isCommandsSupported()) {
+    if (provider.shouldTreatQueryAsCommandWithArg(params.inputQuery) && !provider.areCommandsSupported()) {
       return emptyFlow()
     }
     return itemsRawChannelFlow(params, operationDisposable)
@@ -167,7 +246,7 @@ class SeLocalItemDataProvider(
 
   @OptIn(ExperimentalAtomicApi::class)
   fun getRawItems(params: SeParams): Flow<SeItem> {
-    if (params.inputQuery.isCommandWithArgs && !isCommandsSupported()) {
+    if (provider.shouldTreatQueryAsCommandWithArg(params.inputQuery) && !provider.areCommandsSupported()) {
       return emptyFlow()
     }
 
@@ -210,33 +289,8 @@ class SeLocalItemDataProvider(
     return (provider as? SeItemsPreviewProvider)?.getPreviewInfo(item, project)
   }
 
-  fun isPreviewEnabled(): Boolean {
-    return provider is SeItemsPreviewProvider
-  }
-
-  fun isExtendedInfoEnabled(): Boolean {
-    return provider is SeExtendedInfoProvider
-  }
-
-  fun isCommandsSupported(): Boolean {
-    if (provider is SeAdaptedItemsProvider) {
-      return provider.isCommandsSupported()
-    }
-    return provider is SeCommandsProviderInterface
-  }
-
-  fun getSupportedCommands(): List<SeCommandInfo> {
-    if (provider is SeAdaptedItemsProvider) {
-      return provider.getSupportedCommands()
-    }
-    return (provider as? SeCommandsProviderInterface)?.getSupportedCommands() ?: emptyList()
-  }
-
   override fun dispose() {
     SeLog.log(SeLog.LIFE_CYCLE, "$logLabel provider ${id.value} disposed")
     Disposer.dispose(provider)
   }
 }
-
-private val String.isCommandQuery get() = startsWith(SearchTopHitProvider.getTopHitAccelerator()) && !contains(" ")
-private val String.isCommandWithArgs get() = startsWith(SearchTopHitProvider.getTopHitAccelerator()) && contains(" ")

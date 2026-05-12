@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.idea.maven.utils
 
 import com.intellij.codeInsight.actions.ReformatCodeProcessor
@@ -89,7 +89,6 @@ import org.jetbrains.idea.maven.utils.MavenArtifactUtil.readPluginInfo
 import org.jetbrains.idea.maven.utils.MavenEelUtil.resolveLocalRepositoryBlocking
 import org.jetbrains.idea.maven.utils.MavenEelUtil.resolveM2Dir
 import org.jetbrains.idea.maven.utils.MavenEelUtil.resolveUserSettingsPathBlocking
-import org.jetbrains.idea.maven.utils.MavenUtil.path
 import org.xml.sax.SAXException
 import org.xml.sax.SAXParseException
 import org.xml.sax.helpers.DefaultHandler
@@ -147,6 +146,7 @@ object MavenUtil {
   val SYSTEM_ID: ProjectSystemId = ProjectSystemId(MAVEN_NAME_UPCASE)
   const val MAVEN_NOTIFICATION_GROUP: String = MAVEN_NAME
   const val SETTINGS_XML: String = "settings.xml"
+  const val TOOLCHAINS_XML: String = "toolchains.xml"
   const val DOT_M2_DIR: String = ".m2"
   const val ENV_M2_HOME: String = "M2_HOME"
   const val M2_DIR: String = "m2"
@@ -377,14 +377,6 @@ object MavenUtil {
       MavenLog.LOG.trace("return $baseDir as baseDir")
     }
     return baseDir
-  }
-
-  @JvmStatic
-  fun findProfilesXmlFile(pomFile: VirtualFile?): VirtualFile? {
-    if (pomFile == null) return null
-    val parent = pomFile.getParent()
-    if (parent == null || !parent.isValid()) return null
-    return parent.findChild(MavenConstants.PROFILES_XML)
   }
 
   fun getProfilesXmlNioFile(pomFile: VirtualFile?): Path? {
@@ -2023,6 +2015,22 @@ object MavenUtil {
       .filter { it.isNotBlank() }
     return schemaLocations.all {
       Maven4SchemaVersionChecker.is410Xsd(it)
+    }
+  }
+
+  /**
+   * MNG-7805: Since Maven 4.0.0-alpha-7, modelVersion is optional and inferred from namespace.
+   * @return inferred modelVersion from xmlns, or null if not inferrable
+   */
+  @JvmStatic
+  fun inferModelVersionFromNamespace(xmlns: String?): String? {
+    if (xmlns == null) return null
+    val prefix = "http://maven.apache.org/POM/"
+    val prefixHttps = "https://maven.apache.org/POM/"
+    return when {
+      xmlns.startsWith(prefix) -> xmlns.removePrefix(prefix)
+      xmlns.startsWith(prefixHttps) -> xmlns.removePrefix(prefixHttps)
+      else -> null
     }
   }
 }

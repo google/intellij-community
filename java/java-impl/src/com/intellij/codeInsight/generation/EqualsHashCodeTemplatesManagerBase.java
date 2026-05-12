@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.generation;
 
 import com.intellij.openapi.project.Project;
@@ -63,8 +63,7 @@ public abstract class EqualsHashCodeTemplatesManagerBase extends TemplatesManage
   }
 
   public void setDefaultTemplate(String name) {
-    Set<String> fullNames = ContainerUtil.newHashSet(toEqualsName(name),
-                                                     toHashCodeName(name));
+    Set<String> fullNames = ContainerUtil.newHashSet(toEqualsName(name), toHashCodeName(name));
     for (TemplateResource resource : getAllTemplates()) {
       if (fullNames.contains(resource.getFileName())) {
         setDefaultTemplate(resource);
@@ -81,8 +80,7 @@ public abstract class EqualsHashCodeTemplatesManagerBase extends TemplatesManage
       TemplateResource hc = toHashCodeName(baseName).equals(resource.getFileName()) ? resource : null;
       final Couple<TemplateResource> couple = resources.get(baseName);
       if (couple != null) {
-        resources.put(baseName, Couple.of(couple.first != null ? couple.first : eq,
-                                          couple.second != null ? couple.second : hc));
+        resources.put(baseName, Couple.of(couple.first != null ? couple.first : eq, couple.second != null ? couple.second : hc));
       }
       else {
         resources.put(baseName, Couple.of(eq, hc));

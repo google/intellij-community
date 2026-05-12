@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.codeStyle.arrangement;
 
 import com.intellij.ide.highlighter.JavaHighlightingColors;
@@ -14,7 +14,6 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.codeStyle.CodeStyleSettings;
 import com.intellij.psi.codeStyle.CommonCodeStyleSettings;
 import com.intellij.psi.codeStyle.JavaCodeStyleSettings;
-import com.intellij.psi.codeStyle.arrangement.engine.ArrangementEngine;
 import com.intellij.psi.codeStyle.arrangement.group.ArrangementGroupingRule;
 import com.intellij.psi.codeStyle.arrangement.match.ArrangementEntryMatcher;
 import com.intellij.psi.codeStyle.arrangement.match.StdArrangementEntryMatcher;
@@ -94,8 +93,8 @@ public final class JavaRearranger implements Rearranger<JavaElementArrangementEn
       PUBLIC, PROTECTED, PACKAGE_PRIVATE, PRIVATE, STATIC, FINAL, ABSTRACT, SYNCHRONIZED, TRANSIENT, VOLATILE
     );
   private static final @NotNull List<ArrangementSettingsToken> SUPPORTED_ORDERS = List.of(KEEP, BY_NAME);
-  private static final @NotNull ArrangementSettingsToken NO_TYPE = new ArrangementSettingsToken("NO_TYPE", "NO_TYPE");
-  //NON-NLS not visible in settings
+  private static final @NotNull ArrangementSettingsToken NO_TYPE =
+    new ArrangementSettingsToken("NO_TYPE", "NO_TYPE"); //NON-NLS not visible in settings
 
 
   static class Holder {
@@ -200,7 +199,7 @@ public final class JavaRearranger implements Rearranger<JavaElementArrangementEn
     }
   }
 
-  private static void setupUtilityMethods(@NotNull JavaArrangementParseInfo info, @NotNull ArrangementSettingsToken orderType) {
+  private static void setupDependentMethods(@NotNull JavaArrangementParseInfo info, @NotNull ArrangementSettingsToken orderType) {
     if (DEPTH_FIRST.equals(orderType)) {
       for (ArrangementEntryDependencyInfo rootInfo : info.getMethodDependencyRoots()) {
         setupDepthFirstDependency(rootInfo);
@@ -217,12 +216,20 @@ public final class JavaRearranger implements Rearranger<JavaElementArrangementEn
   }
 
   private static void setupDepthFirstDependency(@NotNull ArrangementEntryDependencyInfo info) {
-    for (ArrangementEntryDependencyInfo dependencyInfo : info.getDependentEntriesInfos()) {
-      setupDepthFirstDependency(dependencyInfo);
-      JavaElementArrangementEntry dependentEntry = dependencyInfo.getAnchorEntry();
-      if (dependentEntry.getDependencies() == null) {
-        dependentEntry.addDependency(info.getAnchorEntry());
+    List<ArrangementEntryDependencyInfo> toProcess = new ArrayList<>(); // used as a stack
+    toProcess.add(info);
+    JavaElementArrangementEntry prev = null;
+    while (!toProcess.isEmpty()) {
+      ArrangementEntryDependencyInfo current = toProcess.removeLast();
+      @NotNull List<ArrangementEntryDependencyInfo> infos = current.getDependentEntriesInfos();
+      for (int i = infos.size() - 1; i >= 0; i--) {
+        toProcess.add(infos.get(i));
       }
+      JavaElementArrangementEntry currentAnchor = current.getAnchorEntry();
+      if (prev != null && currentAnchor.getDependencies() == null) {
+        currentAnchor.addDependency(prev);
+      }
+      prev = currentAnchor;
     }
   }
 
@@ -270,7 +277,7 @@ public final class JavaRearranger implements Rearranger<JavaElementArrangementEn
     if (newEntryInfo.getEntries().size() != 1) {
       return null;
     }
-    return Pair.create(newEntryInfo.getEntries().get(0), existingEntriesInfo.getEntries());
+    return Pair.create(newEntryInfo.getEntries().getFirst(), existingEntriesInfo.getEntries());
   }
 
   @Override
@@ -286,40 +293,24 @@ public final class JavaRearranger implements Rearranger<JavaElementArrangementEn
         setupGettersAndSetters(parseInfo);
       }
       else if (DEPENDENT_METHODS.equals(rule.getGroupingType())) {
-        setupUtilityMethods(parseInfo, rule.getOrderType());
+        setupDependentMethods(parseInfo, rule.getOrderType());
       }
       else if (OVERRIDDEN_METHODS.equals(rule.getGroupingType())) {
         setupOverriddenMethods(parseInfo);
       }
     }
-    List<ArrangementEntryDependencyInfo> fieldDependencyRoots = parseInfo.getFieldDependencyRoots();
-    if (!fieldDependencyRoots.isEmpty()) {
-      setupFieldInitializationDependencies(fieldDependencyRoots, settings, parseInfo);
-    }
+    setupFieldInitializationDependencies(parseInfo);
     return parseInfo.getEntries();
   }
 
-  private static void setupFieldInitializationDependencies(@NotNull List<? extends ArrangementEntryDependencyInfo> fieldDependencyRoots,
-                                                           @NotNull ArrangementSettings settings,
-                                                           @NotNull JavaArrangementParseInfo parseInfo) {
-    Collection<JavaElementArrangementEntry> fields = parseInfo.getFields();
-    List<JavaElementArrangementEntry> arrangedFields =
-      ArrangementEngine.arrange(fields, settings.getSections(), settings.getRulesSortedByPriority(), null);
-
-    for (ArrangementEntryDependencyInfo root : fieldDependencyRoots) {
+  private static void setupFieldInitializationDependencies(@NotNull JavaArrangementParseInfo parseInfo) {
+    for (ArrangementEntryDependencyInfo root : parseInfo.getFieldDependencyRoots()) {
       JavaElementArrangementEntry anchorField = root.getAnchorEntry();
-      final int anchorEntryIndex = arrangedFields.indexOf(anchorField);
-
       for (ArrangementEntryDependencyInfo fieldInInitializerInfo : root.getDependentEntriesInfos()) {
-        JavaElementArrangementEntry fieldInInitializer = fieldInInitializerInfo.getAnchorEntry();
-        if (arrangedFields.indexOf(fieldInInitializer) > anchorEntryIndex ||
-            !fieldInInitializerInfo.getDependentEntriesInfos().isEmpty()) {
-          anchorField.addDependency(fieldInInitializer);
-        }
+        anchorField.addDependency(fieldInInitializerInfo.getAnchorEntry());
       }
     }
   }
-
 
   @Override
   public int getBlankLines(@NotNull CodeStyleSettings settings,
@@ -373,7 +364,7 @@ public final class JavaRearranger implements Rearranger<JavaElementArrangementEn
   }
 
   @Override
-  public @Nullable List<CompositeArrangementSettingsToken> getSupportedGroupingTokens() {
+  public @NotNull List<CompositeArrangementSettingsToken> getSupportedGroupingTokens() {
     return List.of(
       new CompositeArrangementSettingsToken(GETTERS_AND_SETTERS),
       new CompositeArrangementSettingsToken(OVERRIDDEN_METHODS, BY_NAME, KEEP),
@@ -382,7 +373,7 @@ public final class JavaRearranger implements Rearranger<JavaElementArrangementEn
   }
 
   @Override
-  public @Nullable List<CompositeArrangementSettingsToken> getSupportedMatchingTokens() {
+  public @NotNull List<CompositeArrangementSettingsToken> getSupportedMatchingTokens() {
     return List.of(
       new CompositeArrangementSettingsToken(TYPE, SUPPORTED_TYPES),
       new CompositeArrangementSettingsToken(MODIFIER, SUPPORTED_MODIFIERS),
@@ -429,9 +420,7 @@ public final class JavaRearranger implements Rearranger<JavaElementArrangementEn
 
   private static void and(@NotNull List<? super StdArrangementMatchRule> matchRules, ArrangementSettingsToken @NotNull ... conditions) {
     if (conditions.length == 1) {
-      matchRules.add(new StdArrangementMatchRule(new StdArrangementEntryMatcher(new ArrangementAtomMatchCondition(
-        conditions[0]
-      ))));
+      matchRules.add(new StdArrangementMatchRule(new StdArrangementEntryMatcher(new ArrangementAtomMatchCondition(conditions[0]))));
       return;
     }
 
@@ -443,7 +432,8 @@ public final class JavaRearranger implements Rearranger<JavaElementArrangementEn
   }
 
   @Override
-  public @Nullable TextAttributes getTextAttributes(@NotNull EditorColorsScheme scheme, @NotNull ArrangementSettingsToken token, boolean selected) {
+  public @Nullable TextAttributes getTextAttributes(@NotNull EditorColorsScheme scheme, @NotNull ArrangementSettingsToken token,
+                                                    boolean selected) {
     if (selected) {
       TextAttributes attributes = new TextAttributes();
       attributes.setForegroundColor(scheme.getColor(EditorColors.SELECTION_FOREGROUND_COLOR));

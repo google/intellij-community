@@ -18,7 +18,7 @@ public final class ReifiedReturnTypeKt {
     public static final fun function5(t: T, @org.jetbrains.annotations.NotNull i: int, @org.jetbrains.annotations.NotNull s: java.lang.String) : int {
         return 42
     }
-    public static final fun function6($this$function6: T, t: T, @org.jetbrains.annotations.NotNull i: int, @org.jetbrains.annotations.NotNull s: java.lang.String) : T {
+    public static final fun function6(@org.jetbrains.annotations.NotNull $this$function6: T, @org.jetbrains.annotations.NotNull t: T, @org.jetbrains.annotations.NotNull i: int, @org.jetbrains.annotations.NotNull s: java.lang.String) : T {
         return t
     }
     public static final fun function7(t: T, @org.jetbrains.annotations.NotNull i: int, @org.jetbrains.annotations.NotNull s: java.lang.String) : T {

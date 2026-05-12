@@ -1,7 +1,8 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.core.nio.fs;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.VisibleForTesting;
 
 import java.io.IOException;
 import java.nio.file.FileStore;
@@ -19,7 +20,8 @@ import java.util.Set;
  * That delegate is used for all file system operations.
  */
 public abstract class DelegatingFileSystem<P extends DelegatingFileSystemProvider<P, ?>> extends FileSystem {
-  protected abstract @NotNull FileSystem getDelegate();
+  @VisibleForTesting
+  public abstract @NotNull FileSystem getDelegate();
 
   /**
    * This method can choose a backend file system if the inheritor is able to delegate calls to different file systems.
@@ -27,7 +29,8 @@ public abstract class DelegatingFileSystem<P extends DelegatingFileSystemProvide
    * @param root The first directory of an absolute path. On Windows, it can be {@code C:}, {@code \\wsl.localhost\Ubuntu-22.04}, etc.
    * @return A specialized filesystem for the specific root, or a fallback filesystem like returned by {@link #getDelegate()}.
    */
-  protected @NotNull FileSystem getDelegate(@NotNull String root) {
+  @VisibleForTesting
+  public @NotNull FileSystem getDelegate(@NotNull String root) {
     return getDelegate();
   }
 

@@ -33,7 +33,6 @@ import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.BiConsumer;
 import java.util.prefs.Preferences;
 
 /**
@@ -69,11 +68,10 @@ public class JUnit5TestSessionListener implements LauncherSessionListener {
   private static class FirstAndLastInSuiteTestExecutionListener implements TestExecutionListener {
     private static final String BOOTSTRAP_TESTS_SUITE_NAME = "com.intellij.tests.BootstrapTests";  // reuse existing mutes on TeamCity
     private static final String VINTAGE_UNIQUE_ID = UniqueId.forEngine("junit-vintage").toString();
-    private static final String ORDERED_VINTAGE_UNIQUE_ID = UniqueId.forEngine("ordered-vintage").toString();
-    private static final String ENGINE_VINTAGE = System.getProperty("intellij.build.test.engine.vintage");
 
     private final List<Throwable> caughtExceptions;
     private long suiteStarted = 0;
+    private boolean myReportAsBootstrapTestsSuite;
 
     private FirstAndLastInSuiteTestExecutionListener(List<Throwable> caughtExceptions) {
       this.caughtExceptions = caughtExceptions;
@@ -81,20 +79,23 @@ public class JUnit5TestSessionListener implements LauncherSessionListener {
 
     @Override
     public void testPlanExecutionStarted(TestPlan testPlan) {
+      myReportAsBootstrapTestsSuite = ContainerUtil.exists(testPlan.getRoots(), root -> root.getUniqueId().equals(VINTAGE_UNIQUE_ID) && !testPlan.getChildren(root).isEmpty());  // reuse existing mutes on TeamCity
+
       // same as _FirstInSuiteTest
       final String _FirstInSuiteTestPrefix = "_FirstInSuiteTest.";
-
-      // TODO: use the same logic for tests, remove junit34Test
-      final boolean junit34Test = ContainerUtil.exists(testPlan.getRoots(), root -> root.getUniqueId().equals(VINTAGE_UNIQUE_ID) || root.getUniqueId().equals(ORDERED_VINTAGE_UNIQUE_ID));
-      final boolean reportAsBootstrapTestsSuite = "only".equals(ENGINE_VINTAGE);  // reuse existing mutes on TeamCity
-      final BiConsumer<String, ThrowableRunnable<?>> doTest = (reportAsBootstrapTestsSuite ? this::catchExceptionAndReportAsBootstrapTestsSuite : this::catchException);
+      String testProcessName = System.getProperty("intellij.build.test.process.name", "");
+      if (!testProcessName.isEmpty()) testProcessName = "(" + testProcessName + ")";
+      String buildConfName = System.getProperty("teamcity.buildConfName", "");
+      if (!buildConfName.isEmpty()) buildConfName = "[" + buildConfName + "]";
 
       // no testReportClassLoadingProblems
 
       // testNothing
-      doTest.accept(_FirstInSuiteTestPrefix + "testNothing", () -> {
+      catchExceptionAndReportAsTestIfFailed(_FirstInSuiteTestPrefix + "testNothing" + testProcessName + buildConfName, () -> {
         suiteStarted = System.nanoTime();
 
+        // TODO: use the same logic for tests, remove junit34Test
+        boolean junit34Test = ContainerUtil.exists(testPlan.getRoots(), root -> root.getUniqueId().equals(VINTAGE_UNIQUE_ID) && !testPlan.getChildren(root).isEmpty());
         if (junit34Test) {
           IdeaForkJoinWorkerThreadFactory.setupForkJoinCommonPool(true);
           SwingUtilities.invokeAndWait(() -> System.out.println("EDT is " + Thread.currentThread()));
@@ -122,13 +123,13 @@ public class JUnit5TestSessionListener implements LauncherSessionListener {
       System.out.println(Timings.getStatistics());
 
       // testFileEncoding
-      doTest.accept(_FirstInSuiteTestPrefix + "testFileEncoding", () -> {
+      catchExceptionAndReportAsTestIfFailed(_FirstInSuiteTestPrefix + "testFileEncoding" + testProcessName + buildConfName, () -> {
         assertEncoding("file.encoding");
         assertEncoding("sun.jnu.encoding");
       });
 
       // testSymlinkAbility
-      doTest.accept(_FirstInSuiteTestPrefix + "testSymlinkAbility", () -> {
+      catchExceptionAndReportAsTestIfFailed(_FirstInSuiteTestPrefix + "testSymlinkAbility" + testProcessName + buildConfName, () -> {
         Assertions.assertTrue(
           IoTestUtil.isSymLinkCreationSupported,
           String.format("Symlink creation not supported for %s on %s (%s)",
@@ -139,10 +140,8 @@ public class JUnit5TestSessionListener implements LauncherSessionListener {
       });
 
       // testGlobalState
-      doTest.accept(_FirstInSuiteTestPrefix + "testGlobalState", () -> {
-        if (junit34Test) {
-          GlobalState.checkSystemStreams(); // Rather initialize than check.
-        }
+      catchExceptionAndReportAsTestIfFailed(_FirstInSuiteTestPrefix + "testGlobalState" + testProcessName + buildConfName, () -> {
+        GlobalState.checkSystemStreams(); // Rather initialize than check.
       });
     }
 
@@ -159,45 +158,36 @@ public class JUnit5TestSessionListener implements LauncherSessionListener {
     public void testPlanExecutionFinished(TestPlan testPlan) {
       // same as _LastInSuiteTest
       final String _LastInSuiteTestPrefix = "_LastInSuiteTest.";
+      String testProcessName = System.getProperty("intellij.build.test.process.name", "");
+      if (!testProcessName.isEmpty()) testProcessName = "(" + testProcessName + ")";
       String buildConfName = System.getProperty("teamcity.buildConfName", "");
       if (!buildConfName.isEmpty()) buildConfName = "[" + buildConfName + "]";
 
-      // TODO: use the same logic for tests, remove junit34Test
-      final boolean junit34Test = ContainerUtil.exists(testPlan.getRoots(), root -> root.getUniqueId().equals(VINTAGE_UNIQUE_ID) || root.getUniqueId().equals(ORDERED_VINTAGE_UNIQUE_ID));
-      final boolean reportAsBootstrapTestsSuite = "only".equals(ENGINE_VINTAGE);  // reuse existing mutes on TeamCity
-      final BiConsumer<String, ThrowableRunnable<?>> doTest = (reportAsBootstrapTestsSuite ? this::catchExceptionAndReportAsBootstrapTestsSuite : this::catchException);
-
       // setUp
-      if (junit34Test) {
-        Disposer.setDebugMode(true);
-      }
+      Disposer.setDebugMode(true);
 
       // testProjectLeak
-      doTest.accept(_LastInSuiteTestPrefix + "testProjectLeak" + buildConfName, () -> {
+      catchExceptionAndReportAsTestIfFailed(_LastInSuiteTestPrefix + "testProjectLeak" + testProcessName + buildConfName, () -> {
         TestApplicationManager.testProjectLeak();
       });
 
       // testLanguagesHaveDifferentDisplayNames
-      doTest.accept(_LastInSuiteTestPrefix + "testLanguagesHaveDifferentDisplayNames" + buildConfName, () -> {
+      catchExceptionAndReportAsTestIfFailed(_LastInSuiteTestPrefix + "testLanguagesHaveDifferentDisplayNames" + testProcessName + buildConfName, () -> {
         LanguageTestUtil.assertAllLanguagesHaveDifferentDisplayNames();
       });
 
       // testFilenameIndexConsistency
-      doTest.accept(_LastInSuiteTestPrefix + "testFilenameIndexConsistency" + buildConfName, () -> {
-        if (junit34Test) {
-          FSRecords.checkFilenameIndexConsistency();
-        }
+      catchExceptionAndReportAsTestIfFailed(_LastInSuiteTestPrefix + "testFilenameIndexConsistency" + testProcessName + buildConfName, () -> {
+        FSRecords.checkFilenameIndexConsistency();
       });
 
       // testGlobalState
-      doTest.accept(_LastInSuiteTestPrefix + "testGlobalState" + buildConfName, () -> {
-        if (junit34Test) {
-          GlobalState.checkSystemStreams();
-        }
+      catchExceptionAndReportAsTestIfFailed(_LastInSuiteTestPrefix + "testGlobalState" + testProcessName + buildConfName, () -> {
+        GlobalState.checkSystemStreams();
       });
 
       // testStatistics
-      doTest.accept(_LastInSuiteTestPrefix + "testStatistics" + buildConfName, () -> {
+      catchExceptionAndReportAsTestIfFailed(_LastInSuiteTestPrefix + "testStatistics" + testProcessName + buildConfName, () -> {
         if (suiteStarted != 0) {
           long testSuiteDuration = System.nanoTime() - suiteStarted;
           System.out.printf("##teamcity[buildStatisticValue key='ideaTests.totalTimeMs' value='%d']%n", testSuiteDuration / 1_000_000);
@@ -206,34 +196,26 @@ public class JUnit5TestSessionListener implements LauncherSessionListener {
       });
     }
 
-    private void catchException(String testName, ThrowableRunnable<?> test) {
-      try {
-        test.run();
-      }
-      catch (Throwable e) {
-        caughtExceptions.add(e);
-      }
-    }
-
-    private void catchExceptionAndReportAsBootstrapTestsSuite(String testName, ThrowableRunnable<?> test) {
+    private void catchExceptionAndReportAsTestIfFailed(String testName, ThrowableRunnable<?> test) {
       long started = System.nanoTime();
 
-      String escapedTestName = teamcityStdEscaper2(testName);
-      System.out.printf("##teamcity[testSuiteStarted name='%s']%n", BOOTSTRAP_TESTS_SUITE_NAME);
-      System.out.printf("##teamcity[testStarted name='%s' captureStandardOutput='true']%n", escapedTestName);
       try {
         test.run();
       }
       catch (Throwable e) {
         caughtExceptions.add(e);
+
+        if (myReportAsBootstrapTestsSuite) System.out.printf("##teamcity[testSuiteStarted name='%s']%n", BOOTSTRAP_TESTS_SUITE_NAME);
+        String escapedTestName = teamcityStdEscaper2(testName);
+        System.out.printf("##teamcity[testStarted name='%s' captureStandardOutput='true']%n", escapedTestName);
+
         StringWriter stacktrace = new StringWriter();
         e.printStackTrace(new PrintWriter(stacktrace));
         System.out.printf("##teamcity[testFailed name='%s' message='%s' details='%s']%n", escapedTestName, teamcityStdEscaper2(e.toString()), teamcityStdEscaper2(stacktrace.toString()));
-      }
-      finally {
+
         long duration = System.nanoTime() - started;
         System.out.printf("##teamcity[testFinished name='%s' duration='%d']%n", escapedTestName, duration / 1_000_000);
-        System.out.printf("##teamcity[testSuiteFinished name='%s']%n", BOOTSTRAP_TESTS_SUITE_NAME);
+        if (myReportAsBootstrapTestsSuite) System.out.printf("##teamcity[testSuiteFinished name='%s']%n", BOOTSTRAP_TESTS_SUITE_NAME);
       }
     }
 

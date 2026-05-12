@@ -19,6 +19,7 @@ import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.progress.coroutineToIndicator
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.updateSettings.impl.PluginDownloader
 import com.intellij.platform.ide.progress.ModalTaskOwner
 import com.intellij.platform.ide.progress.TaskCancellation
@@ -46,7 +47,20 @@ class InstallAndEnableTask(
   fun getCustomPlugins(): List<PluginUiModel> = customPlugins
 
   suspend fun execute() {
+    if (pluginIds.isEmpty()) {
+      return
+    }
     loadPlugins()
+    if (showDialog && plugins.isEmpty()) {
+      withContext(Dispatchers.EDT) {
+        Messages.showWarningDialog(
+          project,
+          IdeBundle.message("plugins.advertiser.no.compatible.plugins.found"),
+          IdeBundle.message("title.plugins"),
+        )
+      }
+      return
+    }
     showDialogAndRunSuccess()
   }
 

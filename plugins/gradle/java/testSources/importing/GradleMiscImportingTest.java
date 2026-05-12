@@ -33,6 +33,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.plugins.gradle.model.ExternalProject;
 import org.jetbrains.plugins.gradle.service.project.GradleProjectResolverUtil;
 import org.jetbrains.plugins.gradle.service.project.data.ExternalProjectDataCache;
+import org.jetbrains.plugins.gradle.tooling.annotation.TargetVersions;
 import org.jetbrains.plugins.gradle.util.GradleConstants;
 import org.junit.Test;
 import org.junit.runners.Parameterized;
@@ -326,13 +327,13 @@ public class GradleMiscImportingTest extends GradleJavaImportingTestCase {
       "multiproject.util.main",
       "multiproject.util.test",
 
-      "inc-build",
-      "inc-build.util",
+      "included-build",
+      "included-build.util",
 
-      "inc-build.buildSrc",
-      "inc-build.buildSrc.util",
-      "inc-build.buildSrc.main",
-      "inc-build.buildSrc.test"
+      "included-build.buildSrc",
+      "included-build.buildSrc.util",
+      "included-build.buildSrc.main",
+      "included-build.buildSrc.test"
     );
 
     assertExternalProjectId("multiproject", "multiproject");
@@ -359,13 +360,13 @@ public class GradleMiscImportingTest extends GradleJavaImportingTestCase {
     assertExternalProjectId("multiproject.util.main", ":util:main");
     assertExternalProjectId("multiproject.util.test", ":util:test");
 
-    assertExternalProjectId("inc-build", ":included-build");
-    assertExternalProjectId("inc-build.util", ":included-build:util");
+    assertExternalProjectId("included-build", ":included-build");
+    assertExternalProjectId("included-build.util", ":included-build:util");
 
-    assertExternalProjectId("inc-build.buildSrc", ":included-build:buildSrc");
-    assertExternalProjectId("inc-build.buildSrc.util", ":included-build:buildSrc:util");
-    assertExternalProjectId("inc-build.buildSrc.main", ":included-build:buildSrc:main");
-    assertExternalProjectId("inc-build.buildSrc.test", ":included-build:buildSrc:test");
+    assertExternalProjectId("included-build.buildSrc", ":included-build:buildSrc");
+    assertExternalProjectId("included-build.buildSrc.util", ":included-build:buildSrc:util");
+    assertExternalProjectId("included-build.buildSrc.main", ":included-build:buildSrc:main");
+    assertExternalProjectId("included-build.buildSrc.test", ":included-build:buildSrc:test");
 
     Map<String, ExternalProject> projectMap = getExternalProjectsMap();
     assertExternalProjectIds(projectMap, "multiproject", "multiproject:main", "multiproject:test");
@@ -432,6 +433,30 @@ public class GradleMiscImportingTest extends GradleJavaImportingTestCase {
     assertTrue(ExternalSystemApiUtil.isExternalSystemAwareModule(GradleConstants.SYSTEM_ID, moduleAfter));
   }
 
+  @Test
+  public void testDotInModuleName() throws Exception {
+    createSettingsFile(
+      """
+        rootProject.name='root.project'
+        include ':child1'
+        include ':child2'
+        include ':child2:with.dot'
+        """
+    );
+
+    createProjectSubFile("build.gradle", "");
+    createProjectSubFile("child1/build.gradle", "");
+    createProjectSubFile("child2/build.gradle", "");
+    createProjectSubFile("child2/with.dot/build.gradle", "");
+
+    importProject();
+
+    assertModules("root_project",
+                "root_project.child1",
+                "root_project.child2",
+                "root_project.child2.with_dot"
+    );
+  }
 
   @Test
   public void testProjectLibraryCoordinatesAreSet() throws Exception {
@@ -461,6 +486,34 @@ public class GradleMiscImportingTest extends GradleJavaImportingTestCase {
     var javaSettings = JavaModuleSettingsKt.getJavaSettings(moduleEntity);
     var automaticModuleName = javaSettings.getManifestAttributes().get(PsiJavaModule.AUTO_MODULE_NAME);
     assertEquals("my.module.name", automaticModuleName);
+  }
+
+  @Test
+  public void testJAnsiPropertyNotModified() throws Exception {
+    String oldValue = System.getProperty("library.jansi.path");
+    importProject(script(it -> it.withJavaPlugin()));
+    String newValue = System.getProperty("library.jansi.path");
+    assertEquals("The [library.jansi.path] should be preserved, but it has changed", oldValue, newValue);
+  }
+
+  @Test
+  public void testJAnsiPropertyNotModifiedWhenSet() throws Exception {
+    String sentinel = "/some/test/path";
+    String previousValue = System.getProperty("library.jansi.path");
+    System.setProperty("library.jansi.path", sentinel);
+    try {
+      importProject(script(it -> it.withJavaPlugin()));
+      assertEquals("The [library.jansi.path] should be preserved, but it has changed",
+                   sentinel, System.getProperty("library.jansi.path"));
+    }
+    finally {
+      if (previousValue != null) {
+        System.setProperty("library.jansi.path", previousValue);
+      }
+      else {
+        System.clearProperty("library.jansi.path");
+      }
+    }
   }
 
   private static void assertExternalProjectIds(Map<String, ExternalProject> projectMap, String projectId, String... sourceSetModulesIds) {

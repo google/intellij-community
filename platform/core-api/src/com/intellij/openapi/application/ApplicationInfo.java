@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.application;
 
 import com.intellij.openapi.extensions.PluginId;
@@ -57,9 +57,9 @@ public abstract class ApplicationInfo {
   public abstract @NlsSafe String getVersionName();
 
   /**
-   * Returns the first number from 'minor' part of the version.
+   * Returns the first number from the 'minor' part of the version.
    * This method is temporarily added because some products specify a composite number (like '1.3')
-   * in 'minor version' attribute instead of using 'micro version' (i.e., set minor='1' micro='3').
+   * in the 'minor version' attribute instead of using 'micro version' (i.e., set minor='1' micro='3').
    *
    * @see org.jetbrains.intellij.build.ApplicationInfoProperties#getMinorVersionMainPart
    */
@@ -129,7 +129,7 @@ public abstract class ApplicationInfo {
     return false;
   }
 
-  public abstract String getFullApplicationName();
+  public abstract @NlsSafe String getFullApplicationName();
 
   public @Nullable String getSplashImageUrl() {
     return null;

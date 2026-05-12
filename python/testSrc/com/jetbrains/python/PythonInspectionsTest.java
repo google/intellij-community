@@ -260,7 +260,7 @@ public class PythonInspectionsTest extends PyTestCase {
             pass
         def open(file, mode='r', buffering=None, encoding=None, errors=None, newline=None, closefd=True):
           pass""",
-      (__) -> doHighlightingTest(PyArgumentEqualDefaultInspection.class)
+      (_) -> doHighlightingTest(PyArgumentEqualDefaultInspection.class)
     );
   }
 

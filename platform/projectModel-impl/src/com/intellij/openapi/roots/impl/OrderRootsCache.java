@@ -65,7 +65,7 @@ public class OrderRootsCache {
     VirtualFilePointerContainer cached = map == null ? null : map.get(key);
     if (cached == null) {
       map = ConcurrencyUtil.cacheOrGet(myRoots, new ConcurrentHashMap<>());
-      cached = map.computeIfAbsent(key, __ -> createContainer(rootUrlsComputer.get()));
+      cached = map.computeIfAbsent(key, _ -> createContainer(rootUrlsComputer.get()));
     }
     return cached == EMPTY ? null : cached;
   }

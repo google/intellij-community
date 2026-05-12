@@ -58,7 +58,7 @@ final class ErrorStripeMarkersModel {
       int severity = info != null ? info.getSeverity().myVal : -1;
       VirtualFile vFile = event.getEditor().getVirtualFile();
       ApplicationManager.getApplication().executeOnPooledThread(() -> {
-        int totalMarkersInFile = ReadAction.compute(()-> countErrorStripeMarkers());
+        int totalMarkersInFile = ReadAction.computeBlocking(()-> countErrorStripeMarkers());
         FileType fileType = vFile != null && vFile.isValid() ? vFile.getFileType() : null;
         UIEventLogger.ErrorStripeNavigate.log(project, severity, totalMarkersInFile, fileType);
       });
@@ -76,8 +76,8 @@ final class ErrorStripeMarkersModel {
   private int countErrorStripeMarkers(@NotNull MarkupModel model) {
     AtomicInteger c = new AtomicInteger();
     try (MarkupIterator<RangeHighlighterEx> iterator =
-      ((MarkupModelEx)model).overlappingErrorStripeIterator(0, myEditor.getUiDocument().getTextLength())) {
-      ContainerUtil.process(iterator, __ -> c.getAndIncrement() >= 0);
+      ((MarkupModelEx)model).overlappingErrorStripeIterator(0, myEditor.getElfDocument().getTextLength())) {
+      ContainerUtil.process(iterator, _ -> c.getAndIncrement() >= 0);
     }
     return c.get();
   }

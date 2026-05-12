@@ -11,7 +11,7 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.statistics.StatisticsManager;
 import com.intellij.psi.statistics.impl.StatisticsManagerImpl;
 import com.intellij.testFramework.LightProjectDescriptor;
-import com.intellij.testFramework.PlatformTestUtil;
+import com.intellij.testFramework.common.TestApplicationKt;
 import com.intellij.testFramework.fixtures.LightJavaCodeInsightFixtureTestCase;
 import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.NotNull;
@@ -88,7 +88,7 @@ public abstract class LightFixtureCompletionTestCase extends LightJavaCodeInsigh
       type(completionChar);
     }
     NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
-    PlatformTestUtil.waitForAllDocumentsCommitted(10, TimeUnit.SECONDS);
+    TestApplicationKt.waitForAllDocumentsCommitted(10, TimeUnit.SECONDS);
   }
 
   protected LookupImpl getLookup() {

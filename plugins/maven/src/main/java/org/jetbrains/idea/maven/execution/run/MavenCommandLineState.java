@@ -188,14 +188,13 @@ public class MavenCommandLineState extends JavaCommandLineState implements Remot
                                                 Function<String, String> targetFileMapper) throws ExecutionException {
     ConsoleView consoleView = createConsole(executor, processHandler, myConfiguration.getProject());
     BuildViewManager viewManager = getEnvironment().getProject().getService(BuildViewManager.class);
-    descriptor.withProcessHandler(new MavenBuildHandlerFilterSpyWrapper(processHandler, useMaven4(), false), null);
+    descriptor.withProcessHandler(new MavenBuildHandlerFilterSpyWrapper(processHandler, false), null);
     descriptor.withExecutionEnvironment(getEnvironment());
     StartBuildEventImpl startBuildEvent = new StartBuildEventImpl(descriptor, "");
     boolean withResumeAction = MavenResumeAction.isApplicable(getEnvironment().getProject(), getJavaParameters(), myConfiguration);
     MavenBuildEventProcessor eventProcessor =
       new MavenBuildEventProcessor(myConfiguration, viewManager, descriptor, taskId,
-                                   targetFileMapper, getStartBuildEventSupplier(runner, processHandler, startBuildEvent, withResumeAction),
-                                   useMaven4()
+                                   targetFileMapper, getStartBuildEventSupplier(runner, processHandler, startBuildEvent, withResumeAction)
       );
 
     processHandler.addProcessListener(new BuildToolConsoleProcessAdapter(eventProcessor));
@@ -217,14 +216,14 @@ public class MavenCommandLineState extends JavaCommandLineState implements Remot
     }
     MavenBuildEventProcessor eventProcessor =
       new MavenBuildEventProcessor(myConfiguration, buildView, descriptor, taskId, targetFileMapper, ctx ->
-        new StartBuildEventImpl(descriptor, ""), useMaven4());
+        new StartBuildEventImpl(descriptor, ""));
 
     processHandler.addProcessListener(new BuildToolConsoleProcessAdapter(eventProcessor));
     if (emulateTerminal()) {
       buildView.attachToProcess(processHandler);
     }
     else {
-      buildView.attachToProcess(new MavenHandlerFilterSpyWrapper(processHandler, useMaven4(), false));
+      buildView.attachToProcess(new MavenHandlerFilterSpyWrapper(processHandler, false));
     }
 
     AnAction[] actions = new AnAction[]{BuildTreeFilters.createFilteringActionsGroup(new WeakFilterableSupplier<>(buildView))};
@@ -239,12 +238,6 @@ public class MavenCommandLineState extends JavaCommandLineState implements Remot
     }
     res.setRestartActions(restartActions.toArray(AnAction.EMPTY_ARRAY));
     return res;
-  }
-
-  private boolean useMaven4() {
-    var mavenCache = MavenDistributionsCache.getInstance(myConfiguration.getProject());
-    var mavenDistribution = mavenCache.getMavenDistribution(myConfiguration.getRunnerParameters().getWorkingDirPath());
-    return isMaven4(mavenDistribution);
   }
 
   private @NotNull Function<MavenParsingContext, StartBuildEvent> getStartBuildEventSupplier(@NotNull ProgramRunner runner,
@@ -414,8 +407,7 @@ public class MavenCommandLineState extends JavaCommandLineState implements Remot
       return new MavenKillableProcessHandler(process,
                                              targetedCommandLine.getCommandPresentation(remoteEnvironment),
                                              targetedCommandLine.getCharset(),
-                                             targetedCommandLineBuilder.getFilesToDeleteOnTermination(),
-                                             useMaven4());
+                                             targetedCommandLineBuilder.getFilesToDeleteOnTermination());
     }
     else {
       return new KillableColoredProcessHandler.Silent(process,

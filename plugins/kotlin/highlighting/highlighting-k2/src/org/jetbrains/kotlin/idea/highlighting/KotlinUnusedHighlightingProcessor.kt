@@ -123,8 +123,8 @@ internal class KotlinUnusedHighlightingProcessor(private val ktFile: KtFile) {
         }
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun registerLocalReferences(elements: List<PsiElement>) {
         val registerDeclarationAccessVisitor = object : KtVisitorVoid() {
             override fun visitSimpleNameExpression(expression: KtSimpleNameExpression) {

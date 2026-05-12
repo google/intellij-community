@@ -121,7 +121,7 @@ abstract class SearchResultPanel(
 
       loading(false)
 
-      if (!group.getDescriptors().isEmpty()) {
+      if (!group.getModels().isEmpty()) {
         group.titleWithCount()
         try {
           startBatchMode()
@@ -198,7 +198,7 @@ abstract class SearchResultPanel(
       val pluginsTabName = IdeBundle.message(if (isMarketplace) "plugin.manager.tab.marketplace" else "plugin.manager.tab.installed")
       val message = IdeBundle.message(
         "plugins.configurable.search.result.0.plugins.found.in.1",
-        group.getDescriptors().size, pluginsTabName
+        group.getModels().size, pluginsTabName
       )
       AccessibleAnnouncerUtil.announce(myPanel, message, false)
     }

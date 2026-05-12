@@ -123,6 +123,8 @@
     <statistics.counterUsagesCollector implementationClass="com.jetbrains.jsonSchema.fus.JsonFeatureUsageCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.jetbrains.jsonSchema.fus.JsonHttpFileLoadingUsageCollector"/>
     <statistics.validation.customValidationRule implementation="com.jetbrains.jsonSchema.fus.JsonSchemaIdValidationRule"/>
+    <projectSettings service="com.jetbrains.jsonSchema.JsonSchemaCatalogProjectConfiguration"/>
+    <projectSettings service="com.jetbrains.jsonSchema.JsonSchemaMappingsProjectConfiguration"/>
   </extensions>
 
   <extensions defaultExtensionNs="JavaScript">

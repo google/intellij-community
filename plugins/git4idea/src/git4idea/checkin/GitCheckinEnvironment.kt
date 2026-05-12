@@ -133,8 +133,8 @@ class GitCheckinEnvironment(private val myProject: Project) : CheckinEnvironment
     return amendService.isAmendSpecificCommitSupported()
   }
 
-  override suspend fun getAmendSpecificCommitTargets(root: VirtualFile, limit: Int): List<CommitToAmend.Specific> {
-    return amendService.getAmendSpecificCommitTargets(root, limit)
+  override suspend fun getAmendSpecificCommitTargets(root: VirtualFile): List<CommitToAmend.Resolved> {
+    return amendService.getAmendSpecificCommitTargets(root)
   }
 
   @Throws(VcsException::class)
@@ -238,10 +238,6 @@ class GitCheckinEnvironment(private val myProject: Project) : CheckinEnvironment
     }
 
     if (exceptions.isEmpty()) {
-      if (commitOptions.commitToAmend is CommitToAmend.Specific) {
-        val repository = repositories.single()
-        GitAmendSpecificCommitSquasher.squashLastCommitIntoTarget(repository, commitOptions.commitToAmend.targetHash, commitMessage)
-      }
       if (commitContext.isPushAfterCommit) {
         GitPushAfterCommitDialog.showOrPush(myProject, repositories)
       }

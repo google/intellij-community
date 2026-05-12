@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.vcs.impl.shared` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "shared_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "shared",
   module_name = "intellij.platform.vcs.impl.shared",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":shared_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/core-api:core",
@@ -38,13 +33,17 @@ jvm_library(
     "//libraries/fastutil",
     "//platform/util/jdom",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//platform/diagnostic/telemetry",
     "//platform/core-impl",
+    "//platform/diff-api:diff",
+    "//fleet/rhizomedb",
   ]
 )
 
 jvm_library(
   name = "shared_test_lib",
+  testonly = True,
   module_name = "intellij.platform.vcs.impl.shared",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -72,21 +71,32 @@ jvm_library(
     "//libraries/fastutil:fastutil_test_lib",
     "//platform/util/jdom:jdom_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/diagnostic/telemetry:telemetry_test_lib",
     "//platform/core-impl:core-impl_test_lib",
+    "//platform/diff-api:diff_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.vcs.impl.shared` end
 
+### auto-generated section `iml intellij.platform.vcs.impl.shared` start
+exports_files([
+  "intellij.platform.vcs.impl.shared.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.vcs.impl.shared` end
+
 ### auto-generated section `build intellij.platform.vcs.impl.shared.tests` start
 jvm_library(
   name = "vcs-impl-shared-tests",
+  module_name = "intellij.platform.vcs.impl.shared.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "vcs-impl-shared-tests_test_lib",
+  testonly = True,
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
   associates = [
@@ -137,6 +147,7 @@ jvm_library(
     "//platform/util/jdom",
     "//platform/util/jdom:jdom_test_lib",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//platform/diagnostic/telemetry",
     "//platform/diagnostic/telemetry:telemetry_test_lib",
     "//platform/testFramework",
@@ -144,15 +155,24 @@ jvm_library(
     "@lib//:mockito",
     "//platform/core-impl",
     "//platform/core-impl:core-impl_test_lib",
+    "//fleet/rhizomedb",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ],
   runtime_deps = [
     ":vcs-impl-shared-tests",
     "//platform/platform-impl/rpc:rpc_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.vcs.impl.shared.tests` end
+
+### auto-generated section `iml intellij.platform.vcs.impl.shared.tests` start
+exports_files([
+  "intellij.platform.vcs.impl.shared.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.vcs.impl.shared.tests` end
 
 ### auto-generated section `test intellij.platform.vcs.impl.shared.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

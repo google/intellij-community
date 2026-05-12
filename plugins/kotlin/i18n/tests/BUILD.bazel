@@ -3,10 +3,12 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tests",
+  module_name = "intellij.kotlin.i18n.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
     "@lib//:kotlin-stdlib",
+    "//plugins/kotlin/plugin/k2",
     "@lib//:kotlinc-kotlin-compiler-common",
     "//plugins/kotlin/frontend-independent",
     "//plugins/kotlin/i18n",
@@ -17,6 +19,7 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.i18n.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -26,6 +29,8 @@ jvm_library(
     "@lib//:junit4",
     "//java/testFramework",
     "//java/testFramework:testFramework_test_lib",
+    "//java/java-psi-api:psi",
+    "//java/java-psi-api:psi_test_lib",
     "//platform/analysis-api:analysis",
     "//platform/analysis-api:analysis_test_lib",
     "//platform/core-api:core",
@@ -44,8 +49,8 @@ jvm_library(
     "//plugins/properties/properties-psi-impl:backend-psi_test_lib",
     "//plugins/kotlin/code-insight/api",
     "//plugins/kotlin/code-insight/api:api_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/base/plugin",
     "//plugins/kotlin/base/plugin:plugin_test_lib",
     "//platform/projectModel-api:projectModel",
@@ -53,9 +58,18 @@ jvm_library(
     "//platform/lang-core",
     "//platform/lang-core:lang-core_test_lib",
   ],
-  runtime_deps = [":tests"]
+  runtime_deps = [
+    ":tests",
+    "//plugins/kotlin/plugin/k2:k2_test_lib",
+  ]
 )
 ### auto-generated section `build intellij.kotlin.i18n.tests` end
+
+### auto-generated section `iml intellij.kotlin.i18n.tests` start
+exports_files([
+  "intellij.kotlin.i18n.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.i18n.tests` end
 
 ### auto-generated section `test intellij.kotlin.i18n.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

@@ -27,7 +27,7 @@ public class BaseQuoteHandler implements MultiCharQuoteHandler {
   }
 
   @Override
-  public boolean isOpeningQuote(HighlighterIterator iterator, int offset) {
+  public boolean isOpeningQuote(@NotNull HighlighterIterator iterator, int offset) {
     // don't assume an opening quote unless we're in an explicitly "blank" context
     final Document document = iterator.getDocument();
     if (document == null) {
@@ -78,7 +78,7 @@ public class BaseQuoteHandler implements MultiCharQuoteHandler {
   }
 
   @Override
-  public boolean hasNonClosedLiteral(Editor editor, HighlighterIterator iterator, int offset) {
+  public boolean hasNonClosedLiteral(@NotNull Editor editor, @NotNull HighlighterIterator iterator, int offset) {
     final IElementType tokenType = iterator.getTokenType();
     if (!getOpeningQuotesTokens().contains(tokenType)) {
       return false;
@@ -101,7 +101,7 @@ public class BaseQuoteHandler implements MultiCharQuoteHandler {
   }
 
   @Override
-  public boolean isClosingQuote(HighlighterIterator iterator, int offset) {
+  public boolean isClosingQuote(@NotNull HighlighterIterator iterator, int offset) {
     final IElementType tokenType = iterator.getTokenType();
     if (getClosingQuotesTokens().contains(tokenType)) {
       int start = iterator.getStart();
@@ -160,7 +160,7 @@ public class BaseQuoteHandler implements MultiCharQuoteHandler {
   }
 
   @Override
-  public boolean isInsideLiteral(HighlighterIterator iterator) {
+  public boolean isInsideLiteral(@NotNull HighlighterIterator iterator) {
     return getLiteralContentTokens().contains(iterator.getTokenType());
   }
 

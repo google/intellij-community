@@ -1,6 +1,6 @@
 ### auto-generated section `build intellij.platform.jewel.uiTests` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_ui-tests",
@@ -13,14 +13,9 @@ create_kotlinc_options(
   x_context_parameters = True
 )
 
-resourcegroup(
-  name = "ui-tests_test_resources",
-  srcs = glob(["src/test/resources/**/*"]),
-  strip_prefix = "src/test/resources"
-)
-
 jvm_library(
   name = "ui-tests",
+  module_name = "intellij.platform.jewel.uiTests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   plugins = ["@lib//:compose-plugin"]
@@ -28,10 +23,12 @@ jvm_library(
 
 jvm_library(
   name = "ui-tests_test_lib",
+  testonly = True,
   module_name = "intellij.platform.jewel.uiTests",
   visibility = ["//visibility:public"],
   srcs = glob(["src/test/kotlin/**/*.kt", "src/test/kotlin/**/*.java", "src/test/kotlin/**/*.form"], allow_empty = True),
-  resources = [":ui-tests_test_resources"],
+  resources = glob(["src/test/resources/**/*"]),
+  resource_strip_prefix = "src/test/resources",
   kotlinc_opts = ":custom_ui-tests",
   deps = [
     "//libraries/kotlinx/coroutines/core",
@@ -64,6 +61,12 @@ jvm_library(
   plugins = ["@lib//:compose-plugin"]
 )
 ### auto-generated section `build intellij.platform.jewel.uiTests` end
+
+### auto-generated section `iml intellij.platform.jewel.uiTests` start
+exports_files([
+  "intellij.platform.jewel.uiTests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.jewel.uiTests` end
 
 ### auto-generated section `test intellij.platform.jewel.uiTests` start
 load("@community//build:tests-options.bzl", "jps_test")

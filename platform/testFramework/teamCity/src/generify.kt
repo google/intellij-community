@@ -38,6 +38,7 @@ fun generifyErrorMessage(originalMessage: String): String {
     .generifyHexadecimal()
     .generifyHexCode()
     .generifyNumber()
+    .generifyKernelMessage()
 }
 
 fun String.generifyFileNames(): String {
@@ -82,29 +83,16 @@ fun String.generifyHexadecimal(): String {
   }
 }
 
+fun String.generifyKernelMessage(): String {
+  val regex = Regex("\\[Kernel.*, CoroutineName\\((.*)\\), .*]")
+  return this.replace(regex) {
+    "[<Kernel details> ${it.groupValues[1]}]"
+  }
+}
+
+
 /** 0x01 => <HEX> */
 fun String.generifyHexCode(): String = this.replace("0x[\\da-fA-F]+".toRegex(), "<HEX>")
 
 /** text1234text => text<NUM>text */
 fun String.generifyNumber(): String = this.replace("\\d+".toRegex(), "<NUM>")
-
-fun String.generifyDollarSign(): String = this.replace("\\$<NUM>+".toRegex(), "")
-
-/** Leave only numbers and characters */
-fun String.replaceSpecialCharacters(newValue: String, vararg ignoreSymbols: String): String {
-  val regex = Regex("[^a-zA-Z0-9${ignoreSymbols.joinToString(separator = "")}]")
-
-  return this
-    .replace(regex, newValue)
-}
-
-/** Leave only numbers and characters.
- * Replace everything else with hyphens.
- */
-fun String.replaceSpecialCharactersWithHyphens(ignoreSymbols: List<String> = listOf(".", "/", """\\""")): String {
-  return this
-    .replaceSpecialCharacters(newValue = "-", *ignoreSymbols.toTypedArray())
-    .replace("[-]+".toRegex(), "-")
-    .removePrefix("-")
-    .removeSuffix("-")
-}

@@ -106,6 +106,15 @@
                      level="WARNING"
                      implementationClass="org.intellij.plugins.markdown.editor.tables.inspections.MarkdownNoTableBordersInspection"/>
 
+    <localInspection language="Markdown"
+                     shortName="MarkdownTablePipeInCodeSpan"
+                     bundle="messages.MarkdownBundle"
+                     key="markdown.table.pipe.in.code.span.inspection.name"
+                     groupKey="markdown.inspection.group.ruby.name"
+                     enabledByDefault="true"
+                     level="WARNING"
+                     implementationClass="org.intellij.plugins.markdown.editor.tables.inspections.MarkdownTablePipeInCodeSpanInspection"/>
+
     <intentionAction>
       <language>Markdown</language>
       <className>org.intellij.plugins.markdown.editor.tables.intentions.MarkdownInsertTableColumnIntention$InsertBefore</className>
@@ -147,6 +156,7 @@
 
     <fileType name="Markdown" extensions="markdown;md" language="Markdown"
               implementationClass="org.intellij.plugins.markdown.lang.MarkdownFileType" fieldName="INSTANCE"/>
+    <liveTemplateContext contextId="MARKDOWN" implementation="org.intellij.plugins.markdown.lang.MarkdownContextType"/>
     <lang.fileViewProviderFactory language="Markdown"
                                   id="SingleRootMarkdownFileViewProviderFactory"
                                   implementationClass="org.intellij.plugins.markdown.lang.MarkdownFileViewProviderFactory"/>
@@ -239,14 +249,21 @@
     <stubIndex implementation="org.intellij.plugins.markdown.lang.index.HeaderAnchorIndex"/>
 
     <pathReferenceProvider implementation="org.intellij.plugins.markdown.lang.references.paths.RelativeFileWithoutExtensionReferenceProvider"/>
+    <anchorReferenceProvider implementation="org.intellij.plugins.markdown.lang.references.paths.LineNumberPathReferenceProvider"/>
     <psi.referenceContributor language="Markdown" implementation="org.intellij.plugins.markdown.lang.references.paths.github.GithubWikiLocalReferenceContributor"/>
 
     <lang.elementManipulator forClass="org.intellij.plugins.markdown.lang.psi.impl.MarkdownAutoLink"
                              implementationClass="org.intellij.plugins.markdown.lang.psi.impl.MarkdownAutoLink$Manipulator"/>
+    <lang.elementManipulator forClass="org.intellij.plugins.markdown.lang.psi.impl.MarkdownCodeSpan"
+                             implementationClass="org.intellij.plugins.markdown.lang.psi.impl.MarkdownCodeSpan$Manipulator"/>
     <psi.referenceContributor language="Markdown" implementation="org.intellij.plugins.markdown.lang.references.AutoLinkWebReferenceContributor"/>
+    <psi.referenceContributor language="Markdown" implementation="org.intellij.plugins.markdown.lang.references.backtick.BacktickReferenceContributor"/>
+    <referencesSearch implementation="org.intellij.plugins.markdown.lang.references.backtick.BacktickReferenceSearcher"/>
+    <useScopeEnlarger implementation="org.intellij.plugins.markdown.lang.references.backtick.MarkdownReferenceUseScopeEnlarger"/>
 
     <todoIndexer filetype="Markdown" implementationClass="org.intellij.plugins.markdown.highlighting.MarkdownTodoIndexer"/>
     <indexPatternBuilder implementation="org.intellij.plugins.markdown.highlighting.MarkdownIndexPatternBuilder"/>
+    <copyPastePreProcessor implementation="org.intellij.plugins.markdown.editor.MarkdownLinkPastePreProcessor"/>
     <enterHandlerDelegate id="MarkdownEnterHandler"
                           implementation="org.intellij.plugins.markdown.editor.MarkdownEnterHandler"/>
 
@@ -365,12 +382,19 @@
     <registryKey key="markdown.experimental.allow.external.requests"
                  defaultValue="true"
                  description="Enables requests for external resources from the preview (e.g. non-local images)."/>
+    <registryKey key="markdown.command.runner.use.file.directory"
+                 defaultValue="false"
+                 description="Use the markdown file's parent directory as the working directory when running commands. Defaults to project root."/>
     <!--endregion-->
 
     <advancedSetting id="markdown.hide.floating.toolbar" default="false" groupKey="markdown.settings.name"/>
     <advancedSetting id="markdown.squash.multiple.dashes.in.header.anchors" default="false" groupKey="markdown.settings.name"/>
 
     <statistics.counterUsagesCollector implementationClass="org.intellij.plugins.markdown.MarkdownUsageCollector"/>
+    <applicationSettings service="org.intellij.plugins.markdown.settings.MarkdownCodeFoldingSettings"/>
+    <applicationSettings service="org.intellij.plugins.markdown.fileActions.export.MarkdownHtmlExportSettings"/>
+    <projectSettings service="org.intellij.plugins.markdown.settings.DocumentLinksSafeState"/>
+    <projectSettings service="org.intellij.plugins.markdown.settings.pandoc.PandocSettings"/>
   </extensions>
 
   <applicationListeners>
@@ -558,9 +582,6 @@
       <!-- Also add all insert actions into the default generate popup -->
       <add-to-group group-id="GenerateGroup" anchor="last"/>
       <reference ref="Markdown.Styling.CreateLink"/>
-      <action id="Markdown.InsertEmptyTable"
-              class="org.intellij.plugins.markdown.editor.tables.actions.InsertEmptyTableAction"
-              icon="org.intellij.plugins.markdown.MarkdownIcons.EditorActions.Table"/>
       <!--<action class="org.intellij.plugins.markdown.ui.actions.styling.InsertImageAction"-->
       <!--        id="org.intellij.plugins.markdown.ui.actions.styling.InsertImageAction"-->
       <!--        icon="AllIcons.General.LayoutPreviewOnly">-->
@@ -570,9 +591,7 @@
               class="org.intellij.plugins.markdown.editor.toc.GenerateTableOfContentsAction"
               icon="org.intellij.plugins.markdown.MarkdownIcons.EditorActions.BulletList"/>
     </group>
-    <action id="Markdown.Insert"
-            class="org.intellij.plugins.markdown.ui.actions.InsertAction"
-            use-shortcut-of="Generate"/>
+
 
     <action class="org.intellij.plugins.markdown.ui.actions.styling.MarkdownIntroduceLinkReferenceAction"
             id="org.intellij.plugins.markdown.ui.actions.styling.MarkdownIntroduceLinkReferenceAction"
@@ -583,7 +602,6 @@
       <add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="EditorToggleColumnMode"/>
       <separator/>
       <reference ref="Markdown.TableContextMenuGroup"/>
-      <reference ref="Markdown.Insert"/>
     </group>
 
     <group id="Markdown.Toolbar.Left" class="com.intellij.openapi.actionSystem.DefaultActionGroup">

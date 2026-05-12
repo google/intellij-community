@@ -17,35 +17,29 @@ import java.awt.Window
 import javax.swing.SwingUtilities
 
 /**
- * Returns the area where the given popup is allowed to be located.
+ * Returns the area where a popup is allowed to be located.
  *
- * Normally the environment will allow the popup to be shown
+ * Normally the environment will allow a popup to be shown
  * only if at least one pixel of it is located within this area.
  *
  * For this function to return a non-`null` meaningful value,
- * the popup must be showing, it must have a parent,
+ * the given component must be showing,
  * and it must be a descendant of some top-level (as in "not a popup") window.
+ * This component could be the popup itself, some component within the popup,
+ * or it could be the popup's owner. Strictly speaking, the nearest top-level ancestor
+ * of the given component must be the same as the nearest top-level ancestor of the popup
+ * we're trying to position.
  *
- * @return the rectangle in the given component's parent coordinate system, or `null` if the area cannot be determined
+ * @return the rectangle in the given component's "screen" coordinate system, or `null` if the area cannot be determined
  */
 @ApiStatus.Internal
-fun getValidBoundsForPopup(popup: Component): Rectangle? {
-  if (!popup.isShowing) {
-    LOG.warn("Impossible to determine the valid bounds because the popup is not showing: $popup")
+fun getValidBoundsForPopup(component: Component): Rectangle? {
+  if (!component.isShowing) {
+    LOG.warn("Impossible to determine the valid bounds because the component is not showing: $component")
     return null
   }
-  val validBounds = getNearestTopLevelParentBounds(popup) ?: return null
+  val validBounds = getNearestTopLevelParentBounds(component) ?: return null
   LOG.debug { "The allowed bounds in screen coordinates are $validBounds" }
-  val directParent = popup.parent
-  if (directParent == null) {
-    LOG.warn("Impossible to determine the valid bounds because the popup has no direct parent: $popup")
-    return null
-  }
-  // Now convert the allowed bounds to the direct parent's coordinate system.
-  val directParentLocation = directParent.locationOnScreen
-  validBounds.x -= directParentLocation.x
-  validBounds.y -= directParentLocation.y
-  LOG.debug { "The allowed bounds in parent coordinates are $validBounds" }
   return validBounds
 }
 

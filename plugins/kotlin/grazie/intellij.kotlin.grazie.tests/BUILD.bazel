@@ -3,12 +3,14 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "kotlin-grazie-tests",
+  module_name = "intellij.kotlin.grazie.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "kotlin-grazie-tests_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.grazie.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -25,10 +27,12 @@ jvm_library(
     "//plugins/kotlin/base/plugin:plugin_test_lib",
     "//plugins/grazie/src/test:grazie-tests",
     "//plugins/grazie/src/test:grazie-tests_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//platform/core-api:core",
     "//platform/core-api:core_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/analysis-api:analysis",
     "//platform/analysis-api:analysis_test_lib",
     "//plugins/kotlin/test-framework",
@@ -37,6 +41,12 @@ jvm_library(
   runtime_deps = [":kotlin-grazie-tests"]
 )
 ### auto-generated section `build intellij.kotlin.grazie.tests` end
+
+### auto-generated section `iml intellij.kotlin.grazie.tests` start
+exports_files([
+  "intellij.kotlin.grazie.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.grazie.tests` end
 
 ### auto-generated section `test intellij.kotlin.grazie.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

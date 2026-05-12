@@ -2,30 +2,21 @@
 package org.jetbrains.intellij.build
 
 import com.intellij.TestCaseLoader
-import com.intellij.util.SystemProperties
 import com.intellij.util.text.nullize
 import org.jetbrains.intellij.build.TestingOptions.Companion.ALL_EXCLUDE_DEFINED_GROUP
-import org.jetbrains.intellij.build.TestingOptions.Companion.BOOTSTRAP_SUITE_DEFAULT
 import org.jetbrains.intellij.build.impl.JUnitRunConfigurationProperties
 
-private val OLD_TEST_GROUP = System.getProperty("idea.test.group", TestingOptions.ALL_EXCLUDE_DEFINED_GROUP)
-private val OLD_TEST_PATTERNS = System.getProperty("idea.test.patterns")
 private val OLD_PLATFORM_PREFIX = System.getProperty("idea.platform.prefix")
-private val OLD_DEBUG_PORT = System.getProperty("debug.port")?.toIntOrNull() ?: 0
-private val OLD_SUSPEND_DEBUG_PROCESS = System.getProperty("debug.suspend", "n") == "y"
-private val OLD_JVM_MEMORY_OPTIONS = System.getProperty("test.jvm.memory")
-private val OLD_MAIN_MODULE = System.getProperty("module.to.make")
 
 /**
  * Options available for tests running on TeamCity.
  * If you want to run it locally, see [CommunityRunTestsBuildTarget] or [IdeaUltimateRunTestsBuildTarget].
  *
- * When running tests locally, specify the necessary options as VM arguments, e.g. `-Dintellij.build.test.groups=JAVA_TESTS`
+ * When running tests locally, specify the necessary options as VM arguments, e.g. `-Dintellij.build.test.groups=COMMUNITY_JAVA_TESTS`
  */
 open class TestingOptions {
   companion object {
     const val ALL_EXCLUDE_DEFINED_GROUP: String = "ALL_EXCLUDE_DEFINED"
-    const val BOOTSTRAP_SUITE_DEFAULT: String = "com.intellij.tests.BootstrapTests"
     const val PERFORMANCE_TESTS_ONLY_FLAG: String = "idea.performance.tests"
     const val TEST_JRE_PROPERTY: String = "intellij.build.test.jre"
     const val REDIRECT_STDOUT_TO_FILE: String = "intellij.build.test.redirectStdoutToFile"
@@ -35,16 +26,37 @@ open class TestingOptions {
   /**
    * Semicolon-separated names of test groups tests from which should be executed, by default all tests will be executed.
    *
-   *  Test groups are defined in testGroups.properties files and there is an implicit [ALL_EXCLUDE_DEFINED_GROUP] group for tests which aren't
-   * included into any group and 'ALL' group for all tests. By default, [ALL_EXCLUDE_DEFINED_GROUP] group is used.
+   * Test groups are defined in testGroups.properties files and there is an implicit [ALL_EXCLUDE_DEFINED_GROUP] group for tests which aren't
+   * included into any group and 'ALL' group for all tests.
    */
-  var testGroups: String = System.getProperty("intellij.build.test.groups").nullize(nullizeSpaces = true) ?: OLD_TEST_GROUP
+  var testGroups: String? = System.getProperty("intellij.build.test.groups").nullize(nullizeSpaces = true)
 
   /**
    * Semicolon-separated patterns for test class names which need to be executed. Wildcard '*' is supported. If this option is specified,
    * [testGroups] will be ignored.
    */
-  var testPatterns: String? = System.getProperty("intellij.build.test.patterns").nullize(nullizeSpaces = true) ?: OLD_TEST_PATTERNS
+  var testPatterns: String? = System.getProperty("intellij.build.test.patterns").nullize(nullizeSpaces = true)
+
+  /**
+   * Semicolon-separated JUnit 5 tag expressions to include; only tests tagged with at least one of these are executed.
+   * Supports JUnit Platform tag expressions (e.g. `"slow"`, `"slow;integration"`).
+   * If not specified, no tag filtering is applied.
+   */
+  var testTags: String? = System.getProperty("intellij.build.test.tags").nullize(nullizeSpaces = true)
+
+  /**
+   * Semicolon-separated JUnit 5 tag expressions to exclude; tests tagged with any of these are skipped.
+   * Supports JUnit Platform tag expressions (e.g. `"slow"`, `"slow;flaky"`).
+   * If not specified, no tag exclusion is applied.
+   */
+  var testExcludedTags: String? = System.getProperty("intellij.build.test.excluded.tags").nullize(nullizeSpaces = true)
+
+  /**
+   * Semicolon-separated exact test simple patterns, wildcards are not allowed.
+   * Each entry is `FullyQualifiedClassName` or `FullyQualifiedClassName#methodName`.
+   * If specified, [testGroups] and [testPatterns] will be ignored.
+   */
+  var testSimplePatterns: String? = System.getProperty("intellij.build.test.simple.patterns").nullize(nullizeSpaces = true)
 
   /**
    * Semicolon-separated names of JUnit run configurations in the project which need to be executed. If this option is specified,
@@ -60,7 +72,7 @@ open class TestingOptions {
   /**
    * Enables debug for a testing process
    */
-  var isDebugEnabled: Boolean = getBooleanProperty("intellij.build.test.debug.enabled", true)
+  var isDebugEnabled: Boolean = getBooleanProperty("intellij.build.test.debug.enabled")
 
   /**
    * Specifies address on which the testing process will listen for connections, by default a localhost will be used.
@@ -70,34 +82,29 @@ open class TestingOptions {
   /**
    * Specifies port on which the testing process will listen for connections, by default, a random port will be used.
    */
-  var debugPort: Int = System.getProperty("intellij.build.test.debug.port")?.toIntOrNull() ?: OLD_DEBUG_PORT
+  var debugPort: Int = System.getProperty("intellij.build.test.debug.port")?.toIntOrNull() ?: 0
 
   /**
    * If `true` to suspend the testing process until a debugger connects to it.
    */
-  var isSuspendDebugProcess: Boolean = getBooleanProperty("intellij.build.test.debug.suspend", OLD_SUSPEND_DEBUG_PROCESS)
+  var isSuspendDebugProcess: Boolean = getBooleanProperty("intellij.build.test.debug.suspend")
 
   /**
    * Custom JVM memory options (e.g. -Xmx) for the testing process.
    */
-  var jvmMemoryOptions: String? = System.getProperty("intellij.build.test.jvm.memory.options", OLD_JVM_MEMORY_OPTIONS)
+  var jvmMemoryOptions: String? = System.getProperty("intellij.build.test.jvm.memory.options")
 
   /**
    * Specifies a module which classpath will be used to search the test classes by default.
    *
    * If [searchScope] is set to `singleModule`, only tests from the main module are searched.
    */
-  var mainModule: String? = System.getProperty("intellij.build.test.main.module").nullize(nullizeSpaces = true) ?: OLD_MAIN_MODULE
+  var mainModule: String? = System.getProperty("intellij.build.test.main.module").nullize(nullizeSpaces = true)
 
   /**
    * Abort tests execution if [mainModule] does not match the module specified in the Run Configuration from [testConfigurations].
    */
   var validateMainModule: Boolean = System.getProperty("intellij.build.test.main.module.validate")?.toBooleanStrict() ?: false
-
-  /**
-   * Specifies a custom test suite, [BOOTSTRAP_SUITE_DEFAULT] is using by default.
-   */
-  var bootstrapSuite: String = System.getProperty("intellij.build.test.bootstrap.suite", BOOTSTRAP_SUITE_DEFAULT)
 
   /**
    * Specifies path to runtime which will be used to run tests.
@@ -180,6 +187,11 @@ open class TestingOptions {
   var attemptCount: Int = System.getProperty("intellij.build.test.attempt.count")?.toInt() ?: 1
 
   /**
+   * Number of full test runs. Each run executes all selected tests from scratch.
+   */
+  var repeatCount: Int = System.getProperty("intellij.build.test.repeat.count")?.toInt() ?: 1
+
+  /**
    * @see [com.intellij.TestCaseLoader.matchesCurrentBucket]
    */
   var bucketsCount: Int = System.getProperty(TestCaseLoader.TEST_RUNNERS_COUNT_FLAG)?.toInt() ?: 1
@@ -195,20 +207,14 @@ open class TestingOptions {
    */
   val useArchivedCompiledClasses: Boolean = getBooleanProperty(USE_ARCHIVED_COMPILED_CLASSES, false)
 
-  /** Skip running (and collection) of JUnit5 tests */
-  val shouldSkipJUnit5Tests: Boolean = SystemProperties.getBooleanProperty("intellij.build.test.skip.tests.junit5", false)
-
-  /** Skip running (and collection) of JUnit3/4 tests */
-  val shouldSkipJUnit34Tests: Boolean = SystemProperties.getBooleanProperty("intellij.build.test.skip.tests.junit34", false)
-
   /**
-   * Test search scope, for local runs only.
+   * Test search scope.
    * Allowed values:
    * - singleModule
    * - moduleWithDependencies
    * By default, tests are searched across module dependencies.
    */
-  val searchScope: String = System.getProperty("intellij.build.test.search.scope", JUnitRunConfigurationProperties.TestSearchScope.MODULE_WITH_DEPENDENCIES.serialized)
+  var searchScope: String = System.getProperty("intellij.build.test.search.scope", JUnitRunConfigurationProperties.TestSearchScope.MODULE_WITH_DEPENDENCIES.serialized)
 
   /**
    * If `true` then a test process's stdout is redirected to a file,

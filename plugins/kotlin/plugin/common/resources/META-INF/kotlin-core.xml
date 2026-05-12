@@ -124,6 +124,10 @@
     <extensionPoint qualifiedName="org.jetbrains.kotlin.idea.codeInsight.lineMarkers.kotlinRunLineMarkerHider"
                     interface="org.jetbrains.kotlin.idea.codeInsight.KotlinRunLineMarkerHider"
                     dynamic="true"/>
+    <extensionPoint
+            qualifiedName="org.jetbrains.kotlin.classImportFilter"
+            interface="org.jetbrains.kotlin.idea.util.ClassImportFilter"
+            dynamic="true"/>
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
@@ -260,6 +264,11 @@
             id="KotlinDumbCompletionContributor"
             order="first, after KotlinCompletionContributor"
             implementationClass="org.jetbrains.kotlin.idea.completion.implCommon.KotlinDumbCompletionContributor"/>
+
+    <completion.plainTextSymbol
+            language="kotlin"
+            implementationClass="org.jetbrains.kotlin.idea.completion.KotlinPlainTextSymbolCompletionContributor"/>
+
     <codeInsight.wordCompletionFilter language="kotlin"
                                       implementationClass="org.jetbrains.kotlin.idea.completion.implCommon.KotlinWordCompletionFilter"/>
 
@@ -278,6 +287,8 @@
 
     <pluginSuggestionProvider order="first" implementation="org.jetbrains.kotlin.idea.suggestions.JupyterNotebookSuggestionProvider"/>
     <pluginSuggestionProvider implementation="org.jetbrains.kotlin.idea.suggestions.AmperPluginSuggestionProvider"/>
+    <applicationSettings service="org.jetbrains.kotlin.idea.codeInsight.KotlinCodeInsightSettings"/>
+    <applicationSettings service="org.jetbrains.kotlin.idea.editor.KotlinEditorOptions"/>
   </extensions>
 
   <!-- Templates -->
@@ -348,6 +359,9 @@
             implementationClass="org.jetbrains.kotlin.idea.highlighter.KotlinTestRunLineMarkerContributor"/>
 
     <lang.inspectionSuppressor language="kotlin" implementationClass="org.jetbrains.kotlin.idea.inspections.suppress.KotlinInspectionSuppressor"/>
+    <optionController implementation="org.jetbrains.kotlin.idea.configuration.KotlinCompilerPluginProvider"/>
+    <optionController implementation="org.jetbrains.kotlin.idea.configuration.KotlinDependencyProvider"/>
+    <optionController implementation="org.jetbrains.kotlin.idea.configuration.JpsDependencyProvider"/>
   </extensions>
 
   <!-- Editing -->
@@ -448,6 +462,10 @@
     <registryKey key="kotlin.copy.paste.allow.import.of.nested.declarations"
                  description="Allows the copy-paste processor to import nested declarations (enum values, static Java members, etc.) if they were imported in the original source."
                  defaultValue="true" />
+
+    <registryKey key="kotlin.shorten.context.sensitive.resolution.qualifiers.by.default"
+                 description="Allows reference shortener to remove explicit qualifiers on references which could be resolved by context-sensitive resolution (when the corresponding language feature is enabled)"
+                 defaultValue="true" />
   </extensions>
 
   <!-- Tips and Tricks -->
@@ -497,12 +515,6 @@
             displayType="STICKY_BALLOON"
             key="configure.kotlin"
             bundle="messages.KotlinProjectConfigurationBundle"
-    />
-    <notificationGroup
-            id="Configure K2"
-            displayType="STICKY_BALLOON"
-            key="enable.k2"
-            bundle="messages.FeedbackBundle"
     />
   </extensions>
 
@@ -594,6 +606,7 @@
            popup="true">
       <action id="ConvertJavaToKotlinInGroup"
               class="org.jetbrains.kotlin.idea.actions.JavaToKotlinActionForGroup">
+        <override-text place="GoToAction"/>
         <keyboard-shortcut keymap="$default" first-keystroke="control alt shift K"/>
       </action>
       <add-to-group group-id="CodeMenu" anchor="last"/>

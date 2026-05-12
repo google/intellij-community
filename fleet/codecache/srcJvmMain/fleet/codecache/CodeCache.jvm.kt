@@ -28,6 +28,7 @@ import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
 import java.text.DecimalFormat
 import kotlin.io.path.absolutePathString
+import kotlin.io.path.copyToRecursively
 import kotlin.io.path.isDirectory
 import kotlin.io.path.outputStream
 import kotlin.math.log10
@@ -81,7 +82,7 @@ class CodeCache(
                                        tmpFile: Path,
                                        coord: Coordinates.Remote,
                                        queryParams: Map<String, String>): Boolean {
-    logger.debug("Downloading $coord to $targetFile")
+    logger.debug { "Downloading $coord to $targetFile" }
 
     ensureDirExists(targetFile.parent)
     ensureDirExists(tmpFile.parent)

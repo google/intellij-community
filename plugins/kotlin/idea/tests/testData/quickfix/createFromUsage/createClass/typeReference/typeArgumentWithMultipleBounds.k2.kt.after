@@ -1,6 +1,7 @@
 // "Create class 'Foo'" "true"
 // K2 TODO: improve generated class type arguments when "expected type" is fixed
-// K2_AFTER_ERROR: Type argument is not within its bounds: must be subtype of 'I & A'.
+// K2_ERROR: Unresolved reference 'Foo'.
+// K2_AFTER_ERROR: Type argument is not within its bounds: type parameter 'T (of fun <T : I, A> foo)' must be subtype of 'I & A', but actual: 'Foo'.
 open class A
 interface I
 

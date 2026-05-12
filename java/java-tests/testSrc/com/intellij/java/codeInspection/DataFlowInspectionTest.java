@@ -138,25 +138,25 @@ public class DataFlowInspectionTest extends DataFlowInspectionTestCase {
 
   public void testPassingNullableIntoVararg() { doTest(); }
   public void testEqualsImpliesNotNull() {
-    doTestWith((i, __) -> i.SUGGEST_NULLABLE_ANNOTATIONS = true);
+    doTestWith((i, _) -> i.SUGGEST_NULLABLE_ANNOTATIONS = true);
   }
   public void testEffectivelyUnqualified() { doTest(); }
 
   public void testQualifierEquality() { doTest(); }
 
   public void testSkipAssertions() {
-    doTestWith((__, i) -> {
+    doTestWith((_, i) -> {
       i.DONT_REPORT_TRUE_ASSERT_STATEMENTS = true;
       i.REPORT_CONSTANT_REFERENCE_VALUES = true;
     });
   }
 
   public void testParanoidMode() {
-    doTestWith((i, __) -> i.TREAT_UNKNOWN_MEMBERS_AS_NULLABLE = true);
+    doTestWith((i, _) -> i.TREAT_UNKNOWN_MEMBERS_AS_NULLABLE = true);
   }
 
   public void testReportConstantReferences() {
-    doTestWith((i, __) -> i.SUGGEST_NULLABLE_ANNOTATIONS = true);
+    doTestWith((i, _) -> i.SUGGEST_NULLABLE_ANNOTATIONS = true);
     String hint = "Replace with 'null'";
     checkIntentionResult(hint);
   }
@@ -169,12 +169,12 @@ public class DataFlowInspectionTest extends DataFlowInspectionTestCase {
   }
 
   public void testReportConstantReferences_OverloadedCall() {
-    doTestWith((i, __) -> i.SUGGEST_NULLABLE_ANNOTATIONS = true);
+    doTestWith((i, _) -> i.SUGGEST_NULLABLE_ANNOTATIONS = true);
     checkIntentionResult("Replace with 'null'");
   }
 
   public void testReportConstantReferencesAfterFinalFieldAccess() {
-    doTestWith((i, __) -> i.SUGGEST_NULLABLE_ANNOTATIONS = true);
+    doTestWith((i, _) -> i.SUGGEST_NULLABLE_ANNOTATIONS = true);
   }
 
   public void testCheckFieldInitializers() {
@@ -235,7 +235,7 @@ public class DataFlowInspectionTest extends DataFlowInspectionTestCase {
   public void testHonorGetterAnnotation() { doTest(); }
 
   public void testIgnoreAssertions() {
-    doTestWith((__, i) -> i.IGNORE_ASSERT_STATEMENTS = true);
+    doTestWith((_, i) -> i.IGNORE_ASSERT_STATEMENTS = true);
   }
 
   public void testContractAnnotation() { doTest(); }
@@ -361,7 +361,7 @@ public class DataFlowInspectionTest extends DataFlowInspectionTestCase {
 
   public void testNullabilityDefaultVsMethodImplementing() {
     addJavaxDefaultNullabilityAnnotations(myFixture);
-    doTestWith((i, __) -> i.TREAT_UNKNOWN_MEMBERS_AS_NULLABLE = true);
+    doTestWith((i, _) -> i.TREAT_UNKNOWN_MEMBERS_AS_NULLABLE = true);
   }
 
   public void testTypeQualifierNickname() {
@@ -537,7 +537,7 @@ public class DataFlowInspectionTest extends DataFlowInspectionTestCase {
   public void testNullableMethodReturningNotNull() { doTest(); }
 
   public void testDivisionByZero() {
-    doTestWith((i, __) -> i.SUGGEST_NULLABLE_ANNOTATIONS = true);
+    doTestWith((i, _) -> i.SUGGEST_NULLABLE_ANNOTATIONS = true);
   }
 
   public void testFieldUsedBeforeInitialization() { doTest(); }
@@ -626,12 +626,12 @@ public class DataFlowInspectionTest extends DataFlowInspectionTestCase {
   public void testEqualsInLoopNotTooComplex() { doTest(); }
   public void testEqualsWithItself() { doTest(); }
   public void testBoxingBoolean() {
-    doTestWith((__, i) -> i.REPORT_CONSTANT_REFERENCE_VALUES = true);
+    doTestWith((_, i) -> i.REPORT_CONSTANT_REFERENCE_VALUES = true);
   }
   public void testOrWithAssignment() { doTest(); }
   public void testAndAndLastOperand() { doTest(); }
   public void testReportAlwaysNull() {
-    doTestWith((__, i) -> i.REPORT_CONSTANT_REFERENCE_VALUES = true);
+    doTestWith((_, i) -> i.REPORT_CONSTANT_REFERENCE_VALUES = true);
   }
 
   public void testBoxUnboxArrayElement() { doTest(); }
@@ -719,7 +719,7 @@ public class DataFlowInspectionTest extends DataFlowInspectionTestCase {
   public void testFieldUpdateViaSetter() { doTest(); }
   public void testInitArrayInConstructor() { doTest(); }
   public void testGetterNullityAfterCheck() { doTest(); }
-  public void testInferenceNullityMismatch() { doTestWith((insp, __) -> insp.SUGGEST_NULLABLE_ANNOTATIONS = false); }
+  public void testInferenceNullityMismatch() { doTestWith((insp, _) -> insp.SUGGEST_NULLABLE_ANNOTATIONS = false); }
   public void testFieldInInstanceInitializer() { doTest(); }
   public void testCallsBeforeFieldInitializing() {
     IdeaTestUtil.withLevel(getModule(), LanguageLevel.JDK_17, () -> doTest());
@@ -730,7 +730,7 @@ public class DataFlowInspectionTest extends DataFlowInspectionTestCase {
   public void testArrayInitializerElementRewritten() { doTest(); }
   public void testFinallyEphemeralNpe() { doTest(); }
   public void testTypeParameterAsSuperClass() { doTest(); }
-  public void testSuppressConstantBooleans() { doTestWith((__, insp) -> insp.REPORT_CONSTANT_REFERENCE_VALUES = true); }
+  public void testSuppressConstantBooleans() { doTestWith((_, insp) -> insp.REPORT_CONSTANT_REFERENCE_VALUES = true); }
   public void testTempVarsInContracts() { doTest(); }
   public void testNestedUnrolledLoopNotComplex() { doTest(); }
   public void testEnumOrdinal() { doTest(); }
@@ -741,7 +741,7 @@ public class DataFlowInspectionTest extends DataFlowInspectionTestCase {
   public void testPureMethodReadsMutableArray() { doTest(); }
   public void testBoxingInConstructorArguments() { doTest(); }
   public void testBoxingInArrayDeclaration() { doTest(); }
-  public void testBoxedBooleanNullableTrue() { doTestWith((__, insp) -> insp.REPORT_CONSTANT_REFERENCE_VALUES = true); }
+  public void testBoxedBooleanNullableTrue() { doTestWith((_, insp) -> insp.REPORT_CONSTANT_REFERENCE_VALUES = true); }
   public void testNestedVersusSuper() { doTest(); }
   public void testChangeFieldUsedInPureMethod() { doTest(); }
   public void testSuppression() { doTest(); }

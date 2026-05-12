@@ -53,7 +53,6 @@ import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtFunction
-import org.jetbrains.kotlin.psi.KtIntersectionType
 import org.jetbrains.kotlin.psi.KtLambdaExpression
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
 import org.jetbrains.kotlin.psi.KtNamedFunction
@@ -72,6 +71,7 @@ import org.jetbrains.kotlin.psi.KtValueArgumentName
 import org.jetbrains.kotlin.psi.createExpressionByPattern
 import org.jetbrains.kotlin.psi.psiUtil.containingClass
 import org.jetbrains.kotlin.psi.psiUtil.findDescendantOfType
+import org.jetbrains.kotlin.psi.psiUtil.forEachDescendantOfType
 import org.jetbrains.kotlin.psi.psiUtil.getReceiverExpression
 import org.jetbrains.kotlin.psi.psiUtil.isNull
 import org.jetbrains.kotlin.psi.psiUtil.parameterIndex
@@ -214,8 +214,10 @@ internal fun insertExplicitTypeArguments(codeToInline: MutableCodeToInline) {
                     expr.addAfter(KtPsiFactory(expr.project).createTypeArguments(arguments), expr.calleeExpression)
                     expr.typeArguments.forEach { typeArgument ->
                         val typeElement = typeArgument.typeReference?.typeElement
-                        val reference = (((typeElement as? KtIntersectionType)?.getLeftTypeRef()?.typeElement ?: typeElement) as? KtUserType)?.referenceExpression
-                        reference?.putCopyableUserData(CodeToInline.TYPE_PARAMETER_USAGE_KEY, Name.identifier(reference.text))
+                        typeElement?.forEachDescendantOfType<KtUserType> {
+                            val referenceExpression = it.referenceExpression
+                            referenceExpression?.putCopyableUserData(CodeToInline.TYPE_PARAMETER_USAGE_KEY, Name.identifier(referenceExpression.text))
+                        }
                     }
                 }
             }

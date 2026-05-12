@@ -160,6 +160,7 @@ public class JavaDocInfoGeneratorTest extends JavaCodeInsightTestCase {
   public void testSuperJavadocErasureResolve() { doTestAtCaret(); }
   public void testPackageInfo() { doTestPackageInfo(); }
   public void testPackageWithoutPackageInfo() { doTestPackageInfo(); }
+  public void testEmptyPackage() { doTestPackageInfo(); }
   public void testPackageHtml() { doTestPackageInfo(); }
   public void testSyntheticEnumValues() { doTestAtCaret(); }
   public void testVariableDoc() { doTestAtCaret(); }
@@ -234,6 +235,7 @@ public class JavaDocInfoGeneratorTest extends JavaCodeInsightTestCase {
   }
   public void testMarkdownParagraphSeparation() { doTestClass(); }
   public void testMarkdownJepExample(){ doTestMethod(); }
+  public void testMarkdownJepExample02(){ doTestClass(); }
   public void testHtmlCodeInMarkdown() { doTestMethod(); }
   public void testMarkdownInlineCodeBlock() { doTestClass(); }
   public void testEscapeHtmlCodesInCodeBlock() { doTestClass(); }
@@ -244,13 +246,24 @@ public class JavaDocInfoGeneratorTest extends JavaCodeInsightTestCase {
   public void testSeeTagWithNestedLink() { doTestClass(); }
   public void testSeeTagWithNestedLinkMarkdown() { doTestClass(); }
   public void testLinkInParamDescriptionMarkdown() { doTestAtCaret(); }
+  public void testSeeTagMarkdownDescription() { doTestClass(); }
   public void testAllTags() { doTestAtCaret(); }
   public void testAllTagsMarkdown() { doTestAtCaret(); }
   public void testFragmentReference()  { doTestClass(); }
   public void testPackageInfoMarkdown() { doTestPackageInfo(); }
   public void testListInTags() { doTestMethod(); }
   public void testParagraphInTagsMarkdown() { doTestMethod(); }
+  public void testBareMethodReferences() { doTestClass(); }
   public void testPreTagInJavadocTag() { doTestClass();}
+  public void testLinkTagMalformed() { doTestClass(); }
+  public void testCursedCodeBlock() { doTestClass(); }
+  public void testSnippetMarkup() { doTestClass(); }
+  public void testSealedClass() {
+    createProjectStructure(getTestDataPath() + TEST_DATA_FOLDER + "sealedClasses");
+    verifyJavadocFor("Sealer");
+    verifyJavadocFor("SecondSealer");
+  }
+ public void testParameterizedLinks() { doTestClass(); }
 
   public void testRepeatableAnnotations() {
     useJava8();

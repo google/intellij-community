@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vcs.changes.patch.tool
 
 import com.intellij.diff.DiffContext
@@ -6,7 +6,7 @@ import com.intellij.diff.DiffViewerEx
 import com.intellij.diff.EditorDiffViewer
 import com.intellij.diff.FrameDiffTool
 import com.intellij.diff.actions.impl.FocusOppositePaneAction
-import com.intellij.diff.actions.impl.SetEditorSettingsAction
+import com.intellij.diff.actions.impl.SetEditorSettingsActionGroup
 import com.intellij.diff.comparison.ByWord
 import com.intellij.diff.comparison.ComparisonPolicy
 import com.intellij.diff.comparison.DiffTooBigException
@@ -74,7 +74,7 @@ internal class SideBySidePatchDiffViewer(
 
   private val prevNextDifferenceIterable: MyPrevNextDifferenceIterable
   private val focusTrackerSupport: FocusTrackerSupport<Side>
-  private val editorSettingsAction: SetEditorSettingsAction
+  private val editorSettingsAction: SetEditorSettingsActionGroup
   private val syncScrollable: MySyncScrollable
   private val syncScrollSupport: TwosideSyncScrollSupport
   private val alignedDiffModel: AlignedDiffModel
@@ -132,7 +132,7 @@ internal class SideBySidePatchDiffViewer(
     MyFocusOppositePaneAction(true).install(panel)
     MyFocusOppositePaneAction(false).install(panel)
 
-    editorSettingsAction = SetEditorSettingsAction(textSettings, editors)
+    editorSettingsAction = SetEditorSettingsActionGroup(textSettings, editors)
     editorSettingsAction.setSyncScrollSupport(syncScrollSupport)
     editorSettingsAction.applyDefaults()
 

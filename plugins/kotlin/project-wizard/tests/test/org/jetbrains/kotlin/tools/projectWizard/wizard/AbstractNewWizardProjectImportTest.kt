@@ -20,7 +20,7 @@ import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.components.KaDiagnosticCheckerFilter
 import org.jetbrains.kotlin.analysis.api.diagnostics.KaSeverity
-import org.jetbrains.kotlin.gradle.scripting.k2.workspaceModel.KotlinGradleScriptEntitySource
+import org.jetbrains.kotlin.gradle.scripting.k2.workspaceModel.GradleKotlinScriptEntitySource
 import org.jetbrains.kotlin.idea.codeInsight.inspections.shared.ReplaceUntilWithRangeUntilInspection
 import org.jetbrains.kotlin.idea.core.script.k2.modules.KotlinScriptEntity
 import org.jetbrains.kotlin.idea.core.script.v1.alwaysVirtualFile
@@ -164,7 +164,6 @@ abstract class AbstractNewWizardProjectImportTest : HeavyPlatformTestCase() {
         getSettings(project, SYSTEM_ID).linkProject(settings)
     }
 
-    @OptIn(KaExperimentalApi::class)
     protected fun checkScriptConfigurationsIfAny() {
         val settings = (getSettings(project, SYSTEM_ID) as GradleSettings).linkedProjectsSettings.firstOrNull()
             ?: error("Cannot find linked gradle project: ${project.basePath}")
@@ -181,7 +180,7 @@ abstract class AbstractNewWizardProjectImportTest : HeavyPlatformTestCase() {
             )
             analyze(psiFile) {
                 val diagnostics =
-                    psiFile.diagnostics(KaDiagnosticCheckerFilter.EXTENDED_AND_COMMON_CHECKERS).filter { it.severity == KaSeverity.ERROR }
+                    psiFile.collectDiagnostics(KaDiagnosticCheckerFilter.EXTENDED_AND_COMMON_CHECKERS).filter { it.severity == KaSeverity.ERROR }
                 assert(diagnostics.isEmpty()) {
                     "Diagnostics list should be empty:\n ${diagnostics.joinToString("\n") { it.defaultMessage }}"
                 }
@@ -195,7 +194,7 @@ abstract class AbstractNewWizardProjectImportTest : HeavyPlatformTestCase() {
         val scriptEntities = workspaceModel.currentSnapshot.getVirtualFileUrlIndex()
             .findEntitiesByUrl(this.alwaysVirtualFile.toVirtualFileUrl(fileUrlManager))
             .filterIsInstance<KotlinScriptEntity>().toList()
-        return scriptEntities.any { it.entitySource is KotlinGradleScriptEntitySource }
+        return scriptEntities.any { it.entitySource is GradleKotlinScriptEntitySource }
     }
 
     companion object {

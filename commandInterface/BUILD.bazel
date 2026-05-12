@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.commandInterface` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "commandInterface_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "commandInterface",
   module_name = "intellij.commandInterface",
   visibility = ["//visibility:public"],
   srcs = glob(["gen/**/*.kt", "gen/**/*.java", "src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":commandInterface_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/core-api:core",
     "//platform/util",
@@ -21,12 +16,14 @@ jvm_library(
     "//platform/analysis-impl",
     "//platform/execution",
     "//platform/editor-ui-api:editor-ui",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
   ],
   runtime_deps = ["//platform/backend"]
 )
 
 jvm_library(
   name = "commandInterface_test_lib",
+  testonly = True,
   module_name = "intellij.commandInterface",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -40,6 +37,13 @@ jvm_library(
     "//platform/analysis-impl:analysis-impl_test_lib",
     "//platform/execution:execution_test_lib",
     "//platform/editor-ui-api:editor-ui_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
   ]
 )
 ### auto-generated section `build intellij.commandInterface` end
+
+### auto-generated section `iml intellij.commandInterface` start
+exports_files([
+  "intellij.commandInterface.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.commandInterface` end

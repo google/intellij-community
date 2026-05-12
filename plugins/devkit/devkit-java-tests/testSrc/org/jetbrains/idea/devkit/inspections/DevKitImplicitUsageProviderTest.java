@@ -39,6 +39,10 @@ public class DevKitImplicitUsageProviderTest extends LightJavaCodeInsightFixture
     myFixture.addClass("package com.intellij.util.xml; public interface GenericAttributeValue<T> extends DomElement {}");
 
     myFixture.addClass("package com.intellij.jam; public interface JamElement {}");
+
+    myFixture.addClass("package com.intellij.mcpserver.annotations; public @interface McpTool {}");
+    myFixture.addClass("package com.intellij.mcpserver.annotations; public @interface McpDescription { String value(); }");
+    myFixture.addClass("package com.intellij.mcpserver; public interface McpToolset {}");
   }
 
   public void testImplicitUsagesDomElement() {
@@ -49,6 +53,11 @@ public class DevKitImplicitUsageProviderTest extends LightJavaCodeInsightFixture
   public void testImplicitUsagesDomElementVisitor() {
     enableImplicitUsageInspections();
     myFixture.testHighlighting("ImplicitUsagesDomElementVisitor.java");
+  }
+
+  public void testImplicitUsagesMcpToolMethod() {
+    enableImplicitUsageInspections();
+    myFixture.testHighlighting("ImplicitUsagesMcpToolMethod.java");
   }
 
   private void enableImplicitUsageInspections() {

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.debugger.impl.backend
 
 import com.intellij.ide.ui.colors.rpcId
@@ -64,6 +64,7 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -122,8 +123,8 @@ internal class BackendXValueApi : XValueApi {
         trySend(XFullValueEvaluatorResult.Evaluated(fullValue))
       }
 
+      @Suppress("OVERRIDE_DEPRECATION")
       override fun evaluated(fullValue: String, font: Font?) {
-        // TODO[IJPL-160146]: support Font?
         trySend(XFullValueEvaluatorResult.Evaluated(fullValue))
       }
 
@@ -167,14 +168,14 @@ internal class BackendXValueApi : XValueApi {
 
   override suspend fun computeInlineData(xValueId: XValueId): XInlineDebuggerDataDto? {
     val xValueModel = BackendXValueModel.findById(xValueId) ?: return null
-    val channel = Channel<XSourcePositionDto>(Channel.UNLIMITED)
+    val channel = Channel<suspend () -> XSourcePositionDto>(Channel.UNLIMITED)
     val state = xValueModel.xValue.computeInlineDebuggerData(object : XInlineDebuggerDataCallback() {
       override fun computed(position: XSourcePosition?) {
         if (position == null) return
-        channel.trySend(position.toRpc())
+        channel.trySend { position.toRpc() }
       }
     })
-    return XInlineDebuggerDataDto(state, channel.asColdFlow().toRpc())
+    return XInlineDebuggerDataDto(state, channel.asColdFlow().map { it() }.toRpc())
   }
 
   override suspend fun nodeLinkClicked(linkId: XDebuggerHyperlinkId) {

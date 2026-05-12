@@ -37,6 +37,7 @@ import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.NlsSafe;
+import com.intellij.openapi.util.text.HtmlChunk;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.util.text.Strings;
 import com.intellij.ui.ExperimentalUI;
@@ -164,7 +165,9 @@ public class ActionButton extends JComponent implements ActionButtonComponent, A
     addKeyListener(new KeyAdapter() {
       @Override
       public void keyReleased(KeyEvent e) {
-        if (e.getModifiers() == 0 && e.getKeyCode() == KeyEvent.VK_SPACE) {
+        if (e.getModifiersEx() == 0 &&
+            (e.getKeyCode() == KeyEvent.VK_SPACE ||
+             (e.getKeyCode() == KeyEvent.VK_DOWN && shallPaintDownArrow()))) {
           click();
         }
       }
@@ -347,7 +350,7 @@ public class ActionButton extends JComponent implements ActionButtonComponent, A
   public void addNotify() {
     super.addNotify();
     if (ActionToolbar.findToolbarBy(this) == null) {
-      ActionManagerEx.withLazyActionManager(null, __ -> { update(); return Unit.INSTANCE; });
+      ActionManagerEx.withLazyActionManager(null, _ -> { update(); return Unit.INSTANCE; });
     }
     else {
       updateToolTipText();
@@ -480,7 +483,7 @@ public class ActionButton extends JComponent implements ActionButtonComponent, A
     if (UISettings.isIdeHelpTooltipEnabled()) {
       HelpTooltip ht = myPresentation.getClientProperty(CUSTOM_HELP_TOOLTIP);
       if ((Strings.isNotEmpty(text) || Strings.isNotEmpty(description)) && ht == null) {
-        ht = new HelpTooltip().setTitle(text).setShortcut(getShortcutText());
+        ht = new HelpTooltip().setPlainTextTitle(text).setShortcut(getShortcutText());
         if (myAction instanceof TooltipLinkProvider) {
           TooltipLinkProvider.TooltipLink link = ((TooltipLinkProvider)myAction).getTooltipLink(this);
           if (link != null) {
@@ -488,8 +491,8 @@ public class ActionButton extends JComponent implements ActionButtonComponent, A
           }
         }
         String id = ActionManager.getInstance().getId(myAction);
-        if (!Objects.equals(text, description) && ((id != null && WHITE_LIST.contains(id)) || myAction instanceof TooltipDescriptionProvider)) {
-          ht.setDescription(description);
+        if (description != null && !Objects.equals(text, description) && ((id != null && WHITE_LIST.contains(id)) || myAction instanceof TooltipDescriptionProvider)) {
+          ht.setDescription(HtmlChunk.raw(description));
         }
       }
       if (ht != null) {
@@ -553,7 +556,9 @@ public class ActionButton extends JComponent implements ActionButtonComponent, A
 
   @Override
   protected void processMouseEvent(MouseEvent e) {
-    IdeMouseEventDispatcher.requestFocusInNonFocusedWindow(e);
+    if (isRequestFocusEnabled()) {
+      IdeMouseEventDispatcher.requestFocusInNonFocusedWindow(e);
+    }
     super.processMouseEvent(e);
     if (e.isConsumed()) return;
     boolean skipPress = checkSkipPressForEvent(e);
@@ -661,12 +666,11 @@ public class ActionButton extends JComponent implements ActionButtonComponent, A
 
   @Override
   public @NotNull AccessibleContext getAccessibleContext() {
-    AccessibleContext context = accessibleContext;
-    if(context == null) {
-      accessibleContext = context = new AccessibleActionButton();
+    if (accessibleContext == null) {
+      accessibleContext = new AccessibleActionButton();
     }
 
-    return context;
+    return accessibleContext;
   }
 
   protected class AccessibleActionButton extends JComponent.AccessibleJComponent implements AccessibleAction, AccessibleValue {
@@ -730,7 +734,7 @@ public class ActionButton extends JComponent implements ActionButtonComponent, A
       //  var1.add(AccessibleState.?);
       //}
 
-      if (state == ActionButtonComponent.PUSHED) {
+      if (state == PUSHED) {
         accessibleStateSet.add(AccessibleState.PRESSED);
       }
       if (isSelected()) {
@@ -739,6 +743,10 @@ public class ActionButton extends JComponent implements ActionButtonComponent, A
 
       if (isFocusOwner()) {
         accessibleStateSet.add(AccessibleState.FOCUSED);
+      }
+
+      if (shallPaintDownArrow()) {
+        accessibleStateSet.add(AccessibleState.EXPANDABLE);
       }
     }
 

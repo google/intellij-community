@@ -50,8 +50,12 @@ import com.intellij.util.ConcurrencyUtil;
 import com.intellij.util.TimeoutUtil;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.containers.ContainerUtil;
+import com.intellij.xdebugger.BreakpointErrorData;
 import com.intellij.xdebugger.DapMode;
+import com.intellij.xdebugger.XBreakpointBehaviorPolicy;
+import com.intellij.xdebugger.XBreakpointBehaviorPolicy.BreakpointErrorAction;
 import com.intellij.xdebugger.XDebugSession;
+import com.intellij.xdebugger.XDebuggerManager;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.impl.XDebugSessionImpl;
 import com.intellij.xdebugger.impl.XDebuggerManagerImpl;
@@ -124,7 +128,7 @@ public class DebugProcessEvents extends DebugProcessImpl {
       vmAttached(proxy);
       if (vm.canBeModified()) {
         DebuggerManagerThreadImpl managerThread = DebuggerManagerThreadImpl.getCurrentThread();
-        DebuggerEventThread eventThread = myEventThreads.computeIfAbsent(vm, __ -> new DebuggerEventThread(managerThread));
+        DebuggerEventThread eventThread = myEventThreads.computeIfAbsent(vm, _ -> new DebuggerEventThread(managerThread));
         ApplicationManager.getApplication().executeOnPooledThread(
           ConcurrencyUtil.underThreadNameRunnable("DebugProcessEvents", eventThread));
       }
@@ -481,11 +485,9 @@ public class DebugProcessEvents extends DebugProcessImpl {
       XDebugSessionImpl session = (XDebugSessionImpl)getSession().getXDebugSession();
 
       // breakpoints should be initialized after all processAttached listeners work
-      ApplicationManager.getApplication().runReadAction(() -> {
-        if (session != null) {
-          session.initBreakpoints();
-        }
-      });
+      if (session != null) {
+        session.initBreakpoints();
+      }
 
       if (Registry.is("debugger.track.instrumentation", true) && canBeModified) {
         trackClassRedefinitions();
@@ -774,14 +776,32 @@ public class DebugProcessEvents extends DebugProcessImpl {
         catch (final LocatableEventRequestor.EventProcessingException ex) {
           // stop timer here to prevent reporting dialog opened time
           endTimeNs = System.nanoTime();
-          String exceptionMessage = ex.getMessage();
+          String exceptionMessage = Objects.toString(ex.getMessage(), "");
           if (LOG.isDebugEnabled()) {
             LOG.debug(exceptionMessage);
           }
           String title = ex.getTitle();
+          XBreakpoint<?> xBreakpoint = requestor instanceof Breakpoint<?> breakpoint ? breakpoint.getXBreakpoint() : null;
+          XDebugSession xDebugSession = getSession().getXDebugSession();
+          BreakpointErrorData errorData = new BreakpointErrorData(title, exceptionMessage, ex.getCause());
+          BreakpointErrorAction policyAction = (xDebugSession == null || xBreakpoint == null)
+                                               ? BreakpointErrorAction.UNHANDLED
+                                               : XBreakpointBehaviorPolicy.doChooseBreakpointErrorAction(xDebugSession, xBreakpoint, errorData);
+
           final String displayName = DebuggerUtilsImpl.getRequestorStringForUser(requestor);
-          requestHit = DebuggerUtilsImpl.askAboutPauseOnException(getProject(), displayName, exceptionMessage, title);
+          if (policyAction != BreakpointErrorAction.UNHANDLED) {
+            requestHit = policyAction == BreakpointErrorAction.PAUSE;
+          }
+          else {
+            requestHit = DebuggerUtilsImpl.askAboutPauseOnException(getProject(), displayName, exceptionMessage, title);
+          }
+
+          if (xDebugSession != null && xBreakpoint != null) {
+            XDebuggerManagerImpl debuggerManager = (XDebuggerManagerImpl)XDebuggerManager.getInstance(xDebugSession.getProject());
+            debuggerManager.getBreakpointManager().fireBreakpointError(xBreakpoint, xDebugSession, errorData);
+          }
           // TODO: may be we need to use another approach for letting the user know that the evaluation failed?
+          // TODO: probably report this message via `com.intellij.xdebugger.breakpoints.XBreakpointListener.breakpointError` in the Dap case
           if (DapMode.isDap()) {
             printToConsole(JavaDebuggerBundle.message("error.failed.evaluating.breakpoint.condition", displayName, exceptionMessage));
           }
@@ -808,7 +828,12 @@ public class DebugProcessEvents extends DebugProcessImpl {
           }
         }
 
-        if (requestHit && requestor instanceof Breakpoint<?> breakpoint) {
+        Requestor adjustedRequestor = requestor;
+        if (requestor instanceof InstrumentedTechnicalBreakpointHit instrumentedTechnicalBreakpointHit) {
+          adjustedRequestor = instrumentedTechnicalBreakpointHit.getOriginalRequestor();
+        }
+
+        if (requestHit && adjustedRequestor instanceof Breakpoint<?> breakpoint) {
           // if requestor is a breakpoint and this breakpoint was hit, no matter its suspend policy
           ApplicationManager.getApplication().runReadAction(() -> {
             XDebugSession session = getSession().getXDebugSession();

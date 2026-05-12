@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.externalSystem.dependencyUpdater` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "dependency-updater_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "dependency-updater",
   module_name = "intellij.platform.externalSystem.dependencyUpdater",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":dependency-updater_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/core-api:core",
     "//platform/core-ui",
@@ -27,6 +22,7 @@ jvm_library(
 
 jvm_library(
   name = "dependency-updater_test_lib",
+  testonly = True,
   module_name = "intellij.platform.externalSystem.dependencyUpdater",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -43,15 +39,16 @@ jvm_library(
 )
 ### auto-generated section `build intellij.platform.externalSystem.dependencyUpdater` end
 
-### auto-generated section `build intellij.platform.externalSystem.dependencyUpdater.tests` start
-resourcegroup(
-  name = "externalSystem-dependencyUpdater-tests_test_resources",
-  srcs = glob(["testData/**/*"]),
-  strip_prefix = "testData"
-)
+### auto-generated section `iml intellij.platform.externalSystem.dependencyUpdater` start
+exports_files([
+  "intellij.platform.externalSystem.dependencyUpdater.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.externalSystem.dependencyUpdater` end
 
+### auto-generated section `build intellij.platform.externalSystem.dependencyUpdater.tests` start
 jvm_library(
   name = "externalSystem-dependencyUpdater-tests",
+  module_name = "intellij.platform.externalSystem.dependencyUpdater.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = ["@lib//:kotlin-stdlib"]
@@ -59,10 +56,12 @@ jvm_library(
 
 jvm_library(
   name = "externalSystem-dependencyUpdater-tests_test_lib",
+  testonly = True,
   module_name = "intellij.platform.externalSystem.dependencyUpdater.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
-  resources = [":externalSystem-dependencyUpdater-tests_test_resources"],
+  resources = glob(["testData/**/*"]),
+  resource_strip_prefix = "testData",
   deps = [
     "//platform/core-api:core",
     "//platform/core-api:core_test_lib",
@@ -93,10 +92,18 @@ jvm_library(
     "//platform/testFramework:testFramework_test_lib",
     "//java/java-runtime:rt",
     "//java/java-runtime:rt_test_lib",
+    "//jps/model-api:model",
+    "//jps/model-api:model_test_lib",
   ],
   runtime_deps = [":externalSystem-dependencyUpdater-tests"]
 )
 ### auto-generated section `build intellij.platform.externalSystem.dependencyUpdater.tests` end
+
+### auto-generated section `iml intellij.platform.externalSystem.dependencyUpdater.tests` start
+exports_files([
+  "intellij.platform.externalSystem.dependencyUpdater.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.externalSystem.dependencyUpdater.tests` end
 
 ### auto-generated section `test intellij.platform.externalSystem.dependencyUpdater.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

@@ -18,13 +18,11 @@ import com.intellij.xdebugger.impl.breakpoints.XDependentBreakpointListener
 import com.intellij.xdebugger.impl.breakpoints.XDependentBreakpointManager
 import com.intellij.xdebugger.impl.rpc.models.findValue
 import fleet.rpc.core.toRpc
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.channelFlow
-import kotlinx.coroutines.withContext
 
 internal class BackendXDependentBreakpointManagerApi : XDependentBreakpointManagerApi {
   override suspend fun breakpointDependencies(projectId: ProjectId): XBreakpointDependenciesDto {
@@ -43,19 +41,15 @@ internal class BackendXDependentBreakpointManagerApi : XDependentBreakpointManag
 
   override suspend fun clearMasterBreakpoint(breakpointId: XBreakpointId) {
     val breakpoint = breakpointId.findValue() ?: return
-    withContext(Dispatchers.EDT) {
-      val dependentBreakpointManager = (XDebuggerManager.getInstance(breakpoint.project) as XDebuggerManagerImpl).breakpointManager.dependentBreakpointManager
-      dependentBreakpointManager.clearMasterBreakpoint(breakpoint)
-    }
+    val dependentBreakpointManager = (XDebuggerManager.getInstance(breakpoint.project) as XDebuggerManagerImpl).breakpointManager.dependentBreakpointManager
+    dependentBreakpointManager.clearMasterBreakpoint(breakpoint)
   }
 
   override suspend fun setMasterDependency(breakpointId: XBreakpointId, masterBreakpointId: XBreakpointId, isLeaveEnabled: Boolean) {
     val breakpoint = breakpointId.findValue() ?: return
     val masterBreakpoint = masterBreakpointId.findValue() ?: return
-    withContext(Dispatchers.EDT) {
-      val dependentBreakpointManager = (XDebuggerManager.getInstance(breakpoint.project) as XDebuggerManagerImpl).breakpointManager.dependentBreakpointManager
-      dependentBreakpointManager.setMasterBreakpoint(breakpoint, masterBreakpoint, isLeaveEnabled)
-    }
+    val dependentBreakpointManager = (XDebuggerManager.getInstance(breakpoint.project) as XDebuggerManagerImpl).breakpointManager.dependentBreakpointManager
+    dependentBreakpointManager.setMasterBreakpoint(breakpoint, masterBreakpoint, isLeaveEnabled)
   }
 
   private fun collectInitialDependencies(dependentBreakpointManager: XDependentBreakpointManager): List<XBreakpointDependencyDto> {

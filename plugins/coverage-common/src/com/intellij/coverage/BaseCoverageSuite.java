@@ -11,6 +11,7 @@ import com.intellij.openapi.util.InvalidDataException;
 import com.intellij.openapi.util.JDOMExternalizable;
 import com.intellij.openapi.util.WriteExternalException;
 import com.intellij.openapi.util.io.FileUtil;
+import com.intellij.openapi.util.io.NioFiles;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.GlobalSearchScopesCore;
 import com.intellij.rt.coverage.data.ProjectData;
@@ -20,8 +21,9 @@ import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
 import java.lang.ref.SoftReference;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 
 public abstract class BaseCoverageSuite implements CoverageSuite, JDOMExternalizable {
@@ -181,8 +183,8 @@ public abstract class BaseCoverageSuite implements CoverageSuite, JDOMExternaliz
   protected @Nullable ProjectData loadProjectInfo() {
     String sessionDataFileName = myCoverageDataFileProvider.getCoverageDataFilePath();
     if (sessionDataFileName == null) return null;
-    File sessionDataFile = new File(sessionDataFileName);
-    if (!sessionDataFile.exists()) {
+    Path sessionDataFile = Path.of(sessionDataFileName);
+    if (!Files.exists(sessionDataFile)) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Nonexistent file given +" + sessionDataFileName);
       }
@@ -226,7 +228,8 @@ public abstract class BaseCoverageSuite implements CoverageSuite, JDOMExternaliz
   @Override
   public void writeExternal(final Element element) throws WriteExternalException {
     String absolutePath = myCoverageDataFileProvider.getCoverageDataFilePath();
-    String pathInSystemDir = FileUtil.getRelativePath(new File(PathManager.getSystemPath()), new File(absolutePath));
+    String pathInSystemDir = FileUtil.getRelativePath(FileUtil.toSystemIndependentName(PathManager.getSystemPath()),
+                                                      FileUtil.toSystemIndependentName(absolutePath), '/');
     element.setAttribute(FILE_PATH, pathInSystemDir != null ? FileUtil.toSystemIndependentName(pathInSystemDir) : absolutePath);
     element.setAttribute(NAME_ATTRIBUTE, myName);
     element.setAttribute(MODIFIED_STAMP, String.valueOf(myTimestamp));
@@ -275,10 +278,9 @@ public abstract class BaseCoverageSuite implements CoverageSuite, JDOMExternaliz
   }
 
   private static String generateName(String path) {
-    String text = path;
-    int i = text.lastIndexOf(File.separatorChar);
-    if (i >= 0) text = text.substring(i + 1);
-    i = text.lastIndexOf('.');
+    Path file = NioFiles.toPath(path);
+    String text = file != null ? NioFiles.getFileName(file) : path;
+    int i = text.lastIndexOf('.');
     if (i >= 0) text = text.substring(0, i);
     return text;
   }
@@ -295,9 +297,9 @@ public abstract class BaseCoverageSuite implements CoverageSuite, JDOMExternaliz
     }
 
     String relativeOrAbsolutePath = FileUtil.toSystemDependentName(element.getAttributeValue(FILE_PATH));
-    File file = new File(relativeOrAbsolutePath);
-    if (!file.exists()) {
-      file = new File(PathManager.getSystemPath(), relativeOrAbsolutePath);
+    Path file = Path.of(relativeOrAbsolutePath);
+    if (!Files.exists(file)) {
+      file = Path.of(PathManager.getSystemPath(), relativeOrAbsolutePath);
     }
     return new DefaultCoverageFileProvider(file, sourceProvider);
   }

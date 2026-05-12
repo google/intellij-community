@@ -214,6 +214,10 @@ public final class ConsentOptions implements ModificationTracker {
     return getDefaultConsent(STATISTICS_OPTION_ID);
   }
 
+  public @Nullable Consent getDefaultErrorAutoReportConsent() {
+    return getDefaultConsent(EA_AUTO_REPORT_OPTION_ID);
+  }
+
   public static @NotNull Predicate<Consent> condUsageStatsConsent() {
     return consent -> STATISTICS_OPTION_ID.equals(consent.getId());
   }
@@ -350,7 +354,7 @@ public final class ConsentOptions implements ModificationTracker {
   }
 
   public @NotNull Pair<List<Consent>, Boolean> getConsents() {
-    return getConsents(consent -> true);
+    return getConsents(_ -> true);
   }
 
   public @NotNull Pair<List<Consent>, Boolean> getConsents(@NotNull Predicate<? super Consent> filter) {
@@ -358,14 +362,16 @@ public final class ConsentOptions implements ModificationTracker {
     if (isEAP()) {
       // for EA builds there is a different option for statistics sending management
       allDefaults.remove(STATISTICS_OPTION_ID);
+      // auto reporting exceptions in EAPs is controlled in `ExceptionEAPAutoReportManager`
+      allDefaults.remove(EA_AUTO_REPORT_OPTION_ID);
     }
     else {
       // EAP feedback consent is relevant to EA builds only
       allDefaults.remove(lookupConsentID(EAP_FEEDBACK_OPTION_ID));
     }
 
-    if (!ExceptionAutoReportUtil.isAutoReportVisible()) {
-      allDefaults.remove(lookupConsentID(EA_AUTO_REPORT_OPTION_ID));
+    if (!ExceptionAutoReportUtil.isConsentAllowedToBeVisible()) {
+      allDefaults.remove(EA_AUTO_REPORT_OPTION_ID);
     }
 
     for (var it = allDefaults.entrySet().iterator(); it.hasNext(); ) {

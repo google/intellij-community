@@ -17,6 +17,7 @@ jvm_library(
 
 jvm_library(
   name = "tools-ide-performanceTesting-commands_test_lib",
+  testonly = True,
   module_name = "intellij.tools.ide.performanceTesting.commands",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -29,3 +30,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.tools.ide.performanceTesting.commands` end
+
+### auto-generated section `iml intellij.tools.ide.performanceTesting.commands` start
+exports_files([
+  "intellij.tools.ide.performanceTesting.commands.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.tools.ide.performanceTesting.commands` end

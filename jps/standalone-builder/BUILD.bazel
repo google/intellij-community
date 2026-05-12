@@ -16,11 +16,13 @@ jvm_library(
     "//jps/model-serialization",
     "@community//build:build-javac-rt",
     "//libraries/protobuf",
+    "//platform/util/base",
   ]
 )
 
 jvm_library(
   name = "tools-jps-build-standalone_test_lib",
+  testonly = True,
   module_name = "intellij.tools.jps.build.standalone",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -34,6 +36,13 @@ jvm_library(
     "//jps/model-serialization:model-serialization_test_lib",
     "@community//build:build-javac-rt_test_lib",
     "//libraries/protobuf:protobuf_test_lib",
+    "//platform/util/base:base_test_lib",
   ]
 )
 ### auto-generated section `build intellij.tools.jps.build.standalone` end
+
+### auto-generated section `iml intellij.tools.jps.build.standalone` start
+exports_files([
+  "intellij.tools.jps.build.standalone.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.tools.jps.build.standalone` end

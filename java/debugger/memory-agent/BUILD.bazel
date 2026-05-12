@@ -1,35 +1,36 @@
 ### auto-generated section `build intellij.java.debugger.memory.agent` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "java-debugger-memory-agent_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "java-debugger-memory-agent",
   module_name = "intellij.java.debugger.memory.agent",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":java-debugger-memory-agent_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
-    "//platform/util",
     "//platform/backend",
     "@lib//:java-debugger-memory-agent-debugger-memory-agent",
-    "@lib//:kotlin-stdlib",
-  ]
+  ],
+  exports = ["@lib//:java-debugger-memory-agent-debugger-memory-agent"]
 )
 
 jvm_library(
   name = "java-debugger-memory-agent_test_lib",
+  testonly = True,
   module_name = "intellij.java.debugger.memory.agent",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
+  exports = ["@lib//:java-debugger-memory-agent-debugger-memory-agent"],
   runtime_deps = [
     ":java-debugger-memory-agent",
-    "//platform/util:util_test_lib",
     "//platform/backend:backend_test_lib",
   ]
 )
 ### auto-generated section `build intellij.java.debugger.memory.agent` end
+
+### auto-generated section `iml intellij.java.debugger.memory.agent` start
+exports_files([
+  "intellij.java.debugger.memory.agent.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.java.debugger.memory.agent` end

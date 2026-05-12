@@ -470,6 +470,10 @@ public final class ScreenUtil {
     int screenY = rect.y;
     final Rectangle screen = getScreenRectangle(screenX, screenY);
 
+    cropRectangleToFitTheScreen(rect, screen);
+  }
+
+  public static void cropRectangleToFitTheScreen(@NotNull Rectangle rect, @NotNull Rectangle screen) {
     if (rect.getMaxX() > screen.getMaxX()) {
       rect.width = (int)screen.getMaxX() - rect.x;
     }

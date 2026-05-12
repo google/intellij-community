@@ -228,6 +228,14 @@
 
     <adEntityProvider implementation="com.intellij.openapi.editor.impl.ad.document.DefaultAdEntityProvider" />
 
+    <projectSettings service="com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl"/>
+    <applicationSettings service="com.intellij.ide.ui.laf.LafManagerImpl"/>
+    <applicationSettings service="com.intellij.codeInsight.daemon.DaemonCodeAnalyzerSettingsImpl"/>
+    <projectSettings service="com.intellij.openapi.wm.impl.ToolWindowManagerStateImpl"/>
+    <applicationSettings service="com.intellij.openapi.wm.impl.WindowManagerImpl"/>
+    <applicationSettings service="com.intellij.ide.actionMacro.ActionMacroManager"/>
+    <projectSettings service="com.intellij.openapi.fileEditor.impl.IdeDocumentHistoryImpl"/>
+    <applicationSettings service="com.intellij.codeInsight.inline.completion.tooltip.onboarding.InlineCompletionOnboardingComponent"/>
   </extensions>
 
   <applicationListeners>

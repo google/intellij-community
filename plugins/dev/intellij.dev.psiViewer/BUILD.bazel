@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.dev.psiViewer` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "psiViewer_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "psiViewer",
   module_name = "intellij.dev.psiViewer",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":psiViewer_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:jetbrains-annotations",
     "//platform/editor-ui-api:editor-ui",
@@ -31,14 +26,19 @@ jvm_library(
     "//platform/platform-impl:ide-impl",
     "//platform/core-ui",
     "//platform/platform-impl/concurrency",
+    "//platform/ide-core",
     "//platform/util/coroutines",
     "//platform/core-impl",
     "//platform/forms_rt:java-guiForms-rt",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//platform/util/concurrency",
+    "//libraries/fastutil",
   ]
 )
 
 jvm_library(
   name = "psiViewer_test_lib",
+  testonly = True,
   module_name = "intellij.dev.psiViewer",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -60,9 +60,19 @@ jvm_library(
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/core-ui:core-ui_test_lib",
     "//platform/platform-impl/concurrency:concurrency_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/util/coroutines:coroutines_test_lib",
     "//platform/core-impl:core-impl_test_lib",
     "//platform/forms_rt:java-guiForms-rt_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/util/concurrency:concurrency_test_lib",
+    "//libraries/fastutil:fastutil_test_lib",
   ]
 )
 ### auto-generated section `build intellij.dev.psiViewer` end
+
+### auto-generated section `iml intellij.dev.psiViewer` start
+exports_files([
+  "intellij.dev.psiViewer.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.dev.psiViewer` end

@@ -49,9 +49,23 @@ class FrontMatterHeaderMarkerProvider: MarkerBlockProvider<MarkerProcessor.State
       return emptyList()
     }
     val possibleDelimiter = position.currentLine
-    return when (isOpeningDelimiterLine(possibleDelimiter)) {
-      true -> listOf(FrontMatterHeaderBlock(position, stateInfo.currentConstraints, productionHolder, possibleDelimiter))
-      else -> emptyList()
+    if (!isOpeningDelimiterLine(possibleDelimiter)) {
+      return emptyList()
+    }
+    if (!hasClosingDelimiter(position, possibleDelimiter)) {
+      return emptyList()
+    }
+    return listOf(FrontMatterHeaderBlock(position, stateInfo.currentConstraints, productionHolder, possibleDelimiter))
+  }
+
+  private fun hasClosingDelimiter(startPosition: LookaheadText.Position, openingDelimiter: String): Boolean {
+    var current = startPosition.nextLinePosition() ?: return false
+    while (true) {
+      val line = current.currentLine
+      if (isYamlDelimiters(openingDelimiter, line) || isTomlDelimiters(openingDelimiter, line)) {
+        return true
+      }
+      current = current.nextLinePosition() ?: return false
     }
   }
 

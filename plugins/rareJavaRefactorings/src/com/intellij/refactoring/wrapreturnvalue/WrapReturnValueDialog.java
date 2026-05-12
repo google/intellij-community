@@ -31,7 +31,8 @@ import com.intellij.refactoring.ui.RefactoringDialog;
 import com.intellij.ui.ComboboxWithBrowseButton;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.ReferenceEditorComboWithBrowseButton;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.LcrJavaHelper;
+import com.intellij.ui.dsl.listCellRenderer.RendererPresentation;
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.uiDesigner.core.GridLayoutManager;
 import com.intellij.uiDesigner.core.Spacer;
@@ -458,12 +459,10 @@ class WrapReturnValueDialog extends RefactoringDialog {
 
     final DefaultComboBoxModel<PsiField> model = new DefaultComboBoxModel<>();
     myFieldsCombo.setModel(model);
-    myFieldsCombo.setRenderer(SimpleListCellRenderer.create((label, field, index) -> {
-      if (field != null) {
-        label.setText(field.getName());
-        label.setIcon(field.getIcon(Iconable.ICON_FLAG_VISIBILITY));
-      }
-    }));
+    myFieldsCombo.setRenderer(LcrJavaHelper.create(
+      "",
+      field -> new RendererPresentation(field.getIcon(Iconable.ICON_FLAG_VISIBILITY), field.getName())
+    ));
     existingClassField.getChildComponent().getDocument().addDocumentListener(new com.intellij.openapi.editor.event.DocumentListener() {
       @Override
       public void documentChanged(@NotNull com.intellij.openapi.editor.event.DocumentEvent e) {

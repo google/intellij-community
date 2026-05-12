@@ -13,7 +13,7 @@ import junit.framework.TestCase
 import org.jdom.Element
 import java.io.File
 
-@TestDataPath("\$CONTENT_ROOT/testData/")
+@TestDataPath("\$CONTENT_ROOT/../testData/")
 class YamlInspectionProfileTest: LightPlatformTestCase() {
 
   override fun getTestDirectoryName(): String = PathManager.getCommunityHomePath() + "/platform/inspect/testData/"

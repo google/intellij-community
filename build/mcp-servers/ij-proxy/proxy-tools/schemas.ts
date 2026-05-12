@@ -13,52 +13,20 @@ function objectSchema(properties: Record<string, JsonSchemaProperty>, required?:
   }
 }
 
-export function createReadSchema(includeIndentation: boolean): ToolInputSchema {
-  const properties = {
+export function createReadSchema(): ToolInputSchema {
+  const properties: Record<string, JsonSchemaProperty> = {
     file_path: {
       type: 'string',
-      description: 'Absolute or project-relative path to the file.'
+      description: 'Path relative to the project root.'
     },
     offset: {
       type: 'number',
-      description: 'The line number to start reading from. Must be 1 or greater.'
+      description: '1-based line number to start reading from.'
     },
     limit: {
       type: 'number',
-      description: 'The maximum number of lines to return.'
+      description: 'Maximum number of lines to return.'
     }
-  }
-
-  if (includeIndentation) {
-    properties.mode = {
-      type: 'string',
-      description: 'Optional mode selector: "slice" for simple ranges (default) or "indentation" to expand around an anchor line.'
-    }
-    properties.indentation = objectSchema(
-      {
-        anchor_line: {
-          type: 'number',
-          description: 'Anchor line to center the indentation lookup on (defaults to offset).'
-        },
-        max_levels: {
-          type: 'number',
-          description: 'How many parent indentation levels (smaller indents) to include.'
-        },
-        include_siblings: {
-          type: 'boolean',
-          description: 'When true, include additional blocks that share the anchor indentation.'
-        },
-        include_header: {
-          type: 'boolean',
-          description: 'Include doc comments or attributes directly above the selected block.'
-        },
-        max_lines: {
-          type: 'number',
-          description: 'Hard cap on the number of lines returned when using indentation mode.'
-        }
-      },
-      []
-    )
   }
 
   return objectSchema(properties, ['file_path'])
@@ -178,12 +146,35 @@ export function createSearchSymbolSchema(): ToolInputSchema {
   return createSearchSchema('Symbol query text (class, method, field, etc.).')
 }
 
+export function createLintFilesSchema(): ToolInputSchema {
+  return objectSchema(
+    {
+      file_paths: {
+        type: 'array',
+        description: 'List of project-relative file paths to analyze. Duplicate paths are ignored after normalization.',
+        items: {
+          type: 'string'
+        }
+      },
+      min_severity: {
+        type: 'string',
+        description: 'Minimum severity to include: warning or error. Defaults to warning.'
+      },
+      timeout: {
+        type: 'number',
+        description: 'Timeout in milliseconds for the full batch.'
+      }
+    },
+    ['file_paths']
+  )
+}
+
 export function createApplyPatchSchema(): ToolInputSchema {
   return objectSchema(
     {
       input: {
         type: 'string',
-        description: 'Patch text in the apply_patch format, including Begin/End markers.'
+        description: 'Patch text in the apply_patch format or unified git diff format.'
       }
     },
     ['input']

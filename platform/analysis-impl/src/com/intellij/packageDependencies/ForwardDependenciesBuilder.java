@@ -140,7 +140,7 @@ public class ForwardDependenciesBuilder extends DependenciesBuilder {
               }
             }
           });
-          Set<PsiFile> deps = getDependencies().computeIfAbsent(file, __ -> new HashSet<>());
+          Set<PsiFile> deps = getDependencies().computeIfAbsent(file, _ -> new HashSet<>());
           deps.addAll(found);
 
           getDirectDependencies().put(psiFile, new HashSet<>(found));

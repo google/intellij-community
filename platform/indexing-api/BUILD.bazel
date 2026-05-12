@@ -1,16 +1,10 @@
 ### auto-generated section `build intellij.platform.indexing` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_indexing",
   opt_in = ["kotlinx.serialization.ExperimentalSerializationApi"]
-)
-
-resourcegroup(
-  name = "indexing_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
 )
 
 jvm_library(
@@ -18,7 +12,8 @@ jvm_library(
   module_name = "intellij.platform.indexing",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":indexing_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_indexing",
   deps = [
     "@lib//:jetbrains-annotations",
@@ -27,17 +22,22 @@ jvm_library(
     "//platform/projectModel-api:projectModel",
     "//platform/util/jdom",
     "//platform/util",
+    "//platform/util/multiplatform",
+    "//platform/util/base",
     "//platform/util/concurrency",
     "@lib//:kotlin-stdlib",
     "//libraries/kotlinx/serialization/core",
     "//libraries/kotlinx/serialization/json",
     "//platform/workspace/storage",
     "//platform/workspace/jps",
+    "//libraries/fastutil",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
   ]
 )
 
 jvm_library(
   name = "indexing_test_lib",
+  testonly = True,
   module_name = "intellij.platform.indexing",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -49,11 +49,21 @@ jvm_library(
     "//platform/projectModel-api:projectModel_test_lib",
     "//platform/util/jdom:jdom_test_lib",
     "//platform/util:util_test_lib",
+    "//platform/util/multiplatform:multiplatform_test_lib",
+    "//platform/util/base:base_test_lib",
     "//platform/util/concurrency:concurrency_test_lib",
     "//libraries/kotlinx/serialization/core:core_test_lib",
     "//libraries/kotlinx/serialization/json:json_test_lib",
     "//platform/workspace/storage:storage_test_lib",
     "//platform/workspace/jps:jps_test_lib",
+    "//libraries/fastutil:fastutil_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.indexing` end
+
+### auto-generated section `iml intellij.platform.indexing` start
+exports_files([
+  "intellij.platform.indexing.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.indexing` end

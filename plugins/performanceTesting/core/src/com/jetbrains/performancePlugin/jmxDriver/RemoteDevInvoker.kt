@@ -6,6 +6,8 @@ import com.intellij.driver.client.impl.DriverImpl
 import com.intellij.driver.client.impl.Invoker
 import com.intellij.driver.client.impl.JmxHost
 import com.intellij.driver.impl.InvokerMBean
+import com.intellij.driver.model.LockSemantics
+import com.intellij.driver.model.OnDispatcher
 import com.intellij.driver.model.ProductVersion
 import com.intellij.driver.model.RdTarget
 import com.intellij.driver.model.transport.Ref
@@ -25,7 +27,11 @@ internal class RemoteDevInvoker(private val localInvoker: InvokerMBean, remoteJm
     val originalClassLoader = Thread.currentThread().getContextClassLoader()
     try {
       Thread.currentThread().setContextClassLoader(this::class.java.getClassLoader())
-      driver = Driver.create(JmxHost(null, null, remoteJmxAddress)) as DriverImpl
+      driver = object : DriverImpl(JmxHost(null, null, remoteJmxAddress), isRemDevMode = false) {
+        override fun <T> withContext(dispatcher: OnDispatcher, semantics: LockSemantics, code: Driver.() -> T): T {
+          throw UnsupportedOperationException("Host driver does not support withContext (see AT-4216)")
+        }
+      }
     }
     finally {
       Thread.currentThread().setContextClassLoader(originalClassLoader)

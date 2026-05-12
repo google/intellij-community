@@ -58,7 +58,7 @@ public final class JsonQuoteHandler extends SimpleTokenSetQuoteHandler implement
   }
 
   @Override
-  public boolean isOpeningQuote(HighlighterIterator iterator, int offset) {
+  public boolean isOpeningQuote(@NotNull HighlighterIterator iterator, int offset) {
     return super.isOpeningQuote(iterator, offset) && !previousTokenIsValidEscapeSequence(iterator);
   }
 

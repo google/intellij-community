@@ -4,6 +4,7 @@ package com.intellij.ide.actions.searcheverywhere
 import com.intellij.featureStatistics.FeatureUsageTracker
 import com.intellij.ide.IdeBundle
 import com.intellij.ide.actions.SearchEverywherePsiRenderer
+import com.intellij.ide.actions.searcheverywhere.FilesTabSEContributor.Companion.unwrapFilesTabContributorIfPossible
 import com.intellij.ide.actions.searcheverywhere.SearchEverywhereFiltersStatisticsCollector.FileTypeFilterCollector
 import com.intellij.ide.actions.searcheverywhere.footer.createPsiExtendedInfo
 import com.intellij.ide.util.gotoByName.FileTypeRef
@@ -14,6 +15,7 @@ import com.intellij.ide.util.gotoByName.GotoFileModel
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.Logger
@@ -32,6 +34,7 @@ import com.intellij.ui.DirtyUI
 import com.intellij.util.Processor
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.Nls
+import java.util.function.BiConsumer
 import java.util.function.Function
 import javax.swing.JList
 import javax.swing.ListCellRenderer
@@ -46,6 +49,8 @@ open class FileSearchEverywhereContributor(event: AnActionEvent, contributorModu
   @Internal
   override val navigationHandler: SearchEverywhereNavigationHandler = FileSearchEverywhereNavigationContributionHandler(project)
 
+  private val linkedFilesTabContributors: MutableList<FilesTabSEContributor> = mutableListOf()
+
   constructor(event: AnActionEvent) : this(event, null)
 
   init {
@@ -54,13 +59,33 @@ open class FileSearchEverywhereContributor(event: AnActionEvent, contributorModu
     filter = createFileTypeFilter(project)
   }
 
+  @Internal
+  fun linkFilesTabContributorsFrom(contributors: List<SearchEverywhereContributor<*>>) {
+    val filesTabContributors = contributors.mapNotNull { it.unwrapFilesTabContributorIfPossible() }
+    linkFilesTabContributors(filesTabContributors)
+  }
+
+  @Internal
+  fun linkFilesTabContributors(contributors: List<FilesTabSEContributor>) {
+    linkedFilesTabContributors.clear()
+    linkedFilesTabContributors.addAll(contributors)
+    // Immediately synchronize current scope to linked contributors
+    linkedFilesTabContributors.forEach { it.setScope(myScopeDescriptor) }
+  }
+
   companion object {
     @JvmStatic
     fun createFileTypeFilter(project: Project): PersistentSearchEverywhereContributorFilter<FileTypeRef> {
-      val items = forAllFileTypes().toMutableList()
-      items.add(0, GotoFileModel.DIRECTORY_FILE_TYPE_REF)
+      val items = getAllFileTypes()
       return PersistentSearchEverywhereContributorFilter(items, GotoFileConfiguration.getInstance(project), FileTypeRef::displayName,
                                                          FileTypeRef::icon)
+    }
+
+    @Internal
+    fun getAllFileTypes(): List<FileTypeRef> {
+      val items = forAllFileTypes().toMutableList()
+      items.add(0, GotoFileModel.DIRECTORY_FILE_TYPE_REF)
+      return items
     }
   }
 
@@ -77,7 +102,22 @@ open class FileSearchEverywhereContributor(event: AnActionEvent, contributorModu
     return model
   }
 
-  override fun getActions(onChanged: Runnable): List<AnAction> = doGetActions(filter, FileTypeFilterCollector(), onChanged)
+  override fun getActions(onChanged: Runnable): List<AnAction> {
+    val wrappedOnChanged = Runnable {
+      // Propagate scope and hidden types to all linked FilesTabSEContributors
+      val allTypes = getAllFileTypes()
+      val selectedTypes = filter.selectedElements.toSet()
+      val hiddenTypes = allTypes.filter { it !in selectedTypes }
+
+      linkedFilesTabContributors.forEach {
+        it.setScope(myScopeDescriptor)
+        it.setHiddenTypes(hiddenTypes)
+      }
+
+      onChanged.run()
+    }
+    return doGetActions(filter, FileTypeFilterCollector(), wrappedOnChanged)
+  }
 
   final override fun getElementsRenderer(): ListCellRenderer<in Any?> {
     return object : SearchEverywherePsiRenderer(this) {
@@ -115,11 +155,10 @@ open class FileSearchEverywhereContributor(event: AnActionEvent, contributorModu
     return consumer.process(FoundItemDescriptor(element, degree))
   }
 
-  override fun getDataForItem(element: Any, dataId: String): Any? {
-    if (CommonDataKeys.PSI_FILE.`is`(dataId) && element is PsiFile) {
-      return element
+  override fun getDataProviders(): List<BiConsumer<Any, DataSink>> = super.getDataProviders() + BiConsumer { element, sink ->
+    if (element is PsiFile) {
+      sink.lazy(CommonDataKeys.PSI_FILE) { element }
     }
-    return super.getDataForItem(element, dataId)
   }
 
   override fun getItemDescription(element: Any): String? {
@@ -136,6 +175,11 @@ open class FileSearchEverywhereContributor(event: AnActionEvent, contributorModu
   override fun isEmptyPatternSupported(): Boolean = true
 
   override fun createExtendedInfo(): @Nls ExtendedInfo? = createPsiExtendedInfo()
+
+  override fun dispose() {
+    super.dispose()
+    linkFilesTabContributors(emptyList())
+  }
 }
 
 @Internal

@@ -3,7 +3,11 @@
 
 package com.intellij.platform.workspace.storage.testEntities.entities
 
-import com.intellij.platform.workspace.storage.*
+import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.EntityType
+import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
+import com.intellij.platform.workspace.storage.MutableEntityStorage
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceList
 
 @GeneratedCodeApiVersion(3)
@@ -78,6 +82,15 @@ fun EntityWithSoftLinks(
   deepSealedClass: DeepSealedOne,
   entitySource: EntitySource,
   init: (EntityWithSoftLinksBuilder.() -> Unit)? = null,
-): EntityWithSoftLinksBuilder =
-  EntityWithSoftLinksType(link, manyLinks, inContainer, inContainerList, deepContainer, sealedContainer, listSealedContainer, justProperty,
-                          justListProperty, deepSealedClass, entitySource, init)
+): EntityWithSoftLinksBuilder = EntityWithSoftLinksType(link,
+                                                        manyLinks,
+                                                        inContainer,
+                                                        inContainerList,
+                                                        deepContainer,
+                                                        sealedContainer,
+                                                        listSealedContainer,
+                                                        justProperty,
+                                                        justListProperty,
+                                                        deepSealedClass,
+                                                        entitySource,
+                                                        init)

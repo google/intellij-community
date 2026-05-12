@@ -61,8 +61,14 @@ com.intellij.openapi.diagnostic.ExceptionWithAttachments
 com.intellij.openapi.diagnostic.Logger$Factory
 - a:getLoggerInstance(java.lang.String):com.intellij.openapi.diagnostic.Logger
 f:com.intellij.openapi.diagnostic.LoggerKt
+- sf:currentClassLogger():com.intellij.openapi.diagnostic.Logger
 - sf:debug(com.intellij.openapi.diagnostic.Logger,java.lang.Throwable,kotlin.jvm.functions.Function0):V
 - bs:debug$default(com.intellij.openapi.diagnostic.Logger,java.lang.Throwable,kotlin.jvm.functions.Function0,I,java.lang.Object):V
+- sf:fileLogger():com.intellij.openapi.diagnostic.Logger
+- sf:getOrHandleException(java.lang.Object,kotlin.jvm.functions.Function1):java.lang.Object
+- sf:getOrLogException(java.lang.Object,com.intellij.openapi.diagnostic.Logger):java.lang.Object
+- sf:rethrowControlFlowException(java.lang.Throwable):V
+- sf:runAndLogException(com.intellij.openapi.diagnostic.Logger,kotlin.jvm.functions.Function0):java.lang.Object
 com.intellij.openapi.diagnostic.UntraceableException
 com.intellij.openapi.util.BooleanGetter
 - java.util.function.BooleanSupplier
@@ -183,6 +189,9 @@ com.intellij.openapi.util.io.ByteSequence
 - a:length():I
 - a:subSequence(I,I):com.intellij.openapi.util.io.ByteSequence
 - a:toBytes():B[]
+f:com.intellij.openapi.util.io.FileAttributes
+- withLastModified(J):com.intellij.openapi.util.io.FileAttributes
+- withLength(J):com.intellij.openapi.util.io.FileAttributes
 e:com.intellij.openapi.util.io.FileAttributes$CaseSensitivity
 - s:fromBoolean(Z):com.intellij.openapi.util.io.FileAttributes$CaseSensitivity
 Fc:com.intellij.openapi.util.io.FileUtil
@@ -226,6 +235,35 @@ f:com.intellij.openapi.util.io.OSAgnosticPathUtil
 - s:isUncPath(java.lang.String):Z
 - s:startsWith(java.lang.String,java.lang.String):Z
 - s:startsWithWindowsDrive(java.lang.String):Z
+f:com.intellij.openapi.util.registry.Registry
+- sf:Companion:com.intellij.openapi.util.registry.Registry$Companion
+- <init>():V
+- sf:doubleValue(java.lang.String):D
+- sf:doubleValue(java.lang.String,D):D
+- sf:get(java.lang.String):com.intellij.openapi.util.registry.RegistryValue
+- sf:getColor(java.lang.String,java.awt.Color):java.awt.Color
+- sf:getInstance():com.intellij.openapi.util.registry.Registry
+- sf:intValue(java.lang.String):I
+- sf:intValue(java.lang.String,I):I
+- sf:intValue(java.lang.String,I,I,I):I
+- sf:is(java.lang.String):Z
+- sf:is(java.lang.String,Z):Z
+- f:isLoaded():Z
+- sf:stringValue(java.lang.String):java.lang.String
+- sf:stringValue(java.lang.String,java.lang.String):java.lang.String
+f:com.intellij.openapi.util.registry.Registry$Companion
+- f:doubleValue(java.lang.String):D
+- f:doubleValue(java.lang.String,D):D
+- f:get(java.lang.String):com.intellij.openapi.util.registry.RegistryValue
+- f:getColor(java.lang.String,java.awt.Color):java.awt.Color
+- f:getInstance():com.intellij.openapi.util.registry.Registry
+- f:intValue(java.lang.String):I
+- f:intValue(java.lang.String,I):I
+- f:intValue(java.lang.String,I,I,I):I
+- f:is(java.lang.String):Z
+- f:is(java.lang.String,Z):Z
+- f:stringValue(java.lang.String):java.lang.String
+- f:stringValue(java.lang.String,java.lang.String):java.lang.String
 c:com.intellij.openapi.util.registry.RegistryValue
 - sf:Companion:com.intellij.openapi.util.registry.RegistryValue$Companion
 f:com.intellij.openapi.util.registry.RegistryValue$Companion
@@ -236,6 +274,10 @@ com.intellij.openapi.util.text.CharFilter
 - sf:NOT_WHITESPACE_FILTER:com.intellij.openapi.util.text.CharFilter
 - sf:WHITESPACE_FILTER:com.intellij.openapi.util.text.CharFilter
 - a:accept(C):Z
+Fc:com.intellij.openapi.util.text.StringUtil
+- s:endsWithIgnoreWhitespaces(java.lang.CharSequence,java.lang.CharSequence):Z
+- s:padLeft(java.lang.StringBuilder,java.lang.CharSequence,I,I):V
+- s:padRight(java.lang.StringBuilder,java.lang.CharSequence,I,I):V
 com.intellij.ui.IconManager
 - sf:Companion:com.intellij.ui.IconManager$Companion
 - colorize(java.awt.Graphics2D,javax.swing.Icon,java.awt.Color):javax.swing.Icon
@@ -533,7 +575,6 @@ com.intellij.util.io.AppendablePersistentMap$ValueDataAppender
 com.intellij.util.io.BaseDataReader$SleepingPolicy
 - sf:BLOCKING:com.intellij.util.io.BaseDataReader$SleepingPolicy
 - sf:NON_BLOCKING:com.intellij.util.io.BaseDataReader$SleepingPolicy
-- sf:SIMPLE:com.intellij.util.io.BaseDataReader$SleepingPolicy
 - sf:sleepTimeWhenIdle:I
 - sf:sleepTimeWhenWasActive:I
 - a:getTimeToSleep(Z):I
@@ -602,10 +643,46 @@ c:com.intellij.util.system.OS$UnixInfo
 f:com.intellij.util.system.OS$WindowsInfo
 - com.intellij.util.system.OS$OsInfo
 - getBuildNumber():java.lang.Long
-- getSystemCharset():java.nio.charset.Charset
+f:com.intellij.util.text.StringTokenizer
+- resetCurrentPosition(I):V
 f:com.intellij.util.text.TextRangeUtil
 - s:mergeRanges(java.util.List):java.util.List
 - s:mergeRanges(java.util.List,I):java.util.List
+f:com.intellij.util.ui.JdkConstants
+@:com.intellij.util.ui.JdkConstants$AdjustableOrientation
+- java.lang.annotation.Annotation
+@:com.intellij.util.ui.JdkConstants$BoxLayoutAxis
+- java.lang.annotation.Annotation
+@:com.intellij.util.ui.JdkConstants$CalendarMonth
+- java.lang.annotation.Annotation
+@:com.intellij.util.ui.JdkConstants$CursorType
+- java.lang.annotation.Annotation
+@:com.intellij.util.ui.JdkConstants$FlowLayoutAlignment
+- java.lang.annotation.Annotation
+@:com.intellij.util.ui.JdkConstants$FontStyle
+- java.lang.annotation.Annotation
+@:com.intellij.util.ui.JdkConstants$HorizontalAlignment
+- java.lang.annotation.Annotation
+@:com.intellij.util.ui.JdkConstants$HorizontalScrollBarPolicy
+- java.lang.annotation.Annotation
+@:com.intellij.util.ui.JdkConstants$InputEventMask
+- java.lang.annotation.Annotation
+@:com.intellij.util.ui.JdkConstants$ListSelectionMode
+- java.lang.annotation.Annotation
+@:com.intellij.util.ui.JdkConstants$PatternFlags
+- java.lang.annotation.Annotation
+@:com.intellij.util.ui.JdkConstants$TabLayoutPolicy
+- java.lang.annotation.Annotation
+@:com.intellij.util.ui.JdkConstants$TabPlacement
+- java.lang.annotation.Annotation
+@:com.intellij.util.ui.JdkConstants$TitledBorderJustification
+- java.lang.annotation.Annotation
+@:com.intellij.util.ui.JdkConstants$TitledBorderTitlePosition
+- java.lang.annotation.Annotation
+@:com.intellij.util.ui.JdkConstants$TreeSelectionMode
+- java.lang.annotation.Annotation
+@:com.intellij.util.ui.JdkConstants$VerticalScrollBarPolicy
+- java.lang.annotation.Annotation
 com.intellij.util.xmlb.Accessor
 - a:getAnnotation(java.lang.Class):java.lang.annotation.Annotation
 - a:getGenericType():java.lang.reflect.Type

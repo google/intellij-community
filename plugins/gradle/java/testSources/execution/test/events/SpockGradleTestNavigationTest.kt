@@ -1,14 +1,17 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.execution.test.events
 
 import org.gradle.util.GradleVersion
 import org.jetbrains.plugins.gradle.testFramework.GradleTestExecutionTestCase
 import org.jetbrains.plugins.gradle.testFramework.annotations.AllGradleVersionsSource
+import org.jetbrains.plugins.gradle.testFramework.util.SPOCK_SUPPORTED_VERSIONS
+import org.jetbrains.plugins.gradle.tooling.annotation.TargetVersions
 import org.junit.jupiter.params.ParameterizedTest
 
 class SpockGradleTestNavigationTest : GradleTestExecutionTestCase() {
 
   @ParameterizedTest
+  @TargetVersions(SPOCK_SUPPORTED_VERSIONS)
   @AllGradleVersionsSource
   fun `test display name and navigation with Groovy and Spock`(gradleVersion: GradleVersion) {
     testSpockProject(gradleVersion) {
@@ -36,6 +39,7 @@ class SpockGradleTestNavigationTest : GradleTestExecutionTestCase() {
   }
 
   @ParameterizedTest
+  @TargetVersions(SPOCK_SUPPORTED_VERSIONS)
   @AllGradleVersionsSource
   fun `test navigation for inner Groovy class with Spock specification`(gradleVersion: GradleVersion) {
     testSpockProject(gradleVersion) {

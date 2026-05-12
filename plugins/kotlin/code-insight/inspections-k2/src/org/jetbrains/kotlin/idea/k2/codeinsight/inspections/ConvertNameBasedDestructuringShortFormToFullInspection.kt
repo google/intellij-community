@@ -5,20 +5,22 @@ import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.modcommand.ModPsiUpdater
 import com.intellij.openapi.project.Project
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.idea.base.projectStructure.languageVersionSettings
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.inspections.KotlinApplicableInspectionBase
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.inspections.KotlinModCommandQuickFix
+import org.jetbrains.kotlin.idea.codeinsight.utils.NameBasedDestructuringForm
+import org.jetbrains.kotlin.idea.codeinsight.utils.buildNameBasedDestructuringText
 import org.jetbrains.kotlin.idea.codeinsight.utils.extractPrimaryParameters
+import org.jetbrains.kotlin.idea.codeinsight.utils.isPositionalDestructuringType
 import org.jetbrains.kotlin.psi.KtDestructuringDeclaration
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtVisitor
 import org.jetbrains.kotlin.psi.KtVisitorVoid
 
-internal class ConvertNameBasedDestructuringShortFormToFullInspection : KotlinApplicableInspectionBase.Simple<KtDestructuringDeclaration, Unit>() {
+internal class ConvertNameBasedDestructuringShortFormToFullInspection : KotlinApplicableInspectionBase.Simple<KtDestructuringDeclaration, String>() {
 
     override fun buildVisitor(
         holder: ProblemsHolder,
@@ -38,25 +40,28 @@ internal class ConvertNameBasedDestructuringShortFormToFullInspection : KotlinAp
         return true
     }
 
-    override fun getProblemDescription(element: KtDestructuringDeclaration, context: Unit): String {
+    override fun getProblemDescription(element: KtDestructuringDeclaration, context: String): String {
         return KotlinBundle.message("convert.to.full.name.based.form.destructing")
     }
 
     override fun createQuickFix(
         element: KtDestructuringDeclaration,
-        context: Unit
+        context: String
     ): KotlinModCommandQuickFix<KtDestructuringDeclaration> {
-        return ConvertNameBasedDestructuringShortFormToFullFix()
+        return ConvertNameBasedDestructuringShortFormToFullFix(context)
     }
 
-    override fun KaSession.prepareContext(element: KtDestructuringDeclaration): Unit? {
-        // Just verify that we can extract primary parameters - the actual work will be done in the QuickFix
-        if (extractPrimaryParameters(element) == null) return null
-        return Unit
+    override fun KaSession.prepareContext(element: KtDestructuringDeclaration): String? {
+        val names = extractPrimaryParameters(element)?.map { it.name.asString() } ?: return null
+        // Exclude stdlib types - they should use brackets [x, y] instead
+        if (element.isPositionalDestructuringType()) return null
+        return element.buildNameBasedDestructuringText(
+            NameBasedDestructuringForm(names, positionBased = false, useFullForm = true)
+        )
     }
 }
 
-private class ConvertNameBasedDestructuringShortFormToFullFix : KotlinModCommandQuickFix<KtDestructuringDeclaration>() {
+internal class ConvertNameBasedDestructuringShortFormToFullFix(private val newDestructuringText: String) : KotlinModCommandQuickFix<KtDestructuringDeclaration>() {
 
     override fun getFamilyName(): String = KotlinBundle.message("convert.to.full.name.based.form.destructing")
 
@@ -65,35 +70,6 @@ private class ConvertNameBasedDestructuringShortFormToFullFix : KotlinModCommand
         element: KtDestructuringDeclaration,
         updater: ModPsiUpdater
     ) {
-        // For regular destructuring declarations with initializers
-        val initializerText = element.initializer?.text
-
-        // Determine if we're using 'val' or 'var'
-        val keyword = if (element.isVar) "var" else "val"
-
-        // Build the new destructuring declaration with explicit names
-        val newEntries = analyze(element) {
-            val constructorParameters = extractPrimaryParameters(element) ?: return@analyze ""
-
-            element.entries.zip(constructorParameters) { entry, param ->
-                val entryName = entry.nameAsName
-                val originalPropertyName = param.name
-
-                if (entryName == null || entryName != originalPropertyName) {
-                    "$keyword ${entry.text} = $originalPropertyName"
-                } else {
-                    "$keyword ${entry.name}"
-                }
-            }.joinToString(", ")
-        }
-
-        val newDestructuringText = if (initializerText != null) {
-            "($newEntries) = $initializerText"
-        } else {
-            // For lambda parameters
-            "($newEntries)"
-        }
-
         // Create the new destructuring declaration and replace the entire declaration
         val psiFactory = KtPsiFactory(project)
         val newDestructuringDeclaration = psiFactory.createDestructuringDeclaration(newDestructuringText)

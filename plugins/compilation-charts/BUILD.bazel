@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.compilation.charts` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "compilation-charts_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "compilation-charts",
   module_name = "intellij.compilation.charts",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":compilation-charts_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//java/compiler/impl",
     "//platform/analysis-api:analysis",
@@ -20,6 +15,7 @@ jvm_library(
     "//jps/jps-builders:build",
     "//platform/extensions",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//libraries/rd/framework",
     "//platform/core-api:core",
     "//jps/model-api:model",
@@ -42,11 +38,13 @@ jvm_library(
     "//java/idea-ui:ui",
     "//platform/platform-impl:ide-impl",
     "//platform/execution",
+    "//platform/util:util-ui",
   ]
 )
 
 jvm_library(
   name = "compilation-charts_test_lib",
+  testonly = True,
   module_name = "intellij.compilation.charts",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -58,6 +56,7 @@ jvm_library(
     "//jps/jps-builders:build_test_lib",
     "//platform/extensions:extensions_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//libraries/rd/framework:framework_test_lib",
     "//platform/core-api:core_test_lib",
     "//jps/model-api:model_test_lib",
@@ -79,6 +78,13 @@ jvm_library(
     "//java/idea-ui:ui_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/execution:execution_test_lib",
+    "//platform/util:util-ui_test_lib",
   ]
 )
 ### auto-generated section `build intellij.compilation.charts` end
+
+### auto-generated section `iml intellij.compilation.charts` start
+exports_files([
+  "intellij.compilation.charts.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.compilation.charts` end

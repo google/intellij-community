@@ -14,6 +14,7 @@
                 factoryClass="com.intellij.ide.commander.CommanderToolWindowFactory"/>
     <projectService serviceImplementation="com.intellij.ide.commander.Commander"/>
     <customizableActionGroupProvider implementation="com.intellij.ide.commander.actions.CommanderCustomizableActionGroupProvider"/>
+    <projectSettings service="com.intellij.ide.commander.Commander"/>
   </extensions>
 
   <actions>

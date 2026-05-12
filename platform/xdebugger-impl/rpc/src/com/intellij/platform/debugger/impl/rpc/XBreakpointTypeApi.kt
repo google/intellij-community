@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.debugger.impl.rpc
 
 import com.intellij.ide.rpc.DocumentPatchVersion
@@ -10,6 +10,7 @@ import com.intellij.platform.rpc.Id
 import com.intellij.platform.rpc.RemoteApiProviderService
 import com.intellij.platform.rpc.UID
 import com.intellij.xdebugger.breakpoints.SuspendPolicy
+import com.intellij.xdebugger.breakpoints.XLineBreakpointVerticalPlacement
 import com.intellij.xdebugger.breakpoints.XBreakpointType
 import fleet.rpc.RemoteApi
 import fleet.rpc.Rpc
@@ -141,12 +142,13 @@ data class XLineBreakpointMultipleVariantResponse(
 @ApiStatus.Internal
 @Serializable
 data class XLineBreakpointInstallationRequest(
-  val types: List<XBreakpointTypeId>,
-  val position: XSourcePositionDto,
-  val isTemporary: Boolean,
-  val isLogging: Boolean,
-  val logExpression: String?,
-  val hasBreakpoints: Boolean,
+    val types: List<XBreakpointTypeId>,
+    val position: XSourcePositionDto,
+    val placement: XLineBreakpointVerticalPlacement,
+    val isTemporary: Boolean,
+    val isLogging: Boolean,
+    val logExpression: String?,
+    val hasBreakpoints: Boolean,
 )
 
 

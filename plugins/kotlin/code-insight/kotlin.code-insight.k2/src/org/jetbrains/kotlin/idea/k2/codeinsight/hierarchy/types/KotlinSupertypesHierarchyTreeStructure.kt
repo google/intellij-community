@@ -11,11 +11,13 @@ import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFunctionalExpression
 import com.intellij.util.ArrayUtilRt
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
 import org.jetbrains.kotlin.analysis.api.types.symbol
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtClassOrObject
+import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.psiUtil.getSuperNames
 import org.jetbrains.kotlin.utils.addIfNotNull
 
@@ -32,6 +34,9 @@ class KotlinSupertypesHierarchyTreeStructure(project: Project, aClass: KtClassOr
                 for (aSuper in supers) {
                     descriptors.add(KotlinTypeHierarchyNodeDescriptor.createTypeHierarchyDescriptor(aSuper, descriptor))
                 }
+
+                appendExpectNodes(element, descriptors, descriptor)
+
                 return descriptors.toTypedArray()
             }
 
@@ -53,6 +58,22 @@ class KotlinSupertypesHierarchyTreeStructure(project: Project, aClass: KtClassOr
             }
         }
         return ArrayUtilRt.EMPTY_OBJECT_ARRAY
+    }
+
+    @OptIn(KaExperimentalApi::class)
+    private fun appendExpectNodes(
+        element: KtClassOrObject,
+        descriptors: MutableList<HierarchyNodeDescriptor>,
+        descriptor: HierarchyNodeDescriptor
+    ) {
+        analyze(element) {
+            val classSymbol = element.classSymbol ?: return
+            if (!classSymbol.isActual) return
+            classSymbol.getExpectsForActual().forEach {
+                val expectElement = it.psi as? KtElement ?: return@forEach
+                descriptors.add(KotlinTypeHierarchyNodeDescriptor.createTypeHierarchyDescriptor(expectElement, descriptor))
+            }
+        }
     }
 
     companion object {

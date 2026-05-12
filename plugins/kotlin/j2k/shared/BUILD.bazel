@@ -1,6 +1,6 @@
 ### auto-generated section `build kotlin.j2k.shared` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_shared",
@@ -13,18 +13,13 @@ create_kotlinc_options(
   x_context_parameters = True
 )
 
-resourcegroup(
-  name = "shared_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "shared",
   module_name = "kotlin.j2k.shared",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":shared_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_shared",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -45,24 +40,32 @@ jvm_library(
     "//plugins/kotlin/base/plugin",
     "//plugins/kotlin/base/project-structure",
     "//platform/platform-impl:ide-impl",
+    "//platform/ide-core",
+    "//platform/progress/shared:ide-progress",
     "//plugins/kotlin/base/psi",
     "//plugins/kotlin/base/util",
     "//platform/forms_rt:java-guiForms-rt",
+    "//java/java-frontback-psi-api:frontback-psi",
     "//plugins/kotlin/frontend-independent",
     "//plugins/kotlin/code-insight/utils",
     "//platform/core-api:core",
     "//platform/util",
+    "//platform/util:util-ui",
     "//plugins/kotlin/project-configuration",
     "//plugins/kotlin/preferences",
     "//plugins/kotlin/base/statistics",
     "//platform/lang-api:lang",
     "//plugins/kotlin/base/resources:kotlin-base-resources",
     "//platform/core-ui",
+    "//platform/util/concurrency",
+    "//platform/backend/observation",
+    "//platform/statistics",
   ]
 )
 
 jvm_library(
   name = "shared_test_lib",
+  testonly = True,
   module_name = "kotlin.j2k.shared",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -84,19 +87,32 @@ jvm_library(
     "//plugins/kotlin/base/plugin:plugin_test_lib",
     "//plugins/kotlin/base/project-structure:project-structure_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
     "//plugins/kotlin/base/psi:psi_test_lib",
     "//plugins/kotlin/base/util:util_test_lib",
     "//platform/forms_rt:java-guiForms-rt_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
     "//plugins/kotlin/frontend-independent:frontend-independent_test_lib",
     "//plugins/kotlin/code-insight/utils:utils_test_lib",
     "//platform/core-api:core_test_lib",
     "//platform/util:util_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//plugins/kotlin/project-configuration:project-configuration_test_lib",
     "//plugins/kotlin/preferences:preferences_test_lib",
     "//plugins/kotlin/base/statistics:statistics_test_lib",
     "//platform/lang-api:lang_test_lib",
     "//plugins/kotlin/base/resources:kotlin-base-resources_test_lib",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/util/concurrency:concurrency_test_lib",
+    "//platform/backend/observation:observation_test_lib",
+    "//platform/statistics:statistics_test_lib",
   ]
 )
 ### auto-generated section `build kotlin.j2k.shared` end
+
+### auto-generated section `iml kotlin.j2k.shared` start
+exports_files([
+  "kotlin.j2k.shared.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.j2k.shared` end

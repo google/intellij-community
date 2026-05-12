@@ -108,6 +108,10 @@
             "description": "A name of the class to launch",
             "type": "string"
           },
+          "stdioRedirectArg" : {
+            "description": "The name of a special argument that will trigger the launcher to capture its original stdout and provide it separately as a system property",
+            "type" : "string"
+          },
           "customCommands": {
             "description": "Specifies custom values for some properties if IDE is started with a specific command",
             "type": "array",
@@ -147,6 +151,10 @@
                 },
                 "mainClass": {
                   "description": "Overrides value of 'mainClass' for the specified commands",
+                  "type": "string"
+                },
+                "stdioRedirectArg": {
+                  "description": "The name of a special argument that will trigger the launcher to capture its original stdout and provide it separately as a system property",
                   "type": "string"
                 },
                 "envVarBaseName": {

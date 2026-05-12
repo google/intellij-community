@@ -57,9 +57,7 @@ class NotebookTableOutputUi(data: ComponentData) : UiComponent(data) {
       popup().waitOneText { it.text.contains("Custom") }.click()
 
       dialog {
-        keyboard {
-          driver.ui.pasteText(n.toString())
-        }
+        textField().text = n.toString()
         okButton.click()
       }
     }
@@ -117,11 +115,7 @@ class NotebookTableOutputUi(data: ComponentData) : UiComponent(data) {
     driver.ideFrame {
       dialog().apply {
         checkBox(xpath = "//div[@class='JBCheckBox' and contains(@text,'Add column header')]").check()
-        textField(xpath = "//div[contains(@notifyaction, 'notify-field-accept')]").click()
-        keyboard {
-          hotKey(if (SystemInfo.isMac) KeyEvent.VK_META else KeyEvent.VK_CONTROL, KeyEvent.VK_A)
-          driver.ui.pasteText(fileName)
-        }
+        textField(xpath = "//div[contains(@notifyaction, 'notify-field-accept')]").text = fileName
         button("Export to File").click()
       }
     }

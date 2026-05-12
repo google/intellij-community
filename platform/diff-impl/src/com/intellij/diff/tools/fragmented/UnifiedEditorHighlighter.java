@@ -1,6 +1,8 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diff.tools.fragmented;
 
+import com.intellij.diff.contents.DocumentContent;
+import com.intellij.diff.util.DiffUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
@@ -10,6 +12,7 @@ import com.intellij.openapi.editor.highlighter.HighlighterClient;
 import com.intellij.openapi.editor.highlighter.HighlighterIterator;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.tree.IElementType;
@@ -29,6 +32,25 @@ public class UnifiedEditorHighlighter implements EditorHighlighter {
 
   private final @NotNull Document myDocument;
   private final @NotNull List<Element> myPieces;
+
+  @ApiStatus.Internal
+  public static @Nullable EditorHighlighter buildHighlighter(@Nullable Project project,
+                                                              @NotNull Document document,
+                                                              @NotNull DocumentContent content1,
+                                                              @NotNull DocumentContent content2,
+                                                              @NotNull CharSequence text1,
+                                                              @NotNull CharSequence text2,
+                                                              @NotNull List<HighlightRange> ranges,
+                                                              int textLength) {
+    EditorHighlighter highlighter1 = DiffUtil.initEditorHighlighter(project, content1, text1);
+    EditorHighlighter highlighter2 = DiffUtil.initEditorHighlighter(project, content2, text2);
+
+    if (highlighter1 == null && highlighter2 == null) return null;
+    if (highlighter1 == null) highlighter1 = DiffUtil.initEmptyEditorHighlighter(text1);
+    if (highlighter2 == null) highlighter2 = DiffUtil.initEmptyEditorHighlighter(text2);
+
+    return new UnifiedEditorHighlighter(document, highlighter1, highlighter2, ranges, textLength);
+  }
 
   UnifiedEditorHighlighter(@NotNull Document document,
                            @NotNull EditorHighlighter highlighter1,

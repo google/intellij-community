@@ -1,13 +1,15 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
 import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
-import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
@@ -22,14 +24,12 @@ import com.intellij.platform.workspace.storage.testEntities.entities.currentVers
 @GeneratedCodeApiVersion(3)
 @GeneratedCodeImplVersion(7)
 @OptIn(WorkspaceEntityInternalApi::class)
-internal class ChangedComputablePropEntityImpl(private val dataSource: ChangedComputablePropEntityData) : ChangedComputablePropEntity, WorkspaceEntityBase(
-  dataSource) {
+internal class ChangedComputablePropEntityImpl(private val dataSource: ChangedComputablePropEntityData) : ChangedComputablePropEntity,
+                                                                                                          WorkspaceEntityBase(dataSource) {
 
   private companion object {
 
-
-    private val connections = listOf<ConnectionId>(
-    )
+    private val connections = listOf<ConnectionId>()
 
   }
 
@@ -52,8 +52,9 @@ internal class ChangedComputablePropEntityImpl(private val dataSource: ChangedCo
   }
 
 
-  internal class Builder(result: ChangedComputablePropEntityData?) : ModifiableWorkspaceEntityBase<ChangedComputablePropEntity, ChangedComputablePropEntityData>(
-    result), ChangedComputablePropEntityBuilder {
+  internal class Builder(result: ChangedComputablePropEntityData?) :
+    ModifiableWorkspaceEntityBase<ChangedComputablePropEntity, ChangedComputablePropEntityData>(result),
+    ChangedComputablePropEntityBuilder {
     internal constructor() : this(ChangedComputablePropEntityData())
 
     override fun applyToBuilder(builder: MutableEntityStorage) {
@@ -66,15 +67,13 @@ internal class ChangedComputablePropEntityImpl(private val dataSource: ChangedCo
           error("Entity ChangedComputablePropEntity is already created in a different builder")
         }
       }
-
       this.diff = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
-      // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
-      // Builder may switch to snapshot at any moment and lock entity data to modification
+// After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
+// Builder may switch to snapshot at any moment and lock entity data to modification
       this.currentEntityData = null
-
-      // Process linked entities that are connected without a builder
+// Process linked entities that are connected without a builder
       processLinkedEntities(builder)
       checkInitialization() // TODO uncomment and check failed tests
     }
@@ -110,7 +109,6 @@ internal class ChangedComputablePropEntityImpl(private val dataSource: ChangedCo
         changedProperty.add("entitySource")
 
       }
-
     override var text: String
       get() = getEntityData().text
       set(value) {
@@ -121,6 +119,7 @@ internal class ChangedComputablePropEntityImpl(private val dataSource: ChangedCo
 
     override fun getEntityClass(): Class<ChangedComputablePropEntity> = ChangedComputablePropEntity::class.java
   }
+
 }
 
 @OptIn(WorkspaceEntityInternalApi::class)
@@ -136,7 +135,6 @@ internal class ChangedComputablePropEntityData : WorkspaceEntityData<ChangedComp
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): ChangedComputablePropEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {
@@ -148,8 +146,7 @@ internal class ChangedComputablePropEntityData : WorkspaceEntityData<ChangedComp
   }
 
   override fun getMetadata(): EntityMetadata {
-    return MetadataStorageImpl.getMetadataByTypeFqn(
-      "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedComputablePropEntity") as EntityMetadata
+    return MetadataStorageImpl.getMetadataByTypeFqn("com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedComputablePropEntity") as EntityMetadata
   }
 
   override fun getEntityInterface(): Class<out WorkspaceEntity> {
@@ -157,8 +154,7 @@ internal class ChangedComputablePropEntityData : WorkspaceEntityData<ChangedComp
   }
 
   override fun createDetachedEntity(parents: List<WorkspaceEntityBuilder<*>>): WorkspaceEntityBuilder<*> {
-    return ChangedComputablePropEntity(text, entitySource) {
-    }
+    return ChangedComputablePropEntity(text, entitySource)
   }
 
   override fun getRequiredParents(): List<Class<out WorkspaceEntity>> {
@@ -169,9 +165,7 @@ internal class ChangedComputablePropEntityData : WorkspaceEntityData<ChangedComp
   override fun equals(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as ChangedComputablePropEntityData
-
     if (this.entitySource != other.entitySource) return false
     if (this.text != other.text) return false
     return true
@@ -180,9 +174,7 @@ internal class ChangedComputablePropEntityData : WorkspaceEntityData<ChangedComp
   override fun equalsIgnoringEntitySource(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as ChangedComputablePropEntityData
-
     if (this.text != other.text) return false
     return true
   }

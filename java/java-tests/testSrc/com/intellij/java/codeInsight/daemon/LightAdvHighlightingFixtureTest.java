@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.java.codeInsight.daemon;
 
 import com.intellij.JavaTestUtil;
@@ -18,11 +18,9 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.psi.JavaCodeFragment;
 import com.intellij.psi.JavaCodeFragmentFactory;
-import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiCallExpression;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiDocumentManager;
-import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiResolveHelper;
 import com.intellij.psi.infos.CandidateInfo;
@@ -37,7 +35,6 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class LightAdvHighlightingFixtureTest extends LightJavaCodeInsightFixtureTestCase {
-  
 
   @Override
   protected String getBasePath() {
@@ -206,8 +203,7 @@ public class LightAdvHighlightingFixtureTest extends LightJavaCodeInsightFixture
     myFixture.addClass("public class MainClass { }");
 
     Project project = getProject();
-    PsiElement context = JavaPsiFacade.getInstance(project).findPackage("");
-    JavaCodeFragment fragment = JavaCodeFragmentFactory.getInstance(project).createReferenceCodeFragment("MainClass", context, true, true);
+    JavaCodeFragment fragment = JavaCodeFragmentFactory.getInstance(project).createReferenceCodeFragmentInPackage("MainClass", "", true);
     Document document = PsiDocumentManager.getInstance(project).getDocument(fragment);
     Editor editor = EditorFactory.getInstance().createViewer(document, project);
     Disposer.register(myFixture.getTestRootDisposable(), () -> EditorFactory.getInstance().releaseEditor(editor));

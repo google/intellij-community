@@ -1,22 +1,19 @@
 ### auto-generated section `build intellij.compilation.charts.jps` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "compilation-charts-jps_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "compilation-charts-jps",
   module_name = "intellij.compilation.charts.jps",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":compilation-charts-jps_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = "@community//:k11",
   deps = [
     "//jps/jps-builders:build",
     "//platform/util",
+    "//platform/util/base/multiplatform",
+    "//platform/util/base",
     "//libraries/gson",
     "//jps/model-api:model",
   ]
@@ -24,6 +21,7 @@ jvm_library(
 
 jvm_library(
   name = "compilation-charts-jps_test_lib",
+  testonly = True,
   module_name = "intellij.compilation.charts.jps",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -32,8 +30,16 @@ jvm_library(
     ":compilation-charts-jps",
     "//jps/jps-builders:build_test_lib",
     "//platform/util:util_test_lib",
+    "//platform/util/base/multiplatform:multiplatform_test_lib",
+    "//platform/util/base:base_test_lib",
     "//libraries/gson:gson_test_lib",
     "//jps/model-api:model_test_lib",
   ]
 )
 ### auto-generated section `build intellij.compilation.charts.jps` end
+
+### auto-generated section `iml intellij.compilation.charts.jps` start
+exports_files([
+  "intellij.compilation.charts.jps.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.compilation.charts.jps` end

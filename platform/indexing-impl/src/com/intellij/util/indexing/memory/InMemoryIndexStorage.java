@@ -41,7 +41,7 @@ public final class InMemoryIndexStorage<K, V> extends IndexStorageLockingBase im
   @Override
   public void addValue(K k, int inputId, V v) {
     withWriteLock(
-      () -> inMemoryStorage.computeIfAbsent(k, __ -> ValueContainerImpl.createNewValueContainer()).addValue(inputId, v)
+      () -> inMemoryStorage.computeIfAbsent(k, _ -> ValueContainerImpl.createNewValueContainer()).addValue(inputId, v)
     );
   }
 

@@ -56,9 +56,9 @@ import com.intellij.ui.EditorTextFieldWithBrowseButton;
 import com.intellij.ui.InsertPathAction;
 import com.intellij.ui.PanelWithAnchor;
 import com.intellij.ui.RawCommandLineEditor;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.fields.ExpandableTextField;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.uiDesigner.core.GridLayoutManager;
 import com.intellij.uiDesigner.core.Spacer;
@@ -428,7 +428,7 @@ public class JUnitConfigurable<T extends JUnitConfiguration> extends SettingsEdi
     myClass.setComponent(new EditorTextFieldWithBrowseButton(myProject, true, createClassVisibilityChecker(classBrowser)));
 
     myModel.reloadTestKindModel(myTypeChooser, myModuleSelector.getModule(), () -> addListeners());
-    myTypeChooser.setRenderer(SimpleListCellRenderer.create("", value -> JUnitConfigurationModel.getKindName(value)));
+    myTypeChooser.setRenderer(BuilderKt.textListCellRenderer("", value -> JUnitConfigurationModel.getKindName(value)));
 
     myTestLocations[JUnitConfigurationModel.ALL_IN_PACKAGE] = myPackage;
     myTestLocations[JUnitConfigurationModel.CLASS] = myClass;
@@ -447,8 +447,8 @@ public class JUnitConfigurable<T extends JUnitConfiguration> extends SettingsEdi
       }
     });
 
-    myRepeatCb.setRenderer(SimpleListCellRenderer.create("", value -> JUnitConfigurationModel.getRepeatModeName(value)));
-    myForkCb.setRenderer(SimpleListCellRenderer.create("", value -> JUnitConfigurationModel.getForkModeName(value)));
+    myRepeatCb.setRenderer(BuilderKt.textListCellRenderer("", value -> JUnitConfigurationModel.getRepeatModeName(value)));
+    myForkCb.setRenderer(BuilderKt.textListCellRenderer("", value -> JUnitConfigurationModel.getForkModeName(value)));
 
     final JPanel panel = myPattern.getComponent();
     panel.setLayout(new BorderLayout());

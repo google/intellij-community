@@ -6,6 +6,7 @@ import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.backgroundWriteAction
 import com.intellij.openapi.application.contextModality
+import com.intellij.openapi.application.edtWriteAction
 import com.intellij.openapi.application.impl.AsyncExecutionServiceImpl
 import com.intellij.openapi.application.impl.concurrencyTest
 import com.intellij.openapi.application.readAction
@@ -288,10 +289,29 @@ class VfsRefreshTest {
       }
     })
 
+
+    application.messageBus.connect(disposable).subscribe(VirtualFileManager.VFS_CHANGES_BG, object : BulkFileListenerBackgroundable {
+      override fun before(events: List<VFileEvent>) {
+        assertThat(EDT.isCurrentThreadEdt()).isFalse
+        counter.incrementAndGet()
+      }
+
+      override fun after(events: List<VFileEvent>) {
+        assertThat(EDT.isCurrentThreadEdt()).isFalse
+        counter.incrementAndGet()
+      }
+    })
+
     backgroundWriteAction {
       FileContentUtilCore.reparseFiles(virtualFile)
     }
-    assertThat(counter.get()).isEqualTo(2)
+    assertThat(counter.get()).isEqualTo(4)
+
+
+    edtWriteAction {
+      FileContentUtilCore.reparseFiles(virtualFile)
+    }
+    assertThat(counter.get()).isEqualTo(8)
   }
 
   @Test
@@ -319,6 +339,51 @@ class VfsRefreshTest {
       checkpoint(3)
     } finally {
       RefreshQueueImpl.setTestListener(null)
+    }
+  }
+
+  @Test
+  @RegistryKey("vfs.refresh.use.background.write.action", "true")
+  fun `high priority refresh collection can start regardless of active scan`() = concurrencyTest {
+    val dir1 = createTempDirectory()
+    val dir2 = createTempDirectory()
+    dir1.resolve("file1").createFile().write("42")
+    dir2.resolve("file2").createFile().write("43")
+    val virtualFile1 = VirtualFileManager.getInstance().findFileByNioPath(dir1)!!
+    val virtualFile2 = VirtualFileManager.getInstance().findFileByNioPath(dir2)!!
+    val path1 = virtualFile1.path
+    val path2 = virtualFile2.path
+
+    val regularScanStarted = AtomicBoolean(false)
+    val prioritizedScanStarted = AtomicBoolean(false)
+    RefreshQueueImpl.setTestListener { file ->
+      when {
+        file != null && file.path.startsWith(path1) && regularScanStarted.compareAndSet(false, true) -> {
+          checkpoint(1)
+          checkpoint(4)
+        }
+        file != null && file.path.startsWith(path2) && prioritizedScanStarted.compareAndSet(false, true) -> {
+          checkpoint(3)
+        }
+      }
+    }
+    try {
+      val regularRefresh = launch(Dispatchers.Default) {
+        RefreshQueue.getInstance().refresh(false, listOf(virtualFile1))
+      }
+      checkpoint(2)
+      val prioritizedRefresh = launch(Dispatchers.Default) {
+        RefreshQueue.getInstance().refreshWithHighPriority(false, listOf(virtualFile2))
+      }
+      checkpoint(3)
+      checkpoint(4)
+      regularRefresh.join()
+      prioritizedRefresh.join()
+    }
+    finally {
+      RefreshQueueImpl.setTestListener(null)
+      dir1.delete()
+      dir2.delete()
     }
   }
 

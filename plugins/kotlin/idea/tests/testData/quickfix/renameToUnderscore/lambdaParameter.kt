@@ -1,4 +1,5 @@
-// "Rename to _" "true"
+// "Rename 'x' to '_'" "true"
+// TOOL: org.jetbrains.kotlin.idea.k2.codeinsight.inspections.UnusedSymbolInspection
 fun foo(block: (String, Int) -> Unit) {
     block("", 1)
 }
@@ -10,5 +11,4 @@ fun bar() {
 }
 
 // FUS_QUICKFIX_NAME: org.jetbrains.kotlin.idea.quickfix.RenameToUnderscoreFix
-// In K2, this is handled by org.jetbrains.kotlin.idea.k2.codeinsight.inspections.diagnosticBased.UnusedVariableInspection
-// see https://youtrack.jetbrains.com/issue/KTIJ-29532/K2-IDE-Port-RenameToUnderscoreFix#focus=Change-27-10072644.0-0
+// FUS_K2_QUICKFIX_NAME: com.intellij.codeInsight.daemon.impl.quickfix.RenameElementFix

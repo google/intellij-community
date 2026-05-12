@@ -2,8 +2,7 @@ package com.intellij.grazie.text
 
 import ai.grazie.nlp.langs.Language
 import com.intellij.grazie.rule.ParsedSentence
-import com.intellij.grazie.text.TreeRuleChecker.TreeProblem
-import com.intellij.grazie.utils.shouldCheckGrammarStyle
+import com.intellij.grazie.utils.hasLanguage
 import java.util.Locale
 
 class AsyncTreeRuleChecker : ExternalTextChecker() {
@@ -12,11 +11,18 @@ class AsyncTreeRuleChecker : ExternalTextChecker() {
     return TreeRuleChecker.getRules(language)
   }
 
-  override suspend fun checkExternally(context: ProofreadingContext): Collection<TreeProblem> {
-    if (!context.shouldCheckGrammarStyle()) return emptyList()
+  // Used by ReSharper
+  override suspend fun checkExternally(context: ProofreadingContext): Collection<TextProblem> {
+    if (!context.hasLanguage()) return emptyList()
     val sentences = ParsedSentence.getSentencesAsync(context)
     if (sentences.isEmpty()) return emptyList()
 
     return TreeRuleChecker.check(context.text, sentences)
+  }
+
+  override suspend fun checkExternally(contexts: List<ProofreadingContext>): Collection<TextProblem> {
+    val texts = contexts.mapNotNull { if (it.hasLanguage()) it.text else null }
+    if (texts.isEmpty()) return emptyList()
+    return TreeRuleChecker.checkText(texts)
   }
 }

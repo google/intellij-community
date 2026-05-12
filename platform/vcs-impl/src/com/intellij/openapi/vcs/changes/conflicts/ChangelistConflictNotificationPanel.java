@@ -41,7 +41,7 @@ public final class ChangelistConflictNotificationPanel extends EditorNotificatio
 
     ChangeListManager manager = ChangeListManager.getInstance(project);
 
-    myLabel.setText(VcsBundle.message("changes.file.from.non.active.changelist.is.modified"));
+    myTextLabel.setText(VcsBundle.message("changes.file.from.non.active.changelist.is.modified"));
     createActionLabel(VcsBundle.message("link.label.move.changes"),
                       () -> ChangelistConflictResolution.MOVE.resolveConflict(project, changeList.getChanges(), file))
       .setToolTipText(VcsBundle.message("changes.move.changes.to.active.change.list.name", manager.getDefaultChangeList().getName()));

@@ -8,11 +8,12 @@ import com.intellij.execution.impl.InlayProvider
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.editor.colors.EditorColorsManager
+import com.intellij.openapi.editor.event.EditorMouseEvent
 import com.intellij.openapi.editor.markup.HighlighterLayer
 import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.project.Project
 import com.intellij.platform.util.coroutines.childScope
-import com.intellij.terminal.backend.hyperlinks.BackendTerminalHyperlinkFacade
+import com.intellij.terminal.frontend.session.hyperlinks.BackendTerminalHyperlinkFacade
 import com.intellij.terminal.tests.reworked.util.TerminalTestUtil
 import com.intellij.testFramework.ExtensionTestUtil
 import com.intellij.testFramework.common.timeoutRunBlocking
@@ -33,6 +34,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.assertj.core.api.Assertions.assertThat
+import org.jetbrains.plugins.terminal.hyperlinks.TerminalAsyncHyperlinkInfo
 import org.jetbrains.plugins.terminal.session.impl.TerminalContentUpdatedEvent
 import org.jetbrains.plugins.terminal.session.impl.TerminalFilterResultInfo
 import org.jetbrains.plugins.terminal.session.impl.TerminalHighlightingInfo
@@ -108,6 +110,22 @@ internal class BackendTerminalHyperlinkHighlighterTest : BasePlatformTestCase() 
       inlay(at(1, "link_inlay12")),
     )
     assertHighlightings()
+  }
+
+  @Test
+  fun `async hyperlink uses async navigation`() = withFixture {
+    filter.hyperlinkInfoFactory = { hyperlinkInfo ->
+      createRecordingAsyncHyperlink(hyperlinkInfo, "async-only", failOnSyncNavigate = true)
+    }
+    updateModel(0L, "0: line0 link0")
+
+    assertStoredHyperlinkInfo(at(0, "link0")) { hyperlinkInfo ->
+      assertThat(hyperlinkInfo).isInstanceOf(TerminalAsyncHyperlinkInfo::class.java)
+    }
+
+    click(at(0, "link0"))
+
+    assertClickedLinks("async-only")
   }
 
   @Test
@@ -420,7 +438,7 @@ internal class BackendTerminalHyperlinkHighlighterTest : BasePlatformTestCase() 
             link(at(767, "link1004")),
             link(at(768, "link1005")),
           )
-        ).toTypedArray(),
+         ).toTypedArray(),
       )
       assertHighlightings()
     }
@@ -441,7 +459,7 @@ internal class BackendTerminalHyperlinkHighlighterTest : BasePlatformTestCase() 
             link(at(767, "link1003")),
             link(at(768, "link1004")),
           )
-        ).toTypedArray(),
+         ).toTypedArray(),
       )
       assertHighlightings()
     }
@@ -454,17 +472,18 @@ internal class BackendTerminalHyperlinkHighlighterTest : BasePlatformTestCase() 
     }
   }
 
-  private fun withFixture(test: suspend Fixture.() -> Unit) = timeoutRunBlocking(coroutineName = "BackendTerminalHyperlinkHighlighterTest") {
-    val fixture = Fixture(project)
-    ExtensionTestUtil.maskExtensions<ConsoleFilterProvider>(
-      ConsoleFilterProvider.FILTER_PROVIDERS,
-      listOf(ConsoleFilterProvider { arrayOf(fixture.filter as Filter) }),
-      testRootDisposable
-    )
-    withContext(Dispatchers.Default) {
-      fixture.run(test)
+  private fun withFixture(test: suspend Fixture.() -> Unit) =
+    timeoutRunBlocking(coroutineName = "BackendTerminalHyperlinkHighlighterTest") {
+      val fixture = Fixture(project)
+      ExtensionTestUtil.maskExtensions<ConsoleFilterProvider>(
+        ConsoleFilterProvider.FILTER_PROVIDERS,
+        listOf(ConsoleFilterProvider { arrayOf(fixture.filter as Filter) }),
+        testRootDisposable
+      )
+      withContext(Dispatchers.Default) {
+        fixture.run(test)
+      }
     }
-  }
 
   private class Fixture(private val project: Project) {
 
@@ -517,7 +536,15 @@ internal class BackendTerminalHyperlinkHighlighterTest : BasePlatformTestCase() 
     }
 
     suspend fun updateModel(fromLine: Long, newText: String) {
-      updateEvents.send(listOf(TerminalContentUpdatedEvent(newText.ensureEOL(), emptyList(), fromLine)))
+      val textWithEol = newText.ensureEOL()
+      val event = TerminalContentUpdatedEvent(
+        text = textWithEol,
+        styles = emptyList(),
+        startLineLogicalIndex = fromLine,
+        cursorLogicalLineIndex = fromLine + textWithEol.count { it == '\n' } - 1,
+        cursorColumnIndex = 0
+      )
+      updateEvents.send(listOf(event))
       pendingUpdateEventCount.update { it + 1 }
     }
 
@@ -528,11 +555,18 @@ internal class BackendTerminalHyperlinkHighlighterTest : BasePlatformTestCase() 
 
     suspend fun assertLinks(vararg expectedLinks: Link) {
       awaitEventProcessing()
-      val actualLinks = backendFacade.dumpState().hyperlinks.filterIsInstance<TerminalHyperlinkInfo>().map { link ->
-        ActualLinkWrapper(
-          outputModel.getText(TerminalOffset.of(link.absoluteStartOffset), TerminalOffset.of(link.absoluteEndOffset)).toString(),
-          link,
-        )
+      val actualLinks = backendFacade.dumpState().hyperlinks.filterIsInstance<TerminalHyperlinkInfo>().mapNotNull { link ->
+        val start = TerminalOffset.of(link.absoluteStartOffset)
+        val end = TerminalOffset.of(link.absoluteEndOffset)
+        if (start < outputModel.startOffset && end >= outputModel.startOffset) {
+          null // partially trimmed links are allowed
+        }
+        else {
+          ActualLinkWrapper(
+            outputModel.getText(start, end).toString(),
+            link,
+          )
+        }
       }
       assertThat(actualLinks).hasSameSizeAs(expectedLinks)
       for (i in actualLinks.indices) {
@@ -544,7 +578,7 @@ internal class BackendTerminalHyperlinkHighlighterTest : BasePlatformTestCase() 
         val expectedStartOffset = expected.locator.locateOffset(outputModel)
         val expectedEndOffset = expectedStartOffset + expected.locator.length.toLong()
         val expectedLayer = HighlighterLayer.HYPERLINK
-        
+
         val description = "at $i actual link $actual expected link $expected"
         assertThat(actualStartOffset).`as`(description).isEqualTo(expectedStartOffset)
         assertThat(actualEndOffset).`as`(description).isEqualTo(expectedEndOffset)
@@ -564,7 +598,8 @@ internal class BackendTerminalHyperlinkHighlighterTest : BasePlatformTestCase() 
       awaitEventProcessing()
       val actualHighlightings = backendFacade.dumpState().hyperlinks.filterIsInstance<TerminalHighlightingInfo>().map { highlighting ->
         ActualHighlightingWrapper(
-          outputModel.getText(TerminalOffset.of(highlighting.absoluteStartOffset), TerminalOffset.of(highlighting.absoluteEndOffset)).toString(),
+          outputModel.getText(TerminalOffset.of(highlighting.absoluteStartOffset), TerminalOffset.of(highlighting.absoluteEndOffset))
+            .toString(),
           highlighting,
         )
       }
@@ -610,12 +645,26 @@ internal class BackendTerminalHyperlinkHighlighterTest : BasePlatformTestCase() 
     }
 
     suspend fun assertClicks(vararg clicks: LinkLocator) {
+      click(*clicks)
+      assertClickedLinks(*clicks.map { it.substring }.toTypedArray())
+    }
+
+    suspend fun assertStoredHyperlinkInfo(click: LinkLocator, assertion: (HyperlinkInfo) -> Unit) {
+      awaitEventProcessing()
+      val actualLink = click.locateLink(outputModel, backendFacade) as TerminalHyperlinkInfo
+      assertion(checkNotNull(actualLink.hyperlinkInfo))
+    }
+
+    suspend fun click(vararg clicks: LinkLocator) {
       awaitEventProcessing()
       for (click in clicks) {
         backendFacade.hyperlinkClicked(click.locateLink(outputModel, backendFacade).id, null)
       }
       awaitEventProcessing()
-      assertThat(clickedLinks).containsExactlyElementsOf(clicks.map { it.substring })
+    }
+
+    fun assertClickedLinks(vararg expectedLinks: String) {
+      assertThat(clickedLinks).containsExactly(*expectedLinks)
     }
 
     fun link(
@@ -681,6 +730,7 @@ internal class BackendTerminalHyperlinkHighlighterTest : BasePlatformTestCase() 
       var followedHighlight: TextAttributes? = null
       var hoveredHighlight: TextAttributes? = null
       var delayPerLine = 0L
+      var hyperlinkInfoFactory: (HyperlinkInfo) -> HyperlinkInfo = { hyperlinkInfo -> hyperlinkInfo }
 
       private val pattern = Regex("""(link|highlight|link_inlay|highlight_inlay)\d+""")
 
@@ -696,7 +746,7 @@ internal class BackendTerminalHyperlinkHighlighterTest : BasePlatformTestCase() 
           results += createResultItem(
             highlightStartOffset = startOffset + matchResult.range.first,
             highlightEndOffset = startOffset + matchResult.range.last + 1,
-            hyperlinkInfo = if (isHyperlink) MyHyperlinkInfo(matchResult.value) else null,
+            hyperlinkInfo = if (isHyperlink) hyperlinkInfoFactory(MyHyperlinkInfo(matchResult.value)) else null,
             highlightAttributes = highlight,
             followedHyperlinkAttributes = if (isHyperlink) followedHighlight else null,
             hoveredHyperlinkAttributes = if (isHyperlink) hoveredHighlight else null,
@@ -739,6 +789,40 @@ internal class BackendTerminalHyperlinkHighlighterTest : BasePlatformTestCase() 
     private inner class MyHyperlinkInfo(private val value: String) : HyperlinkInfo {
       override fun navigate(project: Project) {
         clickedLinks += value
+      }
+    }
+
+    fun createRecordingAsyncHyperlink(
+      delegate: HyperlinkInfo,
+      value: String,
+      delegateAfterRecording: Boolean = false,
+      failOnSyncNavigate: Boolean = false,
+    ): HyperlinkInfo {
+      return RecordingAsyncHyperlinkInfo(delegate, value, delegateAfterRecording, failOnSyncNavigate)
+    }
+
+    private inner class RecordingAsyncHyperlinkInfo(
+      private val delegate: HyperlinkInfo,
+      private val value: String,
+      private val delegateAfterRecording: Boolean,
+      private val failOnSyncNavigate: Boolean,
+    ) : TerminalAsyncHyperlinkInfo {
+      override fun navigate(project: Project) {
+        check(!failOnSyncNavigate) { "sync navigate should not be used for async terminal hyperlinks" }
+        delegate.navigate(project)
+      }
+
+      override suspend fun navigate(project: Project, mouseEvent: EditorMouseEvent?) {
+        clickedLinks += value
+        if (!delegateAfterRecording) {
+          return
+        }
+        if (delegate is TerminalAsyncHyperlinkInfo) {
+          delegate.navigate(project, mouseEvent)
+        }
+        else {
+          delegate.navigate(project)
+        }
       }
     }
   }

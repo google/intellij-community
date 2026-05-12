@@ -14,6 +14,7 @@ UClass (name = Regex)
         UBlockExpression
             UCallExpression (kind = UastCallKind(name='constructor_call'), argCount = 0))
                 UIdentifier (Identifier ())
+                USimpleNameReferenceExpression (identifier = Object, resolvesTo = PsiClass: Object)
     UMethod (name = Regex)
         UParameter (name = pattern)
             UAnnotation (fqName = org.jetbrains.annotations.NotNull)
@@ -22,6 +23,7 @@ UClass (name = Regex)
         UBlockExpression
             UCallExpression (kind = UastCallKind(name='constructor_call'), argCount = 0))
                 UIdentifier (Identifier ())
+                USimpleNameReferenceExpression (identifier = Object, resolvesTo = PsiClass: Object)
     UMethod (name = Regex)
         UParameter (name = pattern)
             UAnnotation (fqName = org.jetbrains.annotations.NotNull)
@@ -30,79 +32,62 @@ UClass (name = Regex)
         UBlockExpression
             UCallExpression (kind = UastCallKind(name='constructor_call'), argCount = 0))
                 UIdentifier (Identifier ())
+                USimpleNameReferenceExpression (identifier = Object, resolvesTo = PsiClass: Object)
     UMethod (name = getPattern)
-        UBlockExpression
     UMethod (name = getOptions)
-        UBlockExpression
     UMethod (name = matches)
         UParameter (name = input)
             UAnnotation (fqName = org.jetbrains.annotations.NotNull)
-        UBlockExpression
     UMethod (name = containsMatchIn)
         UParameter (name = input)
             UAnnotation (fqName = org.jetbrains.annotations.NotNull)
-        UBlockExpression
     UMethod (name = find)
         UParameter (name = input)
             UAnnotation (fqName = org.jetbrains.annotations.NotNull)
         UParameter (name = startIndex)
-        UBlockExpression
     UMethod (name = findAll)
         UParameter (name = input)
             UAnnotation (fqName = org.jetbrains.annotations.NotNull)
         UParameter (name = startIndex)
-        UBlockExpression
     UMethod (name = matchEntire)
         UParameter (name = input)
             UAnnotation (fqName = org.jetbrains.annotations.NotNull)
-        UBlockExpression
     UMethod (name = matchAt)
         UParameter (name = input)
             UAnnotation (fqName = org.jetbrains.annotations.NotNull)
         UParameter (name = index)
-        UBlockExpression
     UMethod (name = matchesAt)
         UParameter (name = input)
             UAnnotation (fqName = org.jetbrains.annotations.NotNull)
         UParameter (name = index)
-        UBlockExpression
     UMethod (name = replace)
         UParameter (name = input)
             UAnnotation (fqName = org.jetbrains.annotations.NotNull)
         UParameter (name = replacement)
             UAnnotation (fqName = org.jetbrains.annotations.NotNull)
-        UBlockExpression
     UMethod (name = replace)
         UParameter (name = input)
             UAnnotation (fqName = org.jetbrains.annotations.NotNull)
         UParameter (name = transform)
             UAnnotation (fqName = org.jetbrains.annotations.NotNull)
-        UBlockExpression
     UMethod (name = replaceFirst)
         UParameter (name = input)
             UAnnotation (fqName = org.jetbrains.annotations.NotNull)
         UParameter (name = replacement)
             UAnnotation (fqName = org.jetbrains.annotations.NotNull)
-        UBlockExpression
     UMethod (name = split)
         UParameter (name = input)
             UAnnotation (fqName = org.jetbrains.annotations.NotNull)
         UParameter (name = limit)
-        UBlockExpression
     UMethod (name = splitToSequence)
         UParameter (name = input)
             UAnnotation (fqName = org.jetbrains.annotations.NotNull)
         UParameter (name = limit)
-        UBlockExpression
     UMethod (name = toString)
-        UBlockExpression
     UMethod (name = toPattern)
-        UBlockExpression
     UMethod (name = writeReplace)
-        UBlockExpression
     UMethod (name = readObject)
         UParameter (name = input)
-        UBlockExpression
     UMethod (name = findAll$lambda$0)
         UParameter (name = this$0)
         UParameter (name = $input)
@@ -112,18 +97,14 @@ UClass (name = Regex)
         UMethod (name = fromLiteral)
             UParameter (name = literal)
                 UAnnotation (fqName = org.jetbrains.annotations.NotNull)
-            UBlockExpression
         UMethod (name = escape)
             UParameter (name = literal)
                 UAnnotation (fqName = org.jetbrains.annotations.NotNull)
-            UBlockExpression
         UMethod (name = escapeReplacement)
             UParameter (name = literal)
                 UAnnotation (fqName = org.jetbrains.annotations.NotNull)
-            UBlockExpression
         UMethod (name = ensureUnicodeCase)
             UParameter (name = flags)
-            UBlockExpression
     UClass (name = Serialized)
         UField (name = Companion)
             UAnnotation (fqName = null)
@@ -141,6 +122,5 @@ UClass (name = Regex)
         UMethod (name = getPattern)
         UMethod (name = getFlags)
         UMethod (name = readResolve)
-            UBlockExpression
         UClass (name = Companion)
             UMethod (name = Companion)

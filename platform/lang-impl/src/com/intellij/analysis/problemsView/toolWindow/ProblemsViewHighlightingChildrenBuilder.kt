@@ -2,6 +2,7 @@
 package com.intellij.analysis.problemsView.toolWindow
 
 import com.intellij.analysis.problemsView.Problem
+import com.intellij.analysis.problemsView.toolWindow.splitApi.HighlightingBaseProblem
 import com.intellij.codeInsight.multiverse.CodeInsightContext
 import com.intellij.openapi.vfs.VirtualFile
 import org.jetbrains.annotations.ApiStatus
@@ -17,7 +18,7 @@ object ProblemsViewHighlightingChildrenBuilder {
    *   - If grouping by tool id is enabled, the problems are grouped by tool id next.
    */
   fun prepareChildrenForFileRoot(
-    fileProblems: List<HighlightingProblem>,
+    fileProblems: List<HighlightingBaseProblem>,
     node: FileNode,
     groupByToolId: Boolean,
   ): List<Node> {
@@ -63,7 +64,7 @@ object ProblemsViewHighlightingChildrenBuilder {
 
   private fun getChildrenGroupedByContext(
       node: FileNode,
-      problemsPerContextGroup: Map<CodeInsightContext?, List<HighlightingProblem>>,
+      problemsPerContextGroup: Map<CodeInsightContext?, List<HighlightingBaseProblem>>,
       groupByToolId: Boolean,
   ): List<Node> = problemsPerContextGroup.flatMap { (context, problems) ->
       when (context) {
@@ -86,7 +87,7 @@ object ProblemsViewHighlightingChildrenBuilder {
       }
   }
 
-  private fun Map<CodeInsightContext?, List<HighlightingProblem>>.hasSeveralContextGroups(): Boolean {
+  private fun Map<CodeInsightContext?, List<HighlightingBaseProblem>>.hasSeveralContextGroups(): Boolean {
     val containsGlobalGroup = contains(null)
     val containsSeveralContextGroups = if (containsGlobalGroup) size > 2 else size > 1
     return containsSeveralContextGroups

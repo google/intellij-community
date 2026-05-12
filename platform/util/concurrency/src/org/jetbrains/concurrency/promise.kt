@@ -13,6 +13,8 @@ import com.intellij.util.Function
 import com.intellij.util.ThreeState
 import com.intellij.util.concurrency.AppExecutorUtil
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import java.util.Collections
 import java.util.concurrent.CompletableFuture
@@ -300,6 +302,22 @@ fun Job.asPromise(): Promise<*> {
   }
   return promise
 }
+
+@OptIn(ExperimentalCoroutinesApi::class)
+fun <T> Deferred<T>.toPromise(logErrors: Boolean = true): Promise<T> = object : AsyncPromise<T>() {
+  override fun shouldLogErrors(): Boolean = logErrors
+}.also { promise ->
+  invokeOnCompletion { throwable ->
+    if (throwable != null) {
+      promise.setError(throwable)
+    }
+    else {
+      promise.setResult(getCompleted())
+    }
+  }
+}
+
+fun <T> Deferred<T>.toPromiseWithoutLogError(): Promise<T> = toPromise(logErrors = false)
 
 fun ActionCallback.toPromise(): Promise<Any?> {
   val promise = AsyncPromise<Any?>()

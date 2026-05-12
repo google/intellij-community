@@ -98,7 +98,6 @@ productModules {
 fun deprecatedInclude(
   moduleName: String,
   resourcePath: String,
-  ultimateOnly: Boolean = false,
   optional: Boolean = false
 )
 ```
@@ -109,13 +108,12 @@ Adds an xi:include directive to include XML content from a module's resources.
 |-----------|-------------|
 | `moduleName` | Module containing the resource |
 | `resourcePath` | Path within the module (e.g., `META-INF/Plugin.xml`) |
-| `ultimateOnly` | If true, skipped in Community builds |
 | `optional` | If true, always uses xi:fallback (never inlined) |
 
 **Example:**
 ```kotlin
 deprecatedInclude("intellij.platform.resources", "META-INF/PlatformLangPlugin.xml")
-deprecatedInclude("intellij.ultimate.resources", "META-INF/UltimatePlugin.xml", ultimateOnly = true)
+deprecatedInclude("intellij.ultimate.resources", "META-INF/UltimatePlugin.xml")
 deprecatedInclude("intellij.rider.languages", "intellij.rider.languages.xml", optional = true)
 ```
 
@@ -392,6 +390,33 @@ fun ideCommon() = moduleSet("ide.common") {
 
 ---
 
+### `plugin(name)` - Create Pluginized Module Set
+
+```kotlin
+fun plugin(
+  name: String,
+  pluginId: String? = null,
+  outputModule: String? = null,
+  addToMainModule: Boolean = true,
+  block: ModuleSetBuilder.() -> Unit
+): ModuleSet
+```
+
+Creates a module set and marks it to be materialized as a standalone bundled plugin wrapper.
+The Product DSL pipeline generates the wrapper module files, `plugin-content.yaml`, and `modules.xml` entries during generation.
+Do not pass the result to product-level or nested `moduleSet(...)` composition APIs; bundle the generated wrapper plugin module instead.
+
+**Example:**
+```kotlin
+fun recentFiles() = plugin("recentFiles") {
+  module("intellij.platform.recentFiles")
+  module("intellij.platform.recentFiles.frontend")
+  module("intellij.platform.recentFiles.backend")
+}
+```
+
+---
+
 ## Loading Override Builder
 
 Available when using `moduleSet(set) { ... }` with overrides:
@@ -472,7 +497,6 @@ Represents an XML include directive.
 data class DeprecatedXmlInclude(
   val moduleName: String,
   val resourcePath: String,
-  val ultimateOnly: Boolean = false,
   val optional: Boolean = false
 )
 ```

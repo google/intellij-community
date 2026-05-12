@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.bookmarks.backend` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "backend_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "backend",
   module_name = "intellij.platform.bookmarks.backend",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":backend_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/bookmarks",
@@ -23,6 +18,7 @@ jvm_library(
     "//platform/lang-impl",
     "//platform/kernel/backend",
     "//platform/project/shared:project",
+    "//fleet/rhizomedb",
   ],
   exports = ["//platform/bookmarks"],
   runtime_deps = ["//platform/backend"]
@@ -30,6 +26,7 @@ jvm_library(
 
 jvm_library(
   name = "backend_test_lib",
+  testonly = True,
   module_name = "intellij.platform.bookmarks.backend",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -48,6 +45,13 @@ jvm_library(
     "//platform/lang-impl:lang-impl_test_lib",
     "//platform/kernel/backend:backend_test_lib",
     "//platform/project/shared:project_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.bookmarks.backend` end
+
+### auto-generated section `iml intellij.platform.bookmarks.backend` start
+exports_files([
+  "intellij.platform.bookmarks.backend.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.bookmarks.backend` end

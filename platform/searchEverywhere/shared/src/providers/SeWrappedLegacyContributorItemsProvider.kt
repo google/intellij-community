@@ -2,7 +2,10 @@
 package com.intellij.platform.searchEverywhere.providers
 
 import com.intellij.ide.actions.searcheverywhere.SearchEverywhereContributor
-import com.intellij.openapi.actionSystem.DataProvider
+import com.intellij.ide.actions.searcheverywhere.addDataForItem
+import com.intellij.openapi.actionSystem.CustomizedDataContext
+import com.intellij.openapi.actionSystem.DataContext
+import com.intellij.openapi.actionSystem.DataKey
 import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.actionSystem.PlatformCoreDataKeys
 import com.intellij.openapi.util.Disposer
@@ -10,7 +13,6 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.searchEverywhere.SeCommandInfo
 import com.intellij.platform.searchEverywhere.SeCommandInfoFactory
 import com.intellij.platform.searchEverywhere.SeItem
-import com.intellij.platform.searchEverywhere.SeItemsProvider
 import com.intellij.platform.searchEverywhere.SeItemsProviderWithPossibleOperationDisposable
 import com.intellij.platform.searchEverywhere.SeLegacyItem
 import com.intellij.pom.Navigatable
@@ -22,28 +24,35 @@ abstract class SeWrappedLegacyContributorItemsProvider: SeItemsProviderWithPossi
   abstract val contributor: SearchEverywhereContributor<*>
 
   override fun addDataForItem(item: SeItem, sink: DataSink) {
-    sink[PlatformCoreDataKeys.BGT_DATA_PROVIDER] = DataProvider { dataId -> getDataFromElementInfo(dataId, item) }
+    if (item !is SeLegacyItem) return
+
+    @Suppress("UNCHECKED_CAST")
+    val contributor = item.contributor as? SearchEverywhereContributor<Any> ?: return
+    contributor.addDataForItem(item.rawObject, sink)
   }
 
   override fun getPsiElementForItem(item: SeItem): PsiElement? =
-    getDataFromElementInfo(PlatformCoreDataKeys.PSI_ELEMENT.name, item) as? PsiElement
+    getDataFromElementInfo(PlatformCoreDataKeys.PSI_ELEMENT, item)
 
   override fun getVirtualFileForItem(item: SeItem): VirtualFile? =
-    getDataFromElementInfo(PlatformCoreDataKeys.VIRTUAL_FILE.name, item) as? VirtualFile
+    getDataFromElementInfo(PlatformCoreDataKeys.VIRTUAL_FILE, item)
 
   override fun getNavigatableForItem(item: SeItem): Navigatable? =
-    getDataFromElementInfo(PlatformCoreDataKeys.NAVIGATABLE.name, item) as? Navigatable
+    getDataFromElementInfo(PlatformCoreDataKeys.NAVIGATABLE, item)
 
   protected fun getSupportedCommandsFromContributor(): List<SeCommandInfo> {
     return contributor.supportedCommands.map { commandInfo -> SeCommandInfoFactory().create(commandInfo, id) }
   }
 
-  private fun getDataFromElementInfo(dataId: String, item: SeItem): Any? {
+  private fun <T : Any> getDataFromElementInfo(key: DataKey<T>, item: SeItem): T? {
     if (item !is SeLegacyItem) return null
 
     @Suppress("UNCHECKED_CAST")
-    val contributor = item.contributor as? SearchEverywhereContributor<Any>
-    return contributor?.getDataForItem(item.rawObject, dataId)
+    val contributor = item.contributor as? SearchEverywhereContributor<Any> ?: return null
+    val ctx = CustomizedDataContext.withSnapshot(DataContext.EMPTY_CONTEXT) { sink ->
+      contributor.addDataForItem(item.rawObject, sink)
+    }
+    return ctx.getData(key)
   }
 
   override fun dispose() {

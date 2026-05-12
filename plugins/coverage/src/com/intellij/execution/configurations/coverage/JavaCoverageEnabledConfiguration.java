@@ -24,7 +24,6 @@ import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -83,7 +82,7 @@ public final class JavaCoverageEnabledConfiguration extends CoverageEnabledConfi
       CoverageLogger.logStarted(runner, suite.isBranchCoverage(), suite.isCoverageByTestEnabled(),
                                 patterns == null ? 0 : patterns.length,
                                 excludePatterns == null ? 0 : excludePatterns.length);
-      javaCoverageRunner.appendCoverageArgument(new File(path).getAbsolutePath(),
+      javaCoverageRunner.appendCoverageArgument(Path.of(path).toAbsolutePath().toString(),
                                                 patterns,
                                                 excludePatterns,
                                                 javaParameters,

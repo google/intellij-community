@@ -16,6 +16,7 @@ create_kotlinc_options(
 
 jvm_library(
   name = "tests",
+  module_name = "kotlin.core.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -27,6 +28,7 @@ jvm_library(
     "//libraries/guava",
     "@lib//:kotlinc-kotlin-compiler-common",
     "@lib//:kotlinc-kotlin-compiler-fe10",
+    "//plugins/kotlin/base/fe10/project-structure",
     "@lib//:kotlinc-kotlin-script-runtime",
     "//plugins/kotlin/base/plugin",
     "//plugins/kotlin/base/project-structure",
@@ -53,6 +55,7 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "kotlin.core.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -71,6 +74,8 @@ jvm_library(
     "@lib//:kotlin-test",
     "@lib//:kotlinc-kotlin-compiler-common",
     "@lib//:kotlinc-kotlin-compiler-fe10",
+    "//plugins/kotlin/base/fe10/project-structure",
+    "//plugins/kotlin/base/fe10/project-structure:project-structure_test_lib",
     "@lib//:kotlinc-kotlin-script-runtime",
     "//plugins/kotlin/plugin/k1",
     "//plugins/kotlin/plugin/k1:k1_test_lib",
@@ -113,10 +118,18 @@ jvm_library(
     "//platform/code-style-impl:codeStyle-impl_test_lib",
     "//java/manifest",
     "//java/manifest:manifest_test_lib",
+    "//plugins/kotlin/base/fe10/analysis",
+    "//plugins/kotlin/base/fe10/analysis:analysis_test_lib",
   ],
   runtime_deps = [":tests"]
 )
 ### auto-generated section `build kotlin.core.tests` end
+
+### auto-generated section `iml kotlin.core.tests` start
+exports_files([
+  "kotlin.core.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.core.tests` end
 
 ### auto-generated section `test kotlin.core.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

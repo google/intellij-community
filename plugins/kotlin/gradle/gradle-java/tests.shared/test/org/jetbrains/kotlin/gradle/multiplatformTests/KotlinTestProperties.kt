@@ -29,6 +29,12 @@ class TestVersion<T : Any>(
         }
         return super.equals(other)
     }
+
+    override fun hashCode(): Int {
+        var result = version.hashCode()
+        result = 31 * result + (alias?.hashCode() ?: 0)
+        return result
+    }
 }
 
 abstract class KotlinTestProperties {
@@ -267,8 +273,13 @@ class KotlinMppTestProperties(
                 MinimalSupportConfiguration("1.7", "org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_7")
             } else if (kotlinVersion < KotlinGradlePluginVersions.V_2_3_0) {
                 MinimalSupportConfiguration("1.8", "org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_8")
-            } else {
+            } else if (
+                // replace with KotlinGradlePluginVersions.V_2_4_0 this after KotlinGradlePluginVersions.latest moves to a 2.4.20 dev version
+                kotlinVersion < KotlinToolingVersion("2.4.0-dev-8449")
+            ) {
                 MinimalSupportConfiguration("1.9", "org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_9")
+            } else {
+                MinimalSupportConfiguration("2.0", "org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0")
             }
         }
 

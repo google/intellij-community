@@ -1,34 +1,37 @@
 ### auto-generated section `build intellij.libraries.jackson.module.kotlin` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "libraries-jackson-module-kotlin_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "libraries-jackson-module-kotlin",
+  module_name = "intellij.libraries.jackson.module.kotlin",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
-  resources = [":libraries-jackson-module-kotlin_resources"],
-  exports = ["@lib//:jackson-module-kotlin"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
+  exports = ["@lib//:libraries-jackson-module-kotlin-jackson-module-kotlin"],
   runtime_deps = [
-    "@lib//:jackson-module-kotlin",
+    "@lib//:libraries-jackson-module-kotlin-jackson-module-kotlin",
     "//libraries/jackson/jackson",
   ]
 )
 
 jvm_library(
   name = "libraries-jackson-module-kotlin_test_lib",
+  testonly = True,
   module_name = "intellij.libraries.jackson.module.kotlin",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   kotlinc_opts = "@community//:k8",
-  exports = ["@lib//:jackson-module-kotlin"],
+  exports = ["@lib//:libraries-jackson-module-kotlin-jackson-module-kotlin"],
   runtime_deps = [
     ":libraries-jackson-module-kotlin",
     "//libraries/jackson/jackson:jackson_test_lib",
   ]
 )
 ### auto-generated section `build intellij.libraries.jackson.module.kotlin` end
+
+### auto-generated section `iml intellij.libraries.jackson.module.kotlin` start
+exports_files([
+  "intellij.libraries.jackson.module.kotlin.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.libraries.jackson.module.kotlin` end

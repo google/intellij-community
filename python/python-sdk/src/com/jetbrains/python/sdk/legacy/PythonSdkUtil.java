@@ -13,21 +13,20 @@ import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileSystemUtil;
 import com.intellij.openapi.util.io.FileUtil;
-import com.intellij.openapi.vfs.StandardFileSystems;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.PlatformUtils;
-import com.intellij.util.SlowOperations;
 import com.intellij.util.SystemProperties;
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
 import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.python.PyNames;
 import com.jetbrains.python.module.PyModuleService;
-import com.jetbrains.python.sdk.CustomSdkHomePattern;
 import com.jetbrains.python.sdk.PyRemoteSdkAdditionalDataMarker;
 import com.jetbrains.python.sdk.PySdkUtil;
+import com.jetbrains.python.sdk.PythonEnvironment;
+import com.jetbrains.python.sdk.PythonEnvironmentKt;
 import com.jetbrains.python.venvReader.VirtualEnvReaderKt;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Contract;
@@ -53,6 +52,7 @@ import java.util.stream.Collectors;
 public final class PythonSdkUtil {
 
   public static final String REMOTE_SOURCES_DIR_NAME = "remote_sources";
+
   /**
    * Name of directory where skeleton files (despite the value) are stored.
    */
@@ -61,7 +61,6 @@ public final class PythonSdkUtil {
    * In which root type built-in skeletons are put.
    */
   public static final OrderRootType BUILTIN_ROOT_TYPE = OrderRootType.CLASSES;
-  static final String[] WINDOWS_EXECUTABLE_SUFFIXES = {"cmd", "exe", "bat", "com"};
   private static final Predicate<Sdk> REMOTE_SDK_PREDICATE = PythonSdkUtil::isRemote;
 
   public static boolean isPythonSdk(@NotNull Sdk sdk) {
@@ -85,7 +84,9 @@ public final class PythonSdkUtil {
    * @return PyCharm with Pro mode disabled
    */
   public static boolean isFreeTier() {
-    return PlatformUtils.isPyCharm() && (!PlatformUtils.isDataSpell()) && PluginManagerCore.isDisabled(PluginManagerCore.ULTIMATE_PLUGIN_ID);
+    return PlatformUtils.isPyCharm() &&
+           (!PlatformUtils.isDataSpell()) &&
+           PluginManagerCore.isDisabled(PluginManagerCore.ULTIMATE_PLUGIN_ID);
   }
 
   public static @Unmodifiable @NotNull List<@NotNull Sdk> getAllSdks() {
@@ -96,11 +97,15 @@ public final class PythonSdkUtil {
     return ContainerUtil.filter(ProjectJdkTable.getInstance().getAllJdks(), sdk -> isPythonSdk(sdk, allowRemoteInFreeTier));
   }
 
+  /**
+   * Consider to use suspended {@link com.jetbrains.python.sdk.ModuleExKt#findPythonSdk} instead, it waits for project model to be ready
+   */
+  @ApiStatus.Obsolete
   public static @Nullable Sdk findPythonSdk(@Nullable Module module) {
     if (module == null || module.isDisposed()) {
       return null;
     }
-    var sdk = PyModuleService.getInstance().findPythonSdk(module);
+    var sdk = PyModuleService.getInstance(module.getProject()).findPythonSdk(module);
     if (sdk != null && isPythonSdk(sdk)) {
       return sdk;
     }
@@ -250,57 +255,6 @@ public final class PythonSdkUtil {
     return null;
   }
 
-  /**
-   * @param binaryPath must point to a Python interpreter
-   * @return if the surroundings look like a virtualenv installation, its root is returned (normally the grandparent of binaryPath).
-   */
-  @RequiresBackgroundThread(generateAssertion = false)
-  public static @Nullable File getVirtualEnvRoot(final @NotNull String binaryPath) {
-    SlowOperations.assertSlowOperationsAreAllowed();
-    final File bin = new File(binaryPath).getParentFile();
-    if (bin != null) {
-      final String rootPath = bin.getParent();
-      if (rootPath != null) {
-        final File root = new File(rootPath);
-        final File activateThis = new File(bin, "activate_this.py");
-        // binaryPath should contain an 'activate' script, and root should have bin (with us) and include and libp
-        if (activateThis.exists()) {
-          final File activate = findExecutableFile(bin, "activate");
-          if (activate != null) {
-            return root;
-          }
-        }
-        // Python 3.3 virtualenvs can be found as described in PEP 405
-        if (new File(root, "pyvenv.cfg").exists()) {
-          return root;
-        }
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Finds a file that looks executable: an .exe or .cmd under windows, plain file under *nix.
-   *
-   * @param parent directory to look at
-   * @param name   name of the executable without suffix
-   * @return File representing the executable, or null.
-   */
-  public static @Nullable File findExecutableFile(File parent, String name) {
-    if (SystemInfo.isWindows) {
-      for (String suffix : WINDOWS_EXECUTABLE_SUFFIXES) {
-        File file = new File(parent, name + "." + suffix);
-        if (file.exists()) return file;
-      }
-    }
-    else if (SystemInfo.isUnix) {
-      File file = new File(parent, name);
-      if (file.exists()) return file;
-    }
-    return null;
-  }
-
-
   public static @Nullable Sdk findSdkByKey(@NotNull String key) {
     return ProjectJdkTable.getInstance().findJdk(key);
   }
@@ -336,94 +290,12 @@ public final class PythonSdkUtil {
     return null;
   }
 
-  @RequiresBackgroundThread(generateAssertion = false)
-  public static boolean isVirtualEnv(@NotNull Sdk sdk) {
-    final String path = sdk.getHomePath();
-    return isVirtualEnv(path);
-  }
-
+  @Deprecated(forRemoval = true)
   @Contract("null -> false")
   public static boolean isVirtualEnv(@Nullable String path) {
-    return path != null && getVirtualEnvRoot(path) != null;
-  }
-
-  @RequiresBackgroundThread(generateAssertion = false)
-  public static @Nullable VirtualFile getCondaDirectory(@NotNull Sdk sdk) {
-    final VirtualFile homeDirectory = sdk.getHomeDirectory();
-    if (homeDirectory == null) return null;
-    if (SystemInfo.isWindows) return homeDirectory.getParent();
-    return homeDirectory.getParent().getParent();
-  }
-
-  @RequiresBackgroundThread(generateAssertion = false)
-  public static boolean isCondaVirtualEnv(@NotNull Sdk sdk) {
-    return isCondaVirtualEnv(sdk.getHomePath());
-  }
-
-  @RequiresBackgroundThread(generateAssertion = false)
-  public static boolean isCondaVirtualEnv(@Nullable String sdkPath) {
-    SlowOperations.assertSlowOperationsAreAllowed();
-    final VirtualFile condaMeta = findCondaMeta(sdkPath);
-    if (condaMeta == null) {
-      return false;
-    }
-    final VirtualFile envs = condaMeta.getParent().findChild("envs");
-    return envs == null;
-  }
-
-  /**
-   * @deprecated Check sdk flavour instead
-   */
-  @Deprecated
-  // Conda virtual environment and base conda
-  public static boolean isConda(@NotNull Sdk sdk) {
-    return isConda(sdk.getHomePath());
-  }
-
-  /**
-   * @deprecated flavour instead
-   */
-  @Deprecated
-  public static boolean isConda(@Nullable String sdkPath) {
-    return findCondaMeta(sdkPath) != null;
-  }
-
-  /**
-   * @deprecated flavour instead
-   */
-  @Deprecated
-  public static boolean isBaseConda(@Nullable String sdkPath) {
-    final VirtualFile condaMeta = findCondaMeta(sdkPath);
-    if (condaMeta == null) {
-      return false;
-    }
-    final VirtualFile parent = condaMeta.getParent();
-    if (parent == null) {
-      return false;
-    }
-    final VirtualFile condaBin = parent.findChild("condabin");
-    if (condaBin != null) {
-      return true;
-    }
-    return parent.findChild("envs") != null;
-  }
-
-  @RequiresBackgroundThread(generateAssertion = false)
-  public static @Nullable VirtualFile findCondaMeta(@Nullable String sdkPath) {
-    SlowOperations.assertSlowOperationsAreAllowed();
-    if (sdkPath == null || CustomSdkHomePattern.isCustomPythonSdkHomePath(sdkPath)) {
-      return null;
-    }
-    final VirtualFile homeDirectory = StandardFileSystems.local().findFileByPath(sdkPath);
-    if (homeDirectory == null) {
-      return null;
-    }
-    VirtualFile parentDirectory = homeDirectory.getParent();
-    if (parentDirectory == null) {
-      return null;
-    }
-    final VirtualFile condaParent = SystemInfo.isWindows ? parentDirectory
-                                                         : parentDirectory.getParent();
-    return condaParent != null ? condaParent.findChild("conda-meta") : null;
+    if (path == null) return false;
+    var envResult = PythonEnvironmentKt.detectPythonEnvironment(Path.of(path));
+    var env = envResult.getSuccessOrNull();
+    return env instanceof PythonEnvironment.Venv;
   }
 }

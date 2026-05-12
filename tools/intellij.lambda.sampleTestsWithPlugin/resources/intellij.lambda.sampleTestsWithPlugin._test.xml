@@ -1,2 +1,5 @@
 <idea-plugin>
+  <dependencies>
+    <module name="intellij.libraries.assertj.core"/>
+  </dependencies>
 </idea-plugin>

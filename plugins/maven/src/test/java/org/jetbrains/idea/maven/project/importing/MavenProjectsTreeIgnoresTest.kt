@@ -13,7 +13,7 @@ class MavenProjectsTreeIgnoresTest : MavenProjectsTreeTestCase() {
 
   override fun setUp() = runBlocking {
     super.setUp()
-    tree.addListener(MyLoggingListener(), getTestRootDisposable())
+    project.messageBus.connect(getTestRootDisposable()).subscribe(MavenProjectsTree.Listener.TOPIC, MyLoggingListener())
     val m1 = createModulePom("m1",
                              """
                                        <groupId>test</groupId>

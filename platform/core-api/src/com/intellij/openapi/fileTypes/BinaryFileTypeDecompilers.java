@@ -7,7 +7,11 @@ import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.extensions.ExtensionPointName;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.util.Computable;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.KeyedLazyInstance;
+import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @see BinaryFileDecompiler
@@ -31,5 +35,52 @@ public final class BinaryFileTypeDecompilers extends FileTypeExtension<BinaryFil
 
   public static BinaryFileTypeDecompilers getInstance() {
     return ApplicationManager.getApplication().getService(BinaryFileTypeDecompilers.class);
+  }
+
+  /**
+   * Allows executing a computation while temporarily enabling decompilation on the Event Dispatch Thread (EDT).
+   * For the duration of the computation, decompilation on EDT is allowed, and it is automatically disabled
+   * afterward, ensuring thread safety and proper cleanup.
+   *
+   * @param computation the computation to be executed with decompilation on EDT permitted.
+   *                    Must not be null.
+   * @return the result of the computation.
+   * @deprecated Redesign the logic - move to BGT with the progress-bar.
+   */
+  @ApiStatus.Internal
+  @Deprecated
+  public <T> T allowDecompilerSlowOperation(@NotNull Computable<T> computation) {
+    allowDecompilerSlowOperation(true);
+    try {
+      return computation.compute();
+    }
+    finally {
+      allowDecompilerSlowOperation(false);
+    }
+  }
+
+  /**
+   * Determines if a given file is a binary file and has a corresponding decompiler.
+   *
+   * @param file the virtual file to check; must not be null.
+   * @return {@code true} if the file is binary and has an associated decompiler; {@code false} otherwise.
+   */
+  @ApiStatus.Experimental
+  public boolean hasDecompiler(@NotNull VirtualFile file) {
+    FileType type = file.getFileType();
+    return type.isBinary() && forFileType(type) != null;
+  }
+
+  private final ThreadLocal<Boolean> myAllowDecompileOnEDT = ThreadLocal.withInitial(() -> false);
+
+  @ApiStatus.Internal
+  public boolean isAllowedDecompilerSlowOperation() {
+    return myAllowDecompileOnEDT.get();
+  }
+
+  private void allowDecompilerSlowOperation(boolean enabled) {
+    boolean oldValue = myAllowDecompileOnEDT.get();
+    assert oldValue != enabled : "Non-paired myAllowDecompileOnEDT mode";
+    myAllowDecompileOnEDT.set(enabled);
   }
 }

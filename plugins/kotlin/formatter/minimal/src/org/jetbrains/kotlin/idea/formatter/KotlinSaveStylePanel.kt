@@ -6,10 +6,10 @@ import com.intellij.application.options.CodeStyleAbstractPanel
 import com.intellij.openapi.editor.colors.EditorColorsScheme
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.psi.codeStyle.CodeStyleSettings
-import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.panels.HorizontalLayout
 import com.intellij.ui.components.panels.VerticalLayout
+import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import org.jetbrains.annotations.Nls
@@ -56,7 +56,7 @@ internal class KotlinSaveStylePanel(settings: CodeStyleSettings) : CodeStyleAbst
                             saveDefaultsComboBox.addItem(it)
                         }
 
-                        saveDefaultsComboBox.renderer = SimpleListCellRenderer.create("") {
+                        saveDefaultsComboBox.renderer = textListCellRenderer("") {
                             it.label
                         }
 

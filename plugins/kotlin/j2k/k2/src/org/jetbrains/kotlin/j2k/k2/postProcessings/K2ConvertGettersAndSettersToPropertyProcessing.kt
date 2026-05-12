@@ -251,8 +251,8 @@ private class PropertiesDataCollector(private val searcher: JKInMemoryFilesSearc
         return propertyDataList
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun collectPropertyData(klass: KtClassOrObject, propertyInfoGroup: List<PropertyInfo>): PropertyData? {
         val property = propertyInfoGroup.firstIsInstanceOrNull<RealProperty>()
         val getter = propertyInfoGroup.firstIsInstanceOrNull<RealGetter>()

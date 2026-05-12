@@ -42,8 +42,8 @@ object ConvertToBlockBodyUtils {
     fun isConvertibleByPsi(element: KtDeclarationWithBody): Boolean =
         (element is KtNamedFunction || element is KtPropertyAccessor) && !element.hasBlockBody() && element.hasBody()
 
-    context(session: KaSession)
     @OptIn(KaExperimentalApi::class, KaContextParameterApi::class)
+    context(session: KaSession)
     fun createContext(
         declaration: KtDeclarationWithBody,
         reformat: Boolean,

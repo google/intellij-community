@@ -3,12 +3,14 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tests",
+  module_name = "intellij.textmate.core.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "intellij.textmate.core.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "srcMultiplatform/**/*.kt", "srcMultiplatform/**/*.java", "srcMultiplatform/**/*.form"], allow_empty = True),
@@ -34,6 +36,12 @@ jvm_library(
   runtime_deps = [":tests"]
 )
 ### auto-generated section `build intellij.textmate.core.tests` end
+
+### auto-generated section `iml intellij.textmate.core.tests` start
+exports_files([
+  "intellij.textmate.core.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.textmate.core.tests` end
 
 ### auto-generated section `test intellij.textmate.core.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

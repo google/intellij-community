@@ -12,12 +12,14 @@ create_kotlinc_options(
 
 jvm_library(
   name = "k1",
+  module_name = "kotlin.code-insight.inspections-shared.tests.k1",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "k1_test_lib",
+  testonly = True,
   module_name = "kotlin.code-insight.inspections-shared.tests.k1",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -53,8 +55,8 @@ jvm_library(
     "//plugins/kotlin/base/fe10/plugin:plugin_test_lib",
     "//plugins/kotlin/code-insight/api",
     "//plugins/kotlin/code-insight/api:api_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/code-insight/utils",
     "//plugins/kotlin/code-insight/utils:utils_test_lib",
     "//plugins/kotlin/code-insight/inspections-shared:kotlin-code-insight-inspections-shared",
@@ -88,6 +90,12 @@ jvm_library(
   runtime_deps = [":k1"]
 )
 ### auto-generated section `build kotlin.code-insight.inspections-shared.tests.k1` end
+
+### auto-generated section `iml kotlin.code-insight.inspections-shared.tests.k1` start
+exports_files([
+  "kotlin.code-insight.inspections-shared.tests.k1.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.code-insight.inspections-shared.tests.k1` end
 
 ### auto-generated section `test kotlin.code-insight.inspections-shared.tests.k1` start
 load("@community//build:tests-options.bzl", "jps_test")

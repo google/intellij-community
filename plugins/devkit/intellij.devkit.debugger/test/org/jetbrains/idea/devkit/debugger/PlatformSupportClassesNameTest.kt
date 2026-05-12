@@ -34,4 +34,11 @@ class PlatformSupportClassesNameTest : HeavyPlatformTestCase() {
       boolean inNonCancelableSection
     """.trimIndent(), fields)
   }
+
+  fun testImageDebugUtilMethodsExist() {
+    val clazz = Class.forName(IMAGE_DEBUG_SUPPORT_FQN)
+    Assert.assertNotNull(clazz.getDeclaredMethod(IMAGE_TO_BYTES_METHOD, java.awt.Image::class.java))
+    Assert.assertNotNull(clazz.getDeclaredMethod(ICON_TO_BYTES_METHOD, javax.swing.Icon::class.java))
+    Assert.assertNotNull(clazz.getDeclaredMethod(ICON_TO_BYTES_PREVIEW_METHOD, javax.swing.Icon::class.java, Int::class.javaPrimitiveType))
+  }
 }

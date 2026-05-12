@@ -8,20 +8,37 @@ import com.intellij.navigation.SymbolNavigationService
 import com.intellij.openapi.project.Project
 import com.intellij.platform.backend.navigation.NavigationTarget
 import com.intellij.polySymbols.PolySymbol
+import com.intellij.polySymbols.utils.PolySymbolDeclaredInPsi
 import com.intellij.psi.PsiElement
 
 /**
- * Should be implemented by [PolySymbol] if its declaration is a regular [com.intellij.psi.PsiElement], e.g. a variable or a declared type.
- * Once a symbol implements this interface it can be searched and refactored together with the PSI element declaration.
- * If your symbol is part of a [com.intellij.psi.PsiElement] (e.g. part of a string literal), or spans multiple PSI elements,
+ * This interface servers as a bridge between Symbol-based functionality and the old
+ * PSI-based functionality. Implementing this interface on a [PolySymbol] links it directly
+ * to the [PsiElement] returned by the [source] property.
+ *
+ * If your symbol is part of a [PsiElement] (e.g. part of a string literal), or spans multiple PSI elements,
  * or does not relate 1-1 with a PSI element, instead of implementing this interface you should contribute
- * dedicated declaration provider.
+ * dedicated declaration provider ([com.intellij.polySymbols.declarations.PolySymbolDeclarationProvider]).
+ *
+ * When a [PsiElement] usages are being searched for, or the element is being renamed,
+ * any references, which resolve to a [PolySymbolDeclaredInPsi], of which [source]
+ * property is equivalent to the [PsiElement], are recognized as references to the symbol
+ * and are being returned as usages, or rename usages.
+ *
+ * It works the other way too, so if a usage search or rename is performed on a reference
+ * to a [PolySymbolDeclaredInPsi], the usage search or rename is also run for [source].
+ *
+ * The PolySymbol, which implements this interface, should not override [renameTarget] or
+ * [searchTarget] properties, as the framework already handles this functionality.
  *
  * To properly support search and rename refactoring for symbols, which names can be modified
  * by [com.intellij.polySymbols.query.PolySymbolNameConversionRules], a `PsiSourcedPolySymbolProvider`
  * should be implemented to allow the framework to search for alternative names.
  *
  * See also: [Declarations, References, Search, Refactoring](https://plugins.jetbrains.com/docs/intellij/websymbols-implementation.html#declarations-references-search-refactoring)
+ *
+ * @see [PolySymbolDeclaredInPsi]
+ *
  */
 interface PsiSourcedPolySymbol : PolySymbol {
 

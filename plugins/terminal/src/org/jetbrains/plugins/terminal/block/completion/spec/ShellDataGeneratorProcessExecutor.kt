@@ -1,7 +1,7 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.terminal.block.completion.spec
 
-import com.intellij.terminal.completion.spec.ShellCommandResult
+import com.intellij.terminal.completion.spec.ProcessExecutionResult
 import org.jetbrains.annotations.ApiStatus
 
 /**
@@ -10,7 +10,7 @@ import org.jetbrains.annotations.ApiStatus
  */
 @ApiStatus.Experimental
 interface ShellDataGeneratorProcessExecutor {
-  suspend fun executeProcess(options: ShellDataGeneratorProcessOptions): ShellCommandResult
+  suspend fun executeProcess(options: ShellDataGeneratorProcessOptions): ProcessExecutionResult
 }
 
 @ApiStatus.Experimental

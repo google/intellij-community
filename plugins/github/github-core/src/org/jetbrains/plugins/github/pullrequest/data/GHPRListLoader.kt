@@ -12,12 +12,9 @@ import com.intellij.collaboration.util.SingleCoroutineLauncher
 import com.intellij.platform.util.coroutines.childScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import org.jetbrains.plugins.github.api.GHGQLRequests
 import org.jetbrains.plugins.github.api.GHRepositoryCoordinates
 import org.jetbrains.plugins.github.api.GHRepositoryPath
@@ -66,10 +63,6 @@ internal class GHPRListLoader(
   val loadedData: StateFlow<List<GHPullRequestShort>> = dataStateFlow.mapState { it.getOrNull() ?: listOf() }
   val error: StateFlow<Throwable?> = loader.resultOrErrorFlow.map { it.exceptionOrNull() }.stateInNow(cs, null)
   val isLoading: StateFlow<Boolean> = loader.isBusyFlow
-  val refreshOrReloadRequests: Flow<Unit> = channelFlow {
-    launch { reloadRequests.collect { send(it) } }
-    launch { refreshRequests.collect { send(it) } }
-  }
 
   fun tryLoadMore() {
     requestMoreLauncher.launch {

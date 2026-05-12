@@ -4,6 +4,7 @@ package org.jetbrains.idea.devkit.kotlin.inspections
 import com.intellij.psi.PsiElement
 import org.jetbrains.idea.devkit.inspections.CancellationExceptionHandlingChecker
 import org.jetbrains.idea.devkit.kotlin.util.getContext
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotationValue
@@ -26,7 +27,8 @@ internal class KtCancellationExceptionHandlingChecker : CancellationExceptionHan
     if (getContext(parameter).isSuspending()) {
       analyze(parameter) {
         val catchParameterType = parameter.typeReference?.type ?: return false
-        val cancellationException = buildClassType(cancellationExceptionClassId)
+        @OptIn(KaExperimentalApi::class)
+        val cancellationException = typeCreator.classType(cancellationExceptionClassId)
         return catchParameterType.semanticallyEquals(cancellationException)
       }
     }
@@ -71,7 +73,8 @@ internal class KtCancellationExceptionHandlingChecker : CancellationExceptionHan
       .any { it.type.semanticallyEquals(buildCancellationExceptionType()) }
   }
 
+  @OptIn(KaExperimentalApi::class)
   private fun KaSession.buildCancellationExceptionType(): KaType =
-    buildClassType(cancellationExceptionClassId)
+    typeCreator.classType(cancellationExceptionClassId)
 
 }

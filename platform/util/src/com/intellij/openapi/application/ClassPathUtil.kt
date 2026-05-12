@@ -11,6 +11,7 @@ import com.intellij.util.text.CharArrayCharSequence
 import com.sun.jna.TypeMapper
 import com.sun.jna.platform.FileUtils
 import it.unimi.dsi.fastutil.objects.Object2IntMap
+import kotlinx.serialization.StringFormat
 import kotlinx.serialization.json.JsonElement
 import net.jpountz.lz4.LZ4Factory
 import org.apache.log4j.Appender
@@ -61,7 +62,8 @@ object ClassPathUtil {
       LZ4Factory::class.java,  // LZ4-Java
       ReaderConfig::class.java,  // Aalto XML
       XMLStreamReader2::class.java,  // Aalto XML
-      JsonElement::class.java,  // kotlinx-serialization
+      StringFormat::class.java,  // kotlinx-serialization-core
+      JsonElement::class.java,  // kotlinx-serialization-json
       Pair::class.java // Kotlin stdlib
     )
   }

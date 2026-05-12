@@ -86,13 +86,15 @@ import com.intellij.ui.ComboboxSpeedSearch;
 import com.intellij.ui.GuiUtils;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.ScrollPaneFactory;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.SortedComboBoxModel;
 import com.intellij.ui.TitledSeparator;
 import com.intellij.ui.TreeUIHelper;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBList;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
+import com.intellij.ui.dsl.listCellRenderer.LcrJavaHelper;
+import com.intellij.ui.dsl.listCellRenderer.RendererPresentation;
 import com.intellij.ui.tabs.JBTabs;
 import com.intellij.ui.tabs.JBTabsFactory;
 import com.intellij.ui.tabs.TabInfo;
@@ -609,12 +611,10 @@ public class PsiViewerDialog extends DialogWrapper implements UiDataProvider {
 
     myFileTypeComboBox.setSwingPopup(false);
     myFileTypeComboBox.setModel(new CollectionComboBoxModel<>(new ArrayList<>(mySourceWrappers), lastUsed));
-    myFileTypeComboBox.setRenderer(SimpleListCellRenderer.create((label, value, index) -> {
-      if (value != null) {
-        label.setText(value.getText());
-        label.setIcon(value.getIcon());
-      }
-    }));
+    myFileTypeComboBox.setRenderer(LcrJavaHelper.create(
+      "",
+      value -> new RendererPresentation(value.getIcon(), value.getText())
+    ));
     ComboboxSpeedSearch search1 = new ComboboxSpeedSearch(myFileTypeComboBox, null) {
       @Override
       protected String getElementText(Object element) {
@@ -622,14 +622,14 @@ public class PsiViewerDialog extends DialogWrapper implements UiDataProvider {
       }
     };
     search1.setupListeners();
-    myFileTypeComboBox.addActionListener(__ -> {
+    myFileTypeComboBox.addActionListener(_ -> {
       WriteIntentReadAction.run(() -> {
         updateDialectsCombo(null);
         updateExtensionsCombo();
         rebuildPsiAndUpdateEditor();
       });
     });
-    myDialectComboBox.addActionListener(__ -> WriteIntentReadAction.run(() -> rebuildPsiAndUpdateEditor()));
+    myDialectComboBox.addActionListener(_ -> WriteIntentReadAction.run(() -> rebuildPsiAndUpdateEditor()));
     ComboboxSpeedSearch search = new ComboboxSpeedSearch(myDialectComboBox, null) {
       @Override
       protected String getElementText(Object element) {
@@ -642,24 +642,24 @@ public class PsiViewerDialog extends DialogWrapper implements UiDataProvider {
       myFileTypeComboBox.setSelectedIndex(0);
     }
 
-    myDialectComboBox.setRenderer(SimpleListCellRenderer.create(DevPsiViewerBundle.message("label.none"), value -> value.getDisplayName()));
+    myDialectComboBox.setRenderer(BuilderKt.textListCellRenderer(DevPsiViewerBundle.message("label.none"), value -> value.getDisplayName()));
     myDialectComboBox.addFocusListener(new AutoExpandFocusListener(myDialectComboBox));
-    myExtensionComboBox.setRenderer(SimpleListCellRenderer.create("", value -> "." + value)); //NON-NLS
+    myExtensionComboBox.setRenderer(BuilderKt.textListCellRenderer("", value -> "." + value)); //NON-NLS
     myExtensionComboBox.addFocusListener(new AutoExpandFocusListener(myExtensionComboBox));
-    myExtensionComboBox.addActionListener(__ -> WriteIntentReadAction.run(() -> rebuildPsiAndUpdateEditor()));
+    myExtensionComboBox.addActionListener(_ -> WriteIntentReadAction.run(() -> rebuildPsiAndUpdateEditor()));
 
-    myShowWhiteSpacesBox.addActionListener(__ -> {
+    myShowWhiteSpacesBox.addActionListener(_ -> {
       myTreeStructure.setShowWhiteSpaces(myShowWhiteSpacesBox.isSelected());
       myStructureTreeModel.invalidateAsync();
     });
-    myShowTreeNodesCheckBox.addActionListener(__ -> {
+    myShowTreeNodesCheckBox.addActionListener(_ -> {
       myTreeStructure.setShowTreeNodes(myShowTreeNodesCheckBox.isSelected());
       myStructureTreeModel.invalidateAsync();
     });
-    myShowEmptyPropertiesCheckBox.addActionListener(__ -> {
+    myShowEmptyPropertiesCheckBox.addActionListener(_ -> {
       myPsiViewerPropertiesTabViewModel.setShowEmptyProperties(myShowEmptyPropertiesCheckBox.isSelected());
     });
-    myUpdatePsiTreeCheckbox.addActionListener(__ -> {
+    myUpdatePsiTreeCheckbox.addActionListener(_ -> {
       var isSelected = myUpdatePsiTreeCheckbox.isSelected();
       settings.updatePsiTreeOnChanges = isSelected;
       if (isSelected) {
@@ -730,15 +730,15 @@ public class PsiViewerDialog extends DialogWrapper implements UiDataProvider {
   private void registerCustomKeyboardActions() {
     int mask = ClientSystemInfo.isMac() ? InputEvent.META_DOWN_MASK : InputEvent.ALT_DOWN_MASK;
 
-    registerKeyboardAction(__ -> focusEditor(), KeyStroke.getKeyStroke(KeyEvent.VK_T, mask));
+    registerKeyboardAction(_ -> focusEditor(), KeyStroke.getKeyStroke(KeyEvent.VK_T, mask));
 
-    registerKeyboardAction(__ -> focusTree(), KeyStroke.getKeyStroke(KeyEvent.VK_S, mask));
+    registerKeyboardAction(_ -> focusTree(), KeyStroke.getKeyStroke(KeyEvent.VK_S, mask));
 
-    registerKeyboardAction(__ -> myBlockTree.focusTree(), KeyStroke.getKeyStroke(KeyEvent.VK_K, mask));
+    registerKeyboardAction(_ -> myBlockTree.focusTree(), KeyStroke.getKeyStroke(KeyEvent.VK_K, mask));
 
-    registerKeyboardAction(__ -> focusRefs(), KeyStroke.getKeyStroke(KeyEvent.VK_R, mask));
+    registerKeyboardAction(_ -> focusRefs(), KeyStroke.getKeyStroke(KeyEvent.VK_R, mask));
 
-    registerKeyboardAction(__ -> {
+    registerKeyboardAction(_ -> {
       if (myRefs.isFocusOwner()) {
         myBlockTree.focusTree();
       }

@@ -112,9 +112,6 @@ f:com.intellij.concurrency.JobSchedulerImpl
 c:com.intellij.concurrency.SensitiveProgressWrapper
 - com.intellij.openapi.progress.util.ProgressWrapper
 - <init>(com.intellij.openapi.progress.ProgressIndicator):V
-c:com.intellij.core.CoreASTFactory
-- com.intellij.lang.DefaultASTFactoryImpl
-- <init>():V
 f:com.intellij.core.CoreFileTypeRegistry
 - com.intellij.openapi.fileTypes.FileTypeRegistry
 - <init>():V
@@ -369,7 +366,6 @@ f:com.intellij.ide.plugins.PluginManager
 - enablePlugin(com.intellij.openapi.extensions.PluginId):Z
 - s:enablePlugin(java.lang.String):Z
 - findEnabledPlugin(com.intellij.openapi.extensions.PluginId):com.intellij.ide.plugins.IdeaPluginDescriptor
-- s:getDisabledPlugins():java.util.List
 - s:getInstance():com.intellij.ide.plugins.PluginManager
 - s:getLoadedPlugins():java.util.List
 - s:getOnceInstalledIfExists():java.nio.file.Path
@@ -379,7 +375,6 @@ f:com.intellij.ide.plugins.PluginManager
 - s:getPlugins():com.intellij.ide.plugins.IdeaPluginDescriptor[]
 - s:isPluginInstalled(com.intellij.openapi.extensions.PluginId):Z
 f:com.intellij.ide.plugins.PluginManagerCore
-- sf:ALL_MODULES_MARKER:com.intellij.openapi.extensions.PluginId
 - sf:CORE_ID:com.intellij.openapi.extensions.PluginId
 - sf:CORE_PLUGIN_ID:java.lang.String
 - sf:DISABLE:java.lang.String
@@ -391,24 +386,13 @@ f:com.intellij.ide.plugins.PluginManagerCore
 - sf:META_INF:java.lang.String
 - sf:PLUGIN_XML:java.lang.String
 - sf:PLUGIN_XML_PATH:java.lang.String
-- sf:SPECIAL_IDEA_PLUGIN_ID:com.intellij.openapi.extensions.PluginId
 - sf:VENDOR_JETBRAINS:java.lang.String
 - sf:VENDOR_JETBRAINS_SRO:java.lang.String
-- s:isIgnoreCompatibility:Z
-- s:isUnitTestMode:Z
-- sf:addDisablePluginListener(java.lang.Runnable):V
 - sf:checkBuildNumberCompatibility(com.intellij.ide.plugins.IdeaPluginDescriptor,com.intellij.openapi.util.BuildNumber):com.intellij.ide.plugins.PluginNonLoadReason
-- sf:disablePlugin(com.intellij.openapi.extensions.PluginId):Z
 - sf:disablePlugin(java.lang.String):Z
-- sf:enablePlugin(com.intellij.openapi.extensions.PluginId):Z
-- sf:enablePlugin(java.lang.String):Z
 - sf:getBuildNumber():com.intellij.openapi.util.BuildNumber
-- sf:getLoadedPlugins():java.util.List
-- sf:getPlugin(com.intellij.openapi.extensions.PluginId):com.intellij.ide.plugins.IdeaPluginDescriptor
 - sf:getPluginByClassName(java.lang.String):com.intellij.openapi.extensions.PluginId
 - sf:getPluginNameAndVendor(com.intellij.ide.plugins.IdeaPluginDescriptor):java.lang.String
-- sf:getPlugins():com.intellij.ide.plugins.IdeaPluginDescriptor[]
-- sf:invalidatePlugins():V
 - sf:isCompatible(com.intellij.ide.plugins.IdeaPluginDescriptor):Z
 - f:isCompatible(com.intellij.ide.plugins.IdeaPluginDescriptor,com.intellij.openapi.util.BuildNumber):Z
 - sf:isDevelopedByJetBrains(com.intellij.openapi.extensions.PluginDescriptor):Z
@@ -819,8 +803,6 @@ c:com.intellij.lexer.StringLiteralLexer
 - p:shouldAllowSlashZero():Z
 - start(java.lang.CharSequence,I,I,I):V
 c:com.intellij.mock.MockComponentManager
-- com.intellij.openapi.Disposable
-- com.intellij.openapi.components.ComponentManager
 - com.intellij.openapi.util.UserDataHolderBase
 - com.intellij.util.messages.MessageBusOwner
 - addComponent(java.lang.Class,java.lang.Object):V
@@ -986,7 +968,6 @@ c:com.intellij.openapi.command.impl.CoreCommandProcessor
 - <init>():V
 - addAffectedDocuments(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Document[]):V
 - addAffectedFiles(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile[]):V
-- addCommandListener(com.intellij.openapi.command.CommandListener):V
 - allowMergeGlobalCommands(java.lang.Runnable):V
 - enterModal():V
 - executeCommand(com.intellij.openapi.project.Project,java.lang.Runnable,java.lang.String,java.lang.Object):V
@@ -1535,11 +1516,7 @@ f:com.intellij.pom.tree.TreeAspect
 - s:getInstance(com.intellij.openapi.project.Project):com.intellij.pom.tree.TreeAspect
 - update(com.intellij.pom.event.PomModelEvent):V
 com.intellij.pom.tree.events.ChangeInfo
-- sf:ADD:S
-- sf:CONTENTS_CHANGED:S
-- sf:REMOVED:S
-- sf:REPLACE:S
-- a:getChangeType():I
+- a:getChangeType():com.intellij.pom.tree.events.ChangeInfoKind
 com.intellij.pom.tree.events.TreeChange
 - a:getAffectedChildren():com.intellij.lang.ASTNode[]
 - a:getChangeByChild(com.intellij.lang.ASTNode):com.intellij.pom.tree.events.ChangeInfo
@@ -1550,7 +1527,7 @@ com.intellij.pom.tree.events.TreeChangeEvent
 - a:getRootElement():com.intellij.lang.ASTNode
 c:com.intellij.pom.tree.events.impl.ChangeInfoImpl
 - com.intellij.pom.tree.events.ChangeInfo
-- getChangeType():I
+- getChangeType():com.intellij.pom.tree.events.ChangeInfoKind
 - getNewChild():com.intellij.lang.ASTNode
 - getNewLength():I
 - getOffsetInParent():I
@@ -1589,7 +1566,6 @@ a:com.intellij.psi.AbstractFileViewProvider
 - pf:isIgnored():Z
 - isPhysical():Z
 - f:markInvalidated():V
-- f:markPossiblyInvalidated():V
 - f:onContentReload():V
 - f:registerAsCopy(com.intellij.psi.AbstractFileViewProvider):V
 - rootChanged(com.intellij.psi.PsiFile):V
@@ -1640,40 +1616,6 @@ a:com.intellij.psi.MultiplePsiFilesPerDocumentFileViewProvider
 f:com.intellij.psi.PlainTextTokenTypes
 - sf:PLAIN_TEXT:com.intellij.psi.tree.IElementType
 - sf:PLAIN_TEXT_FILE:com.intellij.psi.tree.IElementType
-a:com.intellij.psi.PsiAnchor
-- com.intellij.model.Pointer
-- <init>():V
-- s:calcStubIndex(com.intellij.psi.StubBasedPsiElement):I
-- s:create(com.intellij.psi.PsiElement):com.intellij.psi.PsiAnchor
-- s:createStubReference(com.intellij.psi.PsiElement,com.intellij.psi.PsiFile):com.intellij.psi.PsiAnchor$StubIndexReference
-- dereference():com.intellij.psi.PsiElement
-- a:getEndOffset():I
-- a:getFile():com.intellij.psi.PsiFile
-- a:getStartOffset():I
-- s:restoreFromStubIndex(com.intellij.psi.impl.source.PsiFileWithStubSupport,I,com.intellij.psi.tree.IElementType,Z):com.intellij.psi.PsiElement
-- a:retrieve():com.intellij.psi.PsiElement
-- retrieveOrThrow():com.intellij.psi.PsiElement
-c:com.intellij.psi.PsiAnchor$HardReference
-- com.intellij.psi.PsiAnchor
-- <init>(com.intellij.psi.PsiElement):V
-- equals(java.lang.Object):Z
-- getEndOffset():I
-- getFile():com.intellij.psi.PsiFile
-- getStartOffset():I
-- hashCode():I
-- retrieve():com.intellij.psi.PsiElement
-- retrieveOrThrow():com.intellij.psi.PsiElement
-f:com.intellij.psi.PsiAnchor$StubIndexReference
-- com.intellij.psi.PsiAnchor
-- diagnoseNull():java.lang.String
-- equals(java.lang.Object):Z
-- getEndOffset():I
-- getFile():com.intellij.psi.PsiFile
-- getProject():com.intellij.openapi.project.Project
-- getStartOffset():I
-- getVirtualFile():com.intellij.openapi.vfs.VirtualFile
-- hashCode():I
-- retrieve():com.intellij.psi.PsiElement
 f:com.intellij.psi.ReferenceProviderType
 - sf:EP_NAME:java.lang.String
 - <init>(java.lang.String):V
@@ -1923,7 +1865,6 @@ a:com.intellij.psi.impl.PsiDocumentManagerBase
 - isCommitInProgress():Z
 - isCommitted(com.intellij.openapi.editor.Document):Z
 - isDocumentBlockedByPsi(com.intellij.openapi.editor.Document):Z
-- isUncommited(com.intellij.openapi.editor.Document):Z
 - performForCommittedDocument(com.intellij.openapi.editor.Document,java.lang.Runnable):V
 - performLaterWhenAllCommitted(com.intellij.openapi.application.ModalityState,java.lang.Runnable):V
 - performLaterWhenAllCommitted(java.lang.Runnable):V
@@ -2066,7 +2007,6 @@ f:com.intellij.psi.impl.PsiModificationTrackerImpl
 - s:canAffectPsi(com.intellij.psi.impl.PsiTreeChangeEventImpl):Z
 - forLanguage(com.intellij.lang.Language):com.intellij.openapi.util.ModificationTracker
 - forLanguages(java.util.function.Predicate):com.intellij.openapi.util.ModificationTracker
-- getJavaStructureModificationTracker():com.intellij.openapi.util.ModificationTracker
 - getModificationCount():J
 - incCounter():V
 - incOutOfCodeBlockModificationCounter():V
@@ -2422,40 +2362,11 @@ f:com.intellij.psi.impl.meta.MetaRegistry
 - s:getMeta(com.intellij.psi.PsiElement):com.intellij.psi.meta.PsiMetaData
 - s:getMetaBase(com.intellij.psi.PsiElement):com.intellij.psi.meta.PsiMetaData
 - registerMetaData(com.intellij.psi.filters.ElementFilter,java.lang.Class):V
-a:com.intellij.psi.impl.smartPointers.Identikit
-- <init>():V
-- a:findPsiElement(com.intellij.psi.PsiFile,I,I):com.intellij.psi.PsiElement
-- s:fromPsi(com.intellij.psi.PsiElement,com.intellij.lang.Language):com.intellij.psi.impl.smartPointers.Identikit$ByType
-- a:getFileLanguage():com.intellij.lang.Language
-- a:isForPsiFile():Z
-f:com.intellij.psi.impl.smartPointers.Identikit$ByType
-- com.intellij.psi.impl.smartPointers.Identikit
-- equals(java.lang.Object):Z
-- findInside(com.intellij.psi.PsiElement,I,I):com.intellij.psi.PsiElement
-- findPsiElement(com.intellij.psi.PsiFile,I,I):com.intellij.psi.PsiElement
-- getFileLanguage():com.intellij.lang.Language
-- hashCode():I
-- isForPsiFile():Z
 a:com.intellij.psi.impl.smartPointers.SmartPointerAnchorProvider
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
 - <init>():V
 - a:getAnchor(com.intellij.psi.PsiElement):com.intellij.psi.PsiElement
 - a:restoreElement(com.intellij.psi.PsiElement):com.intellij.psi.PsiElement
-f:com.intellij.psi.impl.smartPointers.SmartPointerManagerImpl
-- com.intellij.openapi.Disposable
-- com.intellij.psi.SmartPointerManager
-- <init>(com.intellij.openapi.project.Project):V
-- createSmartPsiElementPointer(com.intellij.psi.PsiElement):com.intellij.psi.SmartPsiElementPointer
-- createSmartPsiElementPointer(com.intellij.psi.PsiElement,com.intellij.psi.PsiFile):com.intellij.psi.SmartPsiElementPointer
-- createSmartPsiElementPointer(com.intellij.psi.PsiElement,com.intellij.psi.PsiFile,Z):com.intellij.psi.SmartPsiElementPointer
-- createSmartPsiFileRangePointer(com.intellij.psi.PsiFile,com.intellij.openapi.util.TextRange):com.intellij.psi.SmartPsiFileRange
-- createSmartPsiFileRangePointer(com.intellij.psi.PsiFile,com.intellij.openapi.util.TextRange,Z):com.intellij.psi.SmartPsiFileRange
-- dispose():V
-- fastenBelts(com.intellij.openapi.vfs.VirtualFile):V
-- getPointersNumber(com.intellij.psi.PsiFile):I
-- pointToTheSameElement(com.intellij.psi.SmartPsiElementPointer,com.intellij.psi.SmartPsiElementPointer):Z
-- removePointer(com.intellij.psi.SmartPsiElementPointer):V
-- updatePointerTargetsAfterReparse(com.intellij.openapi.vfs.VirtualFile):V
 f:com.intellij.psi.impl.source.CharTableImpl
 - com.intellij.util.CharTable
 - <init>():V

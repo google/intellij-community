@@ -10,13 +10,14 @@ Line 4 coverage: FULL
 Hits: 1
 Line 11 coverage: FULL
 Hits: 1
-Line 13 coverage: FULL
-Hits: 1
-Line 15 coverage: PARTIAL
-Hits: 1
+Line 13 coverage: PARTIAL
+Hits: 2
   x == 1
     true hits: 1
     false hits: 0
+Unknown outcome: 1
+Line 15 coverage: FULL
+Hits: 1
 Line 17 coverage: FULL
 Hits: 1
 Line 20 coverage: FULL
@@ -77,43 +78,34 @@ Hits: 1
     false hits: 0
 Line 43 coverage: FULL
 Hits: 1
-Line 47 coverage: FULL
+Line 47 coverage: PARTIAL
 Hits: 2
+Covered 1/2 branches
 Line 49 coverage: FULL
 Hits: 1
-Line 51 coverage: PARTIAL
+Line 51 coverage: FULL
 Hits: 1
-  0 until n
-    true hits: 1
-    false hits: 0
-Line 58 coverage: FULL
+Line 58 coverage: PARTIAL
 Hits: 2
-Line 60 coverage: PARTIAL
+Covered 1/2 branches
+Line 60 coverage: FULL
 Hits: 2
-  elements
-    true hits: 1
-    false hits: 0
-Unknown outcome: 1
 Line 67 coverage: FULL
 Hits: 1
-Line 69 coverage: FULL
+Line 69 coverage: PARTIAL
+Hits: 2
+Covered 1/2 branches
+Line 71 coverage: FULL
 Hits: 1
-Line 71 coverage: PARTIAL
-Hits: 1
-  i < n
-    true hits: 0
-    false hits: 1
 Line 79 coverage: FULL
 Hits: 1
 Line 81 coverage: FULL
 Hits: 1
-Line 84 coverage: FULL
+Line 84 coverage: PARTIAL
+Hits: 2
+Covered 1/2 branches
+Line 86 coverage: FULL
 Hits: 1
-Line 86 coverage: PARTIAL
-Hits: 1
-  i++ < n
-    true hits: 0
-    false hits: 1
 Line 90 coverage: FULL
 Hits: 2
 Line 91 coverage: FULL
@@ -127,7 +119,7 @@ Hits: 1
     true hits: 0
     false hits: 1
 Line 95 coverage: FULL
-Hits: 1
+Hits: 2
 Line 97 coverage: PARTIAL
 Hits: 2
   h(a) != null
@@ -139,9 +131,9 @@ Hits: 2
 Line 98 coverage: FULL
 Hits: 1
 Line 99 coverage: FULL
-Hits: 1
+Hits: 2
 Line 102 coverage: FULL
-Hits: 1
+Hits: 2
 Line 103 coverage: PARTIAL
 Hits: 3
   a != null
@@ -149,15 +141,15 @@ Hits: 3
     false hits: 0
 Unknown outcome: 2
 Line 104 coverage: PARTIAL
-Hits: 3
+Hits: 4
   a ?.g() != null
     true hits: 1
     false hits: 0
-Unknown outcome: 2
+Unknown outcome: 3
 Line 106 coverage: FULL
 Hits: 3
 Line 107 coverage: FULL
-Hits: 1
+Hits: 3
 Line 108 coverage: PARTIAL
 Hits: 3
   a != null
@@ -171,10 +163,10 @@ Hits: 3
     false hits: 0
 Unknown outcome: 2
 Line 110 coverage: PARTIAL
-Hits: 3
+Hits: 4
   a
     ?.veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongMethodName()
     ?.veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongMethodName() != null
     true hits: 1
     false hits: 0
-Unknown outcome: 2
+Unknown outcome: 3

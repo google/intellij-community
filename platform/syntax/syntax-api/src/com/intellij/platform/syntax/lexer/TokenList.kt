@@ -1,5 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:ApiStatus.Experimental
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:JvmName("TokenListUtil")
 
 package com.intellij.platform.syntax.lexer
@@ -9,7 +8,6 @@ import com.intellij.platform.syntax.Logger
 import com.intellij.platform.syntax.SyntaxElementType
 import com.intellij.platform.syntax.SyntaxElementTypeSet
 import com.intellij.platform.syntax.impl.builder.DIAGNOSTICS
-import org.jetbrains.annotations.ApiStatus
 import kotlin.jvm.JvmName
 
 /**
@@ -20,7 +18,6 @@ import kotlin.jvm.JvmName
  * @see performLexing
  * @see tokenListLexer
  */
-@ApiStatus.Experimental
 interface TokenList {
   /**
    * @return the number of tokens inside

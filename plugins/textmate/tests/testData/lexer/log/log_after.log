@@ -1,6 +1,6 @@
 text.log: [0, 32], {[36mapp_1_732fd15b0b0c   |[0m }
-text.log;comment;log.date: [32, 43], {2019-09-10T}
-text.log;comment;log.date: [43, 62], {12:16:44.516540594Z}
+text.log;comment;log.date: [32, 42], {2019-09-10}
+text.log;comment;log.date: [42, 62], {T12:16:44.516540594Z}
 text.log: [62, 63], { }
 text.log;comment;log.date: [63, 75], {12:16:44.511}
 text.log: [75, 83], { [main] }

@@ -7,7 +7,13 @@
 
   <dependencies>
     <module name="intellij.java.backend"/>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+    <module name="intellij.java.frontback.psi"/>
+    <module name="intellij.java.psi"/>
+    <module name="intellij.java.psi.impl"/>
+    <module name="intellij.java.syntax"/>
     <module name="intellij.platform.coverage"/>
+    <!-- endregion -->
   </dependencies>
 
   <description>
@@ -40,6 +46,11 @@ To configure, open <b>Settings/Preferences | Build, Execution, Deployment | Cove
               extensions="exec"
               implementationClass="com.intellij.coverage.JaCoCoCoverageFileType"
               fieldName="INSTANCE"/>
+    <projectSettings service="com.intellij.coverage.JavaCoverageOptionsProvider"/>
+
+    <registryKey defaultValue="true"
+                 description="Collect JaCoCo coverage for classes with no location (pass additional inclnolocationclasses=true option)"
+                 key="idea.jacoco.collect.coverage.for.classes.with.no.location"/>
   </extensions>
 
   <extensionPoints>

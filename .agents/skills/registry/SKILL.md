@@ -9,8 +9,8 @@ Guidelines for using the IntelliJ Registry API.
 
 ## Documentation
 
-- **Defining Registry Keys**: [Registry.md](../docs/IntelliJ-Platform/4_man/Registry.md) - How to declare keys in `plugin.xml` or `registry.properties`
-- **Cloud Registry**: [Cloud Registry and Notifications.md](../docs/IntelliJ-Platform/4_man/Cloud%20Registry%20and%20Notifications.md) - Remote registry updates for JetBrains IDEs
+- **Defining Registry Keys**: [Registry.md](../../../../docs/IntelliJ-Platform/4_man/Registry.md) - How to declare keys in `plugin.xml` or `registry.properties`
+- **Cloud Registry**: [Cloud Registry and Notifications.md](../../../../docs/IntelliJ-Platform/4_man/Cloud%20Registry%20and%20Notifications.md) - Remote registry updates for JetBrains IDEs
 
 ## Quick Reference
 
@@ -34,17 +34,19 @@ To override in a dependent plugin:
              overrides="true"/>
 ```
 
-### Using Registry.is() - Avoid Redundant Defaults
-
-Don't use default value when application is fully loaded - the default comes from registry extension:
-
+### Accessing the Registry
+In suspending code:
 ```kotlin
-// Bad - redundant default
-Registry.`is`("my.key", false)
-
-// Good - default from extension
-Registry.`is`("my.key")
+val isEnabled = RegistryManager.getInstanceAsync().get("my.key")
 ```
+
+In blocking code:
+```kotlin
+val isEnabled = RegistryManager.getInstance().get("my.key")
+```
+
+Access via `Registry.get()` or `Registry.is()` is effectively deprecated, since it might cause problems during early IDE startup.
+Always prefer the `RegistryManager` when possible.
 
 ### Early Startup: Registry.is() with Default Value
 

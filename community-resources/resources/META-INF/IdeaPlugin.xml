@@ -6,7 +6,6 @@
   <module value="com.intellij.modules.idea"/>
   <module value="com.intellij.modules.idea.community"/>
   <module value="com.intellij.modules.java-capable"/>
-  <module value="com.intellij.modules.jcef"/>
   <module value="com.intellij.modules.jsp.base"/>
   <module value="com.intellij.modules.python-core-capable"/>
   <module value="com.intellij.modules.python-in-non-pycharm-ide-capable"/>
@@ -22,10 +21,6 @@
   <xi:include href="/META-INF/JavaIdePlugin.xml"/>
   <xi:include href="/META-INF/tips-intellij-idea-community.xml"/>
   <xi:include href="/META-INF/community-customization.xml"/>
-  <xi:include href="/META-INF/community-extensions.xml">
-    <xi:fallback/>
-  </xi:include>
-  <xi:include href="/META-INF/intellij.moduleSets.debugger.streams.xml"/>
   <xi:include href="/META-INF/intellij.moduleSets.ide.common.xml"/>
   <xi:include href="/META-INF/intellij.moduleSets.rd.common.xml"/>
   <!-- region additional -->

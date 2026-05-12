@@ -23,6 +23,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.progress.Cancellation;
+import com.intellij.openapi.progress.CeProcessCanceledException;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
@@ -56,7 +57,6 @@ import kotlin.coroutines.CoroutineContext;
 import kotlin.reflect.KClass;
 import kotlinx.coroutines.Job;
 import kotlinx.coroutines.JobKt;
-import kotlinx.coroutines.future.FutureKt;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Async;
 import org.jetbrains.annotations.Contract;
@@ -100,7 +100,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
 @ApiStatus.Internal
 public final class NonBlockingReadActionImpl<T> implements NonBlockingReadAction<T> {
   private static final Logger LOG = Logger.getInstance(NonBlockingReadActionImpl.class);
-  private static final Executor SYNC_DUMMY_EXECUTOR = __ -> {
+  private static final Executor SYNC_DUMMY_EXECUTOR = _ -> {
     throw new UnsupportedOperationException();
   };
 
@@ -656,7 +656,7 @@ public final class NonBlockingReadActionImpl<T> implements NonBlockingReadAction
             boolean couldRun = ThreadContext.installThreadContext(context, true, this::attemptComputation);
 
             if (!couldRun) {
-              blockUntilWriteActionIsDone(context);
+              blockUntilWriteActionIsDone(this, context);
             }
 
             if (isDone()) {
@@ -699,22 +699,35 @@ public final class NonBlockingReadActionImpl<T> implements NonBlockingReadAction
       }
     }
 
-    private static void blockUntilWriteActionIsDone(CoroutineContext context) {
+    private static void blockUntilWriteActionIsDone(Submission<?> submission, CoroutineContext context) {
       ThreadingAssertions.assertNoReadAccess();
-      CompletableFuture<Unit> future = FutureKt.asCompletableFuture(JobKt.Job(context.get(Job.Key)));
+      Job contextJob = context.get(Job.Key);
+      CompletableFuture<Unit> future = new CompletableFuture<>();
       Objects.requireNonNull(ApplicationManager.getApplication().getThreadingSupport()).runWhenWriteActionIsCompleted(() -> {
         future.complete(Unit.INSTANCE);
         return Unit.INSTANCE;
       });
-      try {
-        future.get();
-      }
-      catch (InterruptedException e) {
-        throw new ProcessCanceledException(e);
-      }
-      catch (ExecutionException e) {
-        // should be impossible
-        throw new RuntimeException(e);
+      while (!future.isDone()) {
+        try {
+          if (contextJob != null) {
+            JobKt.ensureActive(contextJob);
+          }
+          future.get(10, TimeUnit.MILLISECONDS);
+        }
+        catch (InterruptedException e) {
+          throw new ProcessCanceledException(e);
+        }
+        catch (ExecutionException e) {
+          // should be impossible
+          throw new RuntimeException(e);
+        }
+        catch (TimeoutException e) {
+          if (submission.checkObsolete()) {
+            future.cancel(false);
+          }
+        } catch (CancellationException e) {
+          throw new CeProcessCanceledException(e);
+        }
       }
     }
 
@@ -915,7 +928,7 @@ public final class NonBlockingReadActionImpl<T> implements NonBlockingReadAction
             completeJob();
           }
         }
-      }, builder.myModalityState, __ -> isCancelled());
+      }, builder.myModalityState, _ -> isCancelled());
     }
 
     @Override

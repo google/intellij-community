@@ -1295,7 +1295,7 @@ public final class PsiUtil {
   }
 
   public static @Unmodifiable @NotNull List<@NotNull PsiAnnotation> getAllAnnotations(@NotNull PsiElement element, @NotNull String annotationNameFq) {
-    List<PsiModifierListOwner> parents = PsiTreeUtil.collectParents(element, PsiModifierListOwner.class, true, __ -> false);
+    List<PsiModifierListOwner> parents = PsiTreeUtil.collectParents(element, PsiModifierListOwner.class, true, _ -> false);
     List<PsiAnnotation> annotations = new SmartList<>();
     for (PsiModifierListOwner parent : parents) {
       PsiAnnotation annotation = parent.getAnnotation(annotationNameFq);

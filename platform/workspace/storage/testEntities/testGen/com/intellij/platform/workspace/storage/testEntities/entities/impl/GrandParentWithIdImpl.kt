@@ -1,18 +1,16 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.storage.testEntities.entities.impl
 
-import com.intellij.openapi.util.NlsSafe
 import com.intellij.platform.workspace.storage.ConnectionId
 import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
-import com.intellij.platform.workspace.storage.SymbolicEntityId
 import com.intellij.platform.workspace.storage.WorkspaceEntity
 import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
-import com.intellij.platform.workspace.storage.WorkspaceEntityWithSymbolicId
-import com.intellij.platform.workspace.storage.annotations.Parent
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
@@ -29,9 +27,7 @@ internal class GrandParentWithIdImpl(private val dataSource: GrandParentWithIdDa
 
   private companion object {
 
-
-    private val connections = listOf<ConnectionId>(
-    )
+    private val connections = listOf<ConnectionId>()
 
   }
 
@@ -54,8 +50,8 @@ internal class GrandParentWithIdImpl(private val dataSource: GrandParentWithIdDa
   }
 
 
-  internal class Builder(result: GrandParentWithIdData?) : ModifiableWorkspaceEntityBase<GrandParentWithId, GrandParentWithIdData>(
-    result), GrandParentWithIdBuilder {
+  internal class Builder(result: GrandParentWithIdData?) : ModifiableWorkspaceEntityBase<GrandParentWithId, GrandParentWithIdData>(result),
+                                                           GrandParentWithIdBuilder {
     internal constructor() : this(GrandParentWithIdData())
 
     override fun applyToBuilder(builder: MutableEntityStorage) {
@@ -68,15 +64,13 @@ internal class GrandParentWithIdImpl(private val dataSource: GrandParentWithIdDa
           error("Entity GrandParentWithId is already created in a different builder")
         }
       }
-
       this.diff = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
-      // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
-      // Builder may switch to snapshot at any moment and lock entity data to modification
+// After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
+// Builder may switch to snapshot at any moment and lock entity data to modification
       this.currentEntityData = null
-
-      // Process linked entities that are connected without a builder
+// Process linked entities that are connected without a builder
       processLinkedEntities(builder)
       checkInitialization() // TODO uncomment and check failed tests
     }
@@ -112,7 +106,6 @@ internal class GrandParentWithIdImpl(private val dataSource: GrandParentWithIdDa
         changedProperty.add("entitySource")
 
       }
-
     override var myId: String
       get() = getEntityData().myId
       set(value) {
@@ -123,6 +116,7 @@ internal class GrandParentWithIdImpl(private val dataSource: GrandParentWithIdDa
 
     override fun getEntityClass(): Class<GrandParentWithId> = GrandParentWithId::class.java
   }
+
 }
 
 @OptIn(WorkspaceEntityInternalApi::class)
@@ -138,7 +132,6 @@ internal class GrandParentWithIdData : WorkspaceEntityData<GrandParentWithId>() 
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): GrandParentWithId {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {
@@ -150,8 +143,7 @@ internal class GrandParentWithIdData : WorkspaceEntityData<GrandParentWithId>() 
   }
 
   override fun getMetadata(): EntityMetadata {
-    return MetadataStorageImpl.getMetadataByTypeFqn(
-      "com.intellij.platform.workspace.storage.testEntities.entities.GrandParentWithId") as EntityMetadata
+    return MetadataStorageImpl.getMetadataByTypeFqn("com.intellij.platform.workspace.storage.testEntities.entities.GrandParentWithId") as EntityMetadata
   }
 
   override fun getEntityInterface(): Class<out WorkspaceEntity> {
@@ -159,8 +151,7 @@ internal class GrandParentWithIdData : WorkspaceEntityData<GrandParentWithId>() 
   }
 
   override fun createDetachedEntity(parents: List<WorkspaceEntityBuilder<*>>): WorkspaceEntityBuilder<*> {
-    return GrandParentWithId(myId, entitySource) {
-    }
+    return GrandParentWithId(myId, entitySource)
   }
 
   override fun getRequiredParents(): List<Class<out WorkspaceEntity>> {
@@ -171,9 +162,7 @@ internal class GrandParentWithIdData : WorkspaceEntityData<GrandParentWithId>() 
   override fun equals(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as GrandParentWithIdData
-
     if (this.entitySource != other.entitySource) return false
     if (this.myId != other.myId) return false
     return true
@@ -182,9 +171,7 @@ internal class GrandParentWithIdData : WorkspaceEntityData<GrandParentWithId>() 
   override fun equalsIgnoringEntitySource(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as GrandParentWithIdData
-
     if (this.myId != other.myId) return false
     return true
   }

@@ -76,6 +76,66 @@ public class MarkdownHtmlGenerationTest extends BasePlatformTestCase {
     doTestByHtmlFile();
   }
 
+  public void testFootnoteBasic() {
+    doTestByHtmlFile();
+  }
+
+  public void testFootnoteWithoutReference() {
+    doTestByHtmlFile();
+  }
+
+  public void testFootnoteRegularReferenceLinksUnaffected() {
+    doTestByHtmlFile();
+  }
+
+  public void testFootnoteFullReferenceLinksUnaffected() {
+    doTestByHtmlFile();
+  }
+
+  public void testFootnoteMultiline() {
+    doTestByHtmlFile();
+  }
+
+  public void testFootnoteIndentedCodeBlockUnaffected() {
+    doTestByHtmlFile();
+  }
+
+  public void testFootnoteMultilineWithCode() {
+    doTestByHtmlFile();
+  }
+
+  public void testFootnoteMultilineWithCodeLines() {
+    doTestByHtmlFile();
+  }
+
+  public void testFootnoteInlineMarkdown() {
+    doTestByHtmlFile();
+  }
+
+  public void testFootnoteBlockquote() {
+    doTestByHtmlFile();
+  }
+
+  public void testFootnoteCodeFence() {
+    doTestByHtmlFile();
+  }
+
+  public void testFootnoteConsecutiveReferences() {
+    doTestByHtmlFile();
+  }
+
+  public void testFootnoteMultilineCodeBlockWithBlankLine() {
+    doTestByHtmlFile();
+  }
+
+  public void testFootnoteNested() {
+    doTestByHtmlFile();
+  }
+
+  public void testFootnoteLabelWithSpaceUnaffected() {
+    doTestByHtmlFile();
+  }
+
   void doTestByHtmlFile() {
     doTest(myFixture.configureByFile(getTestName(true) + ".html").getText());
   }

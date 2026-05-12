@@ -127,9 +127,12 @@ import javax.swing.Icon;
 import java.awt.datatransfer.StringSelection;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
@@ -347,22 +350,45 @@ public class ModCommandExecutorImpl extends ModCommandBatchExecutorImpl {
     int templateStart = templateElement.getTextRange().getStartOffset();
     WriteAction.run(() -> {
       TemplateBuilderImpl builder = new TemplateBuilderImpl(templateElement);
+      // TemplateBuilderImpl stores elements in text-position order, so the resulting Template
+      // has variables in text order — not the semantic declaration order that cmd.fields carries.
+      // Restore declaration order with an explicit comparator over the first occurrence of each
+      // varName in cmd.fields.
+      Map<String, Integer> declaredOrder = new LinkedHashMap<>();
+      for (ModStartTemplate.TemplateField field : template.fields()) {
+        String varName = switch (field) {
+          case ModStartTemplate.ExpressionField ef -> ef.varName();
+          case ModStartTemplate.DependantVariableField dvf -> dvf.varName();
+          default -> null;
+        };
+        if (varName != null) declaredOrder.putIfAbsent(varName, declaredOrder.size());
+      }
+      builder.setVariableOrdering(Comparator.comparingInt(v -> declaredOrder.getOrDefault(v.getName(), Integer.MAX_VALUE)));
+      Set<String> seenVarNames = new HashSet<>();
       for (ModStartTemplate.TemplateField field : template.fields()) {
         switch (field) {
           case ModStartTemplate.ExpressionField(TextRange range, String varName, Expression expression) -> {
-            if (varName != null) {
-              builder.replaceElement(templateElement, range.shiftLeft(templateStart), varName, expression, true);
-            } else {
-              builder.replaceElement(templateElement, range.shiftLeft(templateStart), expression);
+            TextRange shiftedRange = range.shiftLeft(templateStart);
+            if (varName != null && !seenVarNames.add(varName)) {
+              // Second (or later) occurrence of the same variable — add as a linked reference
+              // so it mirrors edits from the primary occurrence without creating a duplicate variable.
+              builder.addVariableOccurrence(templateElement, shiftedRange, varName);
+            }
+            else if (varName != null) {
+              builder.replaceElement(templateElement, shiftedRange, varName, expression, true);
+            }
+            else {
+              builder.replaceElement(templateElement, shiftedRange, expression);
             }
           }
-          case ModStartTemplate.DependantVariableField(TextRange range, String varName, String variableName, boolean alwaysStopAt) ->
-            builder.replaceElement(templateElement, range.shiftLeft(templateStart), varName, variableName, alwaysStopAt);
+          case ModStartTemplate.DependantVariableField(TextRange range, String varName, String variableName,
+                                                       boolean alwaysStopAt, String defaultValue) ->
+            builder.replaceElement(templateElement, range.shiftLeft(templateStart), varName, variableName,
+                                   defaultValue, alwaysStopAt);
+          // Use exact offset to preserve precise caret position (e.g., inside a loop body),
+          // rather than mapping to a PSI element whose range may be wider than the desired offset.
           case ModStartTemplate.EndField(TextRange range) -> {
-            PsiElement leaf = psiFile.findElementAt(range.getStartOffset());
-            if (leaf != null) {
-              builder.setEndVariableBefore(leaf);
-            }
+            builder.setEndVariableAt(range.getStartOffset());
           }
         }
       }

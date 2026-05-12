@@ -428,6 +428,7 @@
       <group id="Diff.Conflicts.Additional.Actions"/>
       <group id="Diff.Conflicts.Feedback"/>
 
+      <group id="Merge.Dialog.Iterative.ResolveActions"/>
       <group id="compare.contents" icon="AllIcons.Actions.Diff" popup="true" class="com.intellij.openapi.actionSystem.EmptyActionGroup">
         <action id="Diff.ComparePartial.Base.Left" class="com.intellij.openapi.actionSystem.EmptyAction"
                 icon="AllIcons.Diff.Compare4LeftMiddle"/>
@@ -452,7 +453,6 @@
     <group id="Diff.ViewerToolbar"/>
     <group id="Diff.EditorGutterPopupMenu">
       <group id="Diff.EditorGutterPopupMenu.DiffModes"/>
-      <separator/>
       <group id="Diff.EditorGutterPopupMenu.EditorSettings"/>
     </group>
     <group id="Diff.Binary.Settings" popup="true" icon="AllIcons.General.GearPlain" searchable="false"/>
@@ -819,6 +819,7 @@
         <group id="ActiveToolwindowGroup" popup="true">
           <action id="HideActiveWindow" class="com.intellij.ide.actions.HideToolWindowAction"/>
           <action id="HideSideWindows" class="com.intellij.ide.actions.HideSideWindowsAction"/>
+          <action id="HideBottomWindows" class="com.intellij.ide.actions.HideBottomToolWindowsAction"/>
           <action id="HideAllWindows" class="com.intellij.ide.actions.HideAllToolWindowsAction"/>
           <action id="MoveToolWindowTabToEditorAction" class="com.intellij.openapi.wm.impl.tabInEditor.ToolWindowTabInEditorAction"
                   icon="AllIcons.Actions.OpenNewTab"/>
@@ -1020,6 +1021,8 @@
       <reference ref="ViewToolBar"/>
       <action id="CustomizeUI" class="com.intellij.ide.actions.CustomizeUIAction"/>
     </group>
+
+    <group id="EditorTabsToolbarActions" searchable="false"/>
 
     <group id="EditorTabsEntryPoint" popup="true" icon="AllIcons.Actions.More">
       <reference ref="RecentFilesFallback"/>
@@ -1373,7 +1376,7 @@
         <action id="DropPluginError" internal="true" class="com.intellij.diagnostic.DropPluginErrorAction"
                 text="Drop an Error in a Random Plugin" description="Hold down SHIFT for 3rd-party plugins only"/>
         <action id="DropAnOutOfMemoryError" internal="true" class="com.intellij.diagnostic.DropAnOutOfMemoryErrorAction"
-                text="Drop an OutOfMemoryError" description="Hold down SHIFT for OOME in Metaspace"/>
+                text="Drop an OutOfMemoryError" description="No modifier to exhaust heap, CTRL/CMD to throw heap OOME, SHIFT to throw Metaspace OOME"/>
       </group>
       <separator/>
       <action internal="true" id="ReloadProjectAction" class="com.intellij.internal.ReloadProjectAction"/>
@@ -1399,6 +1402,7 @@
         <synonym text="Exit Dumb Mode"/>
         <synonym text="Enter Dumb Mode"/>
       </action>
+      <action id="ShortDumbMode" internal="true" class="com.intellij.internal.RunShortDumbModeAction" text="Run Short Dumb Action"/>
       <action id="ToggleIncompleteMode" internal="true" class="com.intellij.internal.ToggleIncompleteDependenciesModeAction">
         <synonym text="Exit Incomplete Dependencies Mode"/>
       </action>
@@ -1426,10 +1430,15 @@
       <separator/>
       <group id="Internal.Editor" popup="true">
         <action id="AddInlayInternalAction" internal="true" class="com.intellij.internal.AddInlayInternalAction"/>
+        <action id="AddAfterLineEndInlayInternalAction" internal="true" class="com.intellij.internal.AddAfterLineEndInlayInternalAction"/>
         <action id="AddInlayBlockInternalAction" internal="true" class="com.intellij.internal.AddInlayBlockInternalAction"/>
+        <action id="DumpEditorStateInternalAction" internal="true" class="com.intellij.internal.DumpEditorStateInternalAction"/>
         <action id="SetCaretVisualAttributesInternalAction" internal="true" class="com.intellij.internal.SetCaretVisualAttributesAction"/>
         <action id="EditorRenderingBenchmarkAction" internal="true"
                 class="com.intellij.internal.performance.EditorRenderingBenchmarkAction"/>
+        <action id="EditorAddCustomWrap" internal="true" class="com.intellij.openapi.editor.actions.AddCustomWrapAction"/>
+        <action id="EditorRemoveCustomWrapsAtCaret" internal="true"
+                class="com.intellij.openapi.editor.actions.RemoveCustomWrapsAtCaretAction"/>
       </group>
       <group id="Internal.UI" popup="true">
         <group id="Internal.UI.Demos" popup="true">
@@ -1462,13 +1471,13 @@
           <action id="IconScaleTestAction" internal="true" class="com.intellij.internal.ui.ShowIconScaleTestAction"/>
         </group>
         <group id="Internal.UI.KotlinUiDsl" popup="true">
-          <action id="UiDslShowcaseAction" internal="true" class="com.intellij.internal.ui.uiDslShowcase.UiDslShowcaseAction"/>
           <action id="GridLayoutTestAction" internal="true" class="com.intellij.internal.ui.gridLayoutTestAction.GridLayoutTestAction"
                   text="Show GridLayout Test"/>
         </group>
         <action id="JBCefOsrMeasureFps" class="com.intellij.internal.jcef.JBCefOsrBrowserMeasureFpsAction"/>
         <action id="NotificationTestAction" internal="true" class="com.intellij.notification.impl.actions.NotificationTestAction"/>
         <action id="TestMessageBoxAction" internal="true" class="com.intellij.diagnostic.TestMessageBoxAction"/>
+        <action id="ShowCountdownDialog" internal="true" class="com.intellij.openapi.updateSettings.impl.ShowCountdownDialogAction"/>
         <action id="ComponentPanelTestAction" internal="true" class="com.intellij.internal.ui.ComponentPanelTestAction"/>
         <action id="WrapLayoutTestAction" internal="true" class="com.intellij.internal.ui.WrapLayoutTestAction"/>
         <action id="UIFreeze" internal="true" class="com.intellij.internal.UIFreezeAction"/>
@@ -1851,6 +1860,14 @@
       <action id="MergeMenuWithWindowTitleAction" class="com.intellij.ide.actions.MergeMenuWithWindowTitleAction"/>
     </group>
 
+    <action id="FocusMainToolbar" class="com.intellij.openapi.wm.impl.headertoolbar.FocusMainToolbarAction">
+      <keyboard-shortcut keymap="$default" first-keystroke="alt PAGE_UP"/>
+      <keyboard-shortcut keymap="Visual Studio" first-keystroke="alt PAGE_UP" remove="true"/>
+      <keyboard-shortcut keymap="Visual Studio OSX" first-keystroke="alt PAGE_UP" remove="true"/>
+      <keyboard-shortcut keymap="Visual Studio for Mac" first-keystroke="alt PAGE_UP" remove="true"/>
+      <keyboard-shortcut keymap="Xcode" first-keystroke="alt PAGE_UP" remove="true"/>
+    </action>
+
     <action id="RemoveMainToolbarActionsAction" class="com.intellij.openapi.wm.impl.headertoolbar.RemoveMainToolbarActionsAction"
             internal="true"/>
 
@@ -1899,10 +1916,7 @@
     <action id="UndoDumpAction" internal="true" class="com.intellij.ide.actions.UndoDumpHistoryAction"/>
     <action id="UndoClearAction" internal="true" class="com.intellij.ide.actions.UndoClearHistoryAction"/>
 
-    <action id="DisableMinimap" class="com.intellij.ide.minimap.actions.DisableMinimapAction"/>
-    <action id="ToggleMinimap" class="com.intellij.ide.minimap.actions.ToggleMinimapAction"/>
-    <action id="OpenMinimapSettings" class="com.intellij.ide.minimap.actions.OpenMinimapSettingsAction"/>
-    <action id="MoveMinimap" class="com.intellij.ide.minimap.actions.MoveMinimapAction"/>
+
 
     <!-- id should be "OpenInDefaultBrowser", but existing name preserved to keep compatibility - if user configured shortcut for action, it should not be lost -->
     <action id="OpenInBrowser" class="com.intellij.ide.browsers.actions.OpenFileInDefaultBrowserAction"
@@ -1919,6 +1933,25 @@
       <add-to-group group-id="OpenInBrowserEditorContextBarGroup" anchor="last"/>
     </group>
   </actions>
+
+  <actions resource-bundle="messages.MinimapBundle">
+    <action id="ToggleMinimap" class="com.intellij.ide.minimap.actions.ToggleMinimapAction" icon="AllIcons.Actions.Minimap">
+      <add-to-group group-id="EditorTabsEntryPoint"/>
+    </action>
+    <action id="EnableMinimap" class="com.intellij.ide.minimap.actions.EnableMinimapAction" icon="AllIcons.Actions.Minimap"/>
+    <action id="DisableMinimap" class="com.intellij.ide.minimap.actions.DisableMinimapAction"/>
+    <action id="OpenMinimapSettings" class="com.intellij.ide.minimap.actions.OpenMinimapSettingsAction"/>
+    <action id="MoveMinimap" class="com.intellij.ide.minimap.actions.MoveMinimapAction"/>
+    <action id="ToggleMinimapScaleMode" class="com.intellij.ide.minimap.actions.ToggleMinimapScaleModeAction"/>
+
+    <group id="MinimapActionsGroup">
+      <reference ref="OpenMinimapSettings"/>
+      <reference ref="MoveMinimap"/>
+      <reference ref="ToggleMinimapScaleMode"/>
+      <reference ref="DisableMinimap"/>
+    </group>
+  </actions>
+
   <applicationListeners>
     <listener class="com.intellij.ide.projectView.impl.ProjectViewVfsInfoListener" topic="com.intellij.openapi.util.registry.RegistryValueListener"/>
     <listener class="com.intellij.ide.projectView.impl.ProjectViewIndexableInfoListener" topic="com.intellij.openapi.util.registry.RegistryValueListener"/>

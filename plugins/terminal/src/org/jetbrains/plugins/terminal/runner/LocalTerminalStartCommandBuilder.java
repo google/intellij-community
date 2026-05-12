@@ -27,9 +27,9 @@ public final class LocalTerminalStartCommandBuilder {
     return convertShellPathToCommand(shellPath, shellCommand -> LocalEelDescriptor.INSTANCE);
   }
 
-  public static @NotNull List<String> convertShellPathToCommand(@NotNull String shellPath, @NotNull String workingDirectory) {
+  public static @NotNull List<String> convertShellPathToCommand(@NotNull String shellPath, @NotNull Path workingDirectory) {
     return convertShellPathToCommand(shellPath, shellCommand -> {
-      return TerminalStartupKt.findEelDescriptor(workingDirectory, shellCommand);
+      return TerminalStartupKt.buildStartupEelContext(workingDirectory, shellCommand).getEelDescriptor();
     });
   }
 
@@ -46,6 +46,9 @@ public final class LocalTerminalStartCommandBuilder {
       shellCommand = List.of(shellPath);
     }
     else {
+      // TODO: OS of the target environment should be used here.
+      //  But to understand the target environment, we need to parse the shell command...
+      //  This loop need to be untangled.
       shellCommand = ParametersListUtil.parse(shellPath, false, OS.CURRENT != OS.Windows);
     }
     EelDescriptor eelDescriptor = eelDescriptorProvider.apply(shellCommand);
@@ -54,10 +57,10 @@ public final class LocalTerminalStartCommandBuilder {
     String shellName = PathUtil.getFileName(shellExe);
     if (!containsLoginOrInteractiveOption(shellCommand)) {
       shellCommand = new ArrayList<>(shellCommand);
-      if (isLoginOptionAvailable(shellName) && isLoginShellNeeded(eelDescriptor)) {
+      if (isLoginOptionAvailable(shellName, eelDescriptor) && isLoginShellNeeded(eelDescriptor)) {
         shellCommand.add(LocalTerminalDirectRunner.LOGIN_CLI_OPTION);
       }
-      if (isInteractiveOptionAvailable(shellName)) {
+      if (isInteractiveOptionAvailable(shellName, eelDescriptor)) {
         shellCommand.add(INTERACTIVE_CLI_OPTION);
       }
     }
@@ -65,7 +68,7 @@ public final class LocalTerminalStartCommandBuilder {
   }
 
   private static boolean isLoginShellNeeded(@NotNull EelDescriptor eelDescriptor) {
-    return eelDescriptor == LocalEelDescriptor.INSTANCE && OS.CURRENT == OS.macOS ||
+    return isLocalMacOs(eelDescriptor) ||
            eelDescriptor != LocalEelDescriptor.INSTANCE && EelPlatformKt.isPosix(eelDescriptor.getOsFamily());
   }
 
@@ -82,11 +85,15 @@ public final class LocalTerminalStartCommandBuilder {
     return ContainerUtil.exists(command, LocalTerminalDirectRunner.LOGIN_CLI_OPTIONS::contains);
   }
 
-  private static boolean isLoginOptionAvailable(@NotNull String shellName) {
-    return ShellNameUtil.isBashZshFish(shellName);
+  private static boolean isLoginOptionAvailable(@NotNull String shellName, @NotNull EelDescriptor eelDescriptor) {
+    return ShellNameUtil.isBashZshFish(shellName) || (shellName.equals(ShellNameUtil.SH_NAME) && isLocalMacOs(eelDescriptor));
   }
 
-  private static boolean isInteractiveOptionAvailable(@NotNull String shellName) {
-    return ShellNameUtil.isBashZshFish(shellName);
+  private static boolean isInteractiveOptionAvailable(@NotNull String shellName, @NotNull EelDescriptor eelDescriptor) {
+    return ShellNameUtil.isBashZshFish(shellName) || (shellName.equals(ShellNameUtil.SH_NAME) && isLocalMacOs(eelDescriptor));
+  }
+
+  private static boolean isLocalMacOs(@NotNull EelDescriptor eelDescriptor) {
+    return eelDescriptor == LocalEelDescriptor.INSTANCE && OS.CURRENT == OS.macOS;
   }
 }

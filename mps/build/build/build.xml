@@ -62,6 +62,8 @@
   <target name="repackage" depends="repackage-app-jar,repackage-java-plugin,extract-plugin-xml,extract-win-exe"/>
 
   <!--In java-impl.jar, we remove META-INF contents for Idea not to try loading plugins from it (see MPS-30538) -->
+  <!--In java-impl.jar, we we then replace META-INF/plugin.xml with a minimal set of modules -->
+  <!--In java-impl.jar, we replace META-INF/JavaPlugin.xml with a minimal configuration (see MPS-39633)-->
   <target name="repackage-java-plugin" description="Remove IDEA specific descriptors">
     <jar destfile="${target.dist}/plugins/java/lib/stripped.jar">
       <zipfileset src="${target.dist}/plugins/java/lib/java-impl.jar" excludes="META-INF/**" />

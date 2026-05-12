@@ -61,6 +61,19 @@ abstract class RefreshQueue {
   abstract suspend fun refresh(recursive: Boolean, files: List<VirtualFile>)
 
   /**
+   * Similar to suspending [refresh], but the event collection phase can run in parallel to other refreshes.
+   *
+   * Normally, it makes little sense to run event collection phases in parallel, as they involve heavy IO work which can overload the IDE.
+   * Hence, we do not allow more than one event collection phase at a time.
+   * However, sometimes we need to perform refresh urgently, and we cannot wait for other potentially long event collection phases.
+   * In these cases, it is possible to use this method.
+   *
+   * This refresh still ends with write action in an exclusive section.
+   */
+  @ApiStatus.Internal
+  abstract suspend fun refreshWithHighPriority(recursive: Boolean, files: List<VirtualFile>)
+
+  /**
    * Processes [events] in background write action and suspends until the processing is completed.
    */
   @ApiStatus.Internal

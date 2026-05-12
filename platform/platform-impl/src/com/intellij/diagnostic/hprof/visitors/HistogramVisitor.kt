@@ -25,7 +25,7 @@ import com.intellij.diagnostic.hprof.parser.HeapDumpRecordType
 import com.intellij.diagnostic.hprof.parser.InstanceFieldEntry
 import com.intellij.diagnostic.hprof.parser.StaticFieldEntry
 import com.intellij.diagnostic.hprof.parser.Type
-import java.nio.ByteBuffer
+import com.intellij.diagnostic.hprof.util.HProfReadBufferSlidingWindow
 
 internal class HistogramVisitor(private val classStore: ClassStore) : HProfVisitor() {
   private var completed = false
@@ -41,7 +41,7 @@ internal class HistogramVisitor(private val classStore: ClassStore) : HProfVisit
     enable(HeapDumpRecordType.ClassDump)
   }
 
-  override fun visitPrimitiveArrayDump(arrayObjectId: Long, stackTraceSerialNumber: Long, numberOfElements: Long, elementType: Type, primitiveArrayData: ByteBuffer) {
+  override fun visitPrimitiveArrayDump(arrayObjectId: Long, stackTraceSerialNumber: Long, numberOfElements: Long, elementType: Type, primitiveArrayData: HProfReadBufferSlidingWindow) {
     instanceCount++
     val classDefinition = classStore.getClassForPrimitiveArray(elementType)!!
     classToHistogramEntryInternal.computeIfAbsent(classDefinition) {
@@ -72,7 +72,7 @@ internal class HistogramVisitor(private val classStore: ClassStore) : HProfVisit
     }.addInstance(objects.size.toLong() * visitorContext.idSize + ClassDefinition.ARRAY_PREAMBLE_SIZE)
   }
 
-  override fun visitInstanceDump(objectId: Long, stackTraceSerialNumber: Long, classObjectId: Long, bytes: ByteBuffer) {
+  override fun visitInstanceDump(objectId: Long, stackTraceSerialNumber: Long, classObjectId: Long, bytes: HProfReadBufferSlidingWindow) {
     instanceCount++
     val classDefinition = classStore[classObjectId]
     classToHistogramEntryInternal.computeIfAbsent(classDefinition) {

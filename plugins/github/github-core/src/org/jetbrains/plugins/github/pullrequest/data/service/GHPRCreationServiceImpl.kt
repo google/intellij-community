@@ -87,7 +87,7 @@ internal class GHPRCreationServiceImpl(private val requestExecutor: GithubApiReq
         val mergeBase = GitHistoryUtils.getMergeBase(baseRepo.gitRepository.project, baseRepo.gitRepository.root,
                                                      baseBranch.name, headBranch.name)
                         ?: error("Unrelated branches ${baseBranch.name} ${headBranch.name}")
-        val headRef = baseRepo.gitRepository.branches.getHash(headBranch) ?: error("Branch ${headBranch.name} has bo revision")
+        val headRef = baseRepo.gitRepository.branches.getHash(headBranch) ?: error("Branch ${headBranch.name} has no revision")
         GitChangeUtils.getThreeDotDiffOrThrow(baseRepo.gitRepository, baseBranch.name, headBranch.name).map {
           it.toComparisonChange(mergeBase.rev, headRef.asString())
         }

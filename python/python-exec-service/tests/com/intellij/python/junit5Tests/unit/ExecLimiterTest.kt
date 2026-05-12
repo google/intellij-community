@@ -6,7 +6,7 @@ import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.eel.getShell
 import com.intellij.platform.eel.provider.asNioPath
 import com.intellij.platform.eel.provider.localEel
-import com.intellij.platform.eel.provider.systemOs
+import com.intellij.platform.eel.provider.utils.systemOs
 import com.intellij.python.community.execService.Args
 import com.intellij.python.community.execService.ConcurrentProcessWeight
 import com.intellij.python.community.execService.ExecOptions

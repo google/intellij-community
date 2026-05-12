@@ -37,6 +37,9 @@
     <inspection_tool class="7707f5d4-ccb9-3cbc-83e5-4e893e49804f" enabled="true" level="WARNING" enabled_by_default="false">
       <scope name="AA_fleet" level="WARNING" enabled="true" />
     </inspection_tool>
+    <inspection_tool class="7acc0153-ab4a-388e-be38-5b023e16ac18" enabled="true" level="SERVER PROBLEM" enabled_by_default="false">
+      <scope name="Python" level="SERVER PROBLEM" enabled="true" editorAttributes="GENERIC_SERVER_ERROR_OR_WARNING" />
+    </inspection_tool>
     <inspection_tool class="7f0c9c8a-12d3-4b5a-9e7f-1a2b3c4d5e6f" enabled="true" level="WARNING" enabled_by_default="false">
       <scope name="IDE Testing Framework" level="WARNING" enabled="true" />
       <scope name="Tests" level="WARNING" enabled="true" />
@@ -1126,6 +1129,7 @@
     <inspection_tool class="OctalIntegerJS" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="OctalLiteral" enabled="true" level="Strong Warning" enabled_by_default="true" />
     <inspection_tool class="OnlyOneElementUsed" enabled="true" level="Strong Warning" enabled_by_default="true" editorAttributes="Strong Warning" />
+    <inspection_tool class="OptionalDependencyViaDependsTag" enabled="true" level="WARNING" enabled_by_default="true" />
     <inspection_tool class="OptionalIsPresent" enabled="true" level="Strong Warning" enabled_by_default="true" editorAttributes="Strong Warning" />
     <inspection_tool class="OptionalOfNullableMisuse" enabled="true" level="Strong Warning" enabled_by_default="true" />
     <inspection_tool class="OverflowingLoopIndex" enabled="true" level="Strong Warning" enabled_by_default="true" />
@@ -1264,8 +1268,6 @@
             <module name="intellij.java.psi.impl" />
             <module name="intellij.java.remoteServers" />
             <module name="intellij.java.remoteServers.impl" />
-            <module name="intellij.java.resources" />
-            <module name="intellij.java.resources.en" />
             <module name="intellij.java.rt" />
             <module name="intellij.java.structuralSearch" />
             <module name="intellij.java.structureView" />
@@ -1509,8 +1511,6 @@
           <module name="intellij.java.psi.impl" />
           <module name="intellij.java.remoteServers" />
           <module name="intellij.java.remoteServers.impl" />
-          <module name="intellij.java.resources" />
-          <module name="intellij.java.resources.en" />
           <module name="intellij.java.rt" />
           <module name="intellij.java.structuralSearch" />
           <module name="intellij.java.structureView" />
@@ -1963,19 +1963,19 @@
         <constraint name="lType" nameOfExprType="org\.jetbrains\.kotlin\.analysis\.api\.types\.KaType" within="" contains="" />
         <constraint name="rType" within="" contains="" />
       </replaceConfiguration>
-      <replaceConfiguration name="can be simplified to ReadAction.compute()" uuid="44cf5267-e665-3ff5-9d2f-0de5c6983156" text="$application$.runReadAction(new $Computable$() {&#10;  public $SearchScope$ compute() {&#10;    return $e$;&#10;  }&#10;})" recursive="false" caseInsensitive="true" type="JAVA" reformatAccordingToStyle="true" shortenFQN="true" replacement="com.intellij.openapi.application.ReadAction.compute(()-&gt;$e$)">
+      <replaceConfiguration name="can be simplified to ReadAction.compute()" uuid="44cf5267-e665-3ff5-9d2f-0de5c6983156" text="$application$.runReadAction(new $Computable$() {&#10;  public $SearchScope$ compute() {&#10;    return $e$;&#10;  }&#10;})" recursive="false" caseInsensitive="true" type="JAVA" pattern_context="default" reformatAccordingToStyle="true" shortenFQN="true" replacement="com.intellij.openapi.application.ReadAction.computeBlocking(()-&gt;$e$)">
         <constraint name="SearchScope" within="" contains="" />
         <constraint name="e" within="" contains="" />
         <constraint name="application" nameOfExprType="com.intellij.openapi.application.Application" exprTypeWithinHierarchy="true" within="" contains="" />
         <constraint name="Computable" within="" contains="" />
       </replaceConfiguration>
-      <replaceConfiguration name="can be simplified to ReadAction.compute()" uuid="44cf5267-e665-3ff5-9d2f-0de5c6983156" text="$application$.runReadAction(($C$)()-&gt;$e$)" recursive="false" caseInsensitive="true" type="JAVA" pattern_context="default" reformatAccordingToStyle="true" shortenFQN="true" replacement="com.intellij.openapi.application.ReadAction.compute(()-&gt;$e$)">
+      <replaceConfiguration name="can be simplified to ReadAction.compute()" uuid="44cf5267-e665-3ff5-9d2f-0de5c6983156" text="$application$.runReadAction(($C$)()-&gt;$e$)" recursive="false" caseInsensitive="true" type="JAVA" pattern_context="default" reformatAccordingToStyle="true" shortenFQN="true" replacement="com.intellij.openapi.application.ReadAction.computeBlocking(()-&gt;$e$)">
         <constraint name="e" within="" contains="" />
         <constraint name="C" minCount="0" within="" contains="" />
         <constraint name="application" nameOfExprType="com.intellij.openapi.application.Application" exprTypeWithinHierarchy="true" within="" contains="" />
         <constraint name="__context__" within="" contains="" />
       </replaceConfiguration>
-      <replaceConfiguration name="can be simplified to ReadAction.compute()" uuid="44cf5267-e665-3ff5-9d2f-0de5c6983156" text="$application$.runReadAction($Computable$() {&#10;  fun compute() {&#10;    return $e$&#10;  }&#10;})" recursive="false" caseInsensitive="true" type="Kotlin" pattern_context="default" reformatAccordingToStyle="true" shortenFQN="true" replacement="com.intellij.openapi.application.ReadAction.compute { $e$ }">
+      <replaceConfiguration name="can be simplified to ReadAction.compute()" uuid="44cf5267-e665-3ff5-9d2f-0de5c6983156" text="$application$.runReadAction($Computable$() {&#10;  fun compute() {&#10;    return $e$&#10;  }&#10;})" recursive="false" caseInsensitive="true" type="Kotlin" pattern_context="default" reformatAccordingToStyle="true" shortenFQN="true" replacement="com.intellij.openapi.application.ReadAction.computeBlocking { $e$ }">
         <constraint name="e" within="" contains="" />
         <constraint name="application" nameOfExprType="com.intellij.openapi.application.Application" exprTypeWithinHierarchy="true" within="" contains="" />
         <constraint name="Computable" within="" contains="" />
@@ -2640,6 +2640,18 @@
         <constraint name="Class" within="" contains="" />
         <constraint name="logger" nameOfExprType="Logger|libraries\.klogging\.BaseLogger" exprTypeWithinHierarchy="true" target="true" within="" contains="" />
       </searchConfiguration>
+      <replaceConfiguration name="LspServerImpl: call `send*` via requestExecutor explicitly" suppressId="LspServerImplSendViaRequestExecutor" problemDescriptor="On `LspServerImpl`, call `requestExecutor.#ref` explicitly instead of using public `LspServer` API." text="$server$.$method$($args$)" recursive="true" caseInsensitive="false" type="Kotlin" pattern_context="default" search_injected="false" reformatAccordingToStyle="false" shortenFQN="false" replacement="requestExecutor.$method$($args$)">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="server" nameOfExprType="com\.intellij\.platform\.lsp\.impl\.LspServerImpl" within="" contains="" />
+        <constraint name="method" regexp="sendNotification|sendRequest|sendRequestSync" target="true" within="" contains="" />
+        <constraint name="args" minCount="0" maxCount="2147483647" within="" contains="" />
+      </replaceConfiguration>
+      <replaceConfiguration name="LspServerImpl: call `send*` via requestExecutor explicitly" suppressId="LspServerImplSendViaRequestExecutor" problemDescriptor="On `LspServerImpl`, call `requestExecutor.#ref` explicitly instead of using public `LspServer` API." text="$server$.$method$ { $statement$ }" recursive="true" caseInsensitive="false" type="Kotlin" pattern_context="default" search_injected="false" reformatAccordingToStyle="false" shortenFQN="false" replacement="requestExecutor.$method$ { $statement$ }">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="server" nameOfExprType="com\.intellij\.platform\.lsp\.impl\.LspServerImpl" within="" contains="" />
+        <constraint name="method" regexp="sendNotification|sendRequest|sendRequestSync" target="true" within="" contains="" />
+        <constraint name="statement" minCount="0" maxCount="2147483647" within="" contains="" />
+      </replaceConfiguration>
       <replaceConfiguration name="Manual TextRange.substring() implementation" uuid="7eb9e6b2-16c6-3c0e-aa15-b8c0a54a6aee" description="Reports code pattern like str.substring(range.getStartOffset(), range.getEndOffset()). This code could be replaced with range.substring(str)" problemDescriptor="TextRange.substring() could be used" text="$str$.substring($range$.getStartOffset(), $range$.getEndOffset())" recursive="false" caseInsensitive="true" type="JAVA" pattern_context="default" reformatAccordingToStyle="false" shortenFQN="true" replacement="$range$.substring($str$)">
         <constraint name="__context__" within="" contains="" />
         <constraint name="str" nameOfExprType="java\.lang\.String" within="" contains="" />
@@ -3720,6 +3732,18 @@
       <replaceConfiguration name="Use PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue in tests" uuid="1d2c3b4a-5e6f-7081-92a3-b4c5d6e7f809" description="In tests, prefer PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue() over UIUtil.dispatchAllInvocationEvents()" suppressId="UIUtilDispatchAllInvocationEventsInTests" problemDescriptor="Use PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue() in tests" text="com.intellij.util.ui.UIUtil.dispatchAllInvocationEvents()" recursive="false" caseInsensitive="false" type="Kotlin" pattern_context="default" search_injected="false" reformatAccordingToStyle="false" shortenFQN="true" replacement="com.intellij.testFramework.PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue()">
         <constraint name="__context__" within="" contains="" />
       </replaceConfiguration>
+      <searchConfiguration name="Use polymorphism for Filesystem facace" description="Do not use `when`, move all methods to the FileSystem facade" text="when ($Argument$) {&#10;  $Condition$ -&gt; $Expression$&#10;}" recursive="true" caseInsensitive="true" type="Kotlin" pattern_context="default">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="Argument" minCount="0" within="" contains="" />
+        <constraint name="Condition" regexp="is FileSystem.Target" within="" contains="" />
+        <constraint name="Expression" within="" contains="" />
+      </searchConfiguration>
+      <searchConfiguration name="Use polymorphism for Filesystem facace" text="when ($Argument$) {&#10;  $Condition$ -&gt; $Expression$&#10;}" recursive="true" caseInsensitive="true" type="Kotlin" pattern_context="default">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="Argument" minCount="0" within="" contains="" />
+        <constraint name="Condition" regexp="is Filesystem.Eel" within="" contains="" />
+        <constraint name="Expression" within="" contains="" />
+      </searchConfiguration>
       <searchConfiguration name="Use RecursionManager?" text="class $Class$ { &#10;  ThreadLocal&lt;$FieldType$&gt; $FieldName$ = $Init$;&#10;}" recursive="false" caseInsensitive="false" type="JAVA" pattern_context="default">
         <constraint name="Class" within="" contains="" />
         <constraint name="FieldType" regexp="Collection" withinHierarchy="true" target="true" within="" contains="" />

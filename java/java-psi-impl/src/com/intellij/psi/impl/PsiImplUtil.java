@@ -629,11 +629,18 @@ public final class PsiImplUtil {
 
   public static @Nullable PsiJavaDocumentedElement findDocCommentOwner(@NotNull PsiDocComment comment) {
     PsiElement parent = comment.getParent();
+    PsiJavaDocumentedElement owner = null;
     if (parent instanceof PsiJavaDocumentedElement) {
-      PsiJavaDocumentedElement owner = (PsiJavaDocumentedElement)parent;
-      if (owner.getDocComment() == comment) {
-        return owner;
+      owner = (PsiJavaDocumentedElement)parent;
+    }
+    else if (parent instanceof PsiFile) {
+      PsiElement sibling = PsiTreeUtil.skipWhitespacesForward(comment);
+      if (sibling instanceof PsiJavaDocumentedElement) {
+        owner = (PsiJavaDocumentedElement)sibling;
       }
+    }
+    if (owner != null && owner.getDocComment() == comment) {
+      return owner;
     }
     return null;
   }

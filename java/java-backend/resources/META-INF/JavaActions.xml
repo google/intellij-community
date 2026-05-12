@@ -54,6 +54,11 @@
       <keyboard-shortcut first-keystroke="control shift SEMICOLON" keymap="$default"/>
     </action>
 
+    <group id="ChangesViewPopupMenuRunGroup">
+      <reference ref="RunContextPopupGroup"/>
+      <add-to-group group-id="ChangesViewPopupMenu" anchor="before" relative-to-action="ShowDiscoveredTests"/>
+    </group>
+
     <action class="com.intellij.execution.testDiscovery.actions.ShowAffectedTestsAction" id="ShowDiscoveredTests">
       <add-to-group group-id="RunTestGroup" anchor="last"/>
       <add-to-group group-id="ChangesViewPopupMenu" anchor="last"/>

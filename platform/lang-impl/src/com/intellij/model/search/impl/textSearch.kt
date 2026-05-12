@@ -2,6 +2,7 @@
 package com.intellij.model.search.impl
 
 import com.intellij.find.usages.api.PsiUsage
+import com.intellij.model.Pointer
 import com.intellij.model.psi.impl.hasDeclarationsInElement
 import com.intellij.model.psi.impl.hasReferencesInElement
 import com.intellij.model.search.SearchContext
@@ -15,9 +16,20 @@ import com.intellij.psi.search.SearchScope
 import com.intellij.psi.templateLanguages.OuterLanguageElement
 import com.intellij.psi.util.walkUp
 import com.intellij.refactoring.util.TextOccurrencesUtilBase
+import com.intellij.usages.impl.rules.UsageType
 import com.intellij.util.EmptyQuery
 import com.intellij.util.Query
 import com.intellij.util.codeInsight.CommentUtilCore
+
+private class PsiUsageWithUsageType(private val psiUsage: PsiUsage, override val usageType: UsageType) : PsiUsage by psiUsage {
+  override fun createPointer(): Pointer<out PsiUsageWithUsageType> {
+    // Intentional local variable; avoids holding onto a reference to `this` in the pointer
+    val type = usageType
+    return Pointer.delegatingPointer(psiUsage.createPointer(), { PsiUsageWithUsageType(it, type) })
+  }
+}
+
+private enum class TextOccurrenceType { COMMENT, STRING, PLAIN_TEXT }
 
 internal fun buildTextUsageQuery(
   project: Project,
@@ -42,56 +54,43 @@ internal fun buildTextUsageQuery(
     .inContexts(searchContexts)
     .inScope(effectiveSearchScope)
     .buildLeafOccurrenceQuery()
-  val filteredOccurrenceQuery = if (comments && strings && plainText) {
-    occurrenceQuery.filtering {
-      isApplicableOccurrence(it, searchStringLength)
+  return occurrenceQuery.transforming { occurrence: TextOccurrence ->
+    val type = getTextOccurrenceType(occurrence, searchStringLength) ?: return@transforming emptyList()
+    if (!comments && type == TextOccurrenceType.COMMENT) return@transforming emptyList()
+    if (!strings && type == TextOccurrenceType.STRING) return@transforming emptyList()
+    if (!plainText && type == TextOccurrenceType.PLAIN_TEXT) return@transforming emptyList()
+
+    val psiUsage = PsiUsage.textUsage(occurrence.element, TextRange.from(occurrence.offsetInElement, searchStringLength))
+    val usageType = when (type) {
+      TextOccurrenceType.COMMENT -> UsageType.COMMENT_USAGE
+      TextOccurrenceType.STRING -> UsageType.LITERAL_USAGE
+      else -> UsageType.UNCLASSIFIED
     }
-  }
-  else {
-    occurrenceQuery.filtering {
-      isApplicableOccurrence(it, searchStringLength, comments, strings, plainText)
-    }
-  }
-  return filteredOccurrenceQuery.mapping { occurrence: TextOccurrence ->
-    PsiUsage.textUsage(occurrence.element, TextRange.from(occurrence.offsetInElement, searchStringLength))
+
+    listOf(PsiUsageWithUsageType(psiUsage, usageType))
   }
 }
 
-private fun isApplicableOccurrence(occurrence: TextOccurrence, searchStringLength: Int): Boolean {
+private fun getTextOccurrenceType(occurrence: TextOccurrence, searchStringLength: Int): TextOccurrenceType? {
   if (occurrence.element is OuterLanguageElement) {
-    return false
-  }
-  for ((element, offsetInElement) in occurrence.walkUp()) {
-    if (hasDeclarationsOrReferences(element, offsetInElement, searchStringLength)) {
-      return false
-    }
-  }
-  return true
-}
-
-private fun isApplicableOccurrence(
-  occurrence: TextOccurrence,
-  searchStringLength: Int,
-  comments: Boolean,
-  strings: Boolean,
-  plainText: Boolean
-): Boolean {
-  if (occurrence.element is OuterLanguageElement) {
-    return false
+    return null
   }
 
   var isComment = false
   var isString = false
   for ((element, offsetInElement) in occurrence.walkUp()) {
     if (hasDeclarationsOrReferences(element, offsetInElement, searchStringLength)) {
-      return false
+      return null
     }
-    isComment = isComment || CommentUtilCore.isCommentTextElement(element)
-    isString = isString || TextOccurrencesUtilBase.isStringLiteralElement(element)
+    isComment = isComment || (!isString && CommentUtilCore.isCommentTextElement(element))
+    isString = isString || (!isComment && TextOccurrencesUtilBase.isStringLiteralElement(element))
   }
-  return comments && isComment ||
-         strings && isString ||
-         plainText && !isComment && !isString
+
+  return when {
+    isComment -> TextOccurrenceType.COMMENT
+    isString -> TextOccurrenceType.STRING
+    else -> TextOccurrenceType.PLAIN_TEXT
+  }
 }
 
 private fun TextOccurrence.walkUp(): Iterator<Pair<PsiElement, Int>> = walkUp(element, offsetInElement)

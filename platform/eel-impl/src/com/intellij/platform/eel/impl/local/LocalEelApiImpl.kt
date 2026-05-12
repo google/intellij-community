@@ -19,11 +19,9 @@ import com.intellij.platform.eel.fs.EelFileSystemApi
 import com.intellij.platform.eel.fs.EelFileSystemApi.CreateTemporaryEntryError
 import com.intellij.platform.eel.fs.LocalEelFileSystemPosixApi
 import com.intellij.platform.eel.fs.LocalEelFileSystemWindowsApi
-import com.intellij.platform.eel.impl.fs.EelFsResultImpl.Ok
-import com.intellij.platform.eel.impl.fs.EelUserPosixInfoImpl
-import com.intellij.platform.eel.impl.fs.EelUserWindowsInfoImpl
-import com.intellij.platform.eel.impl.fs.PosixNioBasedEelFileSystemApi
-import com.intellij.platform.eel.impl.fs.WindowsNioBasedEelFileSystemApi
+import com.intellij.platform.eel.impl.base.fs.EelFsResultImpl.Ok
+import com.intellij.platform.eel.impl.base.fs.EelUserPosixInfoImpl
+import com.intellij.platform.eel.impl.base.fs.EelUserWindowsInfoImpl
 import com.intellij.platform.eel.impl.local.tunnels.EelLocalPosixTunnelsApiImpl
 import com.intellij.platform.eel.impl.local.tunnels.EelLocalWindowsTunnelsApiImpl
 import com.intellij.platform.eel.path.EelPath

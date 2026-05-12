@@ -21,7 +21,7 @@ import com.intellij.ui.dsl.builder.panel
 import com.jetbrains.python.PyBundle
 import com.jetbrains.python.sdk.PySdkListCellRenderer
 import com.jetbrains.python.sdk.legacy.PythonSdkUtil
-import com.jetbrains.python.sdk.sdkSeemsValid
+import com.jetbrains.python.sdk.isSdkSeemsValid
 import com.jetbrains.python.sdk.uv.isUv
 import org.jetbrains.annotations.ApiStatus
 import javax.swing.JComponent
@@ -172,7 +172,7 @@ fun uvSdkList(): List<Sdk?> =
   PythonSdkUtil
     .getAllSdks()
     .filter { sdk ->
-      sdk.isUv && sdk.sdkSeemsValid
+      sdk.isUv && sdk.isSdkSeemsValid
     }
 
 private val whiteSpaceRegex = Regex("\\s+")

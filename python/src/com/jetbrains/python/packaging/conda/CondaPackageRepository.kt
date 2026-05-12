@@ -6,14 +6,22 @@ import com.jetbrains.python.errorProcessing.MessageError
 import com.jetbrains.python.errorProcessing.PyResult
 import com.jetbrains.python.getOrNull
 import com.jetbrains.python.packaging.PyRequirement
+import com.jetbrains.python.packaging.common.ProjectUrl
 import com.jetbrains.python.packaging.common.PythonPackageDetails
 import com.jetbrains.python.packaging.repository.PyPIPackageRepository
 import com.jetbrains.python.packaging.repository.PyPackageRepository
 import com.jetbrains.python.packaging.repository.buildPackageDetailsBySimpleDetailsProtocol
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 object CondaPackageRepository : PyPackageRepository("Conda", null, null) {
   override fun getPackages(): Set<String> {
     return service<CondaPackageCache>().packages
+  }
+
+  override fun getProjectUrl(packageName: String): ProjectUrl {
+    val encoded = URLEncoder.encode(packageName, StandardCharsets.UTF_8)
+    return ProjectUrl("Anaconda", "https://anaconda.org/anaconda/$encoded")
   }
 
   override fun buildPackageDetails(packageName: String): PyResult<PythonPackageDetails> {

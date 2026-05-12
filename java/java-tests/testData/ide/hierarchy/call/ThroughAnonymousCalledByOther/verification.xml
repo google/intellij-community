@@ -1,7 +1,7 @@
-<node text="AcmClientImpl.returnSomething()  (x)" base="true">
-  <node text="AcmClientImpl.getUser()  (x)">
-    <node text="Anonymous in doSomething() in SomeServiceImpl.exec(Object)  (x)">
-      <node text="OuterService.doOutside()  (x)"/>
+<node text="returnSomething() (x.AcmClientImpl)" base="true">
+  <node text="getUser() (x.AcmClientImpl)">
+    <node text="exec(Object) (x.SomeServiceImpl.doSomething())">
+      <node text="doOutside() (x.OuterService)"/>
     </node>
   </node>
 </node>

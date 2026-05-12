@@ -27,6 +27,7 @@ import java.awt.event.HierarchyEvent.SHOWING_CHANGED
 import java.awt.event.WindowEvent
 import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
+import javax.swing.CellRendererPane
 import javax.swing.DefaultFocusManager
 
 private val logger = logger<IdeKeyboardFocusManager>()
@@ -44,6 +45,11 @@ internal class IdeKeyboardFocusManager(internal val original: KeyboardFocusManag
   private val parentConstructorExecuted = true
 
   override fun dispatchEvent(e: AWTEvent): Boolean {
+    if (e is HierarchyEvent && e.id == HierarchyEvent.HIERARCHY_CHANGED && e.changedParent is CellRendererPane) {
+      // CellRendererPane children exist for a very short time, there's absolutely no meaning in processing these events,
+      // and processing (effectively no-op) can be quite expensive thanks to locking, even can cause freezes.
+      return true // true == stop event processing
+    }
     if (e.id == HierarchyEvent.HIERARCHY_CHANGED &&
         e is HierarchyEvent &&
         e.changeFlags.toInt().and(DISPLAYABILITY_CHANGED or SHOWING_CHANGED) == DISPLAYABILITY_CHANGED &&

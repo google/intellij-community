@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.editor.impl.view;
 
 import com.intellij.lang.CodeDocumentationAwareCommenter;
@@ -20,7 +20,7 @@ import com.intellij.util.BitUtil;
 import com.intellij.util.DocumentUtil;
 import com.intellij.util.SmartList;
 import com.intellij.util.text.CharArrayUtil;
-import org.intellij.lang.annotations.JdkConstants;
+import com.intellij.util.ui.JdkConstants;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -345,7 +345,7 @@ abstract class LineLayout {
                                                      final int startOffset,
                                                      int endOffset,
                                                      @Nullable Runnable quickEvaluationListener) {
-    assert startOffset <= endOffset;
+    view.getEditor().assertOrDumpState(startOffset <= endOffset, "startOffset must be less or equal to endOffset");
     Document document = view.getDocument();
     int lineStartOffset = document.getLineStartOffset(line);
     assert !DocumentUtil.isInsideSurrogatePair(document, lineStartOffset + startOffset);

@@ -301,6 +301,7 @@ fun <T> resetThreadContext(action: () -> T): T {
  *
  */
 fun <T> installThreadContext(coroutineContext: CoroutineContext, replace: Boolean = false, action: () -> T): T {
+  @Suppress("DEPRECATION")
   installThreadContext(coroutineContext, replace = replace).use {
     return action()
   }

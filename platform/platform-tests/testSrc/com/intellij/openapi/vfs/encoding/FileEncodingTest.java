@@ -285,6 +285,8 @@ public class FileEncodingTest implements TestDialog {
 
       setText(document, UTF8_XML_PROLOG + XML_TEST_BODY);
       FileDocumentManager.getInstance().saveAllDocuments();
+      //ensure pending VFS IOps are finished before reading files via Path API:
+      PlatformTestUtil.flushAllPendingVFSUpdates();
 
       byte[] savedBytes = Files.readAllBytes(file);
       String saved = new String(savedBytes, StandardCharsets.UTF_8).replace("\r\n", "\n");
@@ -352,7 +354,11 @@ public class FileEncodingTest implements TestDialog {
     //assertTrue(CharsetToolkit.hasUTF16LEBom(fileCopy.getBOM()));
 
     setText(document, "\u04ab\u04cd\u04ef");
+
     FileDocumentManager.getInstance().saveAllDocuments();
+    //ensure pending VFS IOps are finished before reading files via Path API:
+    PlatformTestUtil.flushAllPendingVFSUpdates();
+
     byte[] bytes = Files.readAllBytes(copy);
     assertTrue(Arrays.toString(bytes), CharsetToolkit.hasUTF16LEBom(bytes));
     assertEquals("[-1, -2, -85, 4, -51, 4, -17, 4]", Arrays.toString(bytes));
@@ -479,6 +485,9 @@ public class FileEncodingTest implements TestDialog {
     changed[0] = false;
 
     FileDocumentManager.getInstance().saveAllDocuments();
+    //ensure pending VFS IOps are finished before reading files via Path API:
+    PlatformTestUtil.flushAllPendingVFSUpdates();
+
     byte[] bytes = FileUtil.loadFileBytes(ioFile);
     //file on disk is still windows_1251
     assertArrayEquals(text.getBytes(WINDOWS_1251), bytes);
@@ -1268,7 +1277,7 @@ public class FileEncodingTest implements TestDialog {
       @Override public String getCharset(@NotNull VirtualFile file, byte @NotNull [] content) { return StandardCharsets.ISO_8859_1.name(); }
     }
     MyForcedFileType fileType = new MyForcedFileType();
-    FileEncodingProvider encodingProvider = (__, project) -> StandardCharsets.UTF_16;
+    FileEncodingProvider encodingProvider = (_, _) -> StandardCharsets.UTF_16;
     FileEncodingProvider.EP_NAME.getPoint().registerExtension(encodingProvider, getTestRootDisposable());
     FileTypeManagerImpl fileTypeManager = (FileTypeManagerImpl)FileTypeManagerEx.getInstanceEx();
     fileTypeManager.registerFileType(fileType, List.of(new ExtensionFileNameMatcher(ext)), getTestRootDisposable(),
@@ -1280,7 +1289,7 @@ public class FileEncodingTest implements TestDialog {
 
   @Test
   public void testDetectedCharsetOverridesFileEncodingProvider() throws IOException {
-    FileEncodingProvider encodingProvider = (__, project) -> WINDOWS_1251;
+    FileEncodingProvider encodingProvider = (_, _) -> WINDOWS_1251;
     FileEncodingProvider.EP_NAME.getPoint().registerExtension(encodingProvider, getTestRootDisposable());
     VirtualFile file = createTempFile("yyy", NO_BOM, "Some text" + THREE_RUSSIAN_LETTERS, StandardCharsets.UTF_8);
     assertEquals(StandardCharsets.UTF_8, file.getCharset());

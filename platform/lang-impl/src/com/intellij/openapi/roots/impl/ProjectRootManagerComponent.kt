@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.roots.impl
 
 import com.intellij.configurationStore.BatchUpdateListener
@@ -6,6 +6,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationListener
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.readAction
+import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.trace
@@ -14,6 +15,7 @@ import com.intellij.openapi.fileTypes.FileTypeEvent
 import com.intellij.openapi.fileTypes.FileTypeListener
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.module.ModuleManager
+import com.intellij.openapi.module.impl.scopes.ModuleWithDependenciesScopeCache
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.project.ProjectManagerListener
@@ -78,6 +80,7 @@ private val WATCHED_ROOTS_PROVIDER_EP_NAME = ExtensionPointName<WatchedRootsProv
 /**
  * ProjectRootManager extended with the ability to watch events.
  */
+@Suppress("SplitModeApiUsage")
 @ApiStatus.Internal
 open class ProjectRootManagerComponent(
   project: Project,
@@ -296,8 +299,8 @@ open class ProjectRootManagerComponent(
     val projectFilePath = store.projectFilePath
     val directoryStorePath = store.directoryStorePath
     if (directoryStorePath == null || !projectFilePath.startsWith(directoryStorePath)) {
-      flatPaths.add(projectFilePath.invariantSeparatorsPathString)
-      flatPaths.add(store.workspacePath.invariantSeparatorsPathString)
+      flatPaths += projectFilePath.invariantSeparatorsPathString
+      flatPaths += store.workspacePath.invariantSeparatorsPathString
       WATCH_ROOTS_LOG.trace { "  project store: ${flatPaths}" }
     }
 
@@ -335,7 +338,7 @@ open class ProjectRootManagerComponent(
     }
 
     // module roots already fire validity change events, see usages of ProjectRootManagerComponent.getRootsValidityChangedListener
-    collectModuleWatchRoots(recursivePaths = recursivePaths, flatPaths = flatPaths, logAllowed = true)
+    collectModuleWatchRoots(recursivePaths, flatPaths, logAllowed = true)
 
     collectCustomWorkspaceWatchRoots(recursivePaths)
 
@@ -356,17 +359,14 @@ open class ProjectRootManagerComponent(
       }
 
       if (logRoots) {
-        WATCH_ROOTS_LOG.trace { "    ${logDescriptor()}: $recursive, $flat" }
+        WATCH_ROOTS_LOG.trace { "    ${logDescriptor()}: ${recursive}, ${flat}" }
         recursivePaths += recursive
-        flatPaths.addAll(flat)
+        flatPaths += flat
       }
     }
 
     for (module in ModuleManager.getInstance(project).modules) {
-      if (logRoots) {
-        WATCH_ROOTS_LOG.trace { "  module ${module}" }
-      }
-
+      if (logRoots) WATCH_ROOTS_LOG.trace { "  module ${module}" }
       val rootManager = ModuleRootManager.getInstance(module)
       collectUrls(rootManager.contentRootUrls) { "content" }
       rootManager.orderEntries().withoutModuleSourceEntries().withoutDepModules().forEach { entry ->
@@ -422,6 +422,8 @@ open class ProjectRootManagerComponent(
   override fun clearScopesCachesForModules() {
     super.clearScopesCachesForModules()
 
+    project.service<ModuleWithDependenciesScopeCache>().clear()
+
     for (module in ModuleManager.getInstance(project).modules) {
       module.clearScopesCache()
     }
@@ -429,7 +431,7 @@ open class ProjectRootManagerComponent(
 
   override fun markRootsForRefresh(): List<VirtualFile> {
     val paths = CollectionFactory.createFilePathSet()
-    collectModuleWatchRoots(paths, paths, false)
+    collectModuleWatchRoots(paths, paths, logAllowed = false)
     val roots = paths.mapNotNull(LocalFileSystem.getInstance()::findFileByPath)
     roots.asSequence()
       .filterIsInstance(NewVirtualFile::class.java)

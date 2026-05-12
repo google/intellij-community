@@ -12,10 +12,10 @@ import org.intellij.lang.annotations.Language
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-fun Finder.dialog(@Language("xpath") xpath: String? = null, title: String? = null, action: DialogUiComponent.() -> Unit = {}): DialogUiComponent {
+fun Finder.dialog(@Language("xpath") xpath: String? = null, title: String? = null, titleContains: Boolean = false, action: DialogUiComponent.() -> Unit = {}): DialogUiComponent {
   val dialogXpath = when {
     xpath != null -> xpath
-    title != null -> "//div[@title='$title']"
+    title != null -> if(titleContains) "//div[contains(@title,'$title')]" else "//div[@title='$title']"
     else -> "//div[@class='MyDialog']"
   }
   return x(dialogXpath, DialogUiComponent::class.java).apply(action)

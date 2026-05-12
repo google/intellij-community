@@ -73,9 +73,8 @@ fun Label(@Label text: String, style: UIUtil.ComponentStyle? = null, fontColor: 
  * That's unexpected behavior
  */
 @ApiStatus.ScheduledForRemoval
-@ApiStatus.Internal
 @Deprecated("Use correspondent constructors JLabel/JBLabel/MultiLineLabel, depends on situation")
-fun Label(
+private fun Label(
   @Label text: String,
   style: UIUtil.ComponentStyle? = null,
   fontColor: UIUtil.FontColor? = null,
@@ -109,15 +108,7 @@ fun Label(
 }
 
 @ApiStatus.ScheduledForRemoval
-@Deprecated("Use Kotlin UI DSL, method Row.link", level = DeprecationLevel.ERROR)
-fun Link(@Label text: String, style: UIUtil.ComponentStyle? = null, action: () -> Unit): JComponent {
-  val result = ActionLink(text) { action() }
-  style?.let { UIUtil.applyStyle(it, result) }
-  return result
-}
-
-@ApiStatus.ScheduledForRemoval
-@Deprecated("Use Kotlin UI DSL, methods like Row.text, Row.comment or Cell.comment")
+@Deprecated("Use Kotlin UI DSL, methods like Row.text, Row.comment or Cell.comment", level = DeprecationLevel.ERROR)
 @JvmOverloads
 fun noteComponent(@Label note: String, linkHandler: ((url: String) -> Unit)? = null): JComponent {
   val matcher = URLUtil.HREF_PATTERN.matcher(note)
@@ -175,19 +166,6 @@ fun CheckBox(@Checkbox text: String, selected: Boolean = false, toolTip: @Toolti
   val component = JCheckBox(BundleBase.replaceMnemonicAmpersand(text), selected)
   toolTip?.let { component.toolTipText = it }
   return component
-}
-
-@ApiStatus.ScheduledForRemoval
-@ApiStatus.Internal
-@Deprecated("Use Kotlin UI DSL, method Panel.group")
-@JvmOverloads
-fun Panel(@BorderTitle title: String? = null, layout: LayoutManager2? = BorderLayout()): JPanel {
-  val panel = JPanel(layout)
-  title?.let {
-    @Suppress("HardCodedStringLiteral")
-    setTitledBorder(title = it, panel = panel, hasSeparator = false)
-  }
-  return panel
 }
 
 fun DialogPanel(title: @BorderTitle String? = null, layout: LayoutManager2? = BorderLayout()): DialogPanel {

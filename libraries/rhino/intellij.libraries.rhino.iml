@@ -9,19 +9,19 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module-library" exported="">
       <library name="rhino" type="repository">
-        <properties maven-id="org.mozilla:rhino-runtime:1.7.15">
+        <properties include-transitive-deps="false" maven-id="org.mozilla:rhino-runtime:1.7.15.1">
           <verification>
-            <artifact url="file://$MAVEN_REPOSITORY$/org/mozilla/rhino-runtime/1.7.15/rhino-runtime-1.7.15.jar">
-              <sha256sum>4f38c96499c614145b87442700e196df39b0af808b1b1204eaccaa15bef17c2b</sha256sum>
+            <artifact url="file://$MAVEN_REPOSITORY$/org/mozilla/rhino-runtime/1.7.15.1/rhino-runtime-1.7.15.1.jar">
+              <sha256sum>0b638531df0405ce68878ac5e37bd0aebf18c3e9a153eb81850212181effbe37</sha256sum>
             </artifact>
           </verification>
         </properties>
         <CLASSES>
-          <root url="jar://$MAVEN_REPOSITORY$/org/mozilla/rhino-runtime/1.7.15/rhino-runtime-1.7.15.jar!/" />
+          <root url="jar://$MAVEN_REPOSITORY$/org/mozilla/rhino-runtime/1.7.15.1/rhino-runtime-1.7.15.1.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES>
-          <root url="jar://$MAVEN_REPOSITORY$/org/mozilla/rhino-runtime/1.7.15/rhino-runtime-1.7.15-sources.jar!/" />
+          <root url="jar://$MAVEN_REPOSITORY$/org/mozilla/rhino-runtime/1.7.15.1/rhino-runtime-1.7.15.1-sources.jar!/" />
         </SOURCES>
       </library>
     </orderEntry>

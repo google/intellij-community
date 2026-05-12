@@ -5,6 +5,7 @@ import com.intellij.debugger.impl.GenericDebuggerRunner
 import com.intellij.devkit.compose.DevkitComposeBundle
 import com.intellij.devkit.compose.hasCompose
 import com.intellij.devkit.compose.icons.DevkitComposeIcons
+import com.intellij.devkit.compose.isComposeToolingEnabled
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.Executor
 import com.intellij.execution.JavaRunConfigurationBase
@@ -76,7 +77,8 @@ private const val DEVKIT_GRADLE_HOT_RELOAD_RUNNER_ID = "DevkitGradleHotReloadRun
 private val DEVKIT_HOT_RELOAD_EXECUTOR_ID_KEY = Key.create<Boolean>(DEVKIT_HOT_RELOAD_EXECUTOR_ID)
 
 private fun isRelevantContext(project: Project): Boolean {
-  return isIntelliJPlatformProject(project) || isPluginProject(project) && hasCompose(project)
+  return isComposeToolingEnabled() &&
+         (isIntelliJPlatformProject(project) || isPluginProject(project) && hasCompose(project))
 }
 
 internal class DevkitHotReloadExecutor : Executor() {

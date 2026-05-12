@@ -14,7 +14,7 @@ interface PolySymbolDocumentationCustomizer {
 
     @TestOnly
     @JvmField
-    val EP_NAME: ExtensionPointName<PolySymbolDocumentationCustomizer> = ExtensionPointName.create<PolySymbolDocumentationCustomizer>(
-      "com.intellij.polySymbols.documentationCustomizer")
+    val EP_NAME: ExtensionPointName<PolySymbolDocumentationCustomizer> =
+      ExtensionPointName.create("com.intellij.polySymbols.documentationCustomizer")
   }
 }

@@ -33,28 +33,25 @@ use std::env;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, bail, Context, Result};
-use log::{debug, LevelFilter, warn};
+use log::{debug, warn, LevelFilter};
 use serde::Deserialize;
 
 #[cfg(target_os = "windows")]
 use {
-    std::io::Write,
+    windows::core::{GUID, HSTRING, PWSTR},
     windows::Win32::Foundation,
     windows::Win32::Foundation::HANDLE,
-    windows::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole, SetStdHandle, STD_ERROR_HANDLE, STD_OUTPUT_HANDLE},
     windows::Win32::System::LibraryLoader,
     windows::Win32::UI::Shell,
-    windows::core::{HSTRING, GUID, PWSTR},
 };
 
 #[cfg(target_family = "unix")]
 use std::os::unix::fs::PermissionsExt;
 
+#[cfg(target_os = "linux")]
+use std::os::unix::process::CommandExt;
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
-use {
-    std::os::unix::process::CommandExt,
-    libc::{dl_iterate_phdr, dl_phdr_info, size_t},
-};
+use libc::{dl_iterate_phdr, dl_phdr_info, size_t};
 
 use crate::cef_sandbox::CefScopedSandboxInfo;
 use crate::default::DefaultLaunchConfiguration;
@@ -81,60 +78,12 @@ pub fn main_lib() {
     let server_mode_argument_used = env::args().nth(1).map(|x| x == "serverMode").unwrap_or(false);
     let remote_dev = remote_dev_launcher_used || server_mode_argument_used;
     let sandbox_subprocess = cfg!(target_os = "windows") && env::args().any(|arg| arg.contains("--type="));
-
     let debug_mode = env::var(DEBUG_MODE_ENV_VAR).is_ok();
-
-    #[cfg(target_os = "windows")]
-    {
-        if debug_mode && !sandbox_subprocess {
-            attach_console();
-        }
-    }
 
     if let Err(e) = main_impl(exe_path, remote_dev, debug_mode, sandbox_subprocess, remote_dev_launcher_used) {
         let gui_mode = !debug_mode && !sandbox_subprocess;
         ui::show_error(gui_mode, e);
         std::process::exit(1);
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn attach_console() {
-    unsafe {
-        let mut err = None;
-        if AttachConsole(ATTACH_PARENT_PROCESS).is_err() {
-            err = Some(Foundation::GetLastError());
-        }
-
-        // case: races when restarting in remote-dev on Windows
-        // (ssh session -> tb proxy -> tb agent -> IDE -> restarter.exe (dying too fast) -> IDE)
-        // cannot repro on a smaller setup (e.g. cmd /C via ssh)
-        // * case: console is alive, but in a state of being closed
-        // * AttachConsole does not always error
-        // * GetStdHandle for STD_OUT_HANDLE returns without errors and the handle is not zero/invalid
-        // * println!/eprintln! panics when it can't write
-        // * setting various process creation flags in restarter does not seem to help
-        // this is the only reliable way I've found to check if it's possible to call println! without panic
-        if writeln!(std::io::stderr(), ".").is_err() {
-            // usually it's Os { code: 232, kind: BrokenPipe, message: "The pipe is being closed." }
-            // but even if it's some other error, let's not write there
-            // passing null here is not explicitly documented,
-            // but it works and is consistent with the GetStdHandle returning null
-            if SetStdHandle(STD_ERROR_HANDLE, HANDLE(std::ptr::null_mut())).is_err() {
-                std::process::exit(1011)
-            }
-        }
-
-        #[allow(clippy::collapsible_if)]
-        if writeln!(std::io::stdout(), ".").is_err() {
-            if SetStdHandle(STD_OUTPUT_HANDLE, HANDLE(std::ptr::null_mut())).is_err() {
-                std::process::exit(1012)
-            }
-        }
-
-        if let Some(err) = err {
-            eprintln!("AttachConsole(ATTACH_PARENT_PROCESS): {err:?}")
-        }
     }
 }
 
@@ -163,17 +112,28 @@ fn main_impl(exe_path: PathBuf, remote_dev: bool, debug_mode: bool, sandbox_subp
     }
 
     debug!("** Preparing launch configuration");
-    let configuration = get_configuration(remote_dev, &exe_path.strip_ns_prefix()?, started_via_remote_dev_launcher).context("Cannot detect a launch configuration")?;
+    let configuration = get_configuration(remote_dev, &exe_path.strip_ns_prefix()?, started_via_remote_dev_launcher)
+        .context("Cannot detect a launch configuration")?;
+
+    let is_musl = if cfg!(all(target_os = "linux", target_env = "gnu")) {
+        is_running_with_gcompat()
+    } else {
+        cfg!(all(target_os = "linux", target_env = "musl"))
+    };
 
     debug!("** Locating runtime");
-    let (jre_home, main_class) = configuration.prepare_for_launch().context("Cannot find a runtime")?;
+    let (jre_home, main_class, _extra_libs) = configuration.prepare_for_launch(is_musl).context("Cannot find a runtime")?;
     debug!("Resolved runtime: {jre_home:?}");
 
+    #[cfg(target_os = "linux")]
+    {
+        if is_musl {
+            adjust_to_musl(&exe_path, &jre_home, &_extra_libs)?;
+        }
+    }
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     {
-        if is_running_with_gcompat() {
-            adjust_to_musl(&exe_path, &jre_home)?;
-        } else {
+        if !is_musl {
             call_mallopt();
         }
     }
@@ -191,7 +151,9 @@ fn main_impl(exe_path: PathBuf, remote_dev: bool, debug_mode: bool, sandbox_subp
 
     debug!("** Launching JVM");
     let args = configuration.get_args();
-    java::run_jvm_and_event_loop(&jre_home, vm_options, main_class, args.to_vec(), debug_mode).context("Cannot start the runtime")?;
+    let redirect_stdout = configuration.should_redirect_stdout();
+    java::run_jvm_and_event_loop(&jre_home, vm_options, main_class, args.to_vec(), debug_mode, redirect_stdout, is_musl)
+        .context("Cannot start the runtime")?;
 
     Ok(())
 }
@@ -199,10 +161,12 @@ fn main_impl(exe_path: PathBuf, remote_dev: bool, debug_mode: bool, sandbox_subp
 #[cfg(target_os = "windows")]
 fn ensure_env_vars_set() -> Result<()> {
     let app_data = get_known_folder_path(&Shell::FOLDERID_RoamingAppData, "FOLDERID_RoamingAppData")?;
-    env::set_var("APPDATA", app_data.strip_ns_prefix()?.to_string_checked()?);
-
     let local_app_data = get_known_folder_path(&Shell::FOLDERID_LocalAppData, "FOLDERID_LocalAppData")?;
-    env::set_var("LOCALAPPDATA", local_app_data.strip_ns_prefix()?.to_string_checked()?);
+
+    unsafe {
+        env::set_var("APPDATA", app_data.strip_ns_prefix()?.to_string_checked()?);
+        env::set_var("LOCALAPPDATA", local_app_data.strip_ns_prefix()?.to_string_checked()?);
+    }
 
     Ok(())
 }
@@ -249,16 +213,17 @@ fn restore_working_directory() -> Result<()> {
     let (cwd_res, pwd_var) = (env::current_dir(), env::var("PWD"));
     debug!("Adjusting current directory (current={:?} $PWD={:?})", cwd_res, pwd_var);
 
-    if let Ok(cwd) = cwd_res {
-        if cwd == PathBuf::from("/") {
-            if let Ok(pwd) = pwd_var {
-                env::set_current_dir(&pwd)
-                    .with_context(|| format!("Cannot set current directory to '{pwd}'"))?;
-            }
-        }
+    #[allow(clippy::cmp_owned)]
+    if let Ok(cwd) = cwd_res && cwd == PathBuf::from("/") && let Ok(pwd) = pwd_var {
+        env::set_current_dir(&pwd).with_context(|| format!("Cannot set current directory to '{pwd}'"))?;
     }
 
     Ok(())
+}
+
+#[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+fn is_running_with_gcompat() -> bool {
+    false
 }
 
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
@@ -283,40 +248,46 @@ extern "C" fn check_gcompat_callback(info: *mut dl_phdr_info, _size: size_t, _da
     0
 }
 
-#[cfg(all(target_os = "linux", target_env = "gnu"))]
-fn adjust_to_musl(exe_path: &Path, jre_home: &Path) -> Result<()> {
-    let ext_lib_path = exe_path.parent_or_err()?.join("libgcompat-ext.so");
-    if !ext_lib_path.exists() {
-        debug!("gcompat extensions missing: {ext_lib_path:?}");
+#[cfg(target_os = "linux")]
+fn adjust_to_musl(exe_path: &Path, jre_home: &Path, extra_libs: &Option<PathBuf>) -> Result<()> {
+    let prev_ld_lib_path = env::var_os("_IJ_PREV_LD_LIBRARY_PATH");
+    if let Some(val) = prev_ld_lib_path {
+        debug!("restoring LD_LIBRARY_PATH to {val:?}");
+        restore_env("LD_LIBRARY_PATH", &val);
+        restore_env("_IJ_PREV_LD_LIBRARY_PATH", &std::ffi::OsString::default());
         return Ok(());
     }
 
-    let jvm_dir = jre_home.join("lib/server");
     let ld_lib_path = env::var_os("LD_LIBRARY_PATH").unwrap_or_default();
-    if env::split_paths(&ld_lib_path).any(|p| p == jvm_dir) {
-        debug!("gcompat patch already applied: LD_LIBRARY_PATH={ld_lib_path:?}");
-        return Ok(());
-    }
-
+    let jvm_dir = jre_home.join("lib/server");
     let mut new_ld_lib_path = std::ffi::OsString::from(jvm_dir);
+    new_ld_lib_path.push(":");
+    new_ld_lib_path.push(jre_home.join("lib"));
+    if let Some(extra_libs) = extra_libs {
+        new_ld_lib_path.push(":");
+        new_ld_lib_path.push(extra_libs);
+    }
     if !ld_lib_path.is_empty() {
         new_ld_lib_path.push(":");
-        new_ld_lib_path.push(ld_lib_path);
+        new_ld_lib_path.push(&ld_lib_path);
     };
 
-    let ld_preload = env::var_os("LD_PRELOAD").unwrap_or_default();
-    let mut new_ld_preload = std::ffi::OsString::from(ext_lib_path);
-    if !ld_preload.is_empty() {
-        new_ld_preload.push(":");
-        new_ld_preload.push(ld_preload);
-    }
-
-    debug!("*** restarting with LD_LIBRARY_PATH={new_ld_lib_path:?} LD_PRELOAD={new_ld_preload:?}");
+    debug!("*** restarting with LD_LIBRARY_PATH={new_ld_lib_path:?}\n=====");
+    let args: Vec<String> = env::args().collect();
     Err(std::process::Command::new(exe_path)
-        .args(env::args())
+        .args(args[1..].to_vec())
         .env("LD_LIBRARY_PATH", new_ld_lib_path)
-        .env("LD_PRELOAD", new_ld_preload)
+        .env("_IJ_PREV_LD_LIBRARY_PATH", ld_lib_path)
         .exec().into())
+}
+
+#[cfg(target_os = "linux")]
+fn restore_env(key: &str, val: &std::ffi::OsStr) {
+    if val.is_empty() {
+        unsafe { env::set_var(key, val); }
+    } else {
+        unsafe { env::remove_var(key); }
+    }
 }
 
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
@@ -360,6 +331,7 @@ pub struct ProductInfoLaunchField {
     pub bootClassPathJarNames: Vec<String>,
     pub additionalJvmArguments: Vec<String>,
     pub mainClass: String,
+    pub stdioRedirectArg: Option<String>,
     pub customCommands: Option<Vec<ProductInfoCustomCommandField>>,
 }
 
@@ -372,6 +344,7 @@ pub struct ProductInfoCustomCommandField {
     pub bootClassPathJarNames: Vec<String>,
     #[serde(default = "Vec::new")]
     pub additionalJvmArguments: Vec<String>,
+    pub stdioRedirectArg: Option<String>,
     pub mainClass: Option<String>,
     pub envVarBaseName: Option<String>,
     pub dataDirectoryName: Option<String>,
@@ -382,7 +355,8 @@ pub trait LaunchConfiguration {
     fn get_vm_options(&self) -> Result<Vec<String>>;
     fn get_custom_properties_file(&self) -> Result<PathBuf>;
     fn get_class_path(&self) -> Result<Vec<String>>;
-    fn prepare_for_launch(&self) -> Result<(PathBuf, &str)>;
+    fn should_redirect_stdout(&self) -> bool;
+    fn prepare_for_launch(&self, is_musl: bool) -> Result<(PathBuf, &str, Option<PathBuf>)>;
 }
 
 fn get_configuration(is_remote_dev: bool, exe_path: &Path, started_via_remote_dev_launcher: bool) -> Result<Box<dyn LaunchConfiguration>> {
@@ -409,7 +383,7 @@ fn init_cef_sandbox(jre_home: &Path, sandbox_subprocess: bool) -> Result<Option<
         let exit_code = unsafe {
             let helper_path = jre_home.join("bin\\jcef_helper.dll");
             let lib = libloading::Library::new(&helper_path)
-                .with_context(|| format!("Cannot load '{:#?}'", helper_path))?;
+                .with_context(|| format!("Cannot load '{helper_path:#?}'"))?;
 
             let proc: libloading::Symbol<'_, unsafe extern "system" fn(*mut std::os::raw::c_void, *mut std::os::raw::c_void) -> i32> = lib.get(b"execute_subprocess\0")
                 .context("Cannot find 'execute_subprocess' in 'jcef_helper.dll'")?;
@@ -417,7 +391,7 @@ fn init_cef_sandbox(jre_home: &Path, sandbox_subprocess: bool) -> Result<Option<
             let mut h_instance = LibraryLoader::GetModuleHandleW(PCWSTR::null())?;
             proc(&mut h_instance as *mut _ as *mut std::os::raw::c_void, cef_sandbox.ptr)
         };
-        debug!("  finished: {}", exit_code);
+        debug!("  finished: {exit_code}");
         std::process::exit(exit_code);
     }
 

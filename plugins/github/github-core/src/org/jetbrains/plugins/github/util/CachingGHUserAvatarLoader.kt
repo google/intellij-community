@@ -7,26 +7,31 @@ import com.intellij.collaboration.async.nestedDisposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.progress.coroutineToIndicator
 import com.intellij.openapi.util.LowMemoryWatcher
 import com.intellij.util.ImageLoader
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.future.asCompletableFuture
+import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus.Obsolete
 import org.jetbrains.plugins.github.api.GithubApiRequestExecutor
 import org.jetbrains.plugins.github.api.GithubApiRequests
-import org.jetbrains.plugins.github.api.executeSuspend
 import java.awt.Image
 import java.awt.image.BufferedImage
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.CompletableFuture
+import kotlin.time.Duration.Companion.milliseconds
 
 @Service
 class CachingGHUserAvatarLoader internal constructor(serviceCs: CoroutineScope) {
   private val cs = serviceCs.childScope(this::class)
+  private val limitedIODispatcher = Dispatchers.IO.limitedParallelism(2)
 
   private val avatarCache = Caffeine.newBuilder()
     .expireAfterAccess(Duration.of(5, ChronoUnit.MINUTES))
@@ -49,7 +54,15 @@ class CachingGHUserAvatarLoader internal constructor(serviceCs: CoroutineScope) 
 
   private suspend fun loadAndDownscale(requestExecutor: GithubApiRequestExecutor, url: String, maximumSize: Int): Image? {
     try {
-      val loadedImage = requestExecutor.executeSuspend(GithubApiRequests.CurrentUser.getAvatar(url))
+      // loading all avatars in parallel may cause issues with server DDOS protection (it will drop connections)
+      // so we load only 2 in parallel and do this with retry
+      val loadedImage = doWithBackoffRetry {
+        withContext(limitedIODispatcher) {
+          coroutineToIndicator {
+            requestExecutor.execute(it, GithubApiRequests.CurrentUser.getAvatar(url))
+          }
+        }
+      }
       return if (loadedImage.width <= maximumSize && loadedImage.height <= maximumSize) loadedImage
       else ImageLoader.scaleImage(loadedImage, maximumSize) as BufferedImage
     }
@@ -57,7 +70,12 @@ class CachingGHUserAvatarLoader internal constructor(serviceCs: CoroutineScope) 
       throw ce
     }
     catch (e: Exception) {
-      LOG.debug("Error loading image from $url", e)
+      if (LOG.isDebugEnabled) {
+        LOG.warn("Error loading image from $url", e)
+      }
+      else {
+        LOG.warn("Error loading image from $url - ${e.message}")
+      }
       return null
     }
   }
@@ -72,5 +90,24 @@ class CachingGHUserAvatarLoader internal constructor(serviceCs: CoroutineScope) 
 
     // store images at maximum used size with maximum reasonable scale to avoid upscaling (3 for system scale, 2 for user scale)
     private const val STORED_IMAGE_SIZE = MAXIMUM_ICON_SIZE * 6
+
+    private const val MAX_ATTEMPTS = 5
+
+    private suspend inline fun <T> doWithBackoffRetry(loader: () -> T): T {
+      var lastException: Exception? = null
+      repeat(MAX_ATTEMPTS) { attempt ->
+        try {
+          return loader()
+        }
+        catch (ce: CancellationException) {
+          throw ce
+        }
+        catch (e: Exception) {
+          lastException = e
+          delay((attempt * 50).milliseconds)
+        }
+      }
+      throw lastException ?: IllegalStateException("No result after $MAX_ATTEMPTS attempts")
+    }
   }
 }

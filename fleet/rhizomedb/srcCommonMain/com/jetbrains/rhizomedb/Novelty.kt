@@ -2,7 +2,7 @@
 package com.jetbrains.rhizomedb
 
 import com.jetbrains.rhizomedb.impl.Editor
-import fleet.util.removeShim
+import fleet.multiplatform.shims.removeShim
 import kotlinx.collections.immutable.ImmutableCollection
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.PersistentSet

@@ -34,6 +34,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.Ref;
+import com.intellij.openapi.vfs.newvfs.ManagingFS;
 import com.intellij.task.ProjectTask;
 import com.intellij.task.ProjectTaskContext;
 import com.intellij.task.ProjectTaskManager;
@@ -201,10 +202,13 @@ public final class CompileStepBeforeRun extends BeforeRunTaskProvider<CompileSte
 
           ProjectTaskManagerImpl.putBuildOriginator(myProject, CompileStepBeforeRun.class);
 
-          ApplicationManager.getApplication().invokeAndWait(() ->
-            ((FileDocumentManagerImpl)FileDocumentManager.getInstance()).saveAllDocuments(false));
+          ApplicationManager.getApplication().invokeAndWait(() -> {
+            ((FileDocumentManagerImpl)FileDocumentManager.getInstance()).saveAllDocuments(false);
+          });
+          //flush pending IO tasks, if any:
+          ManagingFS.getInstance().flushPendingUpdatesOrNotify();
 
-            projectTaskManager.run(pair.first, pair.second).onSuccess(taskResult -> {
+          projectTaskManager.run(pair.first, pair.second).onSuccess(taskResult -> {
             if ((!taskResult.hasErrors() || ignoreErrors) && !taskResult.isAborted()) {
               result.set(Boolean.TRUE);
             }

@@ -15,7 +15,6 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.CoroutineSupport
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.WriteIntentReadAction
-import com.intellij.openapi.application.backgroundWriteAction
 import com.intellij.openapi.application.impl.LaterInvocator
 import com.intellij.openapi.application.ui
 import com.intellij.openapi.components.ComponentManager
@@ -74,6 +73,7 @@ import java.util.concurrent.TimeUnit.NANOSECONDS
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -81,7 +81,10 @@ private val EP_NAME = ExtensionPointName<SaveAndSyncHandlerListener>("com.intell
 private val LISTEN_DELAY = 15.seconds
 
 @OptIn(FlowPreview::class)
-internal class SaveAndSyncHandlerImpl(private val coroutineScope: CoroutineScope) : SaveAndSyncHandler() {
+internal class SaveAndSyncHandlerImpl @JvmOverloads constructor(
+  private val coroutineScope: CoroutineScope,
+  listenDelay: Duration = LISTEN_DELAY,
+) : SaveAndSyncHandler() {
   private val refreshKnownLocalRootsRequests = MutableSharedFlow<Unit>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
   private val refreshOpenedFilesRequests = MutableSharedFlow<Unit>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
   private val saveRequests = MutableSharedFlow<Unit>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
@@ -98,7 +101,7 @@ internal class SaveAndSyncHandlerImpl(private val coroutineScope: CoroutineScope
   init {
     coroutineScope.launch {
       // add listeners after some delay - doesn't make sense to listen earlier
-      delay(LISTEN_DELAY)
+      delay(listenDelay)
 
       val settings = serviceAsync<GeneralSettings>()
       launch {
@@ -276,6 +279,8 @@ internal class SaveAndSyncHandlerImpl(private val coroutineScope: CoroutineScope
               WriteIntentReadAction.run {
                 (FileDocumentManager.getInstance() as FileDocumentManagerImpl).saveAllDocuments(false)
               }
+              //flush pending IO tasks, if any:
+              ManagingFS.getInstance().flushPendingUpdates()
             }
             if (addToSaveQueue(saveAppAndProjectsSettingsTask)) {
               requestSave()
@@ -318,6 +323,8 @@ internal class SaveAndSyncHandlerImpl(private val coroutineScope: CoroutineScope
   private fun saveDocumentsInBackgroundWriteAction() {
     coroutineScope.launch(CoroutineName("Saving documents on frame deactivation") + savingDispatcher + NonCancellable) {
       (FileDocumentManager.getInstance() as FileDocumentManagerImpl).saveAllDocuments(false)
+      //flush pending IO tasks, if any:
+      ManagingFS.getInstance().flushPendingUpdates()
     }
   }
 
@@ -425,7 +432,7 @@ internal class SaveAndSyncHandlerImpl(private val coroutineScope: CoroutineScope
       val interval = Registry.intValue("vfs.background.refresh.interval", 15).coerceIn(0, Int.MAX_VALUE).seconds
       while (true) {
         delay(interval)
-        if (!isSyncBlockedTemporarily() || roots.any { it is NewVirtualFile && it.isDirty }) {
+        if (!isSyncBlockedTemporarily() && roots.any { it is NewVirtualFile && it.isDirty }) {
           queue.refresh(true, roots)
           sessions.incrementAndGet()
         }
@@ -503,15 +510,8 @@ private suspend fun doRefreshOpenedFiles(refreshQueue: RefreshQueue) {
     return
   }
 
-  backgroundWriteAction {
-    val session = refreshQueue.createSession(
-      /* async = */ false,
-      /* recursive = */ false,
-      /* finishRunnable = */ null,
-      /* state = */ ModalityState.nonModal(),
-    )
-    session.addAllFiles(files)
-    session.launch()
+  withContext(Dispatchers.Default) {
+    refreshQueue.refreshWithHighPriority(false, files)
   }
 }
 

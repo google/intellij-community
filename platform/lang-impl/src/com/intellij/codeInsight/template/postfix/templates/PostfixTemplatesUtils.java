@@ -21,6 +21,8 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.SmartPointerManager;
+import com.intellij.psi.SmartPsiElementPointer;
 import com.intellij.refactoring.util.CommonRefactoringUtil;
 import com.intellij.util.Function;
 import com.intellij.util.concurrency.AppExecutorUtil;
@@ -68,11 +70,16 @@ public final class PostfixTemplatesUtils {
                                    @NotNull Editor editor,
                                    @NotNull PsiElement expr) {
     Project project = expr.getProject();
-    PsiElement[] elements = {expr};
     if (surrounder instanceof ModCommandSurrounder modCommandSurrounder) {
       ActionContext context = ActionContext.from(editor, expr.getContainingFile());
+      SmartPsiElementPointer<PsiElement> exprPointer = SmartPointerManager.createPointer(expr);
       ReadAction.nonBlocking(
-          () -> modCommandSurrounder.isApplicable(elements) ? modCommandSurrounder.surroundElements(context, elements) : null)
+          () -> {
+            PsiElement restoredExpr = exprPointer.getElement();
+            if (restoredExpr == null) return null;
+            PsiElement[] elems = {restoredExpr};
+            return modCommandSurrounder.isApplicable(elems) ? modCommandSurrounder.surroundElements(context, elems) : null;
+          })
         .expireWhen(() -> project.isDisposed() || editor.isDisposed())
         .finishOnUiThread(ModalityState.nonModal(), command -> {
           if (command == null) {
@@ -88,6 +95,7 @@ public final class PostfixTemplatesUtils {
         .submit(AppExecutorUtil.getAppExecutorService());
       return null;
     }
+    PsiElement[] elements = {expr};
     if (surrounder.isApplicable(elements)) {
       return surrounder.surroundElements(project, editor, elements);
     }
@@ -173,5 +181,33 @@ public final class PostfixTemplatesUtils {
 
   public static boolean readExternalTopmostAttribute(@NotNull Element template) {
     return Boolean.parseBoolean(template.getAttributeValue(TOPMOST_ATTR));
+  }
+
+  /**
+   * Computes the key range for postfix template expansion based on the current action context.
+   *
+   * @param actionContext the action context containing file and selection info
+   * @param key          the matched key (prefix typed so far)
+   * @param templateKey  the full template key
+   * @return the text range corresponding to the key in the document
+   */
+  public static @NotNull TextRange computeKeyRange(@NotNull ActionContext actionContext,
+                                                    @NotNull String key,
+                                                    @NotNull String templateKey) {
+    int selectionEndOffset = actionContext.selection().getEndOffset();
+    String textBeforeCaret = actionContext.file().getFileDocument().getText().substring(0, selectionEndOffset);
+    if (textBeforeCaret.endsWith(key)) {
+      return new TextRange(selectionEndOffset - key.length() + 1, selectionEndOffset);
+    }
+    else if (textBeforeCaret.endsWith(templateKey)) {
+      return new TextRange(selectionEndOffset - templateKey.length() + 1, selectionEndOffset);
+    }
+    else if (templateKey.substring(1)
+      .startsWith(actionContext.selection().substring(actionContext.file().getFileDocument().getText()))) {
+      return new TextRange(actionContext.selection().getStartOffset(), actionContext.selection().getEndOffset());
+    }
+    else {
+      return new TextRange(selectionEndOffset, selectionEndOffset);
+    }
   }
 }

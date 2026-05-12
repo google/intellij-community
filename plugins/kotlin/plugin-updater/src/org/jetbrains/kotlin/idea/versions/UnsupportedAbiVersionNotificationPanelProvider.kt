@@ -267,7 +267,7 @@ class UnsupportedAbiVersionNotificationPanelProvider : EditorNotificationProvide
 
     private class ErrorNotificationPanel(fileEditor: FileEditor) : EditorNotificationPanel(fileEditor, Status.Error) {
         init {
-            myLabel.icon = AllIcons.General.Error
+            myTextLabel.icon = AllIcons.General.Error
         }
     }
 

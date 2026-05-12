@@ -35,6 +35,8 @@ import com.intellij.psi.PsiManager;
 import com.intellij.psi.util.PsiUtilCore;
 import com.intellij.util.SmartList;
 import com.intellij.util.concurrency.EdtExecutorService;
+import com.intellij.util.concurrency.ThreadingAssertions;
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
 import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -115,7 +117,7 @@ public sealed class GeneralHighlightingPass extends ProgressableTextEditorHighli
 
   @Override
   protected void collectInformationWithProgress(@NotNull ProgressIndicator progress) {
-    ApplicationManager.getApplication().assertIsNonDispatchThread();
+    ThreadingAssertions.assertBackgroundThread();
 
     DaemonCodeAnalyzerEx daemonCodeAnalyzer = DaemonCodeAnalyzerEx.getInstanceEx(myProject);
     myHighlightVisitorRunner.createHighlightVisitorsFor(filteredVisitors->{
@@ -160,7 +162,7 @@ public sealed class GeneralHighlightingPass extends ProgressableTextEditorHighli
         }
         if (myHighlightInfoUpdater instanceof HighlightInfoUpdaterImpl impl) {
           List<? extends Class<? extends HighlightVisitor>> liveVisitorClasses = ContainerUtil.map(filteredVisitors, v -> v.getClass());
-          BiPredicate<? super Object, ? super PsiFile> keepToolIdPredicate = (toolId, __) -> !HighlightInfoUpdaterImpl.isHighlightVisitorToolId(toolId) || toolId instanceof Class && liveVisitorClasses.contains(toolId);
+          BiPredicate<? super Object, ? super PsiFile> keepToolIdPredicate = (toolId, _) -> !HighlightInfoUpdaterImpl.isHighlightVisitorToolId(toolId) || toolId instanceof Class && liveVisitorClasses.contains(toolId);
           impl.removeHighlightsForObsoleteTools(getHighlightingSession(), List.of(), keepToolIdPredicate);
         }
         boolean success;
@@ -224,7 +226,7 @@ public sealed class GeneralHighlightingPass extends ProgressableTextEditorHighli
 
   @Override
   protected void applyInformationWithProgress() {
-    ((HighlightingSessionImpl)getHighlightingSession()).applyFileLevelHighlightsRequests();
+    getHighlightingSession().applyFileLevelHighlightsRequests();
     getFile().putUserData(HAS_ERROR_ELEMENT, myHasErrorElement);
   }
 
@@ -233,6 +235,7 @@ public sealed class GeneralHighlightingPass extends ProgressableTextEditorHighli
     return myHighlights;
   }
 
+  @RequiresBackgroundThread
   private boolean collectHighlights(@NotNull TextRange restrictRange,
                                     @NotNull List<? extends PsiElement> elements1,
                                     @NotNull List<? extends PsiElement> elements2,
@@ -244,8 +247,7 @@ public sealed class GeneralHighlightingPass extends ProgressableTextEditorHighli
     Runnable runnable = () -> myHighlightVisitorRunner.runVisitors(getFile(), elements1, elements2, visitors, forceHighlightParents, chunkSize,
                                                                    myUpdateAll, () -> createInfoHolder(getFile()), resultSink);
     AnnotationSession session = AnnotationSessionImpl.create(getFile());
-    setupAnnotationSession(session, myPriorityRange, restrictRange,
-                           ((HighlightingSessionImpl)getHighlightingSession()).getMinimumSeverity());
+    setupAnnotationSession(session, myPriorityRange, restrictRange, getHighlightingSession().getMinimumSeverity());
     AnnotatorRunner annotatorRunner = myRunAnnotators ? new AnnotatorRunner(session, false) : null;
     if (annotatorRunner == null) {
       runnable.run();
@@ -265,7 +267,7 @@ public sealed class GeneralHighlightingPass extends ProgressableTextEditorHighli
 
   private static void cancelAndRestartDaemonLater(@NotNull ProgressIndicator progress, @NotNull Project project, @NotNull String reason) throws ProcessCanceledException {
     RESTART_REQUESTS.incrementAndGet();
-    progress.cancel();
+    ((DaemonProgressIndicator)progress).cancel(reason);
     int delay = ApplicationManager.getApplication().isUnitTestMode() ? 0 : RESTART_DAEMON_RANDOM.nextInt(100);
     EdtExecutorService.getScheduledExecutorInstance().schedule(() -> {
       RESTART_REQUESTS.set(0);
@@ -309,8 +311,7 @@ public sealed class GeneralHighlightingPass extends ProgressableTextEditorHighli
         return added;
       }
     };
-    setupAnnotationSession(holder.getAnnotationSession(), myPriorityRange, myRestrictRange,
-                           ((HighlightingSessionImpl)getHighlightingSession()).getMinimumSeverity());
+    setupAnnotationSession(holder.getAnnotationSession(), myPriorityRange, myRestrictRange, getHighlightingSession().getMinimumSeverity());
     return holder;
   }
 
@@ -323,8 +324,9 @@ public sealed class GeneralHighlightingPass extends ProgressableTextEditorHighli
     ((AnnotationSessionImpl)annotationSession).setVR(priorityRange, highlightRange);
   }
 
+  @RequiresBackgroundThread
   private void reportErrorsToWolf(boolean hasErrors) {
-    ApplicationManager.getApplication().assertIsNonDispatchThread();
+    ThreadingAssertions.assertBackgroundThread();
     if (!getFile().getViewProvider().isPhysical()) return; // e.g. errors in evaluate expression
     Project project = getFile().getProject();
     if (!PsiManager.getInstance(project).isInProject(getFile())) return; // do not report problems in libraries

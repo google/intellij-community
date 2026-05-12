@@ -25,6 +25,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.getOpenedProjects
 import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.newvfs.ManagingFS
 import com.intellij.platform.ide.progress.ModalTaskOwner
 import com.intellij.platform.ide.progress.runWithModalProgressBlocking
 import com.intellij.platform.ide.progress.withBackgroundProgress
@@ -191,13 +192,25 @@ fun getPerOsSettingsStorageFolderName(): String = when {
 }
 
 /**
+ * File names that are stored inside the options directory but may arrive with an environment-specific
+ * subdirectory prefix (e.g. "WSL-Ubuntu/jdk.table.xml"). Despite containing a path separator, they
+ * still need the "options/" prefix — unlike schema files which already carry their full relative path.
+ *
+ * Note: an identical set exists privately in OptionsDirectoryProcessor (intellij.java.compiler.impl),
+ * kept separate to avoid a cross-module dependency.
+ */
+private val ENVIRONMENT_SPECIFIC_OPTIONS_FILENAMES = setOf("jdk.table.xml", "applicationLibraries.xml")
+
+/**
  * Converts fileSpec passed to [StreamProvider]'s methods to a relative path from the root config directory.
  */
 @Internal
 fun getFileRelativeToRootConfig(fileSpecPassedToProvider: String): String =
-  // For PersistentStateComponents the fileSpec is passed without the 'options' folder, e.g. 'editor.xml' or 'mac/keymaps.xml'
+// For PersistentStateComponents the fileSpec is passed without the 'options' folder, e.g. 'editor.xml' or 'mac/keymaps.xml'
   // OTOH for schemas it is passed together with the containing folder, e.g. 'keymaps/my_keymap.xml'
-  if (!fileSpecPassedToProvider.contains("/") || fileSpecPassedToProvider.startsWith(getPerOsSettingsStorageFolderName() + "/")) {
+  if (!fileSpecPassedToProvider.contains("/")
+      || fileSpecPassedToProvider.startsWith(getPerOsSettingsStorageFolderName() + "/")
+      || ENVIRONMENT_SPECIFIC_OPTIONS_FILENAMES.any { fileSpecPassedToProvider.endsWith("/$it") }) {
     "${PathManager.OPTIONS_DIRECTORY}/${fileSpecPassedToProvider}"
   }
   else fileSpecPassedToProvider
@@ -222,6 +235,8 @@ suspend fun saveProjectsAndApp(forceSavingAllSettings: Boolean, onlyProject: Pro
       }
     }
   }
+  //flush pending IO tasks, if any:
+  ManagingFS.getInstance().flushPendingUpdates()
 
   val duration = (System.nanoTime() - start).nanoseconds.inWholeMilliseconds
   if (duration > 1000 || LOG.isDebugEnabled) {

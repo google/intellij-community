@@ -3,12 +3,14 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "psi-tests",
+  module_name = "intellij.platform.syntax.psi.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "psi-tests_test_lib",
+  testonly = True,
   module_name = "intellij.platform.syntax.psi.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
@@ -43,6 +45,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.syntax.psi.tests` end
+
+### auto-generated section `iml intellij.platform.syntax.psi.tests` start
+exports_files([
+  "intellij.platform.syntax.psi.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.syntax.psi.tests` end
 
 ### auto-generated section `test intellij.platform.syntax.psi.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

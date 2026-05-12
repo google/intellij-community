@@ -17,6 +17,8 @@ import com.intellij.codeInsight.completion.PrefixMatcher;
 import com.intellij.codeInsight.completion.ShowHideIntentionIconLookupAction;
 import com.intellij.codeInsight.completion.impl.CamelHumpMatcher;
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
+import com.intellij.codeInsight.editorActions.smartEnter.SmartEnterProcessor;
+import com.intellij.codeInsight.editorActions.smartEnter.SmartEnterProcessors;
 import com.intellij.codeInsight.lookup.LookupActionProvider;
 import com.intellij.codeInsight.lookup.LookupArranger;
 import com.intellij.codeInsight.lookup.LookupElement;
@@ -40,6 +42,7 @@ import com.intellij.injected.editor.DocumentWindow;
 import com.intellij.injected.editor.EditorWindow;
 import com.intellij.internal.statistic.service.fus.collectors.UIEventLogger;
 import com.intellij.lang.LangBundle;
+import com.intellij.lang.Language;
 import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.modcommand.ActionContext;
 import com.intellij.modcommand.ModCommand;
@@ -91,6 +94,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.impl.source.tree.injected.InjectedLanguageEditorUtil;
 import com.intellij.psi.impl.source.tree.injected.InjectedLanguageUtil;
+import com.intellij.psi.util.PsiUtilBase;
 import com.intellij.ui.ClickListener;
 import com.intellij.ui.CollectionListModel;
 import com.intellij.ui.ComponentUtil;
@@ -107,6 +111,7 @@ import com.intellij.util.SlowOperations;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.concurrency.ThreadingAssertions;
 import com.intellij.util.containers.ContainerUtil;
+import com.intellij.util.indexing.DumbModeAccessType;
 import com.intellij.util.ui.Advertiser;
 import com.intellij.util.ui.EDT;
 import com.intellij.util.ui.JBUI;
@@ -757,7 +762,8 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
     if (command == null) {
       command = ProgressManager.getInstance().runProcessWithProgressSynchronously(
         () -> ReadAction.nonBlocking(
-          () -> wrapper.computeCommand(finalActionContext, insertionContext)).executeSynchronously(),
+          () -> DumbModeAccessType.RELIABLE_DATA_ONLY.ignoreDumbMode(
+            () -> wrapper.computeCommand(finalActionContext, insertionContext))).executeSynchronously(),
         AnalysisBundle.message("complete"), true, project);
     }
     ModCompletionInserter.executeModCommand(editor, psiFile, start, actionContext.offset(), command);
@@ -784,10 +790,11 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
     }
 
     myFinishingCompletionATM = true;
+    PsiFile file = getPsiFile();
     if (fireBeforeItemSelected(item, completionChar)) {
       if (item instanceof CompletionItemLookupElement wrapper) {
-        PsiFile file = Objects.requireNonNull(getPsiFile(), "PsiFile must be known for ModCommand completion");
-        editor.getCaretModel().runForEachCaret(__ -> {
+        Objects.requireNonNull(file, "PsiFile must be known for ModCommand completion");
+        editor.getCaretModel().runForEachCaret(_ -> {
           insertItem(completionChar, editor, editor.getCaretModel().getOffset() - getPrefixLength(item), file, wrapper);
         });
       } else {
@@ -810,6 +817,21 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
     doHide(false, true);
 
     fireItemSelected(item, completionChar);
+
+    if (completionChar == COMPLETE_STATEMENT_SELECT_CHAR && item instanceof CompletionItemLookupElement && file != null) {
+      processSmartEnter(file);
+    }
+  }
+
+  private void processSmartEnter(@NotNull PsiFile file) {
+    Language language = PsiUtilBase.getLanguageInEditor(editor, file.getProject());
+    if (language != null) {
+      ApplicationManager.getApplication().runWriteAction(() -> {
+        for (SmartEnterProcessor processor : SmartEnterProcessors.INSTANCE.allForLanguage(language)) {
+          if (processor.processAfterCompletion(editor, file)) break;
+        }
+      });
+    }
   }
 
   @ApiStatus.Internal
@@ -837,7 +859,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
 
     item.putUserData(CodeCompletionHandlerBase.ITEM_PATTERN_AND_PREFIX_LENGTH, new FinishCompletionInfo(itemPattern, prefixLength));
 
-    editor.getCaretModel().runForEachCaret(__ -> {
+    editor.getCaretModel().runForEachCaret(_ -> {
       EditorModificationUtilEx.deleteSelectedText(editor);
       int caretOffset = editor.getCaretModel().getOffset();
       LookupElementInsertStopper element = item.as(LookupElementInsertStopper.class);
@@ -1045,7 +1067,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
   }
 
   private void addListeners() {
-    editor.getDocument().addDocumentListener(new DocumentListener() {
+    editor.getElfDocument().addDocumentListener(new DocumentListener() {
       @Override
       public void documentChanged(@NotNull DocumentEvent e) {
         if (canHideOnChange()) {
@@ -1273,8 +1295,19 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
     if (currentItem instanceof CompletionItemLookupElement wrapper && !PowerSaveMode.isEnabled()) {
       PsiFile file = getPsiFile();
       if (file != null) {
+        int prefixLength = getPrefixLength(currentItem);
+        // getPrefixLength() can become negative in a transient state when the user deletes a character
+        // that belonged to the base completion prefix (for example, typed "a.", invoked completion,
+        // then pressed Backspace to delete the dot). LookupOffsets.truncatePrefix()
+        // increments myRemovedPrefix and signals that completion must restart; before the
+        // restart runs, scheduleRestart -> hideAutopopupIfMeaningless -> refreshUi ->
+        // fireCurrentItemChanged -> this method is invoked while the currently selected
+        // item still has an itemPattern shorter than myRemovedPrefix (for example, for postfix
+        // templates whose matcher prefix is "" right after the dot). At that moment the
+        // "prefix length" is logically meaningless
+        if (prefixLength < 0) return;
         ActionContext actionContext = ActionContext.from(editor, file);
-        int start = actionContext.offset() - getPrefixLength(currentItem);
+        int start = actionContext.offset() - prefixLength;
         ActionContext finalActionContext = actionContext
           .withOffset(start)
           .withSelection(TextRange.create(start, actionContext.offset()));

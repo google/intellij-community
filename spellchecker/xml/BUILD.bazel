@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.spellchecker.xml` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "xml_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "xml",
   module_name = "intellij.spellchecker.xml",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":xml_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/core-api:core",
     "//spellchecker",
@@ -23,11 +18,13 @@ jvm_library(
     "//platform/analysis-api:analysis",
     "//xml/xml-psi-api:psi",
     "//platform/core-impl",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
   ]
 )
 
 jvm_library(
   name = "xml_test_lib",
+  testonly = True,
   module_name = "intellij.spellchecker.xml",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -42,6 +39,13 @@ jvm_library(
     "//platform/analysis-api:analysis_test_lib",
     "//xml/xml-psi-api:psi_test_lib",
     "//platform/core-impl:core-impl_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
   ]
 )
 ### auto-generated section `build intellij.spellchecker.xml` end
+
+### auto-generated section `iml intellij.spellchecker.xml` start
+exports_files([
+  "intellij.spellchecker.xml.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.spellchecker.xml` end

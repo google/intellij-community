@@ -232,7 +232,7 @@ public class IdEntryToScopeMapImpl extends AbstractMap<IdIndexEntry, Integer> im
 
     Int2ObjectMap<IntList> scopeMaskToHashes = new Int2ObjectOpenHashMap<>(8);
     idToScopeMap.forEach((idHash, scopeMask) -> {
-      IntList idHashes = scopeMaskToHashes.computeIfAbsent(scopeMask, __ -> new IntArrayList());
+      IntList idHashes = scopeMaskToHashes.computeIfAbsent(scopeMask, _ -> new IntArrayList());
       idHashes.add(idHash);
       return true;
     });

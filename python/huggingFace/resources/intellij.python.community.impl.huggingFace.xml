@@ -18,5 +18,6 @@
     <registryKey defaultValue="true"
                  description="Enable Hugging Face model and dataset cards, see PY-63670"
                  key="python.enable.hugging.face.cards"/>
+    <projectSettings service="com.intellij.python.community.impl.huggingFace.cache.HuggingFaceLastCacheRefresh"/>
   </extensions>
 </idea-plugin>

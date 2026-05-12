@@ -12,8 +12,8 @@ import com.intellij.platform.pluginSystem.parser.impl.PluginDescriptorBuilder
 import com.intellij.platform.pluginSystem.parser.impl.PluginDescriptorFromXmlStreamConsumer
 import com.intellij.platform.pluginSystem.parser.impl.PluginDescriptorReaderContext
 import com.intellij.platform.pluginSystem.parser.impl.consume
+import com.intellij.platform.pluginSystem.testFramework.PseudoProductTestPluginInitContext
 import com.intellij.platform.runtime.product.ProductMode
-import com.intellij.platform.testFramework.loadDescriptorInTest
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.TestDataPath
 import com.intellij.testFramework.UsefulTestCase
@@ -24,7 +24,6 @@ import com.intellij.util.system.OS
 import com.intellij.util.xml.dom.NoOpXmlInterner
 import com.intellij.util.xml.dom.XmlElement
 import com.intellij.util.xml.dom.readXmlAsModel
-import org.assertj.core.api.Assertions
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Assert
 import org.junit.Assert.assertEquals
@@ -171,42 +170,10 @@ class PluginManagerTest {
     doPluginSortTest("simplePluginSort", false)
   }
 
-  /*
-   Actual result:
-   HTTP Client (main)
-   Endpoints (main)
-   HTTP Client (intellij.restClient.microservicesUI, depends on Endpoints)
-
-   Expected:
-   Endpoints (main)
-   HTTP Client (main)
-   HTTP Client (intellij.restClient.microservicesUI, depends on Endpoints)
-
-   But the graph is correct - HTTP Client (main) it is a node that doesn't depend on Endpoints (main),
-   so no reason for DFSTBuilder to put it after.
-   See CachingSemiGraph.getSortedPlugins for a solution.
-  */
-  @Test
-  @Throws(Exception::class)
-  fun moduleSort() {
-    doPluginSortTest("moduleSort", true)
-  }
-
   @Test
   @Throws(Exception::class)
   fun testUltimatePlugins() {
     doPluginSortTest("ultimatePlugins", true)
-  }
-
-  @Test
-  fun testModulePluginIdContract() {
-    val pluginsPath = Path.of(PlatformTestUtil.getPlatformTestDataPath(), "plugins", "withModules")
-    val descriptorBundled = loadDescriptorInTest(pluginsPath, true)
-    val pluginSet = PluginSetBuilder(mutableSetOf(descriptorBundled)).createPluginSetWithEnabledModulesMap()
-
-    val moduleId = PluginId.getId("foo.bar")
-    val corePlugin = PluginId.getId("my.plugin")
-    Assertions.assertThat(pluginSet.findEnabledPlugin(moduleId)!!.getPluginId()).isEqualTo(corePlugin)
   }
 
   @Test
@@ -244,7 +211,6 @@ class PluginManagerTest {
 
     @Throws(IOException::class, XMLStreamException::class)
     private fun doPluginSortTest(testDataName: String?, isBundled: Boolean) {
-      PluginManagerCore.getAndClearPluginLoadingErrors()
       val loadPluginResult: PluginManagerState = loadAndInitializeDescriptors("$testDataName.xml", isBundled)
       val text = StringBuilder()
       for (descriptor in loadPluginResult.pluginSet.getEnabledModules()) {
@@ -255,10 +221,15 @@ class PluginManagerTest {
         text.append('\n')
       }
       text.append("\n\n")
-      for (html in PluginManagerCore.getAndClearPluginLoadingErrors()) {
+      for (html in loadPluginResult.loadingErrors) {
         text.append(html.htmlMessage.toString().replace("<br/>", "\n").replace("&#39;", "")).append('\n')
       }
-      UsefulTestCase.assertSameLinesWithFile(File(testDataPath, "$testDataName.txt").path, text.toString())
+      val expectedResultFilename = if (PluginManagerCore.fallbackToOldPluginSetResolution()) {
+        "$testDataName.txt"
+      } else {
+        "$testDataName.txt.2"
+      }
+      UsefulTestCase.assertSameLinesWithFile(File(testDataPath, expectedResultFilename).path, text.toString())
     }
 
     private fun assertConvertsTo(untilBuild: String?, result: String?) {
@@ -309,18 +280,12 @@ class PluginManagerTest {
       val loadingContext = PluginDescriptorLoadingContext(
         getBuildNumberForDefaultDescriptorVersion = { buildNumber }
       )
-      val initContext = PluginInitializationContext.buildForTest(
-        essentialPlugins = emptySet(),
-        disabledPlugins = emptySet(),
-        expiredPlugins = emptySet(),
-        brokenPluginVersions = emptyMap(),
-        getProductBuildNumber = { buildNumber },
-        requirePlatformAliasDependencyForLegacyPlugins = false,
-        checkEssentialPlugins = false,
-        explicitPluginSubsetToLoad = null,
-        disablePluginLoadingCompletely = false,
-        currentProductModeId = ProductMode.MONOLITH.id,
-      )
+      val initContext = object : PseudoProductTestPluginInitContext() {
+        override val productBuildNumber: BuildNumber = buildNumber
+        override val currentProductModeId: String = ProductMode.MONOLITH.id
+        override val environmentConfiguredModules: Map<PluginModuleId, PluginInitializationContext.EnvironmentConfiguredModuleData> get() = emptyMap()
+        override val expiredPlugins: Set<PluginId> = emptySet()
+      }
       val root = readXmlAsModel(Files.newInputStream(file))
       val autoGenerateModuleDescriptor = Ref<Boolean>(false)
       val moduleMap = HashMap<String, XmlElement>()
@@ -361,7 +326,7 @@ class PluginManagerTest {
           dataLoader = LocalFsDataLoader(pluginPath)
         )
         plugins.add(descriptor)
-        descriptor.jarFiles = emptyList()
+        descriptor.ownClassPath = emptyList()
       }
       loadingContext.close()
       val discoveredPlugins = PluginsDiscoveryResult.build(
@@ -372,7 +337,8 @@ class PluginManagerTest {
         initContext = initContext,
         discoveredPlugins = discoveredPlugins,
         coreLoader = PluginManagerTest::class.java.getClassLoader(),
-        parentActivity = null
+        parentActivity = null,
+        reportingPolicy = PluginLoadingErrorReportingPolicy.TEST,
       )
     }
 

@@ -1,6 +1,7 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.editor.impl;
 
+import com.intellij.openapi.CustomFoldRegionRendererEx;
 import com.intellij.openapi.editor.CustomFoldRegion;
 import com.intellij.openapi.editor.CustomFoldRegionRenderer;
 import com.intellij.openapi.editor.Document;
@@ -111,7 +112,11 @@ public final class CustomFoldRegionImpl extends FoldRegionImpl implements Custom
 
   private void doUpdate() {
     myWidthInPixels = Math.max(0, myRenderer.calcWidthInPixels(this));
-    myHeightInPixels = Math.max(myEditor.getLineHeight(), myRenderer.calcHeightInPixels(this));
+    if (myRenderer instanceof CustomFoldRegionRendererEx customFoldRegionRendererEx) {
+      myHeightInPixels = Math.max(customFoldRegionRendererEx.getMinimumHeightInPixels(), myRenderer.calcHeightInPixels(this));
+    } else {
+      myHeightInPixels = Math.max(myEditor.getLineHeight(), myRenderer.calcHeightInPixels(this));
+    }
     myGutterIconRenderer = myRenderer.calcGutterIconRenderer(this);
   }
 

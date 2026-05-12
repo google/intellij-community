@@ -3,6 +3,7 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tests",
+  module_name = "intellij.kotlin.featuresTrainer.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -22,6 +23,7 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.featuresTrainer.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -49,6 +51,8 @@ jvm_library(
     "//platform/testFramework:testFramework_test_lib",
     "//plugins/kotlin/features-trainer",
     "//plugins/kotlin/features-trainer:features-trainer_test_lib",
+    "//plugins/ide-features-trainer:featuresTrainer-tests",
+    "//plugins/ide-features-trainer:featuresTrainer-tests_test_lib",
   ],
   runtime_deps = [
     ":tests",
@@ -56,6 +60,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.kotlin.featuresTrainer.tests` end
+
+### auto-generated section `iml intellij.kotlin.featuresTrainer.tests` start
+exports_files([
+  "intellij.kotlin.featuresTrainer.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.featuresTrainer.tests` end
 
 ### auto-generated section `test intellij.kotlin.featuresTrainer.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

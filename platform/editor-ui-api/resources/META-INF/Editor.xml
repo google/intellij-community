@@ -23,5 +23,6 @@
       serviceImplementation="com.intellij.openapi.vcs.DefaultElementStatusTracker" />
     <applicationService serviceImplementation="com.intellij.ide.ui.NotRoamableUiSettings" />
     <applicationService serviceImplementation="com.intellij.openapi.actionSystem.remoting.ActionRemoteBehaviorCustomizer" open="true"/>
+    <applicationSettings service="com.intellij.ide.ui.NotRoamableUiSettings"/>
   </extensions>
 </idea-plugin>

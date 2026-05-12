@@ -34,7 +34,6 @@ internal class K2PullUpData(
         getSuperTypeEntryBySymbol(sourceClass, getTargetClassSymbol(analysisSession))
     }
 
-    @OptIn(KaAllowAnalysisOnEdt::class, KaExperimentalApi::class)
     private fun KaSession.collectVisibleTypeParameters(klass: KtClassOrObject): List<KaTypeParameterSymbol> =
         klass.containingKtFile.scopeContext(klass).scopes
             .filter { it.kind is KaScopeKind.TypeParameterScope }
@@ -58,12 +57,12 @@ internal class K2PullUpData(
             ) ?: KaSubstitutor.Empty(token)
 
             targetClassSymbol.typeParameters.forEach { targetTypeParam ->
-                val targetTypeParamType = buildTypeParameterType(targetTypeParam)
+                val targetTypeParamType = typeCreator.typeParameterType(targetTypeParam)
                 val substituted = inheritanceSubstitutor.substitute(targetTypeParamType)
 
                 if (!substituted.semanticallyEquals(targetTypeParamType)) {
                     sourceClass.symbol.typeParameters.forEach { sourceTypeParam ->
-                        val sourceTypeParamType = buildTypeParameterType(sourceTypeParam)
+                        val sourceTypeParamType = typeCreator.typeParameterType(sourceTypeParam)
                         if (substituted.semanticallyEquals(sourceTypeParamType)) {
                             substitution(sourceTypeParam, targetTypeParamType)
                         }

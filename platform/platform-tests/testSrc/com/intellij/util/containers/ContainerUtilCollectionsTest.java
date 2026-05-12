@@ -148,7 +148,7 @@ public class ContainerUtilCollectionsTest extends Assert {
       public boolean equals(Object o1, Object o2) {
         return o1.equals(o2);
       }
-    }, (__, __2, __3) -> {
+    }, (_, _, _) -> {
     });
     checkKeyTossedEventually(map);
   }

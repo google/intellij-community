@@ -390,6 +390,56 @@ public class MultiFileJvmBasicCompletionTestGenerated extends AbstractMultiFileJ
         runTest("../testData/basic/multifile/MoreSpecificExtensionIsPrivate/");
     }
 
+    @TestMetadata("MultipleArgumentsJavaCollectionPlatformTypes")
+    public void testMultipleArgumentsJavaCollectionPlatformTypes() throws Exception {
+        runTest("../testData/basic/multifile/MultipleArgumentsJavaCollectionPlatformTypes/");
+    }
+
+    @TestMetadata("MultipleArgumentsJavaMethodWithTheFirstArgument")
+    public void testMultipleArgumentsJavaMethodWithTheFirstArgument() throws Exception {
+        runTest("../testData/basic/multifile/MultipleArgumentsJavaMethodWithTheFirstArgument/");
+    }
+
+    @TestMetadata("MultipleArgumentsJavaNotNullParameter")
+    public void testMultipleArgumentsJavaNotNullParameter() throws Exception {
+        runTest("../testData/basic/multifile/MultipleArgumentsJavaNotNullParameter/");
+    }
+
+    @TestMetadata("MultipleArgumentsJavaOverloadedConstructor")
+    public void testMultipleArgumentsJavaOverloadedConstructor() throws Exception {
+        runTest("../testData/basic/multifile/MultipleArgumentsJavaOverloadedConstructor/");
+    }
+
+    @TestMetadata("MultipleArgumentsJavaOverloadedConstructorWithTheFirstArgument")
+    public void testMultipleArgumentsJavaOverloadedConstructorWithTheFirstArgument() throws Exception {
+        runTest("../testData/basic/multifile/MultipleArgumentsJavaOverloadedConstructorWithTheFirstArgument/");
+    }
+
+    @TestMetadata("MultipleArgumentsJavaRecord")
+    public void testMultipleArgumentsJavaRecord() throws Exception {
+        runTest("../testData/basic/multifile/MultipleArgumentsJavaRecord/");
+    }
+
+    @TestMetadata("MultipleArgumentsJavaStaticMethod")
+    public void testMultipleArgumentsJavaStaticMethod() throws Exception {
+        runTest("../testData/basic/multifile/MultipleArgumentsJavaStaticMethod/");
+    }
+
+    @TestMetadata("MultipleArgumentsJavaSupertypes")
+    public void testMultipleArgumentsJavaSupertypes() throws Exception {
+        runTest("../testData/basic/multifile/MultipleArgumentsJavaSupertypes/");
+    }
+
+    @TestMetadata("MultipleArgumentsJavaSupertypesWithNullableKotlinSubtypes")
+    public void testMultipleArgumentsJavaSupertypesWithNullableKotlinSubtypes() throws Exception {
+        runTest("../testData/basic/multifile/MultipleArgumentsJavaSupertypesWithNullableKotlinSubtypes/");
+    }
+
+    @TestMetadata("MultipleArgumentsJavaWithNullableKotlin")
+    public void testMultipleArgumentsJavaWithNullableKotlin() throws Exception {
+        runTest("../testData/basic/multifile/MultipleArgumentsJavaWithNullableKotlin/");
+    }
+
     @TestMetadata("NoAutoInsertionOfNotImported")
     public void testNoAutoInsertionOfNotImported() throws Exception {
         runTest("../testData/basic/multifile/NoAutoInsertionOfNotImported/");
@@ -568,6 +618,56 @@ public class MultiFileJvmBasicCompletionTestGenerated extends AbstractMultiFileJ
     @TestMetadata("PropertyKeysWithPrefix")
     public void testPropertyKeysWithPrefix() throws Exception {
         runTest("../testData/basic/multifile/PropertyKeysWithPrefix/");
+    }
+
+    @TestMetadata("RerunStaticFromAnnotation")
+    public void testRerunStaticFromAnnotation() throws Exception {
+        runTest("../testData/basic/multifile/RerunStaticFromAnnotation/");
+    }
+
+    @TestMetadata("RerunStaticFromClass")
+    public void testRerunStaticFromClass() throws Exception {
+        runTest("../testData/basic/multifile/RerunStaticFromClass/");
+    }
+
+    @TestMetadata("RerunStaticFromEnum")
+    public void testRerunStaticFromEnum() throws Exception {
+        runTest("../testData/basic/multifile/RerunStaticFromEnum/");
+    }
+
+    @TestMetadata("RerunStaticFromGeneric")
+    public void testRerunStaticFromGeneric() throws Exception {
+        runTest("../testData/basic/multifile/RerunStaticFromGeneric/");
+    }
+
+    @TestMetadata("RerunStaticFromInterface")
+    public void testRerunStaticFromInterface() throws Exception {
+        runTest("../testData/basic/multifile/RerunStaticFromInterface/");
+    }
+
+    @TestMetadata("RerunStaticFromNested")
+    public void testRerunStaticFromNested() throws Exception {
+        runTest("../testData/basic/multifile/RerunStaticFromNested/");
+    }
+
+    @TestMetadata("RerunStaticFromRecord")
+    public void testRerunStaticFromRecord() throws Exception {
+        runTest("../testData/basic/multifile/RerunStaticFromRecord/");
+    }
+
+    @TestMetadata("RerunStaticOtherPackage")
+    public void testRerunStaticOtherPackage() throws Exception {
+        runTest("../testData/basic/multifile/RerunStaticOtherPackage/");
+    }
+
+    @TestMetadata("RerunStaticPrivateOuter")
+    public void testRerunStaticPrivateOuter() throws Exception {
+        runTest("../testData/basic/multifile/RerunStaticPrivateOuter/");
+    }
+
+    @TestMetadata("RerunStaticSamePackage")
+    public void testRerunStaticSamePackage() throws Exception {
+        runTest("../testData/basic/multifile/RerunStaticSamePackage/");
     }
 
     @TestMetadata("StaticMembersOfImportedClassFromJava")

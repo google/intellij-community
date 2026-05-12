@@ -1,11 +1,12 @@
 from collections.abc import Callable
-from typing import TypeVar
 
 from django.http.request import HttpRequest
 from django.utils.functional import SimpleLazyObject
+from typing_extensions import TypeVar
 
 _R = TypeVar("_R", bound=HttpRequest)
 
+def csp(request: HttpRequest) -> dict[str, SimpleLazyObject | None]: ...
 def csrf(request: HttpRequest) -> dict[str, SimpleLazyObject]: ...
 def debug(request: HttpRequest) -> dict[str, Callable | bool]: ...
 def i18n(request: HttpRequest) -> dict[str, list[tuple[str, str]] | bool | str]: ...

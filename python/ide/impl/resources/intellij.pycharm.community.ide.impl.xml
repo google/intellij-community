@@ -25,6 +25,8 @@
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
+    <registryKey defaultValue="[off|on|ask*]" description="Load project structure from pyproject.toml" key="intellij.python.pyproject.model"
+                 restartRequired="true" overrides="true"/>
     <projectService serviceInterface="com.intellij.psi.search.ProjectScopeBuilder"
                     serviceImplementation="com.intellij.pycharm.community.ide.impl.PyProjectScopeBuilder"
                     overrides="true"/>
@@ -132,7 +134,8 @@
                         overrides="true"/>
 
 
-    <directoryIndexExcludePolicy implementation="com.intellij.pycharm.community.ide.impl.PyDirectoryIndexExcludePolicy"/>
+    <workspaceModel.fileIndexContributor implementation="com.intellij.pycharm.community.ide.impl.workspaceModel.PyToxExcludeWorkspaceFileIndexContributor"/>
+    <workspaceModel.fileIndexContributor implementation="com.intellij.pycharm.community.ide.impl.workspaceModel.PySitePackagesExcludeWorkspaceFileIndexContributor"/>
 
     <applicationService serviceImplementation="com.intellij.pycharm.community.ide.impl.newProjectWizard.welcome.PyWelcomeSettings"/>
     <statistics.counterUsagesCollector
@@ -145,10 +148,11 @@
     <codeInsight.codeVision.settings.defaults implementation="com.intellij.pycharm.community.ide.impl.PyCharmCodeVisionSettingsDefaults"/>
     <startPagePromoter
       implementation="com.intellij.pycharm.community.ide.impl.promo.WelcomeToUnifiedWelcomeScreenBanner"/>
+    <applicationSettings service="com.intellij.pycharm.community.ide.impl.newProjectWizard.welcome.PyWelcomeSettings"/>
   </extensions>
 
   <applicationListeners>
-    <listener class="com.intellij.pycharm.community.ide.impl.welcomeScreen.PyWelcomeScreenNewUsersTracker"
+    <listener class="com.intellij.pycharm.community.ide.impl.welcomeScreen.PyWelcomeScreenFreeModeTracker"
               topic="com.intellij.ide.AppLifecycleListener"/>
     <listener class="com.intellij.pycharm.community.ide.impl.promo.CommunityToUnifiedListener"
               topic="com.intellij.ide.AppLifecycleListener"/>

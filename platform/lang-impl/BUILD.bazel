@@ -1,5 +1,5 @@
 ### auto-generated section `build intellij.platform.lang.impl` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "kt_javac_options", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "kt_javac_options")
 
 kt_javac_options(
   name = "custom-javac-options",
@@ -12,18 +12,13 @@ kt_javac_options(
   no_proc = True
 )
 
-resourcegroup(
-  name = "lang-impl_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "lang-impl",
   module_name = "intellij.platform.lang.impl",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
-  resources = [":lang-impl_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   javac_opts = ":custom-javac-options",
   deps = [
     "//platform/boot",
@@ -36,6 +31,7 @@ jvm_library(
     "//libraries/oro-matcher",
     "//libraries/velocity",
     "//platform/platform-impl:ide-impl",
+    "//platform/platform-util-io:ide-util-io",
     "//platform/welcome-screen-impl:welcomeScreen-impl",
     "//platform/lang-core",
     "//platform/lvcs-api:lvcs",
@@ -55,7 +51,6 @@ jvm_library(
     "//libraries/gson",
     "//jps/model-impl",
     "//platform/analysis-impl",
-    "//platform/structure-view-impl:structureView-impl",
     "//libraries/commons/lang3",
     "//libraries/commons/logging",
     "//platform/diff-impl",
@@ -77,11 +72,13 @@ jvm_library(
     "//libraries/stream",
     "//platform/statistics",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//platform/core-impl",
     "//libraries/kotlinx/coroutines/core",
     "//libraries/fastutil",
     "//libraries/pty4j",
     "//platform/core-ui",
+    "//platform/util:util-ui",
     "//platform/code-style-api:codeStyle",
     "//platform/code-style-impl:codeStyle-impl",
     "//libraries/caffeine",
@@ -119,6 +116,7 @@ jvm_library(
     "//platform/backend/observation",
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
     "//platform/util/storages",
+    "//platform/util-ex",
     "//platform/platform-impl/internal",
     "//platform/util/concurrency",
     "//platform/platform-impl/ui",
@@ -133,8 +131,11 @@ jvm_library(
     "//platform/project/shared:project",
     "//platform/kernel/shared:kernel",
     "//platform/platform-impl/rpc",
+    "//platform/progress/shared:ide-progress",
     "//platform/execution",
     "//platform/forms_rt:java-guiForms-rt",
+    "//platform/locking-impl",
+    "//fleet/rhizomedb",
   ],
   exports = [
     "//platform/analysis-impl",
@@ -144,6 +145,7 @@ jvm_library(
 
 jvm_library(
   name = "lang-impl_test_lib",
+  testonly = True,
   module_name = "intellij.platform.lang.impl",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -166,6 +168,7 @@ jvm_library(
     "//libraries/oro-matcher:oro-matcher_test_lib",
     "//libraries/velocity:velocity_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/platform-util-io:ide-util-io_test_lib",
     "//platform/welcome-screen-impl:welcomeScreen-impl_test_lib",
     "//platform/lang-core:lang-core_test_lib",
     "//platform/lvcs-api:lvcs_test_lib",
@@ -185,7 +188,6 @@ jvm_library(
     "//libraries/gson:gson_test_lib",
     "//jps/model-impl:model-impl_test_lib",
     "//platform/analysis-impl:analysis-impl_test_lib",
-    "//platform/structure-view-impl:structureView-impl_test_lib",
     "//libraries/commons/lang3:lang3_test_lib",
     "//libraries/commons/logging:logging_test_lib",
     "//platform/diff-impl:diff-impl_test_lib",
@@ -206,11 +208,13 @@ jvm_library(
     "//libraries/stream:stream_test_lib",
     "//platform/statistics:statistics_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/core-impl:core-impl_test_lib",
     "//libraries/kotlinx/coroutines/core:core_test_lib",
     "//libraries/fastutil:fastutil_test_lib",
     "//libraries/pty4j:pty4j_test_lib",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//platform/code-style-api:codeStyle_test_lib",
     "//platform/code-style-impl:codeStyle-impl_test_lib",
     "//libraries/caffeine:caffeine_test_lib",
@@ -245,6 +249,7 @@ jvm_library(
     "//platform/backend/observation:observation_test_lib",
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
     "//platform/util/storages:storages_test_lib",
+    "//platform/util-ex:util-ex_test_lib",
     "//platform/platform-impl/internal:internal_test_lib",
     "//platform/util/concurrency:concurrency_test_lib",
     "//platform/platform-impl/ui:ui_test_lib",
@@ -259,15 +264,25 @@ jvm_library(
     "//platform/project/shared:project_test_lib",
     "//platform/kernel/shared:kernel_test_lib",
     "//platform/platform-impl/rpc:rpc_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
     "//platform/execution:execution_test_lib",
     "//platform/forms_rt:java-guiForms-rt_test_lib",
+    "//platform/locking-impl:locking-impl_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.lang.impl` end
 
+### auto-generated section `iml intellij.platform.lang.impl` start
+exports_files([
+  "intellij.platform.lang.impl.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.lang.impl` end
+
 ### auto-generated section `build intellij.platform.lang.tests` start
 jvm_library(
   name = "lang-tests",
+  module_name = "intellij.platform.lang.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   exports = [
@@ -315,6 +330,7 @@ jvm_library(
 
 jvm_library(
   name = "lang-tests_test_lib",
+  testonly = True,
   module_name = "intellij.platform.lang.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["testSources/**/*.kt", "testSources/**/*.java", "testSources/**/*.form"], allow_empty = True),
@@ -353,7 +369,6 @@ jvm_library(
     "//libraries/oro-matcher:oro-matcher_test_lib",
     "@lib//:junit4",
     "//platform/platform-impl:ide-impl",
-    "//platform/platform-impl:ide-impl_test_lib",
     "//platform/lang-impl",
     "//platform/lang-impl:lang-impl_test_lib",
     "//platform/usageView",
@@ -366,10 +381,12 @@ jvm_library(
     "//platform/indexing-impl:indexing-impl_test_lib",
     "//platform/refactoring",
     "//platform/refactoring:refactoring_test_lib",
-    "@lib//:assert_j",
+    "//libraries/assertj-core",
+    "//libraries/assertj-core:assertj-core_test_lib",
     "//platform/projectModel-impl",
     "//platform/projectModel-impl:projectModel-impl_test_lib",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//libraries/guava",
     "//libraries/guava:guava_test_lib",
     "//platform/editor-ui-ex:editor-ex",
@@ -446,6 +463,10 @@ jvm_library(
     "//libraries/kotlinx/coroutines/test:test_test_lib",
     "//platform/util/coroutines",
     "//platform/util/coroutines:coroutines_test_lib",
+    "//platform/util:util-ui",
+    "//platform/util:util-ui_test_lib",
+    "//platform/util-ex",
+    "//platform/util-ex:util-ex_test_lib",
     "@lib//:mockito-kotlin",
     "@lib//:mockito-junit-jupiter",
     "@lib//:mockito",
@@ -459,6 +480,8 @@ jvm_library(
     "//platform/forms_rt:java-guiForms-rt_test_lib",
     "//platform/project-frame",
     "//platform/project-frame:project-frame_test_lib",
+    "//platform/platform-impl:ide-impl-tests",
+    "//platform/platform-impl:ide-impl-tests_test_lib",
   ],
   exports = [
     "//platform/lang-api:lang",
@@ -478,11 +501,19 @@ jvm_library(
   ],
   runtime_deps = [
     ":lang-tests",
+    "//platform/platform-impl:ide-impl_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/platform-util-io:ide-util-io_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.lang.tests` end
+
+### auto-generated section `iml intellij.platform.lang.tests` start
+exports_files([
+  "intellij.platform.lang.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.lang.tests` end
 
 ### auto-generated section `test intellij.platform.lang.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

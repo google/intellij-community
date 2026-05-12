@@ -24,10 +24,11 @@ import com.intellij.util.ObjectUtils;
 import com.intellij.util.ui.EDT;
 import com.jetbrains.python.psi.LanguageLevel;
 import com.jetbrains.python.run.CommandLinePatcher;
-import com.jetbrains.python.run.PyVirtualEnvReader;
+import com.jetbrains.python.run.ActivatableScriptExtKt;
 import com.jetbrains.python.sdk.flavors.PythonSdkFlavor;
 import com.jetbrains.python.sdk.impl.PySdkBundle;
 import com.jetbrains.python.sdk.legacy.PythonSdkUtil;
+import com.jetbrains.python.sdk.terminal.Shell;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NonNls;
@@ -41,13 +42,13 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * A more flexible cousin of SdkVersionUtil.
  * Needs not to be instantiated and only holds static methods.
  *
  * @see PythonSdkUtil for Pyhton SDK utilities with no run-time dependencies
- *
  * @deprecated please use Kotlin coroutines to run processes in background
  */
 @Deprecated(forRemoval = true)
@@ -159,7 +160,7 @@ public final class PySdkUtil {
                application.isHeadlessEnvironment() ||
                !application.isWriteAccessAllowed() : "Background task can't be run under write action";
         String dialogTitle = customTitle != null ? customTitle : PySdkBundle.message("python.sdk.run.wait");
-        return progressManager.runProcessWithProgressSynchronously(() -> processHandler.runProcess(timeout), dialogTitle , false, null);
+        return progressManager.runProcessWithProgressSynchronously(() -> processHandler.runProcess(timeout), dialogTitle, false, null);
       }
       else {
         return processHandler.runProcess();
@@ -230,17 +231,17 @@ public final class PySdkUtil {
   @ApiStatus.Internal
   @Deprecated(forRemoval = true)
   public static @NotNull Map<String, String> activateVirtualEnv(@NotNull String sdkHome) {
-    PyVirtualEnvReader reader = new PyVirtualEnvReader(sdkHome);
-    if (reader.getActivate() != null) {
-      try {
-        return Collections.unmodifiableMap(PyVirtualEnvReader.Companion.filterVirtualEnvVars(reader.readPythonEnv()));
-      }
-      catch (Exception e) {
-        LOG.error("Couldn't read virtualenv variables", e);
-      }
+    var pythonEnvironment = PythonEnvironmentKt.detectPythonEnvironment(Path.of(sdkHome)).getSuccessOrNull();
+    if (!(pythonEnvironment instanceof Activatable)) return Collections.emptyMap();
+
+    var shellType = Optional.ofNullable(Shell.Companion.getSystemDefaultShell()).map(Shell::getType).orElse(Shell.Type.UNKNOWN);
+
+    var activateScript = ((Activatable)pythonEnvironment).getActivation().invoke(shellType);
+    if (activateScript == null) {
+      return Collections.emptyMap();
     }
 
-    return Collections.emptyMap();
+    return Collections.unmodifiableMap(ActivatableScriptExtKt.readPythonEnvironment(activateScript));
   }
 
   public static @NotNull LanguageLevel getLanguageLevelForSdk(@Nullable Sdk sdk) {
@@ -282,7 +283,9 @@ public final class PySdkUtil {
     return null;
   }
 
-  private static @Nullable Sdk getLocalSdkForFile(@NotNull Project project, @NotNull VirtualFile workingDirectoryVirtualFile, boolean allowRemote) {
+  private static @Nullable Sdk getLocalSdkForFile(@NotNull Project project,
+                                                  @NotNull VirtualFile workingDirectoryVirtualFile,
+                                                  boolean allowRemote) {
     Module module = ModuleUtilCore.findModuleForFile(workingDirectoryVirtualFile, project);
     if (module != null) {
       Sdk sdk = PythonSdkUtil.findPythonSdk(module);

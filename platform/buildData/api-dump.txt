@@ -6,6 +6,7 @@ f:com.intellij.platform.buildData.productInfo.CustomCommandLaunchData
 - f:dataDirectoryName:java.lang.String
 - f:envVarBaseName:java.lang.String
 - f:mainClass:java.lang.String
+- f:stdioRedirectArg:java.lang.String
 - f:vmOptionsFilePath:java.lang.String
 bf:com.intellij.platform.buildData.productInfo.CustomCommandLaunchData$$serializer
 - kotlinx.serialization.internal.GeneratedSerializer
@@ -83,6 +84,7 @@ f:com.intellij.platform.buildData.productInfo.ProductInfoLaunchData
 - f:getMainClass():java.lang.String
 - f:getOs():java.lang.String
 - f:getStartupWmClass():java.lang.String
+- f:getStdioRedirectArg():java.lang.String
 - f:getVmOptionsFilePath():java.lang.String
 bf:com.intellij.platform.buildData.productInfo.ProductInfoLaunchData$$serializer
 - kotlinx.serialization.internal.GeneratedSerializer

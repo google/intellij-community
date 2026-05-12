@@ -3,20 +3,26 @@ package com.intellij.devkit.compose
 
 import com.intellij.java.library.JavaLibraryUtil
 import com.intellij.openapi.module.Module
+import com.intellij.openapi.options.advanced.AdvancedSettings
 import com.intellij.openapi.project.Project
 
 internal const val COMPOSE_MAVEN = "org.jetbrains.compose.foundation:foundation-desktop"
 internal const val INTELLIJ_LIBS_COMPOSE_MAVEN = "bundledModule:intellij.libraries.compose.foundation.desktop"
 
 // in JPS *.iml definition
-internal const val COMPOSE_HOT_RELOAD_ENABLED_MARKER = "plugin:androidx.compose.compiler.plugins.kotlin:generateFunctionKeyMetaAnnotations=true"
+internal const val COMPOSE_HOT_RELOAD_ENABLED_MARKER =
+  "plugin:androidx.compose.compiler.plugins.kotlin:generateFunctionKeyMetaAnnotations=true"
 
-internal fun hasCompose(m: Module?) :Boolean {
+internal fun hasCompose(m: Module?): Boolean {
   return JavaLibraryUtil.hasLibraryJar(m, COMPOSE_MAVEN)
          || JavaLibraryUtil.hasLibraryJar(m, INTELLIJ_LIBS_COMPOSE_MAVEN)
 }
 
-internal fun hasCompose(p: Project) :Boolean {
+internal fun hasCompose(p: Project): Boolean {
   return JavaLibraryUtil.hasLibraryJar(p, COMPOSE_MAVEN)
          || JavaLibraryUtil.hasLibraryJar(p, INTELLIJ_LIBS_COMPOSE_MAVEN)
+}
+
+internal fun isComposeToolingEnabled(): Boolean {
+  return AdvancedSettings.getBoolean("devkit.compose.tooling.enabled")
 }

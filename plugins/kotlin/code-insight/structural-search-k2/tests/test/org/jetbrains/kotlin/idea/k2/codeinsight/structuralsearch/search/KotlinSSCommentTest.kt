@@ -231,7 +231,7 @@ class KotlinSSCommentTest : KotlinStructuralSearchTest() {
          */
     """.trimIndent(), """
         <warning descr="SSR">/**
-         * @param <warning descr="Cannot resolve symbol 'foo'">foo</warning> bar
+         * @param foo bar
          */</warning>
         class Foo1
 
@@ -247,7 +247,7 @@ class KotlinSSCommentTest : KotlinStructuralSearchTest() {
         class Foo2
 
         <warning descr="SSR">/**
-         * @property <warning descr="Cannot resolve symbol 'foo'">foo</warning> bar
+         * @property foo bar
          */</warning>
         class Bar2
     """.trimIndent()) }

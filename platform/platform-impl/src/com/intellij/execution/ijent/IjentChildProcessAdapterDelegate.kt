@@ -5,16 +5,17 @@ import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.platform.eel.EelPosixProcess
 import com.intellij.platform.eel.EelProcess
 import com.intellij.platform.eel.EelWindowsProcess
+import com.intellij.platform.eel.SafeDeferred
 import com.intellij.platform.eel.provider.utils.asOutputStream
 import com.intellij.platform.eel.provider.utils.consumeAsInputStream
 import com.intellij.platform.ijent.spi.IjentThreadPool
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.future.asCompletableFuture
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.concurrent.CompletableFuture
@@ -35,7 +36,12 @@ internal class IjentChildProcessAdapterDelegate(
   @Throws(InterruptedException::class)
   fun waitFor(): Int =
     runBlockingInContext {
-      ijentChildProcess.exitCode.await()
+      try {
+        ijentChildProcess.exitCode.await()
+      }
+      catch (err: SafeDeferred.DeferredException) {
+        throw IOException("Can't wait for the process", err)
+      }
     }
 
   @RequiresBackgroundThread
@@ -43,7 +49,12 @@ internal class IjentChildProcessAdapterDelegate(
   fun waitFor(timeout: Long, unit: TimeUnit): Boolean =
     runBlockingInContext {
       withTimeoutOrNull(unit.toMillis(timeout).milliseconds) {
-        ijentChildProcess.exitCode.await()
+        try {
+          ijentChildProcess.exitCode.await()
+        }
+        catch (err: SafeDeferred.DeferredException) {
+          throw IOException("Can't wait for the process", err)
+        }
         true
       } == true
     }
@@ -55,16 +66,23 @@ internal class IjentChildProcessAdapterDelegate(
   }
 
   fun isAlive(): Boolean =
-    !ijentChildProcess.exitCode.isCompleted
+    when (ijentChildProcess.exitCode.state) {
+      SafeDeferred.State.Active -> true
+      is SafeDeferred.State.Canceled, is SafeDeferred.State.Completed<*>, is SafeDeferred.State.Failed -> false
+    }
 
   fun onExit(): CompletableFuture<Any?> =
-    ijentChildProcess.exitCode.asCompletableFuture()
+    @Suppress("UNCHECKED_CAST")
+    (ijentChildProcess.exitCode.asCompletableFuture() as CompletableFuture<Any?>)
 
   fun exitValue(): Int =
-    if (ijentChildProcess.exitCode.isCompleted)
-      @Suppress("SSBasedInspection") (runBlocking { ijentChildProcess.exitCode.await() })
-    else
-      throw IllegalThreadStateException()
+    when (val s = ijentChildProcess.exitCode.state) {
+      is SafeDeferred.State.Completed ->
+        s.value
+
+      SafeDeferred.State.Active, is SafeDeferred.State.Canceled, is SafeDeferred.State.Failed ->
+        throw IllegalThreadStateException()
+    }
 
   fun destroy() {
     coroutineScope.launch {

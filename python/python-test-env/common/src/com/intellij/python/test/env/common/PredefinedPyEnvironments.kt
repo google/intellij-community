@@ -155,6 +155,21 @@ enum class PredefinedPyEnvironments(val spec: PyEnvironmentSpec<*>) {
     }
   }),
 
+  /**
+   * Python 3.12 with pandas and numpy for dataframe debugging tests
+   * ID: py312_pandas
+   * Tags: python3.12, pandas, numpy
+   * Packages: virtualenv, pandas, numpy
+   */
+  VENV_3_12_PANDAS(venvEnvironment {
+    pythonVersion = pythonVersion("3.12")
+    libraries {
+      +"virtualenv"
+      +"pandas"
+      +"numpy"
+    }
+  }),
+
   VANILLA_3_13(pythonEnvironment {
     pythonVersion = pythonVersion("3.13")
   }),
@@ -215,6 +230,7 @@ enum class PredefinedPyEnvironments(val spec: PyEnvironmentSpec<*>) {
         "python3.12", "django", "django2", "django20", "behave", "behave-django",
         "pytest", "untangle"
       ),
+      VENV_3_12_PANDAS to setOf("python3.12", "pandas", "numpy"),
       VENV_3_13 to setOf("python3.13", "ruff"),
       VENV_3_14 to setOf("python3", "python3.14", "ruff"),
       VANILLA_3_14 to setOf("vanilla"),

@@ -302,6 +302,21 @@ public abstract class BasicCompletionHandlerTestGenerated extends AbstractBasicC
         public void testQualifyEnum() throws Exception {
             runTest("../testData/handlers/basic/contextSensitiveResolution/qualifyEnum.kt");
         }
+
+        @TestMetadata("shortenEnumInParameter.kt")
+        public void testShortenEnumInParameter() throws Exception {
+            runTest("../testData/handlers/basic/contextSensitiveResolution/shortenEnumInParameter.kt");
+        }
+
+        @TestMetadata("shortenEnumInVariableDeclaration.kt")
+        public void testShortenEnumInVariableDeclaration() throws Exception {
+            runTest("../testData/handlers/basic/contextSensitiveResolution/shortenEnumInVariableDeclaration.kt");
+        }
+
+        @TestMetadata("shortenEnumInWhenBranch.kt")
+        public void testShortenEnumInWhenBranch() throws Exception {
+            runTest("../testData/handlers/basic/contextSensitiveResolution/shortenEnumInWhenBranch.kt");
+        }
     }
 
     @RunWith(JUnit3RunnerWithInners.class)

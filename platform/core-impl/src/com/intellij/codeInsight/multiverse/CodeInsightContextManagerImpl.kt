@@ -1,8 +1,9 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.multiverse
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.EditorLockFreeTyping
 import com.intellij.openapi.application.edtWriteAction
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.trace
@@ -15,6 +16,7 @@ import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListenerBackgroundable
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileMoveEvent
+import com.intellij.platform.util.coroutines.childScope
 import com.intellij.psi.FileViewProvider
 import com.intellij.psi.impl.PsiManagerEx
 import com.intellij.util.AtomicMapCache
@@ -31,8 +33,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.TestOnly
 import java.util.concurrent.CancellationException
-import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 @ApiStatus.Internal
@@ -40,6 +42,7 @@ class CodeInsightContextManagerImpl(
   private val project: Project,
   private val cs: CoroutineScope,
 ) : CodeInsightContextManager, Disposable.Default {
+  private val invalidationCs: CoroutineScope = cs.childScope("active-invalidations")
 
   companion object {
     @JvmStatic
@@ -47,10 +50,10 @@ class CodeInsightContextManagerImpl(
       CodeInsightContextManager.getInstance(project) as CodeInsightContextManagerImpl
   }
 
-  private val allContexts: AtomicMapCache<VirtualFile, ContextOrArray, ConcurrentMap<VirtualFile, ContextOrArray>> =
+  private val allContexts: AtomicMapCache<VirtualFile, ContextOrArray> =
     AtomicMapCache { CollectionFactory.createConcurrentWeakKeySoftValueMap() }
 
-  private val preferredContext: AtomicMapCache<VirtualFile, CodeInsightContext, ConcurrentMap<VirtualFile, CodeInsightContext>> =
+  private val preferredContext: AtomicMapCache<VirtualFile, CodeInsightContext> =
     AtomicMapCache { CollectionFactory.createConcurrentWeakKeySoftValueMap() }
 
   private val _changeFlow = MutableSharedFlow<Unit>()
@@ -59,10 +62,15 @@ class CodeInsightContextManagerImpl(
   @Volatile
   private var invalidationProcessorJob: Job? = null
 
+  @TestOnly
+  fun isContextInvalidationComplete(): Boolean {
+    return invalidationCs.coroutineContext[Job]!!.children.toList().isEmpty()
+  }
+
   private fun invalidateAllContexts() {
     // it's unnecessary here to serialize invalidation requests because they are all equal, and it's unimportant, which is called first.
     // once more granular invalidation requests are added, it's necessary to add serialization (e.g., via a flow)
-    cs.launch {
+    invalidationCs.launch {
       edtWriteAction {
         preferredContext.invalidate()
         allContexts.invalidate()
@@ -75,12 +83,12 @@ class CodeInsightContextManagerImpl(
   }
 
   init {
-    EP_NAME.addChangeListener(cs, Runnable {
-      cs.launch {
+    EP_NAME.addChangeListener(cs) {
+      invalidationCs.launch {
         subscribeToChanges()
         invalidateAllContexts()
       }
-    })
+    }
     subscribeToChanges()
     InvalidationBulkFileListener.subscribeToVfsEvents()
   }
@@ -126,7 +134,9 @@ class CodeInsightContextManagerImpl(
 
     // FIXME: the assert had never worked due to IJPL-221633, but when it is enabled some tests fail
     // ThreadingAssertions.softAssertBackgroundThread()
-    ThreadingAssertions.softAssertReadAccess()
+    if (EditorLockFreeTyping.isReadAccessNeeded(file)) {
+      ThreadingAssertions.softAssertReadAccess()
+    }
 
     log.trace { "requested preferred context of file ${file.path}" }
 
@@ -219,6 +229,16 @@ class CodeInsightContextManagerImpl(
     val effectiveContext = context.takeUnless { it == defaultContext() }
     fileViewProvider.putUserData(codeInsightContextKey, effectiveContext)
   }
+
+  @TestOnly
+  override fun registerTestOnlyCodeInsightContextProvider(provider: CodeInsightContextProvider, disposable: Disposable) {
+    if (!ApplicationManager.getApplication().isUnitTestMode) {
+      throw IllegalStateException("This method is only available in tests")
+    }
+
+    EP_NAME.point.registerExtension(provider, disposable)
+  }
+
 
   private class InvalidationBulkFileListener : BulkFileListenerBackgroundable {
     override fun before(events: List<VFileEvent>) {

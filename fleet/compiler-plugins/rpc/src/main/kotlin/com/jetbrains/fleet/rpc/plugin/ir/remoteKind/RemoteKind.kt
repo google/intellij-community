@@ -1,9 +1,7 @@
 package com.jetbrains.fleet.rpc.plugin.ir.remoteKind
 
 import com.jetbrains.fleet.rpc.plugin.REMOTE_KIND_DATA_CLASS_ID
-import com.jetbrains.fleet.rpc.plugin.REMOTE_KIND_REMOTE_OBJECT_CLASS_ID
 import com.jetbrains.fleet.rpc.plugin.REMOTE_KIND_RESOURCE_CLASS_ID
-import com.jetbrains.fleet.rpc.plugin.REMOTE_OBJECT_FQN
 import com.jetbrains.fleet.rpc.plugin.REMOTE_RESOURCE_FQN
 import com.jetbrains.fleet.rpc.plugin.THROWING_SERIALIZER_CLASS_ID
 import com.jetbrains.fleet.rpc.plugin.ir.FileContext
@@ -36,7 +34,6 @@ fun IrBuilderWithScope.toRemoteKind(
   debugInfo: String,
 ): IrExpression {
   return handleSpecialTypes(irType, context, debugInfo)
-    ?: handleRemoteObject(irType, context)
     ?: handleResource(irType, context)
     ?: run { // RemoteKind.Data
       val serializer = generateSerializerCall(irType, context, debugInfo)
@@ -72,22 +69,6 @@ private fun IrBuilderWithScope.handleResource(
     null
   }
 
-}
-
-@UnsafeDuringIrConstructionAPI
-private fun IrBuilderWithScope.handleRemoteObject(irType: IrType, context: FileContext): IrExpression? {
-  val serviceIrClass = irType.classOrFail.owner
-
-  return if (serviceIrClass.allSuperInterfaces().any { it.kotlinFqName == REMOTE_OBJECT_FQN }) {
-    val remoteApiDescriptor = getDescriptorInstance(context, serviceIrClass)
-    val remoteKindRemoteObjectConstructor = context.referenceClass(REMOTE_KIND_REMOTE_OBJECT_CLASS_ID)!!.constructors.first()
-    irCallConstructor(remoteKindRemoteObjectConstructor, listOf(remoteApiDescriptor.owner.defaultType)).apply {
-      arguments[0] = irGetObject(remoteApiDescriptor)
-    }
-  }
-  else {
-    null
-  }
 }
 
 @UnsafeDuringIrConstructionAPI

@@ -548,7 +548,7 @@ public final class DvcsUtil {
         LOG.info("No repository found for commit " + commit);
         continue;
       }
-      List<VcsCommitMetadata> commitsInRoot = groupedCommits.computeIfAbsent(repository, __ -> new ArrayList<>());
+      List<VcsCommitMetadata> commitsInRoot = groupedCommits.computeIfAbsent(repository, _ -> new ArrayList<>());
       commitsInRoot.add(commit);
     }
     return groupedCommits;

@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.testFramework.annotations.processors
 
 import com.intellij.openapi.util.text.StringUtil
@@ -6,6 +6,7 @@ import org.jetbrains.plugins.gradle.testFramework.annotations.ArgumentsProcessor
 import org.jetbrains.plugins.gradle.testFramework.annotations.CsvCrossProductSource
 import org.junit.jupiter.api.extension.ExtensionContext
 import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.support.ParameterDeclarations
 import java.util.stream.Stream
 
 class CsvCrossProductArgumentsProcessor : ArgumentsProcessor<CsvCrossProductSource> {
@@ -19,13 +20,25 @@ class CsvCrossProductArgumentsProcessor : ArgumentsProcessor<CsvCrossProductSour
     delimiter = annotation.delimiter
   }
 
-  override fun provideArguments(context: ExtensionContext): Stream<out Arguments> {
+  override fun provideArguments(parameters: ParameterDeclarations, context: ExtensionContext): Stream<out Arguments> {
     val values = value.map { evaluateValues(it, separator, delimiter) }
     return crossProduct(values).stream()
       .map { Arguments.of(*it.flatten().toTypedArray()) }
   }
 
   companion object {
+    internal fun crossProduct(
+      firstValues: List<Any>,
+      additionalValues: List<String>,
+      separator: Char,
+      delimiter: Char,
+    ): Stream<out Arguments> {
+      val parsedAdditionalValues = additionalValues.map { evaluateValues(it, separator, delimiter) }
+      val allValues = listOf(firstValues) + parsedAdditionalValues
+      return crossProduct(allValues).stream()
+        .map { args -> Arguments.of(*args.flatMap { it as? List<*> ?: listOf(it) }.toTypedArray()) }
+    }
+
     private fun <T> crossProduct(lists: List<List<T>>): List<List<T>> {
       if (lists.isEmpty()) return emptyList()
       var result = lists.first().map { listOf(it) }

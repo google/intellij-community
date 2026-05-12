@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceGetOrSet", "ReplaceJavaStaticMethodWithKotlinAnalog")
 
 package org.jetbrains.intellij.build.classPath
@@ -20,8 +20,6 @@ import org.jetbrains.intellij.build.impl.DescriptorCacheContainer
 import org.jetbrains.intellij.build.impl.ModuleIncludeReasons
 import org.jetbrains.intellij.build.impl.PRODUCT_DESCRIPTOR_META_PATH
 import org.jetbrains.intellij.build.impl.PlatformJarNames
-import org.jetbrains.intellij.build.impl.PlatformJarNames.APP_BACKEND_JAR
-import org.jetbrains.intellij.build.impl.PlatformJarNames.APP_JAR
 import org.jetbrains.intellij.build.impl.PlatformJarNames.PLATFORM_CORE_NIO_FS
 import org.jetbrains.intellij.build.impl.PlatformJarNames.PRODUCT_BACKEND_JAR
 import org.jetbrains.intellij.build.impl.PlatformLayout
@@ -91,7 +89,7 @@ fun generateClassPathByLayoutReport(libDir: Path, entries: List<DistributionFile
 
   val result = LinkedHashSet<Path>(classPath.size + 4)
   // add first - should be listed first
-  sequenceOf(PLATFORM_LOADER_JAR, UTIL_8_JAR, APP_JAR, UTIL_JAR, PRODUCT_BACKEND_JAR, APP_BACKEND_JAR).map(libDir::resolve).filterTo(result, classPath::contains)
+  sequenceOf(PLATFORM_LOADER_JAR, UTIL_8_JAR, UTIL_JAR, PRODUCT_BACKEND_JAR).map(libDir::resolve).filterTo(result, classPath::contains)
   // sorted to ensure stable performance results
   result.addAll(if (isWindows) classPath.sortedBy(Path::toString) else classPath.sorted())
   return result
@@ -104,10 +102,10 @@ fun generateClassPathByLayoutReport(libDir: Path, entries: List<DistributionFile
  */
 internal suspend fun generateCoreClasspathFromPlugins(
   platformLayout: PlatformLayout,
-  context: BuildContext,
   pluginEntities: List<PluginBuildDescriptor>,
+  context: BuildContext,
 ): Set<Path> {
-  val classPathResult = mutableSetOf<Path>()
+  val classPathResult = LinkedHashSet<Path>()
   for (pluginEntity in pluginEntities) {
     val pluginLayout = pluginEntity.layout
     val cacheContainer = platformLayout.descriptorCacheContainer.forPlugin(pluginEntity.dir)
@@ -130,7 +128,7 @@ internal suspend fun getEmbeddedContentModulesOfPluginsWithUseIdeaClassloader(
   cacheContainer: ScopedCachedDescriptorContainer?,
   context: BuildContext,
 ): Set<String> {
-  val pluginModule = context.findRequiredModule(pluginMainModule)
+  val pluginModule = context.outputProvider.findRequiredModule(pluginMainModule)
   val pluginXmlBytes = cacheContainer?.getCachedFileData(PLUGIN_XML_RELATIVE_PATH) ?: getUnprocessedPluginXmlContent(pluginModule, context.outputProvider)
   val pluginXmlContent = pluginXmlBytes.decodeToString()
   val rootElement = JDOMUtil.load(pluginXmlContent)
@@ -148,7 +146,9 @@ internal suspend fun getEmbeddedContentModulesOfPluginsWithUseIdeaClassloader(
   return embeddedModules
 }
 
-internal data class PluginBuildDescriptor(
+/** Build-scripts internal; not part of the public build API. */
+@org.jetbrains.annotations.ApiStatus.Internal
+data class PluginBuildDescriptor(
   @JvmField val dir: Path,
   @JvmField val os: OsFamily?,
   @JvmField val arch: JvmArchitecture?,

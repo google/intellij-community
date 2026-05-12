@@ -7,7 +7,7 @@ import type {SearchEntry, UpstreamToolCaller} from './types'
 
 export const SEARCH_FALLBACK_REGEX = '(?m)^.*$'
 export const SEARCH_FALLBACK_MAX_LINES = 200_000
-// search_in_files_by_regex returns usage snippets capped at MAX_USAGE_TEXT_CHARS (currently 1000).
+// search_in_files_by_regex returns usage snippets capped at 1000 chars upstream; mirror that cap here.
 export const SEARCH_FALLBACK_MAX_LINE_TEXT_CHARS = 1000
 
 export interface SearchLinesResult {

@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.testframework.sm.runner;
 
 import com.intellij.concurrency.ConcurrentCollectionFactory;
@@ -225,7 +225,7 @@ public class GeneralIdBasedToSMTRunnerEventsConvertor extends GeneralTestEventsP
     if (node != null) {
       SMTestProxy testProxy = node.getProxy();
       final Long duration = testFinishedEvent.getDuration();
-      if (duration != null) {
+      if (duration != null && duration >= 0) {
         testProxy.setDuration(duration);
       }
       testProxy.setFrameworkOutputFile(testFinishedEvent.getOutputFile());
@@ -258,12 +258,14 @@ public class GeneralIdBasedToSMTRunnerEventsConvertor extends GeneralTestEventsP
     if (LOG.isDebugEnabled()) {
       LOG.debug("onSuiteFinished " + suiteFinishedEvent.getId());
     }
+    Long duration = suiteFinishedEvent.getDuration();
     Node node = findNodeToTerminate(suiteFinishedEvent);
     if (node != null) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("finished:" + node.myId);
       }
       SMTestProxy suiteProxy = node.getProxy();
+      if (duration != null && duration >= 0) suiteProxy.setDuration(duration);
       suiteProxy.setFinished();
       fireOnSuiteFinished(suiteProxy, suiteFinishedEvent.getId());
       terminateNode(node, State.FINISHED);

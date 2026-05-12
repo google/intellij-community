@@ -5,6 +5,7 @@
 package org.jetbrains.plugins.gradle.util
 
 import com.intellij.openapi.externalSystem.service.execution.resolveJdkInfo
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.Sdk
@@ -16,6 +17,8 @@ import org.jetbrains.plugins.gradle.properties.GradleLocalPropertiesFile
 import org.jetbrains.plugins.gradle.properties.GradlePropertiesFile
 import org.jetbrains.plugins.gradle.resolvers.GradleJvmResolver
 import java.nio.file.Paths
+
+private val LOG = Logger.getInstance("org.jetbrains.plugins.gradle.util.GradleJvmUtil")
 
 const val GRADLE_LOCAL_JAVA_HOME = "GRADLE_LOCAL_JAVA_HOME"
 
@@ -58,12 +61,18 @@ fun SdkLookupProvider.nonblockingResolveGradleJvmInfo(project: Project, projectS
 suspend fun SdkLookupProvider.resolveGradleJvmInfo(project: Project, projectSdk: Sdk?, externalProjectPath: String?, gradleJvm: String?): SdkInfo {
   if (gradleJvm == null) return getSdkInfo()
 
-  val resolvedSdkInfo = GradleJvmResolver.EP_NAME.extensionList
-    .firstOrNull { it.canBeResolved(gradleJvm) }
-    ?.getResolvedSdkInfo(project, projectSdk, externalProjectPath, this)
-  if (resolvedSdkInfo != null) return resolvedSdkInfo
+  LOG.debug("Resolving Gradle JVM info: reference='$gradleJvm', projectPath='$externalProjectPath'")
+  val resolver = GradleJvmResolver.EP_NAME.extensionList.firstOrNull { it.canBeResolved(gradleJvm) }
+  if (resolver != null) {
+    val resolvedSdkInfo = resolver.getResolvedSdkInfo(project, projectSdk, externalProjectPath, this)
+    LOG.debug("Gradle JVM '$gradleJvm' resolved via ${resolver::class.simpleName}: $resolvedSdkInfo")
+    return resolvedSdkInfo
+  }
 
-  return resolveJdkInfo(project, projectSdk, gradleJvm)
+  LOG.debug("Gradle JVM '$gradleJvm': no extension resolver matched, using standard JDK resolution")
+  val sdkInfo = resolveJdkInfo(project, projectSdk, gradleJvm)
+  LOG.debug("Gradle JVM '$gradleJvm' resolved via standard resolution: $sdkInfo")
+  return sdkInfo
 }
 
 fun GradlePropertiesFile.getJavaHome(project: Project, externalProjectPath: String?): String? {

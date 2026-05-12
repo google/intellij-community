@@ -4,6 +4,7 @@ package com.intellij.analysis.problemsView.toolWindow
 import com.intellij.CommonBundle
 import com.intellij.analysis.problemsView.FileProblem
 import com.intellij.analysis.problemsView.ProblemsProvider
+import com.intellij.analysis.problemsView.toolWindow.splitApi.HighlightingBaseProblem
 import com.intellij.codeHighlighting.HighlightDisplayLevel
 import com.intellij.codeInsight.daemon.HighlightDisplayKey
 import com.intellij.codeInsight.daemon.impl.AsyncDescriptionSupplier
@@ -25,9 +26,9 @@ import javax.swing.Icon
 open class HighlightingProblem(
   override val provider: ProblemsProvider,
   override val file: VirtualFile,
-  val highlighter: RangeHighlighter) : FileProblem {
+  val highlighter: RangeHighlighter) : FileProblem, HighlightingBaseProblem {
 
-  private fun getIcon(level: HighlightDisplayLevel): Icon? = when {
+  internal fun getIcon(level: HighlightDisplayLevel): Icon? = when {
     text.isEmpty() || asyncDescriptionRequested.get() -> AnimatedIcon.Default.INSTANCE
     severity >= level.severity.myVal -> level.icon
     else -> null
@@ -101,8 +102,10 @@ open class HighlightingProblem(
       else "<html>" + StringUtil.join(StringUtil.splitByLines(escapeString(text)), "<br/>")
     }
 
-  val severity: Int
+  override val severity: Int
     get() = info?.severity?.myVal ?: -1
+
+  override fun getQuickFixOffset(): Int = info?.actualStartOffset ?: -1
 
   override fun hashCode(): Int = highlighter.hashCode()
 

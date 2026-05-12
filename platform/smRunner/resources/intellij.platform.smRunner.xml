@@ -3,13 +3,21 @@
   <dependencies>
     <module name="intellij.libraries.fastutil"/>
     <module name="intellij.platform.analysis"/>
+    <module name="intellij.platform.codeStyle"/>
     <module name="intellij.platform.core"/>
     <module name="intellij.platform.core.impl"/>
     <module name="intellij.platform.core.ui"/>
+    <module name="intellij.platform.editor.ui"/>
+    <module name="intellij.platform.execution"/>
+    <module name="intellij.platform.execution.impl"/>
     <module name="intellij.platform.ide.concurrency"/>
+    <module name="intellij.platform.ide.core"/>
     <module name="intellij.platform.ide.impl"/>
     <module name="intellij.platform.lang"/>
+    <module name="intellij.platform.lvcs"/>
     <module name="intellij.platform.projectModel"/>
+    <module name="intellij.platform.testRunner"/>
+    <module name="intellij.platform.util.ui"/>
   </dependencies>
   <!-- endregion -->
 
@@ -23,6 +31,7 @@
     <projectService serviceImplementation="com.intellij.execution.testframework.sm.TestHistoryConfiguration"/>
     <runDashboardCustomizer implementation="com.intellij.execution.testframework.sm.runner.SMTRunnerRunDashboardCustomizer"
                             order="first" id="smtRunnerCustomizer"/>
+    <projectSettings service="com.intellij.execution.testframework.sm.TestHistoryConfiguration"/>
   </extensions>
   <actions>
     <group id="SmRunTestGroup">

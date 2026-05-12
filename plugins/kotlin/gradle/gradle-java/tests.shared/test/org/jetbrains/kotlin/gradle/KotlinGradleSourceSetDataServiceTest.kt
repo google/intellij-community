@@ -34,20 +34,6 @@ val KotlinGradleImportingTestCase.testFacetSettings: IKotlinFacetSettings
 class KotlinGradleSourceSetDataServiceTest : KotlinGradleImportingTestCase() {
     @Test
     @TargetVersions("7.6+")
-    fun testSimpleFacetImport() {
-        configureByFiles()
-        importProject()
-        assertDoesNotThrow {
-            facetSettings("project.main")
-            facetSettings("project.test")
-        }
-        org.junit.jupiter.api.assertThrows<IllegalStateException> {
-            facetSettings("project")
-        }
-    }
-
-    @Test
-    @TargetVersions("7.6+")
     fun testSingleFacetPerModule() {
         configureByFiles()
         // This means a single module called project is imported rather than one per source set

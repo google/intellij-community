@@ -992,6 +992,32 @@ class JavaInjectedFileChangesHandlerTest : JavaCodeInsightFixtureTestCase() {
 
   }
 
+  fun `test copy of physical single-root injection is nonphysical`() {
+    with(myFixture) {
+      configureByText("classA.java", """
+          import org.intellij.lang.annotations.Language;
+
+          class A {
+            void foo() {
+              @Language("JSON") String a = "{\"answer\": <caret>42}";
+            }
+          }
+      """.trimIndent())
+
+      val injectedFile = injectionTestFixture.getAllInjections().single().second
+      val injectedViewProvider = injectedFile.viewProvider
+      assertEquals("SingleRootInjectedFileViewProvider", injectedViewProvider.javaClass.simpleName)
+      assertTrue(injectedViewProvider.isPhysical)
+
+      val copy = injectedFile.copy() as PsiFile
+      val copyViewProvider = copy.viewProvider
+
+      assertEquals("SingleRootInjectedFileViewProvider", copyViewProvider.javaClass.simpleName)
+      assertEquals(injectedFile.text, copy.text)
+      assertFalse(copyViewProvider.isPhysical)
+    }
+  }
+
   private fun injectAndOpenInFragmentEditor(language: String): PsiFile {
     with(myFixture) {
       StoringFixPresenter().apply {

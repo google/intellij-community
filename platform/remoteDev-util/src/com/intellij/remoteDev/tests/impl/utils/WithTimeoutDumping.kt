@@ -1,3 +1,4 @@
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.remoteDev.tests.impl.utils
 
 import com.intellij.diagnostic.ThreadDumper
@@ -80,7 +81,7 @@ internal suspend fun waitSuspending(
   subjectOfWaiting: String,
   timeout: Duration,
   delay: Duration = 500.milliseconds,
-  onFailure: (() -> Unit),
+  onFailure: ((t: Throwable) -> Unit),
   checker: suspend () -> Boolean,
 ): Boolean {
   return runCatching {
@@ -96,6 +97,6 @@ internal suspend fun waitSuspending(
       )
     }
   }
-    .onFailure { onFailure.invoke() }
+    .onFailure { onFailure.invoke(it) }
     .isSuccess
 }

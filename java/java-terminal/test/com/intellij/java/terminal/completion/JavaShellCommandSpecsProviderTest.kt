@@ -1,7 +1,8 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.java.terminal.completion
 
 import com.intellij.java.terminal.JavaShellCommandUtils
+import com.intellij.terminal.completion.spec.ProcessExecutionResult
 import com.intellij.terminal.completion.spec.ShellCommandResult
 import com.intellij.testFramework.UsefulTestCase
 import kotlinx.coroutines.runBlocking
@@ -25,8 +26,8 @@ internal class JavaShellCommandSpecsProviderTest(engine: TerminalEngine) : JdkCo
   fun `default options are present`() = runBlocking {
     val fixture = ShellCompletionTestFixture.builder(project)
       .mockProcessesExecutor(object : ShellDataGeneratorProcessExecutor {
-        override suspend fun executeProcess(options: ShellDataGeneratorProcessOptions): ShellCommandResult {
-          return ShellCommandResult.create("", exitCode = 1)
+        override suspend fun executeProcess(options: ShellDataGeneratorProcessOptions): ProcessExecutionResult {
+          return ProcessExecutionResult.Finished("", exitCode = 1)
         }
       })
       .mockShellCommandResults { _ ->

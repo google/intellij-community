@@ -295,7 +295,10 @@ sealed class GithubApiRequestExecutor {
       }
 
       if (!hostMatches) {
-        LOG.info("URL $url host does not match the server $serverPath. Authorization will not be granted")
+        // do not log for avatars to avoid log pollution
+        if (targetHost != "avatars.githubusercontent.com") {
+          LOG.info("URL $url host does not match the server $serverPath. Authorization will not be granted")
+        }
         return false
       }
       if (url.port != (serverPath.port ?: -1)) {

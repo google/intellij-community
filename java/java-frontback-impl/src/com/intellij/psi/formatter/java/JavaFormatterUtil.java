@@ -603,7 +603,7 @@ public final class JavaFormatterUtil {
    * @param indent               the number of spaces used for indentation
    * @return a list of {@code TextRange} objects representing the extracted text ranges
    */
-  static @NotNull List<TextRange> extractTextRangesFromLiteralText(@NotNull String text, int indent) {
+  public static @NotNull List<TextRange> extractTextRangesFromLiteralText(@NotNull String text, int indent) {
     List<TextRange> linesRanges = new ArrayList<>();
     boolean isLastLine = false;
     int start = StringUtil.indexOf(text, '\n', 3);

@@ -5,7 +5,7 @@ import com.intellij.grazie.ide.language.markdown.MarkdownPsiUtils.isMarkdownLink
 import com.intellij.grazie.text.TextContent
 import com.intellij.grazie.text.TextContentBuilder
 import com.intellij.grazie.text.TextExtractor
-import com.intellij.grazie.utils.nbspToSpace
+import com.intellij.grazie.utils.excludeHtml
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.util.elementType
@@ -15,10 +15,10 @@ import org.intellij.plugins.markdown.lang.MarkdownTokenTypes
 class MarkdownTextExtractor : TextExtractor() {
   private val markup = setOf(MarkdownTokenTypes.EMPH, MarkdownTokenTypes.TILDE)
 
-  public override fun buildTextContent(root: PsiElement, allowedDomains: Set<TextContent.TextDomain>): TextContent? {
+  public override fun buildTextContents(root: PsiElement, allowedDomains: Set<TextContent.TextDomain>): List<TextContent> {
     if (allowedDomains.contains(TextContent.TextDomain.PLAIN_TEXT) &&
         (MarkdownPsiUtils.isHeaderContent(root) || MarkdownPsiUtils.isParagraph(root))) {
-      return nbspToSpace(TextContentBuilder.FromPsi
+      val content = excludeHtml(TextContentBuilder.FromPsi
         .withUnknown { it.node.isMarkdownCodeType() }
         .withMarkup { e ->
           e.elementType in markup ||
@@ -27,8 +27,9 @@ class MarkdownTextExtractor : TextExtractor() {
         .excluding { it.elementType == MarkdownElementTypes.IMAGE }
         .removingIndents(" \t").removingLineSuffixes(" \t")
         .build(root, TextContent.TextDomain.PLAIN_TEXT))
+      return content
     }
-    return null
+    return emptyList()
   }
 
   private fun isLinkText(e: PsiElement) =

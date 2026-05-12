@@ -1,8 +1,8 @@
+import logging
 import os
 import re
 import string
 import sys
-import time
 import types
 
 OUT_ENCODING = 'utf-8'
@@ -183,13 +183,6 @@ if version[0] > 2:
         return io.open(name, mode, **kwargs)
 else:
     fopen = open
-
-class Timer(object):
-    def __init__(self):
-        self.started = time.time()
-
-    def elapsed(self):
-        return int((time.time() - self.started) * 1000)
 
 IS_JAVA = hasattr(os, "java")
 
@@ -696,6 +689,12 @@ CLASS_ATTR_BLACKLIST = [
     'panda3d.core.ExecutionEnvironment.environment_variables',
 ]
 
+PURE_PYTHON_CLASS_ATTRS = [
+    "__static_attributes__",
+    "__firstlineno__",
+    "__weakref__"
+]
+
 SKELETON_HEADER_VERSION_LINE = re.compile(r'# by generator (?P<version>\d+\.\d+)')
 SKELETON_HEADER_ORIGIN_LINE = re.compile(r'# from (?P<path>.*)')
 REQUIRED_GEN_VERSION_LINE = re.compile(r'(?P<name>\S+)\s+(?P<version>\d+\.\d+)')
@@ -711,3 +710,5 @@ FAILED_VERSION_STAMP_PREFIX = '.failed__'
 
 CACHE_DIR_NAME = 'cache'
 STATE_FILE_NAME = '.state.json'
+LOGGING_CATEGORIES = ["docstring", "time", "misc", "multiprocessing"]
+LOGGING_LEVEL_TRACE = logging.DEBUG - 1

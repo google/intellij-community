@@ -1,11 +1,13 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:JvmName("ApplicationLoader")
 @file:Internal
+@file:OptIn(LowLevelLocalMachineAccess::class)
 package com.intellij.platform.ide.bootstrap
 
 import com.intellij.diagnostic.COROUTINE_DUMP_HEADER
 import com.intellij.diagnostic.LoadingState
 import com.intellij.diagnostic.PluginException
+import com.intellij.diagnostic.ProgressIndicatorDumper
 import com.intellij.diagnostic.WriteLockMeasurer
 import com.intellij.diagnostic.dumpCoroutines
 import com.intellij.diagnostic.logs.LogLevelConfigurationManager
@@ -74,6 +76,7 @@ import com.intellij.ui.ExperimentalUI
 import com.intellij.util.PlatformUtils
 import com.intellij.util.io.URLUtil
 import com.intellij.util.io.createDirectories
+import com.intellij.util.system.LowLevelLocalMachineAccess
 import com.intellij.util.system.OS
 import com.jetbrains.JBR
 import kotlinx.coroutines.CompletableDeferred
@@ -129,7 +132,7 @@ internal suspend fun loadApp(
       }
 
       span("app component registration") {
-        app.registerComponents(pluginSet.getEnabledModules(), app)
+        app.registerComponents(pluginSet.sequenceResolvedSortedDescriptorsForRegistration(), app)
       }
       // ApplicationManager.getApplication may be used in ApplicationInitializedListener constructor
       ApplicationManager.setApplication(app)
@@ -138,17 +141,16 @@ internal suspend fun loadApp(
     val languageAndRegionTaskDeferred: Deferred<(suspend () -> Boolean)?>? = if (AppMode.isHeadless()) null else {
       async(CoroutineName("language and region")) {
         val euaDocumentStatus = euaDocumentDeferred.await()
-        if (euaDocumentStatus is EndUserAgreementStatus.Required ||
-            euaDocumentStatus is EndUserAgreementStatus.RemoteDev) {
+        if (euaDocumentStatus is EndUserAgreementStatus.Required || euaDocumentStatus is EndUserAgreementStatus.RemoteDev) {
           getLanguageAndRegionDialogIfNeeded()
         }
         else null
       }
     }
-    
+
     val euaTaskDeferred: Deferred<(suspend () -> Boolean)?>? = if (AppMode.isHeadless()) null else {
       async(CoroutineName("eua document")) {
-        prepareShowEuaIfNeededTask(documentStatus = euaDocumentDeferred.await(), appInfoDeferred = appInfoDeferred, asyncScope = asyncScope)
+        prepareShowEuaIfNeededTask(documentStatus = euaDocumentDeferred.await(), appInfoDeferred, asyncScope)
       }
     }
 
@@ -184,19 +186,13 @@ internal suspend fun loadApp(
       initConfigurationStore(app, args)
     }
 
-    val applicationStarter = createAppStarter(args = args, asyncScope = this@span)
+    val applicationStarter = createAppStarter(args, asyncScope = this@span)
 
     launch(CoroutineName("app pre-initialization")) {
       initConfigurationStoreJob.join()
 
       val preloadJob = launch(CoroutineName("critical services preloading")) {
-        preloadCriticalServices(
-          app = app,
-          preloadScope = this,
-          asyncScope = asyncScope,
-          appRegistered = appRegisteredJob,
-          initAwtToolkitAndEventQueueJob = initAwtToolkitAndEventQueueJob,
-        )
+        preloadCriticalServices(app, preloadScope = this, asyncScope, appRegisteredJob, initAwtToolkitAndEventQueueJob)
 
         asyncScope.launch {
           launch {
@@ -209,7 +205,7 @@ internal suspend fun loadApp(
         }
       }
 
-      val cssInit = initLafManagerAndCss(app = app, asyncScope = asyncScope, initLafJob = initLafJob, loadIconMapping = loadIconMapping)
+      val cssInit = initLafManagerAndCss(app, asyncScope, initLafJob, loadIconMapping)
 
       if (!app.isHeadlessEnvironment) {
         euaTaskDeferred?.await()?.let {
@@ -279,7 +275,7 @@ internal suspend fun loadApp(
 @Suppress("ReplaceJavaStaticMethodWithKotlinAnalog", "CanConvertToMultiDollarString")
 private val asyncAppListenerAllowListForNonCorePlugin = java.util.Set.of(
   "com.jetbrains.rdserver.unattendedHost.logs.BackendMessagePoolExporter\$MyAppListener",
-  "com.intellij.settingsSync.SettingsSynchronizerApplicationInitializedListener",
+  "com.intellij.settingsSync.core.SettingsSynchronizerApplicationInitializedListener",
   "com.intellij.dataspell.ide.impl.jupyter.JupyterDSProjectLifecycleListener",
   "com.jetbrains.gateway.GatewayBuildDateExpirationListener",
   "com.intellij.ide.misc.PluginAgreementUpdateScheduler",
@@ -290,7 +286,7 @@ private val asyncAppListenerAllowListForNonCorePlugin = java.util.Set.of(
   "com.intellij.ide.AgreementUpdater",
   "com.intellij.internal.statistic.updater.StatisticsJobsScheduler",
   "com.intellij.internal.statistic.updater.StatisticsStateCollectorsScheduler",
-  "org.jetbrains.kotlin.idea.base.plugin.K2UnsupportedPluginsNotificationActivity",
+  "com.intellij.platform.daemon.client.DaemonApplicationActivity",
 )
 
 private fun executeAsyncAppInitListeners(scope: CoroutineScope) {
@@ -375,16 +371,20 @@ private suspend fun enableCoroutineDumpAndJstack() {
   }
 }
 
+
 private suspend fun enableLockMonitoring(application: ApplicationImpl) {
   application.serviceAsync<WriteLockMeasurer>()
 }
 
 private suspend fun enableJstack() {
-  span("coroutine jstack configuration") {
+  span("jstack configuration") {
     JBR.getJstack()?.includeInfoFrom {
       """
 $COROUTINE_DUMP_HEADER
 ${dumpCoroutines(stripDump = false)}
+
+${ProgressIndicatorDumper.PROGRESS_INDICATOR_DUMP_HEADER}
+${ProgressIndicatorDumper.dumpProgressIndicatorState() ?: "No progress indicator dump"}
 """
     }
   }
@@ -442,7 +442,7 @@ suspend fun initConfigurationStore(app: ApplicationImpl, args: List<String>) {
     span("beforeApplicationLoaded") {
       for (extension in ApplicationLoadListener.EP_NAME.filterableLazySequence()) {
         extension.useOrLogError {
-          it.beforeApplicationLoaded(application = app, configPath = configDir, args = args)
+          it.beforeApplicationLoaded(app, configDir, args)
         }
       }
     }
@@ -535,9 +535,8 @@ private suspend fun createAppStarter(args: List<String>, asyncScope: CoroutineSc
   }
 }
 
-private fun createDefaultAppStarter(): ApplicationStarter {
-  return if (PlatformUtils.getPlatformPrefix() == "LightEdit") IdeStarter.StandaloneLightEditStarter() else IdeStarter()
-}
+private fun createDefaultAppStarter(): ApplicationStarter =
+  if (PlatformUtils.getPlatformPrefix() == "LightEdit") IdeStarter.StandaloneLightEditStarter() else IdeStarter()
 
 @VisibleForTesting
 internal fun createAppLocatorFile() {
@@ -572,7 +571,7 @@ private fun setActivationListeners() {
 private suspend fun handleExternalCommand(args: List<String>, currentDirectory: String?): CommandLineProcessorResult {
   if (args.isNotEmpty() && args[0].contains(URLUtil.SCHEME_SEPARATOR)) {
     val cliResult = CommandLineProcessor.processProtocolCommand(args[0])
-    val result = CommandLineProcessorResult(project = null, result = cliResult)
+    val result = CommandLineProcessorResult(project = null, cliResult)
     withContext(Dispatchers.EDT) {
       if (result.hasError) {
         result.showError()
@@ -586,7 +585,7 @@ private suspend fun handleExternalCommand(args: List<String>, currentDirectory: 
     return result
   }
   else {
-    return CommandLineProcessor.processExternalCommandLine(args = args, currentDirectory = currentDirectory, focusApp = true)
+    return CommandLineProcessor.processExternalCommandLine(args, currentDirectory, focusApp = true)
   }
 }
 

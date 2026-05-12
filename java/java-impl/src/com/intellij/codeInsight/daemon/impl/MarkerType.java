@@ -169,7 +169,7 @@ public class MarkerType {
   private static void navigateToSiblingOverridingMethod(MouseEvent e, @NotNull PsiMethod method) {
     PsiMethod superMethod = FindSuperElementsHelper.getSiblingInheritedViaSubClass(method);
     if (superMethod == null) return;
-    navigate(e, method, () -> Collections.singletonList(method));
+    navigate(e, method, () -> Collections.singletonList(superMethod));
   }
 
   private static void navigate(MouseEvent e, @NotNull PsiMethod method, Supplier<Collection<PsiMethod>> supplier) {

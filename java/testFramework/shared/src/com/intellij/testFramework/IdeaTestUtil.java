@@ -377,10 +377,6 @@ public final class IdeaTestUtil {
     return getMockJdk(JavaVersion.compose(21));
   }
 
-  public static @NotNull File getMockJdk14Path() {
-    return getPathForJdkNamed(MOCK_JDK_DIR_NAME_PREFIX + "1.4");
-  }
-
   public static @NotNull File getMockJdk17Path() {
     return getPathForJdkNamed(MOCK_JDK_DIR_NAME_PREFIX + "1.7");
   }

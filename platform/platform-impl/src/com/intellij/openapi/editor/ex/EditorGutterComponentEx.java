@@ -160,4 +160,9 @@ public abstract class EditorGutterComponentEx extends JComponent implements Edit
   public @Nullable LineNumberConverter getAdditionalLineNumberConverter() {
     return null;
   }
+
+  // Needed when multiple editors are displayed on top of one another in a flowing layout
+  // If you do something like that, consider using this API
+  @ApiStatus.Internal
+  public void pinLayoutsTogetherOnMaximalWidth(List<EditorGutterComponentEx> gutters) { }
 }

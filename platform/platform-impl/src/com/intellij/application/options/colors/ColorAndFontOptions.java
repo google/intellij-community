@@ -140,6 +140,7 @@ public class ColorAndFontOptions extends SearchableConfigurable.Parent.Abstract
 
   private MessageBusConnection myEditorColorSchemeConnection;
   private boolean myShouldChangeLafIfNecessary = true;
+  private @Nullable String myPreselectedSchemeName;
 
   public ColorAndFontOptions() {
     myModel.addListener(modelListener);
@@ -460,7 +461,7 @@ public class ColorAndFontOptions extends SearchableConfigurable.Parent.Abstract
       }
 
       if (!myInitResetCompleted) {
-        myModel.setPreselectedSchemeName(schemeName, this);
+        myPreselectedSchemeName = schemeName;
       }
     });
   }
@@ -675,15 +676,14 @@ public class ColorAndFontOptions extends SearchableConfigurable.Parent.Abstract
       myModel.dropSchemes(this);
       for (EditorColorsScheme allScheme : EditorColorsManager.getInstance().getAllSchemes()) {
         MyColorScheme schemeDelegate = new MyColorScheme(allScheme);
-        initScheme(schemeDelegate);
         myModel.putScheme(schemeDelegate.getName(), schemeDelegate, this);
       }
 
       EditorColorsScheme schemeToSelect = null;
-      String preselectedSchemeName = myModel.getPreselectedSchemeName();
+      String preselectedSchemeName = myPreselectedSchemeName;
       if (preselectedSchemeName != null) {
         schemeToSelect = myModel.getScheme(preselectedSchemeName);
-        myModel.setPreselectedSchemeName(null, this);
+        myPreselectedSchemeName = null;
       }
 
       if (schemeToSelect == null) {
@@ -691,7 +691,6 @@ public class ColorAndFontOptions extends SearchableConfigurable.Parent.Abstract
 
         if (EditorColorsManagerImpl.Companion.isTempScheme(schemeToSelect)) {
           MyColorScheme schemeDelegate = new MyTempColorScheme((AbstractColorsScheme)schemeToSelect);
-          initScheme(schemeDelegate);
           myModel.putScheme(schemeDelegate.getName(), schemeDelegate, this);
         }
       }
@@ -1259,6 +1258,13 @@ public class ColorAndFontOptions extends SearchableConfigurable.Parent.Abstract
     }
 
     public EditorSchemeAttributeDescriptor[] getDescriptors() {
+      if (myDescriptors == null) {
+        initScheme(this);
+      }
+      return myDescriptors;
+    }
+
+    private EditorSchemeAttributeDescriptor[] getInitializedDescriptors() {
       return myDescriptors;
     }
 
@@ -1270,7 +1276,10 @@ public class ColorAndFontOptions extends SearchableConfigurable.Parent.Abstract
     public boolean isModified() {
       if (isFontModified() || isConsoleFontModified()) return true;
 
-      for (EditorSchemeAttributeDescriptor descriptor : myDescriptors) {
+      EditorSchemeAttributeDescriptor[] descriptors = getInitializedDescriptors();
+      if (descriptors == null) return false;
+
+      for (EditorSchemeAttributeDescriptor descriptor : descriptors) {
         if (descriptor.isModified()) {
           return true;
         }
@@ -1313,10 +1322,13 @@ public class ColorAndFontOptions extends SearchableConfigurable.Parent.Abstract
         scheme.setConsoleFontPreferences(getConsoleFontPreferences());
       }
 
-      for (EditorSchemeAttributeDescriptor descriptor : myDescriptors) {
-        if (descriptor.isModified()) {
-          isModified = true;
-          descriptor.apply(scheme);
+      EditorSchemeAttributeDescriptor[] descriptors = getInitializedDescriptors();
+      if (descriptors != null) {
+        for (EditorSchemeAttributeDescriptor descriptor : descriptors) {
+          if (descriptor.isModified()) {
+            isModified = true;
+            descriptor.apply(scheme);
+          }
         }
       }
 
@@ -1601,7 +1613,10 @@ public class ColorAndFontOptions extends SearchableConfigurable.Parent.Abstract
           }
         }
         else {
-          for (EditorSchemeAttributeDescriptor descriptor : scheme.getDescriptors()) {
+          EditorSchemeAttributeDescriptor[] descriptors = scheme.getInitializedDescriptors();
+          if (descriptors == null) continue;
+
+          for (EditorSchemeAttributeDescriptor descriptor : descriptors) {
             if (mySubPanel.contains(descriptor) && descriptor.isModified()) {
               myRevertChangesCompleted = false;
               return true;

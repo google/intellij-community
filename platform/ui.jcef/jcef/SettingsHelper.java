@@ -85,7 +85,7 @@ final class SettingsHelper {
           LOG.info("JCEF-sandbox was disabled because java-process initialized without sandbox");
           settings.no_sandbox = true;
         }
-      } else if (SystemInfoRt.isMac) {
+      } else if (SystemInfoRt.isMac && !config.isRemoteEnabled()) {
         ProcessHandle.Info i = ProcessHandle.current().info();
         Optional<String> processAppPath = i.command();
         String appBundlePath = getMacAppBundlePath();

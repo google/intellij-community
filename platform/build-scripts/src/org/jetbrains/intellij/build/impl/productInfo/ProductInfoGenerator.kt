@@ -16,7 +16,6 @@ import org.jetbrains.intellij.build.BuiltinModulesFileData
 import org.jetbrains.intellij.build.JvmArchitecture
 import org.jetbrains.intellij.build.OsFamily
 import org.jetbrains.intellij.build.impl.Git
-import org.jetbrains.intellij.build.impl.client.createFrontendContextForLaunchers
 import org.jetbrains.intellij.build.impl.client.getAdditionalEmbeddedClientVmOptions
 import org.jetbrains.jps.model.java.JpsJavaExtensionService
 import java.nio.file.Files
@@ -130,7 +129,7 @@ internal suspend fun generateEmbeddedFrontendLaunchData(
   os: OsFamily,
   ideContext: BuildContext,
   vmOptionsFilePath: (BuildContext) -> String
-): CustomCommandLaunchData? = createFrontendContextForLaunchers(ideContext)?.let { clientContext ->
+): CustomCommandLaunchData? = ideContext.getEmbeddedFrontendProductContext()?.let { clientContext ->
   CustomCommandLaunchData(
     commands = listOf("thinClient", "thinClient-headless", "installFrontendPlugins"),
     vmOptionsFilePath = vmOptionsFilePath(clientContext),

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.ide.impl.wsl
 
 import com.intellij.execution.configurations.GeneralCommandLine
@@ -7,24 +7,24 @@ import com.intellij.execution.wsl.WSLDistribution
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.platform.ijent.ParentOfIjentScopes
 import com.intellij.platform.ijent.spi.IjentConnectionStrategy
 import com.intellij.platform.ijent.spi.IjentDeployingOverShellProcessStrategy
 import com.intellij.util.io.computeDetached
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import org.jetbrains.annotations.ApiStatus
 import java.nio.file.Path
 
 @ApiStatus.Internal
 class WslIjentDeployingStrategy(
-  scope: CoroutineScope,
+  scope: ParentOfIjentScopes,
   currentDispatcher: CoroutineDispatcher,
   override val ijentLabel: String,
   private val distribution: WSLDistribution,
   private val project: Project?,
   private val wslCommandLineOptionsModifier: (WSLCommandLineOptions) -> Unit = {},
-) : IjentDeployingOverShellProcessStrategy(scope, currentDispatcher) {
+) : IjentDeployingOverShellProcessStrategy.JavaProcessBasedStrategy(scope, currentDispatcher) {
   override suspend fun mapPath(path: Path): String? =
     distribution.getWslPath(path)
 

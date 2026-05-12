@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.k2.codeinsight.fixes
 
+import com.intellij.codeInsight.generation.OverrideImplementsAnnotationsFilter
 import com.intellij.codeInspection.util.IntentionFamilyName
 import com.intellij.modcommand.ActionContext
 import com.intellij.modcommand.ModChooseAction
@@ -12,8 +13,10 @@ import com.intellij.openapi.util.NlsSafe
 import org.jetbrains.annotations.Nls
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotation
 import org.jetbrains.kotlin.analysis.api.components.semanticallyEquals
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
+import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.KaRendererAnnotationsFilter
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.KaDeclarationRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KaDeclarationRendererForSource
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.classifiers.KaSingleTypeParameterSymbolRenderer
@@ -31,14 +34,18 @@ import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
 import org.jetbrains.kotlin.analysis.api.types.KaSubstitutor
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.analysis.api.types.symbol
+import org.jetbrains.kotlin.analysis.utils.printer.PrettyPrinter
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.shortenReferences
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
+import org.jetbrains.kotlin.idea.base.util.names.FqNames.OptInFqNames.isRequiresOptInFqName
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.intentions.KotlinPsiUpdateModCommandAction
 import org.jetbrains.kotlin.idea.codeinsight.api.applicators.fixes.KotlinQuickFixFactory
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.load.java.NOT_NULL_ANNOTATIONS
 import org.jetbrains.kotlin.load.java.NULLABLE_ANNOTATIONS
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.psi.KtElement
+import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtParameterList
 import org.jetbrains.kotlin.psi.KtPsiFactory
@@ -85,7 +92,7 @@ internal object ChangeMemberFunctionSignatureFixFactory {
         return superFunctions.asSequence().map { signatureToMatch(functionSymbol, it) }.distinctBy { it.sourceCode }.toList()
     }
 
-    private class Signature(@NlsSafe val preview: String, val sourceCode: String)
+    private class Signature(@param:NlsSafe val preview: String, val sourceCode: String)
 
 
     /**
@@ -112,8 +119,9 @@ internal object ChangeMemberFunctionSignatureFixFactory {
         matchParameters(ParameterChooser.MatchNames, superParameters, parameters, substitutedTypes, names, matched, used)
         matchParameters(ParameterChooser.MatchTypes, superParameters, parameters, substitutedTypes, names, matched, used)
 
-        val preview = getSignature(substitutor, substitutedTypes, names, superFunction, KaDeclarationRendererForSource.WITH_SHORT_NAMES)
-        val sourceCode = getSignature(substitutor, substitutedTypes, names, superFunction, KaDeclarationRendererForSource.WITH_QUALIFIED_NAMES)
+        val targetFile = (function.psi as? KtElement)?.containingKtFile
+        val preview = getSignature(substitutor, substitutedTypes, names, superFunction, targetFile, isPreview = true)
+        val sourceCode = getSignature(substitutor, substitutedTypes, names, superFunction, targetFile, isPreview = false)
 
         return Signature(preview, sourceCode)
     }
@@ -143,7 +151,8 @@ internal object ChangeMemberFunctionSignatureFixFactory {
         types: List<KaType>,
         names: List<String>,
         superFunction: KaNamedFunctionSymbol,
-        declarationRenderer: KaDeclarationRenderer
+        targetFile: KtFile?,
+        isPreview: Boolean
     ): String {
         return buildString {
             if (superFunction.isSuspend) {
@@ -166,6 +175,15 @@ internal object ChangeMemberFunctionSignatureFixFactory {
             }
 
             append("fun ")
+            val declarationRenderer = if (isPreview) {
+                KaDeclarationRendererForSource.WITH_SHORT_NAMES
+            } else {
+                KaDeclarationRendererForSource.WITH_QUALIFIED_NAMES.with {
+                    annotationRenderer = annotationRenderer.with {
+                        annotationFilter = KaRendererAnnotationsFilter { annotation, _ -> targetFile != null && keepAnnotation(annotation, targetFile) }
+                    }
+                }
+            }
             if (superFunction.typeParameters.isNotEmpty()) {
                 append(superFunction.typeParameters.joinToString(prefix = "<", postfix = "> ") {
                     it.render(declarationRenderer.with {
@@ -183,15 +201,49 @@ internal object ChangeMemberFunctionSignatureFixFactory {
             }
 
 
+            val superParameters = superFunction.valueParameters
             append(superFunction.name.asString())
-            append(names.zip(types).joinToString(prefix = "(", postfix = ")") { (name, type) ->
-               name + ": " + type.render(declarationRenderer.typeRenderer, Variance.INVARIANT)
+            append(names.indices.joinToString(prefix = "(", postfix = ")") { index ->
+                val name = names[index]
+                val type = types[index]
+                val annotations = if (!isPreview) {
+                    renderParameterAnnotations(superParameters[index], declarationRenderer)
+                } else {
+                    null
+                }
+                (if (annotations.isNullOrEmpty()) "" else "$annotations ") + (if (superParameters[index].isVararg) "${KtTokens.VARARG_KEYWORD} " else "") + name + ": " + type.render(
+                    declarationRenderer.typeRenderer,
+                    Variance.INVARIANT
+                )
             })
             superFunction.returnType.takeUnless { it.isUnitType }?.let {
                 append(": ")
                 append((substitutor?.substitute(it) ?: it).render(declarationRenderer.typeRenderer, Variance.INVARIANT))
             }
         }
+    }
+
+    @OptIn(KaExperimentalApi::class)
+    private fun KaSession.renderParameterAnnotations(
+        parameter: KaValueParameterSymbol,
+        declarationRenderer: KaDeclarationRenderer
+    ): String {
+        val printer = PrettyPrinter()
+        declarationRenderer.annotationRenderer.renderAnnotations(this, parameter, printer)
+        return printer.toString()
+    }
+
+    private fun KaSession.keepAnnotation(annotation: KaAnnotation, targetFile: KtFile): Boolean {
+        val classId = annotation.classId ?: return false
+        val symbol = findClass(classId)
+
+        if (symbol != null && hasRequiresOptInAnnotation(symbol)) return true
+
+        return OverrideImplementsAnnotationsFilter.keepAnnotationOnOverrideMember(classId.asFqNameString(), targetFile)
+    }
+
+    private fun hasRequiresOptInAnnotation(symbol: KaClassSymbol): Boolean = symbol.annotations.any { annotation ->
+        isRequiresOptInFqName(annotation.classId?.asSingleFqName())
     }
 
     private fun KaSession.matchParameters(
@@ -229,7 +281,7 @@ internal object ChangeMemberFunctionSignatureFixFactory {
         }
     }
 
-    private class ChangeMemberFunctionSignatureFix(function: KtNamedFunction, signature: Signature, @Nls val text: String) :
+    private class ChangeMemberFunctionSignatureFix(function: KtNamedFunction, signature: Signature, @param:Nls val text: String) :
         KotlinPsiUpdateModCommandAction.ElementBased<KtNamedFunction, Signature>(function, signature) {
 
         override fun getPresentation(

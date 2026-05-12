@@ -232,7 +232,7 @@ public final class AntExplorer extends SimpleToolWindowPanel implements Disposab
         treeModel.invalidateAsync();
       }
     });
-    DomManager.getDomManager(project).addDomEventListener(__ -> treeModel.invalidateAsync(), this);
+    DomManager.getDomManager(project).addDomEventListener(_ -> treeModel.invalidateAsync(), this);
 
     project.getMessageBus().connect(this).subscribe(RunManagerListener.TOPIC, new RunManagerListener() {
       @Override

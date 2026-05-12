@@ -36,6 +36,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.ControlFlowException
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.debug
+import com.intellij.openapi.diagnostic.getOrHandleException
 import com.intellij.openapi.diagnostic.getOrLogException
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.extensions.PluginId
@@ -66,6 +67,7 @@ import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.TestOnly
 import java.util.concurrent.CancellationException
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 
 @JvmField
@@ -106,6 +108,8 @@ internal class ComponentStoreImplReloadListener : ConfigFolderChangedListener {
 abstract class ComponentStoreImpl : IComponentStore {
   private val components = ConcurrentHashMap<String, ComponentInfo>()
 
+  private val componentInitializationListeners = CopyOnWriteArrayList<ComponentInitializationListener>()
+
   open val project: Project?
     get() = null
 
@@ -123,7 +127,18 @@ abstract class ComponentStoreImpl : IComponentStore {
     if (project == null) service<FeatureUsageSettingsEvents>() else project.service<FeatureUsageSettingsEvents>()
   }
 
-  internal fun getComponents(): Map<String, ComponentInfo> = components
+  @Internal
+  fun getComponents(): Map<String, ComponentInfo> = components
+
+  /**
+   * Adds a listener for initialization of [PersistentStateComponent]s
+   *
+   * @param listener the listener
+   */
+  @Internal
+  fun addComponentInitializationListener(listener: ComponentInitializationListener) {
+    componentInitializationListeners.add(listener)
+  }
 
   @Internal
   fun incrementModificationCount(componentName: String) {
@@ -177,13 +192,13 @@ abstract class ComponentStoreImpl : IComponentStore {
             @Suppress("UNCHECKED_CAST")
             initComponentWithoutStateSpec(component as PersistentStateComponent<Any>, configurationSchemaKey, componentInfo.pluginId) {
               nonCancelableInvocator(it)
-              component.initializeComponent()
+              initializeComponent(component, stateSpec)
             }
           }
           else {
             nonCancelableInvocator {
               component.noStateLoaded()
-              component.initializeComponent()
+              initializeComponent(component, stateSpec)
             }
           }
         }
@@ -195,7 +210,7 @@ abstract class ComponentStoreImpl : IComponentStore {
             @Suppress("UNCHECKED_CAST")
             doInitComponent(info = componentInfo, component = component as PersistentStateComponent<Any>, changedStorages = null, reloadData = ThreeState.NO) {
               nonCancelableInvocator(it)
-              component.initializeComponent()
+              initializeComponent(component, stateSpec)
             }
 
             // if not service, so, component manager will check it later for all components
@@ -212,7 +227,7 @@ abstract class ComponentStoreImpl : IComponentStore {
           else {
             nonCancelableInvocator {
               component.noStateLoaded()
-              component.initializeComponent()
+              initializeComponent(component, stateSpec)
             }
           }
           registerComponent(componentName, componentInfo)
@@ -230,6 +245,18 @@ abstract class ComponentStoreImpl : IComponentStore {
         throw e
       }
       error(PluginException("Cannot init component state (componentName=$componentName, componentClass=${component.javaClass.simpleName})", e, pluginId))
+    }
+  }
+
+  private fun initializeComponent(component: PersistentStateComponent<*>, stateSpec: State?) {
+    component.initializeComponent()
+
+    componentInitializationListeners.forEach {
+      runCatching {
+        it.onComponentInitialized(stateSpec)
+      }.getOrHandleException { e ->
+        LOG.error("Exception in component initialization listener", e)
+      }
     }
   }
 

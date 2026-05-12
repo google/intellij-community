@@ -25,7 +25,7 @@ val IDEA_BUNDLED_PLUGINS: PersistentList<String> = DEFAULT_BUNDLED_PLUGINS + per
   "intellij.html.tools",
   "intellij.tasks.core",
   "intellij.repository.search",
-  "intellij.maven",
+  "intellij.maven.plugin",
   "intellij.gradle.plugin",
   "intellij.android.gradle.declarative.lang.ide",
   "intellij.android.gradle.dsl",
@@ -57,10 +57,11 @@ val IDEA_BUNDLED_PLUGINS: PersistentList<String> = DEFAULT_BUNDLED_PLUGINS + per
   "intellij.keymap.netbeans",
   "intellij.performanceTesting",
   "intellij.compose.ide.plugin",
+  "intellij.moduleSet.plugin.debugger.streams",
 )
 
 val CE_CLASS_VERSIONS: Map<String, String> = mapOf(
-  "" to "21",
+  "" to "25",
   "lib/idea_rt.jar" to "1.8",
   "lib/forms_rt.jar" to "1.8",
   "lib/annotations.jar" to "1.8",
@@ -72,24 +73,20 @@ val CE_CLASS_VERSIONS: Map<String, String> = mapOf(
   "plugins/junit/lib/junit5-rt.jar" to "1.8",
   "plugins/gradle-plugin/lib/gradle-tooling-extension-api.jar" to "1.8",
   "plugins/gradle-plugin/lib/gradle-tooling-extension-impl.jar" to "1.8",
-  "plugins/maven/lib/maven-server.jar" to "1.8",
-  "plugins/maven/lib/intellij.maven.server3/maven3-server-common.jar" to "1.8",
-  "plugins/maven/lib/intellij.maven.server3/maven3-server.jar" to "1.8",
-  "plugins/maven/lib/artifact-resolver-m31.jar" to "1.8",
+  "plugins/maven-plugin/lib/maven-server.jar" to "1.8",
+  "plugins/maven-plugin/lib/intellij.maven.server3/maven3-server-common.jar" to "1.8",
+  "plugins/maven-plugin/lib/intellij.maven.server3/maven3-server.jar" to "1.8",
+  "plugins/maven-plugin/lib/artifact-resolver-m31.jar" to "1.8",
   "plugins/java/lib/sa-jdwp" to "",  // ignored
   "plugins/java/lib/rt/debugger-agent.jar" to "1.7",
   "plugins/Groovy/lib/groovy-rt.jar" to "1.8",
   "plugins/Groovy/lib/groovy-constants-rt.jar" to "1.8",
-  "plugins/repository-search/lib/maven-model.jar" to "1.8"
 )
 
 fun configurePropertiesForAllEditionsOfIntelliJIdea(properties: JetBrainsProductProperties) {
   properties.productLayout.addPlatformSpec { layout, _ ->
     layout.withModule("intellij.java.ide.resources")
-
-    if (!properties.productLayout.productApiModules.contains("intellij.jsp.base")) {
-      layout.withModule("intellij.jsp.base")
-    }
+    layout.withModule("intellij.jsp.base")
 
     //todo currently intellij.platform.testFramework included into idea.jar depends on this jar so it cannot be moved to java plugin
     layout.withModule("intellij.java.rt", "idea_rt.jar")
@@ -110,8 +107,6 @@ fun configurePropertiesForAllEditionsOfIntelliJIdea(properties: JetBrainsProduct
     layout.withoutProjectLibrary("jetbrains.qodana.sarif.converter")
     layout.withoutProjectLibrary("jetbrains.qodana.web.ui")
     layout.withoutProjectLibrary("qodana-sarif")
-    // todo it is a quick fix - fix the root cause
-    layout.withoutProjectLibrary("assertJ")
     layout.withoutProjectLibrary("hamcrest")
   }
 

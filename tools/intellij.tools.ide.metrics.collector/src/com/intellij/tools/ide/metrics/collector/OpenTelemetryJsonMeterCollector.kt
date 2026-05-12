@@ -15,9 +15,9 @@ import io.opentelemetry.sdk.metrics.data.MetricData
 import io.opentelemetry.sdk.metrics.data.MetricDataType
 import io.opentelemetry.sdk.resources.Resource
 import java.nio.file.Path
+import kotlin.io.path.exists
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
-
 
 /**
  * Collects metrics from `open-telemetry-meters.*DATE*.json` files usually located in IDE's log directory.
@@ -37,11 +37,13 @@ open class OpenTelemetryJsonMeterCollector(
 ) : MetricsCollector {
 
   fun collect(logsDirPath: Path, transform: (String, Long) -> Pair<String, Int>): List<PerformanceMetrics.Metric> {
-    val metricsFiles = logsDirPath.listDirectoryEntries("*.json").filter { it.name.startsWith("open-telemetry-meter") }
+    val newMeterDir = logsDirPath.resolve("telemetry")
+    // we recently moved .json telemetry files into /telemetry subfolder, same as .csv telemetry files above
+    val metricsFiles = listMeterFiles(newMeterDir) + listMeterFiles(logsDirPath)
 
     // fallback to the collecting meters from the .csv files for older IDEs versions (where meters aren't exported to JSON files)
     if (metricsFiles.isEmpty()) {
-      logError("Cannot find JSON files with metrics `open-telemetry-meters.***.json` in '${logsDirPath.toUri()}'. Falling back to use metrics from *.csv files")
+      logError("Cannot find JSON files with metrics `open-telemetry-meters.***.json` in '${newMeterDir.toUri()}'. Falling back to use metrics from *.csv files")
 
       return OpenTelemetryCsvMeterCollector(metricsSelectionStrategy) { metricEntry ->
         val metricData = object : MetricData {
@@ -59,6 +61,7 @@ open class OpenTelemetryJsonMeterCollector(
         meterFilter(metricData)
       }.collect(logsDirPath, transform)
     }
+
     val telemetryMetrics: List<MetricData> = metricsFiles.flatMap { OpenTelemetryMetersJsonImporter.fromJsonFile(it) }
       .filter(meterFilter)
 
@@ -75,6 +78,13 @@ open class OpenTelemetryJsonMeterCollector(
         else -> TODO("Type ${it.type} isn't supported yet")
       }.convert(it, transform)
     }
+  }
+
+  private fun listMeterFiles(logsDirPath: Path): List<Path> {
+    if (!logsDirPath.exists()) return emptyList()
+
+    return logsDirPath.listDirectoryEntries("*.json")
+      .filter { it.name.startsWith("open-telemetry-meter") }
   }
 
   override fun collect(logsDirPath: Path): List<PerformanceMetrics.Metric> {

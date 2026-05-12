@@ -10,15 +10,15 @@ import com.intellij.java.coverage.JavaCoverageBundle
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.rt.coverage.report.XMLCoverageReport
 import com.intellij.rt.coverage.report.XMLProjectData
-import java.io.File
-import java.io.FileInputStream
 import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.Path
 
 private val LOG = logger<XMLReportRunner>()
 
 class XMLReportRunner : CoverageRunner() {
   override fun loadCoverageData(
-    sessionDataFile: File,
+    sessionDataFile: Path,
     baseCoverageSuite: CoverageSuite?,
     reporter: CoverageLoadErrorReporter
   ): CoverageLoadingResult = error("Should not be called")
@@ -26,9 +26,10 @@ class XMLReportRunner : CoverageRunner() {
   override fun getId() = "jacoco_xml_report"
   override fun getDataFileExtension() = "xml"
   override fun acceptsCoverageEngine(engine: CoverageEngine) = engine is XMLReportEngine
-  override fun canBeLoaded(candidate: File) = XMLCoverageReport.canReadFile(candidate)
-  fun loadCoverageData(xmlFile: File): XMLProjectData? = try {
-    XMLCoverageReport().read(FileInputStream(xmlFile))
+  override fun canBeLoaded(candidate: Path) = XMLCoverageReport.canReadFile(candidate.toFile())
+
+  internal fun loadCoverageData(xmlFile: Path): XMLProjectData? = try {
+    Files.newInputStream(xmlFile).use { XMLCoverageReport().read(it) }
   }
   catch (e: IOException) {
     LOG.info(e)

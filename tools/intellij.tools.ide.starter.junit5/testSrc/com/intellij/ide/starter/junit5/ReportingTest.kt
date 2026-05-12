@@ -4,10 +4,10 @@ import com.intellij.ide.starter.junit5.config.KillOutdatedProcessesAfterEach
 import com.intellij.ide.starter.report.FailureDetailsOnCI
 import com.intellij.ide.starter.runner.IDERunContext
 import com.intellij.ide.starter.utils.FileSystem.getFileOrDirectoryPresentableSize
-import com.intellij.ide.starter.utils.convertToHashCodeWithOnlyLetters
 import com.intellij.ide.starter.utils.formatSize
-import com.intellij.ide.starter.utils.generifyErrorMessage
-import com.intellij.ide.starter.utils.replaceSpecialCharactersWithHyphens
+import com.intellij.platform.testFramework.teamCity.convertToHashCodeWithOnlyLetters
+import com.intellij.platform.testFramework.teamCity.generifyErrorMessage
+import com.intellij.tools.ide.util.common.replaceSpecialCharactersWithHyphens
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -50,10 +50,10 @@ class ReportingTest {
                      "DbSourceContextElement(kernel Kernel@vlg56bursheg4flie1tq), ComponentManager(ApplicationImpl@702643297), " +
                      "com.intellij.codeWithMe.ClientIdContextElementPrecursor@1add8c55, CoroutineName(com.intellij.station.core.services.IdeStationServerService), " +
                      "Dispatchers.Default]: D:\\BuildAgent\\temp\\buildTmp\\agentTemp\\Host\\jb.station.ij.8236.sock",
-                     "Unhandled exception in [<Kernel details> com.intellij.station.core.services.IdeStationServerService]: D:\\BuildAgent\\temp\\buildTmp\\agentTemp\\Host\\jb.station.ij.<NUM>.sock"),
+                     "Unhandled exception in [<Kernel details> com.intellij.station.core.services.IdeStationServerService]: <FILE>"),
         Arguments.of("com.intellij.diagnostic.RemoteSerializedThrowable: Invalid lookup start: RangeMarker(invalid:166,166) , " +
                      "EditorImpl[file:///opt/teamcity-agent/temp/buildTmp/testeyqr2monxt4ay/ide-tests/cache/projects/unpacked/laravel.io-8/tests/Unit/UserTest.php], dis",
-                     "com.intellij.diagnostic.RemoteSerializedThrowable: Invalid lookup start: RangeMarker(invalid:<NUM>,<NUM>) , EditorImpl[<FILE>], dis"),
+                     "com.intellij.diagnostic.RemoteSerializedThrowable: Invalid lookup start: RangeMarker(invalid:<NUM>,<NUM>) , EditorImpl[file://<FILE>], dis"),
       )
     }
   }
@@ -142,7 +142,7 @@ class ReportingTest {
     }
     Mockito.doReturn(testName).`when`(runContextMock).contextName
 
-    val failureDetails = FailureDetailsOnCI.instance.getFailureDetails(runContext = runContextMock)
+    val failureDetails = FailureDetailsOnCI.instance.getFailureDetails(runContext = runContextMock, error = null)
     failureDetails.shouldBe("""
       Test: $testName
       $ciMessagePrefix ${testName.replaceSpecialCharactersWithHyphens()}
@@ -156,7 +156,7 @@ class ReportingTest {
     }
     Mockito.doReturn(testName).`when`(runContextMock).contextName
 
-    val failureDetails = FailureDetailsOnCI.instance.getFailureDetails(runContext = runContextMock)
+    val failureDetails = FailureDetailsOnCI.instance.getFailureDetails(runContext = runContextMock, error = null)
     failureDetails.shouldBe("""
       Test: $testName
       $ciMessagePrefix ${testName.replaceSpecialCharactersWithHyphens()}

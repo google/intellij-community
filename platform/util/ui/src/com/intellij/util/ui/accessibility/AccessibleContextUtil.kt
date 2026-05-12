@@ -136,6 +136,16 @@ object AccessibleContextUtil {
                                     getAccessibleDescription(j3))
   }
 
+  @JvmStatic
+  @Nls
+  fun getCombinedDescription(@NlsSafe separator: String, vararg components: Component?): String? {
+    var result: String? = ""
+    for (c in components) {
+      result = combineAccessibleStrings(result, separator, getAccessibleDescription(c))
+    }
+    return result
+  }
+
   /**
    * Returns `description` if it is different from the accessible
    * name, `null` otherwise.

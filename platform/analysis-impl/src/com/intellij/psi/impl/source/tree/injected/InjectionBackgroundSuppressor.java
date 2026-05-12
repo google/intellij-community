@@ -15,10 +15,14 @@
  */
 package com.intellij.psi.impl.source.tree.injected;
 
+import com.intellij.openapi.util.Key;
+import kotlin.Unit;
+
 /**
  * Marker interface that suppresses injection background.
  *
  * @author ignatov
  */
 public interface InjectionBackgroundSuppressor {
+  Key<Unit> SUPPRESS_INJECTION_BACKGROUND = Key.create("SUPPRESS_INJECTION_BACKGROUND");
 }

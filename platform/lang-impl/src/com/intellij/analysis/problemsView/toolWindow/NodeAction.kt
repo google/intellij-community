@@ -7,25 +7,32 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.PlatformCoreDataKeys.SELECTED_ITEMS
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.DumbAwareAction
+import org.jetbrains.annotations.ApiStatus
 import java.awt.datatransfer.StringSelection
 
 internal class CopyProblemDescriptionAction : NodeAction<Problem>() {
   override fun getData(node: Any?): Problem? = (node as? ProblemNodeI)?.problem
   override fun actionPerformed(data: List<Problem>) {
-    val text = when {
-      data.isEmpty() -> null
-      data.size == 1 -> data.single().toCopyableText()
-      else -> data.joinToString("") { "${it.toCopyableText()}\n" }
-    }
-    if (text != null) {
-      CopyPasteManager.getInstance().setContents(StringSelection(text))
-    }
+    copyProblemDescription(data)
+  }
+}
+
+@ApiStatus.Internal
+fun copyProblemDescription(data: List<Problem>) {
+  val text = when {
+    data.isEmpty() -> null
+    data.size == 1 -> data.single().toCopyableText()
+    else -> data.joinToString("") { "${it.toCopyableText()}\n" }
+  }
+  if (text != null) {
+    CopyPasteManager.getInstance().setContents(StringSelection(text))
   }
 }
 
 private fun Problem.toCopyableText(): String = description ?: text
 
-internal abstract class NodeAction<Data> : DumbAwareAction() {
+@ApiStatus.Internal
+abstract class NodeAction<Data> : DumbAwareAction() {
   abstract fun getData(node: Any?): Data?
   abstract fun actionPerformed(data: List<Data>)
   open fun isEnabled(data: List<Data>): Boolean = true

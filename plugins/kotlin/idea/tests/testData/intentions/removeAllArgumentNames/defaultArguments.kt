@@ -1,3 +1,4 @@
+// INTENTION_TEXT: Remove all possible argument names
 fun foo(a: Int, b: Int, c: Int = 3, d: Int) = a + b + c + d
 
 fun main() {

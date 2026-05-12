@@ -22,7 +22,7 @@ class MavenProjectsManagerWatcherTest : MavenMultiVersionImportingTestCase() {
   override fun setUp() = runBlocking {
     super.setUp()
     myProjectsTreeTracker = MavenProjectTreeTracker()
-    projectsManager.addProjectsTreeListener(myProjectsTreeTracker!!, getTestRootDisposable())
+    project.messageBus.connect(getTestRootDisposable()).subscribe(MavenProjectsTree.Listener.TOPIC, myProjectsTreeTracker!!)
     initProjectsManager(true)
     createProjectPom(createPomContent("test", "project"))
     importProjectAsync()

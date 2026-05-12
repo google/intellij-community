@@ -12,6 +12,11 @@ public enum JetBrainsRuntimeDistribution {
   JCEF("jcef"),
 
   /**
+   * JBR with DCEVM, for IDEs distribution
+   */
+  STANDARD(""), // todo change to the real prefix
+
+  /**
    * JBR without JCEF and DCEVM
    */
   LIGHTWEIGHT("");

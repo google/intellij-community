@@ -1,9 +1,28 @@
 <idea-plugin visibility="public">
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
+    <module name="fleet.rhizomedb"/>
+    <module name="intellij.libraries.fastutil"/>
+    <module name="intellij.libraries.kotlinx.serialization.core"/>
+    <module name="intellij.libraries.kotlinx.serialization.json"/>
+    <module name="intellij.platform.core"/>
+    <module name="intellij.platform.core.impl"/>
+    <module name="intellij.platform.core.ui"/>
+    <module name="intellij.platform.diagnostic.telemetry"/>
+    <module name="intellij.platform.diff"/>
+    <module name="intellij.platform.editor.ui"/>
+    <module name="intellij.platform.ide"/>
+    <module name="intellij.platform.ide.core"/>
+    <module name="intellij.platform.ide.impl"/>
     <module name="intellij.platform.kernel"/>
+    <module name="intellij.platform.lang.impl"/>
+    <module name="intellij.platform.projectModel"/>
+    <module name="intellij.platform.util.coroutines"/>
+    <module name="intellij.platform.util.ui"/>
     <module name="intellij.platform.vcs.core"/>
     <module name="intellij.platform.vcs.shared"/>
   </dependencies>
+  <!-- endregion -->
 
   <extensionPoints>
     <extensionPoint name="changesGroupingPolicy" beanClass="com.intellij.openapi.vcs.changes.ui.ChangesGroupingPolicyFactoryEPBean"
@@ -22,6 +41,9 @@
     <extensionPoint name="vcs.changes.changesViewModifier"
                     interface="com.intellij.openapi.vcs.changes.ChangesViewModifier"
                     area="IDEA_PROJECT"
+                    dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.openapi.vcs.merge.resolveActionProvider"
+                    interface="com.intellij.openapi.vcs.merge.MergeResolveActionProvider"
                     dynamic="true"/>
   </extensionPoints>
 
@@ -44,6 +66,9 @@
     <registryKey key="vcs.merge.conflict.iterative.resolution" defaultValue="false" restartRequired="false"
                  description="Enable iterative VCS conflict resolution flow"/>
 
+    <registryKey key="vcs.merge.conflict.file.suggestion" defaultValue="false" restartRequired="false"
+                 description="Automatically open the next file in the merge conflict"/>
+
     <projectService serviceInterface="com.intellij.platform.vcs.impl.shared.changes.ChangesViewSettings"
                     serviceImplementation="com.intellij.platform.vcs.impl.shared.changes.ChangesViewSettingsImpl"/>
 
@@ -58,6 +83,7 @@
                            implementationClass="com.intellij.openapi.vcs.changes.ui.DirectoryChangesGroupingPolicy$Factory"/>
 
     <vcs.changes.changesViewModifier implementation="com.intellij.platform.vcs.impl.shared.commit.EditedCommitChangesViewModifier"/>
+    <projectSettings service="com.intellij.platform.vcs.impl.shared.changes.ChangesViewSettingsImpl"/>
   </extensions>
 
   <actions>

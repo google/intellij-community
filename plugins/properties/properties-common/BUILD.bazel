@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.properties` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "properties_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "properties",
   module_name = "intellij.properties",
   visibility = ["//visibility:public"],
   srcs = glob(["gen/**/*.kt", "gen/**/*.java", "src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":properties_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/core-api:core",
     "//platform/analysis-api:analysis",
@@ -28,13 +23,17 @@ jvm_library(
     "//platform/code-style-impl:codeStyle-impl",
     "//platform/lang-impl",
     "//platform/platform-impl:ide-impl",
+    "//platform/ide-core",
     "//platform/refactoring",
     "//platform/lang-api:lang",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//jps/model-api:model",
   ]
 )
 
 jvm_library(
   name = "properties_test_lib",
+  testonly = True,
   module_name = "intellij.properties",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -53,8 +52,17 @@ jvm_library(
     "//platform/code-style-impl:codeStyle-impl_test_lib",
     "//platform/lang-impl:lang-impl_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/refactoring:refactoring_test_lib",
     "//platform/lang-api:lang_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//jps/model-api:model_test_lib",
   ]
 )
 ### auto-generated section `build intellij.properties` end
+
+### auto-generated section `iml intellij.properties` start
+exports_files([
+  "intellij.properties.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.properties` end

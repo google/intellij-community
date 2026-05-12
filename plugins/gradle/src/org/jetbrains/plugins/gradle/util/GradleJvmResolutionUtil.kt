@@ -4,6 +4,7 @@
 package org.jetbrains.plugins.gradle.util
 
 import com.intellij.openapi.application.runReadAction
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.externalSystem.service.execution.ExternalSystemJdkUtil
 import com.intellij.openapi.externalSystem.service.execution.getLocalJavaHomeIfMatchesEel
 import com.intellij.openapi.project.Project
@@ -29,6 +30,8 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.io.path.pathString
 
+private val LOG = Logger.getInstance("org.jetbrains.plugins.gradle.util.GradleJvmResolutionUtil")
+
 private data class GradleJvmProviderId(val projectSettings: GradleProjectSettings) : Id
 
 fun getGradleJvmLookupProvider(project: Project, projectSettings: GradleProjectSettings) =
@@ -43,14 +46,25 @@ fun setupGradleJvm(project: Project, projectSettings: GradleProjectSettings, gra
   val resolutionContext = GradleJvmResolutionContext(project, projectPath, gradleVersion)
   projectSettings.gradleJvm = resolutionContext.findGradleJvm()
   if (projectSettings.gradleJvm != null) {
+    LOG.debug("Gradle JVM for '$projectPath': reusing existing linked project setting '${projectSettings.gradleJvm}'")
     return
   }
 
   when {
-    resolutionContext.canUseProjectSdk() -> projectSettings.gradleJvm = ExternalSystemJdkUtil.USE_PROJECT_JDK
-    resolutionContext.canUseGradleJavaHomeJdk() -> projectSettings.gradleJvm = USE_GRADLE_JAVA_HOME
-    resolutionContext.canUseJavaHomeJdk() -> projectSettings.gradleJvm = ExternalSystemJdkUtil.USE_JAVA_HOME
+    resolutionContext.canUseProjectSdk() -> {
+      projectSettings.gradleJvm = ExternalSystemJdkUtil.USE_PROJECT_JDK
+      LOG.debug("Gradle JVM for '$projectPath': using project SDK (USE_PROJECT_JDK)")
+    }
+    resolutionContext.canUseGradleJavaHomeJdk() -> {
+      projectSettings.gradleJvm = USE_GRADLE_JAVA_HOME
+      LOG.debug("Gradle JVM for '$projectPath': using gradle.properties java.home (USE_GRADLE_JAVA_HOME)")
+    }
+    resolutionContext.canUseJavaHomeJdk() -> {
+      projectSettings.gradleJvm = ExternalSystemJdkUtil.USE_JAVA_HOME
+      LOG.debug("Gradle JVM for '$projectPath': using JAVA_HOME environment variable (USE_JAVA_HOME)")
+    }
     else -> getGradleJvmLookupProvider(project, projectSettings)
+      .also { LOG.debug("Gradle JVM for '$projectPath': no direct SDK match, starting async SDK version lookup for Gradle ${gradleVersion.version}") }
       .newLookupBuilder()
       .withProject(project)
       .withLookupReason(GradleBundle.message("gradle.jvm.resolution.lookup.reason", gradleVersion.version))
@@ -78,11 +92,13 @@ fun setupGradleJvm(project: Project, projectSettings: GradleProjectSettings, gra
          */
         val fakeSdk = sdk?.let { findRegisteredSdk(project, it) }
         if (fakeSdk != null && projectSettings.gradleJvm == null) {
+          LOG.debug("Gradle JVM for '$projectPath': SDK name resolved to fake SDK '${fakeSdk.name}' (looked up from '${sdk.name}')")
           projectSettings.gradleJvm = fakeSdk.name
         }
       }
       .onSdkResolved { sdk ->
         if (projectSettings.gradleJvm == null) {
+          LOG.debug("Gradle JVM for '$projectPath': SDK resolved via async lookup: '${sdk?.name}'")
           projectSettings.gradleJvm = sdk?.name
         }
       }

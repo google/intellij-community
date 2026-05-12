@@ -117,7 +117,7 @@ public class DomElementAnnotationsManagerImpl extends DomElementAnnotationsManag
     XmlTag rootTag = element.getRootElement().getXmlTag();
     if (rootTag == null) return new DomElementsProblemsHolderImpl(element);
 
-    return myHolders.computeIfAbsent(rootTag, __ -> new DomElementsProblemsHolderImpl(element));
+    return myHolders.computeIfAbsent(rootTag, _ -> new DomElementsProblemsHolderImpl(element));
   }
 
   public boolean isHolderUpToDate(DomElement element) {

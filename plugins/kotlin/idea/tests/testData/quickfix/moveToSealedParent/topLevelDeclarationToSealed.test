@@ -20,8 +20,4 @@ sealed class SomeSealedClass
 // ERROR: Inheritor of sealed class or interface declared in package <root> but it must be in package foo where base class is declared
 // COMPILER_ARGUMENTS: -XXLanguage:+SealedInterfaces -XXLanguage:+AllowSealedInheritorsInDifferentFilesOfSamePackage
 
-import foo.SomeSealedClass
-
 <caret>class ArbitraryClass
-
-

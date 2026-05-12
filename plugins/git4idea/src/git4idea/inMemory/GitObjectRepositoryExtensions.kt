@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package git4idea.inMemory
 
+import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.vcs.VcsException
 
 import com.intellij.platform.util.progress.reportSequentialProgress
@@ -54,9 +55,14 @@ internal suspend fun GitObjectRepository.chainCommits(base: Oid, commits: List<G
 /**
  * Rebases a commit onto a new parent by applying the commit's changes (diff from its original parent)
  * to the new parent's tree, preserving the original commit's metadata.
+ *
+ * Returns `null` when the rebased commit would be empty (the merged tree equals the new parent's tree),
+ * matching `git rebase --empty=drop` behavior.
  */
-internal fun GitObjectRepository.rebaseCommit(commit: GitObject.Commit, newParent: GitObject.Commit?): Oid {
+internal fun GitObjectRepository.rebaseCommit(commit: GitObject.Commit, newParent: GitObject.Commit?): Oid? {
   val tree = mergeTrees(commit, newParent)
+  val parentTreeOid = newParent?.treeOid ?: emptyTree.oid
+  if (tree.oid == parentTreeOid) return null
   persistObject(tree)
   return commitTreeWithOverrides(commit, treeOid = tree.oid, parentsOids = newParent?.let { listOf(it.oid) } ?: emptyList())
 }
@@ -77,7 +83,7 @@ internal fun GitObjectRepository.mergeTrees(commit: GitObject.Commit, newParent:
 }
 
 internal class MergeConflictException(
-  val description: String,
+  val description: @NlsSafe String,
 ) : Exception("Merge conflict with git output:\n$description")
 
 internal fun GitObjectRepository.getTreeFromEntry(entry: GitObject.Tree.Entry?): GitObject.Tree {

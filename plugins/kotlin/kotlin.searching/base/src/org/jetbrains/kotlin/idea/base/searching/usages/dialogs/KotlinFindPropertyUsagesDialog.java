@@ -151,7 +151,7 @@ public class KotlinFindPropertyUsagesDialog extends JavaFindUsagesDialog<KotlinP
             dataClassComponentCheckBox.setSelected(getDisableComponentAndDestructionSearch(project));
             optionsPanel.add(dataClassComponentCheckBox);
             dataClassComponentCheckBox.addActionListener(
-                    ___ -> setDisableComponentAndDestructionSearch(project, dataClassComponentCheckBox.isSelected())
+                    _ -> setDisableComponentAndDestructionSearch(project, dataClassComponentCheckBox.isSelected())
             );
         }
         addDefaultOptions(optionsPanel);

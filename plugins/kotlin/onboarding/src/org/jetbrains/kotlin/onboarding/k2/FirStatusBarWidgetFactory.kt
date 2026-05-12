@@ -14,17 +14,13 @@ import com.intellij.openapi.wm.CustomStatusBarWidget
 import com.intellij.openapi.wm.StatusBarWidget
 import com.intellij.openapi.wm.StatusBarWidgetFactory
 import com.intellij.openapi.wm.impl.status.widget.StatusBarWidgetsManager
-import com.intellij.ui.ClickListener
 import org.jetbrains.kotlin.idea.KotlinIcons
 import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginModeProvider
-import org.jetbrains.kotlin.onboarding.k2.satisfaction.survey.K2UserTracker
-import java.awt.event.MouseEvent
 import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.JLabel
-import javax.swing.SwingUtilities
 
-private class FirStatusBarWidgetFactory : StatusBarWidgetFactory {
+internal class FirStatusBarWidgetFactory : StatusBarWidgetFactory {
     override fun getId(): String = ID
 
     override fun getDisplayName(): String = DISPLAY_NAME
@@ -33,7 +29,7 @@ private class FirStatusBarWidgetFactory : StatusBarWidgetFactory {
         return KotlinPluginModeProvider.isK2Mode() && Registry.`is`(REGISTRY_KEY, /* defaultValue = */ false)
     }
 
-    override fun createWidget(project: Project): StatusBarWidget = Widget(project)
+    override fun createWidget(project: Project): StatusBarWidget = Widget()
 
     companion object {
         const val ID = "kotlin.k2.mode"
@@ -58,7 +54,7 @@ private class FirStatusBarWidgetListener : RegistryValueListener {
 
 private const val REGISTRY_KEY: String = "kotlin.k2.show.fir.statusbar.icon"
 
-private class Widget(private val project: Project) : CustomStatusBarWidget, StatusBarWidget.IconPresentation {
+private class Widget : CustomStatusBarWidget, StatusBarWidget.IconPresentation {
     private var icon: JLabel? = null
 
     override fun ID(): String = FirStatusBarWidgetFactory.ID
@@ -68,15 +64,6 @@ private class Widget(private val project: Project) : CustomStatusBarWidget, Stat
     override fun getComponent(): JComponent {
         val icon = JLabel()
             .apply {
-                object : ClickListener() {
-                    override fun onClick(event: MouseEvent, clickCount: Int): Boolean {
-                        if (SwingUtilities.isLeftMouseButton(event)) {
-                            K2UserTracker.getInstance().forceShowFeedbackForm(project)
-                        }
-                        return true
-                    }
-                }.installOn(this)
-            }.apply {
                 toolTipText = DISPLAY_NAME
                 icon = KotlinIcons.FIR
             }

@@ -6,11 +6,12 @@ package com.intellij.platform.workspace.storage.testEntities.entities
 import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.MutableEntityStorage
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 
 @GeneratedCodeApiVersion(3)
-interface CompositeChildAbstractEntityBuilder : WorkspaceEntityBuilder<CompositeChildAbstractEntity>, CompositeAbstractEntityBuilder<CompositeChildAbstractEntity> {
+interface CompositeChildAbstractEntityBuilder : WorkspaceEntityBuilder<CompositeChildAbstractEntity>,
+                                                CompositeAbstractEntityBuilder<CompositeChildAbstractEntity> {
   override var entitySource: EntitySource
   override var parentInList: CompositeAbstractEntityBuilder<out CompositeAbstractEntity>?
   override var children: List<SimpleAbstractEntityBuilder<out SimpleAbstractEntity>>

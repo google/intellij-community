@@ -3,7 +3,11 @@
 
 package com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion
 
-import com.intellij.platform.workspace.storage.*
+import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.EntityType
+import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
+import com.intellij.platform.workspace.storage.MutableEntityStorage
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceList
 
 @GeneratedCodeApiVersion(3)
@@ -14,7 +18,8 @@ interface ChangedComputablePropsOrderEntityBuilder : WorkspaceEntityBuilder<Chan
   var value: Int
 }
 
-internal object ChangedComputablePropsOrderEntityType : EntityType<ChangedComputablePropsOrderEntity, ChangedComputablePropsOrderEntityBuilder>() {
+internal object ChangedComputablePropsOrderEntityType :
+  EntityType<ChangedComputablePropsOrderEntity, ChangedComputablePropsOrderEntityBuilder>() {
   override val entityClass: Class<ChangedComputablePropsOrderEntity> get() = ChangedComputablePropsOrderEntity::class.java
   operator fun invoke(
     someKey: Int,

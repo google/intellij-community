@@ -61,6 +61,8 @@ internal class RemoveRedundantQualifierNameInspection : AbstractKotlinInspection
             declaration,
             shortenOptions = ShortenOptionsForIde.DEFAULT.copy(
                 removeExplicitCompanionReferences = false,
+                // Highlighting CSR qualifiers as redundant would be too noisy; see KTIJ-38137
+                removeContextSensitiveResolutionQualifiers = false,
             ),
             classShortenStrategy = { classSymbol ->
                 if (classSymbol.isEnumCompanionObject()) {

@@ -8,10 +8,12 @@ import com.intellij.execution.dashboard.RunDashboardManager;
 import com.intellij.execution.dashboard.RunDashboardNode;
 import com.intellij.execution.dashboard.RunDashboardRunConfigurationNode;
 import com.intellij.execution.services.ServiceViewActionUtils;
+import com.intellij.execution.services.ServiceViewManager;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.actionSystem.ActionPlaces;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.PlatformDataKeys;
 import com.intellij.openapi.actionSystem.Presentation;
 import com.intellij.openapi.actionSystem.remoting.ActionRemoteBehaviorSpecification;
 import com.intellij.openapi.project.DumbAwareAction;
@@ -46,6 +48,19 @@ final class RestoreHiddenConfigurationsAction
       presentation.setEnabledAndVisible(false);
       return;
     }
+
+    var toolWindow = e.getData(PlatformDataKeys.TOOL_WINDOW);
+    if (toolWindow == null) {
+      presentation.setEnabledAndVisible(false);
+      return;
+    }
+    var servicesToolWindowId =
+      ServiceViewManager.getInstance(project).getToolWindowId(RunDashboardServiceViewContributor.class);
+    if (!toolWindow.getId().equals(servicesToolWindowId)) {
+      presentation.setEnabledAndVisible(false);
+      return;
+    }
+
     if (ActionPlaces.getActionGroupPopupPlace(ActionPlaces.SERVICES_TOOLBAR).equals(e.getPlace())) {
       presentation.setEnabledAndVisible(hasHiddenConfiguration(project));
       presentation.setText(ExecutionBundle.message("run.dashboard.restore.hidden.configurations.toolbar.action.name"));

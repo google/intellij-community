@@ -49,7 +49,7 @@ public class BackwardDependenciesBuilder extends DependenciesBuilder {
     myScopeOfInterest = scopeOfInterest;
     myForwardScope = scopeOfInterest != null
                      ? scopeOfInterest
-                     : ReadAction.compute(() -> getScope().getNarrowedComplementaryScope(getProject()));
+                     : ReadAction.computeBlocking(() -> getScope().getNarrowedComplementaryScope(getProject()));
     myFileCount = myForwardScope.getFileCount();
     myTotalFileCount = myFileCount + scope.getFileCount();
   }
@@ -109,7 +109,7 @@ public class BackwardDependenciesBuilder extends DependenciesBuilder {
             final Map<PsiFile, Set<PsiFile>> dependencies = builder.getDependencies();
             for (final PsiFile psiFile : dependencies.keySet()) {
               if (dependencies.get(psiFile).contains(file)) {
-                Set<PsiFile> fileDeps = getDependencies().computeIfAbsent(file, __ -> new HashSet<>());
+                Set<PsiFile> fileDeps = getDependencies().computeIfAbsent(file, _ -> new HashSet<>());
                 fileDeps.add(psiFile);
               }
             }

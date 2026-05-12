@@ -16,7 +16,6 @@ import javax.swing.JScrollPane
 import javax.swing.SwingUtilities
 import javax.swing.border.Border
 
-@ApiStatus.Experimental
 class ScrollableContentBorder private constructor(
   @SideMask sideMask: Int,
   private val color: Color = JBColor.border(),

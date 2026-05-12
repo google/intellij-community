@@ -17,12 +17,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 import org.jetbrains.plugins.github.authentication.GHLoginSource
 import org.jetbrains.plugins.github.authentication.accounts.GithubAccount
-import org.jetbrains.plugins.github.exceptions.GithubAuthenticationException
+import org.jetbrains.plugins.github.exceptions.GHAPIExceptionUtil
 import org.jetbrains.plugins.github.i18n.GithubBundle
 import org.jetbrains.plugins.github.pullrequest.GHPRListViewModel
 import org.jetbrains.plugins.github.pullrequest.ui.GHApiLoadingErrorHandler
 import org.jetbrains.plugins.github.pullrequest.ui.filters.GHPRListSearchValue
-import org.jetbrains.plugins.github.ui.component.GHHtmlErrorPanel
 import javax.swing.JComponent
 import javax.swing.JPanel
 
@@ -85,17 +84,14 @@ internal class GHPRListPanelController(
     }
   }
 
-  private fun createErrorStatusPresenter(project: Project, account: GithubAccount): ErrorStatusPresenter.Text<Throwable> {
+  private fun createErrorStatusPresenter(project: Project, account: GithubAccount): ErrorStatusPresenter<Throwable> {
     val errorHandler = GHApiLoadingErrorHandler(project, account, GHLoginSource.PR_LIST) {
       listVm.reload()
     }
 
-    return ErrorStatusPresenter.simple(
+    return ErrorStatusPresenter.simpleHTML(
       GithubBundle.message("pull.request.list.cannot.load"),
-      descriptionProvider = { error ->
-        if (error is GithubAuthenticationException) GithubBundle.message("pull.request.list.error.authorization")
-        else GHHtmlErrorPanel.getLoadingErrorText(error)
-      },
+      descriptionProvider = GHAPIExceptionUtil::getPresentableMessage,
       actionProvider = errorHandler::getActionForError
     )
   }

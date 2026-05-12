@@ -1,12 +1,10 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.syntax.util.lexer
 
 import com.intellij.platform.syntax.SyntaxElementType
 import com.intellij.util.text.CharArrayUtilKmp
 import com.intellij.util.text.CharArrayUtilKmp.regionMatches
-import org.jetbrains.annotations.ApiStatus
 
-@ApiStatus.Experimental
 class PrefixSuffixStripperLexer(
   private val prefix: String,
   private val prefixType: SyntaxElementType?,

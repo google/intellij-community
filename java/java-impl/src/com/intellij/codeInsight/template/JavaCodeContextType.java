@@ -1,7 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.template;
 
-import com.intellij.codeInsight.completion.JavaKeywordCompletion;
+import com.intellij.codeInsight.completion.JavaCompletionUtil;
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.ide.highlighter.JavaFileHighlighter;
 import com.intellij.java.JavaBundle;
@@ -15,6 +15,7 @@ import com.intellij.pom.java.JavaFeature;
 import com.intellij.psi.JavaCodeFragment;
 import com.intellij.psi.JavaCodeFragmentFactory;
 import com.intellij.psi.JavaPsiFacade;
+import com.intellij.psi.JavaTokenType;
 import com.intellij.psi.LambdaUtil;
 import com.intellij.psi.PsiCodeBlock;
 import com.intellij.psi.PsiDocumentManager;
@@ -27,6 +28,7 @@ import com.intellij.psi.PsiIfStatement;
 import com.intellij.psi.PsiImplicitClass;
 import com.intellij.psi.PsiJavaCodeReferenceElement;
 import com.intellij.psi.PsiJavaFile;
+import com.intellij.psi.PsiJavaToken;
 import com.intellij.psi.PsiLambdaExpression;
 import com.intellij.psi.PsiMember;
 import com.intellij.psi.PsiMethod;
@@ -49,6 +51,7 @@ import com.intellij.util.ProcessingContext;
 import com.siyeh.ig.psiutils.ExpectedTypeUtils;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import static com.intellij.patterns.PlatformPatterns.psiElement;
 import static com.intellij.patterns.StandardPatterns.instanceOf;
@@ -142,6 +145,9 @@ public abstract class JavaCodeContextType extends TemplateContextType {
       if (isInJShellContext(element)) {
         return true;
       }
+      if (isAfterDot(element)) {
+        return false;
+      }
       if (isAfterExpression(element) || JavaStringContextType.isStringLiteral(element)) {
         return false;
       }
@@ -154,6 +160,14 @@ public abstract class JavaCodeContextType extends TemplateContextType {
       }
 
       return statement != null && statement.getTextRange().getStartOffset() == element.getTextRange().getStartOffset();
+    }
+
+    private static boolean isAfterDot(@Nullable PsiElement element) {
+      if (element == null) return false;
+      PsiElement prevVisibleLeaf = PsiTreeUtil.prevVisibleLeaf(element);
+      if (prevVisibleLeaf == null) return false;
+      return prevVisibleLeaf instanceof PsiJavaToken javaToken &&
+             javaToken.getTokenType() == JavaTokenType.DOT;
     }
   }
 
@@ -219,7 +233,7 @@ public abstract class JavaCodeContextType extends TemplateContextType {
         }
       }
 
-      if (JavaKeywordCompletion.isInsideParameterList(element)) {
+      if (JavaCompletionUtil.isInsideParameterList(element)) {
         return false;
       }
 
@@ -255,8 +269,8 @@ public abstract class JavaCodeContextType extends TemplateContextType {
       }
 
       return isInRecordHeader(element) ||
-             JavaKeywordCompletion.isSuitableForClass(element) ||
-             JavaKeywordCompletion.isInsideParameterList(element) ||
+             JavaCompletionUtil.isSuitableForClass(element) ||
+             JavaCompletionUtil.isInsideParameterList(element) ||
              PsiTreeUtil.getParentOfType(element, PsiReferenceParameterList.class) != null;
     }
 
@@ -310,20 +324,24 @@ public abstract class JavaCodeContextType extends TemplateContextType {
   }
 
   public static final class NormalClassDeclarationBeforeShortMainMethod extends JavaCodeContextType {
-    private final JavaCodeContextType declarationContext = new Declaration();
-
     public NormalClassDeclarationBeforeShortMainMethod() {
       super(JavaBundle.message("live.template.context.normal.class.before.instance.main.declaration"));
     }
 
     @Override
     protected boolean isInContext(@NotNull PsiElement element) {
-      return declarationContext.isInContext(element) && !PsiUtil.isAvailable(JavaFeature.IMPLICIT_CLASSES, element);
+      return isMethodDeclarationPlace(element) &&
+             !PsiUtil.isAvailable(JavaFeature.IMPLICIT_CLASSES, element);
     }
   }
 
+  private static boolean isMethodDeclarationPlace(@NotNull PsiElement element) {
+    return JavaCompletionUtil.isSuitableForClass(element) &&
+           !Statement.isStatementContext(element) &&
+           !Expression.isExpressionContext(element);
+  }
+
   public static final class NormalClassDeclarationAfterShortMainMethod extends JavaCodeContextType {
-    private final JavaCodeContextType declarationContext = new Declaration();
     private final JavaCodeContextType implicitClassContext = new ImplicitClassDeclaration();
 
     public NormalClassDeclarationAfterShortMainMethod() {
@@ -333,7 +351,7 @@ public abstract class JavaCodeContextType extends TemplateContextType {
     @Override
     protected boolean isInContext(@NotNull PsiElement element) {
       return PsiUtil.isAvailable(JavaFeature.IMPLICIT_CLASSES, element) &&
-             declarationContext.isInContext(element) &&
+             isMethodDeclarationPlace(element) &&
              !implicitClassContext.isInContext(element);
     }
   }

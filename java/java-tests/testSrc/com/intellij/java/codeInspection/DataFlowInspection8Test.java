@@ -29,7 +29,7 @@ public class DataFlowInspection8Test extends DataFlowInspectionTestCase {
   public void testMethodReferenceOnNullable() { doTest(); }
   public void testObjectsNonNullWithUnknownNullable() {
     setupTypeUseAnnotations("typeUse", myFixture);
-    doTestWith((insp, __) -> insp.TREAT_UNKNOWN_MEMBERS_AS_NULLABLE = true);
+    doTestWith((insp, _) -> insp.TREAT_UNKNOWN_MEMBERS_AS_NULLABLE = true);
   }
   public void testNullableVoidLambda() { doTest(); }
   public void testNullableForeachVariable() { doTestWithCustomAnnotations(); }
@@ -194,7 +194,7 @@ public class DataFlowInspection8Test extends DataFlowInspectionTestCase {
   public void testStreamGroupingBy() { doTest(); }
   public void testStreamNestedIncomplete() { doTest(); }
   public void testRequireNonNullMethodRef() {
-    doTestWith((dfa, __) -> dfa.SUGGEST_NULLABLE_ANNOTATIONS = true);
+    doTestWith((dfa, _) -> dfa.SUGGEST_NULLABLE_ANNOTATIONS = true);
   }
 
   public void testMapGetWithValueNullability() { doTestWithCustomAnnotations(); }
@@ -335,9 +335,9 @@ public class DataFlowInspection8Test extends DataFlowInspectionTestCase {
                          import java.lang.annotation.*;
                          @Target(ElementType.TYPE_USE)
                          public @interface UnknownNullability { }""");
-    doTestWith((insp, __) -> insp.SUGGEST_NULLABLE_ANNOTATIONS = false);
+    doTestWith((insp, _) -> insp.SUGGEST_NULLABLE_ANNOTATIONS = false);
   }
-  public void testReturnOrElseNull() { doTestWith((insp, __) -> insp.REPORT_NULLABLE_METHODS_RETURNING_NOT_NULL = true); }
+  public void testReturnOrElseNull() { doTestWith((insp, _) -> insp.REPORT_NULLABLE_METHODS_RETURNING_NOT_NULL = true); }
   public void testArrayIntersectionType() { doTest(); }
   public void testFunctionType() { doTest(); }
   public void testIteratorHasNextModifiesPrivateField() { doTest(); }
@@ -372,7 +372,7 @@ public class DataFlowInspection8Test extends DataFlowInspectionTestCase {
   }
   public void testFieldWriteInLambda() { doTest(); }
   public void testNewMethodReferenceMustBeNonNull() {
-    doTestWith((insp, __) -> insp.TREAT_UNKNOWN_MEMBERS_AS_NULLABLE = true); 
+    doTestWith((insp, _) -> insp.TREAT_UNKNOWN_MEMBERS_AS_NULLABLE = true);
   }
   public void testExternalTypeParameterAnnotations() {
     addJSpecifyNullMarked(myFixture);

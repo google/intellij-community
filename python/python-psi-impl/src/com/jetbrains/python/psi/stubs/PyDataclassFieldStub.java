@@ -33,4 +33,6 @@ public interface PyDataclassFieldStub extends CustomTargetExpressionStub {
   @Nullable Boolean kwOnly();
 
   @Nullable String getAlias();
+
+  @Nullable Boolean frozen();
 }

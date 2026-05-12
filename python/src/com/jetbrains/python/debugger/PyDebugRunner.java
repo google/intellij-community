@@ -15,6 +15,7 @@ import com.intellij.execution.configurations.WrappingRunConfiguration;
 import com.intellij.execution.console.LanguageConsoleBuilder;
 import com.intellij.execution.executors.DefaultDebugExecutor;
 import com.intellij.execution.impl.ConsoleViewImpl;
+import com.intellij.execution.impl.ExecutionManagerImpl;
 import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.execution.runners.ProgramRunner;
@@ -27,6 +28,7 @@ import com.intellij.execution.target.value.TargetEnvironmentFunctions;
 import com.intellij.execution.ui.ExecutionConsole;
 import com.intellij.execution.ui.RunContentDescriptor;
 import com.intellij.execution.ui.RunnerLayoutUi;
+import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.ui.content.Content;
 import com.intellij.openapi.application.AccessToken;
 import com.intellij.openapi.application.AppUIExecutor;
@@ -68,6 +70,7 @@ import com.jetbrains.python.run.DebugAwareConfiguration;
 import com.jetbrains.python.run.EnvironmentController;
 import com.jetbrains.python.run.PlainEnvironmentController;
 import com.jetbrains.python.run.PythonCommandLineState;
+import com.jetbrains.python.run.PythonRunnerCoroutinesKt;
 import com.jetbrains.python.run.PythonExecution;
 import com.jetbrains.python.run.PythonModuleExecution;
 import com.jetbrains.python.run.PythonScriptCommandLineState;
@@ -209,15 +212,17 @@ public class PyDebugRunner implements ProgramRunner<RunnerSettings> {
                                                                                 final @NotNull ExecutionEnvironment environment) {
     PythonCommandLineState pyState = (PythonCommandLineState)state;
     RunProfile profile = environment.getRunProfile();
+    DataContext dataContext = environment.getDataContext();
 
     if (PyDebuggerOptionsProvider.getInstance(environment.getProject()).isRunDebuggerInServerMode() &&
         Registry.is("python.debug.use.single.port")) {
       int port = PyDebuggerOptionsProvider.getInstance(environment.getProject()).getDebuggerPort();
       TargetEnvironment.TargetPortBinding targetPortBinding =
         new TargetEnvironment.TargetPortBinding(port, port);
-      return Promises
-        .runAsync(() -> {
-          try {
+      return PythonRunnerCoroutinesKt
+        .runAsync(environment.getProject(), () -> {
+          // Re-install the environment data context so that macro expansion works (PY-88858).
+          try (AccessToken ignored = ExecutionManagerImpl.Companion.withEnvironmentDataContext(dataContext)) {
             var debuggerScriptCommandLineBuilder = new PythonDebuggerServerModeTargetedCommandLineBuilder(
               environment.getProject(), pyState, profile, targetPortBinding);
             return pyState.execute(environment.getExecutor(), debuggerScriptCommandLineBuilder);
@@ -232,25 +237,28 @@ public class PyDebugRunner implements ProgramRunner<RunnerSettings> {
     }
     else {
       var clientId = ClientId.getCurrentOrNull();
-      return Promises
-        .runAsync(() -> {
-          int serverLocalPort = findAvailableSocketPort();
-          try {
-            TargetEnvironment.LocalPortBinding localPortBinding =
-              new TargetEnvironment.LocalPortBinding(serverLocalPort, null);
-            var debuggerScriptCommandLineBuilder = new PythonDebuggerClientModeTargetedCommandLineBuilder(
-              environment.getProject(), pyState, profile, localPortBinding);
-            ExecutionResult result = pyState.execute(environment.getExecutor(), debuggerScriptCommandLineBuilder);
-            ServerSocket serverSocket = debuggerScriptCommandLineBuilder.getServerSocketForDebugging();
-            if (serverSocket == null) {
-              LOG.error("The server socket has not been created after the target environment preparation" +
-                        ", trying to fallback and create the server socket on the loopback address");
-              serverSocket = createServerSocketOnLoopbackAddress(serverLocalPort);
+      return PythonRunnerCoroutinesKt
+        .runAsync(environment.getProject(), () -> {
+          // Re-install the environment data context so that macro expansion works (PY-88858).
+          try (AccessToken ignored2 = ExecutionManagerImpl.Companion.withEnvironmentDataContext(dataContext)) {
+            int serverLocalPort = findAvailableSocketPort();
+            try {
+              TargetEnvironment.LocalPortBinding localPortBinding =
+                new TargetEnvironment.LocalPortBinding(serverLocalPort, null);
+              var debuggerScriptCommandLineBuilder = new PythonDebuggerClientModeTargetedCommandLineBuilder(
+                environment.getProject(), pyState, profile, localPortBinding);
+              ExecutionResult result = pyState.execute(environment.getExecutor(), debuggerScriptCommandLineBuilder);
+              ServerSocket serverSocket = debuggerScriptCommandLineBuilder.getServerSocketForDebugging();
+              if (serverSocket == null) {
+                LOG.error("The server socket has not been created after the target environment preparation" +
+                          ", trying to fallback and create the server socket on the loopback address");
+                serverSocket = createServerSocketOnLoopbackAddress(serverLocalPort);
+              }
+              return Pair.create(serverSocket, result);
             }
-            return Pair.create(serverSocket, result);
-          }
-          catch (Exception err) {
-            throw new RuntimeException(err.getMessage(), err);
+            catch (Exception err) {
+              throw new RuntimeException(err.getMessage(), err);
+            }
           }
         })
         .thenAsync(pair -> AppUIExecutor.onUiThread().submit(() -> {
@@ -441,7 +449,8 @@ public class PyDebugRunner implements ProgramRunner<RunnerSettings> {
   }
 
   @ApiStatus.Internal
-  public static <T extends XDebugProcess & PyDebugProcessWithConsole> void createConsoleCommunication(final @NotNull Project project,
+  @Nullable
+  public static <T extends XDebugProcess & PyDebugProcessWithConsole> PythonDebugConsoleCommunication<T> createConsoleCommunication(final @NotNull Project project,
                                                                                                       final @NotNull ExecutionResult result,
                                                                                                       @NotNull T debugProcess,
                                                                                                       @NotNull XDebugSession session) {
@@ -449,8 +458,9 @@ public class PyDebugRunner implements ProgramRunner<RunnerSettings> {
     if (console instanceof PythonDebugLanguageConsoleView) {
       ProcessHandler processHandler = result.getProcessHandler();
 
-      initDebugConsole(project, debugProcess, (PythonDebugLanguageConsoleView)console, processHandler, session);
+      return initDebugConsole(project, debugProcess, (PythonDebugLanguageConsoleView)console, processHandler, session);
     }
+    return null;
   }
 
   /**

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.j2k.k2;
 
@@ -2327,6 +2327,11 @@ public abstract class K2JavaToKotlinConverterSingleFileTestGenerated extends Abs
         @TestMetadata("enumValueOf.java")
         public void testEnumValueOf() throws Exception {
             runTest("../../shared/tests/testData/newJ2k/enum/enumValueOf.java");
+        }
+
+        @TestMetadata("enumValueOf2.java")
+        public void testEnumValueOf2() throws Exception {
+            runTest("../../shared/tests/testData/newJ2k/enum/enumValueOf2.java");
         }
 
         @TestMetadata("enumValues.java")

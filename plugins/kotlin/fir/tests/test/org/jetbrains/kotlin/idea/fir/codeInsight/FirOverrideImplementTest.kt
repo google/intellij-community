@@ -66,6 +66,10 @@ internal class FirOverrideImplementTest : OverrideImplementTest<KtClassMember>()
         doImplementFileTest()
     }
 
+    fun testSubstitutionOverrideOutProjection() {
+        doImplementFileTest()
+    }
+
     fun testImplementFromMultipleSupers() {
         doMultiImplementFileTest()
     }

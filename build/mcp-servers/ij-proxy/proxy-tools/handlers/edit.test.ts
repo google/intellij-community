@@ -1,7 +1,6 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 import {rejects, strictEqual} from 'node:assert/strict'
-import {realpathSync} from 'node:fs'
 import path from 'node:path'
 import {describe, it} from 'bun:test'
 import {SUITE_TIMEOUT_MS, withProxy} from '../../test-utils'
@@ -9,75 +8,11 @@ import {handleEditTool} from './edit'
 import {createMockToolCaller, createSeededRng, randInt, randString} from './test-helpers'
 
 describe('ij MCP proxy edit', {timeout: SUITE_TIMEOUT_MS}, () => {
-  it('replaces file contents via create_new_file', async () => {
-    const calls = []
-    await withProxy({
-      proxyEnv: {JETBRAINS_MCP_TOOL_MODE: 'cc'},
-      onToolCall({name, args}) {
-        calls.push({name, args})
-        if (name === 'get_file_text_by_path') {
-          return {text: 'alpha\nbeta\n'}
-        }
-        return {text: 'ok'}
-      }
-    }, async ({proxyClient, testDir}) => {
-      await proxyClient.send('tools/list')
-      const response = await proxyClient.send('tools/call', {
-        name: 'edit',
-        arguments: {
-          file_path: 'sample.txt',
-          old_string: 'beta',
-          new_string: 'delta'
-        }
-      })
-
-      const resolvedRoot = realpathSync(testDir)
-      strictEqual(response.result.content[0].text, `Updated ${path.resolve(resolvedRoot, 'sample.txt')}`)
-      strictEqual(calls.length, 2)
-
-      const [readCall, writeCall] = calls
-      strictEqual(readCall.name, 'get_file_text_by_path')
-      strictEqual(readCall.args.pathInProject, 'sample.txt')
-      strictEqual(readCall.args.truncateMode, 'NONE')
-      strictEqual(realpathSync(readCall.args.project_path), realpathSync(testDir))
-
-      strictEqual(writeCall.name, 'create_new_file')
-      strictEqual(writeCall.args.pathInProject, 'sample.txt')
-      strictEqual(writeCall.args.text, 'alpha\ndelta\n')
-      strictEqual(writeCall.args.overwrite, true)
-      strictEqual(realpathSync(writeCall.args.project_path), realpathSync(testDir))
-    })
-  })
-
-  it('normalizes CRLF content before matching and writing', async () => {
-    const calls = []
-    await withProxy({
-      proxyEnv: {JETBRAINS_MCP_TOOL_MODE: 'cc'},
-      onToolCall({name, args}) {
-        calls.push({name, args})
-        if (name === 'get_file_text_by_path') {
-          return {text: 'alpha\r\nbeta\r\ngamma\r\n'}
-        }
-        return {text: 'ok'}
-      }
-    }, async ({proxyClient, testDir}) => {
-      await proxyClient.send('tools/list')
-      const response = await proxyClient.send('tools/call', {
-        name: 'edit',
-        arguments: {
-          file_path: 'sample.txt',
-          old_string: 'alpha\nbeta\n',
-          new_string: 'alpha\r\nbeta-changed\r\n'
-        }
-      })
-
-      const resolvedRoot = realpathSync(testDir)
-      strictEqual(response.result.content[0].text, `Updated ${path.resolve(resolvedRoot, 'sample.txt')}`)
-      strictEqual(calls.length, 2)
-
-      const writeCall = calls[1]
-      strictEqual(writeCall.name, 'create_new_file')
-      strictEqual(writeCall.args.text, 'alpha\nbeta-changed\ngamma\n')
+  it('does not expose edit', async () => {
+    await withProxy({}, async ({proxyClient}) => {
+      const listResponse = await proxyClient.send('tools/list')
+      const names = listResponse.result.tools.map((tool) => tool.name)
+      strictEqual(names.includes('edit'), false)
     })
   })
 })
@@ -129,7 +64,8 @@ describe('edit handler (unit)', () => {
     }, projectPath, callUpstreamTool)
 
     strictEqual(result, `Updated ${path.resolve(projectPath, 'sample.txt')}`)
-    strictEqual(calls[1].args.text, 'beta\nbeta\n')
+    const writeCall = calls.find((call) => call.name === 'create_new_file')
+    strictEqual(writeCall.args.text, 'beta\nbeta\n')
   })
 
   it('normalizes CRLF line endings for matching and output', async () => {
@@ -145,7 +81,8 @@ describe('edit handler (unit)', () => {
     }, projectPath, callUpstreamTool)
 
     strictEqual(result, `Updated ${path.resolve(projectPath, 'sample.txt')}`)
-    strictEqual(calls[1].args.text, 'alpha\nbeta-updated\ngamma\n')
+    const writeCall = calls.find((call) => call.name === 'create_new_file')
+    strictEqual(writeCall.args.text, 'alpha\nbeta-updated\ngamma\n')
   })
 
   it('fuzz: replaces a unique token without touching other content', async () => {
@@ -177,7 +114,8 @@ describe('edit handler (unit)', () => {
       }, projectPath, callUpstreamTool)
 
       strictEqual(result, `Updated ${path.resolve(projectPath, 'sample.txt')}`)
-      strictEqual(calls[1].args.text, expectedText)
+      const writeCall = calls.find((call) => call.name === 'create_new_file')
+      strictEqual(writeCall.args.text, expectedText)
     }
   })
 })

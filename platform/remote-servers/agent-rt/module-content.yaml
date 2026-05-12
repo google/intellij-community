@@ -1,0 +1,3 @@
+- name: dist.all/lib/intellij.platform.remoteServers.agent.rt.jar
+  modules:
+  - name: intellij.platform.remoteServers.agent.rt

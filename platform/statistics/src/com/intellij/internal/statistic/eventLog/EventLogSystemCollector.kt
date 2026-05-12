@@ -8,6 +8,8 @@ import com.intellij.internal.statistic.eventLog.connection.metadata.EventLogMeta
 import com.intellij.internal.statistic.eventLog.connection.metadata.EventLogMetadataUpdateError
 import com.intellij.internal.statistic.eventLog.connection.metadata.EventLogMetadataUpdateStage
 import com.intellij.internal.statistic.eventLog.events.EventFields
+import com.intellij.internal.statistic.eventLog.events.EventId2
+import com.intellij.internal.statistic.eventLog.events.EventId3
 import com.intellij.internal.statistic.eventLog.events.EventPair
 import com.intellij.internal.statistic.eventLog.uploader.EventLogUploadException.EventLogUploadErrorType
 import com.intellij.internal.statistic.service.fus.collectors.CounterUsagesCollector
@@ -27,14 +29,14 @@ import java.util.Locale
  */
 @Suppress("StatisticsCollectorNotRegistered")
 @ApiStatus.Internal
-internal class EventLogSystemCollector(eventLoggerProvider: StatisticsEventLoggerProvider) : CounterUsagesCollector() {
+open class EventLogSystemCollector(eventLoggerProvider: StatisticsEventLoggerProvider) : CounterUsagesCollector() {
   private val id = "${eventLoggerProvider.recorderId.lowercase(Locale.ENGLISH)}.event.log"
   private val GROUP = EventLogGroup(
     id,
     // Increase the group's versions locally
     // and not increase the versions in all StatisticsEventLoggerProvider
     // in case of any changes in the groups
-    eventLoggerProvider.version + 3,
+    eventLoggerProvider.version + 4,
     eventLoggerProvider.recorderId
   )
   override fun getGroup(): EventLogGroup = GROUP
@@ -72,6 +74,14 @@ internal class EventLogSystemCollector(eventLoggerProvider: StatisticsEventLogge
     "sent.logs.files.calculated",
     totalFilesCount, maxSentFilesCount, sentFilesCount
   )
+  private val deletedFilesCalculated: EventId3<Int, Int, Int> = GROUP.registerEvent("deleted.logs.files.calculated",
+                                                                                    totalFilesCount, deletedFilesCount, failedDeletingFilesCount
+  )
+
+  private val fileMetricsCalculated: EventId2<Long, Int> = GROUP.registerEvent("logs.file.metrics.calculated",
+                                                                               fileSizeBytes, eventsCount
+  )
+
   private val dictionaryListLoadFailed = GROUP.registerEvent(
     "dictionary.list.load.failed",
     stageMetadataLoadFailedField, errorMetadataLoadFailedField, codeMetadataLoadFailedField
@@ -144,6 +154,14 @@ internal class EventLogSystemCollector(eventLoggerProvider: StatisticsEventLogge
 
   fun logFileToSendCalculated(totalFilesCount: Int, maxSentFilesCount: Int, sentFilesCount: Int) {
     sentFilesCountCalculated.log(totalFilesCount, maxSentFilesCount,sentFilesCount)
+  }
+
+  fun logDeletedFilesCalculated(totalFilesCount: Int, deletedFilesCount: Int, failedDeletingFilesCount: Int) {
+    deletedFilesCalculated.log(totalFilesCount, deletedFilesCount, failedDeletingFilesCount)
+  }
+
+  fun logFileMetricsCalculated(fileSizeBytes: Long, eventsCount: Int,) {
+    fileMetricsCalculated.log(fileSizeBytes, eventsCount)
   }
 
   fun logDictionaryListLoadFailed(error: EventLogMetadataUpdateError) {
@@ -219,8 +237,13 @@ internal class EventLogSystemCollector(eventLoggerProvider: StatisticsEventLogge
                                                                                                           ERROR_EXTERNAL_SEND_COMMAND_CREATION_FINISHED_DESCRIPTION)
     private val errorLoadingConfigFailedField = EventFields.StringValidatedByCustomRule("error", ClassNameRuleValidator::class.java)
     private val errorTSLoadingConfigFailedField = EventFields.Long("error_ts", ERROR_TS_LOADING_CONFIG_FAILED_DESCRIPTION)
-    private val totalFilesCount = EventFields.Int("total_files_count", "The total logs files count")
-    private val maxSentFilesCount = EventFields.Int("max_sent_files_count", "The max sent logs files count")
-    private val sentFilesCount = EventFields.Int("sent_files_count", "The sent logs files count")
+    private val totalFilesCount = EventFields.Int("total_files_count", "The total number of log files")
+    private val maxSentFilesCount = EventFields.Int("max_sent_files_count", "The max number of log files which are acceptable for sending")
+    private val sentFilesCount = EventFields.Int("sent_files_count", "The number of log files which are ready for sending")
+    private val deletedFilesCount = EventFields.Int("deleted_files_count", "The number of deleting log files")
+    private val failedDeletingFilesCount = EventFields.Int("failed_deleting_files_count", "The number of log files which were failed to delete")
+    private val fileSizeBytes = EventFields.Long("file_size_bytes", "File size in bytes")
+    private val eventsCount = EventFields.Int("events_count", "Number of events in the file")
+
   }
 }

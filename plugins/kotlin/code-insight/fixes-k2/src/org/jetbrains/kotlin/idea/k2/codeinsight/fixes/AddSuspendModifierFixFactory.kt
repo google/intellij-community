@@ -77,8 +77,8 @@ internal fun KtElement.containingFunction(): KtNamedFunction? {
 context(_: KaSession)
 private fun KaDeclarationSymbol?.isInlineOrInsideInline(): Boolean = getInlineCallSiteVisibility() != null
 
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class)
+context(_: KaSession)
 private fun KaDeclarationSymbol?.getInlineCallSiteVisibility(): Visibility? {
     var declaration: KaDeclarationSymbol? = this
     var result: Visibility? = null

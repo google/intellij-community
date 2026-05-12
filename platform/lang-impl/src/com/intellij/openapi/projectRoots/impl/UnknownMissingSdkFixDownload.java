@@ -48,7 +48,7 @@ final class UnknownMissingSdkFixDownload extends UnknownSdkFixActionDownloadBase
     return new UnknownSdkDownloadTask(mySdk,
                                       myFix,
                                       task -> UnknownMissingSdkFix.createNewSdk(mySdk, task::getSuggestedSdkName),
-                                      __->{},
+                                      _->{},
                                       sdk -> {
                                         if (sdk == null) return;
                                         myFix.configureSdk(sdk);

@@ -31,6 +31,7 @@ import org.jetbrains.kotlin.asJava.propertyNameByAccessor
 import org.jetbrains.kotlin.asJava.toLightMethods
 import org.jetbrains.kotlin.asJava.unwrapped
 import org.jetbrains.kotlin.idea.base.psi.KotlinPsiHeuristics
+import org.jetbrains.kotlin.idea.base.psi.isNameBased
 import org.jetbrains.kotlin.idea.base.psi.unquoteKotlinIdentifier
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.base.util.codeUsageScope
@@ -48,6 +49,7 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.KtCallableDeclaration
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtDeclaration
+import org.jetbrains.kotlin.psi.KtDestructuringDeclaration
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
 import org.jetbrains.kotlin.psi.KtNamedFunction
@@ -89,7 +91,10 @@ class RenameKotlinPropertyProcessor : RenameKotlinPsiProcessor() {
     element: PsiElement,
     allReferences: Collection<PsiReference>
   ): Collection<PsiReference> {
-    val references = allReferences.filterNot { it is KtDestructuringDeclarationReference }
+    val references = allReferences.filterNot {  ref ->
+        val entry = (ref as? KtDestructuringDeclarationReference)?.element
+        entry != null && !entry.isNameBased()
+    }
     val (getterJvmName, setterJvmName) = getJvmNames(element)
     return when {
       getterJvmName == null && setterJvmName == null -> references

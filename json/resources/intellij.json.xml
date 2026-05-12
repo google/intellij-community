@@ -1,4 +1,9 @@
 <idea-plugin visibility="public">
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+  <dependencies>
+    <module name="intellij.json.syntax"/>
+  </dependencies>
+  <!-- endregion -->
   <extensionPoints>
     <extensionPoint qualifiedName="com.intellij.json.jsonLiteralChecker"
                     interface="com.intellij.json.codeinsight.JsonLiteralChecker"
@@ -63,6 +68,7 @@
                                 implementationClass="com.intellij.codeInsight.editorActions.enter.EnterBetweenBracesAndBracketsDelegate"/>
     <quoteHandler fileType="JSON" className="com.intellij.json.JsonQuoteHandler"/>
     <quoteHandler fileType="JSON5" className="com.intellij.json.JsonQuoteHandler"/>
+    <quoteHandler fileType="JSON-lines" className="com.intellij.json.JsonQuoteHandler"/>
 
     <!-- Code style and formatting -->
     <codeStyleSettingsProvider implementation="com.intellij.json.formatter.JsonCodeStyleSettingsProvider"/>
@@ -73,5 +79,6 @@
 
     <!-- Various editor features -->
     <focusModeProvider language="JSON" implementationClass="com.intellij.json.editor.JsonFocusModeProvider"/>
+    <applicationSettings service="com.intellij.json.editor.folding.JsonFoldingSettings"/>
   </extensions>
 </idea-plugin>

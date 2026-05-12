@@ -14,6 +14,7 @@ import static com.intellij.lang.java.syntax.JavaElementTypeConverterKt.getJavaEl
  *             See {@link com.intellij.java.syntax.JavaSyntaxDefinition#createLexer(LanguageLevel)}
  */
 @Deprecated
+@ApiStatus.ScheduledForRemoval
 public final class JavaLexer extends LexerAdapter {
   public JavaLexer(@NotNull LanguageLevel level) {
     super(new com.intellij.java.syntax.lexer.JavaLexer(level), getJavaElementTypeConverter());
@@ -25,17 +26,5 @@ public final class JavaLexer extends LexerAdapter {
   @Deprecated
   public static boolean isKeyword(@NotNull String id, @NotNull LanguageLevel level) {
     return PsiUtil.isKeyword(id, level);
-  }
-
-  /**
-   * @param id keyword candidate
-   * @param level current language level
-   * @return true if a given id is a keyword at a given language level
-   * @deprecated use {@link PsiUtil#isSoftKeyword(CharSequence, LanguageLevel)}
-   */
-  @ApiStatus.ScheduledForRemoval
-  @Deprecated
-  public static boolean isSoftKeyword(@NotNull CharSequence id, @NotNull LanguageLevel level) {
-    return PsiUtil.isSoftKeyword(id, level);
   }
 }

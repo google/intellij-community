@@ -194,7 +194,7 @@ public final class AnnotateOverriddenMethodsIntention extends BaseElementAtCaret
         if (sourceRoot != null) {
           annotationPlaces
             .put(overridingMethod,
-                 sourceRoots.computeIfAbsent(sourceRoot, __ -> annotationsManager.chooseAnnotationsPlace(overridingMethod)));
+                 sourceRoots.computeIfAbsent(sourceRoot, _ -> annotationsManager.chooseAnnotationsPlace(overridingMethod)));
         }
       }
     }

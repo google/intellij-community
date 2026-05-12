@@ -9,7 +9,8 @@ import com.intellij.openapi.project.Project
 import com.intellij.rt.coverage.data.ProjectData
 import com.intellij.rt.coverage.report.XMLProjectData
 import com.intellij.rt.coverage.report.XMLProjectData.FileInfo
-import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
 
 class XMLReportSuite : JavaCoverageSuite {
   constructor(name: String?,
@@ -27,8 +28,8 @@ class XMLReportSuite : JavaCoverageSuite {
   fun getReportData(): XMLProjectData? {
     var current = data
     if (current == null) {
-      val file = File(coverageDataFileName)
-      if (!file.exists()) return null
+      val file = Path.of(coverageDataFileName)
+      if (!Files.exists(file)) return null
       current = (runner as XMLReportRunner).loadCoverageData(file)
       data = current
     }

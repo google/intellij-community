@@ -25,7 +25,9 @@ import org.jetbrains.intellij.build.productLayout.deps.ContentModuleDependencyPl
 import org.jetbrains.intellij.build.productLayout.discovery.PluginContentInfo
 import org.jetbrains.intellij.build.productLayout.generator.PluginGraphDeps
 import org.jetbrains.intellij.build.productLayout.generator.collectPluginGraphDeps
-import org.jetbrains.intellij.build.productLayout.generator.computeEffectiveSuppressedDeps
+import org.jetbrains.intellij.build.productLayout.generator.computeAliasPreservedPluginDeps
+import org.jetbrains.intellij.build.productLayout.generator.computeExistingDependencyHandling
+import org.jetbrains.intellij.build.productLayout.generator.embeddedCheckProductNames
 import org.jetbrains.intellij.build.productLayout.generator.filterPluginDependencies
 import org.jetbrains.intellij.build.productLayout.generator.planContentModuleDependenciesWithBothSets
 import org.jetbrains.intellij.build.productLayout.generator.updateGraphWithModuleDependencyPlans
@@ -43,6 +45,7 @@ import org.jetbrains.intellij.build.productLayout.util.FileUpdateStrategy
 import org.jetbrains.intellij.build.productLayout.util.withUpdateSuppressions
 import org.jetbrains.intellij.build.productLayout.validator.ContentModulePluginDependencyValidator
 import org.jetbrains.intellij.build.productLayout.validator.PluginContentDependencyValidator
+import org.jetbrains.intellij.build.productLayout.xml.extractDependenciesEntries
 import org.jetbrains.intellij.build.productLayout.xml.updateXmlDependencies
 import java.nio.file.Files
 
@@ -67,23 +70,21 @@ internal suspend fun PluginTestSetupContext.generateDependencies(
   productAllowedMissing: Map<String, Set<ContentModuleName>> = emptyMap(),
   updateSuppressions: Boolean = false,
 ): PluginDependencyGenerationResult {
-  return coroutineScope {
-    val descriptorCache = ModuleDescriptorCache(jps.outputProvider, this)
-    generatePluginDependencies(
-      plugins = plugins,
-      pluginContentCache = pluginContentCache,
-      testSetup = this@generateDependencies,
-      graph = pluginGraph,
-      descriptorCache = descriptorCache,
-      suppressionConfig = suppressionConfig,
-      updateSuppressions = updateSuppressions,
-      strategy = strategy,
-      testFrameworkContentModules = testFrameworkContentModules,
-      pluginAllowedMissingDependencies = pluginAllowedMissingDependencies,
-      contentModuleAllowedMissingPluginDeps = contentModuleAllowedMissingPluginDeps,
-      productAllowedMissing = productAllowedMissing,
-    )
-  }
+  val descriptorCache = ModuleDescriptorCache(jps.outputProvider)
+  return generatePluginDependencies(
+    plugins = plugins,
+    pluginContentCache = pluginContentCache,
+    testSetup = this@generateDependencies,
+    graph = pluginGraph,
+    descriptorCache = descriptorCache,
+    suppressionConfig = suppressionConfig,
+    updateSuppressions = updateSuppressions,
+    strategy = strategy,
+    testFrameworkContentModules = testFrameworkContentModules,
+    pluginAllowedMissingDependencies = pluginAllowedMissingDependencies,
+    contentModuleAllowedMissingPluginDeps = contentModuleAllowedMissingPluginDeps,
+    productAllowedMissing = productAllowedMissing,
+  )
 }
 
 /**
@@ -118,9 +119,10 @@ internal suspend fun generatePluginDependencies(
     }
 
     val outputProvider = testSetup.jps.outputProvider
-    val contentModuleCache = AsyncCache<String, PlannedContentModuleResult?>(this)
-    val testContentModuleCache = AsyncCache<String, DependencyFileResult?>(this)
-    val pluginGraphDeps = collectPluginGraphDeps(graph, libraryModuleFilter = { true })
+    val contentModuleCache = AsyncCache<String, PlannedContentModuleResult?>()
+    val testContentModuleCache = AsyncCache<String, DependencyFileResult?>()
+    val allRealProductNames = embeddedCheckProductNames(testSetup.products.map { it.name })
+    val pluginGraphDeps = collectPluginGraphDeps(graph = graph, allRealProductNames = allRealProductNames)
       .associateBy { it.pluginContentModuleName.value }
 
     val generationOutputs = plugins.map { pluginModuleName ->
@@ -131,6 +133,7 @@ internal suspend fun generatePluginDependencies(
           graphDeps = graphDeps,
           pluginContentCache = pluginContentCache,
           graph = graph,
+          allRealProductNames = allRealProductNames,
           outputProvider = outputProvider,
           descriptorCache = descriptorCache,
           suppressionConfig = suppressionConfig,
@@ -224,6 +227,7 @@ private suspend fun generatePluginDependency(
   graphDeps: PluginGraphDeps,
   pluginContentCache: PluginContentProvider,
   graph: PluginGraph,
+  allRealProductNames: Set<String>,
   outputProvider: ModuleOutputProvider,
   descriptorCache: ModuleDescriptorCache,
   suppressionConfig: SuppressionConfig,
@@ -241,21 +245,29 @@ private suspend fun generatePluginDependency(
   val pluginContentModuleName = graphDeps.pluginContentModuleName
   val existingXmlModuleDeps = info.moduleDependencies
   val existingXmlPluginDeps: Set<PluginId> = info.depsByFile.firstOrNull()?.pluginDependencies ?: emptySet()
+  val mainDependencyEntries = extractDependenciesEntries(info.pluginXmlContent)
+  val managedXmlModuleDeps = mainDependencyEntries?.managedModuleNames?.mapTo(HashSet(), ::ContentModuleName) ?: existingXmlModuleDeps
+  val managedXmlPluginDeps = mainDependencyEntries?.managedPluginIds?.mapTo(HashSet(), ::PluginId) ?: existingXmlPluginDeps
   val effectiveJpsPluginDependencies = graphDeps.jpsPluginDependencies - graphDeps.legacyConfigFilePluginDependencies
   val suppressedModules = effectiveConfig.getPluginSuppressedModules(pluginContentModuleName)
   val suppressedPlugins = effectiveConfig.getPluginSuppressedPlugins(pluginContentModuleName)
-  val effectiveSuppressedModules = computeEffectiveSuppressedDeps(
+  val moduleHandling = computeExistingDependencyHandling(
     updateSuppressions = updateSuppressions,
     existingXmlDeps = existingXmlModuleDeps,
     jpsDeps = graphDeps.jpsModuleDependencies,
     suppressedDeps = suppressedModules,
+    xmlOnlySuppressionCandidateDeps = managedXmlModuleDeps,
   )
-  val effectiveSuppressedPlugins = computeEffectiveSuppressedDeps(
+  val pluginHandling = computeExistingDependencyHandling(
     updateSuppressions = updateSuppressions,
     existingXmlDeps = existingXmlPluginDeps,
     jpsDeps = effectiveJpsPluginDependencies,
     suppressedDeps = suppressedPlugins,
+    semanticallyPreservedExistingDeps = computeAliasPreservedPluginDeps(graph, existingXmlPluginDeps),
+    xmlOnlySuppressionCandidateDeps = managedXmlPluginDeps,
   )
+  val effectiveSuppressedModules = moduleHandling.effectiveSuppressedDeps
+  val effectiveSuppressedPlugins = pluginHandling.effectiveSuppressedDeps
 
   val deps = filterPluginDependencies(
     graphDeps = graphDeps,
@@ -270,8 +282,8 @@ private suspend fun generatePluginDependency(
     content = info.pluginXmlContent,
     moduleDependencies = deps.moduleDependencies.map { it.value },
     pluginDependencies = deps.pluginDependencies.map { it.value },
-    preserveExistingModule = { moduleName -> ContentModuleName(moduleName) in effectiveSuppressedModules },
-    preserveExistingPlugin = { pluginName -> PluginId(pluginName) in effectiveSuppressedPlugins },
+    preserveExistingModule = { moduleName -> ContentModuleName(moduleName) in moduleHandling.preserveExistingDeps },
+    preserveExistingPlugin = { pluginName -> PluginId(pluginName) in pluginHandling.preserveExistingDeps },
     strategy = effectiveStrategy,
   )
 
@@ -288,10 +300,10 @@ private suspend fun generatePluginDependency(
         contentModuleName = module.name,
         descriptorCache = descriptorCache,
         pluginGraph = graph,
+        allRealProductNames = allRealProductNames,
         isTestDescriptor = isTestModule,
         suppressionConfig = effectiveConfig,
         updateSuppressions = updateSuppressions,
-        libraryModuleFilter = { true },
       )
       val plan = generation.plan ?: return@getOrPut null
       PlannedContentModuleResult(plan = plan, result = writeContentModulePlan(plan, effectiveStrategy))
@@ -365,7 +377,7 @@ private fun writeContentModulePlan(plan: ContentModuleDependencyPlan, strategy: 
     moduleDependencies = plan.moduleDependencies.map { it.value },
     pluginDependencies = plan.pluginDependencies.map { it.value },
     preserveExistingModule = { moduleName -> plan.suppressedModules.contains(ContentModuleName(moduleName)) },
-    preserveExistingPlugin = { pluginName -> plan.suppressedPlugins.contains(PluginId(pluginName)) },
+    preserveExistingPlugin = { pluginName -> plan.preserveExistingPluginDependencies.contains(PluginId(pluginName)) },
     strategy = strategy,
   )
 
@@ -455,6 +467,7 @@ private suspend fun generateTestDescriptorDependencies(
   )
 }
 
+@Suppress("UNUSED_PARAMETER")
 private suspend fun buildValidationCache(
   outputProvider: ModuleOutputProvider,
   pluginContentInfos: Map<String, PluginContentInfo>,
@@ -462,10 +475,9 @@ private suspend fun buildValidationCache(
 ): PluginContentCache {
   val cache = PluginContentCache(
     outputProvider = outputProvider,
-    xIncludeCache = AsyncCache(scope),
+    xIncludeCache = AsyncCache(),
     skipXIncludePaths = emptySet(),
     xIncludePrefixFilter = { null },
-    scope = scope,
     errorSink = ErrorSink(),
   )
   for ((moduleName, info) in pluginContentInfos) {

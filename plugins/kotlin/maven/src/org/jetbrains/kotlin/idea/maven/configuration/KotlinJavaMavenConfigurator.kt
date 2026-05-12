@@ -17,9 +17,9 @@ import org.jetbrains.kotlin.idea.configuration.hasKotlinJvmRuntimeInScope
 import org.jetbrains.kotlin.idea.maven.KotlinMavenBundle
 import org.jetbrains.kotlin.idea.maven.PomFile
 import org.jetbrains.kotlin.idea.projectConfiguration.getDefaultJvmTarget
-import org.jetbrains.kotlin.idea.projectConfiguration.getJvmStdlibArtifactId
 import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
+import org.jetbrains.kotlin.utils.PathUtil.KOTLIN_JAVA_STDLIB_NAME
 
 class KotlinJavaMavenConfigurator : KotlinMavenConfigurator(TEST_LIB_ID, false, NAME, PRESENTABLE_TEXT) {
 
@@ -30,7 +30,7 @@ class KotlinJavaMavenConfigurator : KotlinMavenConfigurator(TEST_LIB_ID, false, 
         goalName == PomFile.KotlinGoals.Compile
 
     override fun getStdlibArtifactId(module: Module, version: IdeKotlinVersion): String {
-        return getJvmStdlibArtifactId(ModuleRootManager.getInstance(module).sdk, version)
+        return KOTLIN_JAVA_STDLIB_NAME
     }
 
     private fun hasJavaFiles(module: Module): Boolean {

@@ -9,7 +9,7 @@ import com.intellij.platform.workspace.jps.entities.LibraryId
 import com.intellij.platform.workspace.jps.entities.LibraryTableId
 import com.intellij.platform.workspace.jps.entities.ModuleEntity
 import com.intellij.platform.workspace.jps.entities.ModuleId
-import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.testEntities.entities.MySource
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.rules.ProjectModelExtension
 import com.intellij.testFramework.workspaceModel.update
@@ -103,6 +103,4 @@ class LibraryLevelsTrackerTest {
     assertTrue(tracker.getLibraryLevels().isEmpty())
     assertTrue(tracker.isNotUsed(LibraryTableId.ProjectLibraryTableId.level))
   }
-
-  private object MySource : EntitySource
 }

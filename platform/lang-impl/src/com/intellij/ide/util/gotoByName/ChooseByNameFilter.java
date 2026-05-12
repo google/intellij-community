@@ -104,13 +104,13 @@ public abstract class ChooseByNameFilter<T> {
     panel.add(myChooser);
     JPanel buttons = new JPanel();
     JButton all = new JButton(LangBundle.message("label.all"));
-    all.addActionListener(__ -> myChooser.setAllElementsMarked(true));
+    all.addActionListener(_ -> myChooser.setAllElementsMarked(true));
     buttons.add(all);
     JButton none = new JButton(LangBundle.message("label.none"));
-    none.addActionListener(__ -> myChooser.setAllElementsMarked(false));
+    none.addActionListener(_ -> myChooser.setAllElementsMarked(false));
     buttons.add(none);
     JButton invert = new JButton(LangBundle.message("label.invert"));
-    invert.addActionListener(__ -> myChooser.invertSelection());
+    invert.addActionListener(_ -> myChooser.invertSelection());
     buttons.add(invert);
     panel.add(buttons);
     return panel;

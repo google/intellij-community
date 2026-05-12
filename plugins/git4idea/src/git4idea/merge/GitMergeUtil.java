@@ -35,6 +35,7 @@ import git4idea.repo.GitConflict;
 import git4idea.repo.GitRepository;
 import git4idea.util.GitFileUtils;
 import git4idea.util.StringScanner;
+import kotlin.Unit;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -431,14 +432,10 @@ public final class GitMergeUtil {
       }
     }
 
-    for (List<String> paths : VcsFileUtil.chunkPaths(root, toCheckout)) {
-      GitLineHandler handler = new GitLineHandler(project, root, GitCommand.CHECKOUT);
+    GitFileUtils.executeForFiles(project, root, GitCommand.CHECKOUT, toCheckout, handler -> {
       handler.addParameters(isCurrent ? "--ours" : "--theirs");
-      handler.endOptions();
-      handler.addParameters(paths);
-
-      Git.getInstance().runCommand(handler).throwOnError();
-    }
+      return Unit.INSTANCE;
+    });
   }
 
   /**

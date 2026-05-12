@@ -17,6 +17,9 @@
     <psiViewer.propertyNodeFactory implementation="com.intellij.dev.psiViewer.properties.tree.nodes.PsiViewerPsiElementNode$Factory"/>
     <psiViewer.apiMethodsProvider implementation="com.intellij.dev.psiViewer.properties.tree.nodes.apiMethods.PsiViewerApiMethodsReflectionProvider"/>
   </extensions>
+  <extensions defaultExtensionNs="com.intellij">
+    <applicationSettings service="com.intellij.dev.psiViewer.PsiViewerSettings"/>
+  </extensions>
   <actions>
     <group id="Dev.PsiViewerActions">
       <separator/>

@@ -13,7 +13,7 @@
             serviceImplementation="org.jetbrains.kotlin.idea.caches.resolve.KotlinIdeResolutionAnchorService"/>
     <projectService
             serviceInterface="org.jetbrains.kotlin.load.kotlin.MetadataFinderFactory"
-            serviceImplementation="org.jetbrains.kotlin.idea.vfilefinder.IdeVirtualFileFinderFactory"/>
+            serviceImplementation="org.jetbrains.kotlin.idea.vfilefinder.IdeK1VirtualFileFinderFactory"/>
     <projectService
             serviceInterface="org.jetbrains.kotlin.load.kotlin.VirtualFileFinderFactory"
             serviceImplementation="org.jetbrains.kotlin.idea.vfilefinder.IdeVirtualFileFinderFactory"/>
@@ -50,5 +50,7 @@
             implementation="org.jetbrains.kotlin.idea.roots.KotlinNonJvmSourceRootConverterProvider"/>
 
     <orderEnumerationHandlerFactory implementation="org.jetbrains.kotlin.idea.roots.KotlinNonJvmOrderEnumerationHandler$Factory"/>
+    <projectSettings
+            service="org.jetbrains.kotlin.idea.base.projectStructure.libraryToSourceAnalysis.KotlinLibraryToSourceAnalysisStateComponent"/>
   </extensions>
 </idea-plugin>

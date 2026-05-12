@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vcs.changes.patch.tool;
 
 import com.intellij.codeInsight.hint.HintManager;
@@ -9,7 +9,7 @@ import com.intellij.diff.DiffDialogHints;
 import com.intellij.diff.DiffManager;
 import com.intellij.diff.actions.ProxyUndoRedoAction;
 import com.intellij.diff.actions.impl.FocusOppositePaneAction;
-import com.intellij.diff.actions.impl.SetEditorSettingsAction;
+import com.intellij.diff.actions.impl.SetEditorSettingsActionGroup;
 import com.intellij.diff.contents.DocumentContent;
 import com.intellij.diff.merge.MergeModelBase;
 import com.intellij.diff.requests.SimpleDiffRequest;
@@ -103,7 +103,7 @@ class ApplyPatchViewer implements Disposable {
   private final @NotNull StatusPanel myStatusPanel;
   private final @NotNull MyFoldingModel myFoldingModel;
 
-  private final @NotNull SetEditorSettingsAction myEditorSettingsAction;
+  private final @NotNull SetEditorSettingsActionGroup myEditorSettingsAction;
 
   // Changes with known AppliedTo. Ordered as in result-editor
   private final @NotNull List<ApplyPatchChange> myResultChanges = new ArrayList<>();
@@ -175,7 +175,7 @@ class ApplyPatchViewer implements Disposable {
 
     new TextDiffViewerUtil.EditorFontSizeSynchronizer(editors).install(this);
 
-    myEditorSettingsAction = new SetEditorSettingsAction(getTextSettings(), editors);
+    myEditorSettingsAction = new SetEditorSettingsActionGroup(getTextSettings(), editors);
     myEditorSettingsAction.applyDefaults();
 
     ProxyUndoRedoAction.register(myProject, myResultEditor, myContentPanel);

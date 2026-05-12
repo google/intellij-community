@@ -1,3 +1,5 @@
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.workspaceModel.test.api.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
@@ -13,11 +15,10 @@ import com.intellij.platform.workspace.storage.impl.EntityLink
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
-import com.intellij.platform.workspace.storage.impl.extractOneToOneParent
-import com.intellij.platform.workspace.storage.impl.updateOneToOneParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.workspaceModel.test.api.ChildEntityType2
 import com.intellij.workspaceModel.test.api.ChildEntityType2Builder
@@ -41,7 +42,7 @@ readField("version")
 return dataSource.version
 }
 override val parent: EntityWithChildren
-get() = snapshot.extractOneToOneParent(PARENT_CONNECTION_ID, this)!!
+get() = snapshot.instrumentation.getParent(PARENT_CONNECTION_ID, this) as? EntityWithChildren ?: error("Parent parent not found for ChildEntityType2")
 
 override val entitySource: EntitySource
 get() {
@@ -84,7 +85,7 @@ if (!getEntityData().isEntitySourceInitialized()){
 error("Field WorkspaceEntity#entitySource should be initialized")
 }
 if (_diff != null){
-if (_diff.extractOneToOneParent<WorkspaceEntityBase>(PARENT_CONNECTION_ID, this) == null){
+if (_diff.instrumentation.getParentBuilder(PARENT_CONNECTION_ID, this) == null){
 error("Field ChildEntityType2#parent should be initialized")
 }
 }
@@ -125,10 +126,9 @@ override var parent: EntityWithChildrenBuilder
 get(){
 val _diff = diff
 return if (_diff != null) {
-@OptIn(EntityStorageInstrumentationApi::class)
-((_diff as MutableEntityStorageInstrumentation).getParentBuilder(PARENT_CONNECTION_ID, this) as? EntityWithChildrenBuilder) ?: (this.entityLinks[EntityLink(false, PARENT_CONNECTION_ID)]!! as EntityWithChildrenBuilder)
+((_diff as MutableEntityStorageInstrumentation).getParentBuilder(PARENT_CONNECTION_ID, this) as? EntityWithChildrenBuilder) ?: (this.entityLinks[EntityLink(false, PARENT_CONNECTION_ID)] as? EntityWithChildrenBuilder) ?: error("parent is null for ChildEntityType2")
 } else {
-this.entityLinks[EntityLink(false, PARENT_CONNECTION_ID)]!! as EntityWithChildrenBuilder
+(this.entityLinks[EntityLink(false, PARENT_CONNECTION_ID)] as? EntityWithChildrenBuilder) ?: error("parent is null for ChildEntityType2")
 }
 }
 set(value){
@@ -142,7 +142,7 @@ value.entityLinks[EntityLink(true, PARENT_CONNECTION_ID)] = this
 _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
 }
 if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)){
-_diff.updateOneToOneParentOfChild(PARENT_CONNECTION_ID, this, value)
+_diff.instrumentation.addChild(PARENT_CONNECTION_ID, value, this)
 }
 else{
 if (value is ModifiableWorkspaceEntityBase<*, *>){
@@ -172,7 +172,6 @@ modifiable.id = createEntityId()
 return modifiable
 }
 
-@OptIn(EntityStorageInstrumentationApi::class)
 override fun createEntity(snapshot: EntityStorageInstrumentation): ChildEntityType2{
 val entityId = createEntityId()
 return snapshot.initializeEntity(entityId){

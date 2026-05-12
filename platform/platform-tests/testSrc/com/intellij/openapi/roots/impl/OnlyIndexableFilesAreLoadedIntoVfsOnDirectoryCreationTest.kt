@@ -6,12 +6,18 @@ import com.intellij.ide.impl.ProjectUtil
 import com.intellij.internal.visitChildrenInVfsRecursively
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.readAction
+import com.intellij.openapi.vfs.AfterEventShouldBeFiredBeforeOtherListeners
 import com.intellij.openapi.vfs.AsyncFileListener
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.RefreshQueue
+import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent
 import com.intellij.platform.backend.workspace.toVirtualFileUrl
 import com.intellij.platform.backend.workspace.workspaceModel
+import com.intellij.platform.workspace.jps.entities.ContentRootEntity
+import com.intellij.platform.workspace.jps.entities.InheritedSdkDependency
+import com.intellij.platform.workspace.jps.entities.ModuleEntity
+import com.intellij.platform.workspace.jps.entities.ModuleSourceDependency
 import com.intellij.platform.workspace.storage.impl.url.toVirtualFileUrl
 import com.intellij.testFramework.TestObservation
 import com.intellij.testFramework.VfsTestUtil
@@ -26,14 +32,17 @@ import com.intellij.util.indexing.testEntities.NonRecursiveTestEntity
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileIndex
 import com.intellij.workspaceModel.core.fileIndex.impl.WorkspaceFileIndexImpl
 import com.intellij.workspaceModel.ide.NonPersistentEntitySource
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import java.nio.file.Path
+import kotlin.io.path.invariantSeparatorsPathString
 import kotlin.io.path.pathString
 import kotlin.io.path.writeText
 import kotlin.time.Duration.Companion.minutes
@@ -60,6 +69,40 @@ class OnlyIndexableFilesAreLoadedIntoVfsOnDirectoryCreationTest {
     }
   }
 
+  private fun VFileCreateEvent.isUnder(path: String): Boolean = this.path == path || this.path.startsWith("$path/")
+
+  /**
+   * Refresh triggers listeners, which may load extra files into VFS.
+   *
+   * This method collects files loaded into VFS after refresh but before listeners are invoked.
+   *
+   * If asserting that some file is NOT loaded, it is better to call refresh, and [visitChildrenInVfsRecursively] as usual,
+   * to catch, if any listeners have loaded the file into VFS.
+   */
+  suspend fun collectFilesLoadedIntoVfsBeforeListenersRuns(directoryToRefresh: VirtualFile): List<VirtualFile> {
+    val directoryToRefreshPath = directoryToRefresh.toNioPath().invariantSeparatorsPathString
+    val listenerResult = CompletableDeferred<Result<List<VirtualFile>>>()
+    VirtualFileManager.getInstance().addAsyncFileListenerBackgroundable(
+      { events ->
+        if (listenerResult.isCompleted || events.none { it is VFileCreateEvent && it.isUnder(directoryToRefreshPath) }) {
+          return@addAsyncFileListenerBackgroundable null
+        }
+        object : AsyncFileListener.ChangeApplier, AfterEventShouldBeFiredBeforeOtherListeners {
+          override fun afterVfsChange() {
+            listenerResult.complete(runCatching {
+              visitChildrenInVfsRecursively(directoryToRefresh).toList()
+            })
+          }
+        }
+      }, disposable)
+
+    RefreshQueue.getInstance().refresh(true, listOf(directoryToRefresh))
+
+    return withTimeout(10.seconds) {
+      listenerResult.await()
+    }.getOrThrow()
+  }
+
   @Test
   fun `test non-indexable files are not loaded into VFS on creation`(): Unit = runBlocking {
     rootDir.newDirectoryPath(".idea") // forces project.basePath to match project root which may affect how VFS files are refreshed
@@ -74,7 +117,7 @@ class OnlyIndexableFilesAreLoadedIntoVfsOnDirectoryCreationTest {
       delay(1.seconds) // wait for fs events to arrive
       RefreshQueue.getInstance().refresh(true, listOf(rootVirtualFile))
       val filesInVfs = visitChildrenInVfsRecursively(rootVirtualFile).toList()
-      assertThat(filesInVfs).hasSize(3)
+      assertThat(filesInVfs.map { it.name }).containsExactlyInAnyOrder(rootVirtualFile.name, ".idea", "d1")
     }
   }
 
@@ -98,7 +141,38 @@ class OnlyIndexableFilesAreLoadedIntoVfsOnDirectoryCreationTest {
       delay(1.seconds) // wait for fs events to arrive
       RefreshQueue.getInstance().refresh(true, listOf(rootVirtualFile))
       val filesInVfs = visitChildrenInVfsRecursively(rootVirtualFile).toList()
-      assertThat(filesInVfs).hasSize(3)
+      assertThat(filesInVfs.map { it.name }).containsExactlyInAnyOrder(rootVirtualFile.name, ".idea", "d1")
+    }
+  }
+
+  @Test
+  fun `test content root under content root is loaded into VFS on creation`(): Unit = runBlocking {
+    rootDir.newDirectoryPath(".idea") // forces project.basePath to match project root which may affect how VFS files are refreshed
+    val innerContentRoot = rootDir.rootPath.resolve("innerContentRoot")
+    val options = OpenProjectTask { createModule = false }
+    ProjectUtil.openOrImportAsync(rootDir.rootPath, options)!!.useProjectAsync { project ->
+      TestObservation.awaitConfiguration(project)
+      val rootVirtualFile = findVirtualFile(rootDir.rootPath)
+      rootVirtualFile.children // load all children to trigger full sync later
+
+      val urlManager = project.workspaceModel.getVirtualFileUrlManager()
+      project.workspaceModel.update("Add nested content roots") {
+        it.addEntity(ModuleEntity("testModule", listOf(InheritedSdkDependency, ModuleSourceDependency), NonPersistentEntitySource) {
+          contentRoots = listOf(
+            ContentRootEntity(rootVirtualFile.toVirtualFileUrl(urlManager), emptyList(), NonPersistentEntitySource),
+            ContentRootEntity(innerContentRoot.toVirtualFileUrl(urlManager), emptyList(), NonPersistentEntitySource),
+          )
+        })
+      }
+
+      val outerFile = rootDir.newFileNio("outerFile.txt")
+      outerFile.writeText("outer")
+      val innerFile = rootDir.newFileNio("innerContentRoot/innerFile.txt")
+      innerFile.writeText("inner")
+      delay(1.seconds) // wait for fs events to arrive
+
+      val filesInVfs = collectFilesLoadedIntoVfsBeforeListenersRuns(rootVirtualFile)
+      assertThat(filesInVfs.map { it.path }).contains(outerFile.invariantSeparatorsPathString, innerFile.invariantSeparatorsPathString)
     }
   }
 

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.quickfix;
 
@@ -378,6 +378,11 @@ public abstract class QuickFixMultiModuleTestGenerated extends AbstractK1QuickFi
         @TestMetadata("membersWithIncorrectType")
         public void testMembersWithIncorrectType() throws Exception {
             runTest("testData/multiModuleQuickFix/addMissingActualMembers/membersWithIncorrectType/");
+        }
+
+        @TestMetadata("nestedTypeAlias")
+        public void testNestedTypeAlias() throws Exception {
+            runTest("testData/multiModuleQuickFix/addMissingActualMembers/nestedTypeAlias/");
         }
 
         @TestMetadata("primaryConstructorAbsence")
@@ -1020,6 +1025,11 @@ public abstract class QuickFixMultiModuleTestGenerated extends AbstractK1QuickFi
         @TestMetadata("nestedClass")
         public void testNestedClass() throws Exception {
             runTest("testData/multiModuleQuickFix/createExpect/nestedClass/");
+        }
+
+        @TestMetadata("nestedTypeAlias")
+        public void testNestedTypeAlias() throws Exception {
+            runTest("testData/multiModuleQuickFix/createExpect/nestedTypeAlias/");
         }
 
         @TestMetadata("noAccessOnMember")

@@ -33,6 +33,9 @@ class FrontMatterParserTest: LightPlatformCodeInsightTestCase() {
   @Test
   fun `yaml delimiters should not be paired with toml`() = doTest()
 
+  @Test
+  fun `unclosed yaml delimiter is treated as horizontal rule`() = doTest()
+
   private fun doTest() {
     val testName = getTestName(true)
     configureByFile("$testName.md")

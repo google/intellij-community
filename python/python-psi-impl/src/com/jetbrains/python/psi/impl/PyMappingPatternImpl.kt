@@ -9,14 +9,13 @@ import com.jetbrains.python.psi.PyKeyValuePattern
 import com.jetbrains.python.psi.PyMappingPattern
 import com.jetbrains.python.psi.PyPattern
 import com.jetbrains.python.psi.PyPsiFacade
-import com.jetbrains.python.psi.impl.PyBuiltinCache.Companion.getInstance
 import com.jetbrains.python.psi.types.PyCollectionType
 import com.jetbrains.python.psi.types.PyCollectionTypeImpl
 import com.jetbrains.python.psi.types.PyLiteralType
-import com.jetbrains.python.psi.types.PyLiteralType.Companion.upcastLiteralToClass
 import com.jetbrains.python.psi.types.PyNeverType
 import com.jetbrains.python.psi.types.PyType
 import com.jetbrains.python.psi.types.PyTypeChecker
+import com.jetbrains.python.psi.types.PyTypeUtil
 import com.jetbrains.python.psi.types.PyTypeUtil.components
 import com.jetbrains.python.psi.types.PyTypeUtil.convertToType
 import com.jetbrains.python.psi.types.PyTypedDictType
@@ -64,7 +63,7 @@ class PyMappingPatternImpl(astNode: ASTNode?) : PyElementImpl(astNode), PyMappin
     if (sequenceMember is PyDoubleStarPattern) {
       val mappingType = context.getType(this).convertToType("typing.Mapping", pattern, context)
       if (mappingType is PyCollectionType) {
-        val dict = getInstance(pattern).getClass("dict") ?: return null
+        val dict = PyBuiltinCache.getInstance(pattern).getClass("dict") ?: return null
         return PyCollectionTypeImpl(dict, false, mappingType.getElementTypes())
       }
       return null
@@ -79,7 +78,7 @@ class PyMappingPatternImpl(astNode: ASTNode?) : PyElementImpl(astNode), PyMappin
 
   private fun wrapInMappingType(keyType: PyType?, valueType: PyType?): PyType? {
     val sequence = PyPsiFacade.getInstance(getProject()).createClassByQName("typing.Mapping", this) ?: return null
-    return PyCollectionTypeImpl(sequence, false, listOf(keyType, valueType).map { upcastLiteralToClass(it) })
+    return PyCollectionTypeImpl(sequence, false, listOf(keyType, valueType).map { PyTypeUtil.widenLiteralAndNumeric(it) })
   }
 }
 

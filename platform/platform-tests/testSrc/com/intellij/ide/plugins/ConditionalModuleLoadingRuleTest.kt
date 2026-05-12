@@ -31,6 +31,7 @@ class ConditionalModuleLoadingRuleValueTest {
 
   private val rootPath get() = inMemoryFs.fs.getPath("/")
   private val pluginsDirPath get() = rootPath.resolve("wd/plugins")
+  private var loadingErrors: List<PluginLoadingError> = emptyList()
 
   @ParameterizedTest
   @ValueSource(strings = ["monolith", "frontend", "backend"])
@@ -47,9 +48,8 @@ class ConditionalModuleLoadingRuleValueTest {
       assertThat(pluginSet).hasExactlyEnabledPlugins("foo")
     } else {
       assertThat(pluginSet).doesNotHaveEnabledPlugins()
-      val errors = PluginManagerCore.getAndClearPluginLoadingErrors()
-      assertThat(errors).hasSizeGreaterThan(0)
-      assertThat(errors[0].htmlMessage.toString()).contains("foo", "requires plugin", "unavailable", "to be installed")
+      assertThat(loadingErrors).hasSizeGreaterThan(0)
+      assertThat(loadingErrors[0].htmlMessage.toString()).contains("foo", "requires plugin", "unavailable", "to be installed")
     }
   }
 
@@ -68,9 +68,8 @@ class ConditionalModuleLoadingRuleValueTest {
       assertThat(pluginSet).hasExactlyEnabledPlugins("foo")
     } else {
       assertThat(pluginSet).doesNotHaveEnabledPlugins()
-      val errors = PluginManagerCore.getAndClearPluginLoadingErrors()
-      assertThat(errors).hasSizeGreaterThan(0)
-      assertThat(errors[0].htmlMessage.toString()).contains("foo", "requires plugin", "unavailable", "to be installed")
+      assertThat(loadingErrors).hasSizeGreaterThan(0)
+      assertThat(loadingErrors[0].htmlMessage.toString()).contains("foo", "requires plugin", "unavailable", "to be installed")
     }
   }
 
@@ -89,9 +88,8 @@ class ConditionalModuleLoadingRuleValueTest {
       assertThat(pluginSet).hasExactlyEnabledPlugins("foo")
     } else {
       assertThat(pluginSet).doesNotHaveEnabledPlugins()
-      val errors = PluginManagerCore.getAndClearPluginLoadingErrors()
-      assertThat(errors).hasSizeGreaterThan(0)
-      assertThat(errors[0].htmlMessage.toString()).contains("foo", "requires plugin", "unavailable", "to be installed")
+      assertThat(loadingErrors).hasSizeGreaterThan(0)
+      assertThat(loadingErrors[0].htmlMessage.toString()).contains("foo", "requires plugin", "unavailable", "to be installed")
     }
   }
 
@@ -110,11 +108,21 @@ class ConditionalModuleLoadingRuleValueTest {
     assertThat(pluginSetFrontend).hasExactlyEnabledPlugins("foo")
 
     val pluginSetMonolith = buildPluginSet { withProductMode(ProductMode.findById("monolith")!!) }
-    assertThat(pluginSetMonolith).doesNotHaveEnabledPlugins()
-    val errors = PluginManagerCore.getAndClearPluginLoadingErrors()
-    assertThat(errors).hasSizeGreaterThan(0)
-    assertThat(errors[0].htmlMessage.toString()).contains("foo", "cannot be loaded", "form a dependency cycle")
+    if (PluginManagerCore.fallbackToOldPluginSetResolution()) {
+      assertThat(pluginSetMonolith).doesNotHaveEnabledPlugins()
+      assertThat(loadingErrors).hasSizeGreaterThan(0)
+      assertThat(loadingErrors[0].htmlMessage.toString()).contains("foo", "cannot be loaded", "form a dependency cycle")
+    } else {
+      // now there is no artificial edge foo -> foo.maybe.req, so foo.maybe.req -> foo.optional -> foo is allowed
+      assertThat(pluginSetMonolith).hasExactlyEnabledPlugins("foo")
+      assertThat(pluginSetMonolith.getEnabledModules()).hasSize(3)
+      assertThat(loadingErrors).isEmpty()
+    }
   }
 
-  private fun buildPluginSet(builder: PluginSetTestBuilder.() -> Unit = {}): PluginSet = PluginSetTestBuilder.fromPath(pluginsDirPath).apply(builder).build()
+  private fun buildPluginSet(builder: PluginSetTestBuilder.() -> Unit = {}): PluginSet {
+    val state = PluginSetTestBuilder.fromPath(pluginsDirPath).apply(builder).buildState()
+    loadingErrors = state.loadingErrors
+    return state.pluginSet
+  }
 }

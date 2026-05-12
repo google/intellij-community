@@ -12,6 +12,7 @@ import com.intellij.psi.FileViewProvider;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiLanguageInjectionHost;
+import com.intellij.util.Processor;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -19,6 +20,7 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.TestOnly;
 import org.jetbrains.annotations.Unmodifiable;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -50,6 +52,16 @@ public abstract class InjectedLanguageManager {
   public abstract @NotNull TextRange injectedToHost(@NotNull PsiElement injectedContext, @NotNull TextRange injectedTextRange);
   public abstract int injectedToHost(@NotNull PsiElement injectedContext, int injectedOffset);
   public abstract int injectedToHost(@NotNull PsiElement injectedContext, int injectedOffset, boolean minHostOffset);
+
+  /**
+   * Processes the given collection of PSI elements to identify and handle those that are injectable.
+   *
+   * @param in the collection of PSI elements to process; must not be null
+   * @param processor the processor to apply to each injectable PSI element; must not be null
+   */
+  @ApiStatus.Internal
+  public void processInjectableElements(@NotNull Collection<? extends PsiElement> in,
+                                        @NotNull Processor<? super PsiElement> processor) { }
 
   @TestOnly
   public abstract void registerMultiHostInjector(@NotNull MultiHostInjector injector, @NotNull Disposable parentDisposable);

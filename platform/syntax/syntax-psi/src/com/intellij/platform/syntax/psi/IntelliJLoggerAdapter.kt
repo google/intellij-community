@@ -1,13 +1,9 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:JvmName("IntelliJLogger")
-@file:ApiStatus.Experimental
-
 package com.intellij.platform.syntax.psi
 
 import com.intellij.openapi.diagnostic.Logger
-import org.jetbrains.annotations.ApiStatus
 
-@ApiStatus.Experimental
 fun Logger.asSyntaxLogger(): com.intellij.platform.syntax.Logger = IntelliJLoggerAdapter(this)
 
 private class IntelliJLoggerAdapter(private val log: Logger) : com.intellij.platform.syntax.Logger {

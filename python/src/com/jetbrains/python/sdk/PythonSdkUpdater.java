@@ -35,6 +35,7 @@ import com.intellij.openapi.util.io.FileUtilRt;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.StandardFileSystems;
+import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.platform.backend.observation.TrackingUtil;
@@ -78,6 +79,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
+import static com.jetbrains.python.sdk.PyRichSdkKt.pyRichSdk;
 import static com.jetbrains.python.statistics.PythonSDKUpdaterIdsHolder.REMOTE_INTERPRETER_SUPPORT_IS_NOT_AVAILABLE;
 
 /**
@@ -273,18 +275,19 @@ public final class PythonSdkUpdater {
           "Starting SDK refresh for '" + mySdk.getName() + "' triggered by " + Trigger.getCauseByTrace(myRequestData.myTraceback));
       }
       try {
-        PyTargetsIntrospectionFacade targetsFacade = new PyTargetsIntrospectionFacade(mySdk, myProject);
+        PyRichSdk richSdk = pyRichSdk(mySdk, true);
+        PyTargetsIntrospectionFacade targetsFacade = new PyTargetsIntrospectionFacade(richSdk, myProject);
         String version = targetsFacade.getInterpreterVersion(indicator);
-        commitSdkVersionIfChanged(mySdk, version);
+        commitSdkVersionIfChanged(richSdk, version);
         if (targetsFacade.isLocalTarget()) {
           List<String> paths = targetsFacade.getInterpreterPaths(indicator);
-          updateSdkPaths(mySdk, paths, myProject);
+          updateSdkPaths(richSdk, paths, myProject);
         }
         else {
           targetsFacade.synchronizeRemoteSourcesAndSetupMappings(indicator);
         }
         // This step also includes setting mapped interpreter paths
-        generateSkeletons(mySdk, indicator);
+        generateSkeletons(richSdk, indicator);
         if (myRequestData.withPackagesUpdate) {
           refreshPackages(manager, indicator);
         }
@@ -359,7 +362,8 @@ public final class PythonSdkUpdater {
     /**
      * May be invoked from any thread.
      */
-    private void generateSkeletons(@NotNull Sdk sdk, @NotNull ProgressIndicator indicator) {
+    private void generateSkeletons(@NotNull PyRichSdk richSdk, @NotNull ProgressIndicator indicator) {
+      Sdk sdk = richSdk.getSdk();
       final String skeletonsPath = PythonSdkUtil.getSkeletonsPath(sdk);
       try {
         final String sdkPresentableName = getSdkPresentableName(sdk);
@@ -367,7 +371,7 @@ public final class PythonSdkUpdater {
         indicator.setText(PyBundle.message("python.sdk.updating.skeletons"));
         PySkeletonRefresher.refreshSkeletonsOfSdk(myProject, skeletonsPath, sdk);
         if (PythonSdkUtil.isRemote(sdk)) {
-          updateSdkPaths(sdk, getRemoteSdkMappedPaths(sdk), getProject());
+          updateSdkPaths(richSdk, getRemoteSdkMappedPaths(sdk), getProject());
         }
       }
       catch (UnsupportedPythonSdkTypeException | InvalidSdkException e) {
@@ -396,7 +400,7 @@ public final class PythonSdkUpdater {
             }
           });
         }
-        else if (PySdkExtKt.getSdkSeemsValid(sdk)) {
+        else if (SdkExtKt.isSdkSeemsValid(sdk)) {
           LOG.error(exception);
         }
       }
@@ -456,14 +460,16 @@ public final class PythonSdkUpdater {
    */
   private static void updateLocalSdkVersionAndPaths(@NotNull Sdk sdk, @Nullable Project project)
     throws InvalidSdkException {
-    updateLocalSdkVersion(sdk);
-    if (!PythonSdkUtil.isRemote(sdk)) {
-      try {
-        updateSdkPaths(sdk, evaluateSysPath(sdk, project != null ? project : ProjectManager.getInstance().getDefaultProject()), project);
-      }
-      catch (ExecutionException e) {
-        throw new InvalidSdkException(PyBundle.message("python.sdk.cannot.evaluate.sdk.version.error.message"), e);
-      }
+    updateSdkVersion(sdk);
+    if (PythonSdkUtil.isRemote(sdk)) return;
+
+    PyRichSdk richSdk = pyRichSdk(sdk, true);
+
+    try {
+      updateSdkPaths(richSdk, evaluateSysPath(richSdk, project != null ? project : ProjectManager.getInstance().getDefaultProject()), project);
+    }
+    catch (ExecutionException e) {
+      throw new InvalidSdkException(PyBundle.message("python.sdk.cannot.evaluate.sdk.version.error.message"), e);
     }
   }
 
@@ -472,12 +478,10 @@ public final class PythonSdkUpdater {
    * <p>
    * May be invoked from any thread. May freeze the current thread while evaluating the run-time Python version.
    */
-  private static void updateLocalSdkVersion(@NotNull Sdk sdk) {
-    if (!PythonSdkUtil.isRemote(sdk)) {
-      ProgressManager.progress(PyBundle.message("sdk.updating.interpreter.version"));
-      final String versionString = sdk.getSdkType().getVersionString(sdk);
-      commitSdkVersionIfChanged(sdk, versionString);
-    }
+  private static void updateSdkVersion(@NotNull Sdk sdk) {
+    ProgressManager.progress(PyBundle.message("sdk.updating.interpreter.version"));
+    final String versionString = sdk.getSdkType().getVersionString(sdk);
+    commitSdkVersionIfChanged(sdk, versionString);
   }
 
   private static void commitSdkVersionIfChanged(@NotNull Sdk sdk, @Nullable String versionString) {
@@ -489,11 +493,12 @@ public final class PythonSdkUpdater {
     }
   }
 
-  private static void updateSdkPaths(@NotNull Sdk sdk, @NotNull List<String> paths, @Nullable Project project) {
+  private static void updateSdkPaths(@NotNull PyRichSdk richSdk, @NotNull List<String> paths, @Nullable Project project) {
+    Sdk sdk = richSdk.getSdk();
     final var moduleRoots = getModuleRoots(project);
     final var excludedPaths = getExcludedPaths(sdk);
-    final var sdkRoots = splitIntoLibraryAndSourceRoots(sdk, paths, moduleRoots, excludedPaths, it -> sdkPathToRoot(sdk, it));
-    final var userAddedRoots = splitIntoLibraryAndSourceRoots(sdk, getUserAddedPaths(sdk), moduleRoots, excludedPaths, Function.identity());
+    final var sdkRoots = splitIntoLibraryAndSourceRoots(richSdk, paths, moduleRoots, excludedPaths, it -> sdkPathToRoot(richSdk, it));
+    final var userAddedRoots = splitIntoLibraryAndSourceRoots(richSdk, getUserAddedPaths(sdk), moduleRoots, excludedPaths, Function.identity());
 
     final boolean forceCommit = ensureBinarySkeletonsDirectoryExists(sdk);
     final List<VirtualFile> localSdkPaths = buildSdkPaths(sdk, sdkRoots.first, userAddedRoots.first);
@@ -584,7 +589,7 @@ public final class PythonSdkUpdater {
     return Collections.emptyList();
   }
 
-  private static <T> @NotNull Pair<@NotNull List<VirtualFile>, @NotNull List<VirtualFile>> splitIntoLibraryAndSourceRoots(@NotNull Sdk sdk,
+  private static <T> @NotNull Pair<@NotNull List<VirtualFile>, @NotNull List<VirtualFile>> splitIntoLibraryAndSourceRoots(@NotNull PyRichSdk richSdk,
                                                                                                                           @NotNull List<T> paths,
                                                                                                                           @NotNull Set<VirtualFile> moduleRoots,
                                                                                                                           @NotNull Collection<VirtualFile> excludedPaths,
@@ -594,7 +599,7 @@ public final class PythonSdkUpdater {
     for (T path : paths) {
       final VirtualFile rootFile = mapper.apply(path);
       if (rootFile != null && !excludedPaths.contains(rootFile)) {
-        if (isUnderModuleRootsButNotSdk(rootFile, moduleRoots, sdk)) {
+        if (isUnderModuleRootsButNotSdk(rootFile, moduleRoots, richSdk)) {
           source.add(rootFile);
         }
         else {
@@ -625,23 +630,25 @@ public final class PythonSdkUpdater {
     return pythonAdditionalData != null ? pythonAdditionalData.getExcludedPathFiles() : Collections.emptyList();
   }
 
-  private static @Nullable VirtualFile sdkPathToRoot(@NotNull Sdk sdk, @Nullable String path) {
-    if (path != null && !FileUtilRt.extensionEquals(path, "egg-info")) {
-      // TODO: Refactor SDK so they can provide exclusions for root paths
-      final VirtualFile condaFolder = PythonSdkUtil.isConda(sdk) ? PythonSdkUtil.getCondaDirectory(sdk) : null;
+  private static @Nullable VirtualFile sdkPathToRoot(@NotNull PyRichSdk richSdk, @Nullable String path) {
+    if (path == null || FileUtilRt.extensionEquals(path, "egg-info")) {
+      return null;
+    }
 
-      final VirtualFile virtualFile = StandardFileSystems.local().refreshAndFindFileByPath(path);
-      if (virtualFile != null && !virtualFile.equals(condaFolder)) {
-        return PythonSdkType.getSdkRootVirtualFile(virtualFile);
-      }
+    final var homePath = richSdk.getPythonHomePath();
+    final VirtualFile homeFolder = homePath != null ? LocalFileSystem.getInstance().findFileByNioFile(homePath) : null;
+
+    final VirtualFile virtualFile = StandardFileSystems.local().refreshAndFindFileByPath(path);
+    if (virtualFile != null && !virtualFile.equals(homeFolder)) {
+      return PythonSdkType.getSdkRootVirtualFile(virtualFile);
     }
 
     return null;
   }
 
-  private static boolean isUnderModuleRootsButNotSdk(@NotNull VirtualFile file, @NotNull Set<VirtualFile> moduleRoots, @NotNull Sdk sdk) {
+  private static boolean isUnderModuleRootsButNotSdk(@NotNull VirtualFile file, @NotNull Set<VirtualFile> moduleRoots, @NotNull PyRichSdk richSdk) {
     if (VfsUtilCore.isUnder(file, moduleRoots)) {
-      final VirtualFile envRoot = PySdkExtKt.getInnerVirtualEnvRoot(sdk);
+      final VirtualFile envRoot = PySdkExtKt.getInnerVirtualEnvRoot(richSdk);
       if (envRoot == null) {
         return true;
       }

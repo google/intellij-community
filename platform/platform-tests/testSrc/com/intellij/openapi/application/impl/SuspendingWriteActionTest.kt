@@ -2,14 +2,24 @@
 package com.intellij.openapi.application.impl
 
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.WriteActionListener
 import com.intellij.openapi.application.edtWriteAction
+import com.intellij.openapi.application.ex.ApplicationManagerEx
+import com.intellij.openapi.application.runUndoTransparentWriteAction
+import com.intellij.openapi.application.runWriteAction
+import com.intellij.openapi.application.writeAction
 import com.intellij.openapi.progress.Cancellation
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.progress.testExceptions
 import com.intellij.openapi.progress.testNoExceptions
+import com.intellij.openapi.util.Computable
+import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.ThrowableComputable
+import com.intellij.openapi.util.use
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.junit5.TestApplication
+import com.intellij.util.ThrowableRunnable
 import com.intellij.util.ui.EDT
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -17,11 +27,13 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.RepeatedTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import java.util.concurrent.atomic.AtomicReference
 
 private const val repetitions: Int = 100
 
@@ -102,6 +114,89 @@ class SuspendingWriteActionTest {
     val coroutineJob = coroutineContext.job
     edtWriteAction {
       Assertions.assertSame(coroutineJob, Cancellation.currentJob()?.parent)
+    }
+  }
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  @Test
+  fun testWriteActionListenerMustReceiveCorrectClazz() {
+    Disposer.newDisposable().use { disposable ->
+      val listener = object : WriteActionListener {
+        val expectedClass: AtomicReference<Class<*>?> = AtomicReference<Class<*>?>()
+        val calledLog: StringBuffer = StringBuffer()
+        override fun beforeWriteActionStart(action: Class<*>) {
+          Assertions.assertSame(expectedClass.get(), action)
+          calledLog.append("beforeWriteActionStart;")
+        }
+
+        override fun writeActionStarted(action: Class<*>) {
+          Assertions.assertSame(expectedClass.get(), action)
+          calledLog.append("writeActionStarted;")
+        }
+
+        override fun writeActionFinished(action: Class<*>) {
+          Assertions.assertSame(expectedClass.get(), action)
+          calledLog.append("writeActionFinished;")
+        }
+
+        override fun afterWriteActionFinished(action: Class<*>) {
+          Assertions.assertSame(expectedClass.get(), action)
+          calledLog.append("afterWriteActionFinished;")
+        }
+
+        fun assertCorrectClassPassed(expectedObject: Any, writeAction: ()->Unit) {
+          calledLog.setLength(0)
+          expectedClass.set(expectedObject.javaClass)
+          writeAction.invoke()
+          Assertions.assertEquals("beforeWriteActionStart;writeActionStarted;writeActionFinished;afterWriteActionFinished;",
+                                  calledLog.toString())
+        }
+      }
+      val application = ApplicationManagerEx.getApplicationEx()
+      application.addWriteActionListener(listener, disposable)
+
+      val action: Runnable = {}
+      listener.assertCorrectClassPassed(action) {
+        application.runWriteAction(action)
+      }
+
+      val computation: Computable<String> = { "" }
+      listener.assertCorrectClassPassed(computation) {
+        application.runWriteAction(computation)
+      }
+
+      val t: ThrowableComputable<String, Throwable> = { "" }
+      listener.assertCorrectClassPassed(t) { application.runWriteAction(t) }
+
+      val writeLambda: () -> Unit = {  }
+      listener.assertCorrectClassPassed(writeLambda) {
+        runBlocking {
+          edtWriteAction(writeLambda)
+        }
+      }
+
+      listener.assertCorrectClassPassed(writeLambda) {
+        runWriteAction(writeLambda)
+      }
+      listener.assertCorrectClassPassed(writeLambda) {
+        runBlocking {
+          writeAction(writeLambda)
+        }
+      }
+      listener.assertCorrectClassPassed(writeLambda) {
+        runBlocking {
+          runUndoTransparentWriteAction(writeLambda)
+        }
+      }
+
+      val tr: ThrowableRunnable<RuntimeException> = {}
+      listener.assertCorrectClassPassed(tr) {
+        com.intellij.openapi.application.WriteAction.run(tr)
+      }
+
+      listener.assertCorrectClassPassed(tr) {
+        com.intellij.openapi.application.WriteAction.runAndWait(tr)
+      }
     }
   }
 }

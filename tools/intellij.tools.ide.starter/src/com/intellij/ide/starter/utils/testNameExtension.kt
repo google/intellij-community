@@ -1,5 +1,6 @@
 package com.intellij.ide.starter.utils
 
+import com.intellij.tools.ide.util.common.replaceSpecialCharactersWithHyphens
 import java.util.Locale
 import kotlin.io.path.Path
 import kotlin.io.path.name

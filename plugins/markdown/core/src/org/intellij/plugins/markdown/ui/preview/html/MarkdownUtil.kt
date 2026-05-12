@@ -37,6 +37,7 @@ object MarkdownUtil {
     val cacheCollector = MarkdownCodeFencePluginCacheCollector(file)
 
     val linkMap = LinkMap.buildLinkMap(parsedTree, text)
+    val footnoteMap = FootnoteMap.build(parsedTree, text)
     val map = MarkdownParserManager.FLAVOUR.createHtmlGeneratingProviders(linkMap, baseUri).toMutableMap()
     map[MarkdownElementTypes.CODE_FENCE] = createCodeFenceProvider(project, file, cacheCollector)
     if (project != null) {
@@ -44,12 +45,18 @@ object MarkdownUtil {
       map[MarkdownElementTypes.PARAGRAPH] = ParagraphGeneratingProvider()
       map[MarkdownElementTypes.CODE_SPAN] = CodeSpanRunnerGeneratingProvider(project, file)
     }
+    map[MarkdownElementTypes.FULL_REFERENCE_LINK] = FootnoteReferenceProvider(footnoteMap, map[MarkdownElementTypes.FULL_REFERENCE_LINK]!!)
+    map[MarkdownElementTypes.SHORT_REFERENCE_LINK] = FootnoteReferenceProvider(footnoteMap, map[MarkdownElementTypes.SHORT_REFERENCE_LINK]!!)
+    map[MarkdownElementTypes.PARAGRAPH] = FootnoteNodeSuppressor(footnoteMap, map[MarkdownElementTypes.PARAGRAPH]!!)
+    map[MarkdownElementTypes.CODE_BLOCK] = FootnoteNodeSuppressor(footnoteMap, map[MarkdownElementTypes.CODE_BLOCK]!!)
 
-    val html = HtmlGenerator(text, parsedTree, map, true).generateHtml()
+    val mainHtml = HtmlGenerator(text, parsedTree, map, true).generateHtml()
 
     MarkdownCodeFenceHtmlCache.getInstance().registerCacheProvider(cacheCollector)
 
-    return html
+    val footnoteHtml = footnoteMap.generateFootnoteHtml(baseUri)
+    return if (footnoteHtml.isEmpty()) mainHtml
+           else mainHtml.dropLast("</body>".length) + "\n" + footnoteHtml + "\n</body>"
   }
 
   @ApiStatus.Internal

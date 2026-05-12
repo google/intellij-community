@@ -26,7 +26,6 @@ import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression
-import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtTreeVisitorVoid
@@ -40,7 +39,6 @@ internal class EmptyRangeInspection : KotlinApplicableInspectionBase<KtElement, 
 
     data class Context(val replacementOperator: String, val messageKey: String, val messageParam: String?)
 
-    @OptIn(KaExperimentalApi::class)
     override fun KaSession.prepareContext(element: KtElement): Context? {
         if (!isAvailable(element)) return null
         return determineContextFromElement(element as? KtExpression ?: return null)
@@ -101,7 +99,6 @@ internal class EmptyRangeInspection : KotlinApplicableInspectionBase<KtElement, 
             is KtNameReferenceExpression -> {
                 val initializer = when (val resolved = mainReference.resolve()) {
                     is KtProperty -> if (resolved.isVar) null else resolved.initializer
-                    is KtParameter -> resolved.defaultValue
                     else -> null
                 }
                 initializer?.normalizedValue()

@@ -31,7 +31,7 @@ class DefaultEventLogFilesProvider(
   private val activeFileProvider: () -> String?,
 ) : EventLogFilesProvider {
   override fun getLogFiles(): List<File> {
-    return dir.toFile().listFiles()?.toList().orEmpty()
+    return dir.toFile().listFiles()?.sortedBy { it.lastModified() }?.toList().orEmpty()
   }
 
   override fun getLogFilesExceptActive(): List<File> {

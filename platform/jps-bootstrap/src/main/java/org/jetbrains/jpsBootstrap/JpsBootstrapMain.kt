@@ -8,6 +8,7 @@ import com.intellij.openapi.util.text.Strings
 import com.intellij.util.ExceptionUtil
 import jetbrains.buildServer.messages.serviceMessages.MessageWithAttributes
 import jetbrains.buildServer.messages.serviceMessages.ServiceMessageTypes
+import kotlinx.coroutines.runBlocking
 import org.apache.commons.cli.*
 import org.apache.commons.codec.digest.DigestUtils
 import org.apache.commons.compress.archivers.examples.Archiver
@@ -129,10 +130,12 @@ class JpsBootstrapMain(args: Array<String>?) {
     debugOption = cmdline.hasOption(OPT_DEBUG)
   }
 
-  private fun downloadJdk(): Path {
+  private suspend fun downloadJdk(): Path {
     val jdkHome: Path
     if (underTeamCity) {
-      jdkHome = getJdkHome(communityHome)
+      jdkHome = getJdkHome(communityHome) {
+        println(it)
+      }
       exportJava(jdkHome)
     }
     else {
@@ -161,7 +164,7 @@ class JpsBootstrapMain(args: Array<String>?) {
   }
 
   @Throws(Throwable::class)
-  private fun main() {
+  private suspend fun main() {
     JpsBootstrapUtil.loadJpsSystemProperties(additionalSystemProperties)
 
     val jdkHome = downloadJdk()
@@ -378,7 +381,9 @@ class JpsBootstrapMain(args: Array<String>?) {
         val mainInstance = JpsBootstrapMain(args)
         @Suppress("UNUSED_VALUE")
         jpsBootstrapWorkDir = mainInstance.jpsBootstrapWorkDir
-        mainInstance.main()
+        runBlocking {
+          mainInstance.main()
+        }
         exitProcess(0)
       }
       catch (t: Throwable) {

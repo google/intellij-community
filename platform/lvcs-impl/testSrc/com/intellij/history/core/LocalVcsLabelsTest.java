@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 public class LocalVcsLabelsTest extends LocalHistoryTestCase {
-  LocalHistoryFacade myVcs = new InMemoryLocalHistoryFacade();
+  LocalHistoryFacade myVcs = createInMemoryFacade();
   RootEntry myRoot = new RootEntry();
 
   @Override

@@ -17,7 +17,7 @@ typealias HatchSdkFlavorData = PyFlavorData.Empty
 internal object HatchSdkFlavor : CPythonSdkFlavor<HatchSdkFlavorData>() {
   override fun getIcon(): Icon = PythonHatchIcons.Logo
   override fun getFlavorDataClass(): Class<HatchSdkFlavorData> = HatchSdkFlavorData::class.java
-  override fun isValidSdkPath(pathStr: String): Boolean = false
+  override fun isValidSdkPath(pythonBinaryPath: Path): Boolean = false
   override fun isPlatformIndependent(): Boolean = true
 }
 

@@ -24,8 +24,8 @@ import com.intellij.psi.JavaCodeFragment;
 import com.intellij.psi.JavaCodeFragmentFactory;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiDocumentManager;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBCheckBox;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.FormBuilder;
@@ -48,7 +48,7 @@ public class JavaPostfixTemplateEditor extends PostfixTemplateEditorBase<JavaPos
     super(provider, createEditor(), true);
     myStaticImportCheckBox = new JBCheckBox(JavaBundle.message("dialog.edit.template.checkbox.use.static.import"));
     myLanguageLevelCombo = new ComboBox<>(LanguageLevel.getEntries().toArray(new LanguageLevel[0]));
-    myLanguageLevelCombo.setRenderer(SimpleListCellRenderer.create("", LanguageLevel::getPresentableText));
+    myLanguageLevelCombo.setRenderer(BuilderKt.textListCellRenderer("", LanguageLevel::getPresentableText));
 
     myPanel = FormBuilder.createFormBuilder()
                          .addLabeledComponent(JavaBundle.message("postfix.template.language.level.title"), myLanguageLevelCombo)

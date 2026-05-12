@@ -38,6 +38,7 @@ import com.intellij.psi.PsiType;
 import com.intellij.psi.PsiTypeParameter;
 import com.intellij.psi.PsiTypeParameterList;
 import com.intellij.psi.codeStyle.CodeStyleManager;
+import com.intellij.psi.impl.compiled.ClsElementImpl;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.MethodSignature;
 import com.intellij.psi.util.PsiUtil;
@@ -53,11 +54,14 @@ import com.intellij.util.CommonJavaRefactoringUtil;
 import com.intellij.util.IncorrectOperationException;
 import com.intellij.util.containers.MultiMap;
 import org.jetbrains.annotations.NonNls;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -163,8 +167,22 @@ public final class ExtractSuperClassUtil {
       final PsiCodeBlock body = constructor.getBody();
       assert body != null;
       body.add(statement);
-      constructor.getThrowsList().replace(baseConstructor.getThrowsList());
+      PsiReferenceList throwsList = getThrowsList(baseConstructor, factory);
+      constructor.getThrowsList().replace(throwsList);
     }
+  }
+
+  private static @NotNull PsiReferenceList getThrowsList(@NotNull PsiMethod baseConstructor,
+                                                         @NotNull PsiElementFactory factory) {
+    PsiReferenceList throwsList = baseConstructor.getThrowsList();
+    if (throwsList instanceof ClsElementImpl) {
+      List<PsiJavaCodeReferenceElement> toList = new ArrayList<>();
+      for (PsiJavaCodeReferenceElement element : throwsList.getReferenceElements()) {
+        toList.add(factory.createReferenceFromText(element.getCanonicalText(), baseConstructor));
+      }
+      throwsList = factory.createReferenceList(toList.toArray(PsiJavaCodeReferenceElement.EMPTY_ARRAY));
+    }
+    return throwsList;
   }
 
   private static PsiMethod[] getCalledBaseConstructors(final PsiClass subclass) {

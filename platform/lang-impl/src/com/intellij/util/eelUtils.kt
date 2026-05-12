@@ -5,6 +5,7 @@ import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.eel.EelMachine
 import com.intellij.platform.eel.provider.LocalEelMachine
+import com.intellij.platform.eel.provider.ownsPath
 import com.intellij.platform.workspace.jps.entities.SdkEntity
 import com.intellij.workspaceModel.ide.toPath
 import java.nio.file.InvalidPathException

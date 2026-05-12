@@ -1,4 +1,5 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:JvmName("UrlPathInlayHintsProviderUtil")
 package com.intellij.microservices.url.inlay
 
 import com.intellij.codeInsight.hints.InlayHintsProviderFactory
@@ -17,7 +18,7 @@ internal class UrlPathInlayHintsProviderFactory : InlayHintsProviderFactory {
 
 private val EP_NAME = ExtensionPointName.create<UrlPathInlayLanguagesProvider>("com.intellij.microservices.urlInlayLanguagesProvider")
 
-internal fun getLanguagesProviderByLanguage(language: Language): UrlPathInlayLanguagesProvider? =
+fun getLanguagesProviderByLanguage(language: Language): UrlPathInlayLanguagesProvider? =
   EP_NAME.extensionList.find { language in it.languages }
 
 @TestOnly

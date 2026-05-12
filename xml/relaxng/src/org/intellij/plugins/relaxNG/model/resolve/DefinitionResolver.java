@@ -94,7 +94,7 @@ public final class DefinitionResolver extends CommonElement.Visitor implements
 
   @Override
   public void visitDefine(Define def) {
-    myDefines.get().computeIfAbsent(def.getName(), __ -> new HashSet<>()).add(def);
+    myDefines.get().computeIfAbsent(def.getName(), _ -> new HashSet<>()).add(def);
   }
 
   @Override

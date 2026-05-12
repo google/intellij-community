@@ -666,7 +666,7 @@ public class SingleInspectionProfilePanel extends JPanel {
     tree.setRowHeight(renderer.getTreeCellRendererComponent(tree, "xxx", true, true, false, 0, true).getPreferredSize().height);
     tree.setLargeModel(true);
 
-    tree.addTreeSelectionListener(__ -> {
+    tree.addTreeSelectionListener(_ -> {
       if (myTreeTable.getTree().getSelectionPaths() != null) {
         updateOptionsAndDescriptionPanel();
       }
@@ -1010,7 +1010,7 @@ public class SingleInspectionProfilePanel extends JPanel {
           .disableUpDownActions()
           .setAddIcon(LayeredIcon.ADD_WITH_DROPDOWN)
           .setRemoveActionUpdater(
-            __ -> {
+            _ -> {
               final int selectedRow = scopesAndScopesAndSeveritiesTable.getSelectedRow();
               final int rowCount = scopesAndScopesAndSeveritiesTable.getRowCount();
               return rowCount - 1 != selectedRow;
@@ -1269,7 +1269,7 @@ public class SingleInspectionProfilePanel extends JPanel {
     JPanel panel = new JPanel(new BorderLayout(UIUtil.DEFAULT_HGAP, UIUtil.DEFAULT_VGAP));
     panel.add(inspectionTreePanel, BorderLayout.CENTER);
     panel.add(disableNewInspectionsCheckBox, BorderLayout.SOUTH);
-    disableNewInspectionsCheckBox.addItemListener(__ -> {
+    disableNewInspectionsCheckBox.addItemListener(_ -> {
       final boolean enabled = disableNewInspectionsCheckBox.isSelected();
       if (!isDisposed()) {
         final InspectionProfileImpl profile = getProfile();

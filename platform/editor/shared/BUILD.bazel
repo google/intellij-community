@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.editor` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "editor_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "editor",
   module_name = "intellij.platform.editor",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":editor_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:jetbrains-annotations",
     "@lib//:kotlin-stdlib",
@@ -21,11 +16,13 @@ jvm_library(
     "//platform/kernel/shared:kernel",
     "//platform/platform-impl:ide-impl",
     "//platform/kernel/pasta",
+    "//fleet/rhizomedb",
   ]
 )
 
 jvm_library(
   name = "editor_test_lib",
+  testonly = True,
   module_name = "intellij.platform.editor",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -36,6 +33,13 @@ jvm_library(
     "//platform/kernel/shared:kernel_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/kernel/pasta:pasta_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.editor` end
+
+### auto-generated section `iml intellij.platform.editor` start
+exports_files([
+  "intellij.platform.editor.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.editor` end

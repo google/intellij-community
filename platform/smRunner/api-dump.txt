@@ -370,6 +370,7 @@ c:com.intellij.execution.testframework.sm.runner.SMTestProxy$SMRootTestProxy
 - isTestsReporterAttached():Z
 - printOn(com.intellij.execution.testframework.Printer):V
 - setComment(java.lang.String):V
+- f:setDurationStrategy(com.intellij.execution.testframework.sm.runner.events.TestDurationStrategy):V
 - setExecutionId(J):V
 - setHandler(com.intellij.execution.process.ProcessHandler):V
 - setPresentation(java.lang.String):V
@@ -484,8 +485,11 @@ c:com.intellij.execution.testframework.sm.runner.events.TestSuiteFinishedEvent
 - com.intellij.execution.testframework.sm.runner.events.TreeNodeEvent
 - <init>(java.lang.String):V
 - <init>(java.lang.String,java.lang.String):V
-- <init>(jetbrains.buildServer.messages.serviceMessages.TestSuiteFinished):V
+- <init>(java.lang.String,java.lang.String,java.lang.Long):V
+- <init>(jetbrains.buildServer.messages.serviceMessages.TestSuiteFinished,java.lang.Long):V
+- <init>(jetbrains.buildServer.messages.serviceMessages.TestSuiteFinished,java.lang.String):V
 - p:appendToStringInfo(java.lang.StringBuilder):V
+- getDuration():java.lang.Long
 c:com.intellij.execution.testframework.sm.runner.events.TestSuiteStartedEvent
 - com.intellij.execution.testframework.sm.runner.events.BaseStartedNodeEvent
 - <init>(java.lang.String,java.lang.String):V
@@ -503,6 +507,7 @@ a:com.intellij.execution.testframework.sm.runner.events.TreeNodeEvent
 - getName():java.lang.String
 - s:getNodeId(jetbrains.buildServer.messages.serviceMessages.ServiceMessage):java.lang.String
 - s:getNodeId(jetbrains.buildServer.messages.serviceMessages.ServiceMessage,java.lang.String):java.lang.String
+- ps:parseDuration(java.lang.String):J
 com.intellij.execution.testframework.sm.runner.history.ImportTestOutputExtension
 - a:createHandler(java.io.Reader,com.intellij.execution.testframework.sm.runner.GeneralTestEventsProcessor):org.xml.sax.helpers.DefaultHandler
 - s:findHandler(java.util.function.Supplier,com.intellij.execution.testframework.sm.runner.GeneralTestEventsProcessor):org.xml.sax.helpers.DefaultHandler

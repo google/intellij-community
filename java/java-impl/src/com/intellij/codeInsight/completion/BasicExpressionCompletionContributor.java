@@ -48,7 +48,7 @@ public final class BasicExpressionCompletionContributor {
                                             final Consumer<? super LookupElement> result,
                                             PrefixMatcher matcher) {
     final PsiElement element = parameters.getPosition();
-    if (JavaKeywordCompletion.isAfterTypeDot(element)) {
+    if (JavaCompletionUtil.isAfterTypeDot(element)) {
       addKeyword(result, element, JavaKeywords.CLASS);
       addKeyword(result, element, JavaKeywords.THIS);
 

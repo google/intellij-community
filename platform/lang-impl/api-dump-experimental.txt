@@ -131,12 +131,13 @@ c:com.intellij.codeInsight.actions.VcsFacade
 *f:com.intellij.codeInsight.codeVision.CodeVisionProvider$Companion
 - sf:EP_NAME:java.lang.String
 - f:getProvidersExtensionPoint():com.intellij.openapi.extensions.ExtensionPointName
-*f:com.intellij.codeInsight.completion.command.CommandCompletionDocumentationProvider
+*f:com.intellij.codeInsight.completion.command.LookupElementCustomPreviewHolderDocumentationProvider
 - com.intellij.platform.backend.documentation.LookupElementDocumentationTargetProvider
 - <init>():V
 - documentationTarget(com.intellij.psi.PsiFile,com.intellij.codeInsight.lookup.LookupElement,I):com.intellij.platform.backend.documentation.DocumentationTarget
-*f:com.intellij.codeInsight.completion.command.CommandCompletionDocumentationProviderKt
+*f:com.intellij.codeInsight.completion.command.LookupElementCustomPreviewHolderDocumentationProviderKt
 - sf:combineFragments(java.util.List,java.util.List):java.util.List
+- sf:getLookupElementCustomPreviewHolder(com.intellij.codeInsight.lookup.LookupElement):com.intellij.codeInsight.lookup.LookupElementCustomPreviewHolder
 *a:com.intellij.codeInsight.completion.command.commands.AbstractChangeSignatureCompletionCommandProvider
 - com.intellij.codeInsight.completion.command.commands.ActionCommandProvider
 - <init>():V
@@ -352,11 +353,11 @@ c:com.intellij.codeInsight.actions.VcsFacade
 - a:skipCommandFromHighlighting(com.intellij.codeInsight.completion.command.CompletionCommand):Z
 *f:com.intellij.codeInsight.completion.command.commands.DirectInspectionFixCompletionCommand
 - com.intellij.codeInsight.completion.command.CompletionCommand
-- <init>(java.lang.String,java.lang.String,java.lang.Integer,javax.swing.Icon,com.intellij.codeInsight.completion.command.HighlightInfoLookup,I,kotlin.jvm.functions.Function0):V
+- <init>(java.util.List,java.lang.String,java.lang.Integer,javax.swing.Icon,com.intellij.codeInsight.completion.command.HighlightInfoLookup,I,kotlin.jvm.functions.Function0):V
 - execute(I,com.intellij.psi.PsiFile,com.intellij.openapi.editor.Editor):V
 - getHighlightInfo():com.intellij.codeInsight.completion.command.HighlightInfoLookup
 - getIcon():javax.swing.Icon
-- f:getInspectionId():java.lang.String
+- f:getInspectionIds():java.util.List
 - getPresentableName():java.lang.String
 - getPreview():com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
 - getPriority():java.lang.Integer
@@ -365,6 +366,10 @@ c:com.intellij.codeInsight.actions.VcsFacade
 - *sf:Companion:com.intellij.codeInsight.completion.command.commands.ErrorFixCommandProvider$Companion
 - a:getCommands(com.intellij.psi.PsiFile,java.util.List,I):java.util.List
 *f:com.intellij.codeInsight.completion.command.commands.ErrorFixCommandProvider$Companion
+*f:com.intellij.codeInsight.completion.command.commands.InsertLiveTemplateCompletionCommandProvider
+- com.intellij.codeInsight.completion.command.commands.ActionCommandProvider
+- <init>():V
+- supportNewLineCompletion():Z
 *:com.intellij.codeInsight.completion.command.commands.IntentionCommandOffsetProvider
 - *sf:Companion:com.intellij.codeInsight.completion.command.commands.IntentionCommandOffsetProvider$Companion
 - findOffsets(com.intellij.psi.PsiFile,I):java.util.List
@@ -373,10 +378,6 @@ c:com.intellij.codeInsight.actions.VcsFacade
 - *sf:Companion:com.intellij.codeInsight.completion.command.commands.IntentionCommandSkipper$Companion
 - skip(com.intellij.codeInsight.intention.CommonIntentionAction,com.intellij.psi.PsiFile,I):Z
 *f:com.intellij.codeInsight.completion.command.commands.IntentionCommandSkipper$Companion
-*f:com.intellij.codeInsight.completion.command.commands.ViewStructureCompletionCommandProvider
-- com.intellij.codeInsight.completion.command.commands.ActionCommandProvider
-- <init>():V
-- supportNewLineCompletion():Z
 *:com.intellij.codeInsight.daemon.impl.focusMode.FocusModeProvider
 - a:calcFocusZones(com.intellij.psi.PsiFile):java.util.List
 com.intellij.codeInsight.editorActions.CopyPastePreProcessor
@@ -422,10 +423,6 @@ f:com.intellij.codeInsight.highlighting.HighlightUsagesHandler
 - <init>(com.intellij.openapi.editor.Inlay):V
 - contentChanged(java.awt.Rectangle):V
 - sizeChanged(java.awt.Dimension,java.awt.Dimension):V
-*f:com.intellij.codeInsight.hints.InlayHintsFactory
-- *sf:Companion:com.intellij.codeInsight.hints.InlayHintsFactory$Companion
-- <init>():V
-*f:com.intellij.codeInsight.hints.InlayHintsFactory$Companion
 *f:com.intellij.codeInsight.hints.InlayHintsSinkImpl
 - com.intellij.codeInsight.hints.InlayHintsSink
 - <init>(com.intellij.openapi.editor.Editor):V
@@ -568,6 +565,57 @@ f:com.intellij.codeInsight.highlighting.HighlightUsagesHandler
 f:com.intellij.codeInsight.navigation.UtilKt
 - *sf:fileLocation(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):com.intellij.util.TextWithIcon
 - *sf:fileStatusAttributes(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):com.intellij.openapi.editor.markup.TextAttributes
+c:com.intellij.codeInsight.template.postfix.completion.PostfixTemplateLookupElement
+- com.intellij.codeInsight.template.impl.CustomLiveTemplateLookupElement
+- com.intellij.codeInsight.lookup.LookupElementCustomPreviewHolder
+- *:preview(com.intellij.modcommand.ActionContext):com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
+*c:com.intellij.codeInsight.template.postfix.templates.ExpressionSelectorModExpander
+- com.intellij.codeInsight.template.postfix.templates.PostfixModExpander
+- <init>(com.intellij.codeInsight.template.postfix.templates.PostfixTemplateExpressionSelector,com.intellij.codeInsight.template.postfix.templates.ExpressionSelectorModExpander$ModExpandAction):V
+- expand(com.intellij.modcommand.ActionContext,com.intellij.codeInsight.template.postfix.templates.PostfixTemplateProvider,com.intellij.openapi.util.TextRange):com.intellij.modcommand.ModCommand
+*:com.intellij.codeInsight.template.postfix.templates.ExpressionSelectorModExpander$ModExpandAction
+- a:expand(com.intellij.modcommand.ActionContext,com.intellij.modcommand.ModPsiUpdater,com.intellij.psi.PsiElement):V
+c:com.intellij.codeInsight.template.postfix.templates.NotPostfixTemplate
+- com.intellij.codeInsight.template.postfix.templates.PostfixTemplateWithExpressionSelector
+- *:createModExpander():com.intellij.codeInsight.template.postfix.templates.PostfixModExpander
+c:com.intellij.codeInsight.template.postfix.templates.ParenthesizedPostfixTemplate
+- com.intellij.codeInsight.template.postfix.templates.PostfixTemplateWithExpressionSelector
+- *:createModExpander():com.intellij.codeInsight.template.postfix.templates.PostfixModExpander
+c:com.intellij.codeInsight.template.postfix.templates.PostfixLiveTemplate
+- com.intellij.codeInsight.template.CustomLiveTemplateBase
+- *s:computeTemplateKeyWithoutContextChecking(com.intellij.codeInsight.template.postfix.templates.PostfixTemplateProvider,java.lang.CharSequence,I):java.lang.String
+*:com.intellij.codeInsight.template.postfix.templates.PostfixModExpander
+- a:expand(com.intellij.modcommand.ActionContext,com.intellij.codeInsight.template.postfix.templates.PostfixTemplateProvider,com.intellij.openapi.util.TextRange):com.intellij.modcommand.ModCommand
+a:com.intellij.codeInsight.template.postfix.templates.PostfixTemplate
+- com.intellij.openapi.project.PossiblyDumbAware
+- *:createModExpander():com.intellij.codeInsight.template.postfix.templates.PostfixModExpander
+- *:isApplicableForModCommand():Z
+com.intellij.codeInsight.template.postfix.templates.PostfixTemplateProvider
+- *:prepareCopyForModCommand(com.intellij.psi.PsiFile,I):V
+a:com.intellij.codeInsight.template.postfix.templates.PostfixTemplateWithExpressionSelector
+- com.intellij.codeInsight.template.postfix.templates.PostfixTemplate
+- *:createModExpander():com.intellij.codeInsight.template.postfix.templates.PostfixModExpander
+- *pf:createModExpander(com.intellij.codeInsight.template.postfix.templates.ExpressionSelectorModExpander$ModExpandAction):com.intellij.codeInsight.template.postfix.templates.PostfixModExpander
+*f:com.intellij.codeInsight.template.postfix.templates.StringBasedModExpandAction
+- com.intellij.codeInsight.template.postfix.templates.ExpressionSelectorModExpander$ModExpandAction
+- <init>(com.intellij.codeInsight.template.postfix.templates.StringBasedPostfixTemplate):V
+- expand(com.intellij.modcommand.ActionContext,com.intellij.modcommand.ModPsiUpdater,com.intellij.psi.PsiElement):V
+a:com.intellij.codeInsight.template.postfix.templates.StringBasedPostfixTemplate
+- com.intellij.codeInsight.template.postfix.templates.PostfixTemplateWithExpressionSelector
+- *:createModExpander():com.intellij.codeInsight.template.postfix.templates.PostfixModExpander
+a:com.intellij.codeInsight.template.postfix.templates.SurroundPostfixTemplateBase
+- com.intellij.codeInsight.template.postfix.templates.PostfixTemplateWithExpressionSelector
+- *:createModExpander():com.intellij.codeInsight.template.postfix.templates.PostfixModExpander
+a:com.intellij.codeInsight.template.postfix.templates.editable.EditablePostfixTemplate
+- com.intellij.codeInsight.template.postfix.templates.PostfixTemplate
+- *:createModExpander():com.intellij.codeInsight.template.postfix.templates.PostfixModExpander
+*c:com.intellij.codeInsight.template.postfix.templates.editable.EditableTemplateModExpander
+- com.intellij.codeInsight.template.postfix.templates.PostfixModExpander
+- <init>(com.intellij.codeInsight.template.postfix.templates.editable.EditablePostfixTemplate):V
+- expand(com.intellij.modcommand.ActionContext,com.intellij.codeInsight.template.postfix.templates.PostfixTemplateProvider,com.intellij.openapi.util.TextRange):com.intellij.modcommand.ModCommand
+*:com.intellij.codeInspection.actions.RunInspectionDialogExtension
+- com.intellij.codeInspection.options.OptionContainer
+- beforeInspectionRun(com.intellij.openapi.project.Project):V
 *f:com.intellij.codeInspection.ui.OptPaneUtils
 - <init>():V
 - s:editOptions(com.intellij.openapi.project.Project,com.intellij.codeInspection.options.OptionContainer,com.intellij.codeInspection.options.OptPane,java.lang.String,java.lang.Runnable):V
@@ -608,8 +656,11 @@ f:com.intellij.codeInsight.navigation.UtilKt
 c:com.intellij.find.actions.FindUsagesAction
 - com.intellij.openapi.actionSystem.AnAction
 - *sf:SEARCH_TARGETS:com.intellij.openapi.actionSystem.DataKey
-f:com.intellij.find.impl.FindInProjectUtil
-- *sf:FIND_IN_FILES_SEARCH_IN_NON_INDEXABLE:com.intellij.openapi.util.Key
+c:com.intellij.find.findUsages.CommonFindUsagesDialog
+- com.intellij.find.findUsages.AbstractFindUsagesDialog
+- *s:precomputeFindUsagesDialogData(com.intellij.find.findUsages.FindUsagesHandlerBase):V
+f:com.intellij.find.findUsages.FindUsagesManager
+- *:getFindUsagesHandlerForDialog(com.intellij.psi.PsiElement,com.intellij.find.findUsages.FindUsagesHandlerFactory$OperationMode):com.intellij.find.findUsages.FindUsagesHandler
 *:com.intellij.find.impl.livePreview.EditorSearchAreaProvider
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
 - s:getEnabled(com.intellij.openapi.editor.Editor,com.intellij.find.FindModel):java.util.List
@@ -735,10 +786,6 @@ com.intellij.ide.actions.searcheverywhere.SearchListener
 - p:getActionName(com.intellij.psi.PsiDirectory,java.lang.String,java.lang.String):java.lang.String
 - p:getLiveTemplateDefaults(com.intellij.openapi.actionSystem.DataContext,com.intellij.psi.PsiFile):java.util.Map
 - p:postProcess(com.intellij.psi.PsiFile,com.intellij.openapi.actionSystem.DataContext,java.lang.String,java.util.Map):V
-f:com.intellij.ide.impl.StructureViewWrapperImpl
-- com.intellij.ide.structureView.StructureViewWrapper
-- com.intellij.openapi.Disposable
-- *sf:STRUCTURE_VIEW_TARGET_FILE_KEY:com.intellij.openapi.actionSystem.DataKey
 *f:com.intellij.ide.projectView.actions.MarkRootsManager
 - s:commitModel(com.intellij.openapi.module.Module,com.intellij.openapi.roots.ModifiableRootModel):V
 - s:findContentEntry(com.intellij.openapi.roots.ModuleRootModel,com.intellij.openapi.vfs.VirtualFile):com.intellij.openapi.roots.ContentEntry
@@ -749,15 +796,6 @@ com.intellij.ide.projectView.impl.ProjectViewListener
 - sf:EP:com.intellij.openapi.extensions.ExtensionPointName
 - a:createNode(com.intellij.platform.workspace.storage.WorkspaceEntity,com.intellij.openapi.project.Project,com.intellij.ide.projectView.ViewSettings):com.intellij.ide.util.treeView.AbstractTreeNode
 - a:getWorkspaceClass():java.lang.Class
-*:com.intellij.ide.structureView.newStructureView.StructurePopup
-- com.intellij.ide.structureView.newStructureView.TreeActionsOwner
-- com.intellij.openapi.Disposable
-- a:setTitle(java.lang.String):V
-- a:show():V
-*:com.intellij.ide.structureView.newStructureView.TreeActionsOwnerEx
-- com.intellij.ide.structureView.newStructureView.TreeActionsOwner
-- a:isActionActive(com.intellij.ide.util.treeView.smartTree.TreeAction):Z
-- a:setActionActive(com.intellij.ide.util.treeView.smartTree.TreeAction,Z):V
 c:com.intellij.ide.util.scopeChooser.ScopeDescriptor
 - com.intellij.openapi.util.ColoredItem
 - *:needsUserInputForScope():Z

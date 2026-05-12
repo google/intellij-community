@@ -1,7 +1,6 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diff.actions.impl;
 
-import com.intellij.diff.tools.util.DiffDataKeys;
 import com.intellij.diff.tools.util.SyncScrollSupport;
 import com.intellij.diff.tools.util.base.HighlightingLevel;
 import com.intellij.diff.tools.util.base.TextDiffSettingsHolder.TextDiffSettings;
@@ -41,6 +40,7 @@ public class SetEditorSettingsActionGroup extends ActionGroup implements DumbAwa
   private @Nullable SyncScrollSupport.Support mySyncScrollSupport;
 
   protected final AnAction @NotNull [] myActions;
+  private @NotNull List<AnAction> myDiffActions = List.of();
 
   @ApiStatus.Internal
   public SetEditorSettingsActionGroup(@NotNull TextDiffSettings settings,
@@ -160,6 +160,10 @@ public class SetEditorSettingsActionGroup extends ActionGroup implements DumbAwa
     };
   }
 
+  public void setDiffActions(@NotNull List<AnAction> actions) {
+    myDiffActions = actions;
+  }
+
   public void setSyncScrollSupport(@Nullable SyncScrollSupport.Support syncScrollSupport) {
     mySyncScrollSupport = syncScrollSupport;
   }
@@ -190,27 +194,31 @@ public class SetEditorSettingsActionGroup extends ActionGroup implements DumbAwa
 
   @Override
   public AnAction @NotNull [] getChildren(@Nullable AnActionEvent e) {
+    List<AnAction> actions = new ArrayList<>();
     AnAction editorSettingsGroup = ActionManager.getInstance().getAction(IdeActions.GROUP_DIFF_EDITOR_SETTINGS);
 
-    List<AnAction> actions = new ArrayList<>();
-    ContainerUtil.addAll(actions, myActions);
     actions.add(editorSettingsGroup);
+    actions.addAll(myDiffActions);
     actions.add(Separator.getInstance());
-
-    if (e != null && e.getData(DiffDataKeys.MERGE_VIEWER) != null) {
-      actions.add(Separator.getInstance());
-      actions.add(ActionManager.getInstance().getAction(IdeActions.ACTION_CONTEXT_HELP));
-    }
+    actions.add(createAppearanceGroup());
+    actions.add(ActionManager.getInstance().getAction(IdeActions.ACTION_CONTEXT_HELP));
 
     if (e != null && ActionPlaces.DIFF_TOOLBAR.equals(e.getPlace())) {
-      return actions.toArray(AnAction.EMPTY_ARRAY);
+      return actions.toArray(EMPTY_ARRAY);
     }
 
     ActionGroup gutterGroup = (ActionGroup)ActionManager.getInstance().getAction(IdeActions.GROUP_DIFF_EDITOR_GUTTER_POPUP);
     List<AnAction> result = new ArrayList<>(Arrays.asList(gutterGroup.getChildren(e)));
     result.add(Separator.getInstance());
     replaceOrAppend(result, editorSettingsGroup, new DefaultActionGroup(actions));
-    return result.toArray(AnAction.EMPTY_ARRAY);
+    return result.toArray(EMPTY_ARRAY);
+  }
+
+  protected DefaultActionGroup createAppearanceGroup() {
+    DefaultActionGroup appearance = DefaultActionGroup.createPopupGroup(
+      () -> DiffBundle.message("settings.appearance"));
+    appearance.addAll(myActions);
+    return appearance;
   }
 
   protected static <T> void replaceOrAppend(List<T> list, T from, T to) {
@@ -259,16 +267,19 @@ public class SetEditorSettingsActionGroup extends ActionGroup implements DumbAwa
   }
 
   private class EditorHighlightingLayerGroup extends ActionGroup implements EditorSettingAction, DumbAware {
-    private final AnAction[] myOptions;
+    private final List<? extends AnAction> myOptions;
 
     EditorHighlightingLayerGroup() {
-      super(DiffBundle.message("highlighting.level"), true);
-      myOptions = ContainerUtil.map(HighlightingLevel.values(), level -> new OptionAction(level), AnAction.EMPTY_ARRAY);
+      super(DiffBundle.message("highlighting.level"), false);
+      myOptions = Arrays.stream(HighlightingLevel.values()).map(option -> new OptionAction(option)).toList();
     }
 
     @Override
     public AnAction @NotNull [] getChildren(@Nullable AnActionEvent e) {
-      return myOptions;
+      List<AnAction> result = new ArrayList<>();
+      result.add(Separator.create(getTemplatePresentation().getText()));
+      result.addAll(myOptions);
+      return result.toArray(EMPTY_ARRAY);
     }
 
     @Override
@@ -311,17 +322,20 @@ public class SetEditorSettingsActionGroup extends ActionGroup implements DumbAwa
   }
 
   private class EditorBreadcrumbsPlacementGroup extends ActionGroup implements EditorSettingAction, DumbAware {
-    private final AnAction[] myOptions;
+    private final List<? extends AnAction> myOptions;
 
     EditorBreadcrumbsPlacementGroup() {
       ActionUtil.copyFrom(this, IdeActions.BREADCRUMBS_OPTIONS_GROUP);
-      myOptions = ContainerUtil.map(BreadcrumbsPlacement.values(), option -> new OptionAction(option), AnAction.EMPTY_ARRAY);
-      setPopup(true);
+      myOptions = Arrays.stream(BreadcrumbsPlacement.values()).map(option -> new OptionAction(option)).toList();
+      setPopup(false);
     }
 
     @Override
     public AnAction @NotNull [] getChildren(@Nullable AnActionEvent e) {
-      return myOptions;
+      List<AnAction> result = new ArrayList<>();
+      result.add(Separator.create(getTemplatePresentation().getText()));
+      result.addAll(myOptions);
+      return result.toArray(EMPTY_ARRAY);
     }
 
     @Override

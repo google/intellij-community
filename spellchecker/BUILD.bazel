@@ -3,12 +3,6 @@ load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
 
 resourcegroup(
   name = "spellchecker_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
-resourcegroup(
-  name = "spellchecker_resources_1",
   srcs = glob(["compatibilityResources/**/*"]),
   strip_prefix = "compatibilityResources"
 )
@@ -18,10 +12,9 @@ jvm_library(
   module_name = "intellij.spellchecker",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
-  resources = [
-    ":spellchecker_resources",
-    ":spellchecker_resources_1",
-  ],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
+  resource_jars = [":spellchecker_resources"],
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
@@ -32,12 +25,12 @@ jvm_library(
     "//platform/lang-impl",
     "//platform/platform-api:ide",
     "//platform/platform-impl:ide-impl",
+    "//platform/ide-core",
     "//platform/editor-ui-ex:editor-ex",
     "//platform/projectModel-api:projectModel",
     "//platform/refactoring",
     "//libraries/guava",
     "//platform/statistics",
-    "@lib//:spellchecker-java-string-similarity",
     "//platform/core-ui",
     "//libraries/lucene.common",
     "//platform/vcs-api:vcs",
@@ -46,12 +39,17 @@ jvm_library(
     "@lib//:kotlin-stdlib",
     "//libraries/kotlinx/coroutines/core",
     "//platform/core-impl",
+    "//libraries/fastutil",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//platform/util/concurrency",
+    "//platform/util:util-ui",
   ],
   runtime_deps = ["//platform/backend"]
 )
 
 jvm_library(
   name = "spellchecker_test_lib",
+  testonly = True,
   module_name = "intellij.spellchecker",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -66,6 +64,7 @@ jvm_library(
     "//platform/lang-impl:lang-impl_test_lib",
     "//platform/platform-api:ide_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/editor-ui-ex:editor-ex_test_lib",
     "//platform/projectModel-api:projectModel_test_lib",
     "//platform/backend:backend_test_lib",
@@ -79,6 +78,16 @@ jvm_library(
     "//platform/util/jdom:jdom_test_lib",
     "//libraries/kotlinx/coroutines/core:core_test_lib",
     "//platform/core-impl:core-impl_test_lib",
+    "//libraries/fastutil:fastutil_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/util/concurrency:concurrency_test_lib",
+    "//platform/util:util-ui_test_lib",
   ]
 )
 ### auto-generated section `build intellij.spellchecker` end
+
+### auto-generated section `iml intellij.spellchecker` start
+exports_files([
+  "intellij.spellchecker.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.spellchecker` end

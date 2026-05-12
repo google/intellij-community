@@ -90,8 +90,9 @@ public class UrlClassLoader extends ClassLoader implements ClassPath.ClassDataCo
   }
 
   /**
-   * @see com.intellij.TestAll#getClassRoots()
+   * @deprecated this method may not return all items in the classpath, use {@link #getFiles()} instead
    */
+  @Deprecated
   public final @NotNull List<Path> getBaseUrls() {
     return classPath.getBaseUrls();
   }

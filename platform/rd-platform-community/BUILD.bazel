@@ -6,10 +6,13 @@ jvm_library(
   module_name = "intellij.platform.rd.community",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//libraries/kotlinx/coroutines/core",
     "//platform/platform-api:ide",
+    "//platform/progress/shared:ide-progress",
     "//libraries/rd/core",
     "//libraries/rd/text",
     "//libraries/rd/swing",
@@ -23,6 +26,7 @@ jvm_library(
 
 jvm_library(
   name = "rd-community_test_lib",
+  testonly = True,
   module_name = "intellij.platform.rd.community",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -30,6 +34,7 @@ jvm_library(
     ":rd-community",
     "//libraries/kotlinx/coroutines/core:core_test_lib",
     "//platform/platform-api:ide_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
     "//libraries/rd/core:core_test_lib",
     "//libraries/rd/text:text_test_lib",
     "//libraries/rd/swing:swing_test_lib",
@@ -41,3 +46,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.rd.community` end
+
+### auto-generated section `iml intellij.platform.rd.community` start
+exports_files([
+  "intellij.platform.rd.community.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.rd.community` end

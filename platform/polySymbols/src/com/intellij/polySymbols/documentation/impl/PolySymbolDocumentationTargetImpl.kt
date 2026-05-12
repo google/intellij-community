@@ -11,8 +11,9 @@ import com.intellij.platform.backend.navigation.NavigationRequest
 import com.intellij.platform.backend.presentation.TargetPresentation
 import com.intellij.polySymbols.PolySymbol
 import com.intellij.polySymbols.documentation.PolySymbolDocumentation
-import com.intellij.polySymbols.documentation.PolySymbolDocumentationProvider
+import com.intellij.polySymbols.documentation.PolySymbolDocumentationBuilder
 import com.intellij.polySymbols.documentation.PolySymbolDocumentationTarget
+import com.intellij.polySymbols.documentation.PolySymbolDocumentationTarget.PresentationProvider
 import com.intellij.pom.Navigatable
 import com.intellij.psi.PsiElement
 import com.intellij.psi.createSmartPointer
@@ -20,20 +21,23 @@ import com.intellij.psi.createSmartPointer
 internal class PolySymbolDocumentationTargetImpl<T : PolySymbol>(
   override val symbol: T,
   override val location: PsiElement?,
-  private val provider: PolySymbolDocumentationProvider<T>,
+  private val presentationProvider: PresentationProvider<T>? = null,
+  internal val builder: (PolySymbolDocumentationBuilder.(symbol: T, location: PsiElement?) -> Unit),
 ) : PolySymbolDocumentationTarget {
 
   override fun computePresentation(): TargetPresentation =
-    provider.computePresentation(symbol)
+    presentationProvider?.getPresentation(symbol)
     ?: TargetPresentation.builder(symbol.name)
       .icon(symbol.icon)
       .presentation()
 
   override val documentation: PolySymbolDocumentation by lazy(LazyThreadSafetyMode.PUBLICATION) {
-    this.provider.createDocumentation(symbol, location)
+    PolySymbolDocumentationBuilderImpl(symbol, location)
+      .also { it.builder(symbol, location) }
+      .build()
   }
 
-  override fun computeDocumentationHint(): @NlsContexts.HintText String? =
+  override fun computeDocumentationHint(): @NlsContexts.HintText String =
     documentation.let { it.definitionDetails ?: it.definition }
 
   override val navigatable: Navigatable?
@@ -50,18 +54,18 @@ internal class PolySymbolDocumentationTargetImpl<T : PolySymbol>(
   override fun createPointer(): Pointer<out DocumentationTarget> {
     val pointer = symbol.createPointer()
     val locationPtr = location?.createSmartPointer()
-    val provider = this.provider
+    val presentationProvider = this.presentationProvider
+    val builder = this.builder
     return Pointer<DocumentationTarget> {
       pointer.dereference()?.let {
         @Suppress("UNCHECKED_CAST")
-        PolySymbolDocumentationTargetImpl(it as T, locationPtr?.dereference(), provider)
+        PolySymbolDocumentationTargetImpl(it as T, locationPtr?.dereference(), presentationProvider, builder)
       }
     }
   }
 
   override fun computeDocumentation(): DocumentationResult? =
-    documentation.takeIf { it.isNotEmpty() }
-      ?.build(provider::loadIcon)
+    documentation.takeIf { it.isNotEmpty() }?.let { (it as PolySymbolDocumentationImpl).build() }
 
   companion object {
     internal fun check(lambda: Any) {

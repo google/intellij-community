@@ -200,7 +200,7 @@ class ConcurrentBitSetTest {
     Benchmark.newBenchmark("testParallelReadPerformance", ()-> {
       Semaphore threadReady = new Semaphore();
       Set<Thread> threadUsed = ConcurrentCollectionFactory.createConcurrentSet();
-      boundedParallelRun(executor, threadUsed, threadReady, N, __-> {
+      boundedParallelRun(executor, threadUsed, threadReady, N, _-> {
         int r = 0;
         for (int j = 0; j < len; j++) {
           r += set.get(j)?1:0;

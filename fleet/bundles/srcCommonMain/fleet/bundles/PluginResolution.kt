@@ -328,7 +328,7 @@ private suspend fun PluginRepository.getPlugins(plugins: Map<PluginName, PluginV
 private fun PluginVersion.satisfies(requirement: VersionRequirement): Boolean {
   return when (requirement) {
     is VersionRequirement.Above -> this >= requirement.version
-    is VersionRequirement.CompatibleWith -> major == requirement.version.major && this >= requirement.version
+    is VersionRequirement.CompatibleWith -> this.component1 == requirement.version.component1 && this >= requirement.version
   }
 }
 

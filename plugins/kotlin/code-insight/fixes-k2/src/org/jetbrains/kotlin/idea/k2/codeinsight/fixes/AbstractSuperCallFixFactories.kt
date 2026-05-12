@@ -53,10 +53,6 @@ internal object AbstractSuperCallFixFactories {
         listOfNotNull(createQuickFix(diagnostic.psi))
     }
 
-    val warningFactory = KotlinQuickFixFactory.ModCommandBased { diagnostic: KaFirDiagnostic.AbstractSuperCallWarning ->
-        listOfNotNull(createQuickFix(diagnostic.psi))
-    }
-
     private fun KaSession.createQuickFix(element: PsiElement): ModCommandAction? {
         val expression = element as? KtNameReferenceExpression ?: return null
         val containingClass = expression.getNonStrictParentOfType<KtClassOrObject>() ?: return null

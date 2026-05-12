@@ -6,7 +6,7 @@ import com.intellij.openapi.vfs.newvfs.FileAttribute;
 import com.intellij.openapi.vfs.newvfs.persistent.recovery.ContentStoragesRecoverer;
 import com.intellij.openapi.vfs.newvfs.persistent.recovery.NotClosedProperlyRecoverer;
 import com.intellij.platform.util.io.storages.StorageTestingUtils;
-import com.intellij.platform.util.io.storages.blobstorage.StreamlinedBlobStorageHelper;
+import com.intellij.platform.util.io.storages.blobstorage.StreamlinedBlobStorageOverMMappedFile;
 import com.intellij.testFramework.TemporaryDirectory;
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
@@ -263,13 +263,13 @@ public class VFSCorruptionRecoveryTest {
   private void corruptAttributeRecord(@NotNull Path attributeStoragePath) throws IOException {
     ByteBuffer buffer = ByteBuffer.allocate(8);
     try (SeekableByteChannel channel = Files.newByteChannel(attributeStoragePath, WRITE, READ)) {
-      channel.position(StreamlinedBlobStorageHelper.HeaderLayout.HEADER_SIZE);
+      channel.position(StreamlinedBlobStorageOverMMappedFile.HeaderLayout.HEADER_SIZE);
       channel.read(buffer);
       buffer.putInt(0, buffer.getInt(0) + 1);//field: fileId (backref)
 
       buffer.rewind();
 
-      channel.position(StreamlinedBlobStorageHelper.HeaderLayout.HEADER_SIZE);
+      channel.position(StreamlinedBlobStorageOverMMappedFile.HeaderLayout.HEADER_SIZE);
       channel.write(buffer);
     }
     //TODO RC: corrupt attribute record _header_ and check VFS able to detect and recover it

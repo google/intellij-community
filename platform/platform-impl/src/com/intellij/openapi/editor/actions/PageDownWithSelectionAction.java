@@ -29,7 +29,7 @@ public final class PageDownWithSelectionAction extends EditorAction implements A
       }
       else {
         if (caret == null) {
-          editor.getCaretModel().runForEachCaret(__ -> EditorActionUtil.moveCaretPageDown(editor, true));
+          editor.getCaretModel().runForEachCaret(_ -> EditorActionUtil.moveCaretPageDown(editor, true));
         }
         else {
           // assuming caret is equal to CaretModel.getCurrentCaret()

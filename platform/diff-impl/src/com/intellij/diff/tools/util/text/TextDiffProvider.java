@@ -24,8 +24,5 @@ import java.util.List;
 @ApiStatus.Internal
 public interface TextDiffProvider {
   @NotNull
-  List<AnAction> getToolbarActions();
-
-  @NotNull
-  List<AnAction> getPopupActions();
+  List<AnAction> getDiffSettingsActions();
 }

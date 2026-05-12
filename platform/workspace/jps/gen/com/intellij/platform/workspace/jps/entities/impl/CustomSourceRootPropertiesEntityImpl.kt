@@ -1,4 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.jps.entities.impl
 
 import com.intellij.platform.workspace.jps.entities.CustomSourceRootPropertiesEntity
@@ -16,11 +18,10 @@ import com.intellij.platform.workspace.storage.impl.EntityLink
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
-import com.intellij.platform.workspace.storage.impl.extractOneToOneParent
-import com.intellij.platform.workspace.storage.impl.updateOneToOneParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import org.jetbrains.annotations.ApiStatus.Internal
 
@@ -46,7 +47,8 @@ internal class CustomSourceRootPropertiesEntityImpl(private val dataSource: Cust
       return dataSource.propertiesXmlTag
     }
   override val sourceRoot: SourceRootEntity
-    get() = snapshot.extractOneToOneParent(SOURCEROOT_CONNECTION_ID, this)!!
+    get() = snapshot.instrumentation.getParent(SOURCEROOT_CONNECTION_ID, this) as? SourceRootEntity
+            ?: error("Parent sourceRoot not found for CustomSourceRootPropertiesEntity")
 
   override val entitySource: EntitySource
     get() {
@@ -94,7 +96,7 @@ internal class CustomSourceRootPropertiesEntityImpl(private val dataSource: Cust
         error("Field CustomSourceRootPropertiesEntity#propertiesXmlTag should be initialized")
       }
       if (_diff != null) {
-        if (_diff.extractOneToOneParent<WorkspaceEntityBase>(SOURCEROOT_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getParentBuilder(SOURCEROOT_CONNECTION_ID, this) == null) {
           error("Field CustomSourceRootPropertiesEntity#sourceRoot should be initialized")
         }
       }
@@ -137,12 +139,13 @@ internal class CustomSourceRootPropertiesEntityImpl(private val dataSource: Cust
       get() {
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(SOURCEROOT_CONNECTION_ID, this) as? SourceRootEntityBuilder)
-          ?: (this.entityLinks[EntityLink(false, SOURCEROOT_CONNECTION_ID)]!! as SourceRootEntityBuilder)
+          ?: (this.entityLinks[EntityLink(false, SOURCEROOT_CONNECTION_ID)] as? SourceRootEntityBuilder)
+          ?: error("sourceRoot is null for CustomSourceRootPropertiesEntity")
         }
         else {
-          this.entityLinks[EntityLink(false, SOURCEROOT_CONNECTION_ID)]!! as SourceRootEntityBuilder
+          (this.entityLinks[EntityLink(false, SOURCEROOT_CONNECTION_ID)] as? SourceRootEntityBuilder)
+          ?: error("sourceRoot is null for CustomSourceRootPropertiesEntity")
         }
       }
       set(value) {
@@ -156,7 +159,7 @@ internal class CustomSourceRootPropertiesEntityImpl(private val dataSource: Cust
           _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
         }
         if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)) {
-          _diff.updateOneToOneParentOfChild(SOURCEROOT_CONNECTION_ID, this, value)
+          _diff.instrumentation.addChild(SOURCEROOT_CONNECTION_ID, value, this)
         }
         else {
           if (value is ModifiableWorkspaceEntityBase<*, *>) {
@@ -186,7 +189,6 @@ internal class CustomSourceRootPropertiesEntityData : WorkspaceEntityData<Custom
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): CustomSourceRootPropertiesEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {

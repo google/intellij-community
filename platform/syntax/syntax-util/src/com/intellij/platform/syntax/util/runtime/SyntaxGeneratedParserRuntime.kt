@@ -1,5 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:ApiStatus.Experimental
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("FunctionName")
 
 package com.intellij.platform.syntax.util.runtime
@@ -17,7 +16,6 @@ import org.jetbrains.annotations.ApiStatus
  *
  * @see SyntaxGeneratedParserRuntime() factory method.
  */
-@ApiStatus.Experimental
 @ApiStatus.NonExtendable
 interface SyntaxGeneratedParserRuntime {
   val syntaxBuilder: SyntaxTreeBuilder
@@ -100,7 +98,6 @@ interface SyntaxGeneratedParserRuntime {
   ): Boolean
 }
 
-@ApiStatus.Experimental
 fun create_token_set_(vararg tokenTypes: SyntaxElementType): SyntaxElementTypeSet {
   return syntaxElementTypeSetOf(*tokenTypes)
 }

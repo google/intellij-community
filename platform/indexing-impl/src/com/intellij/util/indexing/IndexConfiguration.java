@@ -83,7 +83,7 @@ public final class IndexConfiguration {
       Collection<FileType> associatedFileTypes = getAssociatedFileTypes(inputFilter);
       if (associatedFileTypes != null) {
         for (FileType fileType : associatedFileTypes) {
-          List<ID<?, ?>> ids = myFileType2IndicesWithFileTypeInfoMap.computeIfAbsent(fileType, __ -> new ArrayList<>(5));
+          List<ID<?, ?>> ids = myFileType2IndicesWithFileTypeInfoMap.computeIfAbsent(fileType, _ -> new ArrayList<>(5));
           ids.add(indexId);
         }
       }

@@ -1,19 +1,27 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.java.workspace.entities.impl
 
 import com.intellij.java.workspace.entities.JavaProjectSettingsEntity
 import com.intellij.platform.workspace.jps.entities.ProjectSettingsEntity
 import com.intellij.platform.workspace.jps.entities.ProjectSettingsEntityBuilder
-import com.intellij.platform.workspace.storage.*
+import com.intellij.platform.workspace.storage.ConnectionId
+import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
+import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
+import com.intellij.platform.workspace.storage.MutableEntityStorage
+import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
+import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.EntityLink
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
-import com.intellij.platform.workspace.storage.impl.extractOneToOneParent
-import com.intellij.platform.workspace.storage.impl.updateOneToOneParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 
@@ -33,7 +41,8 @@ internal class JavaProjectSettingsEntityImpl(private val dataSource: JavaProject
   }
 
   override val projectSettings: ProjectSettingsEntity
-    get() = snapshot.extractOneToOneParent(PROJECTSETTINGS_CONNECTION_ID, this)!!
+    get() = snapshot.instrumentation.getParent(PROJECTSETTINGS_CONNECTION_ID, this) as? ProjectSettingsEntity
+            ?: error("Parent projectSettings not found for JavaProjectSettingsEntity")
   override val compilerOutput: VirtualFileUrl?
     get() {
       readField("compilerOutput")
@@ -93,7 +102,7 @@ internal class JavaProjectSettingsEntityImpl(private val dataSource: JavaProject
         error("Field WorkspaceEntity#entitySource should be initialized")
       }
       if (_diff != null) {
-        if (_diff.extractOneToOneParent<WorkspaceEntityBase>(PROJECTSETTINGS_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getParentBuilder(PROJECTSETTINGS_CONNECTION_ID, this) == null) {
           error("Field JavaProjectSettingsEntity#projectSettings should be initialized")
         }
       }
@@ -131,13 +140,14 @@ internal class JavaProjectSettingsEntityImpl(private val dataSource: JavaProject
       get() {
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(PROJECTSETTINGS_CONNECTION_ID,
                                                                            this) as? ProjectSettingsEntityBuilder)
-          ?: (this.entityLinks[EntityLink(false, PROJECTSETTINGS_CONNECTION_ID)]!! as ProjectSettingsEntityBuilder)
+          ?: (this.entityLinks[EntityLink(false, PROJECTSETTINGS_CONNECTION_ID)] as? ProjectSettingsEntityBuilder)
+          ?: error("projectSettings is null for JavaProjectSettingsEntity")
         }
         else {
-          this.entityLinks[EntityLink(false, PROJECTSETTINGS_CONNECTION_ID)]!! as ProjectSettingsEntityBuilder
+          (this.entityLinks[EntityLink(false, PROJECTSETTINGS_CONNECTION_ID)] as? ProjectSettingsEntityBuilder)
+          ?: error("projectSettings is null for JavaProjectSettingsEntity")
         }
       }
       set(value) {
@@ -151,7 +161,7 @@ internal class JavaProjectSettingsEntityImpl(private val dataSource: JavaProject
           _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
         }
         if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)) {
-          _diff.updateOneToOneParentOfChild(PROJECTSETTINGS_CONNECTION_ID, this, value)
+          _diff.instrumentation.addChild(PROJECTSETTINGS_CONNECTION_ID, value, this)
         }
         else {
           if (value is ModifiableWorkspaceEntityBase<*, *>) {
@@ -206,7 +216,6 @@ internal class JavaProjectSettingsEntityData : WorkspaceEntityData<JavaProjectSe
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): JavaProjectSettingsEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {

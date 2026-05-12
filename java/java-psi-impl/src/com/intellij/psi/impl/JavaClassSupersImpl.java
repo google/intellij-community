@@ -1,10 +1,10 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.impl;
 
+import com.intellij.codeInsight.TypeNullability;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.psi.JavaPsiFacade;
-import com.intellij.psi.PsiAnnotation;
 import com.intellij.psi.PsiCapturedWildcardType;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiClassType;
@@ -21,7 +21,6 @@ import com.intellij.psi.util.JavaClassSupers;
 import com.intellij.psi.util.PsiUtil;
 import com.intellij.psi.util.PsiUtilCore;
 import com.intellij.psi.util.TypeConversionUtil;
-import com.intellij.util.ArrayUtil;
 import com.intellij.util.containers.UnmodifiableHashMap;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -129,9 +128,8 @@ public final class JavaClassSupersImpl extends JavaClassSupers {
         PsiType targetType;
         if (paramCandidate instanceof PsiTypeParameter && paramCandidate != parameter) {
           targetType = outer.substituteWithBoundsPromotion((PsiTypeParameter)paramCandidate);
-          if (targetType != null && innerType.hasAnnotations()) {
-            PsiAnnotation[] typeAnnotations = targetType.getAnnotations();
-            targetType = targetType.annotate(() -> ArrayUtil.mergeArrays(innerType.getAnnotations(), typeAnnotations));
+          if (targetType != null && !innerType.getNullability().equals(TypeNullability.UNKNOWN)) {
+            targetType = targetType.withNullability(innerType.getNullability());
           }
         }
         else {

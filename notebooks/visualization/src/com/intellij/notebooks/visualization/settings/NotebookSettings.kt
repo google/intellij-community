@@ -11,6 +11,9 @@ import com.intellij.util.xmlb.XmlSerializerUtil
 @State(name = NotebookSettings.COMPONENT_NAME, storages = [(Storage(value = "notebook-settings.xml"))], category = SettingsCategory.UI)
 class NotebookSettings : PersistentStateComponent<NotebookSettings>, Cloneable {
 
+  /** Default value for scrolling in output cells. */
+  var outputScrollingEnabledByDefault: Boolean = true
+
   /** When <=0, the max height of output is limited by 30% of screen height. When set, it is calculated in the height of a single text line. */
   var outputMaxHeightInEditorLines: Int = -1
 
@@ -22,6 +25,9 @@ class NotebookSettings : PersistentStateComponent<NotebookSettings>, Cloneable {
 
   /** The top-right-cell-corner-toolbar will always be visible for the large cells and will stick to the editor top. */
   var cellToolbarStickyVisible: Boolean = true
+
+  /** When 'false', line numbers in notebook cell editors are hidden regardless of the global editor setting. */
+  var showLineNumbers: Boolean = true
 
   override fun getState(): NotebookSettings = this
 

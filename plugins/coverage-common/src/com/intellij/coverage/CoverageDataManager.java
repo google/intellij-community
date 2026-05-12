@@ -14,12 +14,13 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 
 public abstract class CoverageDataManager {
 
-  CoverageDataManager() {}
+  CoverageDataManager() { }
 
   public static CoverageDataManager getInstance(@NotNull Project project) {
     return project.getService(CoverageDataManagerImpl.class);
@@ -44,18 +45,15 @@ public abstract class CoverageDataManager {
                                                  @NotNull CoverageRunner coverageRunner,
                                                  boolean coverageByTestEnabled, boolean branchCoverage);
 
-  /**
-   * @deprecated Use {@link CoverageDataManager#addExternalCoverageSuite(File, CoverageRunner)}
-   */
-  @ApiStatus.Internal
-  @Deprecated(forRemoval = true)
-  public abstract CoverageSuite addExternalCoverageSuite(@NotNull String selectedFileName,
-                                                         long timeStamp,
-                                                         @NotNull CoverageRunner coverageRunner,
-                                                         @NotNull CoverageFileProvider fileProvider);
+  public abstract CoverageSuite addExternalCoverageSuite(@NotNull Path file, @NotNull CoverageRunner coverageRunner);
 
-  public final CoverageSuite addExternalCoverageSuite(@NotNull File file, @NotNull CoverageRunner coverageRunner) {
-    return addExternalCoverageSuite(file.getName(), file.lastModified(), coverageRunner, new DefaultCoverageFileProvider(file.getAbsolutePath()));
+  /**
+   * @deprecated Use {@link #addExternalCoverageSuite(Path, CoverageRunner)} instead.
+   */
+  @SuppressWarnings({"IO_FILE_USAGE"})
+  @Deprecated
+  public CoverageSuite addExternalCoverageSuite(@NotNull File file, @NotNull CoverageRunner coverageRunner) {
+    return addExternalCoverageSuite(file.toPath(), coverageRunner);
   }
 
 
@@ -64,6 +62,7 @@ public abstract class CoverageDataManager {
 
   /**
    * Suites that are tracked by the coverage manager.
+   *
    * @return registered suites
    * @see com.intellij.coverage.actions.CoverageSuiteChooserDialog
    */
@@ -81,6 +80,7 @@ public abstract class CoverageDataManager {
 
   /**
    * Choose active suite. Calling this method triggers updating the presentations in project view, editors etc.
+   *
    * @param suite coverage suite to choose. Must not be <code>null</code>. Use <code>closeSuitesBundle</code> to close a suite
    */
   public abstract void chooseSuitesBundle(@NotNull CoverageSuitesBundle suite);
@@ -96,6 +96,7 @@ public abstract class CoverageDataManager {
 
   /**
    * Remove suite
+   *
    * @param suite coverage suite to remove
    */
   public abstract void removeCoverageSuite(CoverageSuite suite);
@@ -104,6 +105,7 @@ public abstract class CoverageDataManager {
    * Remove suite from the list of tracked suites.
    * <p>
    * In contrast to <code>removeCoverageSuite</code>, this method keeps file on disk.
+   *
    * @param suite suite to unregister
    */
   public abstract void unregisterCoverageSuite(CoverageSuite suite);
@@ -111,7 +113,8 @@ public abstract class CoverageDataManager {
   /**
    * runs computation in read action, blocking project close till action has been run,
    * and doing nothing in case projectClosing() event has been already broadcasted.
-   *  Note that actions must not be long-running not to cause significant pauses on project close.
+   * Note that actions must not be long-running not to cause significant pauses on project close.
+   *
    * @param computation {@link Computable to be run}
    * @return result of the computation or null if the project is already closing.
    */
@@ -141,5 +144,4 @@ public abstract class CoverageDataManager {
                                        final @NotNull RunConfigurationBase<?> configuration, RunnerSettings runnerSettings);
 
   public abstract void processGatheredCoverage(@NotNull RunConfigurationBase<?> configuration, RunnerSettings runnerSettings);
-
 }

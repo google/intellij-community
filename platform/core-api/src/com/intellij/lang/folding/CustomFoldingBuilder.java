@@ -11,6 +11,7 @@ import com.intellij.openapi.util.registry.RegistryValue;
 import com.intellij.psi.PsiComment;
 import com.intellij.psi.PsiElement;
 import com.intellij.util.containers.Stack;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -185,7 +186,7 @@ public abstract class CustomFoldingBuilder extends FoldingBuilderEx implements P
     return false;
   }
 
-  protected static boolean isCustomRegionElement(PsiElement element) {
+  public static boolean isCustomRegionElement(PsiElement element) {
     Set<ASTNode> set = ourCustomRegionElements.get();
     return set != null && element != null && set.contains(element.getNode());
   }

@@ -21,4 +21,8 @@ public abstract class PropertiesQuickFixFactory {
   public abstract IntentionAction createRemovePropertyFix(@NotNull Property property);
 
   public abstract LocalQuickFix createRemovePropertyLocalFix(@NotNull Property property);
+
+  public abstract IntentionAction createRemovePropertyFromBundleFix(@NotNull Property property);
+
+  public abstract LocalQuickFix createRemovePropertyFromBundleLocalFix(@NotNull Property property);
 }

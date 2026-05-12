@@ -32,6 +32,7 @@ internal class KotlinWrapIntoArrayPostfixTemplate : StringBasedPostfixTemplate {
     }
 
     override fun getElementToRemove(expr: PsiElement): PsiElement = expr
+    override fun isApplicableForModCommand(): Boolean = true
 }
 
 private val ARRAY_CLASS_ID = ClassId.fromString("kotlin/Array")

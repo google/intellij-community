@@ -22,13 +22,14 @@ class SeFilesTabFactory : SeEssentialTabFactory {
   override suspend fun getTab(scope: CoroutineScope, project: Project?, session: SeSession, initEvent: AnActionEvent, registerShortcut: (AnAction) -> Unit): SeTab? {
     project ?: return null
 
-    val delegate = SeTabDelegate(project,
-                                 session,
-                                 "Files",
-                                 listOf(SeProviderId(SeProviderIdUtils.FILES_ID),
-                                        SeProviderId(SeProviderIdUtils.NON_INDEXABLE_FILES_ID)),
-                                 initEvent,
-                                 scope)
+    val delegate = SeTabDelegate.create(project,
+                                        session,
+                                        "Files",
+                                        listOf(SeProviderId(SeProviderIdUtils.FILES_ID),
+                                               SeProviderId(SeProviderIdUtils.NON_INDEXABLE_FILES_ID),
+                                               SeProviderId(SeProviderIdUtils.FUZZY_FILES_ID)),
+                                        initEvent,
+                                        scope)
 
     return SeFilesTab(delegate)
   }

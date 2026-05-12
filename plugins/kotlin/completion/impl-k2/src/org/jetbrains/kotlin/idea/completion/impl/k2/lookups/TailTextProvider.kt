@@ -70,8 +70,8 @@ object TailTextProvider {
         signature.symbol.getContainerOrAliasPresentation(useFqName = useFqName, isFunctionalVariableCall = true)?.let { append(it) }
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     fun getTailText(
         symbol: KaClassLikeSymbol,
         usePackageFqName: Boolean = false,
@@ -98,8 +98,8 @@ object TailTextProvider {
         }
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun StringBuilder.renderReceiverType(receiverType: KaType) {
         val renderedType = receiverType.renderVerbose()
         append(KotlinCompletionImplK2Bundle.message("presentation.tail.for.0", renderedType))

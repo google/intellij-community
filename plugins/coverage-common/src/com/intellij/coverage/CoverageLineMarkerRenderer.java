@@ -386,12 +386,7 @@ public class CoverageLineMarkerRenderer implements ActiveGutterRenderer, Filling
       if (nextOldLine != null) {
         final LineData lineData = getLineData(nextOldLine);
         if (lineData != null) {
-          return switch (lineData.getStatus()) {
-            case LineCoverage.NONE -> CoverageBundle.message("coverage.next.change.uncovered");
-            case LineCoverage.PARTIAL -> CoverageBundle.message("coverage.next.change.partial.covered");
-            case LineCoverage.FULL -> CoverageBundle.message("coverage.next.change.fully.covered");
-            default -> null;
-          };
+          return CoverageEngine.getLineCoverageStatus(lineData);
         }
       }
       return null;

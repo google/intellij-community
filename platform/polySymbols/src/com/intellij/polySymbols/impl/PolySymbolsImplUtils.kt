@@ -25,7 +25,7 @@ internal val objectMapper = ObjectMapper().configure(DeserializationFeature.FAIL
     val interner = Interner.createStringInterner()
     module.addDeserializer(String::class.java, object : StringDeserializer() {
       override fun deserialize(p: JsonParser, ctxt: DeserializationContext): String? {
-        return super.deserialize(p, ctxt)?.let { interner.intern(it) }
+        return super.deserialize(p, ctxt)?.let { synchronized(interner) { interner.intern(it) } }
       }
     })
   })

@@ -73,7 +73,7 @@ public final class BatchModeDescriptorsUtil {
 
       RefElement refElement = getProblemElementFunction.fun(tool, element, context);
 
-      List<ProblemDescriptor> elementProblems = problems.computeIfAbsent(refElement, __ -> new ArrayList<>());
+      List<ProblemDescriptor> elementProblems = problems.computeIfAbsent(refElement, _ -> new ArrayList<>());
       elementProblems.add(descriptor);
     }
 

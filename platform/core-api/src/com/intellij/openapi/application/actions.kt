@@ -2,19 +2,18 @@
 package com.intellij.openapi.application
 
 import com.intellij.openapi.command.CommandProcessor
-import com.intellij.openapi.util.Computable
 import com.intellij.util.concurrency.annotations.RequiresBlockingContext
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.ApiStatus.Obsolete
 
 /** Use [edtWriteAction]. */
 fun <T> runWriteAction(runnable: () -> T): T {
-  return ApplicationManager.getApplication().runWriteAction(Computable(runnable))
+  return ApplicationManager.getApplication().runWriteAction(lambdaToComputable(runnable))
 }
 
 fun <T> runUndoTransparentWriteAction(runnable: () -> T): T {
   return CommandProcessor.getInstance().withUndoTransparentAction().use {
-    ApplicationManager.getApplication().runWriteAction(Computable(runnable))
+    ApplicationManager.getApplication().runWriteAction(lambdaToComputable(runnable))
   }
 }
 
@@ -42,7 +41,11 @@ fun <T> runReadAction(runnable: () -> T): T = runReadActionBlocking(runnable)
  */
 @RequiresBlockingContext
 fun <T> runReadActionBlocking(runnable: () -> T): T {
-  return ApplicationManager.getApplication().runReadAction(Computable(runnable))
+  val application = ApplicationManager.getApplication()
+  if (application.isReadAllowedButNotWrite()) {
+    return runnable()
+  }
+  return application.runReadAction(lambdaToComputable(runnable))
 }
 
 /**
@@ -75,4 +78,8 @@ fun runInEdt(modalityState: ModalityState? = null, runnable: () -> Unit) {
 @Obsolete
 fun invokeLater(modalityState: ModalityState? = null, runnable: () -> Unit) {
   ApplicationManager.getApplication().invokeLater({ runnable() }, modalityState ?: ModalityState.defaultModalityState())
+}
+
+internal fun Application.isReadAllowedButNotWrite(): Boolean {
+  return isReadAccessAllowed && !isWriteAccessAllowed
 }

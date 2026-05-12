@@ -14,7 +14,6 @@ import com.intellij.diagnostic.PluginException;
 import com.intellij.injected.editor.DocumentWindow;
 import com.intellij.lang.Language;
 import com.intellij.lang.injection.InjectedLanguageManager;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Attachment;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
@@ -40,6 +39,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.InjectionUtils;
 import com.intellij.util.PairConsumer;
+import com.intellij.util.concurrency.ThreadingAssertions;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.NotNullList;
 import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
@@ -120,13 +120,13 @@ public final class LineMarkersPass extends TextEditorHighlightingPass implements
              Collection<LineMarkerProvider> providers = getMarkerProviders(language, myProject);
              List<LineMarkerProvider> providersList = new ArrayList<>(providers);
              queryProviders(
-               elements.inside(), root, providersList, (__, info) -> {
+               elements.inside(), root, providersList, (_, info) -> {
                  info.updatePass = passId;
                  lineMarkers.add(info);
                  LineMarkersUtil.addLineMarkerToEditorIncrementally(myProject, getDocument(), info, myHighlightingSession);
                });
              queryProviders(elements.outside(), root, providersList,
-               (__, info) -> {
+               (_, info) -> {
                  info.updatePass = passId;
                  lineMarkers.add(info);
                });
@@ -148,7 +148,7 @@ public final class LineMarkersPass extends TextEditorHighlightingPass implements
     for (LineMarkerInfo<?> marker : markers) {
       if (marker instanceof MergeableLineMarkerInfo<?> mergeable) {
         int line = document.getLineNumber(marker.startOffset);
-        List<MergeableLineMarkerInfo<?>> infos = sameLineMarkers.computeIfAbsent(line, __ -> new ArrayList<>());
+        List<MergeableLineMarkerInfo<?>> infos = sameLineMarkers.computeIfAbsent(line, _ -> new ArrayList<>());
         infos.add(mergeable);
       }
       else {
@@ -178,7 +178,7 @@ public final class LineMarkersPass extends TextEditorHighlightingPass implements
                               @NotNull PsiFile containingFile,
                               @NotNull List<? extends LineMarkerProvider> providers,
                               @NotNull PairConsumer<? super PsiElement, ? super LineMarkerInfo<?>> consumer) {
-    ApplicationManager.getApplication().assertReadAccessAllowed();
+    ThreadingAssertions.assertReadAccess();
 
     if (myMode != Mode.SLOW) {
       //noinspection ForLoopReplaceableByForEach
@@ -302,7 +302,7 @@ public final class LineMarkersPass extends TextEditorHighlightingPass implements
       return Collections.emptyList();
     }
     LineMarkersPass pass = new LineMarkersPass(psiFile.getProject(), psiFile, document, psiFile.getTextRange(), psiFile.getTextRange(), Mode.ALL,
-                                               HighlightingSessionImpl.getFromCurrentIndicator(psiFile));
+                                               DaemonCodeAnalyzerEx.getInstanceEx(psiFile.getProject()).getHighlightSessionFromCurrentIndicator(psiFile));
     return pass.doCollectMarkers();
   }
 

@@ -23,6 +23,7 @@ jvm_library(
 
 jvm_library(
   name = "wsl-impl_test_lib",
+  testonly = True,
   module_name = "intellij.platform.wsl.impl",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -41,3 +42,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.wsl.impl` end
+
+### auto-generated section `iml intellij.platform.wsl.impl` start
+exports_files([
+  "intellij.platform.wsl.impl.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.wsl.impl` end

@@ -9,7 +9,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.IdentityHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -139,7 +138,8 @@ public abstract class PyCloningTypeVisitor extends PyTypeVisitorExt<PyType> {
       )
     );
     return new PyTypedDictType(typedDictType.getName(), substitutedTDFields, typedDictType.myClass, typedDictType.isDefinition(),
-                               typedDictType.getDeclarationElement());
+                               typedDictType.getDeclarationElement(), typedDictType.isClosed(), clone(typedDictType.getExtraItemsType()),
+                               typedDictType.getExtraItemsQualifiers());
   }
 
   @Override
@@ -199,13 +199,20 @@ public abstract class PyCloningTypeVisitor extends PyTypeVisitorExt<PyType> {
   @Override
   public PyType visitPyCallableType(@NotNull PyCallableType callableType) {
     PyCallableParameterVariadicType clonedParametersType = clone(callableType.getParametersType(myTypeEvalContext));
+    var typeParameters = callableType.getTypeParameters(myTypeEvalContext);
     return new PyCallableTypeImpl(
+      typeParameters != null ? ContainerUtil.map(typeParameters, this::clone) : null,
       clonedParametersType,
       clone(callableType.getReturnType(myTypeEvalContext)),
       callableType.getCallable(),
       callableType.getModifier(),
       callableType.getImplicitOffset()
     );
+  }
+
+  @Override
+  public PyType visitPyOverloadType(@NotNull PyOverloadType overloadType) {
+    return new PyOverloadType(ContainerUtil.map(overloadType.getItems(), this::clone), overloadType.getImpl());
   }
 
   @Override
@@ -239,11 +246,20 @@ public abstract class PyCloningTypeVisitor extends PyTypeVisitorExt<PyType> {
           parameter.getName(),
           Ref.create(clone(parameter.getType(myTypeEvalContext))),
           parameter.getDefaultValue(),
+          parameter.getDefaultValueText(),
           parameter.getParameter(),
           parameter.isPositionalContainer(),
           parameter.isKeywordContainer(),
+          parameter.isSelf(),
+          parameter.isKeywordOnlySeparator(),
+          parameter.isPositionOnlySeparator(),
           parameter.getDeclarationElement()
         ))
     );
+  }
+
+  @Override
+  public PyType visitPyUnpackedTypedDictType(@NotNull PyUnpackedTypedDictType unpackedTypedDictType) {
+    return new PyUnpackedTypedDictTypeImpl(clone(unpackedTypedDictType.getTypedDictType()));
   }
 }

@@ -12,7 +12,7 @@ public class LambdaAfterNullCheck {
   
   @Nullable IntSupplier test2() {
     if(s == null || s1 == null) return null;
-    return () -> fn(s, s1);
+    return () -> fn(<warning descr="Argument 's' might be null">s</warning>, <warning descr="Argument 's1' might be null">s1</warning>);
   }
   
   static int fn(String s, String s1) {

@@ -8,6 +8,7 @@ import com.intellij.platform.testFramework.assertion.treeAssertion.SimpleTreeAss
 import com.intellij.testFramework.RunAll.Companion.runAll
 import com.intellij.testFramework.fixtures.BuildViewTestFixture
 import com.intellij.testFramework.utils.vfs.deleteRecursively
+import org.jetbrains.annotations.ApiStatus.Obsolete
 import org.jetbrains.plugins.gradle.testFramework.fixtures.GradleExecutionEnvironmentFixture
 import org.jetbrains.plugins.gradle.testFramework.fixtures.GradleExecutionOutputFixture
 import org.jetbrains.plugins.gradle.testFramework.fixtures.GradleExecutionTestFixture
@@ -96,12 +97,28 @@ abstract class GradleExecutionBaseTestCase : GradleProjectTestCase() {
     }
   }
 
+  /**
+   * obsolete: Use [executeTasksAsync] instead.
+   */
+  @Obsolete
   fun executeTasks(commandLine: String, isRunAsTest: Boolean = false, isDebug: Boolean = false) {
     executionFixture.executeTasks(commandLine, isRunAsTest, isDebug)
   }
 
+  suspend fun executeTasksAsync(commandLine: String, isRunAsTest: Boolean = false, isDebug: Boolean = false) {
+    executionFixture.executeTasksAsync(commandLine, isRunAsTest, isDebug)
+  }
+
+  /**
+   * obsolete: Use [awaitAnyGradleTaskExecution] instead.
+   */
+  @Obsolete
   fun <R> waitForAnyGradleTaskExecution(action: () -> R): R {
     return executionFixture.waitForAnyGradleTaskExecution(action)
+  }
+
+  suspend fun <R> awaitAnyGradleTaskExecution(action: suspend () -> R): R {
+    return executionFixture.awaitAnyGradleTaskExecution(action)
   }
 
   fun assertSyncViewTree(assert: SimpleTreeAssertion.Node<Nothing?>.() -> Unit) {

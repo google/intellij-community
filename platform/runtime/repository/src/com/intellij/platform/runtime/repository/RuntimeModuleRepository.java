@@ -2,6 +2,7 @@
 package com.intellij.platform.runtime.repository;
 
 import com.intellij.platform.runtime.repository.impl.RuntimeModuleRepositoryImpl;
+import com.intellij.platform.runtime.repository.serialization.RawRuntimePluginHeader;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -35,6 +36,12 @@ public interface RuntimeModuleRepository {
   @NotNull ResolveResult resolveModule(@NotNull RuntimeModuleId moduleId);
 
   /**
+   * Searches for the module header by the given {@code moduleId} or returns {@code null} if it is not found in the repository.
+   */
+  @ApiStatus.Internal
+  @Nullable RuntimeModuleHeader findHeader(@NotNull RuntimeModuleId moduleId);
+
+  /**
    * Computes resource paths of a module with the given {@code moduleId} without resolving its dependencies.
    */
   @NotNull List<Path> getModuleResourcePaths(@NotNull RuntimeModuleId moduleId);
@@ -58,4 +65,16 @@ public interface RuntimeModuleRepository {
    * bootstrap module is cached in MANIFEST.MF, because in that case it isn't needed to read and parse module descriptors.
    */
   @NotNull List<@NotNull Path> getBootstrapClasspath(@NotNull String bootstrapModuleName);
+
+  /**
+   * Returns the list of headers of plugins bundled with the current distribution.
+   * For a monolithic IDE, it also includes plugins bundled with its embedded frontend.
+   */
+  @NotNull List<@NotNull RawRuntimePluginHeader> getBundledPluginHeaders();
+
+  /**
+   * Returns the header of a plugin bundled with the current distribution which {@code plugin.xml} is located in
+   * {@code pluginDescriptorModuleId} or {@code null} if no such plugin is found.
+   */
+  @Nullable RawRuntimePluginHeader findBundledPluginHeader(@NotNull RuntimeModuleId pluginDescriptorModuleId);
 }

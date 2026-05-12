@@ -1,12 +1,14 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python
 
+import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.python.fixtures.PyTestCase
 import com.jetbrains.python.psi.PyExpression
+import com.jetbrains.python.psi.PyStringLiteralExpression
+import com.jetbrains.python.psi.PyUtil
 import com.jetbrains.python.psi.types.PyExpectedVarianceJudgment.getExpectedVariance
-import com.jetbrains.python.psi.types.PyTypeVarType.Variance
+import com.jetbrains.python.psi.types.PyTypeParameterType.Variance
 import com.jetbrains.python.psi.types.TypeEvalContext
-import junit.framework.AssertionFailedError
 import org.intellij.lang.annotations.Language
 
 internal class PyExpectedVarianceJudgmentTest : PyTestCase() {
@@ -14,7 +16,16 @@ internal class PyExpectedVarianceJudgmentTest : PyTestCase() {
   private fun doTest(expression: String, expectedVariance: Variance?, @Language("Python") text: String) {
     val textIndented = text.trimIndent()
     myFixture.configureByText(PythonFileType.INSTANCE, textIndented)
-    val typeAnnotation: PyExpression = myFixture.findElementByText(expression, PyExpression::class.java)
+    var typeAnnotation: PyExpression = myFixture.findElementByText(expression, PyExpression::class.java)
+
+    if (typeAnnotation is PyStringLiteralExpression && typeAnnotation.text.contains(expression)) {
+      val syntheticElement = PyUtil.createExpressionFromFragment(typeAnnotation.stringValue, typeAnnotation)
+                             ?: throw AssertionError("Expression not found in string literal: $expression")
+      val posWithQuotes = typeAnnotation.text.indexOf(expression)
+      val pos = posWithQuotes - (typeAnnotation.text.length - typeAnnotation.stringValue.length) / 2
+      typeAnnotation = PsiTreeUtil.getParentOfType(syntheticElement.findElementAt(pos), PyExpression::class.java)
+                       ?: throw AssertionError("Expression not found in string literal: $expression")
+    }
 
     val context = TypeEvalContext.userInitiated(typeAnnotation.project, typeAnnotation.containingFile)
     val actualVariance = getExpectedVariance(typeAnnotation, context)
@@ -104,6 +115,14 @@ internal class PyExpectedVarianceJudgmentTest : PyTestCase() {
       """)
   }
 
+  fun `test Generic class final attribute callable concatenate parameter`() {
+    doTest("T, P], None", Variance.CONTRAVARIANT, """
+      from typing import Callable, Concatenate, Final
+      class A[T, **P]:
+          attr: Final[Callable[Concatenate[T, P], None]]
+      """)
+  }
+
   fun `test Generic class final attribute callable return`() {
     doTest("T]]", Variance.COVARIANT, """
       from typing import Final, Callable
@@ -142,6 +161,14 @@ internal class PyExpectedVarianceJudgmentTest : PyTestCase() {
       """)
   }
 
+  fun `test Generic class method parameter nesting callable concatenate parameter`() {
+    doTest("T, P], None", Variance.COVARIANT, """
+      from typing import Callable, Concatenate
+      class A[T, **P]:
+          def method(self, arg: Callable[Concatenate[T, P], None]): ...
+      """)
+  }
+
   fun `test Generic class method parameter nesting callable return`() {
     doTest("T])", Variance.CONTRAVARIANT, """
       from typing import Callable
@@ -155,6 +182,14 @@ internal class PyExpectedVarianceJudgmentTest : PyTestCase() {
       from typing import Callable
       class A[T]:
           def method(self) -> Callable[[T], None]: pass
+      """)
+  }
+
+  fun `test Generic class method return nesting callable concatenate parameter`() {
+    doTest("T, P], None", Variance.CONTRAVARIANT, """
+      from typing import Callable, Concatenate
+      class A[T, **P]:
+          def f2(self, t: T) -> Callable[Concatenate[T, P], None]: ...
       """)
   }
 
@@ -332,28 +367,47 @@ internal class PyExpectedVarianceJudgmentTest : PyTestCase() {
       """)
   }
 
-  fun `test String literal type at return`() {
-    fixme("PY-87942: No AST in string literal of type annotation", AssertionFailedError::class.java) {
-      doTest("T\"", Variance.COVARIANT, """
-        class A[T]:
-            def f(self, t: Callable[["T"],None]) : ...
-        """)
-    }
+  fun `test String literal type at return inside callable`() {
+    doTest("T\"", Variance.COVARIANT, """
+      from typing import Callable
+      class A[T]:
+          def f(self, t: Callable[["T"],None]) : ...
+      """)
   }
 
-  // Expect null to avoid variance compatibility inspection check
+  fun `test String literal type at function parameter`() {
+    doTest("T],", Variance.COVARIANT, """
+      from typing import Callable
+      class A[T]:
+          def f(self, t: "Callable[[T],None]") : ...
+      """)
+  }
 
-  fun `test Type alias for generic class`() {
-    doTest("T2]", null, """
+  fun `test Type alias use for generic class invariant`() {
+    doTest("T2]", Variance.INVARIANT, """
       from typing import TypeVar, Generic
-      T1 = TypeVar("T1", covariant=True)
-      class Box(Generic[T1]):
-          pass
-      Box_TA = Box[T1]
+      T1 = TypeVar("T1")
+      class Box(Generic[T1]): ...
+      Box_TA: TypeAlias = Box[T1]
       T2 = TypeVar("T2", covariant=True)
       my_box: Box_TA[T2]
       """)
   }
+
+  fun `test Type alias use for generic class covariant`() {
+    doTest("T_co] #", Variance.COVARIANT, """
+      from typing import Generic, TypeVar, TypeAlias
+      T_co = TypeVar("T_co", covariant=True)
+      class ClassA(Generic[T_co]): ...
+      
+      T = TypeVar("T")
+      A_Alias_1: TypeAlias = ClassA[T]
+      
+      obj: A_Alias_1[T_co] #
+      """)
+  }
+
+  // Expect null to avoid variance compatibility inspection check
 
   fun `test Generic class dunder init special case`() {
     // actually bivariant
@@ -368,6 +422,13 @@ internal class PyExpectedVarianceJudgmentTest : PyTestCase() {
     doTest("T):", null, """
       class A[T]:
           def __new__(self, value: T): pass
+      """)
+  }
+
+  fun `test Type argument of self type`() {
+    doTest("T]\"", null, """"
+      class K[T]:
+          def m1(self: "K[T]", x: T) -> None: ...
       """)
   }
 

@@ -1,13 +1,6 @@
-<idea-plugin package="org.jetbrains.kotlin.idea.base.fir.analysisApiPlatform">
+<idea-plugin package="org.jetbrains.kotlin.idea.base.fir.analysisApiPlatform" visibility="internal">
 
   <extensions defaultExtensionNs="com.intellij">
-    <registryKey
-            defaultValue="false"
-            description="Whether module-specific instead of global modification events should be published for project structure changes."
-            key="kotlin.analysis.enableModuleSpecificProjectStructureModificationEvents"
-            restartRequired="true"
-    />
-
     <registryKey
             defaultValue="5"
             description="The maximum number of files that the tree change preprocessor will process in a single write action before publishing a global modification event."
@@ -33,9 +26,6 @@
     <projectService
             serviceInterface="org.jetbrains.kotlin.analysis.api.platform.projectStructure.KotlinModuleDependentsProvider"
             serviceImplementation="org.jetbrains.kotlin.idea.base.fir.analysisApiPlatform.K2IdeKotlinModuleDependentsProvider"/>
-    <projectService
-            serviceInterface="org.jetbrains.kotlin.idea.base.projectStructure.ProjectStructureProviderService"
-            serviceImplementation="org.jetbrains.kotlin.idea.base.fir.analysisApiPlatform.K2IdeProjectStructureProviderService"/>
     <projectService
             serviceInterface="org.jetbrains.kotlin.analysis.api.platform.projectStructure.KotlinModuleInformationProvider"
             serviceImplementation="org.jetbrains.kotlin.idea.base.fir.analysisApiPlatform.K2IdeKotlinModuleInformationProvider"/>
@@ -64,14 +54,23 @@
               topic="com.intellij.platform.backend.workspace.WorkspaceModelChangeListener"/>
     <listener class="org.jetbrains.kotlin.idea.base.fir.analysisApiPlatform.FirIdeModuleStateModificationService$GeneralWorkspaceModelChangeListener"
               topic="com.intellij.platform.backend.workspace.WorkspaceModelChangeListener"/>
+    <listener class="org.jetbrains.kotlin.idea.base.fir.analysisApiPlatform.FirIdeModuleStateModificationService$EventPublishingStateResetAnalysisInWriteActionListener"
+              topic="org.jetbrains.kotlin.analysis.api.platform.KotlinAnalysisInWriteActionListener"/>
+
+    <listener class="org.jetbrains.kotlin.idea.base.fir.analysisApiPlatform.FirIdeOutOfBlockModificationService$StateResetAnalysisInWriteActionListener"
+              topic="org.jetbrains.kotlin.analysis.api.platform.KotlinAnalysisInWriteActionListener"/>
 
     <listener class="org.jetbrains.kotlin.idea.base.fir.analysisApiPlatform.FirIdeDumbModeInvalidationListener"
               topic="com.intellij.openapi.project.DumbModeListenerBackgroundable"/>
   </projectListeners>
 
   <dependencies>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+    <module name="intellij.java.psi"/>
+    <module name="intellij.java.psi.impl"/>
     <module name="intellij.kotlin.base.analysis.platform"/>
     <module name="intellij.kotlin.searching"/>
+    <!-- endregion -->
   </dependencies>
 
 </idea-plugin>

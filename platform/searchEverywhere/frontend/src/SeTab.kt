@@ -2,7 +2,6 @@
 package com.intellij.platform.searchEverywhere.frontend
 
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.platform.searchEverywhere.SeItemData
 import com.intellij.platform.searchEverywhere.SeParams
@@ -64,7 +63,7 @@ interface SeTab : Disposable {
 
   suspend fun canBeShownInFindResults(): Boolean
 
-  suspend fun openInFindToolWindow(session: SeSession, params: SeParams, initEvent: AnActionEvent): Boolean = false
+  suspend fun openInFindToolWindow(session: SeSession, params: SeParams): Boolean = false
 
   /**
    * Perform the action provided by the extended info inside the item presentation

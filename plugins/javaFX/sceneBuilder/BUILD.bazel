@@ -11,6 +11,8 @@ jvm_library(
     "//java/java-psi-api:psi",
     "//java/java-indexing-api:indexing",
     "//java/openapi:java",
+    "//java/java-frontback-psi-api:frontback-psi",
+    "//java/java-syntax:syntax",
     "//plugins/javaFX",
     "//platform/core-api:core",
     "//jps/model-api:model",
@@ -25,6 +27,7 @@ jvm_library(
 
 jvm_library(
   name = "sceneBuilder_test_lib",
+  testonly = True,
   module_name = "intellij.javaFX.sceneBuilder",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -33,6 +36,8 @@ jvm_library(
     "//java/java-psi-api:psi_test_lib",
     "//java/java-indexing-api:indexing_test_lib",
     "//java/openapi:java_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
+    "//java/java-syntax:syntax_test_lib",
     "//plugins/javaFX:javaFX_test_lib",
     "//platform/core-api:core_test_lib",
     "//jps/model-api:model_test_lib",
@@ -45,3 +50,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.javaFX.sceneBuilder` end
+
+### auto-generated section `iml intellij.javaFX.sceneBuilder` start
+exports_files([
+  "intellij.javaFX.sceneBuilder.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.javaFX.sceneBuilder` end

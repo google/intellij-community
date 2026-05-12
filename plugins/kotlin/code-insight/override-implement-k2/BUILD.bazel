@@ -50,6 +50,7 @@ jvm_library(
 
 jvm_library(
   name = "kotlin-codeInsight-overrideImplement_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.codeInsight.overrideImplement",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -79,3 +80,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.kotlin.codeInsight.overrideImplement` end
+
+### auto-generated section `iml intellij.kotlin.codeInsight.overrideImplement` start
+exports_files([
+  "intellij.kotlin.codeInsight.overrideImplement.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.codeInsight.overrideImplement` end

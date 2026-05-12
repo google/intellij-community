@@ -204,16 +204,12 @@ public abstract class BreadcrumbsPanel extends JComponent implements Disposable 
 
   private void updateCrumbsAsync() {
     if (myEditor == null || myEditor.isDisposed()) return;
-    // this is EDT, so we need an explicit read action to correct dependencies correctly
-    ReadAction.run(() -> {
-      ReadAction
-        .nonBlocking(() -> computeCrumbs(myEditor.getCaretModel().getOffset()))
-        .withDocumentsCommitted(myProject)
-        .expireWith(this)
-        .coalesceBy(this)
-        .finishOnUiThread(ModalityState.any(), crumbs -> applyCrumbs(crumbs))
-        .submit(NonUrgentExecutor.getInstance());
-    });
+    ReadAction.nonBlocking(() -> computeCrumbs(myEditor.getCaretModel().getOffset()))
+      .withDocumentsCommitted(myProject)
+      .expireWith(this)
+      .coalesceBy(this)
+      .finishOnUiThread(ModalityState.any(), crumbs -> applyCrumbs(crumbs))
+      .submit(NonUrgentExecutor.getInstance());
   }
 
   private void applyCrumbs(Iterable<? extends Crumb> _crumbs) {

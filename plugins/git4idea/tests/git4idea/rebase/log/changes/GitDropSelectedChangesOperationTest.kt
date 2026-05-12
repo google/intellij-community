@@ -106,7 +106,7 @@ class GitDropSelectedChangesOperationTest : GitSingleRepoTest() {
       assertCommitted(3) { added("a") }
     }
 
-    val undoPossibility = result.checkUndoPossibility()
+    val undoPossibility = runBlocking { result.checkUndoPossibility() }
     assertTrue("Undo should be possible", undoPossibility is GitCommitEditingOperationResult.Complete.UndoPossibility.Possible)
 
     result.undo()

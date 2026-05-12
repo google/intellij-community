@@ -29,13 +29,13 @@ import com.intellij.ui.CheckboxTreeBase
 import com.intellij.ui.CheckboxTreeListener
 import com.intellij.ui.CheckedTreeNode
 import com.intellij.ui.ScrollPaneFactory
-import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.TreeSpeedSearch
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.dsl.builder.Align
 import com.intellij.ui.dsl.builder.BottomGap
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import com.intellij.util.ui.components.BorderLayoutPanel
@@ -176,7 +176,7 @@ open class StarterLibrariesStep(contextProvider: StarterContextProvider) : Modul
 
   private fun createComponent(): DialogPanel {
     startersComboBox.setMinimumAndPreferredWidth(200)
-    startersComboBox.renderer = SimpleListCellRenderer.create("", Starter::title)
+    startersComboBox.renderer = textListCellRenderer("", Starter::title)
     startersComboBox.addItemListener { e ->
       if (e.stateChange == ItemEvent.SELECTED) {
         val newValue = e.item as? Starter

@@ -2,6 +2,7 @@
 package org.jetbrains.plugins.gitlab.ui.clone
 
 import com.intellij.collaboration.async.nestedDisposable
+import com.intellij.collaboration.auth.ui.AccountsPanelFactory.Companion.addWarningForEnabledCredentialHelper
 import com.intellij.collaboration.auth.ui.AccountsPanelFactory.Companion.addWarningForPersistentCredentials
 import com.intellij.collaboration.auth.ui.login.LoginModel
 import com.intellij.collaboration.auth.ui.login.TokenLoginInputPanelFactory
@@ -19,6 +20,7 @@ import com.intellij.util.ui.JBEmptyBorder
 import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
+import git4idea.config.GitVcsApplicationSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -51,7 +53,7 @@ internal object GitLabCloneLoginComponentFactory {
       cs,
       serverFieldDisabled = false,
       tokenNote = CollaborationToolsBundle.message("clone.dialog.insufficient.scopes", GitLabSecurityUtil.MASTER_SCOPES),
-      errorPresenter = GitLabLoginErrorStatusPresenter(cs, loginModel),
+      errorPresenter = GitLabLoginErrorStatusPresenter(cs, loginModel, canLogInWithGit = false),
       footer = {
         row("") {
           cell(loginButton)
@@ -62,6 +64,9 @@ internal object GitLabCloneLoginComponentFactory {
             service<GitLabAccountManager>().canPersistCredentials,
             ::panel
           ).align(AlignX.RIGHT)
+
+          addWarningForEnabledCredentialHelper(GitVcsApplicationSettings.getInstance().isUseCredentialHelper, ::panel)
+            .align(AlignX.RIGHT)
         }
       }
     ).apply {

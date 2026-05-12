@@ -26,7 +26,7 @@ import java.util.Locale
 
 // TODO: Fix or replace a whole bunch of these statistics as they're no longer being collected since generalizing to Collab Tools
 internal object GHPRStatisticsCollector : CounterUsagesCollector() {
-  private val COUNTERS_GROUP = EventLogGroup("vcs.github.pullrequest.counters", 12)
+  private val COUNTERS_GROUP = EventLogGroup("vcs.github.pullrequest.counters", 15)
 
   private val LOG = logger<GHPRStatisticsCollector>()
 
@@ -267,7 +267,7 @@ internal object GHPRStatisticsCollector : CounterUsagesCollector() {
     val resource = RateLimitResource.fromString(resourceName)
 
     if (resource == RateLimitResource.Unknown) {
-      LOG.info("Unknown rate limit resource: ${resourceName}")
+      LOG.debug("Unknown rate limit resource: ${resourceName}")
     }
 
     activity.finished {

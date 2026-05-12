@@ -55,13 +55,13 @@ private fun KaType.unwrap(): KaType {
 @OptIn(KaExperimentalApi::class)
 private fun KaSession.substituteErrorAndTypeParameterTypesWithStarTypeProjections(type: KaType): KaType? {
     return when (type) {
-        is KaClassType -> buildClassType(type.symbol) {
+        is KaClassType -> typeCreator.classType(type.symbol) {
             type.typeArguments.mapNotNull { it.type }.forEach {
                 if (it is KaTypeParameterType || it is KaErrorType) {
-                    argument(buildStarTypeProjection())
+                    typeArgument(starTypeProjection())
                 } else {
-                    substituteErrorAndTypeParameterTypesWithStarTypeProjections(it)?.let { type ->
-                        argument(type)
+                    substituteErrorAndTypeParameterTypesWithStarTypeProjections(it)?.let { argumentType ->
+                        invariantTypeArgument(argumentType)
                     }
                 }
             }

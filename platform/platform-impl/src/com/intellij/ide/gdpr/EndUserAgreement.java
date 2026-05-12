@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.gdpr;
 
 import com.intellij.ide.Prefs;
@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 
+@SuppressWarnings("UseOptimizedEelFunctions")
 public final class EndUserAgreement {
   private static final Logger LOG = Logger.getInstance(EndUserAgreement.class);
   private static final String POLICY_TEXT_PROPERTY = "jb.privacy.policy.text"; // to be used in tests to pass arbitrary policy text
@@ -145,8 +146,7 @@ public final class EndUserAgreement {
 
       Document bundled = loadContent(docName, getBundledResourcePath(docName));
       if (!bundled.getVersion().isUnknown() && bundled.getVersion().isNewer(cached.getVersion())) {
-        // update content only and not the active document name
-        // active document name can be changed by JBA only
+        // update content only and not the active document name (the latter can only be changed by JBA)
         writeToFile(getDocumentContentFile(docName), bundled.getText());
       }
     }
@@ -205,21 +205,21 @@ public final class EndUserAgreement {
   private static @NotNull String getDocumentName() {
     if (!PlatformUtils.isCommercialEdition()) {
       if (PlatformUtils.isCommunityEdition()) {
-        return shouldUseEAPAgreement()? DEFAULT_DOC_EAP_NAME : EULA_COMMUNITY_DOCUMENT_NAME;
+        return shouldUseEAPAgreement() ? DEFAULT_DOC_EAP_NAME : EULA_COMMUNITY_DOCUMENT_NAME;
       }
       if (PlatformUtils.isMPS()) {
         if (isValidFileName(System.getProperty(EULA_MPS_CUSTOM_DOCUMENT_KEY))) {
           return System.getProperty(EULA_MPS_CUSTOM_DOCUMENT_KEY);
         }
-        return shouldUseEAPAgreement()? DEFAULT_DOC_EAP_NAME : EULA_MPS_DOCUMENT_NAME;
+        return shouldUseEAPAgreement() ? DEFAULT_DOC_EAP_NAME : EULA_MPS_DOCUMENT_NAME;
       }
       if (PlatformUtils.isJetBrainsClient()) {
         return CWM_GUEST_EULA_NAME;
       }
       if (PlatformUtils.isGateway()) {
-        return shouldUseEAPAgreement()? DEFAULT_DOC_EAP_NAME : DEFAULT_DOC_NAME;
+        return shouldUseEAPAgreement() ? DEFAULT_DOC_EAP_NAME : DEFAULT_DOC_NAME;
       }
-      return shouldUseEAPAgreement()? PRIVACY_POLICY_EAP_DOCUMENT_NAME : PRIVACY_POLICY_DOCUMENT_NAME;
+      return shouldUseEAPAgreement() ? PRIVACY_POLICY_EAP_DOCUMENT_NAME : PRIVACY_POLICY_DOCUMENT_NAME;
     }
 
     try {
@@ -228,9 +228,8 @@ public final class EndUserAgreement {
         return docName;
       }
     }
-    catch (IOException ignored) {
-    }
-    return shouldUseEAPAgreement()? DEFAULT_DOC_EAP_NAME : DEFAULT_DOC_NAME;
+    catch (IOException ignored) { }
+    return shouldUseEAPAgreement() ? DEFAULT_DOC_EAP_NAME : DEFAULT_DOC_NAME;
   }
 
   private static boolean isValidFileName(String docName) {
@@ -239,8 +238,7 @@ public final class EndUserAgreement {
         Paths.get(docName);
         return true;
       }
-      catch (InvalidPathException ignored) {
-      }
+      catch (InvalidPathException ignored) { }
     }
     return false;
   }

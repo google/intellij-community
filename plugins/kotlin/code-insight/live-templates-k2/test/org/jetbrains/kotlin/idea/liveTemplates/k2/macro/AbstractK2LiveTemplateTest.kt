@@ -3,10 +3,10 @@ package org.jetbrains.kotlin.idea.liveTemplates.k2.macro
 
 import com.intellij.codeInsight.template.impl.TemplateManagerImpl
 import com.intellij.testFramework.LightProjectDescriptor
+import org.jetbrains.kotlin.idea.artifacts.KotlinJvmLightProjectDescriptor
 import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode
 import org.jetbrains.kotlin.idea.base.test.IgnoreTests
 import org.jetbrains.kotlin.idea.base.test.InTextDirectivesUtils
-import org.jetbrains.kotlin.idea.base.test.KotlinJvmLightProjectDescriptor
 import org.jetbrains.kotlin.idea.base.test.NewLightKotlinCodeInsightFixtureTestCase
 import org.jetbrains.kotlin.idea.util.application.executeCommand
 import java.nio.file.Paths

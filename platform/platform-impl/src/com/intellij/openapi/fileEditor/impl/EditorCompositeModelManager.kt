@@ -23,6 +23,7 @@ import com.intellij.openapi.fileEditor.ex.FileEditorWithProvider
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.diagnostic.telemetry.impl.span
 import com.intellij.platform.fileEditor.FileEntry
 import com.intellij.platform.ide.ideFingerprint
 import kotlinx.coroutines.CoroutineName
@@ -88,24 +89,27 @@ private fun CoroutineScope.computeFileEditorProviders(
   file: VirtualFile,
 ): Deferred<List<FileEditorProvider>> {
   if (fileEntry == null || fileEntry.ideFingerprint != ideFingerprint()) {
-    return async(CoroutineName("editor provider computing")) {
-      serviceAsync<FileEditorProviderManager>().getProvidersAsync(project, file)
+    return async {
+      span("editor provider computing") {
+        serviceAsync<FileEditorProviderManager>().getProvidersAsync(project, file)
+      }
     }
   }
 
-  return async(CoroutineName("editor provider resolving")) {
-    val fileEditorProviderManager = serviceAsync<FileEditorProviderManager>()
-    val list = fileEntry.providers.keys.mapNotNullTo(ArrayList(fileEntry.providers.size)) {
-      fileEditorProviderManager.getProvider(it)
-    }
-
-    // if some provider is not found, compute without taking cache in an account
-    if (fileEntry.providers.size == list.size && list.isNotEmpty()) {
-      list
-    }
-    else {
-      LOG.warn("Cannot use saved provider list (savedProviders=${fileEntry.providers}, resolvedProvider=$list)")
-      fileEditorProviderManager.getProvidersAsync(project, file)
+  return async {
+    span("editor provider resolving") {
+      val fileEditorProviderManager = serviceAsync<FileEditorProviderManager>()
+      val list = fileEntry.providers.keys.mapNotNullTo(ArrayList(fileEntry.providers.size)) {
+        fileEditorProviderManager.getProvider(it)
+      }
+      // if some provider is not found, compute without taking cache in an account
+      if (fileEntry.providers.size == list.size && list.isNotEmpty()) {
+        list
+      }
+      else {
+        LOG.warn("Cannot use saved provider list (savedProviders=${fileEntry.providers}, resolvedProvider=$list)")
+        fileEditorProviderManager.getProvidersAsync(project, file)
+      }
     }
   }
 }
@@ -126,18 +130,20 @@ internal class EditorCompositeModelManager(
       providers.map { provider ->
         async(ModalityState.any().asContextElement()) {
           try {
-            val editor = if (provider is AsyncFileEditorProvider) {
-              provider.createFileEditor(
-                project = project,
-                file = file,
-                document = document,
-                editorCoroutineScope = editorCoroutineScope,
-              )
-            }
-            else {
-              withContext(Dispatchers.EDT) {
-                writeIntentReadAction {
-                  provider.createEditor(project, file)
+            val editor = span("Creating file editor for $provider") {
+              if (provider is AsyncFileEditorProvider) {
+                provider.createFileEditor(
+                  project = project,
+                  file = file,
+                  document = document,
+                  editorCoroutineScope = editorCoroutineScope,
+                )
+              }
+              else {
+                withContext(Dispatchers.EDT) {
+                  writeIntentReadAction {
+                    provider.createEditor(project, file)
+                  }
                 }
               }
             }

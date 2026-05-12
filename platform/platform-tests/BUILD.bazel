@@ -1,14 +1,9 @@
 ### auto-generated section `build intellij.platform.tests` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "tests_test_resources",
-  srcs = glob(["testResources/**/*"]),
-  strip_prefix = "testResources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tests",
+  module_name = "intellij.platform.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -45,10 +40,12 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "intellij.platform.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["testGen/**/*.kt", "testGen/**/*.java", "testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
-  resources = [":tests_test_resources"],
+  resources = glob(["testResources/**/*"]),
+  resource_strip_prefix = "testResources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/analysis-api:analysis_test_lib",
@@ -88,6 +85,8 @@ jvm_library(
     "//platform/observable",
     "//platform/projectModel-api:projectModel",
     "//platform/projectModel-api:projectModel_test_lib",
+    "//platform/project-frame",
+    "//platform/project-frame:project-frame_test_lib",
     "//platform/refactoring",
     "//platform/refactoring:refactoring_test_lib",
     "//platform/remote-core",
@@ -109,6 +108,7 @@ jvm_library(
     "//platform/usageView:usageView_test_lib",
     "//platform/ide-core-impl",
     "//platform/ide-core/plugins",
+    "//platform/ide-core",
     "//platform/workspace/storage",
     "//platform/workspace/storage:storage_test_lib",
     "//platform/platform-impl/codeinsight-inline:ide-codeinsight-inline",
@@ -133,7 +133,8 @@ jvm_library(
     "//libraries/gson:gson_test_lib",
     "@lib//:kotlin-stdlib",
     "@lib//:easymock",
-    "@lib//:assert_j",
+    "//libraries/assertj-core",
+    "//libraries/assertj-core:assertj-core_test_lib",
     "@lib//:kotlin-test",
     "//platform/configuration-store-impl:configurationStore-impl",
     "//platform/configuration-store-impl:configurationStore-impl_test_lib",
@@ -176,6 +177,8 @@ jvm_library(
     "//libraries/jackson3/jackson:libraries-jackson3_test_lib",
     "//platform/core-ui",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/code-style-impl:codeStyle-impl",
     "//platform/code-style-impl:codeStyle-impl_test_lib",
     "//platform/statistics/uploader",
@@ -252,6 +255,8 @@ jvm_library(
     "//platform/platform-impl/internal",
     "//platform/util/storages",
     "//platform/util/storages:storages_test_lib",
+    "//platform/util-ex",
+    "//platform/util-ex:util-ex_test_lib",
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
     "//platform/buildData",
@@ -271,6 +276,8 @@ jvm_library(
     "//platform/platform-impl/ui",
     "//platform/eel-provider",
     "//platform/eel-provider:eel-provider_test_lib",
+    "//libraries/mockito",
+    "//libraries/mockito:mockito_test_lib",
     "@lib//:io-mockk",
     "@lib//:io-mockk-jvm",
     "//platform/bookmarks",
@@ -279,6 +286,8 @@ jvm_library(
     "//platform/pluginSystem/testFramework:testFramework_test_lib",
     "//platform/statistics/testFramework",
     "//platform/statistics/testFramework:testFramework_test_lib",
+    "//platform/statistics/config",
+    "//platform/statistics/config:config_test_lib",
     "//platform/platform-impl/bootstrap/eel",
     "//platform/testFramework/junit5/projectStructure",
     "//platform/testFramework/junit5/projectStructure:projectStructure_test_lib",
@@ -288,10 +297,13 @@ jvm_library(
     "@lib//:com-jetbrains-fus-reporting-fus-api",
     "@lib//:com-jetbrains-fus-reporting-ap-validation-all",
     "//platform/platform-impl/eel:ide-impl-wsl",
+    "//platform/progress/shared:ide-progress",
     "//platform/syntax/syntax-psi-tests:psi-tests",
     "//platform/syntax/syntax-psi-tests:psi-tests_test_lib",
     "//xml/xml-psi-api:psi",
     "//xml/xml-psi-api:psi_test_lib",
+    "//xml/xml-parser:parser",
+    "//xml/xml-parser:parser_test_lib",
     "//platform/runtime/product",
     "//platform/runtime/product:product_test_lib",
     "//platform/locking-impl",
@@ -304,6 +316,7 @@ jvm_library(
     "//platform/execution:execution_test_lib",
     "@lib//:jet_check",
     "@lib//:jediterm-core",
+    "@lib//:jetbrains-kotlinx-lincheck-jvm",
     "//images:images-tests",
     "//images:images-tests_test_lib",
     "//RegExpSupport:regexp-tests",
@@ -312,6 +325,12 @@ jvm_library(
     "//platform/xdebugger-impl:debugger-impl-tests_test_lib",
     "//platform/vcs-impl:vcs-impl-tests",
     "//platform/vcs-impl:vcs-impl-tests_test_lib",
+    "//platform/service-container:serviceContainer-tests",
+    "//platform/service-container:serviceContainer-tests_test_lib",
+    "//platform/workspace/storage/testEntities",
+    "//platform/workspace/storage/testEntities:testEntities_test_lib",
+    "//platform/eel-impl-base",
+    "//platform/eel-impl-base:eel-impl-base_test_lib",
   ],
   runtime_deps = [
     ":tests",
@@ -320,6 +339,7 @@ jvm_library(
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
     "//platform/ide-core/plugins:plugins_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/platform-impl/codeinsight-inline:ide-codeinsight-inline_test_lib",
     "//platform/platform-impl/bootstrap:bootstrap_test_lib",
     "//xml/dom-impl:dom-impl_test_lib",
@@ -335,9 +355,16 @@ jvm_library(
     "//platform/platform-impl/bootstrap/eel:eel_test_lib",
     "//platform/platform-impl/update-checker:update-checker_test_lib",
     "//platform/platform-impl/eel:ide-impl-wsl_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.tests` end
+
+### auto-generated section `iml intellij.platform.tests` start
+exports_files([
+  "intellij.platform.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.tests` end
 
 ### auto-generated section `test intellij.platform.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

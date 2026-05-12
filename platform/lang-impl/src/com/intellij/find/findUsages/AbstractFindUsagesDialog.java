@@ -228,7 +228,7 @@ public abstract class AbstractFindUsagesDialog extends DialogWrapper {
     cb.setSelected(toSelect);
     cb.setAlignmentX(Component.LEFT_ALIGNMENT);
     if (toUpdate) {
-      cb.addActionListener(___ -> update());
+      cb.addActionListener(_ -> update());
     }
     myFindOptionsCount++;
     return cb;

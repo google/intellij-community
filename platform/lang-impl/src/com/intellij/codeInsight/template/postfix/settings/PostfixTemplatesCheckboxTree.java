@@ -57,7 +57,7 @@ import java.util.function.Function;
 
 @ApiStatus.Internal
 public class PostfixTemplatesCheckboxTree extends CheckboxTree implements Disposable {
-  private static final Function<Object, Set<PostfixTemplateCheckedTreeNode>> myNodesComparator = __ -> new TreeSet<>((o1, o2) -> {
+  private static final Function<Object, Set<PostfixTemplateCheckedTreeNode>> myNodesComparator = _ -> new TreeSet<>((o1, o2) -> {
     PostfixTemplate template1 = o1.getTemplate();
     PostfixTemplate template2 = o2.getTemplate();
     int compare = Comparing.compare(template1.getPresentableName(), template2.getPresentableName());
@@ -193,7 +193,7 @@ public class PostfixTemplatesCheckboxTree extends CheckboxTree implements Dispos
     final Map<String, Set<String>> result = new HashMap<>();
     visitTemplateNodes(template -> {
       if (!template.isChecked()) {
-        Set<String> templatesForProvider = result.computeIfAbsent(template.getTemplateProvider().getId(), __ -> new HashSet<>());
+        Set<String> templatesForProvider = result.computeIfAbsent(template.getTemplateProvider().getId(), _ -> new HashSet<>());
         templatesForProvider.add(template.getTemplate().getId());
       }
     });

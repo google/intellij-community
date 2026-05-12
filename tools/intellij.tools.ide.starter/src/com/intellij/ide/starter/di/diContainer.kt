@@ -3,8 +3,8 @@ package com.intellij.ide.starter.di
 import com.intellij.ide.starter.buildTool.BuildTool
 import com.intellij.ide.starter.ci.CIServer
 import com.intellij.ide.starter.ci.NoCIServer
-import com.intellij.ide.starter.ci.teamcity.NoOpCodeOwnerResolver
 import com.intellij.ide.starter.ci.teamcity.CodeOwnerResolver
+import com.intellij.ide.starter.ci.teamcity.NoOpCodeOwnerResolver
 import com.intellij.ide.starter.community.PublicIdeDownloader
 import com.intellij.ide.starter.config.ConfigurationStorage
 import com.intellij.ide.starter.config.ScrambleToolProvider
@@ -18,8 +18,8 @@ import com.intellij.ide.starter.ide.IdeDownloader
 import com.intellij.ide.starter.ide.JBRDownloader
 import com.intellij.ide.starter.ide.StarterJBRDownloader
 import com.intellij.ide.starter.ide.installer.IdeInstallerFactory
-import com.intellij.ide.starter.models.IdeProduct
-import com.intellij.ide.starter.models.IdeProductImp
+import com.intellij.ide.starter.models.IdeInfo
+import com.intellij.ide.starter.models.IdeProductInit
 import com.intellij.ide.starter.path.GlobalPaths
 import com.intellij.ide.starter.path.StarterGlobalPaths
 import com.intellij.ide.starter.plugins.PluginConfigurator
@@ -49,6 +49,7 @@ import org.kodein.di.bindProvider
 import org.kodein.di.bindSingleton
 import java.net.URI
 import java.nio.file.Path
+import java.util.ServiceLoader
 
 /**
  * Reinitialize / override bindings for this DI container in your module before executing tests
@@ -83,7 +84,6 @@ private var _di = DI {
 
   bindSingleton<List<ReportPublisher>> { listOf(ConsoleTestResultPublisher) }
 
-  bindSingleton<IdeProduct> { IdeProductImp }
   bindSingleton<CurrentTestMethod> { CurrentTestMethod }
   bindSingleton<ConfigurationStorage> { ConfigurationStorage(this, starterConfigurationStorageDefaults) }
   bindSingleton<TestTelemetryService> { NoopTestTelemetryService() }
@@ -102,6 +102,15 @@ private var _di = DI {
   bindSingleton<ScrambleToolProvider> { object : ScrambleToolProvider {} }
   bindSingleton<DevBuildServerRunner> { NoOpDevBuildServerRunner }
   bindSingleton<CodeOwnerResolver> { NoOpCodeOwnerResolver }
+
+  // Discover and bind all IDE product IdeInfo via ServiceLoader
+  val ideProducts = ServiceLoader.load(IdeProductInit::class.java, IdeProductInit::class.java.classLoader).toList()
+  if (ideProducts.isNotEmpty()) {
+    logOutput("Initializing IDE products: ${ideProducts.joinToString { it.javaClass.name }}")
+    for (productInit in ideProducts) {
+      bindSingleton<IdeInfo>(tag = productInit.ideInfoType) { productInit.ideInfo }
+    }
+  }
 }.apply {
   logOutput("Starter DI was initialized")
 }
@@ -113,7 +122,7 @@ var di: DI = _di
     synchronized(lock) {
       field = value
       logOutput(
-        """Starter DI was updated by: 
+        """Starter DI was updated by:
         |${Thread.currentThread().stackTrace.copyOfRange(2, 5).joinToString(separator = "\n") { "- $it" }}"""
           .trimMargin()
       )

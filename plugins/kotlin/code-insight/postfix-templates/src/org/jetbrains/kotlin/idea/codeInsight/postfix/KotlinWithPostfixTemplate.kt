@@ -33,6 +33,7 @@ internal class KotlinWithPostfixTemplate : StringBasedPostfixTemplate {
 
     override fun getTemplateString(element: PsiElement): String = "kotlin.with(\$expr$) {\n\$END$\n}"
     override fun getElementToRemove(expr: PsiElement): PsiElement = expr
+    override fun isApplicableForModCommand(): Boolean = true
 }
 
 private object WhenTargetFilter : (KtExpression) -> Boolean {

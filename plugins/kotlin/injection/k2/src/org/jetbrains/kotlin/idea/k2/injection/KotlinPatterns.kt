@@ -33,8 +33,8 @@ internal object KotlinPatterns : StandardPatterns() {
     fun receiver() = KotlinReceiverPattern()
 }
 
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class, KaContextParameterApi::class)
+context(_: KaSession)
 private fun KaType.renderFullyQualifiedName() = render(KaTypeRendererForSource.WITH_QUALIFIED_NAMES, Variance.INVARIANT)
 
 // Methods in this class are used through reflection during pattern construction

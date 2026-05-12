@@ -29,4 +29,6 @@ object FusCompletionKeys {
   @JvmField
   val LOOKUP_ELEMENT_SHOW_TIMESTAMP_MILLIS: Key<Long> = Key.create("lookup element shown timestamp")
 
+  @JvmField
+  val LOOKUP_SYNC_PHASE_DURATION_MILLIS: Key<Long> = Key.create("lookup sync phase duration")
 }

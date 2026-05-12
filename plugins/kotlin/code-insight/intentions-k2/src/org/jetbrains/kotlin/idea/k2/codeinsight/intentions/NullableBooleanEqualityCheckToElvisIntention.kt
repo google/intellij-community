@@ -53,7 +53,6 @@ class NullableBooleanEqualityCheckToElvisIntention : KotlinApplicableModCommandA
     }
 
     context(_: KaSession)
-    @OptIn(KaExperimentalApi::class)
     private fun isApplicable(lhs: KtExpression, rhs: KtExpression): Boolean {
         if (!KtPsiUtil.isBooleanConstant(rhs)) return false
 

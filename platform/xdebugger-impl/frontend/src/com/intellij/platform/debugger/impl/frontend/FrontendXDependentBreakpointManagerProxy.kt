@@ -2,6 +2,7 @@
 package com.intellij.platform.debugger.impl.frontend
 
 import com.intellij.openapi.project.Project
+import com.intellij.platform.debugger.impl.frontend.util.SequentialRpcRequestsExecutor
 import com.intellij.platform.debugger.impl.rpc.XBreakpointDependencyDto
 import com.intellij.platform.debugger.impl.rpc.XBreakpointDependencyEvent
 import com.intellij.platform.debugger.impl.rpc.XBreakpointId
@@ -10,17 +11,15 @@ import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointProxy
 import com.intellij.platform.debugger.impl.shared.proxy.XDependentBreakpointManagerProxy
 import com.intellij.platform.project.projectId
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 
 internal class FrontendXDependentBreakpointManagerProxy(
   private val project: Project,
-  private val cs: CoroutineScope,
+  cs: CoroutineScope,
   private val breakpointById: (XBreakpointId) -> XBreakpointProxy?,
 ) : XDependentBreakpointManagerProxy {
   private val dependantBreakpoints = mutableMapOf<XBreakpointId, XBreakpointDependencyDto>()
-
-  private val sequencedRequests = Channel<suspend () -> Unit>(capacity = Channel.UNLIMITED)
+  private val sequentialExecutor = SequentialRpcRequestsExecutor.create(cs)
 
   init {
     cs.launch {
@@ -45,12 +44,6 @@ internal class FrontendXDependentBreakpointManagerProxy(
         dependantBreakpoints.clear()
       })
     }
-
-    cs.launch {
-      for (rpcRequest in sequencedRequests) {
-        rpcRequest()
-      }
-    }
   }
 
   override fun getMasterBreakpoint(breakpoint: XBreakpointProxy): XBreakpointProxy? {
@@ -64,7 +57,7 @@ internal class FrontendXDependentBreakpointManagerProxy(
   override fun clearMasterBreakpoint(breakpoint: XBreakpointProxy) {
     dependantBreakpoints.remove(breakpoint.id)
 
-    sequencedRequests.trySend {
+    sequentialExecutor.execute {
       XDependentBreakpointManagerApi.getInstance().clearMasterBreakpoint(breakpoint.id)
     }
   }
@@ -75,7 +68,7 @@ internal class FrontendXDependentBreakpointManagerProxy(
       parent = masterBreakpoint.id,
       isLeaveEnabled = selected,
     )
-    sequencedRequests.trySend {
+    sequentialExecutor.execute {
       XDependentBreakpointManagerApi.getInstance().setMasterDependency(breakpoint.id, masterBreakpoint.id, selected)
     }
   }

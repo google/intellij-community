@@ -16,4 +16,5 @@ internal class KotlinTryPostfixTemplate(provider: PostfixTemplateProvider) : Sur
     provider
 ) {
     override fun getSurrounder(): KotlinTryCatchSurrounder = KotlinTryCatchSurrounder()
+    override fun isApplicableForModCommand(): Boolean = true
 }

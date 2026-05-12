@@ -14,6 +14,7 @@ import org.jetbrains.kotlin.cli.common.arguments.K2JSCompilerArguments
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
 import org.jetbrains.kotlin.cli.common.arguments.K2MetadataCompilerArguments
 import org.jetbrains.kotlin.cli.common.arguments.K2NativeCompilerArguments
+import org.jetbrains.kotlin.cli.common.arguments.KotlinWasmCompilerArguments
 import org.jetbrains.kotlin.cli.common.arguments.ManualLanguageFeatureSetting
 import org.jetbrains.kotlin.config.CompilerSettings
 import org.jetbrains.kotlin.config.ExternalSystemNativeMainRunTask
@@ -109,6 +110,7 @@ object CompilerArgumentsSerializer {
     private val argumentsTypeMap = mapOf(
         "J" to K2JVMCompilerArguments::class.java,
         "S" to K2JSCompilerArguments::class.java,
+        "W" to KotlinWasmCompilerArguments::class.java,
         "M" to K2MetadataCompilerArguments::class.java,
         "N" to K2NativeCompilerArguments::class.java,
         "F" to FakeK2NativeCompilerArguments::class.java,

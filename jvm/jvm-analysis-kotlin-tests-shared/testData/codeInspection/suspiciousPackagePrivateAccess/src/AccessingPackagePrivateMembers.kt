@@ -7,7 +7,7 @@ import xxx.StaticMembers.*
  * @see PublicClass.packagePrivateField
  */
 @Suppress("UNUSED_VARIABLE")
-class AccessingPackagePrivateMembers {
+class AccessingPackagePrivateMembers : InnerClasses() {
   private val property = <warning descr="Class xxx.PackagePrivateClass is package-private, but declared in a different module 'dep'">PackagePrivateClass</warning>()
 
   fun main() {
@@ -34,6 +34,30 @@ class AccessingPackagePrivateMembers {
     InnerClasses.<warning descr="Class xxx.InnerClasses.PackagePrivateInnerClass is package-private, but declared in a different module 'dep'">PackagePrivateInnerClass</warning>()
     InnerClasses.<warning descr="Class xxx.InnerClasses.PackagePrivateInnerClassWithConstructor is package-private, but declared in a different module 'dep'"><warning descr="Constructor PackagePrivateInnerClassWithConstructor.PackagePrivateInnerClassWithConstructor() is package-private, but declared in a different module 'dep'">PackagePrivateInnerClassWithConstructor</warning></warning>()
     InnerClasses.<warning descr="Constructor ClassWithPackagePrivateConstructor.ClassWithPackagePrivateConstructor() is package-private, but declared in a different module 'dep'">ClassWithPackagePrivateConstructor</warning>()
+
+    object : InnerClasses.<warning descr="Class xxx.InnerClasses.PackagePrivateInnerClass is package-private, but declared in a different module 'dep'">PackagePrivateInnerClass</warning>() {
+      fun foo() {
+        super.toString()
+      }
+    }
+
+    object : InnerClasses.ProtectedInnerClass() {
+      fun foo() {
+        super.toString()
+      }
+    }
+
+    object : InnerClasses.<warning descr="Class xxx.InnerClasses.PackagePrivateInnerClassWithConstructor is package-private, but declared in a different module 'dep'">PackagePrivateInnerClassWithConstructor</warning>() {
+      fun foo() {
+        super.toString()
+      }
+    }
+
+    object : InnerClasses.ClassWithPackagePrivateConstructor() {
+      fun foo() {
+        super.toString()
+      }
+    }
   }
 
   companion object {

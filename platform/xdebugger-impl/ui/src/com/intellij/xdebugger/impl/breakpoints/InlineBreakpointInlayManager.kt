@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger.impl.breakpoints
 
 import com.intellij.openapi.application.EDT
@@ -35,9 +35,9 @@ import com.intellij.util.DocumentUtil
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.util.concurrency.annotations.RequiresWriteLock
 import com.intellij.util.containers.isEmpty
-import com.intellij.util.ui.update.MergingUpdateQueue
-import com.intellij.util.ui.update.Update
+import com.intellij.util.ui.update.DebouncedUpdates
 import com.intellij.xdebugger.XDebuggerUtil
+import com.intellij.xdebugger.breakpoints.XLineBreakpointVerticalPlacement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -45,17 +45,26 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import java.util.concurrent.atomic.AtomicLong
 import java.util.stream.Stream
+import kotlin.time.Duration.Companion.milliseconds
 
 @ApiStatus.Internal
 @Service(Service.Level.PROJECT)
 class InlineBreakpointInlayManager(private val project: Project, parentScope: CoroutineScope) {
   private val scope = parentScope.childScope("InlineBreakpoints")
 
-  private val redrawQueue = MergingUpdateQueue.mergingUpdateQueue(
-    name = "inline breakpoint inlay redraw queue",
-    mergingTimeSpan = 300,
-    coroutineScope = scope,
-  ).setRestartTimerOnAdd(true)
+  private data class RedrawRequest(val document: Document, val line: Int?, val editor: Editor?)
+
+  private val redrawQueue = DebouncedUpdates.forScope<RedrawRequest>(
+    scope,
+    "inline breakpoint inlay redraw queue",
+    300.milliseconds
+  )
+    .restartTimerOnAdd(true)
+    .runBatched { requests ->
+      requests.distinctBy { it.document to it.line }.forEach { request ->
+        redraw(request.document, request.line, request.editor)
+      }
+    }
 
   private fun areInlineBreakpointsEnabled(virtualFile: VirtualFile?) = XDebuggerUtil.areInlineBreakpointsEnabled(virtualFile)
 
@@ -114,9 +123,7 @@ class InlineBreakpointInlayManager(private val project: Project, parentScope: Co
    */
   private fun redrawLineQueued(document: Document, line: Int) {
     if (!areInlineBreakpointsEnabled(document)) return
-    redrawQueue.queue(Update.create(Pair(document, line)) {
-      redrawLine(document, line)
-    })
+    redrawQueue.queue(RedrawRequest(document, line, null))
   }
 
   fun redrawDocument(e: DocumentEvent) {
@@ -151,9 +158,14 @@ class InlineBreakpointInlayManager(private val project: Project, parentScope: Co
     }
   }
 
+  /**
+   * Returns document breakpoints that are eligible for inline inlay rendering.
+   * Only breakpoints which can be placed on a line are taken into account.
+   */
   private fun allBreakpoints(document: Document): Collection<XLineBreakpointProxy> =
     XDebugManagerProxy.getInstance().getBreakpointManagerProxy(project).getLineBreakpointManager()
       .getDocumentBreakpointProxies(document)
+      .filter { it.getPlacement() == XLineBreakpointVerticalPlacement.ON_LINE }
 
   private fun getBreakpointLines(document: Document, onlyLine: Int?): Set<Int> {
     var lines: Set<Int> = allBreakpoints(document).map { it.getLine() }.toHashSet()
@@ -221,11 +233,7 @@ class InlineBreakpointInlayManager(private val project: Project, parentScope: Co
     }
 
     private fun doPostpone() {
-      redrawQueue.queue(Update.create(Pair(document, onlyLine)) {
-        scope.launch {
-          redraw(document, onlyLine, onlyEditor)
-        }
-      })
+      redrawQueue.queue(RedrawRequest(document, onlyLine, onlyEditor))
     }
 
     private fun shouldBePostponed(): Boolean {

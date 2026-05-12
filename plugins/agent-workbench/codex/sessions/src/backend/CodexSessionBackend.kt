@@ -7,11 +7,19 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
 data class CodexBackendThread(
-  val thread: CodexThread,
-  val activity: CodexSessionActivity = CodexSessionActivity.READY,
+  @JvmField val thread: CodexThread,
+  @JvmField val activity: CodexSessionActivity = CodexSessionActivity.READY,
+  @JvmField val requiresResponse: Boolean = false,
+)
+
+data class CodexBackendThreadRefreshResult(
+  @JvmField val threads: List<CodexBackendThread> = emptyList(),
+  @JvmField val removedThreadIds: Set<String> = emptySet(),
+  @JvmField val isComplete: Boolean = false,
 )
 
 enum class CodexSessionActivity {
+  NEEDS_INPUT,
   UNREAD,
   REVIEWING,
   PROCESSING,
@@ -20,6 +28,8 @@ enum class CodexSessionActivity {
 
 interface CodexSessionBackend {
   suspend fun listThreads(path: String, openProject: Project?): List<CodexBackendThread>
+
+  suspend fun refreshThreads(path: String, threadIds: Set<String>, openProject: Project?): CodexBackendThreadRefreshResult? = null
 
   val updates: Flow<Unit>
     get() = emptyFlow()

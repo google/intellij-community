@@ -8,9 +8,8 @@ import com.intellij.openapi.options.UnnamedConfigurable;
 import com.intellij.openapi.project.Project;
 import com.jetbrains.python.PyBundle;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-public final class PyIntegratedToolsModulesConfigurable extends ModuleAwareProjectConfigurable {
+public final class PyIntegratedToolsModulesConfigurable extends ModuleAwareProjectConfigurable<UnnamedConfigurable> {
   public PyIntegratedToolsModulesConfigurable(@NotNull Project project) {
     super(project, PyBundle.message("configurable.PyIntegratedToolsModulesConfigurable.display.name"), "reference-python-integrated-tools");
   }
@@ -21,7 +20,7 @@ public final class PyIntegratedToolsModulesConfigurable extends ModuleAwareProje
   }
 
   @Override
-  protected @Nullable UnnamedConfigurable createDefaultProjectConfigurable() {
+  protected @NotNull UnnamedConfigurable createDefaultProjectConfigurable() {
     return new PyIntegratedToolsConfigurable();
   }
 }

@@ -1,12 +1,11 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.importing
 
-import com.intellij.openapi.externalSystem.util.DEFAULT_SYNC_TIMEOUT_MS
 import com.intellij.openapi.externalSystem.util.ExternalSystemUtil
 import com.intellij.openapi.projectRoots.JavaSdkVersion
+import com.intellij.platform.externalSystem.testFramework.ExternalSystemTestObservation
 import com.intellij.pom.java.JavaRelease
 import com.intellij.pom.java.LanguageLevel
-import com.intellij.testFramework.TestObservation
 import org.jetbrains.plugins.gradle.jvmcompat.GradleJvmSupportMatrix
 import org.jetbrains.plugins.gradle.settings.GradleProjectSettings
 import org.jetbrains.plugins.gradle.settings.GradleSettings
@@ -210,8 +209,9 @@ class GradleJavaCompilerSettingsImportingTest : GradleJavaCompilerSettingsImport
     val settings = GradleSettings.getInstance(myProject)
     settings.linkProject(GradleProjectSettings("$projectPath/project1"))
     settings.linkProject(GradleProjectSettings("$projectPath/project2"))
-    ExternalSystemUtil.refreshProjects(createImportSpec())
-    TestObservation.waitForConfiguration(myProject, DEFAULT_SYNC_TIMEOUT_MS)
+    ExternalSystemTestObservation.waitForProjectActivity(myProject) {
+      ExternalSystemUtil.refreshProjects(createImportSpec())
+    }
 
     assertModules("project1", "project1.main", "project1.test",
                   "project2", "project2.main", "project2.test")

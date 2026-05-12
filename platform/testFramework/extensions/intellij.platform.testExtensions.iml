@@ -23,10 +23,11 @@
     <orderEntry type="module" module-name="intellij.platform.util.jdom" />
     <orderEntry type="library" name="memoryfilesystem" level="project" />
     <orderEntry type="library" name="JUnit4" level="project" />
-    <orderEntry type="library" name="assertJ" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.assertj.core" />
     <orderEntry type="module" module-name="intellij.libraries.snakeyaml" />
     <orderEntry type="module" module-name="intellij.libraries.fastutil" />
     <orderEntry type="module" module-name="intellij.platform.core.ui" />
+    <orderEntry type="module" module-name="intellij.platform.ide.core" />
     <orderEntry type="library" name="JUnit5" level="project" />
     <orderEntry type="module" module-name="intellij.java.rt" />
   </component>

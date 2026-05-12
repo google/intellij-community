@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.junit5.report;
 
 import com.intellij.rt.execution.junit.MapSerializerUtil;
@@ -13,6 +13,7 @@ import java.util.List;
 public class CompositeTestReporter extends AbstractTestReporter {
   private final TestReporter asTest;
   private final SuiteReporter asSuite;
+  private long myStartNanos;
 
   public CompositeTestReporter(TestIdentifier identifier, ExecutionState state) {
     super(identifier, state);
@@ -22,6 +23,7 @@ public class CompositeTestReporter extends AbstractTestReporter {
 
   @Override
   public List<String> start() {
+    myStartNanos = System.nanoTime();
     List<String> out = new ArrayList<>();
     out.addAll(asSuite.start());
     out.addAll(asTest.start());
@@ -35,6 +37,11 @@ public class CompositeTestReporter extends AbstractTestReporter {
 
   @Override
   public List<String> finish(TestExecutionResult result) {
+    if (state.isUseSuiteDuration()) {
+      // Do not move this to start(): child test events can overwrite the shared current-test start time
+      // before TestReporter.finish() computes the composite node duration.
+      state.setCurrentTestStartNanos(myStartNanos);
+    }
     List<String> out = new ArrayList<>();
     out.addAll(asTest.finish(result));
     out.addAll(asSuite.finish(result));

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide
 
 import com.intellij.featureStatistics.fusCollectors.LifecycleUsageTriggerCollector
@@ -75,9 +75,7 @@ object CommandLineProcessor {
   suspend fun doOpenFileOrProject(file: Path, createOrOpenExistingProject: Boolean, shouldWait: Boolean): CommandLineProcessorResult {
     if (!LightEditUtil.isForceOpenInLightEditMode()) {
       val options = OpenProjectTask {
-        // do not check for .ipr files in the specified directory
-        // (@develar: it is existing behavior, I am not fully sure that it is correct)
-        preventIprLookup = true
+        preventIprLookup = !createOrOpenExistingProject
         if (createOrOpenExistingProject) {
           configureToOpenDotIdeaOrCreateNewIfNotExists(projectDir = file, projectToClose = null)
         }
@@ -142,7 +140,7 @@ object CommandLineProcessor {
     val project: Project?
     if (LightEditUtil.isForceOpenInLightEditMode()) {
       project = LightEditService.getInstance().openFile(file)
-      LightEditFeatureUsagesUtil.logFileOpen(project, OpenPlace.CommandLine)
+      LightEditFeatureUsagesUtil.logFileOpen(project, file, OpenPlace.CommandLine)
     }
     else {
       project = findBestProject(file, projects)
@@ -221,7 +219,7 @@ object CommandLineProcessor {
         if (file != null) {
           val line = parameters["line"]?.lastOrNull()?.toIntOrNull() ?: -1
           val column = parameters["column"]?.lastOrNull()?.toIntOrNull() ?: -1
-          val (project) = openFileOrProject(file, line, column, tempProject = false, shouldWait = false, lightEditMode = false)
+          val (project, _) = openFileOrProject(file, line, column, tempProject = false, shouldWait = false, lightEditMode = false)
           LifecycleUsageTriggerCollector.onProtocolOpenCommandHandled(project)
           return CliResult.OK
         }
@@ -482,16 +480,9 @@ object CommandLineProcessor {
     lightEditMode: Boolean,
   ): CommandLineProcessorResult = LightEditUtil.computeWithCommandLineOptions(shouldWait, lightEditMode).use {
     val asFile = line != -1 || tempProject
-    if (asFile) doOpenFile(file, line, column, tempProject, shouldWait)
-    else doOpenFileOrProject(file, !tempProject, shouldWait)
+    if (asFile)
+      doOpenFile(file, line, column, tempProject, shouldWait)
+    else
+      doOpenFileOrProject(file, createOrOpenExistingProject = true, shouldWait)
   }
 }
-
-@Deprecated("Replace with a hard-coded name", level = DeprecationLevel.ERROR)
-@Suppress("unused")
-@get:ApiStatus.Internal
-val ApplicationStarter.commandNameFromExtension: String?
-  get() = ExtensionPointName<ApplicationStarter>("com.intellij.appStarter")
-    .filterableLazySequence()
-    .find { it.implementationClassName == javaClass.name }
-    ?.id

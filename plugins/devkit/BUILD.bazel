@@ -1,21 +1,18 @@
 ### auto-generated section `build intellij.devkit` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "devkit_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "devkit",
+  module_name = "intellij.devkit",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
-  resources = [":devkit_resources"]
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources"
 )
 
 jvm_library(
   name = "devkit_test_lib",
+  testonly = True,
   module_name = "intellij.devkit",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -23,9 +20,16 @@ jvm_library(
 )
 ### auto-generated section `build intellij.devkit` end
 
+### auto-generated section `iml intellij.devkit` start
+exports_files([
+  "intellij.devkit.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.devkit` end
+
 ### auto-generated section `build intellij.devkit.plugin.main` start
 jvm_library(
   name = "devkit-plugin-main",
+  module_name = "intellij.devkit.plugin.main",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -35,11 +39,13 @@ jvm_library(
     "//plugins/devkit/intellij.kotlin.devkit/k2",
     "//plugins/devkit/intellij.devkit.workspaceModel:workspaceModel",
     "//plugins/devkit/intellij.devkit.compose:compose",
+    "//plugins/devkit/intellij.devkit.uiDsl:uiDsl",
   ]
 )
 
 jvm_library(
   name = "devkit-plugin-main_test_lib",
+  testonly = True,
   module_name = "intellij.devkit.plugin.main",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -55,13 +61,21 @@ jvm_library(
     "//plugins/devkit/intellij.devkit.workspaceModel/tests",
     "//plugins/devkit/intellij.devkit.workspaceModel/tests:tests_test_lib",
     "//plugins/devkit/intellij.devkit.compose:compose_test_lib",
+    "//plugins/devkit/intellij.devkit.uiDsl:uiDsl_test_lib",
   ]
 )
 ### auto-generated section `build intellij.devkit.plugin.main` end
 
+### auto-generated section `iml intellij.devkit.plugin.main` start
+exports_files([
+  "intellij.devkit.plugin.main.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.devkit.plugin.main` end
+
 ### auto-generated section `build intellij.devkit.plugin.main.noKotlin` start
 jvm_library(
   name = "devkit-plugin-main-noKotlin",
+  module_name = "intellij.devkit.plugin.main.noKotlin",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -74,7 +88,6 @@ jvm_library(
     "//plugins/devkit/intellij.devkit.themes:themes",
     "//plugins/devkit/intellij.devkit.uiDesigner:uiDesigner",
     "//plugins/devkit/jps-plugin:jps",
-    "//plugins/devkit/runtimeModuleRepository/jps",
     "//plugins/devkit/intellij.devkit.scaffolding:scaffolding",
     "//plugins/devkit/intellij.devkit.stacktrace:stacktrace",
     "//plugins/devkit/api-dump",
@@ -84,6 +97,7 @@ jvm_library(
 
 jvm_library(
   name = "devkit-plugin-main-noKotlin_test_lib",
+  testonly = True,
   module_name = "intellij.devkit.plugin.main.noKotlin",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -98,7 +112,6 @@ jvm_library(
     "//plugins/devkit/intellij.devkit.themes:themes_test_lib",
     "//plugins/devkit/intellij.devkit.uiDesigner:uiDesigner_test_lib",
     "//plugins/devkit/jps-plugin:jps_test_lib",
-    "//plugins/devkit/runtimeModuleRepository/jps:jps_test_lib",
     "//plugins/devkit/intellij.devkit.scaffolding:scaffolding_test_lib",
     "//plugins/devkit/devkit-java-tests:java-tests",
     "//plugins/devkit/devkit-java-tests:java-tests_test_lib",
@@ -108,3 +121,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.devkit.plugin.main.noKotlin` end
+
+### auto-generated section `iml intellij.devkit.plugin.main.noKotlin` start
+exports_files([
+  "intellij.devkit.plugin.main.noKotlin.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.devkit.plugin.main.noKotlin` end

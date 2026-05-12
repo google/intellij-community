@@ -1,5 +1,6 @@
 package com.jetbrains.performancePlugin
 
+import com.intellij.platform.testFramework.teamCity.generifyErrorMessage
 import org.junit.Assert
 import org.junit.Test
 

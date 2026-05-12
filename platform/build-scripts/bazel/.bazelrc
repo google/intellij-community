@@ -1,7 +1,17 @@
 # IJI-2767 Bazel: move bazel output root to a standard location
 startup:macos --output_user_root=~/Library/Caches/JetBrains/MonorepoBazel
 startup:linux --output_user_root=~/.cache/JetBrains/MonorepoBazel
-startup:windows --output_user_root=~/AppData/Local/JetBrains/MonorepoBazel
+# MRI-4120: On Windows, we use a short `output_user_root` to mitigate long path issues
+# When using a custom disk drive setup (different disk label, etc.), configure in `%USERPROFILE%\.bazelrc`:
+# ```
+# startup --output_user_root=<YOUR PATH HERE WITH / SLASHES>
+# startup:windows --output_user_root=<YOUR PATH HERE WITH / SLASHES>
+# ```
+# (both lines matter to match various Bazel configurations out there)
+# USE '/' slashes in your path, like W:/bazel
+#
+# See https://bazel.build/run/bazelrc for more details
+startup:windows --output_user_root=C:/ProgramData/_bazel
 
 build --nobuild_runfile_links
 
@@ -25,8 +35,8 @@ build --@rules_kotlin//kotlin/settings:jvm_emit_jdeps=False
 
 # https://bazel.build/docs/bazel-and-java#hermetic-testing
 # The code is compiled for, executed, and tested on this JVM.
-build --java_language_version=21
-build --java_runtime_version=remotejdk_21
+build --java_language_version=25
+build --java_runtime_version=remotejdk_25
 
 # Why we register a local Java toolchain override here:
 # 1) This module intentionally sets `BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1` below,
@@ -49,20 +59,19 @@ build --java_runtime_version=remotejdk_21
 # 8) We therefore register our local toolchain definition via `--extra_toolchains`;
 #    the local toolchain is defined in BUILD.bazel and replaces
 #    `proguard_allowlister` with a no-op executable, removing the C++ edge while
-#    preserving the rest of the JDK21 toolchain behavior.
-build --extra_toolchains=//:jps_to_bazel_toolchain_jdk_21_definition
+#    preserving the rest of the JDK25 toolchain behavior.
+build --extra_toolchains=//:jps_to_bazel_toolchain_jdk_25_definition
 
 # https://bazel.build/docs/bazel-and-java#config-build-tools-java
 # A second pair of JDK and JVM used to build and execute tools, which are used in the build process, but are not in the build results.
 # That JDK and JVM are controlled using --tool_java_language_version and --tool_java_runtime_version
-build --tool_java_language_version=21
+build --tool_java_language_version=25
 # Java runtime the tools should use
-build --tool_java_runtime_version=remotejdk_21
+build --tool_java_runtime_version=remotejdk_25
 
 # see https://bazel.build/external/lockfile
 # use `bazel mod deps --lockfile_mode=refresh` to update lock file
 common --lockfile_mode=error
-common:windows --lockfile_mode=off  # todo: https://youtrack.jetbrains.com/issue/DPE-59
 
 # make sure you don't need to open file to read compilation errors
 common --experimental_ui_max_stdouterr_bytes=-1

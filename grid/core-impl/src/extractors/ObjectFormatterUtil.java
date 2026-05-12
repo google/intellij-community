@@ -1,12 +1,10 @@
 package com.intellij.database.extractors;
 
-import com.intellij.database.datagrid.CoreGrid;
+import com.intellij.database.datagrid.GridCellRequest;
 import com.intellij.database.datagrid.GridColumn;
 import com.intellij.database.datagrid.GridRow;
 import com.intellij.database.datagrid.JdbcColumnDescriptor;
 import com.intellij.database.datagrid.JdbcGridColumn;
-import com.intellij.database.datagrid.ModelIndex;
-import com.intellij.database.run.ui.DataAccessType;
 import com.intellij.database.run.ui.grid.editors.GridCellEditorHelper;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.CommonClassNames;
@@ -188,12 +186,12 @@ public class ObjectFormatterUtil {
             CommonClassNames.JAVA_LANG_BOOLEAN.equals(className)) && ((JdbcGridColumn)column).getSize() <= 1;
   }
 
-  public static boolean isBooleanCell(@NotNull CoreGrid<GridRow, GridColumn> grid, @NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
-    return isBooleanColumn(Objects.requireNonNull(grid.getDataModel(DataAccessType.DATABASE_DATA).getColumn(column)), GridCellEditorHelper.get(grid).guessJdbcTypeForEditing(grid, row, column));
+  public static boolean isBooleanCell(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    return isBooleanColumn(Objects.requireNonNull(request.getColumn()), GridCellEditorHelper.get(request.getGrid()).guessJdbcTypeForEditing(request));
   }
 
-  public static boolean isNumericCell(@NotNull CoreGrid<GridRow, GridColumn> grid, @NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
-    return isNumericValue(GridCellEditorHelper.get(grid).guessJdbcTypeForEditing(grid, row, column));
+  public static boolean isNumericCell(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    return isNumericValue(GridCellEditorHelper.get(request.getGrid()).guessJdbcTypeForEditing(request));
   }
 
   public static boolean isNumericValue(int type) {

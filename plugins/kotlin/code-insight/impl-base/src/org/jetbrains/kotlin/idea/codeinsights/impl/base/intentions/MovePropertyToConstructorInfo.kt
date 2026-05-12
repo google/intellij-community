@@ -75,8 +75,8 @@ sealed interface MovePropertyToConstructorInfo {
             }
         }
 
-        context(_: KaSession)
         @OptIn(KaExperimentalApi::class)
+        context(_: KaSession)
         fun create(element: KtProperty, initializer: KtExpression? = element.initializer): MovePropertyToConstructorInfo? {
             if (initializer != null && !initializer.isValidInConstructor()) return null
 
@@ -125,8 +125,8 @@ sealed interface MovePropertyToConstructorInfo {
             it.getTextWithUseSite()
         }
 
-        context(_: KaSession)
         @OptIn(KaExperimentalApi::class)
+        context(_: KaSession)
         private fun KtAnnotationEntry.getTextWithUseSite(): String {
             if (useSiteTarget != null) return text
             val typeReference = typeReference ?: return text

@@ -1,12 +1,13 @@
 // Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.base.codeInsight
 
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.components.DefaultTypeClassIds
-import org.jetbrains.kotlin.analysis.api.components.buildClassType
+import org.jetbrains.kotlin.analysis.api.components.KaStandardTypeClassIds
 import org.jetbrains.kotlin.analysis.api.components.expressionType
 import org.jetbrains.kotlin.analysis.api.components.isSubtypeOf
 import org.jetbrains.kotlin.analysis.api.components.resolveToCall
+import org.jetbrains.kotlin.analysis.api.components.typeCreator
 import org.jetbrains.kotlin.analysis.api.resolution.KaCompoundArrayAccessCall
 import org.jetbrains.kotlin.analysis.api.resolution.KaFunctionCall
 import org.jetbrains.kotlin.analysis.api.resolution.calls
@@ -177,8 +178,9 @@ private fun getForElvis(target: KtElement): ExpectedExpressionMatcher? {
         val ifExpression = containerNode.parent as? KtIfExpression ?: return null
 
         if (target == ifExpression.condition) {
+            @OptIn(KaExperimentalApi::class)
             return ExpectedExpressionMatcher(
-                types = listOf(buildClassType(DefaultTypeClassIds.BOOLEAN)),
+                types = listOf(typeCreator.classType(KaStandardTypeClassIds.BOOLEAN)),
                 nullability = KaTypeNullability.NON_NULLABLE
             )
         }
@@ -202,14 +204,16 @@ private fun getForElvis(target: KtElement): ExpectedExpressionMatcher? {
         if (target == forExpression.loopRange) {
             val loopParameter = forExpression.loopParameter
 
+            @OptIn(KaExperimentalApi::class)
             val elementType = when {
                 loopParameter != null && loopParameter.typeReference != null -> loopParameter.symbol.returnType
-                else -> buildClassType(DefaultTypeClassIds.ANY)
+                else -> typeCreator.classType(KaStandardTypeClassIds.ANY)
             }
 
             fun constructType(classId: ClassId): KaType {
-                return buildClassType(classId) {
-                    argument(elementType, Variance.OUT_VARIANCE)
+                @OptIn(KaExperimentalApi::class)
+                return typeCreator.classType(classId) {
+                    typeArgument(Variance.OUT_VARIANCE, elementType)
                 }
             }
 
@@ -217,7 +221,8 @@ private fun getForElvis(target: KtElement): ExpectedExpressionMatcher? {
                 constructType(KOTLIN_ITERABLE_CLASS_ID),
                 constructType(KOTLIN_SEQUENCE_CLASS_ID),
                 constructType(JAVA_STREAM_CLASS_ID),
-                buildClassType(DefaultTypeClassIds.CHAR_SEQUENCE)
+                @OptIn(KaExperimentalApi::class)
+                typeCreator.classType(KaStandardTypeClassIds.CHAR_SEQUENCE)
             )
 
             return ExpectedExpressionMatcher(types = possibleTypes)

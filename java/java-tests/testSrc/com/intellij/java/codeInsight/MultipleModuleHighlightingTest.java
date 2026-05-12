@@ -59,7 +59,7 @@ public class MultipleModuleHighlightingTest extends JavaCodeInsightFixtureTestCa
   @Override
   protected void tuneFixture(JavaModuleFixtureBuilder<?> moduleBuilder) throws Exception {
     moduleBuilder.setLanguageLevel(LanguageLevel.JDK_1_8);
-    moduleBuilder.addJdk(IdeaTestUtil.getMockJdk18Path().getPath());
+    moduleBuilder.addJdkVersion(LanguageLevel.JDK_1_8);
   }
 
   public void testMissedTransitiveDepFunctionalInterface() throws IOException {

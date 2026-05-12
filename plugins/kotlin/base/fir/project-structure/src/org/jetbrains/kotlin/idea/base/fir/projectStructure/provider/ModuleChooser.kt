@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.base.fir.projectStructure.provider
 
+import com.intellij.openapi.roots.OrderRootType
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaBuiltinsModule
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaDanglingFileModule
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaLibraryModule
@@ -10,6 +11,7 @@ import org.jetbrains.kotlin.analysis.api.projectStructure.KaNotUnderContentRootM
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaScriptDependencyModule
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaScriptModule
 import org.jetbrains.kotlin.analysis.api.projectStructure.allDirectDependencies
+import org.jetbrains.kotlin.idea.base.projectStructure.openapiLibrary
 
 
 /**
@@ -28,7 +30,14 @@ internal object ModuleChooser {
         if (useSiteModule != null) {
             chooseByPriority(modules, useSiteModule)?.let { return it }
         }
-        return modules.firstOrNull()
+
+        val module = modules.singleOrNull()
+        if (module != null) {
+            return module
+        }
+
+        return modules.firstOrNull { (it as? KaLibraryModule)?.openapiLibrary?.getUrls(OrderRootType.SOURCES)?.isNotEmpty() == true  }
+            ?: modules.firstOrNull()
     }
 
     private fun chooseByPriority(

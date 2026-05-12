@@ -16,7 +16,7 @@ import com.intellij.util.PathUtil;
 
 import java.io.File;
 
-@TestDataPath("$CONTENT_ROOT/testData/inspections/pluginXmlI18n")
+@TestDataPath("$CONTENT_ROOT/../testData/inspections/pluginXmlI18n")
 public class PluginXmlI18nInspectionTest extends JavaCodeInsightFixtureTestCase {
 
   @Override

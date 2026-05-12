@@ -38,8 +38,6 @@
 
     <applicationService serviceImplementation="com.intellij.debugger.settings.NodeRendererSettings"/>
     <applicationService serviceImplementation="com.intellij.debugger.settings.ViewsGeneralSettings"/>
-    <applicationService serviceImplementation="com.intellij.debugger.settings.DebuggerSettings"/>
-    <applicationService serviceImplementation="com.intellij.refactoring.JavaRefactoringSettings"/>
     <projectService serviceImplementation="com.intellij.debugger.settings.DebuggerProjectSettings"/>
     <applicationService serviceImplementation="com.intellij.debugger.settings.ThreadsViewSettings"/>
     <applicationService serviceImplementation="com.intellij.debugger.settings.TraceSettings"/>
@@ -48,8 +46,6 @@
 
     <statistics.counterUsagesCollector groupId="java.find.usages" version="1"/>
     <statistics.counterUsagesCollector groupId="java.extract.method" version="1"/>
-    <statistics.applicationUsagesCollector implementation="com.intellij.debugger.settings.DebuggerSettingsStatisticsCollector"/>
-    <statistics.applicationUsagesCollector implementation="com.intellij.refactoring.JavaRefactoringUsageCollector"/>
 
     <applicationService serviceInterface="com.intellij.packaging.elements.PackagingElementFactory"
                         serviceImplementation="com.intellij.packaging.impl.elements.PackagingElementFactoryImpl"/>
@@ -77,8 +73,6 @@
                         serviceImplementation="com.intellij.openapi.projectRoots.impl.DefaultJdkConfiguratorImpl"/>
     <orderRootType implementation="com.intellij.openapi.roots.JavadocOrderRootType"/>
     <orderRootType implementation="com.intellij.openapi.roots.AnnotationOrderRootType"/>
-
-    <dynamicActionConfigurationCustomizer  implementation="jetbrains.mps.ide.projectPane.ProjectPaneActionsCustomizer"/>
 
     <projectService serviceImplementation="com.intellij.compiler.CompilerConfigurationSettings" configurationSchemaKey="compiler"/>
 

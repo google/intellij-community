@@ -1,9 +1,9 @@
 package com.intellij.database.run.ui.grid.renderers;
 
 import com.intellij.database.datagrid.DataGrid;
+import com.intellij.database.datagrid.GridCellRequest;
 import com.intellij.database.datagrid.GridColumn;
 import com.intellij.database.datagrid.GridRow;
-import com.intellij.database.datagrid.ModelIndex;
 import com.intellij.database.datagrid.ViewIndex;
 import com.intellij.openapi.Disposable;
 import org.jetbrains.annotations.NotNull;
@@ -23,7 +23,7 @@ public abstract class GridCellRenderer implements Disposable {
     myGrid = grid;
   }
 
-  public abstract int getSuitability(@NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column);
+  public abstract int getSuitability(@NotNull GridCellRequest<GridRow, GridColumn> request);
 
   public abstract @NotNull JComponent getComponent(@NotNull ViewIndex<GridRow> row, @NotNull ViewIndex<GridColumn> column, @Nullable Object value);
 
@@ -36,15 +36,15 @@ public abstract class GridCellRenderer implements Disposable {
 
   public abstract void reinitSettings();
 
-  public static @NotNull GridCellRenderer getRenderer(@NotNull DataGrid grid, @NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
-    GridCellRendererFactories factories = GridCellRendererFactories.get(grid);
+  public static @NotNull GridCellRenderer getRenderer(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    GridCellRendererFactories factories = GridCellRendererFactories.get((DataGrid)request.getGrid());
 
     GridCellRenderer bestRenderer = null;
     int bestSuitability = SUITABILITY_UNSUITABLE;
 
-    for (GridCellRendererFactory factory : factories.getFactoriesFor(row, column)) {
-      GridCellRenderer renderer = factory.getOrCreateRenderer(row, column);
-      int suitability = renderer.getSuitability(row, column);
+    for (GridCellRendererFactory factory : factories.getFactoriesFor(request)) {
+      GridCellRenderer renderer = factory.getOrCreateRenderer(request);
+      int suitability = renderer.getSuitability(request);
       if (suitability > bestSuitability) {
         bestRenderer = renderer;
         bestSuitability = suitability;

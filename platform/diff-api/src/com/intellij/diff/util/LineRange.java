@@ -2,9 +2,13 @@
 package com.intellij.diff.util;
 
 import com.intellij.openapi.diagnostic.Logger;
+import org.jetbrains.annotations.ApiStatus;
 
 public final class LineRange {
   private static final Logger LOG = Logger.getInstance(LineRange.class);
+
+  @ApiStatus.Internal
+  public static final LineRange EMPTY = new LineRange(-1, -1);
 
   public final int start;
   public final int end;

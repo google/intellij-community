@@ -2,6 +2,7 @@
 
   <dependencies>
     <module name="intellij.java.backend"/>
+    <plugin id="com.intellij.copyright"/>
     <plugin id="org.jetbrains.kotlin"/>
     <plugin id="org.editorconfig.editorconfigjetbrains"/>
     <module name="intellij.devkit.core"/>

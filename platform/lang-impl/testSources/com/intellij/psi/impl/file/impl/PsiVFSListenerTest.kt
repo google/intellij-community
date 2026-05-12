@@ -20,9 +20,6 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
-
-private object TestEntitySource : EntitySource
-
 @TestApplication
 class PsiVFSListenerTest {
 
@@ -40,7 +37,7 @@ class PsiVFSListenerTest {
     PsiManagerEx.getInstanceEx(project).addPsiTreeChangeListener(psiListener, testDisposable)
 
     val wsm = WorkspaceModel.getInstance(project)
-    val module = ModuleEntity("Test", emptyList(), TestEntitySource)
+    val module = ModuleEntity("Test", emptyList(), object : EntitySource {})
     wsm.update("add module in test") {
       it.addEntity(module)
     }
@@ -50,7 +47,7 @@ class PsiVFSListenerTest {
 
     IndexingTestUtil.suspendUntilIndexesAreReady(project) // index just added module (dumb mode may generate psi events)
 
-    val imlData = ModuleCustomImlDataEntity(emptyMap(), TestEntitySource) {
+    val imlData = ModuleCustomImlDataEntity(emptyMap(), object : EntitySource {}) {
       this.module = module
     }
     rootListener.reset()

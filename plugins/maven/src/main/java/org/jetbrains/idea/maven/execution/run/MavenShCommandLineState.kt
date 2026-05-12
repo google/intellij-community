@@ -273,7 +273,7 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
         MavenLog.LOG.debug("extracted charset $it from JAVA_TOOL_OPTIONS")
         return Charset.forName(it)
       }
-      if(eelApi.descriptor.osFamily.isWindows) {
+      if (eelApi.descriptor.osFamily.isWindows) {
         return null
       }
       eelApi.exec.getCodepage()?.let {
@@ -343,11 +343,10 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
                                descriptor,
                                taskId,
                                { it },
-                               Function { ctx: MavenParsingContext? -> StartBuildEventImpl(descriptor, "") },
-                               isWrapperedOutput())
+                               Function { ctx: MavenParsingContext? -> StartBuildEventImpl(descriptor, "") })
 
     processHandler.addProcessListener(BuildToolConsoleProcessAdapter(eventProcessor))
-    buildView.attachToProcess(MavenHandlerFilterSpyWrapper(processHandler, isWrapperedOutput(), isWindows()))
+    buildView.attachToProcess(MavenHandlerFilterSpyWrapper(processHandler, isWrapperedOutput()))
 
     val actions = arrayOf<AnAction>(createFilteringActionsGroup(WeakFilterableSupplier(buildView)))
 
@@ -396,12 +395,12 @@ class MavenShCommandLineState(val environment: ExecutionEnvironment, private val
     val consoleView = createConsole()
     val viewManager = environment.project.getService<BuildViewManager>(BuildViewManager::class.java)
 
-    descriptor.withProcessHandler(MavenBuildHandlerFilterSpyWrapper(processHandler, isWrapperedOutput(), isWindows()), null)
+    descriptor.withProcessHandler(MavenBuildHandlerFilterSpyWrapper(processHandler, isWindows()), null)
     descriptor.withExecutionEnvironment(environment)
     val startBuildEvent = StartBuildEventImpl(descriptor, "")
     val eventProcessor =
       MavenBuildEventProcessor(myConfiguration, viewManager, descriptor, taskId,
-                               { it }, { startBuildEvent }, isWrapperedOutput())
+                               { it }, { startBuildEvent })
 
     processHandler.addProcessListener(BuildToolConsoleProcessAdapter(eventProcessor))
     val res = DefaultExecutionResult(consoleView, processHandler, DefaultActionGroup())

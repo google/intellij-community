@@ -35,6 +35,11 @@ public class HighLevelMultiFileSmartCompletionTestGenerated extends AbstractHigh
         runTest("../../completion/testData/smartMultiFile/AnonymousObjectGenericJava/");
     }
 
+    @TestMetadata("AnonymousObjectGenericJavaSubClass")
+    public void testAnonymousObjectGenericJavaSubClass() throws Exception {
+        runTest("../../completion/testData/smartMultiFile/AnonymousObjectGenericJavaSubClass/");
+    }
+
     @TestMetadata("CallableReferenceNotImported")
     public void testCallableReferenceNotImported() throws Exception {
         runTest("../../completion/testData/smartMultiFile/CallableReferenceNotImported/");
@@ -48,6 +53,16 @@ public class HighLevelMultiFileSmartCompletionTestGenerated extends AbstractHigh
     @TestMetadata("FlexibleType")
     public void testFlexibleType() throws Exception {
         runTest("../../completion/testData/smartMultiFile/FlexibleType/");
+    }
+
+    @TestMetadata("FlexibleTypeMultipleArguments")
+    public void testFlexibleTypeMultipleArguments() throws Exception {
+        runTest("../../completion/testData/smartMultiFile/FlexibleTypeMultipleArguments/");
+    }
+
+    @TestMetadata("FlexibleTypeMultipleArgumentsNullable")
+    public void testFlexibleTypeMultipleArgumentsNullable() throws Exception {
+        runTest("../../completion/testData/smartMultiFile/FlexibleTypeMultipleArgumentsNullable/");
     }
 
     @TestMetadata("FlexibleTypeNotNull")
@@ -78,6 +93,16 @@ public class HighLevelMultiFileSmartCompletionTestGenerated extends AbstractHigh
     @TestMetadata("GenericInheritors4")
     public void testGenericInheritors4() throws Exception {
         runTest("../../completion/testData/smartMultiFile/GenericInheritors4/");
+    }
+
+    @TestMetadata("HideNestedPrivateObject")
+    public void testHideNestedPrivateObject() throws Exception {
+        runTest("../../completion/testData/smartMultiFile/HideNestedPrivateObject/");
+    }
+
+    @TestMetadata("HidePrivateObject")
+    public void testHidePrivateObject() throws Exception {
+        runTest("../../completion/testData/smartMultiFile/HidePrivateObject/");
     }
 
     @TestMetadata("InheritorInTheSameFile")
@@ -133,6 +158,11 @@ public class HighLevelMultiFileSmartCompletionTestGenerated extends AbstractHigh
     @TestMetadata("NotImportedGetValue")
     public void testNotImportedGetValue() throws Exception {
         runTest("../../completion/testData/smartMultiFile/NotImportedGetValue/");
+    }
+
+    @TestMetadata("ShowElementsFromIndexWithoutPrefix")
+    public void testShowElementsFromIndexWithoutPrefix() throws Exception {
+        runTest("../../completion/testData/smartMultiFile/ShowElementsFromIndexWithoutPrefix/");
     }
 
     @TestMetadata("StaticMembers1")

@@ -113,10 +113,10 @@ public class MavenTargetShCommandLineState extends CommandLineState implements T
     }
     MavenBuildEventProcessor eventProcessor =
       new MavenBuildEventProcessor(myConfiguration, buildView, descriptor, taskId, targetFileMapper, ctx ->
-        new StartBuildEventImpl(descriptor, ""), useMaven4());
+        new StartBuildEventImpl(descriptor, ""));
 
     processHandler.addProcessListener(new BuildToolConsoleProcessAdapter(eventProcessor));
-    buildView.attachToProcess(new MavenHandlerFilterSpyWrapper(processHandler, useMaven4(), false));
+    buildView.attachToProcess(new MavenHandlerFilterSpyWrapper(processHandler, false));
 
     AnAction[] actions = new AnAction[]{BuildTreeFilters.createFilteringActionsGroup(new WeakFilterableSupplier<>(buildView))};
     DefaultExecutionResult res = new DefaultExecutionResult(buildView, processHandler, actions);
@@ -125,12 +125,6 @@ public class MavenTargetShCommandLineState extends CommandLineState implements T
 
     res.setRestartActions(restartActions.toArray(AnAction.EMPTY_ARRAY));
     return res;
-  }
-
-  private boolean useMaven4() {
-    var mavenCache = MavenDistributionsCache.getInstance(myConfiguration.getProject());
-    var mavenDistribution = mavenCache.getMavenDistribution(myConfiguration.getRunnerParameters().getWorkingDirPath());
-    return isMaven4(mavenDistribution);
   }
 
   private @NotNull Function<MavenParsingContext, StartBuildEvent> getStartBuildEventSupplier(@NotNull ProgramRunner runner,

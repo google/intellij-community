@@ -3,7 +3,9 @@ package com.intellij.driver.sdk.ui
 import com.intellij.driver.client.Driver
 import com.intellij.driver.client.Remote
 import com.intellij.driver.client.impl.RefWrapper
+import com.intellij.driver.client.service
 import com.intellij.driver.model.OnDispatcher
+import com.intellij.driver.model.RdTarget
 import com.intellij.driver.sdk.Project
 import com.intellij.driver.sdk.invokeAction
 import com.intellij.driver.sdk.ui.components.UiComponent
@@ -106,6 +108,13 @@ fun Driver.getSystemClipboard(): ClipboardRef = utility(ToolkitRef::class)
   .getDefaultToolkit()
   .getSystemClipboard()
 
+
+fun Driver.syncVfs() {
+  withWriteAction {
+    service<VirtualFileManagerRemote>().syncRefresh()
+  }
+}
+
 @Remote("org.assertj.swing.driver.CellRendererReader")
 interface CellRendererReader
 
@@ -129,3 +138,9 @@ interface ClipboardOwnerRef
 
 @Remote("java.awt.datatransfer.StringSelection")
 interface StringSelectionRef
+
+
+@Remote("com.intellij.openapi.vfs.VirtualFileManager", rdTarget = RdTarget.BACKEND)
+private interface VirtualFileManagerRemote {
+  fun syncRefresh()
+}

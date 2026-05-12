@@ -1,4 +1,4 @@
-<idea-plugin xmlns:xi="http://www.w3.org/2001/XInclude" package="org.jetbrains.plugins.groovy" allow-bundled-update="true">
+<idea-plugin xmlns:xi="http://www.w3.org/2001/XInclude" allow-bundled-update="true">
   <id>org.intellij.groovy</id>
   <name>Groovy</name>
   <category>Languages</category>
@@ -24,11 +24,18 @@
   <dependencies>
     <plugin id="com.intellij.properties"/>
     <module name="intellij.java.backend"/>
-    <module name="intellij.spellchecker"/>
-    <module name="intellij.java.unscramble"/>
-    <module name="intellij.properties.backend"/>
     <module name="intellij.properties.backend.psi"/>
     <module name="intellij.regexp"/>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+    <module name="intellij.java.frontback.psi"/>
+    <module name="intellij.java.psi"/>
+    <module name="intellij.java.syntax"/>
+    <module name="intellij.java.unscramble"/>
+    <module name="intellij.platform.jps.build.javac.rt"/>
+    <module name="intellij.properties.backend"/>
+    <module name="intellij.properties.psi"/>
+    <module name="intellij.spellchecker"/>
+    <!-- endregion -->
   </dependencies>
 
   <depends optional="true" config-file="intellilang-groovy-support.xml">org.intellij.intelliLang</depends>
@@ -1378,6 +1385,11 @@
     <lang.dumb.mode.supported language="Groovy" implementationClass="org.jetbrains.plugins.groovy.GroovyLanguageDumbAware"/>
 
     <statistics.projectUsagesCollector implementation="org.jetbrains.plugins.groovy.config.GroovyLanguageVersionCollector"/>
+    <projectSettings service="org.jetbrains.plugins.groovy.compiler.GroovyCompilerConfiguration"/>
+    <projectSettings service="org.jetbrains.plugins.groovy.compiler.GreclipseIdeaCompilerSettings"/>
+    <applicationSettings service="org.jetbrains.plugins.groovy.dsl.DslActivationStatus"/>
+    <applicationSettings service="org.jetbrains.plugins.groovy.settings.GroovyApplicationSettings"/>
+    <projectSettings service="org.jetbrains.plugins.groovy.gant.GantSettings"/>
   </extensions>
 
   <extensions defaultExtensionNs="com.intellij.debugger">

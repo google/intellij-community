@@ -8,6 +8,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.extensions.ExtensionDescriptor
 import com.intellij.openapi.extensions.LoadingOrder
 import com.intellij.openapi.extensions.PluginId
+import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.platform.pluginSystem.parser.impl.PluginDescriptorBuilder
 import com.intellij.platform.pluginSystem.parser.impl.PluginXmlConst
@@ -50,8 +51,7 @@ sealed class IdeaPluginDescriptorImpl(
 
   var isDeleted: Boolean = false
 
-  @Transient
-  var jarFiles: List<Path>? = null
+  abstract val ownClassPath: List<Path>?
 
   /** **DO NOT USE** outside plugin subsystem internal code. It is public now due to an unfinished migration */
   var isMarkedForLoading: Boolean = true
@@ -78,19 +78,15 @@ sealed class IdeaPluginDescriptorImpl(
   @Deprecated("Deprecated in Java")
   override fun isEnabled(): Boolean = isMarkedForLoading
 
-  override fun equals(other: Any?): Boolean {
-    return this === other || other is IdeaPluginDescriptorImpl && pluginId == other.pluginId && descriptorPath == other.descriptorPath
-  }
-
-  override fun hashCode(): Int = 31 * pluginId.hashCode() + (descriptorPath?.hashCode() ?: 0)
-
   internal fun createDependsSubDescriptor(
     subBuilder: PluginDescriptorBuilder,
     descriptorPath: String,
+    dependsTargetId: PluginId,
   ): DependsSubDescriptor = DependsSubDescriptor(
     parent = this,
     raw = subBuilder.build(),
-    descriptorPath = descriptorPath
+    descriptorPath = descriptorPath,
+    dependsTargetId = dependsTargetId,
   )
 }
 
@@ -151,6 +147,7 @@ class DependsSubDescriptor(
   val parent: IdeaPluginDescriptorImpl,
   raw: RawPluginDescriptor,
   private val descriptorPath: String,
+  val dependsTargetId: PluginId,
 ) : IdeaPluginDescriptorImpl(raw) {
   init {
     check(parent is PluginMainDescriptor || parent is DependsSubDescriptor)
@@ -160,9 +157,11 @@ class DependsSubDescriptor(
     get() = parent.useCoreClassLoader
   override val isIndependentFromCoreClassLoader: Boolean = raw.isIndependentFromCoreClassLoader
 
-  override val moduleDependencies: ModuleDependencies = convertDependencies(raw.dependencies, null)
+  override val moduleDependencies: ModuleDependencies = ModuleDependencies.EMPTY
 
   private val rawResourceBundleBaseName: String? = raw.resourceBundleBaseName
+
+  override val ownClassPath: List<Path>? = null
 
   override fun getDescriptorPath(): String = descriptorPath
 
@@ -170,6 +169,7 @@ class DependsSubDescriptor(
 
   override fun toString(): String =
     "DependsSubDescriptor(" +
+    "target=$dependsTargetId, " +
     "descriptorPath=$descriptorPath" +
     (if (packagePrefix == null) "" else ", package=$packagePrefix") +
     ") <- $parent"
@@ -277,6 +277,8 @@ class ContentModuleDescriptor(
   override val isIndependentFromCoreClassLoader: Boolean = raw.isIndependentFromCoreClassLoader
 
   private val resourceBundleBaseName: String? = raw.resourceBundleBaseName
+
+  override var ownClassPath: List<Path>? = null
 
   /** java helper */
   fun getModuleNameString(): String = moduleId.name
@@ -394,6 +396,24 @@ val IdeaPluginDescriptorImpl.contentModules: List<ContentModuleDescriptor>
 val IdeaPluginDescriptorImpl.isLoaded: Boolean
   get() = pluginClassLoader != null
 
+@Internal
+suspend fun SequenceScope<IdeaPluginDescriptorImpl>.yieldAllDescriptors(plugin: PluginMainDescriptor) {
+  yield(plugin)
+  yieldAllDependsSubDescriptors(plugin)
+  yieldAll(plugin.contentModules)
+}
+
+/** does not include [descriptor] itself */
+@Internal
+suspend fun SequenceScope<IdeaPluginDescriptorImpl>.yieldAllDependsSubDescriptors(descriptor: IdeaPluginDescriptorImpl) {
+  for (dep in descriptor.pluginDependencies) {
+    dep.subDescriptor?.let {
+      yield(it)
+      yieldAllDependsSubDescriptors(it)
+    }
+  }
+}
+
 internal fun convertDependencies(dependencies: List<DependenciesElement>, parent: PluginMainDescriptor?): ModuleDependencies {
   if (dependencies.isEmpty()) {
     return ModuleDependencies.EMPTY
@@ -481,4 +501,12 @@ private fun convertExtensions(rawMap: Map<String, List<ExtensionElement>>): Map<
       null
     }
   }
+}
+
+@get:Internal
+@IntellijInternalApi
+val IdeaPluginDescriptorImpl.shortLogDescription: String get() = when (this) {
+  is PluginMainDescriptor -> "plugin '$name' ($pluginId, $version)"
+  is DependsSubDescriptor -> "<depends> config '${descriptorPath}' of plugin ${pluginId}"
+  is ContentModuleDescriptor -> "module ${moduleId.displayName}"
 }

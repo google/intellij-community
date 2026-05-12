@@ -95,7 +95,7 @@ internal class ClassLoaderConfiguratorTest {
     }.buildDir(rootDir.resolve("p_dependency"))
     plugin("p_dependent") {
       packagePrefix = "com.example"
-      content {
+      content(namespace = "jetbrains") {
         module("com.example.sub") {
           packagePrefix = "com.example.extraSupportedFeature"
           extensionPoints =
@@ -103,16 +103,18 @@ internal class ClassLoaderConfiguratorTest {
         }
       }
     }.buildDir(rootDir.resolve("p_dependent"))
-    val plugins = PluginSetTestBuilder.fromPath(rootDir).discoverPlugins().second.pluginLists.flatMap { it.plugins }
+    val pluginSetTestBuilder = PluginSetTestBuilder.fromPath(rootDir)
+    val initContext = pluginSetTestBuilder.buildInitContext()
+    val plugins = pluginSetTestBuilder.discoverPlugins().second.pluginLists.flatMap { it.plugins }
     Assertions.assertThat(plugins).hasSize(2)
-    val classLoaderConfigurator = ClassLoaderConfigurator(PluginSetBuilder(plugins.toSet()).createPluginSetWithEnabledModulesMap())
+    val classLoaderConfigurator = ClassLoaderConfigurator(PluginSetBuilder(initContext, UnambiguousPluginSet.tryBuild(plugins)!!).createPluginSetWithEnabledModulesMap())
     classLoaderConfigurator.configure()
     val plugin = plugins[1]
     assertThat(plugin.contentModules[0].pluginClassLoader).isInstanceOf(PluginAwareClassLoader::class.java)
 
     val scope = createPluginDependencyAndContentBasedScope(
       plugin,
-      PluginSetBuilder(plugins.toSet()).createPluginSetWithEnabledModulesMap()
+      PluginSetBuilder(initContext, UnambiguousPluginSet.tryBuild(plugins)!!).createPluginSetWithEnabledModulesMap()
     )!!
     assertThat(scope.isDefinitelyAlienClass(name = "dd", packagePrefix = "dd", force = false)).isNull()
     assertThat(scope.isDefinitelyAlienClass(name = "com.example.extraSupportedFeature.Foo", packagePrefix = "com.example.extraSupportedFeature.", force = false))
@@ -133,12 +135,14 @@ internal class ClassLoaderConfiguratorTest {
       depends("1-foo")
     }.buildDir(rootDir.resolve("2-bar"))
 
-    val plugins = PluginSetTestBuilder.fromPath(rootDir).discoverPlugins().second.pluginLists.flatMap { it.plugins }
+    val pluginSetTestBuilder = PluginSetTestBuilder.fromPath(rootDir)
+    val initContext = pluginSetTestBuilder.buildInitContext()
+    val plugins = pluginSetTestBuilder.discoverPlugins().second.pluginLists.flatMap { it.plugins }
     assertThat(plugins).hasSize(2)
     val barPlugin = plugins.get(1)
     assertThat(barPlugin.pluginId.idString).isEqualTo("2-bar")
 
-    val classLoaderConfigurator = ClassLoaderConfigurator(PluginSetBuilder(plugins.toSet()).createPluginSetWithEnabledModulesMap())
+    val classLoaderConfigurator = ClassLoaderConfigurator(PluginSetBuilder(initContext, UnambiguousPluginSet.tryBuild(plugins)!!).createPluginSetWithEnabledModulesMap())
     classLoaderConfigurator.configure()
 
     assertThat((barPlugin.pluginClassLoader as PluginClassLoader)._getParents().map { it.descriptorPath })

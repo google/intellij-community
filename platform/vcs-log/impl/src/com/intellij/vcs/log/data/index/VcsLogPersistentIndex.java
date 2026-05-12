@@ -253,7 +253,7 @@ public final class VcsLogPersistentIndex implements VcsLogModifiableIndex, Dispo
   }
 
   private synchronized void markForIndexing(@NotNull IntSet commits, @NotNull VirtualFile root) {
-    IntSet commitsToIndex = myCommitsToIndex.computeIfAbsent(root, __ -> new IntOpenHashSet());
+    IntSet commitsToIndex = myCommitsToIndex.computeIfAbsent(root, _ -> new IntOpenHashSet());
     commitsToIndex.addAll(commits);
   }
 

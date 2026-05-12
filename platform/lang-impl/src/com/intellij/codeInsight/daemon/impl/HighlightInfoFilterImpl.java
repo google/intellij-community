@@ -19,7 +19,7 @@ final class HighlightInfoFilterImpl implements HighlightInfoFilter {
     if (psiFile != null && psiFile.getOriginalFile() instanceof PsiCompiledFile) {
       return info.getSeverity() == HighlightInfoType.SYMBOL_TYPE_SEVERITY;
     }
-    if (info.findRegisteredQuickFix((__, __1) -> true) != null) {
+    if (info.findRegisteredQuickFix((_, _) -> true) != null) {
       return true; // must not hide if there are fixes to show
     }
     if (Holder.ourTestMode) {

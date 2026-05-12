@@ -2,6 +2,7 @@
 @file:JvmName("GradleProjectImportUtil")
 package org.jetbrains.plugins.gradle.service.project.open
 
+import com.intellij.ide.impl.OpenProjectTask
 import com.intellij.openapi.application.invokeAndWaitIfNeeded
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
@@ -14,6 +15,7 @@ import com.intellij.openapi.util.io.toCanonicalPath
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.backend.observation.launchTracked
+import org.gradle.util.GradleVersion
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.plugins.gradle.GradleCoroutineScope.gradleCoroutineScope
 import org.jetbrains.plugins.gradle.service.GradleInstallationManager
@@ -28,8 +30,9 @@ import java.nio.file.Path
 
 fun canOpenGradleProject(file: VirtualFile): Boolean = GradleOpenProjectProvider().canOpenProject(file)
 
-suspend fun openGradleProject(projectFile: VirtualFile, projectToClose: Project?, forceOpenInNewFrame: Boolean): Project? {
-  return GradleOpenProjectProvider().openProject(projectFile, projectToClose, forceOpenInNewFrame)
+suspend fun openGradleProject(projectFile: VirtualFile,
+                              projectOpenOptions: OpenProjectTask,): Project? {
+  return GradleOpenProjectProvider().openProject(projectFile, projectOpenOptions)
 }
 
 @ApiStatus.Experimental
@@ -70,7 +73,7 @@ fun createLinkSettings(projectDirectory: Path, project: Project): GradleProjectS
   gradleSettings.setupGradleSettings()
   val gradleProjectSettings = GradleDefaultProjectSettings.createProjectSettings(projectDirectory.toCanonicalPath())
 
-  val gradleVersion = gradleProjectSettings.resolveGradleVersion()
+  val gradleVersion = GradleInstallationManager.guessGradleVersion(gradleProjectSettings) ?: GradleVersion.current()
   setupGradleJvm(project, gradleProjectSettings, gradleVersion)
   return gradleProjectSettings
 }

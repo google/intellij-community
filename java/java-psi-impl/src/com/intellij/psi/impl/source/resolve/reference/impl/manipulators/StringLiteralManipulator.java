@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.impl.source.resolve.reference.impl.manipulators;
 
 import com.intellij.openapi.util.TextRange;
@@ -11,6 +11,7 @@ import com.intellij.psi.PsiLanguageInjectionHost;
 import com.intellij.psi.PsiLiteralExpression;
 import com.intellij.psi.PsiType;
 import com.intellij.psi.PsiTypes;
+import com.intellij.psi.util.PsiLiteralUtil;
 import com.intellij.util.IncorrectOperationException;
 import org.jetbrains.annotations.NotNull;
 
@@ -18,7 +19,10 @@ public final class StringLiteralManipulator extends AbstractElementManipulator<P
   @Override
   public PsiLiteralExpression handleContentChange(@NotNull PsiLiteralExpression expr, @NotNull TextRange range, String newContent) throws IncorrectOperationException {
     String oldText = expr.getText();
-    if (oldText.startsWith("\"")) {
+    if (expr.isTextBlock()) {
+      newContent = escapeTextBlockContent(newContent);
+    }
+    else if (oldText.startsWith("\"")) {
       newContent = StringUtil.escapeStringCharacters(newContent);
     }
     else if (oldText.startsWith("'") && newContent.length() <= 1) {
@@ -31,6 +35,26 @@ public final class StringLiteralManipulator extends AbstractElementManipulator<P
     String newText = oldText.substring(0, range.getStartOffset()) + newContent + oldText.substring(range.getEndOffset());
     final PsiExpression newExpr = JavaPsiFacade.getElementFactory(expr.getProject()).createExpressionFromText(newText, null);
     return (PsiLiteralExpression)expr.replace(newExpr);
+  }
+
+  private static @NotNull String escapeTextBlockContent(@NotNull String content) {
+    String[] lines = PsiLiteralUtil.escapeTextBlockCharacters(content, false, true, false).split("(?<=\n)");
+    int indent = PsiLiteralUtil.getTextBlockIndent(lines, true, true);
+    if (indent != 0 && lines.length > 0 && !lines[lines.length - 1].endsWith("\n")) {
+      // append \ + newline at the end of the last line, so we can use closing """ to indent;
+      lines[lines.length - 1] += "\\\n";
+    }
+    for (int i = 0; i < lines.length - 1; i++) {
+      String line = lines[i];
+      if (line.endsWith("\\\n") && lines[i + 1].equals("\n")) {
+        lines[i] = line.substring(0, line.length() - 2); // normalize strings with leading newlines
+      }
+    }
+    String result = StringUtil.join(lines);
+    if (result.endsWith(" ")) {
+      result = result.substring(0, result.length() - 1) + "\\s";
+    }
+    return result;
   }
 
   @Override

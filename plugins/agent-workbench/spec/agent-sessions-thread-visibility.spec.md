@@ -1,104 +1,50 @@
 ---
 name: Agent Threads Visibility and More Row
-description: Deterministic rendering and persisted visibility rules for thread rows and More-row behavior in Agent Threads.
+description: Runtime visibility and More-row behavior for Agent Threads.
 targets:
-  - ../sessions/src/AgentSessionModels.kt
-  - ../sessions/src/SessionTree.kt
-  - ../sessions/src/SessionTreeRows.kt
-  - ../sessions/src/SessionTreeState.kt
-  - ../sessions/resources/messages/AgentSessionsBundle.properties
-  - ../sessions/testSrc/AgentSessionsToolWindowTest.kt
-  - ../sessions/testSrc/AgentSessionsServiceRefreshIntegrationTest.kt
-  - ../sessions/testSrc/AgentSessionsServiceOnDemandIntegrationTest.kt
+  - ../sessions/src/state/AgentSessionsVisibilityDefaults.kt
+  - ../sessions/src/state/AgentSessionsStateStore.kt
+  - ../sessions-toolwindow/src/**/*.kt
+  - ../sessions/testSrc/AgentSessionRefreshServiceIntegrationTest.kt
+  - ../sessions/testSrc/AgentSessionRefreshOnDemandIntegrationTest.kt
+  - ../sessions-toolwindow/testSrc/AgentSessionsSwingTreeRenderingTest.kt
+  - ../sessions-toolwindow/testSrc/AgentSessionsTreeSnapshotTest.kt
 ---
 
 # Agent Threads Visibility and More Row
 
 Status: Draft
-Date: 2026-02-22
+Date: 2026-05-09
 
 ## Summary
-Define deterministic visibility rules for project/worktree thread rows so empty state, warning/error rows, and `More` rows never conflict. Shared visibility primitive semantics are canonical in `spec/agent-core-contracts.spec.md`; this spec owns rendering and precedence behavior.
-
-## Goals
-- Keep row visibility deterministic after refresh and on-demand loads.
-- Support exact-count and unknown-count hidden-thread states.
-- Prevent contradictory rows for the same node.
-
-## Non-goals
-- Provider-side pagination strategy.
-- Aggregation/source-loading behavior.
-- Command mapping or editor-tab contracts.
+Agent Threads keeps thread/project visibility in runtime state so large project lists and thread lists stay bounded until the user asks for more or search reveals hidden matches.
 
 ## Requirements
-- Initial visible-thread count per normalized path must be `DEFAULT_VISIBLE_THREAD_COUNT` (`3`).
-  [@test] ../sessions/testSrc/AgentSessionsToolWindowTest.kt
+- Default project visibility includes all open projects and up to three closed recent projects; additional closed projects appear behind `More`.
+  [@test] ../sessions-toolwindow/testSrc/AgentSessionsSwingTreeRenderingTest.kt
 
-- Visible-thread count lookup order per normalized path must be:
-  - in-memory runtime entry,
-  - persisted tree UI state entry,
-  - default value.
-  [@test] ../sessions/testSrc/AgentSessionsServiceRefreshIntegrationTest.kt
-  [@test] ../sessions/testSrc/AgentSessionsTreeUiStateServiceTest.kt
+- Per-path thread visibility starts from the configured default and grows in fixed +3 increments through shared visibility primitives.
+  [@test] ../sessions/testSrc/AgentSessionRefreshOnDemandIntegrationTest.kt
 
-- For project rows, render `More` only when `project.threads.size > visibleCount`.
-  [@test] ../sessions/testSrc/AgentSessionsToolWindowTest.kt
+- `More` rows must preserve exact versus unknown remaining-count semantics and must not appear when error/warning precedence suppresses helper rows.
+  [@test] ../sessions-toolwindow/testSrc/AgentSessionsSwingTreeRenderingTest.kt
 
-- For worktree rows, render `More` only when `worktree.threads.size > visibleCount`.
-  [@test] ../sessions/testSrc/AgentSessionsToolWindowTest.kt
+- `ensureThreadVisible(path, provider, threadId)` expands visibility until the target loaded thread is visible without reordering provider-sorted thread rows.
+  [@test] ../sessions/testSrc/AgentSessionRefreshOnDemandIntegrationTest.kt
 
-- When `hasUnknownThreadCount=true` for the node, `More` must render without explicit count (`toolwindow.action.more`).
-  [@test] ../sessions/testSrc/AgentSessionsToolWindowTest.kt
+- Speed search may reveal hidden matching projects/threads by using the same visibility primitives, then refreshes active selection once rows materialize.
+  [@test] ../sessions-toolwindow/testSrc/AgentSessionsTreeSnapshotTest.kt
 
-- When `hasUnknownThreadCount=false`, `More` must render with explicit hidden count (`toolwindow.action.more.count`) using `threads.size - visibleCount`.
-  [@test] ../sessions/testSrc/AgentSessionsToolWindowTest.kt
-
-- `No recent activity yet.` must render only when:
-  - `hasLoaded=true`,
-  - no visible project threads,
-  - no visible worktree rows with content/loading/error/warnings,
-  - no project-level error,
-  - no provider warnings.
-  [@test] ../sessions/testSrc/AgentSessionsToolWindowTest.kt
-
-- Project/worktree error rows must take precedence over warning and empty rows.
-  [@test] ../sessions/testSrc/AgentSessionsToolWindowTest.kt
-
-- `showMoreThreads(path)` and `ensureThreadVisible(path, provider, threadId)` must follow increment/persistence contract defined in `spec/agent-core-contracts.spec.md`.
-  [@test] ../sessions/testSrc/AgentSessionsServiceOnDemandIntegrationTest.kt
-  [@test] ../sessions/testSrc/AgentSessionsToolWindowTest.kt
-
-- Refresh bootstrap must restore persisted visible-thread counts above default for known project/worktree paths.
-  [@test] ../sessions/testSrc/AgentSessionsServiceRefreshIntegrationTest.kt
-
-- Persisted visibility key normalization must follow `spec/agent-core-contracts.spec.md`.
-  [@test] ../sessions/testSrc/AgentSessionsTreeUiStateServiceTest.kt
-
-- Tree-side `More` click handling must not trigger backend loads directly; it only updates local visibility state.
-  [@test] ../sessions/testSrc/AgentSessionsServiceOnDemandIntegrationTest.kt
-
-## User Experience
-- Exact-count case renders `More (N)`.
-- Unknown-count case renders `More…`.
-- Empty helper row is mutually exclusive with `More`, warning, and error rows for the same node.
-- Non-default visibility persists across refresh and reopen for the same normalized path.
-
-## Data & Backend
-- Unknown-count state is produced by service aggregation layer (`hasUnknownThreadCount`), not tree rendering.
-- Tree rendering consumes pre-sorted thread lists and performs no additional ordering.
-
-## Error Handling
-- Visibility updates must remain safe when underlying state changes between interactions.
-- Error/warning display must follow precedence rules without conflicting helper rows.
+- Runtime visibility state is not persisted as thread content; collapsed project paths and warm session rows remain in their separate state services.
+  [@test] ../sessions/testSrc/AgentSessionTreeUiStateServiceTest.kt
+  [@test] ../sessions/testSrc/AgentSessionWarmStateServiceTest.kt
 
 ## Testing / Local Run
-- `./tests.cmd '-Dintellij.build.test.patterns=com.intellij.agent.workbench.sessions.AgentSessionsToolWindowTest'`
-- `./tests.cmd '-Dintellij.build.test.patterns=com.intellij.agent.workbench.sessions.AgentSessionsServiceRefreshIntegrationTest'`
-- `./tests.cmd '-Dintellij.build.test.patterns=com.intellij.agent.workbench.sessions.AgentSessionsServiceOnDemandIntegrationTest'`
-
-## Open Questions / Risks
-- If providers begin exposing exact remote totals independent of loaded rows, count semantics may require richer model than current hidden-row math.
+- `./tests.cmd --module intellij.agent.workbench.sessions.toolwindow.tests --test com.intellij.agent.workbench.sessions.toolwindow.AgentSessionsSwingTreeRenderingTest`
+- `./tests.cmd --module intellij.agent.workbench.sessions.toolwindow.tests --test com.intellij.agent.workbench.sessions.toolwindow.AgentSessionsTreeSnapshotTest`
+- `./tests.cmd --module intellij.agent.workbench.sessions.tests --test com.intellij.agent.workbench.sessions.AgentSessionRefreshOnDemandIntegrationTest`
 
 ## References
-- `spec/agent-core-contracts.spec.md`
 - `spec/agent-sessions.spec.md`
+- `spec/agent-sessions-tree.spec.md`
+- `spec/agent-sessions-refresh.spec.md`

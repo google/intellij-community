@@ -66,11 +66,11 @@ public class PyOptimizeImportsTest extends PyTestCase {
     runWithAdditionalFileInLibDir(
       "sys.py",
       "",
-      (__) ->
+      (_) ->
         runWithAdditionalFileInLibDir(
           "datetime.py",
           "",
-          (___) -> doTest()
+          (_) -> doTest()
         )
     );
   }
@@ -80,11 +80,11 @@ public class PyOptimizeImportsTest extends PyTestCase {
     runWithAdditionalFileInLibDir(
       "sys.py",
       "",
-      (__) ->
+      (_) ->
         runWithAdditionalFileInLibDir(
           "datetime.py",
           "",
-          (___) -> doTest()
+          (_) -> doTest()
         )
     );
   }
@@ -93,11 +93,11 @@ public class PyOptimizeImportsTest extends PyTestCase {
     runWithAdditionalFileInLibDir(
       "sys.py",
       "",
-      (__) ->
+      (_) ->
         runWithAdditionalFileInLibDir(
           "datetime.py",
           "",
-          (___) -> doTest()
+          (_) -> doTest()
         )
     );
   }
@@ -144,11 +144,11 @@ public class PyOptimizeImportsTest extends PyTestCase {
     runWithAdditionalFileInLibDir(
       "sys.py",
       "",
-      (__) ->
+      (_) ->
         runWithAdditionalFileInLibDir(
           "datetime.py",
           "",
-          (___) -> doTest()
+          (_) -> doTest()
         )
     );
   }
@@ -262,11 +262,11 @@ public class PyOptimizeImportsTest extends PyTestCase {
         runWithAdditionalFileInLibDir(
           "sys.py",
           "",
-          (__) ->
+          (_) ->
             runWithAdditionalFileInLibDir(
               "datetime.py",
               "",
-              (___) -> doTest()
+              (_) -> doTest()
             )
         )
     );

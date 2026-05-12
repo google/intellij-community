@@ -6,15 +6,21 @@ import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.WorkspaceEntity
 
-interface SimpleEntity : WorkspaceEntity {
+interface NoCompatibilityEntity : WorkspaceEntity {
+  val version: Int
+  val name: String
+  val isSimple: Boolean
+}
+
+interface CompatibilityEntity : WorkspaceEntity {
   val version: Int
   val name: String
   val isSimple: Boolean
 
   //region compatibility generated code
-  interface Builder
+  interface Builder : CompatibilityEntityBuilder
 
-  companion object : EntityType<SimpleEntity, Builder>() {
+  companion object : EntityType<CompatibilityEntity, Builder>() {
     fun foo() {
       // any code should be preserved in the original interface
       // we only delete code that is surronded by `region generated code` comments

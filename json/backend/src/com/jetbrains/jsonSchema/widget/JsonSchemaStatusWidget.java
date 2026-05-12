@@ -22,6 +22,7 @@ import com.intellij.openapi.ui.popup.BalloonBuilder;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.ui.popup.ListPopup;
 import com.intellij.openapi.util.Comparing;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.NlsContexts.StatusBarText;
 import com.intellij.openapi.util.NlsContexts.Tooltip;
 import com.intellij.openapi.util.NlsSafe;
@@ -39,7 +40,6 @@ import com.intellij.util.Alarm;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.concurrency.SynchronizedClearableLazy;
 import com.intellij.util.containers.ContainerUtil;
-import com.intellij.util.messages.MessageBusConnection;
 import com.jetbrains.jsonSchema.JsonSchemaCatalogProjectConfiguration;
 import com.jetbrains.jsonSchema.JsonSchemaMappingsProjectConfiguration;
 import com.jetbrains.jsonSchema.extension.JsonSchemaEnabler;
@@ -77,7 +77,7 @@ final class JsonSchemaStatusWidget extends EditorBasedStatusBarPopup {
   private volatile Pair<WidgetState, VirtualFile> myLastWidgetStateAndFilePair;
   private ProgressIndicator myCurrentProgress;
 
-  JsonSchemaStatusWidget(@NotNull Project project, @NotNull CoroutineScope scope) {
+  private JsonSchemaStatusWidget(@NotNull Project project, @NotNull CoroutineScope scope) {
     super(project, false, scope);
 
     myServiceLazy = new SynchronizedClearableLazy<>(() -> {
@@ -89,7 +89,28 @@ final class JsonSchemaStatusWidget extends EditorBasedStatusBarPopup {
       }
       return null;
     });
-    JsonWidgetSuppressor.EXTENSION_POINT_NAME.addChangeListener(this::update, this);
+  }
+
+  @NotNull
+  public static JsonSchemaStatusWidget create(@NotNull Project project, @NotNull CoroutineScope parentScope) {
+    CoroutineScope childScope = JsonSchemaStatusWidgetKotlin.INSTANCE.childScope(parentScope, "JsonSchemaStatusWidget::childScope");
+
+    JsonSchemaStatusWidget widget = null;
+    try {
+      widget = new JsonSchemaStatusWidget(project, childScope);
+      widget.initialize(childScope);
+      JsonSchemaStatusWidgetKotlin.INSTANCE.cancelOnDispose(childScope, widget);
+    }
+    catch (Exception e) {
+      JsonSchemaStatusWidgetKotlin.INSTANCE.cancel(childScope);
+      if (widget != null) {
+        Disposer.dispose(widget);
+      }
+
+      throw e;
+    }
+
+    return widget;
   }
 
   private @Nullable JsonSchemaService getService() {
@@ -442,8 +463,7 @@ final class JsonSchemaStatusWidget extends EditorBasedStatusBarPopup {
     return null;
   }
 
-  @Override
-  protected void registerCustomListeners(@NotNull MessageBusConnection connection) {
+  private void initialize(CoroutineScope scope) {
     final class Listener implements DumbService.DumbModeListener {
       volatile boolean isDumbMode;
 
@@ -460,7 +480,8 @@ final class JsonSchemaStatusWidget extends EditorBasedStatusBarPopup {
       }
     }
 
-    connection.subscribe(DumbService.DUMB_MODE, new Listener());
+    myConnection.subscribe(DumbService.DUMB_MODE, new Listener());
+    JsonWidgetSuppressor.EXTENSION_POINT_NAME.addChangeListener(scope, this::update);
   }
 
   @Override
@@ -470,7 +491,7 @@ final class JsonSchemaStatusWidget extends EditorBasedStatusBarPopup {
 
   @Override
   protected @NotNull StatusBarWidget createInstance(@NotNull Project project) {
-    return new JsonSchemaStatusWidget(project, getScope());
+    return create(project, getScope());
   }
 
   @Override

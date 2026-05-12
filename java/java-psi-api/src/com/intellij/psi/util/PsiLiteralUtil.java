@@ -270,6 +270,10 @@ public final class PsiLiteralUtil {
       result.append(StringUtil.repeat(" ", nSpaces - 1)).append("\\s");
       return i;
     }
+    if (i < s.length() && s.charAt(i) == '\n') {
+      result.append(StringUtil.repeat(" ", nSpaces - 1)).append("\\s");
+      return i;
+    }
     int nextIdx = i >= s.length() ? -1 : parseBackSlash(s, i);
     if (nextIdx != -1 && nextIdx < s.length() && s.charAt(nextIdx) == 'n') {
       result.append(StringUtil.repeat(" ", nSpaces - 1)).append("\\s");

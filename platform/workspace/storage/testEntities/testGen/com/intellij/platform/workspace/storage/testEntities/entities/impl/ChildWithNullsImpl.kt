@@ -1,13 +1,15 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.storage.testEntities.entities.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
 import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
-import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
@@ -25,9 +27,7 @@ internal class ChildWithNullsImpl(private val dataSource: ChildWithNullsData) : 
 
   private companion object {
 
-
-    private val connections = listOf<ConnectionId>(
-    )
+    private val connections = listOf<ConnectionId>()
 
   }
 
@@ -48,8 +48,8 @@ internal class ChildWithNullsImpl(private val dataSource: ChildWithNullsData) : 
   }
 
 
-  internal class Builder(result: ChildWithNullsData?) : ModifiableWorkspaceEntityBase<ChildWithNulls, ChildWithNullsData>(
-    result), ChildWithNullsBuilder {
+  internal class Builder(result: ChildWithNullsData?) : ModifiableWorkspaceEntityBase<ChildWithNulls, ChildWithNullsData>(result),
+                                                        ChildWithNullsBuilder {
     internal constructor() : this(ChildWithNullsData())
 
     override fun applyToBuilder(builder: MutableEntityStorage) {
@@ -62,15 +62,13 @@ internal class ChildWithNullsImpl(private val dataSource: ChildWithNullsData) : 
           error("Entity ChildWithNulls is already created in a different builder")
         }
       }
-
       this.diff = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
-      // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
-      // Builder may switch to snapshot at any moment and lock entity data to modification
+// After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
+// Builder may switch to snapshot at any moment and lock entity data to modification
       this.currentEntityData = null
-
-      // Process linked entities that are connected without a builder
+// Process linked entities that are connected without a builder
       processLinkedEntities(builder)
       checkInitialization() // TODO uncomment and check failed tests
     }
@@ -106,7 +104,6 @@ internal class ChildWithNullsImpl(private val dataSource: ChildWithNullsData) : 
         changedProperty.add("entitySource")
 
       }
-
     override var childData: String
       get() = getEntityData().childData
       set(value) {
@@ -117,6 +114,7 @@ internal class ChildWithNullsImpl(private val dataSource: ChildWithNullsData) : 
 
     override fun getEntityClass(): Class<ChildWithNulls> = ChildWithNulls::class.java
   }
+
 }
 
 @OptIn(WorkspaceEntityInternalApi::class)
@@ -132,7 +130,6 @@ internal class ChildWithNullsData : WorkspaceEntityData<ChildWithNulls>() {
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): ChildWithNulls {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {
@@ -144,8 +141,7 @@ internal class ChildWithNullsData : WorkspaceEntityData<ChildWithNulls>() {
   }
 
   override fun getMetadata(): EntityMetadata {
-    return MetadataStorageImpl.getMetadataByTypeFqn(
-      "com.intellij.platform.workspace.storage.testEntities.entities.ChildWithNulls") as EntityMetadata
+    return MetadataStorageImpl.getMetadataByTypeFqn("com.intellij.platform.workspace.storage.testEntities.entities.ChildWithNulls") as EntityMetadata
   }
 
   override fun getEntityInterface(): Class<out WorkspaceEntity> {
@@ -153,8 +149,7 @@ internal class ChildWithNullsData : WorkspaceEntityData<ChildWithNulls>() {
   }
 
   override fun createDetachedEntity(parents: List<WorkspaceEntityBuilder<*>>): WorkspaceEntityBuilder<*> {
-    return ChildWithNulls(childData, entitySource) {
-    }
+    return ChildWithNulls(childData, entitySource)
   }
 
   override fun getRequiredParents(): List<Class<out WorkspaceEntity>> {
@@ -165,9 +160,7 @@ internal class ChildWithNullsData : WorkspaceEntityData<ChildWithNulls>() {
   override fun equals(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as ChildWithNullsData
-
     if (this.entitySource != other.entitySource) return false
     if (this.childData != other.childData) return false
     return true
@@ -176,9 +169,7 @@ internal class ChildWithNullsData : WorkspaceEntityData<ChildWithNulls>() {
   override fun equalsIgnoringEntitySource(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as ChildWithNullsData
-
     if (this.childData != other.childData) return false
     return true
   }

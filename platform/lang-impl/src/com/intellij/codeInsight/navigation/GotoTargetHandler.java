@@ -326,18 +326,8 @@ public abstract class GotoTargetHandler implements CodeInsightActionHandler {
     return true;
   }
 
-
-  /**
-   * @deprecated use getChooserTitle(PsiElement, String, int, boolean) instead
-   */
-  @Deprecated(forRemoval = true)
-  protected @NotNull @NlsContexts.PopupTitle String getChooserTitle(PsiElement sourceElement, String name, int length) {
-    LOG.warn("Please override getChooserTitle(PsiElement, String, int, boolean) instead");
-    return "";
-  }
-
   protected @NotNull @NlsContexts.PopupTitle String getChooserTitle(@NotNull PsiElement sourceElement, @Nullable String name, int length, boolean finished) {
-    return getChooserTitle(sourceElement, name, length);
+    return "";
   }
 
   protected @NotNull @NlsContexts.TabTitle String getFindUsagesTitle(@NotNull PsiElement sourceElement, String name, int length) {
@@ -394,13 +384,13 @@ public abstract class GotoTargetHandler implements CodeInsightActionHandler {
       if (ArrayUtil.find(targets, element) > -1) return null;
 
       if (!hasDifferentNames && element instanceof PsiNamedElement) {
-        final String name = ReadAction.compute(() -> ((PsiNamedElement)element).getName());
+        String name = ReadAction.computeBlocking(() -> ((PsiNamedElement)element).getName());
         myNames.add(name);
         hasDifferentNames = myNames.size() > 1;
         if (hasDifferentNames) {
           for (ItemWithPresentation item : myItems) {
             if (item.getItem() instanceof Pointer<?>) {
-              ReadAction.run(() -> {
+              ReadAction.runBlocking(() -> {
                 Object o = ((Pointer<?>)item.getItem()).dereference();
                 if (o instanceof PsiElement) {
                   item.setPresentation(computePresentation((PsiElement)o, hasDifferentNames));
@@ -416,9 +406,11 @@ public abstract class GotoTargetHandler implements CodeInsightActionHandler {
     }
 
     private static ItemWithPresentation initPresentation(PsiElement target, boolean hasDifferentNames) {
-      Pointer<PsiElement> pointer = ReadAction.compute(() -> SmartPointerManager.createPointer(target));
-      TargetPresentation presentation = ReadAction.compute(() -> computePresentation(target, hasDifferentNames));
-      return new ItemWithPresentation(pointer, presentation);
+      return ReadAction.computeBlocking(() -> {
+        Pointer<PsiElement> pointer = SmartPointerManager.createPointer(target);
+        TargetPresentation presentation = computePresentation(target, hasDifferentNames);
+        return new ItemWithPresentation(pointer, presentation);
+      });
     }
 
     public @NotNull String getComparingObject(ItemWithPresentation value) {

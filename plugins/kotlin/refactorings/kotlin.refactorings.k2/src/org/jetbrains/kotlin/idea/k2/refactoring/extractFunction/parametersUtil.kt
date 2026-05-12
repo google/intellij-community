@@ -8,21 +8,21 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.parentOfType
 import com.intellij.util.text.UniqueNameGenerator
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
-import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.analyzeCopy
 import org.jetbrains.kotlin.analysis.api.components.KaDiagnosticCheckerFilter
-import org.jetbrains.kotlin.analysis.api.components.buildClassType
 import org.jetbrains.kotlin.analysis.api.components.buildSubstitutor
 import org.jetbrains.kotlin.analysis.api.components.builtinTypes
 import org.jetbrains.kotlin.analysis.api.components.callableSymbol
 import org.jetbrains.kotlin.analysis.api.components.containingDeclaration
 import org.jetbrains.kotlin.analysis.api.components.expectedType
 import org.jetbrains.kotlin.analysis.api.components.expressionType
-import org.jetbrains.kotlin.analysis.api.components.render
 import org.jetbrains.kotlin.analysis.api.components.resolveToCall
 import org.jetbrains.kotlin.analysis.api.components.type
+import org.jetbrains.kotlin.analysis.api.components.typeCreator
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
+import org.jetbrains.kotlin.analysis.api.projectStructure.KaDanglingFileResolutionMode
 import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
 import org.jetbrains.kotlin.analysis.api.resolution.KaErrorCallInfo
 import org.jetbrains.kotlin.analysis.api.resolution.KaExplicitReceiverValue
@@ -83,7 +83,6 @@ import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtOperationReferenceExpression
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtProperty
-import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtQualifiedExpression
 import org.jetbrains.kotlin.psi.KtReferenceExpression
 import org.jetbrains.kotlin.psi.KtSimpleNameExpression
@@ -100,7 +99,6 @@ import org.jetbrains.kotlin.psi.psiUtil.getParentOfTypeAndBranch
 import org.jetbrains.kotlin.psi.psiUtil.getQualifiedExpressionForSelector
 import org.jetbrains.kotlin.psi.psiUtil.getQualifiedExpressionForSelectorOrThis
 import org.jetbrains.kotlin.psi.psiUtil.isInsideOf
-import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.types.expressions.OperatorConventions
 
 /**
@@ -153,7 +151,7 @@ internal fun ExtractionData.inferParametersInfo(
 
     }
 
-    val unknownContextParameters = analyze(virtualBlock) {
+    val unknownContextParameters = analyzeCopy(virtualBlock, KaDanglingFileResolutionMode.IGNORE_SELF) {
         val parameters = linkedMapOf<KaType, KtParameter>()
         for (referenceExpression in virtualBlock.collectDescendantsOfType<KtReferenceExpression> { it.resolveResult != null }) {
             val call = referenceExpression.resolveToCall()
@@ -439,7 +437,8 @@ private fun ExtractionData.registerQualifierReplacements(
             val fqNameChild = if (name != null) fqName.child(Name.identifier(name)) else fqName
             parametersInfo.replacementMap.putValue(originalRef, FqNameReplacement(fqNameChild))
         } else {
-            parametersInfo.nonDenotableTypes.add(buildClassType(referencedClassifierSymbol))
+            @OptIn(KaExperimentalApi::class)
+            parametersInfo.nonDenotableTypes.add(typeCreator.classType(referencedClassifierSymbol))
         }
     }
 }
@@ -473,43 +472,27 @@ private fun getReferencedClassifierSymbol(
 }
 
 context(session: KaSession)
-@OptIn(KaExperimentalApi::class, KaImplementationDetail::class)
 private fun createOriginalType(
     extractFunctionRef: Boolean,
     originalDeclaration: PsiNamedElement,
     parameterExpression: KtExpression?,
     receiverToExtract: KaReceiverValue?
-): KaType = (if (extractFunctionRef) {
-    val functionSymbol = (originalDeclaration as KtNamedFunction).symbol as KaNamedFunctionSymbol
-    val typeString =
-        buildString { //todo rewrite as soon as functional type can be created by api call: https://youtrack.jetbrains.com/issue/KT-66566
-            functionSymbol.receiverParameter?.returnType?.render(position = Variance.INVARIANT)?.let {
-                append(it)
-                append(".")
-            }
-            functionSymbol.valueParameters.joinTo(
-                this,
-                ", ",
-                "(",
-                ")"
-            ) { //names provided here are removed due to https://youtrack.jetbrains.com/issue/KT-65846
-                it.name.asString() + ": " + it.returnType.render(position = Variance.INVARIANT)
-            }
+): KaType = when {
+        extractFunctionRef -> analyze(originalDeclaration as KtNamedFunction) {
+            val functionSymbol = originalDeclaration.symbol as KaNamedFunctionSymbol
+            @OptIn(KaExperimentalApi::class)
+            typeCreator.functionType {
+                receiverType = functionSymbol.receiverParameter?.returnType
 
-            append(" -> ")
-            append(functionSymbol.returnType.render(position = Variance.INVARIANT))
+                functionSymbol.valueParameters.forEach { parameter ->
+                    valueParameter(parameter.name, parameter.returnType)
+                }
+
+                returnType = functionSymbol.returnType
+            }
         }
-
-    val contentElement =
-        KtPsiFactory(originalDeclaration.project).createTypeCodeFragment(typeString, originalDeclaration).getContentElement()
-    if (contentElement != null) {
-        analyze(contentElement) { contentElement.type.createPointer() }.restore(session)
-    } else null
-
-} else {
-    parameterExpression?.expressionType ?: receiverToExtract?.type
-}) ?: builtinTypes.nullableAny
-
+        else -> parameterExpression?.expressionType ?: receiverToExtract?.type
+    } ?: builtinTypes.nullableAny
 
 @OptIn(KaExperimentalApi::class)
 private fun ExtractionData.getBrokenReferencesInfo(body: KtBlockExpression): List<ResolvedReferenceInfo<PsiNamedElement, KtReferenceExpression, KaType>> {
@@ -572,7 +555,15 @@ private fun ExtractionData.getBrokenReferencesInfo(body: KtBlockExpression): Lis
         // Skip P in type references like 'P.Q'
         if (parent is KtUserType && (parent.parent as? KtUserType)?.qualifier == parent) continue
 
-        val descriptor = newRef.mainReference.resolve()
+        // `resolve` uses Analysis API under the hood to retrieve suitable declarations for the reference.
+        // `analyzeCopy` call is needed here as `newRef` is contained in a synthetic and potentially modified copy of the original file.
+        // The automatic `KaDanglingFileResolutionMode` calculator on the Analysis API side would set `PREFER_SELF` for modified files.
+        // However, in this case, `newRef` would resolve to a declaration from the synthetic file and not from the original one.
+        // This would lead to `descriptor` not being equal to the `originalDescriptor` which was retrieved from the original file.
+        val descriptor = analyzeCopy(newRef, KaDanglingFileResolutionMode.IGNORE_SELF) {
+            newRef.mainReference.resolve()
+        }
+
         val originalDescriptor = originalRefExpr.mainReference.resolve()
         val isBadRef = descriptor != originalDescriptor
 

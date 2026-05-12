@@ -16,4 +16,5 @@ internal class KotlinParenthesizedPostfixTemplate : StringBasedPostfixTemplate, 
 
     override fun getTemplateString(element: PsiElement): String = "(\$expr$)\$END$"
     override fun getElementToRemove(expr: PsiElement): PsiElement = expr
+    override fun isApplicableForModCommand(): Boolean = true
 }

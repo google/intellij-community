@@ -313,7 +313,7 @@ public class RangeMarkerTest extends LightPlatformTestCase {
     String s = "12345\n \n12345";
     RangeMarker marker = createMarker(s, 6, 8);
 
-    replaceString(marker.getDocument(), 0, s.length(), s.replaceAll(" ", ""));
+    replaceString(marker.getDocument(), 0, s.length(), s.replace(" ", ""));
 
     assertValidMarker(marker, 6, 7);
   }
@@ -426,11 +426,11 @@ public class RangeMarkerTest extends LightPlatformTestCase {
         public void documentChanged(@NotNull DocumentEvent e) {
           events.add(e);
         }
-      });
+      }, getTestRootDisposable());
       synchronizer.commitTransaction(document);
       assertEquals(newText, document.getText());
       DocumentEvent event = assertOneElement(events);
-      assertEquals("DocumentEventImpl[myOffset=22, myOldLength=28, myNewLength=0].", event.toString());
+      assertEquals("DocumentEventImpl[myOffset=22, myOldLength=28, myNewLength=0]", event.toString());
     });
 
   }
@@ -946,6 +946,47 @@ public class RangeMarkerTest extends LightPlatformTestCase {
     }
   }
 
+  public void testRandomAddDeleteStress_NoCommand() {
+    int N_TRIES = Timings.adjustAccordingToMySpeed(100_000, false);
+    LOG.debug("N_TRIES = " + N_TRIES);
+    int LEN = 1000;
+    Random random = new Random();
+    IntStream.range(0, N_TRIES)
+      .parallel()
+      .forEach(_-> {
+        long seed = random.nextLong();
+        addDelete(seed, LEN);
+      });
+  }
+
+  private static void addDelete(long seed, int LEN) {
+    Random gen = new Random(seed);
+    DocumentEx document = (DocumentEx)EditorFactory.getInstance().createDocument(StringUtil.repeatSymbol(' ', LEN));
+
+    List<RangeMarker> adds = new ArrayList<>();
+    try {
+      for (int i = 0; i < 1000; i++) {
+        boolean create = gen.nextBoolean();
+        if (create || adds.isEmpty()) {
+          int x = gen.nextInt(LEN);
+          int y = x + gen.nextInt(LEN - x);
+          RangeMarkerEx r = (RangeMarkerEx)document.createRangeMarker(x, y);
+          adds.add(r);
+        }
+        else {
+          int c = gen.nextInt(adds.size());
+          RangeMarker marker = adds.get(c);
+          marker.dispose();
+          adds.remove(c);
+        }
+      }
+    }
+    catch (AssertionError e) {
+      System.err.println("Error during testing seed="+seed+"L");
+      throw e;
+    }
+  }
+
   private static void printFailingSteps(List<Pair<RangeMarker, TextRange>> adds,
                                         List<Pair<RangeMarker, TextRange>> dels,
                                         List<Trinity<Integer, Integer, Integer>> edits) {
@@ -1445,7 +1486,7 @@ public class RangeMarkerTest extends LightPlatformTestCase {
     Benchmark.newBenchmark(getTestName(false), ()->{
       for (int it = 0; it < 2_000; it++) {
         for (int i = 1; i < doc.getTextLength() - 1; i++) {
-          boolean result = doc.processRangeMarkersOverlappingWith(i, i + 1, __ -> false);
+          boolean result = doc.processRangeMarkersOverlappingWith(i, i + 1, _ -> false);
           assertFalse(result);
         }
       }
@@ -1643,7 +1684,7 @@ public class RangeMarkerTest extends LightPlatformTestCase {
     RangeMarkerImpl m = (RangeMarkerImpl)LazyRangeMarkerFactory.getInstance(getProject()).createRangeMarker(vf, 1);
     assertNull(m.getCachedDocument());
 
-    getProject().getMessageBus().connect(getTestRootDisposable()).subscribe(PsiDocumentListener.TOPIC, (doc, __, ___) -> {
+    getProject().getMessageBus().connect(getTestRootDisposable()).subscribe(PsiDocumentListener.TOPIC, (doc, _, _) -> {
       if (vf.equals(FileDocumentManager.getInstance().getFile(doc))) {
         fail("document created");
       }

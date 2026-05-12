@@ -17,7 +17,7 @@ import com.intellij.refactoring.JavaRefactoringSettings;
 import com.intellij.refactoring.RefactoringBundle;
 import com.intellij.refactoring.introduce.inplace.KeyboardComboSwitcher;
 import com.intellij.refactoring.ui.TypeSelectorManager;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.ui.JBInsets;
 import org.jetbrains.annotations.NotNull;
@@ -171,7 +171,7 @@ public class IntroduceFieldPopupPanel extends IntroduceFieldCentralPanel {
       ComboBox<BaseExpressionToFieldHandler.InitializationPlace> initializersCombo = new ComboBox<>(myInitialisersPlaceModel);
       KeyboardComboSwitcher.setupActions(initializersCombo, myParentClass.getProject());
       initLabel.setLabelFor(initializersCombo);
-      initializersCombo.setRenderer(SimpleListCellRenderer.create("", IntroduceFieldPopupPanel::getPresentableText));
+      initializersCombo.setRenderer(BuilderKt.textListCellRenderer("", IntroduceFieldPopupPanel::getPresentableText));
       initializersCombo.addActionListener(new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {

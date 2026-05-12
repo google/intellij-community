@@ -102,6 +102,15 @@ public interface ResultView extends CoreResultView, GridModel.Listener<GridRow, 
 
   void setValueAt(@Nullable Object v, @NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column, boolean allowImmediateUpdate, @NotNull GridRequestSource source);
 
+  default void setValueAt(@Nullable Object v,
+                          @NotNull ModelIndex<GridRow> row,
+                          @NotNull ModelIndex<GridColumn> column,
+                          boolean allowImmediateUpdate,
+                          @NotNull GridRequestSource source,
+                          @Nullable Object metadata) {
+    setValueAt(v, row, column, allowImmediateUpdate, source);
+  }
+
   void columnAttributesUpdated();
 
   void reinitSettings();
@@ -152,6 +161,7 @@ public interface ResultView extends CoreResultView, GridModel.Listener<GridRow, 
   }
 
   default void setHoveredRowHighlightMode(HoveredRowBgHighlightMode mode) {}
+
 
   enum HoveredRowBgHighlightMode {
     HIGHLIGHT,

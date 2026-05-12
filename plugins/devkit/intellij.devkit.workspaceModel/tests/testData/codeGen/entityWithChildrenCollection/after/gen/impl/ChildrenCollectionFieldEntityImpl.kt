@@ -1,3 +1,5 @@
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.workspaceModel.test.api.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
@@ -13,11 +15,10 @@ import com.intellij.platform.workspace.storage.impl.EntityLink
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
-import com.intellij.platform.workspace.storage.impl.extractOneToManyChildren
-import com.intellij.platform.workspace.storage.impl.updateOneToManyChildrenOfParent
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.workspaceModel.test.api.ChildrenCollectionFieldEntity
 import com.intellij.workspaceModel.test.api.ChildrenCollectionFieldEntityBuilder
@@ -41,7 +42,7 @@ readField("name")
 return dataSource.name
 }
 override val childrenEntitiesCollection: List<SimpleEntity>
-get() = snapshot.extractOneToManyChildren<SimpleEntity>(CHILDRENENTITIESCOLLECTION_CONNECTION_ID, this)!!.toList()
+get() = (snapshot.instrumentation.getManyChildren(CHILDRENENTITIESCOLLECTION_CONNECTION_ID, this) as? Sequence<SimpleEntity>)?.toList() ?: error("Children childrenEntitiesCollection not found for ChildrenCollectionFieldEntity")
 
 override val entitySource: EntitySource
 get() {
@@ -88,7 +89,7 @@ error("Field ChildrenCollectionFieldEntity#name should be initialized")
 }
 // Check initialization for list with ref type
 if (_diff != null){
-if (_diff.extractOneToManyChildren<WorkspaceEntityBase>(CHILDRENENTITIESCOLLECTION_CONNECTION_ID, this) == null){
+if (_diff.instrumentation.getManyChildrenBuilders(CHILDRENENTITIESCOLLECTION_CONNECTION_ID, this) == null){
 error("Field ChildrenCollectionFieldEntity#childrenEntitiesCollection should be initialized")
 }
 }
@@ -132,7 +133,6 @@ get(){
 // Getter of the list of non-abstract referenced types
 val _diff = diff
 return if (_diff != null) {
-@OptIn(EntityStorageInstrumentationApi::class)
 ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(CHILDRENENTITIESCOLLECTION_CONNECTION_ID, this)!!.toList() as List<SimpleEntityBuilder>) + (this.entityLinks[EntityLink(true, CHILDRENENTITIESCOLLECTION_CONNECTION_ID)] as? List<SimpleEntityBuilder> ?: emptyList())
 } else {
 this.entityLinks[EntityLink(true, CHILDRENENTITIESCOLLECTION_CONNECTION_ID)] as? List<SimpleEntityBuilder> ?: emptyList()
@@ -153,7 +153,7 @@ item_value.entityLinks[EntityLink(false, CHILDRENENTITIESCOLLECTION_CONNECTION_I
 _diff.addEntity(item_value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
 }
 }
-_diff.updateOneToManyChildrenOfParent(CHILDRENENTITIESCOLLECTION_CONNECTION_ID, this, value)
+_diff.instrumentation.replaceChildren(CHILDRENENTITIESCOLLECTION_CONNECTION_ID, this, value)
 }
 else{
 for (item_value in value){
@@ -185,7 +185,6 @@ modifiable.id = createEntityId()
 return modifiable
 }
 
-@OptIn(EntityStorageInstrumentationApi::class)
 override fun createEntity(snapshot: EntityStorageInstrumentation): ChildrenCollectionFieldEntity{
 val entityId = createEntityId()
 return snapshot.initializeEntity(entityId){

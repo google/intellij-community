@@ -79,7 +79,12 @@ class TestFixtureImpl<T>(
       val scope = TestFixtureInitializerReceiverImpl<T>(testScope, context)
       val (fixture, tearDown) = try {
         with(initializer) {
-          scope.initFixture(context) as InitializedTestFixtureData<T>
+          val data = scope.initFixture(context) as InitializedTestFixtureData<T>
+          val childJob = coroutineContext.job.children.firstOrNull()
+          if (childJob != null) {
+            throw IllegalStateException("Initializer $initializer left unexpected child job")
+          }
+          data
         }
       }
       catch (t: Throwable) {

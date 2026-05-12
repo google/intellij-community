@@ -151,7 +151,7 @@ mod tests {
     }
 
     #[test]
-    fn missing_standard_vm_options_failure_test() {
+    fn missing_standard_vm_options_tolerance_test() {
         let test = prepare_test_env(LauncherLocation::Standard);
 
         let bin_dir = test.dist_root.join("bin");
@@ -162,8 +162,7 @@ mod tests {
             }
         }
 
-        let result = run_launcher_ext(&test, LauncherRunSpec::standard().with_dump());
-        assert!(!result.exit_status.success(), "Expected to fail: {result:?}");
+        run_launcher_ext(&test, LauncherRunSpec::standard().assert_status());
     }
 
     #[test]
@@ -354,6 +353,7 @@ mod tests {
         let exception = "java.lang.UnsupportedOperationException: aw, snap";
         assert!(result.stderr.contains(exception), "Exception message ('{exception}') is missing: {result:?}");
         assert!(result.stderr.contains("at com.intellij.idea.TestMain.exception"), "Stacktrace is missing: {result:?}");
+        assert!(result.stderr.contains("Caused by:"), "'caused by' is missing: {result:?}");
     }
 
     #[test]
@@ -431,7 +431,7 @@ mod tests {
         let result = run_launcher_ext(&test, LauncherRunSpec::standard().with_args(&["main-class"]));
 
         let expected = "main.class=com.intellij.idea.TestMain";
-        assert!(result.stdout.contains(expected), "'{expected}' is not in the output:\n{result:?}")
+        assert!(result.stdout.contains(expected), "'{expected}' is not in the output:\n{result:?}");
     }
 
     #[test]
@@ -445,5 +445,18 @@ mod tests {
             let sys_acp = &dump.systemProperties["sun.jnu.encoding.sys"];
             assert!(sys_acp.starts_with("windows-"), "Unexpected system ACP value: {sys_acp}");
         }
+    }
+
+    #[test]
+    fn stdout_redirect() {
+        let test = prepare_test_env(LauncherLocation::Standard);
+
+        let result = run_launcher_ext(&test, LauncherRunSpec::standard().with_args(&["stdout-redirect", "--stdio"]));
+
+        let expected_out = "<<redirected stdout>>";
+        let expected_err = "<<original stdout>>";
+        assert!(result.stdout.contains(expected_out), "'{expected_out}' is not in the output:\n{result:?}");
+        assert!(!result.stdout.contains(expected_err), "'{expected_err}' is in the output:\n{result:?}");
+        assert!(result.stderr.contains(expected_err), "'{expected_err}' is not in the error:\n{result:?}");
     }
 }

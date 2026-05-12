@@ -6,6 +6,7 @@ import com.intellij.application.options.CodeStyle;
 import com.intellij.ide.highlighter.JavaFileType;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.fileTypes.BinaryFileTypeDecompilers;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.StandardFileSystems;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -70,6 +71,7 @@ public class ClsMirrorBuildingTest extends LightIdeaTestCase {
   public void testInheritFromDollar$1() { doTest(); }
   public void testSealed() { doTest(); }
   public void testCompanyDO() { doTest(); }
+  public void testGenericRecord() { doTest(); }
   public void testCompanyDOInDumbMode() {
     testDumbMode("CompanyDO");
   }
@@ -86,12 +88,15 @@ public class ClsMirrorBuildingTest extends LightIdeaTestCase {
     assertNotNull(clsPath, file);
 
     DumbModeTestUtils.runInDumbModeSynchronously(getProject(), () -> {
-      assertSameLinesWithFile(txtPath, ClsFileImpl.decompile(file).toString());
-      PsiFile psiFile = PsiManager.getInstance(getProject()).findFile(file);
-      if (psiFile instanceof PsiCompiledElement compiledElement) {
-        PsiElement mirror = compiledElement.getMirror();
-        assertNotNull(mirror);
-      }
+      BinaryFileTypeDecompilers.getInstance().allowDecompilerSlowOperation(()->{
+        assertSameLinesWithFile(txtPath, ClsFileImpl.decompile(file).toString());
+        PsiFile psiFile = PsiManager.getInstance(getProject()).findFile(file);
+        if (psiFile instanceof PsiCompiledElement compiledElement) {
+          PsiElement mirror = compiledElement.getMirror();
+          assertNotNull(mirror);
+        }
+        return null;
+      });
     });
   }
 
@@ -159,7 +164,7 @@ public class ClsMirrorBuildingTest extends LightIdeaTestCase {
     FileUtil.copy(new File(testDir, "pkg/ReuseTestV1.class"), classFile);
     vFile.refresh(false, false);
     PsiDocumentManager.getInstance(getProject()).commitAllDocuments();
-    String text1 = psiFile.getText();
+    String text1 = BinaryFileTypeDecompilers.getInstance().allowDecompilerSlowOperation(() -> psiFile.getText());
     assertTrue(text1, text1.contains("private int f1"));
     assertFalse(text1, text1.contains("private int f2"));
     Document doc1 = FileDocumentManager.getInstance().getCachedDocument(vFile);
@@ -183,7 +188,8 @@ public class ClsMirrorBuildingTest extends LightIdeaTestCase {
     assertNotNull(path, vFile);
     PsiFile psiFile = PsiManager.getInstance(getProject()).findFile(vFile);
     assertNotNull(path, psiFile);
-    for (int i = 0; i < psiFile.getTextLength(); i++) {
+    int length = BinaryFileTypeDecompilers.getInstance().allowDecompilerSlowOperation(() -> psiFile.getTextLength());
+    for (int i = 0; i < length; i++) {
       PsiElement element = psiFile.findElementAt(i);
       assertTrue(i + ":" + element, element != null && !(element instanceof ClsElementImpl));
     }

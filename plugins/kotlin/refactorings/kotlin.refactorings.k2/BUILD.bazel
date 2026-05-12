@@ -1,6 +1,6 @@
 ### auto-generated section `build intellij.kotlin.refactorings` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_kotlin-refactorings",
@@ -15,18 +15,13 @@ create_kotlinc_options(
   x_context_parameters = True
 )
 
-resourcegroup(
-  name = "kotlin-refactorings_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "kotlin-refactorings",
   module_name = "intellij.kotlin.refactorings",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":kotlin-refactorings_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_kotlin-refactorings",
   deps = [
     "//java/java-indexing-api:indexing",
@@ -38,6 +33,7 @@ jvm_library(
     "//platform/refactoring",
     "//plugins/kotlin/base/psi",
     "//platform/usageView",
+    "//platform/lang-api:lang",
     "//plugins/kotlin/base/util",
     "//java/java-psi-api:psi",
     "//platform/core-api:core",
@@ -69,17 +65,24 @@ jvm_library(
     "//libraries/guava",
     "//plugins/kotlin/refactorings/kotlin.refactorings.move.k2:kotlin-refactorings-move",
     "//platform/util/text-matching",
+    "//platform/util:util-ui",
     "//plugins/kotlin/base/indices",
     "//libraries/fastutil",
     "//plugins/kotlin/j2k/shared",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
+    "//platform/progress/shared:ide-progress",
     "//plugins/kotlin/kotlin.ide",
     "//platform/forms_rt:java-guiForms-rt",
+    "//java/java-frontback-psi-api:frontback-psi",
+    "//platform/util/concurrency",
+    "//platform/statistics",
   ]
 )
 
 jvm_library(
   name = "kotlin-refactorings_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.refactorings",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -95,6 +98,7 @@ jvm_library(
     "//platform/refactoring:refactoring_test_lib",
     "//plugins/kotlin/base/psi:psi_test_lib",
     "//platform/usageView:usageView_test_lib",
+    "//platform/lang-api:lang_test_lib",
     "//plugins/kotlin/base/util:util_test_lib",
     "//java/java-psi-api:psi_test_lib",
     "//platform/core-api:core_test_lib",
@@ -122,12 +126,24 @@ jvm_library(
     "//libraries/guava:guava_test_lib",
     "//plugins/kotlin/refactorings/kotlin.refactorings.move.k2:kotlin-refactorings-move_test_lib",
     "//platform/util/text-matching:text-matching_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//plugins/kotlin/base/indices:indices_test_lib",
     "//libraries/fastutil:fastutil_test_lib",
     "//plugins/kotlin/j2k/shared:shared_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
     "//plugins/kotlin/kotlin.ide:kotlin.ide_test_lib",
     "//platform/forms_rt:java-guiForms-rt_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
+    "//platform/util/concurrency:concurrency_test_lib",
+    "//platform/statistics:statistics_test_lib",
   ]
 )
 ### auto-generated section `build intellij.kotlin.refactorings` end
+
+### auto-generated section `iml intellij.kotlin.refactorings` start
+exports_files([
+  "intellij.kotlin.refactorings.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.refactorings` end

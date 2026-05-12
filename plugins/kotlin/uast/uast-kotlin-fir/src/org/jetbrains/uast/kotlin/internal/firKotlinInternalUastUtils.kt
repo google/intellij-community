@@ -21,7 +21,6 @@ import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotationValue
 import org.jetbrains.kotlin.analysis.api.components.asPsiType
-import org.jetbrains.kotlin.analysis.api.components.buildClassType
 import org.jetbrains.kotlin.analysis.api.components.containingDeclaration
 import org.jetbrains.kotlin.analysis.api.components.containingJvmClassName
 import org.jetbrains.kotlin.analysis.api.components.expandedSymbol
@@ -32,6 +31,7 @@ import org.jetbrains.kotlin.analysis.api.components.isMarkedNullable
 import org.jetbrains.kotlin.analysis.api.components.isNullable
 import org.jetbrains.kotlin.analysis.api.components.isUnitType
 import org.jetbrains.kotlin.analysis.api.components.originalConstructorIfTypeAliased
+import org.jetbrains.kotlin.analysis.api.components.typeCreator
 import org.jetbrains.kotlin.analysis.api.getModule
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisFromWriteAction
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
@@ -162,8 +162,8 @@ internal fun toPsiClass(
     )
 }
 
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class)
+context(_: KaSession)
 private fun fakePsiMethodForReifiedInline(
     functionSymbol: KaFunctionSymbol,
     context: KtElement,
@@ -252,8 +252,8 @@ internal fun toPsiMethod(
     }
 }
 
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class)
+context(_: KaSession)
 private fun toPsiMethodForDeserialized(
     functionSymbol: KaFunctionSymbol,
     context: KtElement,
@@ -298,6 +298,7 @@ private fun toPsiMethodForDeserialized(
 
             if (methodParameters[i].type != symbolParameterType) return false
         }
+        if (psiMethod.isConstructor) return true
         val psiMethodReturnType = psiMethod.returnType ?: PsiTypes.voidType()
         val symbolReturnType =
             // The return type of compiled `suspend` function is [Object].
@@ -372,7 +373,7 @@ private fun toPsiMethodForDeserialized(
         ?: functionSymbol.callableId?.classId
     if (classId != null) {
         toPsiClass(
-            buildClassType(classId),
+            typeCreator.classType(classId),
             source = null,
             context,
             TypeOwnerKind.DECLARATION,
@@ -436,8 +437,8 @@ internal fun toPsiType(
         config
     )
 
-context(session: KaSession)
 @OptIn(KaExperimentalApi::class, KaImplementationDetail::class)
+context(session: KaSession)
 internal fun toPsiType(
     ktType: KaType,
     containingLightDeclaration: PsiModifierListOwner?,
@@ -546,8 +547,8 @@ internal fun getKtType(ktCallableDeclaration: KtCallableDeclaration): KaType? {
 /**
  * Finds Java stub-based [PsiElement] for symbols that refer to declarations from [KaSymbolOrigin.LIBRARY]
  */
-context(session: KaSession)
 @OptIn(KaExperimentalApi::class)
+context(session: KaSession)
 internal tailrec fun psiForUast(
     symbol: KaSymbol,
     context: KtElement,

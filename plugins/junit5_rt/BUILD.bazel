@@ -21,6 +21,7 @@ jvm_library(
 
 jvm_library(
   name = "junit-v5-rt_test_lib",
+  testonly = True,
   module_name = "intellij.junit.v5.rt",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -40,3 +41,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.junit.v5.rt` end
+
+### auto-generated section `iml intellij.junit.v5.rt` start
+exports_files([
+  "intellij.junit.v5.rt.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.junit.v5.rt` end

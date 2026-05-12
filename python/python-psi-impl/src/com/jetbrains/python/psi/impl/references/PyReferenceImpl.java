@@ -337,7 +337,7 @@ public class PyReferenceImpl implements PsiReferenceEx, PsiPolyVariantReference 
 
           if (outermostNestedClass != null) {
             final List<Instruction> instructions =
-              PyDefUseUtil.getLatestDefs(resolvedOwner, referencedName, outermostNestedClass, false, true, typeEvalContext);
+              PyDefUseUtil.getLatestDefs(resolvedOwner, referencedName, outermostNestedClass, false, true, typeEvalContext).defs();
 
             return resolveToLatestDefs(instructions, outermostNestedClass, referencedName, typeEvalContext);
           }
@@ -392,7 +392,7 @@ public class PyReferenceImpl implements PsiReferenceEx, PsiPolyVariantReference 
   protected @NotNull List<Instruction> getLatestDefinitions(@NotNull String referencedName,
                                                             @NotNull ScopeOwner resolvedOwner,
                                                             @NotNull PsiElement referenceAnchor) {
-    return PyDefUseUtil.getLatestDefs(resolvedOwner, referencedName, referenceAnchor, false, true, myContext.getTypeEvalContext());
+    return PyDefUseUtil.getLatestDefs(resolvedOwner, referencedName, referenceAnchor, false, true, myContext.getTypeEvalContext()).defs();
   }
 
   private static boolean allowsForwardOutgoingReferencesInClass(@NotNull PyQualifiedExpression element) {

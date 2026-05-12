@@ -12,6 +12,7 @@ create_kotlinc_options(
 
 jvm_library(
   name = "kotlin-compiler-plugins-allopen-tests-k1",
+  module_name = "kotlin.compiler-plugins.allopen.tests.k1",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -36,6 +37,7 @@ jvm_library(
 
 jvm_library(
   name = "kotlin-compiler-plugins-allopen-tests-k1_test_lib",
+  testonly = True,
   module_name = "kotlin.compiler-plugins.allopen.tests.k1",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -52,8 +54,8 @@ jvm_library(
     "//platform/lang-core:lang-core_test_lib",
     "//platform/projectModel-api:projectModel",
     "//platform/projectModel-api:projectModel_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/tests-common:common-tests",
     "//plugins/kotlin/tests-common:common-tests_test_lib",
     "@lib//:kotlinc-kotlin-jps-common",
@@ -87,6 +89,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build kotlin.compiler-plugins.allopen.tests.k1` end
+
+### auto-generated section `iml kotlin.compiler-plugins.allopen.tests.k1` start
+exports_files([
+  "kotlin.compiler-plugins.allopen.tests.k1.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.compiler-plugins.allopen.tests.k1` end
 
 ### auto-generated section `test kotlin.compiler-plugins.allopen.tests.k1` start
 load("@community//build:tests-options.bzl", "jps_test")

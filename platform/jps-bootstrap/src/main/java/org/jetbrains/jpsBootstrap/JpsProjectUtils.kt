@@ -7,6 +7,7 @@ import com.intellij.openapi.util.text.StringUtil
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.io.URLUtil
 import org.jetbrains.intellij.build.dependencies.BuildDependenciesLogging.info
+import org.jetbrains.intellij.build.dependencies.TeamCityHelper.isUnderTeamCity
 import org.jetbrains.jps.model.JpsElementFactory
 import org.jetbrains.jps.model.JpsModel
 import org.jetbrains.jps.model.java.JavaSourceRootType
@@ -29,8 +30,13 @@ import kotlin.io.path.listDirectoryEntries
 object JpsProjectUtils {
   fun loadJpsProject(projectHome: Path, jdkHome: Path, kotlincHome: Path): JpsModel {
     val startTime = System.currentTimeMillis()
-    val m2LocalRepository = getMavenRepositoryPath()?.let { Path.of(it) }
-                            ?: Path.of(System.getProperty("user.home"), ".m2", "repository")
+    val m2LocalRepository = if (isUnderTeamCity) {
+      Path.of(System.getProperty("user.home"), ".m2", "repository")
+    }
+    else {
+      getMavenRepositoryPath().let { Path.of(it) }
+        ?: Path.of(System.getProperty("user.home"), ".m2", "repository")
+    }
     val model = JpsElementFactory.getInstance().createModel()
 
     val pathVariablesConfiguration = JpsModelSerializationDataService.getOrCreatePathVariablesConfiguration(model.global)
@@ -49,6 +55,7 @@ object JpsProjectUtils {
     val sdkName = "jdk-home"
     addSdk(model, sdkName, jdkHome)
     JpsSdkTableSerializer.setSdkReference(model.project.sdkReferencesTable, sdkName, JpsJavaSdkType.INSTANCE)
+    println("SDK added: $jdkHome")
     return model
   }
 

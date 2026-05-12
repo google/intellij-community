@@ -17,7 +17,7 @@ import com.jetbrains.python.PythonLanguage
 import com.jetbrains.python.extensions.getSdk
 import com.jetbrains.python.hatch.sdk.isHatch
 import com.jetbrains.python.isCondaVirtualEnv
-import com.jetbrains.python.isVirtualEnv
+import com.jetbrains.python.isNonToolVirtualEnv
 import com.jetbrains.python.psi.LanguageLevel
 import com.jetbrains.python.sdk.PySdkUtil
 import com.jetbrains.python.sdk.PythonSdkAdditionalData
@@ -196,7 +196,7 @@ val Sdk.interpreterType: InterpreterType
     isHatch -> HATCH
     this.isCondaVirtualEnv || this.sdkAdditionalData.asSafely<PythonSdkAdditionalData>()?.flavor is CondaEnvSdkFlavor -> CONDAVENV
     homePath?.contains(PYENV_PATTERN) == true -> PYENV
-    this.isVirtualEnv -> VIRTUALENV
+    this.isNonToolVirtualEnv -> VIRTUALENV
     else -> REGULAR
   }
 

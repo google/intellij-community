@@ -128,8 +128,8 @@ import java.util.Collections
 
 open class KotlinFirIntroduceParameterHandler(private val helper: KotlinIntroduceParameterHelper<KtNamedDeclaration> = KotlinIntroduceParameterHelper.Default()) : RefactoringActionHandler {
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     protected fun findInternalUsagesOfParametersAndReceiver(
         targetParent: KtNamedDeclaration
     ): MultiMap<KtElement, KtElement> {

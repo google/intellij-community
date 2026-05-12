@@ -1,12 +1,12 @@
 package com.intellij.notebooks.visualization.outputs.impl
 
-import com.intellij.notebooks.ui.visualization.NotebookUtil.notebookAppearance
 import com.intellij.notebooks.visualization.outputs.NotebookLazyOutputComponent
 import com.intellij.notebooks.visualization.outputs.action.NotebookOutputCollapseSingleInCellAction
 import com.intellij.notebooks.visualization.r.inlays.ResizeController
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.editor.DefaultLanguageHighlighterColors
 import com.intellij.openapi.editor.colors.EditorColors
 import com.intellij.openapi.editor.ex.util.EditorUtil
 import com.intellij.openapi.editor.impl.EditorImpl
@@ -40,7 +40,8 @@ open class CollapsingComponent(
 
   var maximized: Boolean = false
 
-  fun calculateInnerSize(): Dimension = size.let { Dimension(it.width - insets.run { left + right }, it.height - insets.run { top + bottom }) }
+  fun calculateInnerSize(): Dimension =
+    size.let { Dimension(it.width - insets.run { left + right }, it.height - insets.run { top + bottom }) }
 
   val hasBeenManuallyResized: Boolean
     get() = customSize != null
@@ -138,10 +139,10 @@ open class CollapsingComponent(
 
   private class StubComponent(private val editor: EditorImpl) : JLabel("...") {
     init {
-      isOpaque = true
       border = IdeBorderFactory.createEmptyBorder(JBUI.insets(7, 0))
-      updateUIFromEditor()
       cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+
+      updateUIFromEditor()
 
       addMouseListener(object : MouseAdapter() {
         override fun mouseClicked(e: MouseEvent) {
@@ -152,7 +153,8 @@ open class CollapsingComponent(
 
     override fun updateUI() {
       super.updateUI()
-      if (@Suppress("SENSELESS_COMPARISON") (editor != null)) {
+      @Suppress("SENSELESS_COMPARISON") // updateUI called in constructor before editor is set.
+      if (editor != null) {
         updateUIFromEditor()
       }
     }
@@ -168,8 +170,7 @@ open class CollapsingComponent(
 
     private fun updateUIFromEditor() {
       val fontType = editor.colorsScheme.getAttributes(EditorColors.FOLDED_TEXT_ATTRIBUTES)?.fontType ?: Font.PLAIN
-      foreground = JBUI.CurrentTheme.ActionsList.MNEMONIC_FOREGROUND
-      background = editor.notebookAppearance.getTextOutputBackground(editor.colorsScheme)
+      foreground = editor.colorsScheme.getAttributes(DefaultLanguageHighlighterColors.LINE_COMMENT).foregroundColor
       font = EditorUtil.fontForChar(text.first(), fontType, editor).font
     }
   }

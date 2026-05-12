@@ -1,6 +1,6 @@
 // WITH_STDLIB
 // IS_APPLICABLE: false
-
+// PROBLEM: none
 class List {
     val size = 0
 }

@@ -29,4 +29,7 @@
                     interface="com.intellij.openapi.compiler.util.InspectionValidator"
                     area="IDEA_PROJECT" dynamic="true"/>
   </extensionPoints>
+  <extensions defaultExtensionNs="com.intellij">
+    <projectSettings service="com.intellij.compiler.CompilerWorkspaceConfiguration"/>
+  </extensions>
 </idea-plugin>

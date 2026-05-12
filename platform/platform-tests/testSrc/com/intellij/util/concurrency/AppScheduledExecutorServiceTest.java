@@ -58,7 +58,7 @@ public class AppScheduledExecutorServiceTest extends CatchLogErrorsInAllThreadsT
     int N = 3;
     CountDownLatch c = new CountDownLatch(1);
     // pre-start all threads
-    List<Future<Boolean>> futures = ContainerUtil.map(Collections.nCopies(N, null), __ -> service.submit(() -> c.await(1, TimeUnit.MINUTES)));
+    List<Future<Boolean>> futures = ContainerUtil.map(Collections.nCopies(N, null), _ -> service.submit(() -> c.await(1, TimeUnit.MINUTES)));
     c.countDown();
     for (Future<Boolean> future : futures) {
       future.get();
@@ -234,7 +234,7 @@ public class AppScheduledExecutorServiceTest extends CatchLogErrorsInAllThreadsT
 
     int N = 20;
     List<? extends Future<?>> futures =
-      ContainerUtil.map(Collections.nCopies(N, ""), __ -> service.schedule(()-> {
+      ContainerUtil.map(Collections.nCopies(N, ""), _ -> service.schedule(()-> {
         log.add(new LogInfo(0));
         TimeoutUtil.sleep(10 * 1000);
       }

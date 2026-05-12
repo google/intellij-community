@@ -17,6 +17,7 @@ package com.intellij.java.codeInsight.daemon.impl;
 
 import com.intellij.JavaTestUtil;
 import com.intellij.codeInsight.CodeInsightActionHandler;
+import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.GutterIconDescriptor;
 import com.intellij.codeInsight.daemon.LightDaemonAnalyzerTestCase;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
@@ -46,6 +47,7 @@ import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl;
 import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.NotNull;
 
+import java.awt.event.MouseEvent;
 import java.util.List;
 
 public class JavaGotoSuperTest extends LightDaemonAnalyzerTestCase {
@@ -115,6 +117,64 @@ public class JavaGotoSuperTest extends LightDaemonAnalyzerTestCase {
     LineMarkerInfo<?> aMarker = findMarkerWithElement(markers, aRun.getNameIdentifier());
     assertSame(MarkerType.SIBLING_OVERRIDING_METHOD.getNavigationHandler(), aMarker.getNavigationHandler());
   }
+
+  public void testSiblingInheritanceGutterNavigatesToSuper() {
+    configureByFile(getBasePath() + "SiblingInheritance.java");
+    PsiJavaFile file = (PsiJavaFile)getFile();
+    PsiClass i = JavaPsiFacade.getInstance(getProject()).findClass("z.I", GlobalSearchScope.fileScope(file));
+    PsiClass a = JavaPsiFacade.getInstance(getProject()).findClass("z.A", GlobalSearchScope.fileScope(file));
+    PsiMethod iRun = i.getMethods()[0];
+    PsiMethod aRun = a.getMethods()[0];
+
+    doHighlighting();
+    List<LineMarkerInfo<?>> markers =
+      DaemonCodeAnalyzerImpl.getLineMarkers(getEditor().getDocument(), getProject());
+    LineMarkerInfo<?> aMarker = findMarkerWithElement(markers, aRun.getNameIdentifier());
+    assertSame(MarkerType.SIBLING_OVERRIDING_METHOD.getNavigationHandler(), aMarker.getNavigationHandler());
+
+    @SuppressWarnings("unchecked")
+    GutterIconNavigationHandler<PsiElement> handler =
+      (GutterIconNavigationHandler<PsiElement>)aMarker.getNavigationHandler();
+    handler.navigate(fakeClickEvent(), aMarker.getElement());
+
+    int caretOffset = getEditor().getCaretModel().getOffset();
+    assertTrue(
+      "Gutter click on A#run must navigate to I#run, but caret is at offset " + caretOffset,
+      iRun.getNameIdentifier().getTextRange().contains(caretOffset));
+  }
+
+  public void testSiblingInheritanceGutterNavigatesToSealedSuper() {
+    configureByFile(getBasePath() + "SiblingInheritanceSealed.java");
+    PsiJavaFile file = (PsiJavaFile)getFile();
+    PsiClass derivative = JavaPsiFacade.getInstance(getProject())
+      .findClass("z.Derivative", GlobalSearchScope.fileScope(file));
+    PsiClass abstractDerivative = JavaPsiFacade.getInstance(getProject())
+      .findClass("z.AbstractDerivative", GlobalSearchScope.fileScope(file));
+    PsiMethod superGet = derivative.getMethods()[0];
+    PsiMethod absGet = abstractDerivative.getMethods()[0];
+
+    doHighlighting();
+    List<LineMarkerInfo<?>> markers =
+      DaemonCodeAnalyzerImpl.getLineMarkers(getEditor().getDocument(), getProject());
+    LineMarkerInfo<?> marker = findMarkerWithElement(markers, absGet.getNameIdentifier());
+    assertSame(MarkerType.SIBLING_OVERRIDING_METHOD.getNavigationHandler(), marker.getNavigationHandler());
+
+    @SuppressWarnings("unchecked")
+    GutterIconNavigationHandler<PsiElement> handler =
+      (GutterIconNavigationHandler<PsiElement>)marker.getNavigationHandler();
+    handler.navigate(fakeClickEvent(), marker.getElement());
+
+    int caretOffset = getEditor().getCaretModel().getOffset();
+    assertTrue(
+      "Gutter click on AbstractDerivative#getExpiration must navigate to Derivative#getExpiration, caret at " + caretOffset,
+      superGet.getNameIdentifier().getTextRange().contains(caretOffset));
+  }
+
+  private MouseEvent fakeClickEvent() {
+    return new MouseEvent(getEditor().getContentComponent(), MouseEvent.MOUSE_CLICKED,
+                          System.currentTimeMillis(), 0, 0, 0, 1, false);
+  }
+
   public void testSiblingInheritanceLineMarkersEvenIfMethodIsFinal() {
     configureByFile(getBasePath() + "SiblingInheritanceFinal.java");
     PsiJavaFile file = (PsiJavaFile)getFile();

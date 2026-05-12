@@ -48,7 +48,6 @@ import java.util.stream.Collectors;
 import static com.jetbrains.python.PythonBinaryKt.PYTHON_VERSION_ARG;
 import static com.jetbrains.python.sdk.flavors.PySdkFlavorUtilKt.getFileExecutionError;
 import static com.jetbrains.python.sdk.flavors.PySdkFlavorUtilKt.getFileExecutionErrorOnEdt;
-import static com.jetbrains.python.venvReader.ResolveUtilKt.tryResolvePath;
 
 
 /**
@@ -120,7 +119,7 @@ public abstract class PythonSdkFlavor<D extends PyFlavorData> {
   public final @NotNull Collection<@NotNull Path> suggestLocalHomePaths(final @Nullable Module module,
                                                                         final @Nullable UserDataHolder context) {
     return suggestLocalHomePathsImpl(module, context).stream().filter(path -> {
-      var flavor = tryDetectFlavorByLocalPath(path.toString());
+      var flavor = tryDetectFlavorByLocalPath(path);
       boolean correctFlavor = flavor != null && flavor.getClass().equals(getClass());
       // Some flavors might report foreign pythons: e.g. Windows might find conda on PATH.
       if (!correctFlavor) {
@@ -233,7 +232,7 @@ public abstract class PythonSdkFlavor<D extends PyFlavorData> {
 
   /**
    * List of flavors starting from platform-independent, so venv flavor goes before unix or windows flavor.
-   * That could be used to find the first flavor that is {@link PythonSdkFlavor#isValidSdkPath(File)} for example
+   * That could be used to find the first flavor that is {@link PythonSdkFlavor#isValidSdkPath(Path)} for example
    */
   public static @NotNull List<PythonSdkFlavor<?>> getApplicableFlavors(boolean addPlatformIndependent) {
     List<PythonSdkFlavor<?>> result = new ArrayList<>();
@@ -294,41 +293,19 @@ public abstract class PythonSdkFlavor<D extends PyFlavorData> {
   @RequiresBackgroundThread(generateAssertion = false)
   public static @Nullable PythonSdkFlavor<?> getFlavor(@Nullable String sdkPath) {
     if (sdkPath == null || CustomSdkHomePattern.isCustomPythonSdkHomePath(sdkPath)) return null;
-    return tryDetectFlavorByLocalPath(sdkPath);
+    return tryDetectFlavorByLocalPath(Path.of(sdkPath));
   }
 
   /**
    * Detects {@link PythonSdkFlavor} for a local python path
    */
+  @ApiStatus.Internal
   @RequiresBackgroundThread(generateAssertion = false) //No warning yet as there are usages: to be fixed
-  public static @Nullable PythonSdkFlavor<?> tryDetectFlavorByLocalPath(@NotNull String sdkPath) {
+  public static @Nullable PythonSdkFlavor<?> tryDetectFlavorByLocalPath(@NotNull Path pythonBinaryPath) {
     // Iterate over all flavors starting with platform-independent (like venv): see `getApplicableFlavors` doc.
     // Order is important as venv must have priority over unix/windows
     for (PythonSdkFlavor<?> flavor : getApplicableFlavors(true)) {
-      if (flavor.isValidSdkPath(sdkPath)) {
-        return flavor;
-      }
-    }
-    return null;
-  }
-
-  /**
-   * @deprecated SDK path is not enough to get flavor, use {@link #getFlavor(Sdk)} instead
-   */
-  @Deprecated(forRemoval = true)
-  public static @Nullable PythonSdkFlavor<?> getPlatformIndependentFlavor(final @Nullable String sdkPath) {
-    if (sdkPath == null) {
-      return null;
-    }
-
-    for (PythonSdkFlavor<?> flavor : getPlatformIndependentFlavors()) {
-      if (flavor.isValidSdkPath(sdkPath)) {
-        return flavor;
-      }
-    }
-
-    for (PythonSdkFlavor<?> flavor : getPlatformFlavorsFromExtensions()) {
-      if (flavor.isValidSdkPath(sdkPath)) {
+      if (flavor.isValidSdkPath(pythonBinaryPath)) {
         return flavor;
       }
     }
@@ -339,13 +316,8 @@ public abstract class PythonSdkFlavor<D extends PyFlavorData> {
    * It only validates path for local target, hence use {@link #sdkSeemsValid(Sdk, PyFlavorData, TargetEnvironmentConfiguration)} instead
    */
   @ApiStatus.Internal
-  public boolean isValidSdkPath(@NotNull String pathStr) {
-    Path path = tryResolvePath(pathStr);
-    if (path == null) {
-      return false;
-    }
-
-    return Files.exists(path) && Files.isExecutable(path);
+  public boolean isValidSdkPath(@NotNull Path pythonBinaryPath) {
+    return Files.exists(pythonBinaryPath) && Files.isExecutable(pythonBinaryPath);
   }
 
   /**

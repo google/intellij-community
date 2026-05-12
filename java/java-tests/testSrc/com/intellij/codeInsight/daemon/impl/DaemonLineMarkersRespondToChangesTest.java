@@ -15,7 +15,6 @@ import com.intellij.lang.annotation.HighlightSeverity;
 import com.intellij.lang.java.JavaLanguage;
 import com.intellij.openapi.command.undo.UndoManager;
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorMouseHoverPopupManager;
 import com.intellij.openapi.editor.ex.MarkupModelEx;
 import com.intellij.openapi.editor.ex.RangeHighlighterEx;
@@ -28,10 +27,8 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.projectRoots.Sdk;
 import com.intellij.openapi.projectRoots.impl.JavaAwareProjectJdkTableImpl;
 import com.intellij.openapi.util.TextRange;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.pom.java.LanguageLevel;
 import com.intellij.psi.PsiComment;
-import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiJavaFile;
@@ -40,13 +37,10 @@ import com.intellij.testFramework.SkipSlowTestLocally;
 import com.intellij.util.ExceptionUtil;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.EdtInvocationManager;
+import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -97,23 +91,6 @@ public class DaemonLineMarkersRespondToChangesTest extends ProductionDaemonAnaly
   }
 
   @Override
-  protected void configureByExistingFile(@NotNull VirtualFile virtualFile) {
-    super.configureByExistingFile(virtualFile);
-    setActiveEditors(getEditor());
-  }
-
-  @Override
-  protected VirtualFile configureByFiles(@Nullable File rawProjectRoot, VirtualFile @NotNull ... vFiles) throws IOException {
-    VirtualFile file = super.configureByFiles(rawProjectRoot, vFiles);
-    setActiveEditors(getEditor());
-    return file;
-  }
-
-  private void setActiveEditors(Editor @NotNull ... editors) {
-    EditorTracker.getInstance(myProject).setActiveEditorsInTests(Arrays.asList(editors));
-  }
-
-  @Override
   protected boolean doTestLineMarkers() {
     return true;
   }
@@ -127,7 +104,7 @@ public class DaemonLineMarkersRespondToChangesTest extends ProductionDaemonAnaly
 
   public void testOverriddenMethodMarkers() throws Exception {
     configureByFile(DaemonRespondToChangesTest.BASE_PATH + getTestName(false) + ".java");
-    assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getProject(), getEditor().getDocument(), HighlightSeverity.ERROR));
+    assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getFile(), HighlightSeverity.ERROR));
 
     Document document = getEditor().getDocument();
     List<LineMarkerInfo<?>> markers = DaemonCodeAnalyzerImpl.getLineMarkers(document, getProject());
@@ -135,7 +112,7 @@ public class DaemonLineMarkersRespondToChangesTest extends ProductionDaemonAnaly
 
     type("//xxxx");
 
-    assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getProject(), getEditor().getDocument(), HighlightSeverity.ERROR));
+    assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getFile(), HighlightSeverity.ERROR));
     markers = DaemonCodeAnalyzerImpl.getLineMarkers(document, getProject());
     assertSize(3, markers);
   }
@@ -143,7 +120,7 @@ public class DaemonLineMarkersRespondToChangesTest extends ProductionDaemonAnaly
 
   public void testOverriddenMethodMarkersDoNotClearedByChangingWhitespaceNearby() throws Exception {
     configureByFile(DaemonRespondToChangesTest.BASE_PATH + "OverriddenMethodMarkers.java");
-    assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getProject(), getEditor().getDocument(), HighlightSeverity.ERROR));
+    assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getFile(), HighlightSeverity.ERROR));
 
     Document document = getEditor().getDocument();
     List<LineMarkerInfo<?>> markers = DaemonCodeAnalyzerImpl.getLineMarkers(document, getProject());
@@ -154,7 +131,7 @@ public class DaemonLineMarkersRespondToChangesTest extends ProductionDaemonAnaly
     getEditor().getCaretModel().moveToOffset(element.getTextOffset() + 1);
     type(" ");
 
-    assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getProject(), getEditor().getDocument(), HighlightSeverity.ERROR));
+    assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getFile(), HighlightSeverity.ERROR));
     markers = DaemonCodeAnalyzerImpl.getLineMarkers(document, getProject());
     assertEquals(markers.toString(), 3, markers.size());
   }
@@ -162,7 +139,7 @@ public class DaemonLineMarkersRespondToChangesTest extends ProductionDaemonAnaly
   public void testLineMarkersReuse() throws Throwable {
     configureByFile(DaemonRespondToChangesTest.BASE_PATH + "LineMarkerChange.java");
 
-    assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getProject(), getEditor().getDocument(), HighlightSeverity.ERROR));
+    assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getFile(), HighlightSeverity.ERROR));
 
     List<LineMarkerInfo<?>> lineMarkers = DaemonCodeAnalyzerImpl.getLineMarkers(myEditor.getDocument(), getProject());
     assertSize(5, lineMarkers);
@@ -198,8 +175,7 @@ public class DaemonLineMarkersRespondToChangesTest extends ProductionDaemonAnaly
       }
     });
 
-    PsiDocumentManager.getInstance(getProject()).commitAllDocuments();
-    List<HighlightInfo> infosAfter = myTestDaemonCodeAnalyzer.waitHighlighting(getProject(), getEditor().getDocument(), HighlightSeverity.ERROR);
+    List<HighlightInfo> infosAfter = myTestDaemonCodeAnalyzer.waitHighlighting(getFile(), HighlightSeverity.ERROR);
     assertNotEmpty(infosAfter);
     PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
     assertEmpty(changed);
@@ -208,14 +184,16 @@ public class DaemonLineMarkersRespondToChangesTest extends ProductionDaemonAnaly
   }
 
   public void testLineMarkersDoNotBlinkOnBackSpaceRightBeforeMethodIdentifier() {
-    configureByText(JavaFileType.INSTANCE, """
+    @Language("JAVA")
+    String text = """
       package x;
       class  <caret>ToRun{
         public static void main(String[] args) {
         }
-      }""");
+      }""";
+    configureByText(JavaFileType.INSTANCE, text);
 
-    assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getProject(), getEditor().getDocument(), HighlightSeverity.ERROR));
+    assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getFile(), HighlightSeverity.ERROR));
 
     List<LineMarkerInfo<?>> lineMarkers = DaemonCodeAnalyzerImpl.getLineMarkers(myEditor.getDocument(), getProject());
     assertSize(2, lineMarkers);
@@ -249,7 +227,7 @@ public class DaemonLineMarkersRespondToChangesTest extends ProductionDaemonAnaly
       }
     });
 
-    assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getProject(), getEditor().getDocument(), HighlightSeverity.ERROR));
+    assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getFile(), HighlightSeverity.ERROR));
     PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
     assertSize(2, DaemonCodeAnalyzerImpl.getLineMarkers(myEditor.getDocument(), getProject()));
 
@@ -257,7 +235,9 @@ public class DaemonLineMarkersRespondToChangesTest extends ProductionDaemonAnaly
   }
 
   public void testLineMarkersClearWhenTypingAtTheEndOfPsiComment() {
-    configureByText(JavaFileType.INSTANCE, "class S {\n//ddd<caret>\n}");
+    @Language("JAVA")
+    String text = "class S {\n//ddd<caret>\n}";
+    configureByText(JavaFileType.INSTANCE, text);
     StringBuffer log = new StringBuffer();
     // highlight all PsiComments
     LineMarkerProvider provider = element -> {
@@ -277,8 +257,7 @@ public class DaemonLineMarkersRespondToChangesTest extends ProductionDaemonAnaly
       log.append("FileStatusMap.getDirtyTextRange: " + range+"\n");
       List<PsiElement> elements = CollectHighlightsUtil.getElementsInRange(getFile(), range.getStartOffset(), range.getEndOffset());
       log.append("CollectHighlightsUtil.getElementsInRange: " + range + ": " + elements.size() +" elements : "+ elements+"\n");
-      List<HighlightInfo> infos =
-        myTestDaemonCodeAnalyzer.waitHighlighting(getProject(), getEditor().getDocument(), HighlightSeverity.INFORMATION);
+      List<HighlightInfo> infos = myTestDaemonCodeAnalyzer.waitHighlighting(getFile(), HighlightSeverity.INFORMATION);
       log.append(" File text: '" + getFile().getText() + "'\n");
       log.append("infos: " + infos + "\n");
       assertEmpty(filter(infos,HighlightSeverity.ERROR));
@@ -287,7 +266,7 @@ public class DaemonLineMarkersRespondToChangesTest extends ProductionDaemonAnaly
       assertOneElement(lineMarkers);
 
       type(' ');
-      infos = myTestDaemonCodeAnalyzer.waitHighlighting(getProject(), getEditor().getDocument(), HighlightSeverity.INFORMATION);
+      infos = myTestDaemonCodeAnalyzer.waitHighlighting(getFile(), HighlightSeverity.INFORMATION);
       log.append("File text: '" + getFile().getText() + "'\n");
       log.append("infos: " + infos + "\n");
       assertEmpty(filter(infos,HighlightSeverity.ERROR));
@@ -296,7 +275,7 @@ public class DaemonLineMarkersRespondToChangesTest extends ProductionDaemonAnaly
       assertOneElement(lineMarkers);
 
       backspace();
-      infos = myTestDaemonCodeAnalyzer.waitHighlighting(getProject(), getEditor().getDocument(), HighlightSeverity.INFORMATION);
+      infos = myTestDaemonCodeAnalyzer.waitHighlighting(getFile(), HighlightSeverity.INFORMATION);
       log.append("File text: '" + getFile().getText() + "'\n");
       log.append("infos: " + infos + "\n");
       assertEmpty(filter(infos,HighlightSeverity.ERROR));
@@ -311,18 +290,20 @@ public class DaemonLineMarkersRespondToChangesTest extends ProductionDaemonAnaly
   }
 
   public void testLineMarkerRegisteredOnWrongPsiElementForExampleOnFileLevelYeahCrazyIKnowMustNotRemoveItselfOnTypingOutsideTheLineMarkerRange() {
-    configureByText(JavaFileType.INSTANCE, """
+    @Language("JAVA")
+    String text = """
       class X {
         // blah
         int foo;
       }
       <caret>
-      """);
+      """;
+    configureByText(JavaFileType.INSTANCE, text);
 
-    GutterIconNavigationHandler<PsiFile> MY_NAVIGATION_HANDLER = (_1, _2) -> { };
+    GutterIconNavigationHandler<PsiFile> MY_NAVIGATION_HANDLER = (_, _) -> { };
     LineMarkerProvider provider = element -> {
       if (element instanceof PsiFile psiFile) {
-        return new LineMarkerInfo<>(psiFile, element.getTextRange(), AllIcons.Ide.Dislike, (_3) -> "my tooltip", MY_NAVIGATION_HANDLER, GutterIconRenderer.Alignment.LEFT, () -> "");
+        return new LineMarkerInfo<>(psiFile, element.getTextRange(), AllIcons.Ide.Dislike, (_) -> "my tooltip", MY_NAVIGATION_HANDLER, GutterIconRenderer.Alignment.LEFT, () -> "");
       }
       return null;
     };
@@ -330,7 +311,7 @@ public class DaemonLineMarkersRespondToChangesTest extends ProductionDaemonAnaly
     myDaemonCodeAnalyzer.restart(getTestName(false));
 
     {
-      assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getProject(), getEditor().getDocument(), HighlightSeverity.ERROR));
+      assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getFile(), HighlightSeverity.ERROR));
       LineMarkerInfo<?> info = assertOneElement(DaemonCodeAnalyzerImpl.getLineMarkers(myEditor.getDocument(), getProject()));
       assertSame(MY_NAVIGATION_HANDLER, info.getNavigationHandler());
     }
@@ -338,14 +319,14 @@ public class DaemonLineMarkersRespondToChangesTest extends ProductionDaemonAnaly
     type("\n\n\n\n\n\n\n\n\n\n");
 
     {
-      assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getProject(), getEditor().getDocument(), HighlightSeverity.ERROR));
+      assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getFile(), HighlightSeverity.ERROR));
       LineMarkerInfo<?> info = assertOneElement(DaemonCodeAnalyzerImpl.getLineMarkers(myEditor.getDocument(), getProject()));
       assertSame(MY_NAVIGATION_HANDLER, info.getNavigationHandler());
     }
     type("\n\n\n\n\n\n\n\n\n\n");
 
     {
-      assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getProject(), getEditor().getDocument(), HighlightSeverity.ERROR));
+      assertEmpty(myTestDaemonCodeAnalyzer.waitHighlighting(getFile(), HighlightSeverity.ERROR));
       LineMarkerInfo<?> info = assertOneElement(DaemonCodeAnalyzerImpl.getLineMarkers(myEditor.getDocument(), getProject()));
       assertSame(MY_NAVIGATION_HANDLER, info.getNavigationHandler());
     }

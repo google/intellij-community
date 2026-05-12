@@ -3,6 +3,7 @@ package com.jetbrains.python;
 
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.containers.ContainerUtil;
+import com.jetbrains.python.codeInsight.PyCodeInsightSettings;
 import com.jetbrains.python.codeInsight.override.PyMethodMember;
 import com.jetbrains.python.codeInsight.override.PyOverrideImplementUtil;
 import com.jetbrains.python.fixtures.PyTestCase;
@@ -220,10 +221,18 @@ public class PyOverrideTest extends PyTestCase {
 
   // PY-34493
   public void testAnnotationNotCopiedFromPyiStubs() {
-    myFixture.copyDirectoryToProject(getTestName(false), "");
-    myFixture.configureByFile("main.py");
-    doOverride(null);
-    myFixture.checkResultByFile(getTestName(false) + "/main_after.py", true);
+    PyCodeInsightSettings settings = PyCodeInsightSettings.getInstance();
+    boolean old = settings.COPY_TYPE_ANNOTATIONS_FROM_STUBS;
+    settings.COPY_TYPE_ANNOTATIONS_FROM_STUBS = false;
+    try {
+      myFixture.copyDirectoryToProject(getTestName(false), "");
+      myFixture.configureByFile("main.py");
+      doOverride(null);
+      myFixture.checkResultByFile(getTestName(false) + "/main_after.py", true);
+    }
+    finally {
+      settings.COPY_TYPE_ANNOTATIONS_FROM_STUBS = old;
+    }
   }
 
   // PY-34493

@@ -6,7 +6,7 @@ import com.intellij.psi.stubs.StubElement;
 import org.jetbrains.annotations.NotNull;
 
 public interface StubBuilder {
-  StubElement buildStubTree(@NotNull PsiFile file);
+  @NotNull StubElement buildStubTree(@NotNull PsiFile file);
 
   /**
    * Return true if {@code node} can't contain stubs, false you can't be sure about that.

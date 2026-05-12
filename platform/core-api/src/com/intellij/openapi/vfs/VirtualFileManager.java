@@ -211,7 +211,7 @@ public abstract class VirtualFileManager implements ModificationTracker {
 
   /**
    * Consider using extension point {@code vfs.asyncListenerBackgroundable}.
-   * The listeners registered this way will be able to run on background threads.
+   * The listeners registered this way will always to run on background threads.
    */
   @ApiStatus.Experimental
   public abstract void addAsyncFileListenerBackgroundable(@NotNull AsyncFileListener listener, @NotNull Disposable parentDisposable);

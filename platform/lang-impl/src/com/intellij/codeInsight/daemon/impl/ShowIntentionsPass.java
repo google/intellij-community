@@ -78,7 +78,7 @@ public final class ShowIntentionsPass extends TextEditorHighlightingPass impleme
     myQueryIntentionActions = queryIntentionActions;
     myEditor = editor;
     myPsiFile = psiFile;
-    myVisibleRange = HighlightingSessionImpl.getFromCurrentIndicator(psiFile).getVisibleRange();
+    myVisibleRange = DaemonCodeAnalyzerEx.getInstanceEx(psiFile.getProject()).getHighlightSessionFromCurrentIndicator(psiFile).getVisibleRange();
   }
 
   public static @NotNull List<HighlightInfo.IntentionActionDescriptor> getAvailableFixes(@NotNull Editor editor,
@@ -272,8 +272,8 @@ public final class ShowIntentionsPass extends TextEditorHighlightingPass impleme
     CachedIntentions cachedIntentions = myCachedIntentions;
     boolean actionsChanged = myActionsChanged;
     TemplateState state = TemplateManagerImpl.getTemplateState(myEditor);
-    if ((state == null || state.isFinished()) && cachedIntentions != null && !myEditor.isDisposed()) {
-      IntentionsUI.getInstance(myProject).update(cachedIntentions, actionsChanged);
+    if ((state == null || state.isFinished()) && cachedIntentions != null && !myEditor.isDisposed() && actionsChanged) {
+      IntentionsUI.getInstance(myProject).update(cachedIntentions, true);
       if (PassExecutorService.LOG.isDebugEnabled()) {
         PassExecutorService.LOG.debug("ShowIntentionsPass id="+getId()+" applied; intentions="+cachedIntentions);
       }

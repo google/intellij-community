@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.python.ml.features` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "ml-features_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "ml-features",
   module_name = "intellij.python.ml.features",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":ml-features_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/core-api:core",
@@ -30,6 +25,7 @@ jvm_library(
     "//platform/util/concurrency",
     "//platform/core-ui",
     "//platform/platform-impl/codeinsight-inline:ide-codeinsight-inline",
+    "//platform/ide-core",
     "@lib//:python-ml-features-jetbrains-ml-models-python-imports-ranking-model",
     "@lib//:jetbrains-mlapi-catboost",
     "@lib//:jetbrains-mlapi-catboost-shadow-need-slf4j",
@@ -38,6 +34,7 @@ jvm_library(
 
 jvm_library(
   name = "ml-features_test_lib",
+  testonly = True,
   module_name = "intellij.python.ml.features",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -58,6 +55,13 @@ jvm_library(
     "//platform/util/concurrency:concurrency_test_lib",
     "//platform/core-ui:core-ui_test_lib",
     "//platform/platform-impl/codeinsight-inline:ide-codeinsight-inline_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
   ]
 )
 ### auto-generated section `build intellij.python.ml.features` end
+
+### auto-generated section `iml intellij.python.ml.features` start
+exports_files([
+  "intellij.python.ml.features.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.python.ml.features` end

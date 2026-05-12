@@ -5,9 +5,9 @@ import functools
 import hashlib
 import json
 import keyword
-import logging
-import multiprocessing
 import shutil
+import time
+import traceback
 from contextlib import contextmanager
 
 from generator3.constants import *
@@ -343,17 +343,6 @@ def report(msg, *data):
     sys.stderr.write("\n")
 
 
-def say(msg, *data):
-    """Say something at info level (stdout)"""
-    sys.stderr.write(msg)
-    sys.stderr.write("\n")
-    sys.stderr.write(str(data))
-    sys.stderr.write("\n")
-    sys.stdout.write(msg % data)
-    sys.stdout.write("\n")
-    sys.stdout.flush()
-
-
 def flatten(seq):
     """Transforms tree lists like ['a', ['b', 'c'], 'd'] to strings like '(a, (b, c), d)', enclosing each tree level in parens."""
     ret = []
@@ -553,26 +542,17 @@ def detect_constructor(p_class):
         return None
 
 ##############  notes, actions #################################################################
-_is_verbose = False # controlled by -v
-
 CURRENT_ACTION = "nothing yet"
 
 def action(msg, *data):
     global CURRENT_ACTION
     CURRENT_ACTION = msg % data
-    note(msg, *data)
+    trace(msg, *data)
 
 
-def set_verbose(verbose):
-    global _is_verbose
-    _is_verbose = verbose
-
-
-def note(msg, *data):
-    """Say something at debug info level (stderr)"""
-    if _is_verbose:
-        sys.stderr.write(msg % data)
-        sys.stderr.write("\n")
+def trace(msg, *args, **kwargs):
+    category = kwargs.pop("category", "misc")
+    logging.getLogger("generator3." + category).log(LOGGING_LEVEL_TRACE, msg, *args, **kwargs)
 
 
 ##############  plaform-specific methods    #######################################################
@@ -786,85 +766,129 @@ def get_portable_test_module_path(abs_path, qname):
     return '/'.join(abs_path_components[-rel_path_components_count:])
 
 
-def is_text_file(path):
-    """
-    Verify that some path is a text file (not a binary file).
-    Ideally there should be usage of libmagic but it can be not
-    installed on a target machine.
+class WorkerProcessExecutor(object):
+    def submit(self, fn, *args, **kwargs):
+        raise NotImplementedError
 
-    Actually this algorithm is inspired by function `file_encoding`
-    from libmagic.
-    """
-    try:
-        with open(path, 'rb') as candidate_stream:
-            # Buffer size like in libmagic
-            buffer = candidate_stream.read(256 * 1024)
-    except EnvironmentError:
-        return False
+    def shutdown(self):
+        pass
 
-    # Verify that it looks like ASCII, UTF-8 or UTF-16.
-    for encoding in 'utf-8', 'utf-16', 'utf-16-be', 'utf-16-le':
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.shutdown()
+
+
+class PooledWorkerProcessExecutor(WorkerProcessExecutor):
+    def __init__(self, max_workers, failure_result):
+        logging.getLogger("generator3.multiprocessing").debug("Using multiprocessing mode: POOL")
+        self._failure_result = failure_result
+        self._max_workers = max_workers
+        self._executor = self._create_executor()
+
+    def _create_executor(self):
+        from concurrent.futures import ProcessPoolExecutor
+
+        return ProcessPoolExecutor(
+            max_workers=self._max_workers,
+            initializer=_pool_worker_initializer,
+            initargs=(get_logging_config(),)
+        )
+
+    def submit(self, fn, *args, **kwargs):
+        from concurrent.futures.process import BrokenProcessPool
+
         try:
-            buffer.decode(encoding)
-        except UnicodeDecodeError as err:
-            if err.args[0].endswith(('truncated data', 'unexpected end of data')):
-                return True
+            return self._executor.submit(_pool_worker_wrapper, *((fn,) + args),
+                                         **kwargs).result()
+        except BrokenProcessPool:
+            self._restart()
+        except Exception:
+            traceback.print_exc()
+        return self._failure_result
+
+    def _restart(self):
+        self.shutdown()
+        self._executor = self._create_executor()
+
+    def shutdown(self):
+        if self._executor:
+            self._executor.shutdown(wait=True, cancel_futures=False)
+            self._executor = None
+
+
+def _pool_worker_wrapper(func, *args, **kwargs):
+    return func(*args, **kwargs)
+
+
+def _pool_worker_initializer(logging_config):
+    # type: (dict[str, int]) -> None
+    _configure_logging(logging_config)
+    _enable_segfault_tracebacks()
+
+
+class StandaloneWorkerProcessExecutor(WorkerProcessExecutor):
+    def __init__(self, failure_result):
+        logging.getLogger("generator3.multiprocessing").debug("Using multiprocessing mode: STANDALONE")
+        self._failure_result = failure_result
+
+    def submit(self, fn, *args, **kwargs):
+        import multiprocessing as mp
+
+        extra_process_kwargs = {}
+        if sys.version_info[0] >= 3:
+            extra_process_kwargs['daemon'] = True
+
+        # There is no need to use a full-blown queue for single producer/single consumer scenario.
+        # Also, Pipes don't suffer from issues such as https://bugs.python.org/issue35797.
+        # TODO experiment with a shared queue maintained by multiprocessing.Manager
+        #  (it will require an additional service process)
+        recv_conn, send_conn = mp.Pipe(duplex=False)
+        data = _MainProcessData(result_conn=send_conn,
+                                logging_config=get_logging_config())
+        p = mp.Process(name=name,
+                       target=_standalone_wrapper,
+                       args=(data, fn) + args,
+                       kwargs=kwargs,
+                       **extra_process_kwargs)
+        p.start()
+        # This is actually against the multiprocessing guidelines
+        # https://docs.python.org/3/library/multiprocessing.html#programming-guidelines
+        # but allows us to fail-fast if the child process terminated abnormally with a segfault
+        # (otherwise we would have to wait by timeout on acquiring the result) and should work
+        # fine for small result values such as generation status.
+        p.join()
+        if recv_conn.poll():
+            return recv_conn.recv()
         else:
-            return True
-
-    # Verify that it looks like ISO-8859 or non-ISO extended ASCII.
-    return all(c not in _bytes_that_never_appears_in_text for c in buffer)
-
-
-_bytes_that_never_appears_in_text = set(range(7)) | {11} | set(range(14, 27)) | set(range(28, 32)) | {127}
-
+            return self._failure_result
 
 # This wrapper is intentionally made top-level: local functions can't be pickled.
-def _multiprocessing_wrapper(data, func, *args, **kwargs):
-    configure_logging(data.root_logger_level)
+def _standalone_wrapper(data, func, *args, **kwargs):
+    _configure_logging(data.logging_config)
     data.result_conn.send(func(*args, **kwargs))
 
 
-_MainProcessData = collections.namedtuple('_MainProcessData', ['result_conn', 'root_logger_level'])
+_MainProcessData = collections.namedtuple('_MainProcessData', ['result_conn', 'logging_config'])
+
+def get_logging_config():
+    # type: () -> dict[str, int]
+    result = {"": logging.getLogger().level}
+    for category in LOGGING_CATEGORIES:
+        logger_name = "generator3." + category
+        result[logger_name] = logging.getLogger(logger_name).level
+    return result
 
 
-def execute_in_subprocess_synchronously(name, func, args, kwargs, failure_result=None):
-    import multiprocessing as mp
-
-    extra_process_kwargs = {}
-    if sys.version_info[0] >= 3:
-        extra_process_kwargs['daemon'] = True
-
-    # There is no need to use a full-blown queue for single producer/single consumer scenario.
-    # Also, Pipes don't suffer from issues such as https://bugs.python.org/issue35797.
-    # TODO experiment with a shared queue maintained by multiprocessing.Manager
-    #  (it will require an additional service process)
-    recv_conn, send_conn = mp.Pipe(duplex=False)
-    data = _MainProcessData(result_conn=send_conn,
-                            root_logger_level=logging.getLogger().level)
-    p = mp.Process(name=name,
-                   target=_multiprocessing_wrapper,
-                   args=(data, func) + args,
-                   kwargs=kwargs,
-                   **extra_process_kwargs)
-    p.start()
-    # This is actually against the multiprocessing guidelines
-    # https://docs.python.org/3/library/multiprocessing.html#programming-guidelines
-    # but allows us to fail-fast if the child process terminated abnormally with a segfault
-    # (otherwise we would have to wait by timeout on acquiring the result) and should work
-    # fine for small result values such as generation status.
-    p.join()
-    if recv_conn.poll():
-        return recv_conn.recv()
-    else:
-        return failure_result
-
-
-def configure_logging(root_level):
-    logging.addLevelName(logging.DEBUG - 1, 'TRACE')
+def _configure_logging(logging_config):
+    # type: (dict[str, int]) -> None
+    logging.addLevelName(LOGGING_LEVEL_TRACE, 'TRACE')
 
     root = logging.getLogger()
-    root.setLevel(root_level)
+
+    for name, level in logging_config.items():
+        logging.getLogger(name).setLevel(level)
 
     # In environments where fork is implemented entire logging configuration is already inherited by child processes.
     # Configuring it twice will lead to duplicated records.
@@ -885,6 +909,45 @@ def configure_logging(root_level):
                 'message': s
             })
 
+    class Filter(logging.Filter):
+        def filter(self, record):
+            # Don't pass through logging from imported third-party modules
+            return record.name == "root" or record.name.startswith("generator3")
+
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JsonFormatter())
+    handler.addFilter(Filter())
     root.addHandler(handler)
+
+
+@contextmanager
+def timed(
+        message=None,  # type: str | None
+        logger=None,  # type: logging.Logger | None
+        level=None,  # type: int | None
+):
+    if message and "{elapsed" not in message:
+        raise ValueError("`message` should contain the `{elapsed}` placeholder")
+
+    timer = time.perf_counter if sys.version_info >= (3, 3) else time.time
+    start = timer()
+    elapsed_ms = lambda: (timer() - start) * 1000  # noqa
+    try:
+        yield elapsed_ms
+    finally:
+        if not logger:
+            logger = logging.getLogger("generator3.time")
+        if not level:
+            level = LOGGING_LEVEL_TRACE
+
+        if message:
+            logger.log(level, message.format(elapsed=elapsed_ms()))
+
+
+def _enable_segfault_tracebacks():
+    try:
+        import faulthandler
+
+        faulthandler.enable(file=sys.stderr, all_threads=True)
+    except ImportError:
+        pass

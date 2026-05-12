@@ -32,15 +32,20 @@ class SeAdaptedTab private constructor(delegate: SeTabDelegate,
   override suspend fun getFilterEditor(): SeFilterEditor? = filterEditor
 
   companion object {
-    fun create(legacyContributorId: String,
-               name: @Nls String,
-               priority: Int,
-               filterEditor: SeAdaptedTabFilterEditor?,
-               scope: CoroutineScope,
-               project: Project?,
-               session: SeSession,
-               initEvent: AnActionEvent): SeAdaptedTab {
-      val delegate = SeTabDelegate(project, session, legacyContributorId, listOf(legacyContributorId.toProviderId()), initEvent, scope)
+    suspend fun create(legacyContributorId: String,
+                       name: @Nls String,
+                       priority: Int,
+                       filterEditor: SeAdaptedTabFilterEditor?,
+                       scope: CoroutineScope,
+                       project: Project?,
+                       session: SeSession,
+                       initEvent: AnActionEvent): SeAdaptedTab {
+      val delegate = SeTabDelegate.create(project,
+                                          session,
+                                          legacyContributorId,
+                                          listOf(legacyContributorId.toProviderId()),
+                                          initEvent,
+                                          scope)
 
       return SeAdaptedTab(delegate, name, legacyContributorId, priority, filterEditor)
     }

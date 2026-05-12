@@ -1,6 +1,7 @@
 // Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.openapi.options;
 
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -37,6 +38,16 @@ public interface SearchableConfigurable extends ConfigurableWithId {
    */
   default @NotNull Class<?> getOriginalClass() {
     return this.getClass();
+  }
+
+  /**
+   * Controls whether this configurable may appear as an option result in Find Action / the Actions tab in Search Everywhere.
+   * Returning {@code false} keeps the configurable indexed for Settings search, but suppresses it from action search results.
+   * See also {@link ConfigurableEP#searchableInActions}.
+   */
+  @ApiStatus.Experimental
+  default boolean isSearchableInActions() {
+    return true;
   }
 
   interface Parent extends SearchableConfigurable, Composite {
@@ -104,6 +115,14 @@ public interface SearchableConfigurable extends ConfigurableWithId {
       return myConfigurable instanceof SearchableConfigurable
              ? ((SearchableConfigurable)myConfigurable).enableSearch(option)
              : null;
+    }
+
+    @Override
+    @ApiStatus.Experimental
+    public boolean isSearchableInActions() {
+      return myConfigurable instanceof SearchableConfigurable
+             ? ((SearchableConfigurable)myConfigurable).isSearchableInActions()
+             : SearchableConfigurable.super.isSearchableInActions();
     }
 
     @Override

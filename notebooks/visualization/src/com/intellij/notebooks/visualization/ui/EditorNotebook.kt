@@ -7,6 +7,7 @@ import com.intellij.notebooks.visualization.NotebookIntervalPointer
 import com.intellij.notebooks.visualization.ui.EditorCellEventListener.CellCreated
 import com.intellij.notebooks.visualization.ui.EditorCellEventListener.CellRemoved
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.impl.EditorImpl
 import com.intellij.openapi.editor.state.ObservableStateListener
@@ -92,6 +93,13 @@ class EditorNotebook(val editor: EditorImpl) : Disposable {
   }
 
   fun removeCell(index: Int) {
+    if (index < 0 || index >= _cells.size) {
+      // Document change events can arrive before _cells is populated (e.g. setText("") on a freshly
+      // created console history editor), producing OnRemoved events for ordinals that don't yet
+      // exist in the view model. Skip to avoid IOOBE; the view will be rebuilt on the next update.
+      thisLogger().warn("removeCell($index) out of bounds, _cells.size=${_cells.size}")
+      return
+    }
     val cell = _cells[index]
     cell.onBeforeRemove()
     val removed = _cells.removeAt(index)

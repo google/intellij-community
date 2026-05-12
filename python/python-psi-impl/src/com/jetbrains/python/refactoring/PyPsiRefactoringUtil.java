@@ -411,7 +411,13 @@ public final class PyPsiRefactoringUtil {
   }
 
   public static boolean shouldCopyAnnotations(@NotNull PsiElement copiedElement, @NotNull PsiFile destFile) {
-    return !LanguageLevel.forElement(copiedElement).isPython2() &&
-           (!PyiUtil.isInsideStub(copiedElement) || PyiUtil.isPyiFileOfPackage(destFile));
+    if (LanguageLevel.forElement(copiedElement).isPython2()) return false;
+    if (PyiUtil.isInsideStub(destFile)) {
+      return true;
+    }
+    if (PyiUtil.isInsideStub(copiedElement)) {
+      return PyCodeInsightSettings.getInstance().COPY_TYPE_ANNOTATIONS_FROM_STUBS;
+    }
+    return true;
   }
 }

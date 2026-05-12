@@ -1,24 +1,33 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vcs.merge
 
+import com.intellij.openapi.actionSystem.DataSink
+import com.intellij.openapi.actionSystem.PlatformDataKeys
+import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ui.treeStructure.treetable.DefaultTreeTableExpander
 import com.intellij.ui.treeStructure.treetable.ListTreeTableModelOnColumns
 import com.intellij.ui.treeStructure.treetable.TreeTable
 import com.intellij.util.ui.ColumnInfo
 import com.intellij.util.ui.JBUI
 import org.jetbrains.annotations.ApiStatus
+import java.awt.event.MouseEvent
 import kotlin.math.max
 
 @ApiStatus.Internal
-class MergeConflictsTreeTable(private val tableModel: ListTreeTableModelOnColumns) : TreeTable(tableModel) {
+class MergeConflictsTreeTable(private val tableModel: ListTreeTableModelOnColumns) : TreeTable(tableModel), UiDataProvider {
   init {
     getTableHeader().reorderingAllowed = false
     tree.isRootVisible = false
     if (tableModel.columnCount > 1) setShowColumns(true)
   }
 
+  var minimumColumnWidth: Int? = null
+  private var wasResized = false
+
   override fun doLayout() {
-    if (getTableHeader().resizingColumn == null) {
+    if (getTableHeader().resizingColumn == null && !wasResized) {
       updateColumnSizes()
     }
     super.doLayout()
@@ -31,6 +40,7 @@ class MergeConflictsTreeTable(private val tableModel: ListTreeTableModelOnColumn
         val width = calcColumnWidth(it, columnInfo)
         column.preferredWidth = width
       }
+      minimumColumnWidth?.let { column.minWidth = it }
     }
 
     var size = width
@@ -41,11 +51,29 @@ class MergeConflictsTreeTable(private val tableModel: ListTreeTableModelOnColumn
     }
 
     columnModel.getColumn(fileColumn).preferredWidth = max(size, JBUI.scale(200))
+
+    wasResized = true
   }
 
   private fun calcColumnWidth(maxStringValue: String, columnInfo: ColumnInfo<Any, Any>): Int {
     val columnName = StringUtil.shortenTextWithEllipsis(columnInfo.name, 15, 7, true)
     return max(getFontMetrics(font).stringWidth(maxStringValue),
                     getFontMetrics(tableHeader.font).stringWidth(columnName)) + columnInfo.additionalWidth
+  }
+
+  var toolTipTextProvider: ((file: VirtualFile) -> String?)? = null
+
+  override fun getToolTipText(e: MouseEvent): String? {
+    return toolTipTextProvider?.let { toolTipProvider ->
+      MergeUIUtil.getFileAtRow(this, rowAtPoint(e.point))?.let { file ->
+        toolTipProvider.invoke(file)
+      }
+    } ?: super.getToolTipText(e)
+  }
+
+  private val treeExpander = DefaultTreeTableExpander(this)
+
+  override fun uiDataSnapshot(sink: DataSink) {
+    sink[PlatformDataKeys.TREE_EXPANDER] = treeExpander
   }
 }

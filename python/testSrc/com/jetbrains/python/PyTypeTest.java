@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python;
 
 import com.google.common.collect.ImmutableList;
@@ -52,7 +52,7 @@ public class PyTypeTest extends PyTestCase {
   }
 
   public void testTupleType() {
-    doTest("str",
+    doTest("Literal['a']",
            "t = ('a', 2)\n" +
            "expr = t[0]");
     doTest("List[bool]",
@@ -68,7 +68,7 @@ public class PyTypeTest extends PyTestCase {
   }
 
   public void testTupleAssignmentType() {
-    doTest("str",
+    doTest("Literal['a']",
            "t = ('a', 2)\n" +
            "(expr, q) = t");
   }
@@ -106,7 +106,7 @@ public class PyTypeTest extends PyTestCase {
   }
 
   public void testUnionOfTuples() {
-    doTest("Union[Tuple[int, str], Tuple[str, int]]",
+    doTest("Union[Tuple[Literal[1], Literal['a']], Tuple[Literal['a'], Literal[1]]]",
            """
              def x(b):
                if b:
@@ -138,7 +138,7 @@ public class PyTypeTest extends PyTestCase {
 
   // PY-1425
   public void testNone() {
-    doTest("Any",
+    doTest("UnsafeUnion[None, Any]",
            """
              class C:
                  def __init__(self): self.foo = None
@@ -223,8 +223,8 @@ public class PyTypeTest extends PyTestCase {
 
   public void testReturnTypeAnno() {
     runWithLanguageLevel(
-      LanguageLevel.PYTHON34,
-      () -> doTest("list",
+      LanguageLevel.PYTHON311,
+      () -> doTest("list[Any]",
                    """
                      def foo(x) -> list:
                          return x
@@ -298,7 +298,7 @@ public class PyTypeTest extends PyTestCase {
   }
 
   public void testIsInstance2() {
-    doTest("str",
+    doTest("Literal[\"\"]",
            """
              x = ""
              if isinstance(x, (1, "")):
@@ -390,14 +390,14 @@ public class PyTypeTest extends PyTestCase {
 
   // PY-20679
   public void testIsInstanceViaTrue() {
-    doTest("str",
+    doTest("None & str",
            """
              a = None
              if isinstance(a, str) is True:
                  expr = a
              raise TypeError('Invalid type')""");
 
-    doTest("str",
+    doTest("None & str",
            """
              a = None
              if True is isinstance(a, str):
@@ -407,28 +407,28 @@ public class PyTypeTest extends PyTestCase {
 
   // PY-20679
   public void testIsInstanceViaFalse() {
-    doTest("str",
+    doTest("None & str",
            """
              a = None
              if isinstance(a, str) is not False:
                  expr = a
              raise TypeError('Invalid type')""");
 
-    doTest("str",
+    doTest("None & str",
            """
              a = None
              if False is not isinstance(a, str):
                  expr = a
              raise TypeError('Invalid type')""");
 
-    doTest("str",
+    doTest("None & str",
            """
              a = None
              if not isinstance(a, str) is False:
                  expr = a
              raise TypeError('Invalid type')""");
 
-    doTest("str",
+    doTest("None & str",
            """
              a = None
              if not False is isinstance(a, str):
@@ -438,28 +438,28 @@ public class PyTypeTest extends PyTestCase {
 
   // PY-20679
   public void testNotIsInstanceViaTrue() {
-    doTest("str",
+    doTest("None & str",
            """
              a = None
              if not isinstance(a, str) is True:
                  raise TypeError('Invalid type')
              expr = a""");
 
-    doTest("str",
+    doTest("None & str",
            """
              a = None
              if not True is isinstance(a, str):
                  raise TypeError('Invalid type')
              expr = a""");
 
-    doTest("str",
+    doTest("None & str",
            """
              a = None
              if isinstance(a, str) is not True:
                  raise TypeError('Invalid type')
              expr = a""");
 
-    doTest("str",
+    doTest("None & str",
            """
              a = None
              if True is not isinstance(a, str):
@@ -469,14 +469,14 @@ public class PyTypeTest extends PyTestCase {
 
   // PY-20679
   public void testNotIsInstanceViaFalse() {
-    doTest("str",
+    doTest("None & str",
            """
              a = None
              if isinstance(a, str) is False:
                  raise TypeError('Invalid type')
              expr = a""");
 
-    doTest("str",
+    doTest("None & str",
            """
              a = None
              if False is isinstance(a, str):
@@ -741,13 +741,13 @@ public class PyTypeTest extends PyTestCase {
 
   // PY-5614
   public void testKnownTypeAttribute() {
-    doTest("str",
+    doTest("bool",
            """
              class C(object):
                  def __init__(self):
                      self.foo = 42
                  def f(self):
-                     if isinstance(self.foo, str):
+                     if isinstance(self.foo, bool):
                          expr = self.foo
              """);
   }
@@ -1071,7 +1071,7 @@ public class PyTypeTest extends PyTestCase {
   }
 
   public void testTupleFromTuple() {
-    doTest("Tuple[str, int, int]",
+    doTest("Tuple[Literal['1'], Literal[2], Literal[3]]",
            "expr = tuple(('1', 2, 3))");
   }
 
@@ -1128,7 +1128,7 @@ public class PyTypeTest extends PyTestCase {
   }
 
   public void testTupleIterationType() {
-    doTest("Union[int, str]",
+    doTest("Literal[1, 'a']",
            """
              xs = (1, 'a')
              for expr in xs:
@@ -1138,35 +1138,35 @@ public class PyTypeTest extends PyTestCase {
 
   // PY-12801
   public void testTupleConcatenation() {
-    doTest("Tuple[int, bool, str]",
+    doTest("Tuple[Literal[1], Literal[True], Literal['spam']]",
            "expr = (1,) + (True, 'spam') + ()");
   }
 
   public void testTupleMultiplication() {
-    doTest("Tuple[int, bool, int, bool]",
+    doTest("Tuple[Literal[1], Literal[False], Literal[1], Literal[False]]",
            "expr = (1, False) * 2");
   }
 
 
   public void testTupleDestructuring() {
-    doTest("str",
+    doTest("Literal['val']",
            "_, expr = (1, 'val') ");
   }
 
   public void testParensTupleDestructuring() {
-    doTest("str",
+    doTest("Literal['val']",
            "(_, expr) = (1, 'val') ");
   }
 
   // PY-19825
   public void testSubTupleDestructuring() {
-    doTest("str",
+    doTest("Literal['val']",
            "(a, (_, expr)) = (1, (2,'val')) ");
   }
 
   // PY-19825
   public void testSubTupleIndirectDestructuring() {
-    doTest("str",
+    doTest("Literal['val']",
            "xs = (2,'val')\n" +
            "(a, (_, expr)) = (1, xs) ");
   }
@@ -1670,9 +1670,11 @@ public class PyTypeTest extends PyTestCase {
   }
 
   public void testHeterogeneousTupleLiteral() {
-    doTest("Tuple[str, int, int]", "expr = ('1', 1, 1)");
+    doTest("Tuple[Literal['1'], Literal[1], Literal[1]]", "expr = ('1', 1, 1)");
 
-    doTest("Tuple[str, int, int, int, int, int, int, int, int, int, int]", "expr = ('1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)");
+    doTest(
+      "Tuple[Literal['1'], Literal[1], Literal[1], Literal[1], Literal[1], Literal[1], Literal[1], Literal[1], Literal[1], Literal[1], Literal[1]]",
+      "expr = ('1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)");
   }
 
   // PY-20818
@@ -1744,7 +1746,7 @@ public class PyTypeTest extends PyTestCase {
 
   // PY-21083
   public void testFloatFromhex() {
-    doTest("float",
+    doTest("Union[float, int]",
            "expr = float.fromhex(\"0.5\")");
   }
 
@@ -2432,12 +2434,12 @@ public class PyTypeTest extends PyTestCase {
 
   // PY-21175
   public void testLazyAttributeInitialization() {
-    doTest("Union[int, Any]",
+    doTest("Union[UnsafeUnion[None, Any], int]",
            """
              class C:
                  def __init__(self):
                      self.attr = None
-                \s
+             
                  def m(self):
                      if self.attr is None:
                          self.attr = 42
@@ -2712,7 +2714,7 @@ public class PyTypeTest extends PyTestCase {
   }
 
   public void testUnpackingToNestedTargetsInSquareBracketsInAssignments() {
-    doTest("int",
+    doTest("Literal[42]",
            """
              [_, [[expr], _]] = "foo", ((42,), "bar")
              """);
@@ -3075,9 +3077,9 @@ public class PyTypeTest extends PyTestCase {
              expr = A.B()""");
   }
 
-  // PY-26992
+  // PY-26992 PY-87449
   public void testInitializingInnerCallableClassThroughExplicitDunderInit() {
-    doTest("B",
+    doTest("None",
            """
              class A:
                  class B:
@@ -3087,7 +3089,7 @@ public class PyTypeTest extends PyTestCase {
                          pass
                  def __init__(self):
                      pass
-             expr = A.B.__init__()""");
+             expr = A.B.__init__(object.__new__(A.B))""");
   }
 
   // PY-26992
@@ -3411,12 +3413,13 @@ public class PyTypeTest extends PyTestCase {
 
   // PY-9634
   public void testAfterIsInstanceAndAttributeUsage() {
-    doTest("Union[{bar}, int]",
+    doTest("Union[{bar}, {bar} & int]",
            """
              def bar(y):
                  if isinstance(y, int):
                      pass
-                 print(y.bar)    expr = y""");
+                 print(y.bar)
+                 expr = y""");
   }
 
   // PY-28052
@@ -3438,14 +3441,14 @@ public class PyTypeTest extends PyTestCase {
 
   // PY-13750
   public void testBuiltinRound() {
-    doTest("float", "expr = round(1)");
-    doTest("float", "expr = round(1, 1)");
+    doTest("Union[float, int]", "expr = round(1)");
+    doTest("Union[float, int]", "expr = round(1, 1)");
 
-    doTest("float", "expr = round(1.1)");
-    doTest("float", "expr = round(1.1, 1)");
+    doTest("Union[float, int]", "expr = round(1.1)");
+    doTest("Union[float, int]", "expr = round(1.1, 1)");
 
-    doTest("float", "expr = round(True)");
-    doTest("float", "expr = round(True, 1)");
+    doTest("Union[float, int]", "expr = round(True)");
+    doTest("Union[float, int]", "expr = round(True, 1)");
   }
 
   // PY-28227
@@ -3529,7 +3532,7 @@ public class PyTypeTest extends PyTestCase {
   public void testAssertionFunctionFromOuterScope() {
     runWithLanguageLevel(
       LanguageLevel.PYTHON35,
-      () -> doTest("B",
+      () -> doTest("() -> None & B",
                    """
                      class B: pass
                      
@@ -3821,7 +3824,7 @@ public class PyTypeTest extends PyTestCase {
 
   // PY-30861
   public void testDontReplaceSpecifiedReturnTypeWithSelf() {
-    doTest("Dict[_KT, Any]",
+    doTest("Dict[Any, Any]",
            """
              from collections import defaultdict
              data = defaultdict(dict)

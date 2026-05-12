@@ -100,7 +100,7 @@ public final class IntCollectionUtil {
     Map<T, IntSet> result = new HashMap<>();
     collection.forEach((IntConsumer)(it) -> {
       T key = function.apply(it);
-      IntSet values = result.computeIfAbsent(key, __ -> new IntOpenHashSet());
+      IntSet values = result.computeIfAbsent(key, _ -> new IntOpenHashSet());
       values.add(it);
     });
     return result;
@@ -135,7 +135,7 @@ public final class IntCollectionUtil {
   }
 
   public static <T> void add(@NotNull Map<? super T, IntSet> targetMap, @NotNull T key, int value) {
-    IntSet set = targetMap.computeIfAbsent(key, __ -> new IntOpenHashSet());
+    IntSet set = targetMap.computeIfAbsent(key, _ -> new IntOpenHashSet());
     set.add(value);
   }
 }

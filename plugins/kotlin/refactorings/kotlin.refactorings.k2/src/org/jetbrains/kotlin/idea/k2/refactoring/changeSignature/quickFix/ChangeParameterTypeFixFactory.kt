@@ -42,6 +42,7 @@ import org.jetbrains.kotlin.psi.KtOperationExpression
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtParenthesizedExpression
 import org.jetbrains.kotlin.psi.KtValueArgument
+import org.jetbrains.kotlin.psi.psiUtil.parameterIndex
 import org.jetbrains.kotlin.types.Variance
 
 object ChangeParameterTypeFixFactory {
@@ -66,7 +67,6 @@ object ChangeParameterTypeFixFactory {
     }
 
     context(_: KaSession)
-    @OptIn(KaExperimentalApi::class)
     private fun createTypeMismatchFixes(psi: KtExpression, targetType: KaType): List<KotlinQuickFixAction<*>> {
         val outermostExpression = psi.getOutermostParenthesizedExpressionOrThis()
         val psiParent = outermostExpression.parent ?: return emptyList()
@@ -126,8 +126,8 @@ object ChangeParameterTypeFixFactory {
         }
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun createChangeParameterTypeFix(
         parameter: KtParameter,
         targetType: KaType,
@@ -196,7 +196,9 @@ internal class ChangeParameterTypeFix(
         val methodDescriptor = KotlinMethodDescriptor(function)
 
         val changeInfo = KotlinChangeInfo(methodDescriptor)
-        val parameterInfo = changeInfo.newParameters[if (methodDescriptor.receiver != null) parameterIndex + 1 else parameterIndex]
+        val parameterInfo = changeInfo.getNonReceiverParameters().find {
+            !it.isContextParameter && it.oldIndex == (parameterIndex + if (methodDescriptor.receiver != null) 1 else 0)
+        } ?: return
 
         parameterInfo.setType(typeFQNPresentation)
 

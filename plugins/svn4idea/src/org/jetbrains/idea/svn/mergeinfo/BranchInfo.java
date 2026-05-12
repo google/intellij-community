@@ -99,7 +99,7 @@ public class BranchInfo {
         result = MergeCheckResult.COMMON;
       }
       else {
-        result = myAlreadyCalculatedMap.computeIfAbsent(list.getNumber(), __ -> checkAlive(list, branchPath));
+        result = myAlreadyCalculatedMap.computeIfAbsent(list.getNumber(), _ -> checkAlive(list, branchPath));
       }
       return result;
     }

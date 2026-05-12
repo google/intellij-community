@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.mock;
 
 import com.intellij.codeInsight.multiverse.CodeInsightContext;
@@ -78,11 +78,6 @@ public class MockPsiDocumentManager extends PsiDocumentManager {
   @Override
   public Document @NotNull [] getUncommittedDocuments() {
     throw new UnsupportedOperationException("Method getUncommittedDocuments is not yet implemented in " + getClass().getName());
-  }
-
-  @Override
-  public boolean isUncommited(@NotNull Document document) {
-    throw new UnsupportedOperationException("Method isUncommited is not yet implemented in " + getClass().getName());
   }
 
   @Override

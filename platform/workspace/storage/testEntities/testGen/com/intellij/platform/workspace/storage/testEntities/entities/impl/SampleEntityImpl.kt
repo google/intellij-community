@@ -1,18 +1,26 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.storage.testEntities.entities.impl
 
-import com.intellij.platform.workspace.storage.*
+import com.intellij.platform.workspace.storage.ConnectionId
+import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
+import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
+import com.intellij.platform.workspace.storage.MutableEntityStorage
+import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
+import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.EntityLink
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
 import com.intellij.platform.workspace.storage.impl.containers.MutableWorkspaceList
 import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceList
-import com.intellij.platform.workspace.storage.impl.extractOneToManyChildren
-import com.intellij.platform.workspace.storage.impl.updateOneToManyChildrenOfParent
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.testEntities.entities.ChildSampleEntity
 import com.intellij.platform.workspace.storage.testEntities.entities.ChildSampleEntityBuilder
@@ -27,12 +35,9 @@ import java.util.UUID
 internal class SampleEntityImpl(private val dataSource: SampleEntityData) : SampleEntity, WorkspaceEntityBase(dataSource) {
 
   private companion object {
-    internal val CHILDREN_CONNECTION_ID: ConnectionId = ConnectionId.create(SampleEntity::class.java, ChildSampleEntity::class.java,
-                                                                            ConnectionId.ConnectionType.ONE_TO_MANY, true)
-
-    private val connections = listOf<ConnectionId>(
-      CHILDREN_CONNECTION_ID,
-    )
+    internal val CHILDREN_CONNECTION_ID: ConnectionId =
+      ConnectionId.create(SampleEntity::class.java, ChildSampleEntity::class.java, ConnectionId.ConnectionType.ONE_TO_MANY, true)
+    private val connections = listOf<ConnectionId>(CHILDREN_CONNECTION_ID)
 
   }
 
@@ -46,7 +51,6 @@ internal class SampleEntityImpl(private val dataSource: SampleEntityData) : Samp
       readField("stringProperty")
       return dataSource.stringProperty
     }
-
   override val stringListProperty: List<String>
     get() {
       readField("stringListProperty")
@@ -58,21 +62,20 @@ internal class SampleEntityImpl(private val dataSource: SampleEntityData) : Samp
       readField("stringMapProperty")
       return dataSource.stringMapProperty
     }
+
   override val fileProperty: VirtualFileUrl
     get() {
       readField("fileProperty")
       return dataSource.fileProperty
     }
-
   override val children: List<ChildSampleEntity>
-    get() = snapshot.extractOneToManyChildren<ChildSampleEntity>(CHILDREN_CONNECTION_ID, this)!!.toList()
-
+    get() = (snapshot.instrumentation.getManyChildren(CHILDREN_CONNECTION_ID, this) as? Sequence<ChildSampleEntity>)?.toList()
+            ?: error("Children children not found for SampleEntity")
   override val nullableData: String?
     get() {
       readField("nullableData")
       return dataSource.nullableData
     }
-
   override val randomUUID: UUID?
     get() {
       readField("randomUUID")
@@ -90,8 +93,8 @@ internal class SampleEntityImpl(private val dataSource: SampleEntityData) : Samp
   }
 
 
-  internal class Builder(result: SampleEntityData?) : ModifiableWorkspaceEntityBase<SampleEntity, SampleEntityData>(
-    result), SampleEntityBuilder {
+  internal class Builder(result: SampleEntityData?) : ModifiableWorkspaceEntityBase<SampleEntity, SampleEntityData>(result),
+                                                      SampleEntityBuilder {
     internal constructor() : this(SampleEntityData())
 
     override fun applyToBuilder(builder: MutableEntityStorage) {
@@ -104,16 +107,14 @@ internal class SampleEntityImpl(private val dataSource: SampleEntityData) : Samp
           error("Entity SampleEntity is already created in a different builder")
         }
       }
-
       this.diff = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
-      // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
-      // Builder may switch to snapshot at any moment and lock entity data to modification
+// After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
+// Builder may switch to snapshot at any moment and lock entity data to modification
       this.currentEntityData = null
-
       index(this, "fileProperty", this.fileProperty)
-      // Process linked entities that are connected without a builder
+// Process linked entities that are connected without a builder
       processLinkedEntities(builder)
       checkInitialization() // TODO uncomment and check failed tests
     }
@@ -135,9 +136,9 @@ internal class SampleEntityImpl(private val dataSource: SampleEntityData) : Samp
       if (!getEntityData().isFilePropertyInitialized()) {
         error("Field SampleEntity#fileProperty should be initialized")
       }
-      // Check initialization for list with ref type
+// Check initialization for list with ref type
       if (_diff != null) {
-        if (_diff.extractOneToManyChildren<WorkspaceEntityBase>(CHILDREN_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getManyChildrenBuilders(CHILDREN_CONNECTION_ID, this) == null) {
           error("Field SampleEntity#children should be initialized")
         }
       }
@@ -182,7 +183,6 @@ internal class SampleEntityImpl(private val dataSource: SampleEntityData) : Samp
         changedProperty.add("entitySource")
 
       }
-
     override var booleanProperty: Boolean
       get() = getEntityData().booleanProperty
       set(value) {
@@ -190,7 +190,6 @@ internal class SampleEntityImpl(private val dataSource: SampleEntityData) : Samp
         getEntityData(true).booleanProperty = value
         changedProperty.add("booleanProperty")
       }
-
     override var stringProperty: String
       get() = getEntityData().stringProperty
       set(value) {
@@ -198,7 +197,6 @@ internal class SampleEntityImpl(private val dataSource: SampleEntityData) : Samp
         getEntityData(true).stringProperty = value
         changedProperty.add("stringProperty")
       }
-
     private val stringListPropertyUpdater: (value: List<String>) -> Unit = { value ->
 
       changedProperty.add("stringListProperty")
@@ -220,7 +218,6 @@ internal class SampleEntityImpl(private val dataSource: SampleEntityData) : Samp
         getEntityData(true).stringListProperty = value
         stringListPropertyUpdater.invoke(value)
       }
-
     override var stringMapProperty: Map<String, String>
       get() = getEntityData().stringMapProperty
       set(value) {
@@ -228,7 +225,6 @@ internal class SampleEntityImpl(private val dataSource: SampleEntityData) : Samp
         getEntityData(true).stringMapProperty = value
         changedProperty.add("stringMapProperty")
       }
-
     override var fileProperty: VirtualFileUrl
       get() = getEntityData().fileProperty
       set(value) {
@@ -243,44 +239,42 @@ internal class SampleEntityImpl(private val dataSource: SampleEntityData) : Samp
     var _children: List<ChildSampleEntity>? = emptyList()
     override var children: List<ChildSampleEntityBuilder>
       get() {
-        // Getter of the list of non-abstract referenced types
+// Getter of the list of non-abstract referenced types
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
-          ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(CHILDREN_CONNECTION_ID,
-                                                                                  this)!!.toList() as List<ChildSampleEntityBuilder>) +
-          (this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<ChildSampleEntityBuilder> ?: emptyList())
+          ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(CHILDREN_CONNECTION_ID, this)!!
+            .toList() as List<ChildSampleEntityBuilder>) + (this.entityLinks[EntityLink(true,
+                                                                                        CHILDREN_CONNECTION_ID)] as? List<ChildSampleEntityBuilder>
+                                                            ?: emptyList())
         }
         else {
           this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<ChildSampleEntityBuilder> ?: emptyList()
         }
       }
       set(value) {
-        // Setter of the list of non-abstract referenced types
+// Setter of the list of non-abstract referenced types
         checkModificationAllowed()
         val _diff = diff
         if (_diff != null) {
           for (item_value in value) {
             if (item_value is ModifiableWorkspaceEntityBase<*, *> && (item_value as? ModifiableWorkspaceEntityBase<*, *>)?.diff == null) {
-              // Backref setup before adding to store
+// Backref setup before adding to store
               if (item_value is ModifiableWorkspaceEntityBase<*, *>) {
                 item_value.entityLinks[EntityLink(false, CHILDREN_CONNECTION_ID)] = this
               }
-              // else you're attaching a new entity to an existing entity that is not modifiable
-
+// else you're attaching a new entity to an existing entity that is not modifiable
               _diff.addEntity(item_value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
             }
           }
-          _diff.updateOneToManyChildrenOfParent(CHILDREN_CONNECTION_ID, this, value)
+          _diff.instrumentation.replaceChildren(CHILDREN_CONNECTION_ID, this, value)
         }
         else {
           for (item_value in value) {
             if (item_value is ModifiableWorkspaceEntityBase<*, *>) {
               item_value.entityLinks[EntityLink(false, CHILDREN_CONNECTION_ID)] = this
             }
-            // else you're attaching a new entity to an existing entity that is not modifiable
+// else you're attaching a new entity to an existing entity that is not modifiable
           }
-
           this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] = value
         }
         changedProperty.add("children")
@@ -293,7 +287,6 @@ internal class SampleEntityImpl(private val dataSource: SampleEntityData) : Samp
         getEntityData(true).nullableData = value
         changedProperty.add("nullableData")
       }
-
     override var randomUUID: UUID?
       get() = getEntityData().randomUUID
       set(value) {
@@ -305,6 +298,7 @@ internal class SampleEntityImpl(private val dataSource: SampleEntityData) : Samp
 
     override fun getEntityClass(): Class<SampleEntity> = SampleEntity::class.java
   }
+
 }
 
 @OptIn(WorkspaceEntityInternalApi::class)
@@ -330,7 +324,6 @@ internal class SampleEntityData : WorkspaceEntityData<SampleEntity>() {
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): SampleEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {
@@ -342,8 +335,7 @@ internal class SampleEntityData : WorkspaceEntityData<SampleEntity>() {
   }
 
   override fun getMetadata(): EntityMetadata {
-    return MetadataStorageImpl.getMetadataByTypeFqn(
-      "com.intellij.platform.workspace.storage.testEntities.entities.SampleEntity") as EntityMetadata
+    return MetadataStorageImpl.getMetadataByTypeFqn("com.intellij.platform.workspace.storage.testEntities.entities.SampleEntity") as EntityMetadata
   }
 
   override fun clone(): SampleEntityData {
@@ -372,9 +364,7 @@ internal class SampleEntityData : WorkspaceEntityData<SampleEntity>() {
   override fun equals(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as SampleEntityData
-
     if (this.entitySource != other.entitySource) return false
     if (this.booleanProperty != other.booleanProperty) return false
     if (this.stringProperty != other.stringProperty) return false
@@ -389,9 +379,7 @@ internal class SampleEntityData : WorkspaceEntityData<SampleEntity>() {
   override fun equalsIgnoringEntitySource(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as SampleEntityData
-
     if (this.booleanProperty != other.booleanProperty) return false
     if (this.stringProperty != other.stringProperty) return false
     if (this.stringListProperty != other.stringListProperty) return false

@@ -6,6 +6,7 @@ import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.util.BuildNumber
 import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleLoadingRuleValue
 import com.intellij.platform.pluginSystem.testFramework.PluginSetTestBuilder
+import com.intellij.platform.pluginSystem.testFramework.PseudoProductTestPluginInitContext
 import com.intellij.platform.testFramework.plugins.buildDir
 import com.intellij.platform.testFramework.plugins.content
 import com.intellij.platform.testFramework.plugins.depends
@@ -52,18 +53,15 @@ class PluginInitializationSelectPluginsToLoadTest {
     explicitPluginSubsetToLoad: Set<PluginId>? = null,
     disablePluginLoadingCompletely: Boolean = false,
   ): PluginInitializationContext {
-    return PluginInitializationContext.buildForTest(
-      essentialPlugins = essentialPlugins,
-      disabledPlugins = disabledPlugins,
-      expiredPlugins = emptySet(),
-      brokenPluginVersions = emptyMap(),
-      getProductBuildNumber = { productBuildNumber },
-      requirePlatformAliasDependencyForLegacyPlugins = false,
-      checkEssentialPlugins = false,
-      explicitPluginSubsetToLoad = explicitPluginSubsetToLoad,
-      disablePluginLoadingCompletely = disablePluginLoadingCompletely,
-      currentProductModeId = "test"
-    )
+    return object : PseudoProductTestPluginInitContext() {
+      override val productBuildNumber: BuildNumber = productBuildNumber
+      override val essentialPlugins: Set<PluginId> = essentialPlugins
+      override fun isPluginDisabled(id: PluginId): Boolean = id in disabledPlugins
+      override val explicitPluginSubsetToLoad: Set<PluginId>? = explicitPluginSubsetToLoad
+      override val disablePluginLoadingCompletely: Boolean = disablePluginLoadingCompletely
+      override val currentProductModeId: String = "test"
+      override val expiredPlugins: Set<PluginId> = emptySet()
+    }
   }
 
   private fun testPluginSelection(

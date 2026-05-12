@@ -11,6 +11,7 @@ import git4idea.test.assertCommitted
 import git4idea.test.assertLastMessage
 import git4idea.test.assertMessage
 import git4idea.test.message
+import kotlinx.coroutines.runBlocking
 
 internal abstract class GitSquashOperationTestBase : GitSingleRepoTest() {
   protected abstract fun execute(commitsToSquash: List<VcsCommitMetadata>, newMessage: String): GitCommitEditingOperationResult
@@ -106,7 +107,7 @@ internal abstract class GitSquashOperationTestBase : GitSingleRepoTest() {
     val newMessage = "Squashed commit message"
     val operationResult = execute(commitsToSquash, newMessage) as Complete
 
-    assertTrue(operationResult.checkUndoPossibility() is UndoPossibility.Possible)
+    assertTrue(runBlocking { operationResult.checkUndoPossibility() } is UndoPossibility.Possible)
     val undoResult = operationResult.undo()
     assertTrue(undoResult is UndoResult.Success)
 
@@ -140,7 +141,7 @@ internal abstract class GitSquashOperationTestBase : GitSingleRepoTest() {
 
     file("new").create().addCommit("new")
 
-    assertTrue(operationResult.checkUndoPossibility() is UndoPossibility.Impossible.HeadMoved)
+    assertTrue(runBlocking { operationResult.checkUndoPossibility() } is UndoPossibility.Impossible.HeadMoved)
   }
 
   fun `test undo squash linear history is not allowed if first changed commit is pushed to protected branch`() {
@@ -159,6 +160,6 @@ internal abstract class GitSquashOperationTestBase : GitSingleRepoTest() {
 
     git("update-ref refs/remotes/origin/master HEAD~2")
 
-    assertTrue(operationResult.checkUndoPossibility() is UndoPossibility.Impossible.PushedToProtectedBranch)
+    assertTrue(runBlocking { operationResult.checkUndoPossibility() } is UndoPossibility.Impossible.PushedToProtectedBranch)
   }
 }

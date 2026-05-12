@@ -45,10 +45,10 @@ public class AntBuildModelImpl implements AntBuildModelBase {
 
   public AntBuildModelImpl(final AntBuildFile buildFile) {
     myFile = buildFile;
-    myTargets = new PsiCachedValueImpl.Soft<>(PsiManager.getInstance(myFile.getProject()), ()-> ReadAction.compute(()-> {
+    myTargets = new PsiCachedValueImpl.Soft<>(PsiManager.getInstance(myFile.getProject()), ()-> {
       final Pair<List<AntBuildTargetBase>, Collection<Object>> result = getTargetListImpl(this);
       return CachedValueProvider.Result.create(result.getFirst(), ArrayUtil.toObjectArray(result.getSecond()));
-    }));
+    });
   }
 
   @Override
@@ -68,13 +68,13 @@ public class AntBuildModelImpl implements AntBuildModelBase {
 
   @Override
   public AntBuildTarget[] getTargets() {
-    return myTargets.getValue().toArray(AntBuildTargetBase.EMPTY_ARRAY);
+    return lookupBuildTargets().toArray(AntBuildTargetBase.EMPTY_ARRAY);
   }
 
   @Override
   public AntBuildTarget[] getFilteredTargets() {
     final List<AntBuildTargetBase> filtered = new ArrayList<>();
-    for (final AntBuildTargetBase buildTarget : myTargets.getValue()) {
+    for (final AntBuildTargetBase buildTarget : lookupBuildTargets()) {
       if (myFile.isTargetVisible(buildTarget)) {
         filtered.add(buildTarget);
       }
@@ -101,7 +101,7 @@ public class AntBuildModelImpl implements AntBuildModelBase {
 
   @Override
   public @Nullable AntBuildTargetBase findTarget(final String name) {
-    for (AntBuildTargetBase target : myTargets.getValue()) {
+    for (AntBuildTargetBase target : lookupBuildTargets()) {
       if (Comparing.strEqual(target.getName(), name)) {
         return target;
       }
@@ -122,7 +122,11 @@ public class AntBuildModelImpl implements AntBuildModelBase {
 
   @Override
   public boolean hasTargetWithActionId(final String id) {
-    return StreamEx.of(myTargets.getValue()).map(AntBuildTargetBase::getActionId).has(id);
+    return StreamEx.of(lookupBuildTargets()).map(AntBuildTargetBase::getActionId).has(id);
+  }
+
+  private List<AntBuildTargetBase> lookupBuildTargets() {
+    return ReadAction.nonBlocking(() -> myTargets.getValue()).executeSynchronously();
   }
 
   // todo: return list of dependent psi files as well

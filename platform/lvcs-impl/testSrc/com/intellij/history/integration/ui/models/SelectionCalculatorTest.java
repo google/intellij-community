@@ -2,7 +2,6 @@
 package com.intellij.history.integration.ui.models;
 
 import com.intellij.diff.Block;
-import com.intellij.history.core.InMemoryLocalHistoryFacade;
 import com.intellij.history.core.LocalHistoryFacade;
 import com.intellij.history.core.LocalHistoryTestCase;
 import com.intellij.history.core.tree.RootEntry;
@@ -22,7 +21,7 @@ import static org.easymock.EasyMock.verify;
 public class SelectionCalculatorTest extends LocalHistoryTestCase {
   public static final String PATH = "f";
   IdeaGateway gw = new MyIdeaGateway();
-  LocalHistoryFacade vcs = new InMemoryLocalHistoryFacade();
+  LocalHistoryFacade vcs = createInMemoryFacade();
 
   @Test
   public void testSelectionWasNotChanged() {

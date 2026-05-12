@@ -1,26 +1,21 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:ApiStatus.Experimental
-
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.syntax.extensions
 
 import com.intellij.platform.syntax.SyntaxLanguage
 import com.intellij.platform.syntax.extensions.impl.buildExtensionSupportImpl
 import com.intellij.platform.syntax.extensions.impl.performWithExtensionSupportImpl
 import com.intellij.platform.syntax.extensions.impl.registry
-import org.jetbrains.annotations.ApiStatus
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
 /**
  * Provides the current instance of [ExtensionSupport].
  */
-@ApiStatus.Experimental
 fun currentExtensionSupport(): ExtensionSupport = registry
 
 /**
  * Provides the current instance of [ExtensionSupport] or `null` if it is not supported in the current environment (i.e., in IntelliJ runtime).
  */
-@ApiStatus.Experimental
 fun currentExtensionRegistry(): ExtensionRegistry? = registry as? ExtensionRegistry
 
 /**
@@ -38,7 +33,6 @@ fun currentExtensionRegistry(): ExtensionRegistry? = registry as? ExtensionRegis
  * @see performWithExtensionSupport
  * @see buildExtensionSupport
  */
-@ApiStatus.Experimental
 interface ExtensionSupport {
   fun <T : Any> getExtensions(extensionPoint: ExtensionPointKey<T>): List<T>
   fun <T : Any> getLanguageExtensions(extensionPoint: ExtensionPointKey<T>, language: SyntaxLanguage): List<T>
@@ -48,7 +42,6 @@ interface ExtensionSupport {
  * Allows registering extensions for [ExtensionSupport].
  * It is not supported in IntelliJ runtime. IJ plugin model is used instead.
  */
-@ApiStatus.Experimental
 interface ExtensionRegistry : ExtensionSupport {
   fun <T : Any> registerExtension(extensionPoint: ExtensionPointKey<T>, extension: T)
   fun <T : Any> unregisterExtension(extensionPoint: ExtensionPointKey<T>, extension: T)
@@ -60,7 +53,6 @@ interface ExtensionRegistry : ExtensionSupport {
 /**
  * Marker interface for extension support that does not support dynamic substitution
  */
-@ApiStatus.Experimental
 interface StaticExtensionSupport
 
 /**

@@ -1,28 +1,18 @@
 // Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.github.util
 
-import com.intellij.collaboration.ui.SimpleEventListener
-import com.intellij.concurrency.JobScheduler
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.Pair
-import com.intellij.openapi.util.ThrowableComputable
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.util.EventDispatcher
 import git4idea.remote.hosting.GitHostingUrlUtil.match
 import git4idea.repo.GitRemote
 import git4idea.repo.GitRepository
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.plugins.github.authentication.GithubAuthenticationManager
-import java.io.IOException
 import java.net.UnknownHostException
-import java.util.concurrent.ScheduledFuture
-import java.util.concurrent.TimeUnit
-import kotlin.properties.ObservableProperty
-import kotlin.reflect.KProperty
 
 /**
  * Various utility methods for the GutHub plugin.
@@ -39,32 +29,6 @@ object GithubUtil {
   const val ENTERPRISE_SERVICE_DISPLAY_NAME: String = "GitHub Enterprise"
   const val GIT_AUTH_PASSWORD_SUBSTITUTE: String = "x-oauth-basic"
 
-  @JvmStatic
-  fun addCancellationListener(run: () -> Unit): ScheduledFuture<*> {
-    return JobScheduler.getScheduler().scheduleWithFixedDelay(run, 1000, 300, TimeUnit.MILLISECONDS)
-  }
-
-  private fun addCancellationListener(indicator: ProgressIndicator, thread: Thread): ScheduledFuture<*> {
-    return addCancellationListener { if (indicator.isCanceled) thread.interrupt() }
-  }
-
-  @Throws(IOException::class)
-  @JvmStatic
-  fun <T> runInterruptable(indicator: ProgressIndicator,
-                           task: ThrowableComputable<T, IOException>): T {
-    var future: ScheduledFuture<*>? = null
-    try {
-      val thread = Thread.currentThread()
-      future = addCancellationListener(indicator, thread)
-
-      return task.compute()
-    }
-    finally {
-      future?.cancel(true)
-      Thread.interrupted()
-    }
-  }
-
   @NlsSafe
   @JvmStatic
   fun getErrorTextFromException(e: Throwable): String {
@@ -72,15 +36,6 @@ object GithubUtil {
       "Unknown host: " + e.message
     }
     else StringUtil.notNullize(e.message, "Unknown error")
-  }
-
-  object Delegates {
-
-    fun <T> observableField(initialValue: T, dispatcher: EventDispatcher<SimpleEventListener>): ObservableProperty<T> {
-      return object : ObservableProperty<T>(initialValue) {
-        override fun afterChange(property: KProperty<*>, oldValue: T, newValue: T) = dispatcher.multicaster.eventOccurred()
-      }
-    }
   }
 
   @JvmStatic

@@ -6,4 +6,8 @@
     <module name="intellij.properties"/>
     <!-- endregion -->
   </dependencies>
+  <extensions defaultExtensionNs="com.intellij">
+    <projectSettings service="com.intellij.lang.properties.structureView.PropertiesSeparatorManager"/>
+    <projectSettings service="com.intellij.lang.properties.ResourceBundleManager"/>
+  </extensions>
 </idea-plugin>

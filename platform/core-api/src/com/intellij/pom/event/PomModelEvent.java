@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.pom.event;
 
 import com.intellij.pom.PomModel;
@@ -12,7 +12,7 @@ import java.util.Collections;
 import java.util.EventObject;
 import java.util.Set;
 
-public class PomModelEvent extends EventObject {
+public final class PomModelEvent extends EventObject {
   private PomChangeSet myChangeSet;
 
   @ApiStatus.Internal
@@ -37,7 +37,8 @@ public class PomModelEvent extends EventObject {
   public void merge(@NotNull PomModelEvent event) {
     if (event.myChangeSet != null && myChangeSet != null) {
       myChangeSet.merge(event.myChangeSet);
-    } else if (myChangeSet == null) {
+    }
+    else if (myChangeSet == null) {
       myChangeSet = event.myChangeSet;
     }
   }

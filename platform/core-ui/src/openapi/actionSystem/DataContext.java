@@ -53,7 +53,7 @@ public interface DataContext {
   @ApiStatus.Internal
   @Nullable Object getData(@NotNull String dataId);
 
-  @NotNull DataContext EMPTY_CONTEXT = __ -> null;
+  @NotNull DataContext EMPTY_CONTEXT = _ -> null;
 
   /**
    * Returns the value corresponding to the specified data key. Some of the supported

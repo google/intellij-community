@@ -86,13 +86,13 @@ public class MultipleJdksHighlightingTest extends UsefulTestCase {
 
     builders[0] = projectBuilder.addModule(JavaModuleFixtureBuilder.class);
     builders[0].setLanguageLevel(LanguageLevel.JDK_1_3);
-    builders[0].addJdk(IdeaTestUtil.getMockJdk14Path().getPath());
+    builders[0].addJdkVersion(LanguageLevel.JDK_1_4);
 
     builders[1] = projectBuilder.addModule(JavaModuleFixtureBuilder.class);
-    builders[1].addJdk(IdeaTestUtil.getMockJdk17Path().getPath());
+    builders[1].addJdkVersion(LanguageLevel.JDK_1_7);
 
     builders[2] = projectBuilder.addModule(JavaModuleFixtureBuilder.class);
-    builders[2].addJdk(IdeaTestUtil.getMockJdk18Path().getPath());
+    builders[2].addJdkVersion(LanguageLevel.JDK_1_8);
 
     myFixture.setUp();
 

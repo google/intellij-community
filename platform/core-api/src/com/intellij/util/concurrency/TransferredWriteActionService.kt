@@ -2,6 +2,7 @@
 package com.intellij.util.concurrency
 
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
+import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.concurrency.annotations.RequiresWriteLock
 import org.jetbrains.annotations.ApiStatus
 
@@ -9,7 +10,7 @@ import org.jetbrains.annotations.ApiStatus
 interface TransferredWriteActionService {
 
   /**
-   * Executes [action] on EDT under write action.
+   * Executes [action] syncrhonously on EDT under write action.
    * This function is semantically equivalent to [javax.swing.SwingUtilities.invokeAndWait]
    *
    * The difference is that raw `invokeAndWait` is prone to deadlocks:
@@ -32,4 +33,17 @@ interface TransferredWriteActionService {
   @RequiresWriteLock
   @RequiresBackgroundThread
   fun runOnEdtWithTransferredWriteActionAndWait(action: Runnable)
+
+  /**
+   * Executes [action] synchronously on a background thread under write action.
+   * This function is semantically equivalent to [com.intellij.openapi.application.Application.executeOnPooledThread] with waiting.
+   *
+   * This function allows transferring write access to a background thread,
+   * hence it is possible to use functions that require background threads inside it.
+   * This is useful for invocation of backgroundable listeners (such as [com.intellij.openapi.vfs.newvfs.BulkFileListenerBackgroundable])
+   * from EDT write actions.
+   */
+  @RequiresWriteLock
+  @RequiresEdt
+  fun <T> runOnBackgroundThreadWithTransferredWriteActionAndWait(action: Runnable)
 }

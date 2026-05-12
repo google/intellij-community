@@ -1,23 +1,20 @@
 ### auto-generated section `build intellij.libraries.kotlinx.coroutines.core` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "core_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "core",
+  module_name = "intellij.libraries.kotlinx.coroutines.core",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
-  resources = [":core_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   exports = ["@lib//:kotlinx-coroutines-core"],
   runtime_deps = ["@lib//:kotlinx-coroutines-core"]
 )
 
 jvm_library(
   name = "core_test_lib",
+  testonly = True,
   module_name = "intellij.libraries.kotlinx.coroutines.core",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -26,3 +23,9 @@ jvm_library(
   runtime_deps = [":core"]
 )
 ### auto-generated section `build intellij.libraries.kotlinx.coroutines.core` end
+
+### auto-generated section `iml intellij.libraries.kotlinx.coroutines.core` start
+exports_files([
+  "intellij.libraries.kotlinx.coroutines.core.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.libraries.kotlinx.coroutines.core` end

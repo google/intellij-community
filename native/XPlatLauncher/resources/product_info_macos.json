@@ -10,7 +10,6 @@
   "productVendor": "JetBrains",
   "launch": [
     {
-      "os": "macOS",
       "launcherPath": "../MacOS/xplat",
       "javaExecutablePath": "../jbr/Contents/Home/bin/java",
       "vmOptionsFilePath": "../bin/xplat.vmoptions",
@@ -19,12 +18,14 @@
         "boot-macos.jar"
       ],
       "additionalJvmArguments": [
+        "--add-opens=java.base/java.io=ALL-UNNAMED",
         "-Didea.vendor.name=JetBrains",
         "-Didea.paths.selector=XPlatLauncherTest",
         "-Duser.home.macro.test=$USER_HOME",
         "-Dide.home.macro.test=$APP_PACKAGE/Contents",
         "-Dcache.dir.macro.test=$IDE_CACHE_DIR"
       ],
+      "stdioRedirectArg": "--stdio",
       "mainClass": "com.intellij.idea.TestMain",
       "customCommands": [
         {

@@ -26,7 +26,7 @@ public class MagicIntegerConstAccessor extends ExternalStringAccessor<Integer> i
       String value = strValues[i];
       int intValue = intValues[i];
       myValueMap.put(intValue, value);
-      myValueToKeysMap.computeIfAbsent(value, __ -> new IntArrayList()).add(intValue);
+      myValueToKeysMap.computeIfAbsent(value, _ -> new IntArrayList()).add(intValue);
     }
   }
 

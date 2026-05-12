@@ -13,7 +13,7 @@ Some front matter
 | to be  | collapsed |</fold>
 
 
-<fold text='code fence: ```text
+<fold text='```text
 Simple code fe...d
 ```' expand='false'>```text
 Simple code fence

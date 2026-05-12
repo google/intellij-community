@@ -8,7 +8,6 @@ import org.jetbrains.annotations.ApiStatus
 /**
  * Provides access to the mode the current IDE instance is running in.
  */
-@ApiStatus.Experimental
 interface IdeProductMode {
   companion object {
     @JvmStatic
@@ -41,5 +40,6 @@ interface IdeProductMode {
   /**
    * Returns the mode the current IDE instance is running in.
    */
+  @get:ApiStatus.Experimental
   val currentMode: ProductMode
 }

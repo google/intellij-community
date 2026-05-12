@@ -22,5 +22,5 @@ interface BuildTasks {
    */
   suspend fun buildNonBundledPlugins(mainPluginModules: List<String>, dependencyModules: List<String> = emptyList())
 
-  suspend fun buildUnpackedDistribution(targetDirectory: Path, includeBinAndRuntime: Boolean)
+  suspend fun buildUnpackedDistribution(targetDirectory: Path)
 }

@@ -269,8 +269,8 @@ private fun removeUnusedTypeParameters(typeParameters: List<KtTypeParameter>) {
  * We use this function to check if the callable symbol has a receiver that might potentially be used as a context receiver of this symbol.
  * This is needed because the analysis API does not expose passed context receivers yet: KT-73709
  */
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class)
+context(_: KaSession)
 private fun KaCallableMemberCall<*, *>.hasContextReceiverOfType(type: KaType): Boolean {
     val substitutor = buildSubstitutor {
         substitutions(typeArgumentsMapping)

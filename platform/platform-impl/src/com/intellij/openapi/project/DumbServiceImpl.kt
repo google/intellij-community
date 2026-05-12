@@ -30,6 +30,7 @@ import com.intellij.openapi.wm.WindowManager
 import com.intellij.openapi.wm.ex.StatusBarEx
 import com.intellij.platform.locking.impl.getGlobalThreadingSupport
 import com.intellij.platform.util.coroutines.childScope
+import com.intellij.platform.util.progress.RawProgressReporter
 import com.intellij.serviceContainer.AlreadyDisposedException
 import com.intellij.serviceContainer.NonInjectable
 import com.intellij.util.ConcurrencyUtil
@@ -147,6 +148,7 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(
     }
 
     fun launch() {
+      LOG.debug { "DumbTaskLauncher is about to launch: $launched" }
       if (!launched) {
         launched = true
         guiDumbTaskRunner.startBackgroundProcess(onFinish = {
@@ -241,7 +243,12 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(
     isDisposed = true
     ApplicationManager.getApplication().assertWriteIntentLockAcquired()
     balloon.dispose()
-    scheduledTasksScope.cancel("On dispose of DumbService", ProcessCanceledException())
+    val job = scheduledTasksScope.coroutineContext[Job] ?: error("Scope cannot be cancelled because it does not have a job: ${scheduledTasksScope}")
+    job.cancel(CancellationException("On dispose of DumbService"))
+    job.invokeOnCompletion {
+      // dispose of the tasks that were about to be scheduled while DumbService.disposed was called
+      taskQueue.disposePendingTasks()
+    }
     taskQueue.disposePendingTasks()
   }
 
@@ -487,6 +494,7 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(
   @OptIn(ExperimentalCoroutinesApi::class)
   override fun queueTask(task: DumbModeTask) {
     if (isDisposed) {
+      LOG.debug { "DumbServiceImpl is disposed, throwing an AlreadyDisposedException when trying to queue $task" }
       throw AlreadyDisposedException("Cannot queue task $task after disposal")
     }
 
@@ -778,9 +786,23 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(
         LOG.infoWithDebug("Processing dumb queue under modal progress (start)", startTrace)
         (ApplicationManager.getApplication() as ApplicationImpl).executeSuspendingWriteAction(myProject, IndexingBundle.message(
           "progress.indexing.title")) {
+          val indicator = ProgressManager.getInstance().progressIndicator
           processTask.use {
-            processTask.run(
-              ProgressManager.getInstance().progressIndicator)
+            processTask(object : RawProgressReporter {
+              override fun text(text: @NlsContexts.ProgressText String?) {
+                indicator?.text = text
+              }
+
+              override fun details(details: @NlsContexts.ProgressDetails String?) {
+                indicator?.text2 = details
+              }
+
+              override fun fraction(fraction: Double?) {
+                if (fraction != null) {
+                  indicator?.fraction = fraction
+                }
+              }
+            })
           }
         }
       }
@@ -847,7 +869,7 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(
   fun hasScheduledTasks(): Boolean {
     // when queued on EDT, dumb mode starts immediately, but executor does not start immediately - it schedules start to the end of the EDT
     // queue to give a chance to invoke completeJustSubmittedTasks and index files under modal progress.
-    return scheduledTasksScope.coroutineContext.job.children.firstOrNull() != null
+    return scheduledTasksScope.coroutineContext.job.children.firstOrNull() != null || guiDumbTaskRunner.hasScheduledTasks()
   }
 
   companion object {

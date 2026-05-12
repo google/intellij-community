@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * Utility functions to trigger file reparsing programmatically.
@@ -55,24 +56,25 @@ public final class FileContentUtilCore {
       BulkFileListener publisher = ApplicationManager.getApplication().getMessageBus().syncPublisher(VirtualFileManager.VFS_CHANGES);
       BulkFileListenerBackgroundable publisherBackgroundable = ApplicationManager.getApplication().getMessageBus().syncPublisher(VirtualFileManager.VFS_CHANGES_BG);
       List<VFileEvent> eventList = Collections.unmodifiableList(new ArrayList<>(events));
-      if (EDT.isCurrentThreadEdt()) {
-        publisher.before(eventList);
-      } else {
-        application.getService(TransferredWriteActionService.class).runOnEdtWithTransferredWriteActionAndWait(() -> {
-          publisher.before(eventList);
-        });
-      }
-      publisherBackgroundable.before(eventList);
-      if (EDT.isCurrentThreadEdt()) {
-        publisher.after(eventList);
-      } else {
-        application.getService(TransferredWriteActionService.class).runOnEdtWithTransferredWriteActionAndWait(() -> {
-          publisher.after(eventList);
-        });
-      }
-      publisherBackgroundable.after(eventList);
+
+      TransferredWriteActionService service = application.getService(TransferredWriteActionService.class);
+      Consumer<Runnable> bgToEdt = service::runOnEdtWithTransferredWriteActionAndWait;
+      Consumer<Runnable> edtToBg = service::runOnBackgroundThreadWithTransferredWriteActionAndWait;
+
+      invokePublisher(() -> publisherBackgroundable.before(eventList), edtToBg, Runnable::run);
+      invokePublisher(() -> publisher.before(eventList), Runnable::run, bgToEdt);
+      invokePublisher(() -> publisher.after(eventList), Runnable::run, bgToEdt);
+      invokePublisher(() -> publisherBackgroundable.after(eventList), edtToBg, Runnable::run);
 
       ForcefulReparseModificationTracker.increment();
     });
+  }
+
+  private static void invokePublisher(Runnable targetRunnable, Consumer<Runnable> whatToDoOnEdt, Consumer<Runnable> whatToDoOnBgt) {
+    if (EDT.isCurrentThreadEdt()) {
+      whatToDoOnEdt.accept(targetRunnable);
+    } else {
+      whatToDoOnBgt.accept(targetRunnable);
+    }
   }
 }

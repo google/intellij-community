@@ -141,7 +141,7 @@ companion object {
    * @return the Unicode code point at the specified index.
    * @throws IndexOutOfBoundsException if the index is outside the bounds of the character sequence.
    */
-  fun CharSequence.codePoint(index: Int): Int {
+  private fun CharSequence.codePoint(index: Int): Int {
       val high = this[index]
       if (high.isHighSurrogate() && index + 1 < length) {
           val low = this[index + 1]
@@ -154,18 +154,18 @@ companion object {
   }
 
   /** Returns the character (Unicode code point) at the specified index. */
-  internal fun String.codePointAt(index: Int): Int {
+  private fun String.codePointAt(index: Int): Int {
       val high = this[index]
       if (high.isHighSurrogate() && index + 1 < this.length) {
           val low = this[index + 1]
           if (low.isLowSurrogate()) {
-              return Char.toCodePoint(high, low)
+              return toCodePoint(high, low)
           }
       }
       return high.code
   }
   
-  internal fun CharSequence.offsetByCodePoints(index: Int, codePointOffset: Int): Int {
+  private fun CharSequence.offsetByCodePoints(index: Int, codePointOffset: Int): Int {
     val length = this.length
     if (index < 0 || index > length) throw IndexOutOfBoundsException()
 
@@ -196,18 +196,18 @@ companion object {
     return x
   }
 
-  internal fun Char.Companion.toCodePoint(high: Char, low: Char): Int =
-      (((high - MIN_HIGH_SURROGATE) shl 10) or (low - MIN_LOW_SURROGATE)) + 0x10000
+  private fun toCodePoint(high: Char, low: Char): Int =
+      (((high - Char.MIN_HIGH_SURROGATE) shl 10) or (low - Char.MIN_LOW_SURROGATE)) + 0x10000
 
   private fun charCount(codePoint: Int): Int = if (codePoint < 0x10000) 1 else 2
 
-  private fun Char.Companion.codePointBefore(seq: CharSequence, index: Int): Int {
+  private fun codePointBefore(seq: CharSequence, index: Int): Int {
     var i = index - 1
     val c2 = seq[i];
     if (c2.isLowSurrogate() && index > 0) {
       val c1 = seq[i - 1];
       if (c1.isHighSurrogate()) {
-        return Char.toCodePoint(c1, c2);
+        return toCodePoint(c1, c2);
       }
     }
     return c2.code

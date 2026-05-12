@@ -355,7 +355,7 @@ public final class ExternalSystemUtil {
         public void execute(@NotNull ProgressIndicator indicator) {
           var activity = ExternalSystemStatUtilKt.importActivityStarted(project, externalSystemId, null);
           try {
-            ExternalSystemTelemetryUtil.runWithSpan(externalSystemId, "ExternalSystemSyncProjectTask", __ ->
+            ExternalSystemTelemetryUtil.runWithSpan(externalSystemId, "ExternalSystemSyncProjectTask", _ ->
               executeSync(externalProjectPath, importSpec, resolveProjectTask, indicator)
             );
           }

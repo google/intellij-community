@@ -10,6 +10,7 @@ import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.scratch.JavaScratchConfiguration
 import com.intellij.openapi.compiler.CompilerPaths
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.diagnostic.rethrowControlFlowException
 import com.intellij.openapi.externalSystem.model.execution.ExternalSystemTaskExecutionSettings
 import com.intellij.openapi.externalSystem.service.execution.ExternalSystemRunConfiguration.PROGRESS_LISTENER_KEY
 import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
@@ -32,6 +33,7 @@ import com.intellij.task.ModuleBuildTask
 import com.intellij.task.ProjectTask
 import com.intellij.task.ProjectTaskContext
 import com.intellij.task.ProjectTaskRunner
+import com.intellij.task.TaskRunnerResults.FAILURE
 import com.intellij.task.TaskRunnerResults.SUCCESS
 import com.intellij.util.text.nullize
 import kotlinx.coroutines.async
@@ -72,9 +74,16 @@ class GradleProjectTaskRunner : ProjectTaskRunner() {
   override fun run(project: Project, context: ProjectTaskContext, vararg tasks: ProjectTask): Promise<Result> {
     return project.gradleCoroutineScope.async<Result> {
       mutex.withLock {
-        run(project, context, tasks.asList())
+        try {
+          run(project, context, tasks.asList())
+          SUCCESS
+        }
+        catch (exception: Exception) {
+          // Platform automatically converts only control flow exceptions
+          rethrowControlFlowException(exception)
+          FAILURE
+        }
       }
-      SUCCESS
     }.asCompletableFuture().asPromise()
   }
 

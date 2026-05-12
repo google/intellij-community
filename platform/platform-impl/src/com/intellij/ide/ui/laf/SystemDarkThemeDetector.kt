@@ -59,7 +59,7 @@ private abstract class AsyncDetector : SystemDarkThemeDetector() {
 
   override fun check(parameter: Boolean?) {
     service<CoreUiCoroutineScopeHolder>().coroutineScope.launch {
-      RegistryManager.getInstance().awaitRegistryLoad()
+      RegistryManager.getInstance()
       val isDark = isDark()
       withContext(Dispatchers.UiWithModelAccess + ModalityState.any().asContextElement()) {
         syncFunction.accept(isDark, parameter)

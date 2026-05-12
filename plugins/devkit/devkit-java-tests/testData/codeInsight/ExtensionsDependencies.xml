@@ -33,7 +33,7 @@
 
   
   <!-- cannot mix with non-optional -->
-  <error descr="Cannot use <depends> in addition to <dependencies>"><depends config-file="ExtensionsDependencies-plugin.xml">com.intellij.myPlugin</depends></error>
+  <warning descr="<depends> and <dependencies> shouldn't be used together: <depends> is for classic plugins only, whereas <dependencies> is for modular plugins only"><depends config-file="ExtensionsDependencies-plugin.xml">com.intellij.myPlugin</depends></warning>
 
   <depends config-file="dummy-descriptor.xml" optional="true">com.intellij.myPlugin</depends>
 

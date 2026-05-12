@@ -10,7 +10,9 @@ object KotlinGradlePluginVersions {
     val V_2_1_0 = KotlinToolingVersion(2, 1, 0, null)
     val V_2_2_0 = KotlinToolingVersion(2, 2, 0, null)
     val V_2_3_0 = KotlinToolingVersion(2, 3, 0, null)
-    val latest = KotlinToolingVersion("2.4.0-dev-539")
+    val V_2_3_20 = KotlinToolingVersion(2, 3, 20, null)
+    val V_2_4_0 = KotlinToolingVersion(2, 4, 0, null)
+    val latest = KotlinToolingVersion("2.4.0-dev-8449")
     val latestBootstrap = KotlinToolingVersion("1.9.20-dev-6845")
     val latestStable = V_1_8_22
 }

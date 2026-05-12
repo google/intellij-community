@@ -1,10 +1,10 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.ijent.spi
 
 import com.intellij.platform.eel.EelPlatform
+import com.intellij.platform.eel.SafeDeferred
+import com.intellij.platform.ijent.IjentScope
 import com.intellij.platform.ijent.IjentUnavailableException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 
 /**
  * A wrapper for the Ijent process. The wrapper logs stderr lines, waits for the exit code, terminates the process in case
@@ -18,8 +18,8 @@ import kotlinx.coroutines.Deferred
  * throws [IjentUnavailableException].
  */
 sealed interface IjentSessionMediator {
-  val ijentProcessScope: CoroutineScope
-  val processExit: Deferred<Unit>
+  val ijentProcessScope: IjentScope
+  val processExit: SafeDeferred<Unit>
 }
 
 /**

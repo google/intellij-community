@@ -45,6 +45,7 @@ class PinyinMatcher internal constructor(override val pattern: String) : Minuscu
   }
 
   @Deprecated("use match(String)", replaceWith = ReplaceWith("match(name)"))
+  @ApiStatus.ScheduledForRemoval
   override fun matchingFragments(name: String): FList<TextRange>? {
     return match(name)?.deprecated()
   }
@@ -70,6 +71,7 @@ class PinyinMatcher internal constructor(override val pattern: String) : Minuscu
   }
 
   @Deprecated("use matchingDegree(String, Boolean, List<MatchedFragment>)", replaceWith = ReplaceWith("matchingDegree(name, valueStartCaseMatch, fragments.map { MatchedFragment(it.startOffset, it.endOffset) })"))
+  @ApiStatus.ScheduledForRemoval
   override fun matchingDegree(
     name: String,
     valueStartCaseMatch: Boolean,

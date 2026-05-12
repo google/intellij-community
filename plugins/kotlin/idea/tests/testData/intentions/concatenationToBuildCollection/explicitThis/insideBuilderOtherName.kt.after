@@ -3,7 +3,7 @@ val x = buildSet<Boolean> {
     addAll(
         buildList {
             addAll(listOf(this@buildSet).flatten())
-            mapTo(this) { !it }
+            this@buildSet.mapTo(this) { !it }
             addAll(this@buildSet.mapTo(this@buildSet) { !it })
         }
     )

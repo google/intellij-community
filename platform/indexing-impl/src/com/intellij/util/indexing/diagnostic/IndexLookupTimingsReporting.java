@@ -896,7 +896,7 @@ public final class IndexLookupTimingsReporting {
       if (!failed) {
         final Recorder recorder = allKeysLookupDurationsMsByIndexId.computeIfAbsent(
           indexId,
-          __ -> new Recorder(
+          _ -> new Recorder(
             MAX_TRACKABLE_DURATION_MS,
             /* significant digits = */ 2     /* ~1% accuracy */
           )
@@ -917,7 +917,7 @@ public final class IndexLookupTimingsReporting {
       if (!failed) {
         final Recorder recorder = entriesLookupDurationsMsByIndexId.computeIfAbsent(
           indexId,
-          __ -> new Recorder(
+          _ -> new Recorder(
             MAX_TRACKABLE_DURATION_MS,
             /* significant digits = */ 2     /* ~1% accuracy */
           )
@@ -938,7 +938,7 @@ public final class IndexLookupTimingsReporting {
       if (!failed) {
         final Recorder recorder = stubEntriesLookupDurationsMsByIndexId.computeIfAbsent(
           indexId,
-          __ -> new Recorder(
+          _ -> new Recorder(
             MAX_TRACKABLE_DURATION_MS,
             /* significant digits = */ 2     /* ~1% accuracy */
           )

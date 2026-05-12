@@ -10,7 +10,6 @@ import com.intellij.debugger.engine.evaluation.EvaluateExceptionUtil;
 import com.intellij.debugger.engine.evaluation.EvaluationContextImpl;
 import com.intellij.debugger.impl.ClassLoadingUtils;
 import com.intellij.debugger.impl.DebuggerUtilsEx;
-import com.intellij.debugger.memory.agent.extractor.ProxyExtractor;
 import com.intellij.debugger.memory.agent.parsers.BooleanParser;
 import com.intellij.debugger.memory.agent.parsers.ErrorCodeParser;
 import com.intellij.debugger.memory.agent.parsers.GcRootsPathsParser;
@@ -408,7 +407,7 @@ public class IdeaNativeAgentProxyMirror {
   }
 
   private static byte @NotNull [] readUtilityClass() {
-    return new ProxyExtractor().extractProxy();
+    return ProxyExtractorKt.extractProxy();
   }
 
   private static @Nullable ReferenceType loadUtilityClass(@NotNull EvaluationContextImpl evaluationContext) throws EvaluateException {

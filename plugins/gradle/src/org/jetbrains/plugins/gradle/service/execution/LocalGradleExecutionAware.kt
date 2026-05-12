@@ -153,6 +153,7 @@ class LocalGradleExecutionAware : GradleExecutionAware {
       LOG.warn("Gradle JVM ($gradleJvm) is JRE instead JDK: $sdkInfo")
       throw jdkConfigurationException("gradle.jvm.is.jre")
     }
+    LOG.debug("Gradle JVM configured successfully: reference='$gradleJvm', homePath='$homePath'")
   }
 
   private fun checkJdkCompatibility(project: Project, homePath: Path, externalProjectPath: String, task: ExternalSystemTask) {

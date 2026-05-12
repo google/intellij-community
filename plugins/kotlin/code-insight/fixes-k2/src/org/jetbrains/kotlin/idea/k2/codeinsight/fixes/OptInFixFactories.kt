@@ -19,6 +19,7 @@ import org.jetbrains.kotlin.analysis.api.symbols.symbol
 import org.jetbrains.kotlin.analysis.api.types.KaClassType
 import org.jetbrains.kotlin.idea.base.psi.KotlinPsiHeuristics
 import org.jetbrains.kotlin.idea.codeinsight.api.applicators.fixes.KotlinQuickFixFactory
+import org.jetbrains.kotlin.idea.k2.codeinsight.fixes.OptInGeneralUtils.collectScriptCandidates
 import org.jetbrains.kotlin.idea.quickfix.AddAnnotationFix
 import org.jetbrains.kotlin.idea.quickfix.OptInGeneralUtilsBase
 import org.jetbrains.kotlin.idea.refactoring.isOpen
@@ -56,8 +57,8 @@ internal object OptInFixFactories {
         createQuickFix(diagnostic)
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class, KaImplementationDetail::class)
+    context(_: KaSession)
     private fun createQuickFix(diagnostic: KaFirDiagnostic<PsiElement>): List<ModCommandAction> {
         val element = diagnostic.psi.findParentOfType<KtElement>(strict = false) ?: return emptyList()
         val annotationClassId = OptInFixUtils.optInMarkerClassId(diagnostic) ?: return emptyList()
@@ -71,7 +72,7 @@ internal object OptInFixFactories {
         val applicableTargets = annotationSymbol.annotationApplicableTargets
         val result = mutableListOf<ModCommandAction>()
 
-        val candidates = OptInGeneralUtils.collectCandidates(element)
+        val candidates = if (element.containingKtFile.isScript()) collectScriptCandidates(element) else OptInGeneralUtils.collectCandidates(element)
 
         fun collectPropagateOptInAnnotationFix(targetElement: KtElement, kind: AddAnnotationFix.Kind): AddAnnotationFix? {
             if (targetElement !is KtDeclaration) return null

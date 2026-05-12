@@ -10,18 +10,22 @@ import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.actionSystem.PlatformCoreDataKeys
 import com.intellij.openapi.actionSystem.Toggleable
 import com.intellij.openapi.actionSystem.impl.ActionPresentationDecorator.decorateTextIfNeeded
+import com.intellij.openapi.actionSystem.impl.MenuCancelledControlFlowException
 import com.intellij.openapi.actionSystem.impl.PresentationFactory
 import com.intellij.openapi.actionSystem.impl.Utils
 import com.intellij.openapi.actionSystem.impl.actionholder.createActionRef
 import com.intellij.openapi.application.WriteIntentReadAction
+import com.intellij.openapi.diagnostic.ControlFlowException
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.ui.ExperimentalUI
 import com.intellij.ui.icons.getMenuBarIcon
 import com.intellij.ui.mac.screenmenu.Menu
+import java.util.concurrent.CancellationException
 import javax.swing.JFrame
 
+@Throws(MenuCancelledControlFlowException::class)
 internal fun createMacNativeActionMenu(context: DataContext?,
                                        place: String,
                                        group: ActionGroup,
@@ -48,12 +52,14 @@ internal fun createMacNativeActionMenu(context: DataContext?,
         ) { !menuPeer.isOpened }
       }
     }
-    catch (e: ProcessCanceledException) {
-      // a possible fix is to update PotemkinProgress.isUrgentInvocationEvent()
-      logger<Menu>().warn("ProcessCanceledException is not expected", Throwable().initCause(e))
-    }
     catch (e: Throwable) {
-      logger<Menu>().error(e)
+      if (e is CancellationException || e is ControlFlowException) {
+        // a possible fix is to update PotemkinProgress.isUrgentInvocationEvent()
+        logger<Menu>().warn("CancellationException/ControlFlowException is not expected", Throwable().initCause(e))
+      }
+      else {
+        logger<Menu>().error(e)
+      }
     }
     finally {
       UILatencyLogger.logMainMenuLatency(System.currentTimeMillis() - menuPeer.openTimeMs);

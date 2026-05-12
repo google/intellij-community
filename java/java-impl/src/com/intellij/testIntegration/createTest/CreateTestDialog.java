@@ -45,7 +45,8 @@ import com.intellij.ui.EditorTextField;
 import com.intellij.ui.RecentsManager;
 import com.intellij.ui.ReferenceEditorComboWithBrowseButton;
 import com.intellij.ui.ScrollPaneFactory;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.LcrJavaHelper;
+import com.intellij.ui.dsl.listCellRenderer.RendererPresentation;
 import com.intellij.util.IncorrectOperationException;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.concurrency.AppExecutorUtil;
@@ -377,12 +378,10 @@ public class CreateTestDialog extends DialogWrapper {
     constr.weighty = 1;
     panel.add(ScrollPaneFactory.createScrollPane(myMethodsTable), constr);
 
-    myLibrariesCombo.setRenderer(SimpleListCellRenderer.create((label, value, index) -> {
-      if (value != null) {
-        label.setText(value.getName());
-        label.setIcon(value.getIcon());
-      }
-    }));
+    myLibrariesCombo.setRenderer(LcrJavaHelper.create(
+      "",
+      value -> new RendererPresentation(value.getIcon(), value.getName())
+    ));
     final boolean hasTestRoots = !ModuleRootManager.getInstance(myTargetModule).getSourceRoots(JavaModuleSourceRootTypes.TESTS).isEmpty();
     final List<TestFramework> attachedLibraries = new ArrayList<>();
     final String defaultLibrary = getDefaultLibraryName();
@@ -438,7 +437,7 @@ public class CreateTestDialog extends DialogWrapper {
       public void actionPerformed(ActionEvent e) {
         if (mySelectedFramework instanceof JavaTestFramework) {
           ((JavaTestFramework)mySelectedFramework).setupLibrary(myTargetModule)
-            .onSuccess(__ -> myFixLibraryPanel.setVisible(false));
+            .onSuccess(_ -> myFixLibraryPanel.setVisible(false));
         }
         else {
           OrderEntryFix.addJarToRoots(mySelectedFramework.getLibraryPath(), myTargetModule, null);

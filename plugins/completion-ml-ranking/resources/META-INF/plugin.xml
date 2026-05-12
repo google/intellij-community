@@ -19,8 +19,10 @@
 
   <dependencies>
     <plugin id="com.intellij.modules.lang"/>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
     <module name="intellij.platform.ml.impl"/>
     <module name="intellij.platform.vcs.impl"/>
+    <!-- endregion -->
   </dependencies>
   <!--suppress PluginXmlValidity -->
   <content namespace="jetbrains">
@@ -123,6 +125,9 @@
     <statistics.counterUsagesCollector implementationClass="com.intellij.completion.ml.settings.MLCompletionSettingsCollector"/>
     <completion.ml.localModelProvider implementation="com.intellij.completion.ml.ranker.local.randomforest.LocalRandomForestProvider" />
     <completion.ml.localModelProvider implementation="com.intellij.completion.ml.ranker.local.catboost.LocalCatBoostModelProvider" />
+    <applicationSettings service="com.intellij.completion.ml.settings.CompletionMLRankingSettings"/>
+    <projectSettings service="com.intellij.completion.ml.personalization.impl.ProjectUserFactorStorage"/>
+    <applicationSettings service="com.intellij.completion.ml.personalization.impl.ApplicationUserFactorStorage"/>
   </extensions>
 
   <projectListeners>

@@ -1,4 +1,5 @@
 // "Remove parameter 'x'" "false"
+// TOOL: org.jetbrains.kotlin.idea.k2.codeinsight.inspections.UnusedSymbolInspection
 // ACTION: Convert to anonymous function
 // ACTION: Convert to single-line lambda
 // ACTION: Enable a trailing comma by default in the formatter

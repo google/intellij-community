@@ -14,10 +14,10 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.ui.CollectionComboBoxModel;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.ActionLink;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.uiDesigner.core.GridLayoutManager;
 import com.intellij.uiDesigner.core.Spacer;
@@ -281,7 +281,7 @@ public final class RepositoryLibraryPropertiesEditor {
       myRemoteRepositoryOptionsPanel.setVisible(intSettings.isBindJarRepositoryUiSettingsDisplayed());
     }
 
-    myRemoteRepositoryComboBox.setRenderer(SimpleListCellRenderer.create(
+    myRemoteRepositoryComboBox.setRenderer(BuilderKt.textListCellRenderer(
       JavaUiBundle.message("repository.library.bind.repository.not.selected"),
       RemoteRepositoryDescription::getUrl)
     );
@@ -305,7 +305,7 @@ public final class RepositoryLibraryPropertiesEditor {
         mavenCoordinates.setText(repositoryLibraryDescription.getMavenCoordinates(model.getVersion()));
       }
     };
-    versionSelector.setRenderer(SimpleListCellRenderer.create("", VersionItem::getDisplayName));
+    versionSelector.setRenderer(BuilderKt.textListCellRenderer("", VersionItem::getDisplayName));
     updateManageDependenciesLink();
     reloadVersionsAsync();
   }

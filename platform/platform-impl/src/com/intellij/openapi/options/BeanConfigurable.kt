@@ -7,12 +7,10 @@ import com.intellij.openapi.util.Comparing
 import com.intellij.openapi.util.Getter
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.Setter
-import com.intellij.openapi.util.text.StringUtil
 import com.intellij.ui.dsl.builder.Panel
 import com.intellij.ui.dsl.builder.TopGap
 import com.intellij.ui.dsl.builder.panel
 import org.jetbrains.annotations.ApiStatus
-import org.jetbrains.annotations.NonNls
 import java.util.function.Function
 import java.util.function.Supplier
 import javax.swing.JCheckBox
@@ -38,50 +36,6 @@ abstract class BeanConfigurable<T : Any> protected constructor(protected val ins
     abstract fun setBeanValue(instance: Any, value: Boolean)
   }
 
-  private class BeanFieldAccessor(private val myFieldName: String) : BeanPropertyAccessor() {
-    fun getterName(): @NonNls String {
-      return "is" + StringUtil.capitalize(myFieldName)
-    }
-
-    override fun getBeanValue(instance: Any): Boolean {
-      try {
-        val field = instance.javaClass.getField(myFieldName)
-        return field.get(instance) as Boolean
-      }
-      catch (_: NoSuchFieldException) {
-        try {
-          val method = instance.javaClass.getMethod(getterName())
-          return method.invoke(instance) as Boolean
-        }
-        catch (e1: Exception) {
-          throw RuntimeException(e1)
-        }
-      }
-      catch (e: IllegalAccessException) {
-        throw RuntimeException(e)
-      }
-    }
-
-    override fun setBeanValue(instance: Any, value: Boolean) {
-      try {
-        val field = instance.javaClass.getField(myFieldName)
-        field.set(instance, value)
-      }
-      catch (_: NoSuchFieldException) {
-        try {
-          val method = instance.javaClass.getMethod("set" + StringUtil.capitalize(myFieldName), Boolean::class.java)
-          method.invoke(instance, value)
-        }
-        catch (e1: Exception) {
-          throw RuntimeException(e1)
-        }
-      }
-      catch (e: IllegalAccessException) {
-        throw RuntimeException(e)
-      }
-    }
-  }
-
   private class BeanMethodAccessor(
     private val myGetter: Supplier<Boolean>,
     private val mySetter: Setter<in Boolean>,
@@ -105,19 +59,9 @@ abstract class BeanConfigurable<T : Any> protected constructor(protected val ins
     }
   }
 
-  private class CheckboxField {
-    private val myAccessor: BeanPropertyAccessor
-    val title: @NlsContexts.Checkbox String?
-
-    constructor(fieldName: String, title: @NlsContexts.Checkbox String?) {
-      myAccessor = BeanFieldAccessor(fieldName)
-      this.title = title
-    }
-
-    constructor(accessor: BeanPropertyAccessor, title: @NlsContexts.Checkbox String) {
-      myAccessor = accessor
-      this.title = title
-    }
+  private class CheckboxField(
+    private val myAccessor: BeanPropertyAccessor,
+    val title: @NlsContexts.Checkbox String) {
 
     fun setValue(settingsInstance: Any, value: Boolean) {
       myAccessor.setBeanValue(settingsInstance, value)
@@ -149,12 +93,6 @@ abstract class BeanConfigurable<T : Any> protected constructor(protected val ins
     var componentValue: Boolean
       get() = component.isSelected
       set(value) = component.setSelected(value)
-  }
-
-  @Deprecated("use {@link #checkBox(String, Getter, Setter)} instead", level = DeprecationLevel.HIDDEN)
-  @ApiStatus.ScheduledForRemoval
-  protected fun checkBox(fieldName: @NonNls String, title: @NlsContexts.Checkbox String?) {
-    myFields.add(CheckboxField(fieldName, title))
   }
 
   /**

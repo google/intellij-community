@@ -6,6 +6,7 @@ import com.intellij.ui.SimpleColoredText;
 import com.intellij.util.ArrayUtilRt;
 import com.intellij.xdebugger.frame.XDebuggerTreeNodeHyperlink;
 import com.intellij.xdebugger.impl.ui.tree.XDebuggerTree;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
@@ -180,5 +181,11 @@ public abstract class XDebuggerTreeNode implements TreeNode {
   @Override
   public String toString() {
     return myText.toString();
+  }
+
+  @ApiStatus.Internal
+  protected void clear() {
+    myIcon = null;
+    myText.clear();
   }
 }

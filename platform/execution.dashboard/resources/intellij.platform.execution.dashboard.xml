@@ -1,10 +1,34 @@
 <idea-plugin visibility="internal">
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
-    <module name="intellij.platform.rpc"/>
-    <module name="intellij.platform.execution.serviceView"/>
     <module name="intellij.platform.debugger"/>
     <module name="intellij.platform.debugger.impl"/>
+    <module name="fleet.rhizomedb"/>
+    <module name="intellij.libraries.fastutil"/>
+    <module name="intellij.libraries.guava"/>
+    <module name="intellij.libraries.kotlinx.coroutines.core"/>
+    <module name="intellij.libraries.kotlinx.serialization.core"/>
+    <module name="intellij.libraries.kotlinx.serialization.json"/>
+    <module name="intellij.platform.core"/>
+    <module name="intellij.platform.core.ui"/>
+    <module name="intellij.platform.editor.ui"/>
+    <module name="intellij.platform.execution"/>
+    <module name="intellij.platform.execution.impl"/>
+    <module name="intellij.platform.execution.serviceView"/>
+    <module name="intellij.platform.ide"/>
+    <module name="intellij.platform.ide.core"/>
+    <module name="intellij.platform.ide.impl"/>
+    <module name="intellij.platform.lang"/>
+    <module name="intellij.platform.lang.core"/>
+    <module name="intellij.platform.lang.impl"/>
+    <module name="intellij.platform.projectModel"/>
+    <module name="intellij.platform.projectModel.impl"/>
+    <module name="intellij.platform.rpc"/>
+    <module name="intellij.platform.statistics"/>
+    <module name="intellij.platform.util.coroutines"/>
+    <module name="intellij.platform.util.ui"/>
   </dependencies>
+  <!-- endregion -->
   <extensionPoints>
     <extensionPoint qualifiedName="com.intellij.runDashboardManagerProxy"
                     interface="com.intellij.execution.dashboard.RunDashboardManagerProxy" dynamic="true"/>
@@ -20,7 +44,7 @@
       implementation="com.intellij.platform.execution.dashboard.splitApi.frontend.FrontendRunDashboardManagerProxy"/>
     <projectService serviceInterface="com.intellij.execution.dashboard.RunDashboardUiManager"
                     serviceImplementation="com.intellij.platform.execution.dashboard.splitApi.frontend.RunDashboardUiManagerImpl"/>
-    <serviceViewContributor implementation="com.intellij.platform.execution.dashboard.RunDashboardServiceViewContributor"/>
+    <serviceViewContributor implementation="com.intellij.platform.execution.dashboard.RunDashboardServiceViewContributor" order="first"/>
 
     <runDashboardGroupingRule id="type" order="first"
                               implementation="com.intellij.platform.execution.dashboard.splitApi.frontend.tree.ConfigurationTypeDashboardGroupingRule"/>
@@ -29,6 +53,7 @@
     <runDashboardGroupingRule id="folder" order="after status"
                               implementation="com.intellij.platform.execution.dashboard.splitApi.frontend.tree.FolderDashboardGroupingRule"/>
     <actionPromoter implementation="com.intellij.platform.execution.dashboard.actions.RunDashboardActionPromoter"/>
+    <projectSettings service="com.intellij.platform.execution.dashboard.RunDashboardManagerImpl"/>
   </extensions>
   <extensions defaultExtensionNs="com.intellij.statistics">
     <projectUsagesCollector implementation="com.intellij.platform.execution.dashboard.RunDashboardUsagesCollector"/>
@@ -100,7 +125,7 @@
       <add-to-group group-id="ServiceView.ViewOptions"/>
     </group>
     <action id="RunDashboard.AddConfiguration" class="com.intellij.platform.execution.dashboard.actions.AddRunConfigurationAction">
-      <add-to-group group-id="ServiceView.AddService"/>
+      <add-to-group group-id="ServiceView.AddService" anchor="first"/>
     </action>
     <reference ref="RunDashboard.RestoreHiddenConfigurations">
       <add-to-group group-id="ServiceView.AddService" anchor="after" relative-to-action="RunDashboard.AddConfiguration"/>

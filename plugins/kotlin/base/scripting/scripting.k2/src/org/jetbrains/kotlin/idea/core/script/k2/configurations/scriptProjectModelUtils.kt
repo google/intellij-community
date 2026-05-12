@@ -68,9 +68,11 @@ private fun Iterable<ScriptDependency>.toVirtualFileUrls(urlManager: VirtualFile
     asSequence().filterIsInstance<JvmDependency>().flatMap { it.classpath }.map { it.path }.sorted().map { it.toVirtualFileUrl(urlManager) }
         .toList()
 
-fun ScriptCompilationConfiguration.getDependencyUrls(manager: VirtualFileUrlManager): Pair<List<VirtualFileUrl>, List<VirtualFileUrl>> =
-    get(ScriptCompilationConfiguration.dependencies).orEmpty()
-        .toVirtualFileUrls(manager) to get(ScriptCompilationConfiguration.ide.dependenciesSources).orEmpty().toVirtualFileUrls(manager)
+private fun ScriptCompilationConfiguration.getDependencyUrls(manager: VirtualFileUrlManager): Pair<List<VirtualFileUrl>, List<VirtualFileUrl>> {
+    val classes = get(ScriptCompilationConfiguration.dependencies).orEmpty().toVirtualFileUrls(manager)
+    val sources = get(ScriptCompilationConfiguration.ide.dependenciesSources).orEmpty().toVirtualFileUrls(manager)
+    return classes to sources
+}
 
 internal fun EntityStorage.containsScriptEntity(url: VirtualFileUrl) = getVirtualFileUrlIndex()
     .findEntitiesByUrl(url)

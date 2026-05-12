@@ -1,0 +1,17 @@
+// "Specify 'Int' return type for enclosing function 'test'" "true"
+// KEEP_ACTIONS_LIST_ORDER
+// K2_ACTIONS_LIST: Specify 'Int' return type for enclosing function 'test'
+// K2_ACTIONS_LIST: Remove explicitly specified return type of called function 'foo'
+// K2_ACTIONS_LIST: Introduce import alias
+// WITH_STDLIB
+// K2_ERROR: Return type mismatch: expected 'Unit', actual 'Int'.
+
+fun test() {
+    return <caret>foo()
+}
+
+fun foo(): Int {
+    return 42
+}
+// FUS_QUICKFIX_NAME: org.jetbrains.kotlin.idea.quickfix.ChangeCallableReturnTypeFix$ForEnclosing
+// FUS_K2_QUICKFIX_NAME: org.jetbrains.kotlin.idea.k2.codeinsight.fixes.ChangeTypeQuickFixFactories$UpdateTypeQuickFix

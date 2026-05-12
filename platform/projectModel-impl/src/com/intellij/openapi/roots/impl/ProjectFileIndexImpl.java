@@ -61,7 +61,7 @@ public class ProjectFileIndexImpl extends FileIndexBase implements ProjectFileIn
 
   @Override
   public boolean iterateContent(@NotNull ContentIterator processor, @Nullable VirtualFileFilter filter) {
-    Pair<List<VirtualFile>, List<VirtualFile>> rootsPair = ReadAction.compute(() -> {
+    Pair<List<VirtualFile>, List<VirtualFile>> rootsPair = ReadAction.computeBlocking(() -> {
       Set<VirtualFile> allRecursiveRoots = new LinkedHashSet<>();
       List<VirtualFile> allNonRecursiveRoots = new ArrayList<>();
       List<VirtualFile> allRecursiveNonIndexableRoots = new ArrayList<>();
@@ -250,6 +250,7 @@ public class ProjectFileIndexImpl extends FileIndexBase implements ProjectFileIn
     return myWorkspaceFileIndex.isInContent(fileOrDir);
   }
 
+  @Override
   public @Nullable VirtualFile getModuleSourceOrLibraryClassesRoot(@NotNull VirtualFile file) {
     WorkspaceFileInternalInfo info = myWorkspaceFileIndex.getFileInfo(file, true, true, true, true, false, false, false);
     WorkspaceFileSetWithCustomData<?> fileSet = info.findFileSet(it -> {
@@ -259,6 +260,7 @@ public class ProjectFileIndexImpl extends FileIndexBase implements ProjectFileIn
     return fileSet != null ? fileSet.getRoot() : null;
   }
 
+  @Override
   public @NotNull Collection<RootDescriptor> getModuleSourceOrLibraryClassesRoots(@NotNull VirtualFile file) {
     WorkspaceFileInternalInfo info = myWorkspaceFileIndex.getFileInfo(file, true, true, true, true, false, false, false);
     List<WorkspaceFileSetWithCustomData<?>> fileSets = info.findFileSets(it -> {

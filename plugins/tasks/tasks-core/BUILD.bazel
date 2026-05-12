@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.tasks.core` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "core_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "core",
   module_name = "intellij.tasks.core",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
-  resources = [":core_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/editor-ui-api:editor-ui",
@@ -20,6 +15,8 @@ jvm_library(
     "//plugins/tasks/tasks-api:tasks",
     "//platform/platform-api:ide",
     "//platform/platform-impl:ide-impl",
+    "//platform/ide-core",
+    "//platform/progress/shared:ide-progress",
     "//platform/vcs-api:vcs",
     "//platform/lang-impl",
     "//platform/vcs-impl",
@@ -44,14 +41,19 @@ jvm_library(
     "//platform/util/jdom",
     "//platform/markdown-utils",
     "//platform/util/text-matching",
+    "//platform/util:util-ui",
     "//platform/polySymbols",
     "//platform/forms_rt:java-guiForms-rt",
+    "//libraries/fastutil",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//platform/util/concurrency",
   ],
   exports = ["//plugins/tasks/tasks-core/lib:tasks-core-axis-1-4"]
 )
 
 jvm_library(
   name = "core_test_lib",
+  testonly = True,
   module_name = "intellij.tasks.core",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -64,6 +66,8 @@ jvm_library(
     "//plugins/tasks/tasks-api:tasks_test_lib",
     "//platform/platform-api:ide_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
     "//platform/vcs-api:vcs_test_lib",
     "//platform/lang-impl:lang-impl_test_lib",
     "//platform/vcs-impl:vcs-impl_test_lib",
@@ -86,8 +90,18 @@ jvm_library(
     "//platform/util/jdom:jdom_test_lib",
     "//platform/markdown-utils:markdown-utils_test_lib",
     "//platform/util/text-matching:text-matching_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//platform/polySymbols:polySymbols_test_lib",
     "//platform/forms_rt:java-guiForms-rt_test_lib",
+    "//libraries/fastutil:fastutil_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/util/concurrency:concurrency_test_lib",
   ]
 )
 ### auto-generated section `build intellij.tasks.core` end
+
+### auto-generated section `iml intellij.tasks.core` start
+exports_files([
+  "intellij.tasks.core.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.tasks.core` end

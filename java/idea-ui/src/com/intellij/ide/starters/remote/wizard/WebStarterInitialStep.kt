@@ -58,7 +58,6 @@ import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.Ref
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.ui.InplaceButton
-import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.ActionLink
 import com.intellij.ui.dsl.builder.BottomGap
 import com.intellij.ui.dsl.builder.COLUMNS_MEDIUM
@@ -67,6 +66,7 @@ import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.columns
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import com.intellij.util.concurrency.Semaphore
 import com.intellij.util.ui.AsyncProcessIcon
 import com.intellij.util.ui.UIUtil
@@ -246,7 +246,7 @@ open class WebStarterInitialStep(contextProvider: WebStarterContextProvider) : C
       if (starterSettings.applicationTypes.isNotEmpty()) {
         row(JavaStartersBundle.message("title.project.app.type.label")) {
           applicationTypesModel.addAll(starterSettings.applicationTypes)
-          comboBox(applicationTypesModel, SimpleListCellRenderer.create("") { it?.title ?: "" })
+          comboBox(applicationTypesModel, textListCellRenderer("") { it.title })
             .bindItem(applicationTypeProperty)
             .columns(COLUMNS_MEDIUM)
         }.bottomGap(BottomGap.SMALL)
@@ -257,7 +257,7 @@ open class WebStarterInitialStep(contextProvider: WebStarterContextProvider) : C
       if (starterSettings.languageLevels.isNotEmpty()) {
         row(JavaStartersBundle.message("title.project.java.version.label")) {
           languageLevelsModel.addAll(starterSettings.languageLevels)
-          comboBox(languageLevelsModel, SimpleListCellRenderer.create("") { it?.title ?: "" })
+          comboBox(languageLevelsModel, textListCellRenderer("") { it.title })
             .bindItem(languageLevelProperty)
         }.bottomGap(BottomGap.SMALL)
       }

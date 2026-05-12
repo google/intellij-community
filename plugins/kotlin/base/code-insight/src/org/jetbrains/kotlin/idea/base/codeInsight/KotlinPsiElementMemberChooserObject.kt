@@ -91,8 +91,8 @@ class KotlinPsiElementMemberChooserObject(
             }
         }
 
-        context(_: KaSession)
         @OptIn(KaExperimentalApi::class)
+        context(_: KaSession)
         private fun getChooserText(symbol: KaSymbol): @NlsSafe String {
             if (symbol is KaClassSymbol) {
                 val classId = symbol.classId

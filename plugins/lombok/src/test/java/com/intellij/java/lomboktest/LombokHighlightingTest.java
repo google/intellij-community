@@ -9,6 +9,7 @@ import com.intellij.codeInspection.dataFlow.DataFlowInspection;
 import com.intellij.codeInspection.deadCode.UnusedDeclarationInspection;
 import com.intellij.codeInspection.defUse.DefUseInspection;
 import com.intellij.codeInspection.ex.InspectionProfileImpl;
+import com.intellij.codeInspection.uncheckedWarnings.UncheckedWarningLocalInspection;
 import com.intellij.codeInspection.varScopeCanBeNarrowed.FieldCanBeLocalInspection;
 import com.intellij.profile.codeInspection.ProjectInspectionProfileManager;
 import com.intellij.testFramework.LightProjectDescriptor;
@@ -70,6 +71,13 @@ public class LombokHighlightingTest extends LightDaemonAnalyzerTestCase {
   }
 
   public void testLombokNullable() {
+    doTest();
+  }
+
+  public void testStaticConstructorGenericsInference() {
+    // Enable UncheckedWarningLocalInspection to detect regression that manifest itself with following warning:
+    // Unchecked assignment: 'WithLombok' to 'WithLombok<java.lang.String>'
+    enableInspectionTool(new UncheckedWarningLocalInspection());
     doTest();
   }
 

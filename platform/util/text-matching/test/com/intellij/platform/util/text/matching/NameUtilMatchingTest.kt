@@ -356,6 +356,13 @@ class NameUtilMatchingTest {
   }
 
   @Test
+  fun testLongWithSpaceMatchesItself() {
+    val s = "the class with its attributes mapped to fields of records parsed by an {@link AbstractParser} or written by an {@link AbstractWriter}."
+    val fragments = caseInsensitiveMatcher(s).match(s)
+    assertEquals(listOf(MatchedFragment(startOffset=0, endOffset=s.length, errorCount=0)), fragments)
+  }
+
+  @Test
   fun testUpperCaseMatchesLowerCase() {
     assertMatches("ABC_B.C", "abc_b.c")
   }

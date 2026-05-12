@@ -11,7 +11,9 @@ import com.intellij.openapi.actionSystem.ActionGroup;
 import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.ActionPlaces;
 import com.intellij.openapi.actionSystem.ActionToolbar;
+import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
+import com.intellij.openapi.actionSystem.DataKey;
 import com.intellij.openapi.actionSystem.DataSink;
 import com.intellij.openapi.actionSystem.PlatformCoreDataKeys;
 import com.intellij.openapi.actionSystem.PlatformDataKeys;
@@ -51,6 +53,7 @@ import com.intellij.util.ui.NamedColorUtil;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.tree.TreeUtil;
 import org.intellij.lang.annotations.Language;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -81,6 +84,9 @@ import static com.intellij.util.ArrayUtil.getFirstElement;
 import static com.intellij.util.OpenSourceUtil.navigate;
 
 public class ProblemsViewPanel extends OnePixelSplitter implements Disposable, UiCompatibleDataProvider, ProblemsViewTab {
+  public static final @NotNull DataKey<ProblemsViewPanel> DATA_KEY = DataKey.create("ProblemsViewPanel");
+  public static final @NotNull DataKey<Editor> PREVIEW_DATA_KEY = DataKey.create("ProblemsViewPanel.preview");
+
   private final ClientProjectSession mySession;
   volatile boolean myDisposed;
   private final String myId;
@@ -138,29 +144,7 @@ public class ProblemsViewPanel extends OnePixelSplitter implements Disposable, U
       if (selected) updateAutoscroll();
     }
   };
-  private final Option myShowPreview = new Option() {
-    @Override
-    public boolean isEnabled() {
-      VirtualFile file = getSelectedFile();
-      return file != null && file.isValid() && ProblemsView.getDocument(getProject(), file) != null;
-    }
-
-    @Override
-    public boolean isAlwaysVisible() {
-      return true;
-    }
-
-    @Override
-    public boolean isSelected() {
-      return myState.getShowPreview();
-    }
-
-    @Override
-    public void setSelected(boolean selected) {
-      myState.setShowPreview(selected);
-      updatePreview();
-    }
-  };
+  private final Option myShowPreview = new MyShowPreviewOption();
   private final Option myGroupByToolId = new Option() {
     @Override
     public boolean isSelected() {
@@ -292,6 +276,8 @@ public class ProblemsViewPanel extends OnePixelSplitter implements Disposable, U
   @Override
   public void uiDataSnapshot(@NotNull DataSink sink) {
     sink.set(CommonDataKeys.PROJECT, getProject());
+    sink.set(DATA_KEY, this);
+    sink.set(PREVIEW_DATA_KEY, getPreview());
     sink.set(PlatformDataKeys.TREE_EXPANDER, getTreeExpander());
     sink.set(PlatformDataKeys.TREE_EXPANDER_HIDE_ACTIONS_IF_NO_EXPANDER, shouldHideExpandCollapseActionsIfThereIsNoTreeExpander());
 
@@ -322,7 +308,8 @@ public class ProblemsViewPanel extends OnePixelSplitter implements Disposable, U
     });
   }
 
-  protected void updateToolWindowContent() {
+  @ApiStatus.Internal
+  public void updateToolWindowContent() {
     myUpdateAlarm.cancelAndRequest();
   }
 
@@ -383,7 +370,8 @@ public class ProblemsViewPanel extends OnePixelSplitter implements Disposable, U
     return myTree;
   }
 
-  final @Nullable Editor getPreview() {
+  @ApiStatus.Internal
+  public final @Nullable Editor getPreview() {
     return myPreview.editor();
   }
 
@@ -462,8 +450,7 @@ public class ProblemsViewPanel extends OnePixelSplitter implements Disposable, U
       .toList().toArray(new Node[0]);
   }
 
-  @Nullable VirtualFile getSelectedFile() {
-    Node node = getSelectedNode();
+  private static @Nullable VirtualFile getSelectedFile(@Nullable Node node) {
     return node == null ? null : node.getVirtualFile();
   }
 
@@ -541,34 +528,77 @@ public class ProblemsViewPanel extends OnePixelSplitter implements Disposable, U
   }
 
   @Nullable
-  Option getAutoscrollToSource() {
-    return isNotNullAndSelected(getShowPreview()) ? null : myAutoscrollToSource;
+  private Option getAutoscrollToSource() {
+    return getAutoscrollToSource(null);
+  }
+
+  @ApiStatus.Internal
+  @Nullable
+  public Option getAutoscrollToSource(@Nullable AnActionEvent event) {
+    return isNotNullAndSelected(getShowPreview(event)) ? null : myAutoscrollToSource;
   }
 
   @Nullable
-  Option getOpenInPreviewTab() {
-    return isNotNullAndSelected(getShowPreview()) ? null : myOpenInPreviewTab;
+  private Option getOpenInPreviewTab() {
+    return getOpenInPreviewTab(null);
   }
 
+  @ApiStatus.Internal
+  @Nullable
+  public Option getOpenInPreviewTab(@Nullable AnActionEvent event) {
+    return isNotNullAndSelected(getShowPreview(event)) ? null : myOpenInPreviewTab;
+  }
+
+  /**
+   * Returns the "show preview" option.
+   * <p>
+   *   Inside an action, it's preferable to use {@link #getShowPreview(AnActionEvent)} for consistency and performance.
+   * </p>
+   * <p>
+   *   The {@link Option#isEnabled()} function of this option should not be called on the EDT for performance reasons.
+   * </p>
+   * @return the "show preview" option
+   */
   public @Nullable Option getShowPreview() {
-    return myShowPreview;
+    return getShowPreview(null);
   }
 
+  /**
+   * Returns the "show preview" option.
+   * <p>
+   *   Inside an action, this function is preferable for consistency and performance.
+   * </p>
+   * <p>
+   *   The {@link Option#isEnabled()} function of this option should not be called on the EDT for performance reasons.
+   * </p>
+   * <p>
+   *   If {@code event} is not {@code null}, the returned value should not be stored anywhere because it contains a reference to the given event.
+   * </p>
+   * @return the "show preview" option
+   */
+  public @Nullable Option getShowPreview(@Nullable AnActionEvent event) {
+    return event == null ? myShowPreview : new MyShowPreviewOption(event);
+  }
+
+  @ApiStatus.Internal
   @Nullable
-  Option getGroupByToolId() {
+  public Option getGroupByToolId() {
     return this instanceof HighlightingPanel ? myGroupByToolId : null;
   }
 
+  @ApiStatus.Internal
   @Nullable
-  Option getSortFoldersFirst() {
+  public Option getSortFoldersFirst() {
     return null; // TODO:malenkov - support file hierarchy & mySortFoldersFirst;
   }
 
-  protected @Nullable Option getSortBySeverity() {
+  @ApiStatus.Internal
+  public @Nullable Option getSortBySeverity() {
     return null;
   }
 
-  protected @Nullable Option getSortByName() {
+  @ApiStatus.Internal
+  public @Nullable Option getSortByName() {
     return mySortByName;
   }
 
@@ -578,5 +608,49 @@ public class ProblemsViewPanel extends OnePixelSplitter implements Disposable, U
 
   protected static boolean isNullableOrSelected(@Nullable Option option) {
     return option == null || option.isSelected();
+  }
+
+  private class MyShowPreviewOption implements Option {
+    @Nullable private final AnActionEvent event;
+
+    MyShowPreviewOption() {
+      this(null);
+    }
+
+    MyShowPreviewOption(@Nullable AnActionEvent event) {
+      this.event = event;
+    }
+
+    @Override
+    public boolean isEnabled() {
+      Node node;
+      if (event == null) { // legacy mode, not invoked from an action
+        node = getSelectedNode();
+      }
+      else if (event.getData(PlatformCoreDataKeys.SELECTED_ITEM) instanceof Node selectedNode) {
+        node = selectedNode;
+      }
+      else { // invoked from an action, but no selected node in the data context
+        node = null;
+      }
+      VirtualFile file = getSelectedFile(node);
+      return file != null && file.isValid() && ProblemsView.getDocument(getProject(), file) != null;
+    }
+
+    @Override
+    public boolean isAlwaysVisible() {
+      return true;
+    }
+
+    @Override
+    public boolean isSelected() {
+      return myState.getShowPreview();
+    }
+
+    @Override
+    public void setSelected(boolean selected) {
+      myState.setShowPreview(selected);
+      updatePreview();
+    }
   }
 }

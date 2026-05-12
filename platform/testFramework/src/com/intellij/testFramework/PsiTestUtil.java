@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.testFramework;
 
 import com.intellij.openapi.Disposable;
@@ -231,6 +231,16 @@ public final class PsiTestUtil {
     UsefulTestCase.assertSameLines(text, err.toString());
   }
 
+  /**
+   * Verifies that the PSI tree of the given file is consistent with a freshly parsed PSI tree from the same text.
+   * <p>
+   * Creates a dummy copy of the file, reparses it from text, and compares the resulting PSI tree structures.
+   * If they differ, the assertion fails with a diff highlighting the first diverging line.
+   * The check covers all PSI roots from the file's {@link com.intellij.psi.FileViewProvider}.
+   * <p>
+   * Typically called after PSI modifications (add/delete/replace) to ensure the resulting tree
+   * matches what a clean parse would produce.
+   */
   public static void checkFileStructure(@NotNull PsiFile file) {
     compareFromAllRoots(file, f -> DebugUtil.psiTreeToString(f, true));
   }

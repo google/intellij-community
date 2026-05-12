@@ -3,11 +3,11 @@ package com.intellij.terminal
 
 import com.intellij.execution.ExecutionBundle
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.options.advanced.AdvancedSettings
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.text.StringUtil
 import com.jediterm.terminal.Terminal
 import com.jediterm.terminal.model.TerminalApplicationTitleListener
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -38,7 +38,7 @@ class TerminalTitle {
   val applicationTitle: @Nls String?
     get() = state.applicationTitle
 
-  internal val trackTerminalApplicationTitleChanges: Boolean?
+  internal val trackTerminalApplicationTitleChanges: Boolean
     get() = state.trackTerminalApplicationTitleChanges
 
   val tag: @Nls String?
@@ -63,12 +63,30 @@ class TerminalTitle {
   }
 
   fun buildTitle(): @Nls String {
-    val title = userDefinedTitle ?: shortenApplicationTitle() ?: defaultTitle ?: ExecutionBundle.message("terminal.default.title")
+    return buildTitle(ignoreAppTitle = false)
+  }
+
+  @ApiStatus.Experimental
+  fun buildTitle(ignoreAppTitle: Boolean): @Nls String {
+    val title = if (ignoreAppTitle || applicationTitle.isNullOrBlank()) {
+      userDefinedTitle ?: defaultTitle ?: ExecutionBundle.message("terminal.default.title")
+    }
+    else {
+      userDefinedTitle ?: shortenApplicationTitle() ?: defaultTitle ?: ExecutionBundle.message("terminal.default.title")
+    }
     return if (tag != null) "$title ($tag)" else title
   }
 
   fun buildFullTitle(): @Nls String {
-    return userDefinedTitle ?: applicationTitle ?: defaultTitle ?: ExecutionBundle.message("terminal.default.title")
+    return buildFullTitle(ignoreAppTitle = false)
+  }
+
+  @ApiStatus.Experimental
+  fun buildFullTitle(ignoreAppTitle: Boolean): @Nls String {
+    return if (ignoreAppTitle || applicationTitle.isNullOrBlank()) {
+      userDefinedTitle ?: defaultTitle ?: ExecutionBundle.message("terminal.default.title")
+    }
+    else userDefinedTitle ?: applicationTitle ?: defaultTitle ?: ExecutionBundle.message("terminal.default.title")
   }
 
   private fun shortenApplicationTitle(): String? {
@@ -87,7 +105,8 @@ class TerminalTitle {
                    var applicationTitle: @Nls String? = null,
                    var tag: @Nls String? = null,
                    var defaultTitle: @Nls String? = null,
-                   var trackTerminalApplicationTitleChanges: Boolean? = null) {
+                   @ApiStatus.Internal
+                   var trackTerminalApplicationTitleChanges: Boolean = true) {
     override fun toString(): String {
       return "userDefined=$userDefinedTitle, application=$applicationTitle, tag=$tag," +
              " default=$defaultTitle, trackTerminalApplicationTitle=$trackTerminalApplicationTitleChanges"
@@ -97,7 +116,7 @@ class TerminalTitle {
 
 fun TerminalTitle.bindApplicationTitle(terminal: Terminal, parentDisposable: Disposable) {
   val listener = TerminalApplicationTitleListener { newApplicationTitle ->
-    if (trackTerminalApplicationTitleChanges ?: AdvancedSettings.getBoolean("terminal.show.application.title")) {
+    if (trackTerminalApplicationTitleChanges) {
       change {
         applicationTitle = newApplicationTitle
       }

@@ -36,6 +36,7 @@ import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -247,7 +248,25 @@ public abstract class ChangeViewDiffRequestProcessor extends CacheDiffRequestPro
     return new MyGoToChangePopupAction();
   }
 
+  protected @NotNull List<AnAction> getGoToChangeToolbarActions() {
+    return Collections.emptyList();
+  }
+
+  protected @NotNull List<AnAction> getGoToChangePopupMenuActions() {
+    return Collections.emptyList();
+  }
+
   private class MyGoToChangePopupAction extends PresentableGoToChangePopupAction.Default<Wrapper> {
+    @Override
+    protected @NotNull List<AnAction> createToolbarActions() {
+      return ChangeViewDiffRequestProcessor.this.getGoToChangeToolbarActions();
+    }
+
+    @Override
+    protected @NotNull List<AnAction> createPopupMenuActions() {
+      return ChangeViewDiffRequestProcessor.this.getGoToChangePopupMenuActions();
+    }
+
     @Override
     protected @NotNull ListSelection<? extends Wrapper> getChanges() {
       List<? extends Wrapper> allChanges = ContainerUtil.newArrayList(iterateAllChanges());
@@ -555,7 +574,8 @@ public abstract class ChangeViewDiffRequestProcessor extends CacheDiffRequestPro
     }
 
     @Override
-    public @NotNull DiffRequest process(@NotNull UserDataHolder context, @NotNull ProgressIndicator indicator) throws ProcessCanceledException {
+    public @NotNull DiffRequest process(@NotNull UserDataHolder context, @NotNull ProgressIndicator indicator)
+      throws ProcessCanceledException {
       return myRequest;
     }
   }

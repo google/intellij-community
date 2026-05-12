@@ -51,6 +51,7 @@ import com.maddyhome.idea.copyright.options.LanguageOptions
 import com.maddyhome.idea.copyright.options.Options
 import com.maddyhome.idea.copyright.util.FileTypeUtil
 import org.jdom.Element
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.Function
@@ -278,6 +279,19 @@ class CopyrightManager @NonInjectable constructor(private val project: Project,
   }
 }
 
+private val copyrightUpdateDisabled = mutableSetOf<Project>()
+
+@ApiStatus.Internal
+suspend fun withCopyrightUpdateDisabled(project: Project, action: suspend () -> Unit) {
+  copyrightUpdateDisabled.add(project)
+  try {
+    action()
+  }
+  finally {
+    copyrightUpdateDisabled.remove(project)
+  }
+}
+
 private class CopyrightManagerDocumentListener : BulkFileListenerBackgroundable {
   private val newFilePaths = ConcurrentCollectionFactory.createConcurrentSet<String>()
 
@@ -312,7 +326,7 @@ private class CopyrightManagerDocumentListener : BulkFileListenerBackgroundable 
 
         val projectManager = serviceIfCreated<ProjectManager>() ?: return
         for (project in projectManager.openProjects) {
-          if (project.isDisposed) {
+          if (project.isDisposed || copyrightUpdateDisabled.contains(project)) {
             continue
           }
 

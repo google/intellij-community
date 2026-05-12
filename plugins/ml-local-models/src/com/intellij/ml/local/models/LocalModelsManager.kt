@@ -6,6 +6,8 @@ import com.intellij.ml.local.models.api.LocalModelFactory
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
 import org.jetbrains.annotations.ApiStatus
+import java.util.Optional
+import java.util.concurrent.ConcurrentHashMap
 
 @Service(Service.Level.PROJECT)
 @ApiStatus.Internal
@@ -13,20 +15,18 @@ class LocalModelsManager private constructor(private val project: Project) {
   companion object {
     fun getInstance(project: Project): LocalModelsManager = project.getService(LocalModelsManager::class.java)
   }
-  private val models = mutableMapOf<String, MutableMap<String, LocalModel?>>()
+  private val models = ConcurrentHashMap<String, MutableMap<String, Optional<LocalModel>>>()
 
   fun getModels(language: Language): List<LocalModel> {
-    val id2model = models.getOrPut(language.id) { mutableMapOf() }
+    val id2model = models.computeIfAbsent(language.id) { ConcurrentHashMap() }
     for (factory in LocalModelFactory.forLanguage(language)) {
-      if (factory.id !in id2model) {
-        id2model[factory.id] = factory.modelBuilder(project, language).build()
-      }
+      id2model.computeIfAbsent(factory.id) { Optional.ofNullable(factory.modelBuilder(project, language).build()) }
     }
-    return id2model.values.filterNotNull()
+    return id2model.values.mapNotNull { it.orElse(null) }
   }
 
   fun registerModel(language: Language, model: LocalModel) {
-    models.getOrPut(language.id, { mutableMapOf() })[model.id] = model
+    models.computeIfAbsent(language.id) { ConcurrentHashMap() }[model.id] = Optional.of(model)
   }
 
   fun unregisterModel(language: Language, modelId: String) {

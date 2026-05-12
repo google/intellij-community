@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.relaxng` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "relaxng_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "relaxng",
   module_name = "intellij.relaxng",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":relaxng_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/code-style-api:codeStyle",
@@ -26,6 +21,7 @@ jvm_library(
     "//xml/impl",
     "//xml/dom-openapi:dom",
     "//platform/platform-impl:ide-impl",
+    "//platform/ide-core",
     "//platform/lang-impl",
     "//xml/relaxng/lib:relaxng-rngom-20051226-patched",
     "@lib//:relaxng-isorelax",
@@ -41,12 +37,18 @@ jvm_library(
     "//platform/core-impl",
     "//xml/xml-analysis-api:analysis",
     "//platform/execution",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//platform/util/concurrency",
+    "//jps/model-api:model",
+    "//jps/model-impl",
+    "//platform/util:util-ui",
   ],
   runtime_deps = ["//platform/backend"]
 )
 
 jvm_library(
   name = "relaxng_test_lib",
+  testonly = True,
   module_name = "intellij.relaxng",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -65,6 +67,7 @@ jvm_library(
     "//xml/impl:impl_test_lib",
     "//xml/dom-openapi:dom_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/lang-impl:lang-impl_test_lib",
     "//platform/util/nanoxml:nanoxml_test_lib",
     "//libraries/fastutil:fastutil_test_lib",
@@ -76,13 +79,25 @@ jvm_library(
     "//platform/core-impl:core-impl_test_lib",
     "//xml/xml-analysis-api:analysis_test_lib",
     "//platform/execution:execution_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/util/concurrency:concurrency_test_lib",
+    "//jps/model-api:model_test_lib",
+    "//jps/model-impl:model-impl_test_lib",
+    "//platform/util:util-ui_test_lib",
   ]
 )
 ### auto-generated section `build intellij.relaxng` end
 
+### auto-generated section `iml intellij.relaxng` start
+exports_files([
+  "intellij.relaxng.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.relaxng` end
+
 ### auto-generated section `build intellij.relaxng.tests` start
 jvm_library(
   name = "relaxng-tests",
+  module_name = "intellij.relaxng.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = ["//platform/backend"]
@@ -90,6 +105,7 @@ jvm_library(
 
 jvm_library(
   name = "relaxng-tests_test_lib",
+  testonly = True,
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
   associates = [
@@ -147,6 +163,12 @@ jvm_library(
     "//xml/xml-analysis-api:analysis_test_lib",
     "//platform/execution",
     "//platform/execution:execution_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//jps/model-api:model",
+    "//jps/model-api:model_test_lib",
+    "//jps/model-impl",
+    "//jps/model-impl:model-impl_test_lib",
   ],
   runtime_deps = [
     ":relaxng-tests",
@@ -155,6 +177,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.relaxng.tests` end
+
+### auto-generated section `iml intellij.relaxng.tests` start
+exports_files([
+  "intellij.relaxng.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.relaxng.tests` end
 
 ### auto-generated section `test intellij.relaxng.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

@@ -47,8 +47,36 @@ object PluginDependencyAnalysis {
 
   @ApiStatus.Internal
   sealed class DependencyRef {
-    class Plugin(val pluginId: PluginId) : DependencyRef()
-    class ContentModule(val moduleId: PluginModuleId) : DependencyRef()
+    class Plugin(val pluginId: PluginId) : DependencyRef() {
+      override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as Plugin
+
+        return pluginId == other.pluginId
+      }
+
+      override fun hashCode(): Int = pluginId.hashCode()
+    }
+
+    class ContentModule(val moduleId: PluginModuleId) : DependencyRef() {
+      override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as ContentModule
+
+        return moduleId == other.moduleId
+      }
+
+      override fun hashCode(): Int = moduleId.hashCode()
+    }
+
+    companion object {
+      fun of(pluginId: PluginId): Plugin = Plugin(pluginId)
+      fun of(moduleId: PluginModuleId): ContentModule = ContentModule(moduleId)
+    }
   }
 }
 
@@ -75,6 +103,9 @@ fun PluginDependencyAnalysis.sequenceRequiredModules(initContext: PluginInitiali
 @ApiStatus.Internal
 fun PluginDependencyAnalysis.sequenceStrictDependencies(descriptor: IdeaPluginDescriptorImpl): Sequence<DependencyRef> {
   return sequence {
+    if (descriptor is DependsSubDescriptor) {
+      yield(DependencyRef.Plugin(descriptor.dependsTargetId))
+    }
     for (depends in descriptor.dependencies) {
       if (depends.isOptional) continue
       yield(DependencyRef.Plugin(depends.pluginId))
@@ -84,20 +115,6 @@ fun PluginDependencyAnalysis.sequenceStrictDependencies(descriptor: IdeaPluginDe
     }
     for (id in descriptor.moduleDependencies.modules) {
       yield(DependencyRef.ContentModule(id))
-    }
-  }
-}
-
-/**
- * Sequences legacy `depends` style optional dependencies for the [this] descriptor.
- */
-@ApiStatus.Internal
-fun PluginDependencyAnalysis.sequenceOptionalDependsStatements(plugin: PluginMainDescriptor): Sequence<PluginDependency> {
-  return sequence {
-    for (depends in plugin.dependencies) {
-      if (depends.isOptional) {
-        yield(depends)
-      }
     }
   }
 }

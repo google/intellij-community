@@ -40,25 +40,4 @@ public final class EditorHoverInfo {
     if (c2 != null) p.add(c2);
     return p;
   }
-
-  private static class CombinedPopupPanel extends JPanel implements WidthBasedLayout {
-
-    CombinedPopupPanel(CombinedPopupLayout layout) {
-      super(layout);
-    }
-
-    @Override
-    public int getPreferredWidth() {
-      return getPreferredSize().width;
-    }
-
-    @Override
-    public int getPreferredHeight(int width) {
-      int height = 0;
-      for (Component c: getComponents()) {
-        height += WidthBasedLayout.getPreferredHeight(c, width);
-      }
-      return height;
-    }
-  }
 }

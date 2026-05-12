@@ -61,6 +61,11 @@ fun MutableEntityStorage.modifyModuleEntity(
 
 @get:Internal
 @set:Internal
+var ModuleEntityBuilder.customImlComponent: CustomImlComponentEntityBuilder?
+  by WorkspaceEntity.extensionBuilder(CustomImlComponentEntity::class.java)
+
+@get:Internal
+@set:Internal
 var ModuleEntityBuilder.customImlData: ModuleCustomImlDataEntityBuilder?
   by WorkspaceEntity.extensionBuilder(ModuleCustomImlDataEntity::class.java)
 

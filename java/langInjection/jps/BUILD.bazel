@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.java.langInjection.jps` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "jps_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "jps",
   module_name = "intellij.java.langInjection.jps",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":jps_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = "@community//:k11",
   deps = [
     "//jps/jps-builders:build",
@@ -23,12 +18,14 @@ jvm_library(
     "//jps/model-serialization",
     "//libraries/asm",
     "//platform/util/jdom",
+    "//platform/util/base",
     "@lib//:jetbrains-annotations",
   ]
 )
 
 jvm_library(
   name = "jps_test_lib",
+  testonly = True,
   module_name = "intellij.java.langInjection.jps",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -43,6 +40,13 @@ jvm_library(
     "//jps/model-serialization:model-serialization_test_lib",
     "//libraries/asm:asm_test_lib",
     "//platform/util/jdom:jdom_test_lib",
+    "//platform/util/base:base_test_lib",
   ]
 )
 ### auto-generated section `build intellij.java.langInjection.jps` end
+
+### auto-generated section `iml intellij.java.langInjection.jps` start
+exports_files([
+  "intellij.java.langInjection.jps.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.java.langInjection.jps` end

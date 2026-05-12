@@ -70,11 +70,11 @@ public abstract class AbstractDescriptionAwareSchemesPanel<T extends Scheme> ext
         showDescription(getSelectedScheme());
       }
     });
-    myDescriptionTextField.registerKeyboardAction(__ -> {
+    myDescriptionTextField.registerKeyboardAction(_ -> {
       showDescription(getSelectedScheme());
       IdeFocusManager.getGlobalInstance().doWhenFocusSettlesDown(() -> IdeFocusManager.getGlobalInstance().requestFocus(getConfigurableFocusComponent(), true));
     }, ESC_KEY_STROKE, JComponent.WHEN_FOCUSED);
-    myDescriptionTextField.registerKeyboardAction(__ -> {
+    myDescriptionTextField.registerKeyboardAction(_ -> {
       applyDescription();
       IdeFocusManager.getGlobalInstance().doWhenFocusSettlesDown(() -> IdeFocusManager.getGlobalInstance().requestFocus(getConfigurableFocusComponent(), true));
     }, ENTER_KEY_STROKE, JComponent.WHEN_FOCUSED);

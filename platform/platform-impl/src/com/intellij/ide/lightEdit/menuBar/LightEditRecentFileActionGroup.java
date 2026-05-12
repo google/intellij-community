@@ -102,7 +102,7 @@ final class LightEditRecentFileActionGroup extends ActionGroup implements DumbAw
       Project project = e.getProject();
       if (project != null) {
         LightEditUtil.markUnknownFileTypeAsPlainTextIfNeeded(project, myFile);
-        LightEditFeatureUsagesUtil.logFileOpen(project, RecentFiles);
+        LightEditFeatureUsagesUtil.logFileOpen(project, myFile, RecentFiles);
         LightEditService.getInstance().openFile(myFile);
       }
     }

@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.gradle.java` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "java_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "java",
   module_name = "intellij.gradle.java",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
-  resources = [":java_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//plugins/gradle",
@@ -38,12 +33,15 @@ jvm_library(
     "//platform/lang-api:lang",
     "//platform/external-system-api/dependency-updater",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//java/compiler/openapi:java-compiler",
     "//platform/workspace/storage",
     "//java/execution/impl",
     "//platform/lang-impl",
     "//java/openapi:java",
+    "//java/java-syntax:syntax",
     "//java/java-impl:impl",
+    "//java/java-psi-api:psi",
     "//platform/smRunner",
     "//libraries/gson",
     "//jps/jps-builders:build",
@@ -53,9 +51,11 @@ jvm_library(
     "//jps/model-impl",
     "//platform/statistics",
     "//platform/core-ui",
+    "//platform/core-impl",
     "//platform/platform-util-io:ide-util-io",
     "//java/debugger/impl",
     "//platform/util/jdom",
+    "//platform/util:util-ui",
     "//java/compiler/impl",
     "//libraries/kotlinx/coroutines/core",
     "//platform/object-serializer:objectSerializer-annotations",
@@ -65,8 +65,10 @@ jvm_library(
     "//libraries/fastutil",
     "//platform/platform-impl/ui",
     "//java/debugger/shared",
+    "//java/java-frontback-psi-api:frontback-psi",
     "//platform/eel-provider",
     "//platform/execution",
+    "//platform/testRunner",
     "//plugins/properties/properties-psi-impl:backend-psi",
   ],
   exports = ["//plugins/gradle:gradle-common"],
@@ -75,6 +77,7 @@ jvm_library(
 
 jvm_library(
   name = "java_test_lib",
+  testonly = True,
   module_name = "intellij.gradle.java",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -107,12 +110,15 @@ jvm_library(
     "//platform/lang-api:lang_test_lib",
     "//platform/external-system-api/dependency-updater:dependency-updater_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//java/compiler/openapi:java-compiler_test_lib",
     "//platform/workspace/storage:storage_test_lib",
     "//java/execution/impl:impl_test_lib",
     "//platform/lang-impl:lang-impl_test_lib",
     "//java/openapi:java_test_lib",
+    "//java/java-syntax:syntax_test_lib",
     "//java/java-impl:impl_test_lib",
+    "//java/java-psi-api:psi_test_lib",
     "//platform/smRunner:smRunner_test_lib",
     "//libraries/gson:gson_test_lib",
     "//jps/jps-builders:build_test_lib",
@@ -122,9 +128,11 @@ jvm_library(
     "//jps/model-impl:model-impl_test_lib",
     "//platform/statistics:statistics_test_lib",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/platform-util-io:ide-util-io_test_lib",
     "//java/debugger/impl:impl_test_lib",
     "//platform/util/jdom:jdom_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//java/compiler/impl:impl_test_lib",
     "//libraries/kotlinx/coroutines/core:core_test_lib",
     "//platform/object-serializer:objectSerializer-annotations_test_lib",
@@ -134,22 +142,25 @@ jvm_library(
     "//libraries/fastutil:fastutil_test_lib",
     "//platform/platform-impl/ui:ui_test_lib",
     "//java/debugger/shared:shared_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
     "//platform/eel-provider:eel-provider_test_lib",
     "//platform/execution:execution_test_lib",
+    "//platform/testRunner:testRunner_test_lib",
     "//plugins/properties/properties-psi-impl:backend-psi_test_lib",
   ]
 )
 ### auto-generated section `build intellij.gradle.java` end
 
-### auto-generated section `build intellij.gradle.java.tests` start
-resourcegroup(
-  name = "java-tests_test_resources",
-  srcs = glob(["testData/**/*"]),
-  strip_prefix = "testData"
-)
+### auto-generated section `iml intellij.gradle.java` start
+exports_files([
+  "intellij.gradle.java.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.gradle.java` end
 
+### auto-generated section `build intellij.gradle.java.tests` start
 jvm_library(
   name = "java-tests",
+  module_name = "intellij.gradle.java.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -162,10 +173,12 @@ jvm_library(
 
 jvm_library(
   name = "java-tests_test_lib",
+  testonly = True,
   module_name = "intellij.gradle.java.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["testSources/**/*.kt", "testSources/**/*.java", "testSources/**/*.form"], allow_empty = True),
-  resources = [":java-tests_test_resources"],
+  resources = glob(["testData/**/*"]),
+  resource_strip_prefix = "testData",
   deps = [
     "@lib//:jmock",
     "@lib//:junit4",
@@ -195,6 +208,10 @@ jvm_library(
     "//platform/testFramework:testFramework_test_lib",
     "//java/testFramework",
     "//java/testFramework:testFramework_test_lib",
+    "//java/java-syntax:syntax",
+    "//java/java-syntax:syntax_test_lib",
+    "//java/java-psi-api:psi",
+    "//java/java-psi-api:psi_test_lib",
     "//platform/observable",
     "//java/java-runtime:rt",
     "//java/java-runtime:rt_test_lib",
@@ -223,15 +240,21 @@ jvm_library(
     "@lib//:mockito-kotlin",
     "//java/execution/impl",
     "//java/execution/impl:impl_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
     "//plugins/groovy",
     "//plugins/groovy:groovy_test_lib",
-    "@lib//:assert_j",
+    "//libraries/assertj-core",
+    "//libraries/assertj-core:assertj-core_test_lib",
     "//platform/object-serializer",
     "//platform/object-serializer:object-serializer_test_lib",
     "@lib//:org-codehaus-groovy-groovy-json",
     "//platform/core-ui",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/platform-util-io:ide-util-io",
+    "//platform/ide-core",
     "//jps/model-impl",
     "//jps/model-impl:model-impl_test_lib",
     "//platform/workspace/storage",
@@ -268,6 +291,8 @@ jvm_library(
     "//platform/smRunner:smRunner_test_lib",
     "//platform/statistics/testFramework",
     "//platform/statistics/testFramework:testFramework_test_lib",
+    "//platform/statistics",
+    "//platform/statistics:statistics_test_lib",
     "//platform/execution",
     "//platform/execution:execution_test_lib",
     "//platform/refactoring",
@@ -280,14 +305,31 @@ jvm_library(
     "//plugins/gradle/java/groovy/toml:toml_test_lib",
     "//plugins/gradle/java/properties",
     "//plugins/gradle/java/properties:properties_test_lib",
+    "//plugins/groovy:groovy-tests",
+    "//plugins/groovy:groovy-tests_test_lib",
+    "//platform/smRunner:smRunner-tests",
+    "//platform/smRunner:smRunner-tests_test_lib",
+    "//platform/util:util-ui",
+    "//platform/util:util-ui_test_lib",
+    "//platform/util-ex",
+    "//platform/util-ex:util-ex_test_lib",
+    "//platform/testRunner",
+    "//platform/testRunner:testRunner_test_lib",
   ],
   runtime_deps = [
     ":java-tests",
     "//platform/observable:observable_test_lib",
     "//platform/platform-util-io:ide-util-io_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
   ]
 )
 ### auto-generated section `build intellij.gradle.java.tests` end
+
+### auto-generated section `iml intellij.gradle.java.tests` start
+exports_files([
+  "intellij.gradle.java.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.gradle.java.tests` end
 
 ### auto-generated section `test intellij.gradle.java.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

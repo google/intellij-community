@@ -12,6 +12,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static com.intellij.openapi.editor.impl.EditorGutterComponentImpl.getGapBetweenAreas;
@@ -20,7 +21,7 @@ import static com.intellij.openapi.editor.impl.EditorGutterComponentImpl.getGapB
  * @author Konstantin Bulenkov
  */
 @ApiStatus.Internal
-public final class EditorGutterLayout {
+public sealed class EditorGutterLayout permits EditorGutterLayout.CompoundChooser {
   private static final String GAP_BETWEEN_AREAS = "Gap between areas";
   private static final String LINE_NUMBERS_AREA = "Line numbers";
   private static final String ADDITIONAL_LINE_NUMBERS_AREA = "Additional line numbers";
@@ -236,7 +237,8 @@ public final class EditorGutterLayout {
     );
 
     List<GutterArea> rightEdgeAreasForLineNumbersAfterIcons = List.of(
-      area(FOLDING_AREA, myEditorGutter::getFoldingAreaWidthForLineNumbersAfterIcons)
+      area(FOLDING_AREA, myEditorGutter::getFoldingAreaWidth),
+      areaGap(3).as(EditorMouseEventArea.FOLDING_OUTLINE_AREA)
     );
 
     List<GutterArea> extraRightFreePainters = List.of(
@@ -349,5 +351,25 @@ public final class EditorGutterLayout {
 
   public static int getInitialGutterWidth() {
     return EditorGutterComponentImpl.START_ICON_AREA_WIDTH.get();
+  }
+
+  @ApiStatus.Internal
+  public static final class CompoundChooser extends EditorGutterLayout {
+
+    private final List<EditorGutterLayout> myLayouts;
+    private final Function<List<EditorGutterLayout>, EditorGutterLayout> myChooser;
+
+    CompoundChooser(@NotNull EditorGutterComponentImpl editorGutter,
+                    List<EditorGutterLayout> layouts,
+                    Function<List<EditorGutterLayout>, EditorGutterLayout> chooser) {
+      super(editorGutter);
+      myLayouts = layouts;
+      myChooser = chooser;
+    }
+
+    @Override
+    List<GutterArea> getLayout() {
+      return myChooser.apply(myLayouts).getLayout();
+    }
   }
 }

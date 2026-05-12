@@ -24,12 +24,22 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtFunction
 import org.jetbrains.kotlin.psi.KtPrimaryConstructor
 import org.jetbrains.kotlin.psi.KtProperty
+import org.jetbrains.kotlin.psi.KtTypeAlias
 
 internal object NoActualClassMemberForExpectedClassFactory {
 
     val fixFactory = KotlinQuickFixFactory.IntentionBased { diagnostic: KaFirDiagnostic.NoActualClassMemberForExpectedClass ->
         val actualClassOrObject = diagnostic.psi as? KtClassOrObject ?: return@IntentionBased emptyList()
-        listOf(AddActualFix(actualClassOrObject, diagnostic.members.mapNotNull { it.first.psi as? KtDeclaration }))
+        val missedDeclarations = diagnostic.members
+            .mapNotNull { it.first.psi as? KtDeclaration }
+            .filterNot {
+                // KT-85656: Exclude type aliases — expect/actual nested type aliases are forbidden, so
+                //  reporting them as missing actual members is a false positive. Until this is fixed in
+                //  the compiler, we should not offer a quick fix for them.
+                it is KtTypeAlias
+            }
+        if (missedDeclarations.isEmpty()) return@IntentionBased emptyList()
+        listOf(AddActualFix(actualClassOrObject, missedDeclarations))
     }
 }
 
@@ -53,7 +63,7 @@ private class AddActualFix(
                 val declarationSymbol = missedDeclaration.symbol
                 when (missedDeclaration) {
                     is KtClassOrObject ->
-                        generateClassWithMembers(project, null, declarationSymbol as KaClassSymbol, element, MemberGenerateMode.ACTUAL)
+                        generateClassWithMembers(project, declarationSymbol as KaClassSymbol, element, MemberGenerateMode.ACTUAL)
 
                     is KtFunction, is KtProperty ->
                         generateMember(project, null, declarationSymbol as KaCallableSymbol, element, false, MemberGenerateMode.ACTUAL)

@@ -22,6 +22,12 @@ object StandardKotlinNames {
     object Boolean {
         @JvmField val not: FqName = (BUILT_INS_PACKAGE_FQ_NAME + "Boolean") + "not"
     }
+
+    object Lazy {
+        @JvmField val lazyClassId: ClassId = ClassId(BUILT_INS_PACKAGE_FQ_NAME, Name.identifier("Lazy"))
+        @JvmField val lazyValue: CallableId = CallableId(lazyClassId, Name.identifier("value"))
+    }
+
     object Collections {
         @JvmField val asSequence: FqName = BASE_COLLECTIONS_PACKAGE + "asSequence"
         @JvmField val filter: FqName = BASE_COLLECTIONS_PACKAGE + "filter"
@@ -49,6 +55,8 @@ object StandardKotlinNames {
             }
             pkg + it
         }
+
+        @JvmField val IndexedValue: ClassId = ClassId.topLevel(FqName("kotlin.collections.IndexedValue"))
     }
 
     object Enum {
@@ -123,7 +131,11 @@ object StandardKotlinNames {
         @JvmField val putAll: CallableId = CallableId(mutableMapClassId, Name.identifier("putAll"))
     }
 
+    @JvmField val Pair: ClassId = ClassId.topLevel(FqName("kotlin.Pair"))
+    @JvmField val Triple: ClassId = ClassId.topLevel(FqName("kotlin.Triple"))
+
     @JvmField val also: FqName = BUILT_INS_PACKAGE_FQ_NAME + "also"
+    @JvmField val apply: FqName = BUILT_INS_PACKAGE_FQ_NAME + "apply"
     @JvmField val lazy: FqName = BUILT_INS_PACKAGE_FQ_NAME + "lazy"
     @JvmField val let: FqName = BUILT_INS_PACKAGE_FQ_NAME + "let"
     @JvmField val run: FqName = BUILT_INS_PACKAGE_FQ_NAME + "run"

@@ -1,28 +1,23 @@
 ### auto-generated section `build intellij.kotlin.base.facet` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "facet_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "facet",
   module_name = "intellij.kotlin.base.facet",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
-  resources = [":facet_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinc-kotlin-compiler-common",
     "@lib//:kotlinc-kotlin-jps-common",
     "//platform/core-api:core",
+    "//platform/lang-api:lang",
     "//platform/editor-ui-api:editor-ui",
     "//jps/model-api:model",
     "//jps/model-serialization",
     "//platform/workspace/storage",
-    "//plugins/kotlin/base/frontend-agnostic",
     "//plugins/kotlin/base/util",
     "//plugins/kotlin/base/compiler-configuration",
     "//platform/execution",
@@ -38,25 +33,29 @@ jvm_library(
     "//platform/external-system-impl:externalSystem-impl",
     "//java/openapi:java",
     "//java/java-impl:impl",
+    "//java/java-syntax:syntax",
+    "//java/java-psi-api:psi",
     "//platform/workspace/jps",
     "//platform/backend/workspace",
+    "//platform/ide-core",
     "//libraries/gson",
   ]
 )
 
 jvm_library(
   name = "facet_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.base.facet",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
     ":facet",
     "//platform/core-api:core_test_lib",
+    "//platform/lang-api:lang_test_lib",
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//jps/model-api:model_test_lib",
     "//jps/model-serialization:model-serialization_test_lib",
     "//platform/workspace/storage:storage_test_lib",
-    "//plugins/kotlin/base/frontend-agnostic:frontend-agnostic_test_lib",
     "//plugins/kotlin/base/util:util_test_lib",
     "//plugins/kotlin/base/compiler-configuration:compiler-configuration_test_lib",
     "//platform/execution:execution_test_lib",
@@ -72,9 +71,18 @@ jvm_library(
     "//platform/external-system-impl:externalSystem-impl_test_lib",
     "//java/openapi:java_test_lib",
     "//java/java-impl:impl_test_lib",
+    "//java/java-syntax:syntax_test_lib",
+    "//java/java-psi-api:psi_test_lib",
     "//platform/workspace/jps:jps_test_lib",
     "//platform/backend/workspace:workspace_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//libraries/gson:gson_test_lib",
   ]
 )
 ### auto-generated section `build intellij.kotlin.base.facet` end
+
+### auto-generated section `iml intellij.kotlin.base.facet` start
+exports_files([
+  "intellij.kotlin.base.facet.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.base.facet` end

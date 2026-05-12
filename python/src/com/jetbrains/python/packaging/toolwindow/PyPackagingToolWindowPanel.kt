@@ -42,7 +42,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.intellij.lang.annotations.Language
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.Nls
 import java.awt.BorderLayout
 import java.awt.KeyboardFocusManager
 import java.awt.event.ActionEvent
@@ -250,9 +252,20 @@ class PyPackagingToolWindowPanel(private val project: Project) : SimpleToolWindo
     this.packageListController.selectPackage(name)
   }
 
-  fun startLoadingSdk() {
+  fun startLoadingSdk(@Nls sdkName: String? = null) {
     this.descriptionController.setPackage(null)
+    if (sdkName != null) {
+      packageListController.setSdkName(sdkName)
+    }
     packageListController.startSdkInit()
+  }
+
+  internal fun setRefreshIndicatorVisible(visible: Boolean) {
+    packageListController.setLoadingState(visible)
+  }
+
+  internal fun syncSdkControllerSelection(sdk: Sdk?) {
+    moduleController.refreshAndSyncSelection(sdk)
   }
 
   fun clearFocus() {
@@ -269,6 +282,8 @@ class PyPackagingToolWindowPanel(private val project: Project) : SimpleToolWindo
 
   companion object {
     private const val TOOLWINDOW_ID = "Python Packages"
+
+    @Language("devkit-action-id")
     private const val ADDITIONAL_PACKAGE_TOOLBAR_ACTION_ID = "PyPackageToolbarAdditional"
     private const val HORIZONTAL_SPLITTER_KEY = "Python.PackagingToolWindow.Horizontal"
     private const val VERTICAL_SPLITTER_KEY = "Python.PackagingToolWindow.Vertical"

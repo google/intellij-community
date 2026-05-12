@@ -14,7 +14,6 @@ import java.util.Set;
  * Describes a group of modules which can be enabled or disabled together.
  *
  * @see ProductModules#getMainModuleGroup()
- * @see ProductModules#getBundledPluginModuleGroups()
  */
 public interface RuntimeModuleGroup {
   @NotNull List<@NotNull IncludedRuntimeModule> getIncludedModules();

@@ -53,8 +53,4 @@ public final class PyAnnotationHolder {
   public void addHighlightingAnnotation(@NotNull ASTNode target, @NotNull TextAttributesKey key) {
     addHighlightingAnnotation(target.getPsi(), key);
   }
-
-  public @NotNull AnnotationHolder getOriginalHolder() {
-    return myHolder;
-  }
 }

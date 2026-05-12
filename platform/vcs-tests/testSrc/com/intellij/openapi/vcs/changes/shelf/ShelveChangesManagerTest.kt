@@ -17,6 +17,7 @@ import com.intellij.testFramework.createTestOpenProjectOptions
 import com.intellij.testFramework.runInEdtAndWait
 import com.intellij.util.io.createDirectories
 import junit.framework.TestCase
+import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.After
 import org.junit.Before
@@ -60,6 +61,10 @@ class ShelveChangesManagerTest {
 
     project = ProjectManagerEx.getInstanceEx().openProject(projectFile, createTestOpenProjectOptions())!!
     shelvedChangesManager = ShelveChangesManager.getInstance(project)
+    runBlocking {
+      shelvedChangesManager.scheduleShelvesLoading().await()
+    }
+    assertThat(shelvedChangesManager.shelvedChangeLists).isNotEmpty
   }
 
   @After

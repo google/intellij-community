@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.lang.core` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "lang-core_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "lang-core",
   module_name = "intellij.platform.lang.core",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":lang-core_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/ide-core",
@@ -33,11 +28,13 @@ jvm_library(
     "//platform/analysis-api:analysis",
     "//platform/usageView",
     "//platform/eel-provider",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
   ]
 )
 
 jvm_library(
   name = "lang-core_test_lib",
+  testonly = True,
   module_name = "intellij.platform.lang.core",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -62,6 +59,13 @@ jvm_library(
     "//platform/analysis-api:analysis_test_lib",
     "//platform/usageView:usageView_test_lib",
     "//platform/eel-provider:eel-provider_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.lang.core` end
+
+### auto-generated section `iml intellij.platform.lang.core` start
+exports_files([
+  "intellij.platform.lang.core.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.lang.core` end

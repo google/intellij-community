@@ -36,6 +36,7 @@ import org.jetbrains.kotlin.idea.refactoring.inline.codeInliner.CodeToInline
 import org.jetbrains.kotlin.idea.refactoring.inline.codeInliner.MutableCodeToInline
 import org.jetbrains.kotlin.idea.refactoring.inline.codeInliner.UsageReplacementStrategy
 import org.jetbrains.kotlin.idea.refactoring.inline.codeInliner.buildCodeToInline
+import org.jetbrains.kotlin.idea.refactoring.inline.codeInliner.saveCommentsFromSurroundings
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.idea.util.application.isDispatchThread
 import org.jetbrains.kotlin.psi.KtArrayAccessExpression
@@ -260,7 +261,7 @@ abstract class DeprecatedSymbolUsageFixBase(
             replaceWith.pattern,
             replaceWith.imports.joinToString().takeIf { it.isNotEmpty() },
             context
-        ).getContentElement()
+        ).getContentElement()?.saveCommentsFromSurroundings()
 
         private fun retrieveContext(target: KtDeclaration): PsiElement {
             val context = (if (target is KtFunction) target.valueParameterList?.parameters?.lastOrNull() else null)

@@ -24,7 +24,9 @@ import com.intellij.platform.pluginGraph.LOADING_REQUIRED
 import com.intellij.platform.pluginGraph.MutablePluginGraphStore
 import com.intellij.platform.pluginGraph.NODE_CONTENT_MODULE
 import com.intellij.platform.pluginGraph.NODE_FLAG_HAS_DESCRIPTOR
+import com.intellij.platform.pluginGraph.NODE_FLAG_IS_ALIAS
 import com.intellij.platform.pluginGraph.NODE_FLAG_IS_DSL_DEFINED
+import com.intellij.platform.pluginGraph.NODE_FLAG_IS_MODULE_SET_WRAPPER
 import com.intellij.platform.pluginGraph.NODE_FLAG_IS_TEST
 import com.intellij.platform.pluginGraph.NODE_FLAG_IS_TEST_DESCRIPTOR
 import com.intellij.platform.pluginGraph.NODE_FLAG_SELF_CONTAINED
@@ -39,6 +41,7 @@ import com.intellij.platform.pluginGraph.PluginId
 import com.intellij.platform.pluginGraph.TEST_DESCRIPTOR_SUFFIX
 import com.intellij.platform.pluginGraph.TargetDependencyScope
 import com.intellij.platform.pluginGraph.TargetName
+import com.intellij.platform.pluginGraph.aliasNodeName
 import com.intellij.platform.pluginGraph.baseModuleName
 import com.intellij.platform.pluginGraph.packEdgeEntry
 import com.intellij.platform.pluginGraph.packPluginDepEntry
@@ -130,10 +133,15 @@ internal class PluginGraphBuilder(
     isDslDefined: Boolean = false,
     pluginId: PluginId? = null,
     pluginAliases: List<PluginId> = emptyList(),
+    isModuleSetWrapper: Boolean = false,
+    isAlias: Boolean = false,
   ): Int {
     val existing = store.nameIndex[NODE_PLUGIN].getOrDefault(name.value, -1)
     if (existing >= 0) {
-      val flags = (if (isTest) NODE_FLAG_IS_TEST else 0) or (if (isDslDefined) NODE_FLAG_IS_DSL_DEFINED else 0)
+      val flags = (if (isTest) NODE_FLAG_IS_TEST else 0) or
+                  (if (isDslDefined) NODE_FLAG_IS_DSL_DEFINED else 0) or
+                  (if (isModuleSetWrapper) NODE_FLAG_IS_MODULE_SET_WRAPPER else 0) or
+                  (if (isAlias) NODE_FLAG_IS_ALIAS else 0)
       if (flags != 0) {
         store.kinds[existing] = store.kinds[existing] or flags
       }
@@ -165,7 +173,9 @@ internal class PluginGraphBuilder(
     store.names.add(name.value)
     store.kinds.add(NODE_PLUGIN
               or (if (isTest) NODE_FLAG_IS_TEST else 0)
-              or (if (isDslDefined) NODE_FLAG_IS_DSL_DEFINED else 0))
+              or (if (isDslDefined) NODE_FLAG_IS_DSL_DEFINED else 0)
+              or (if (isModuleSetWrapper) NODE_FLAG_IS_MODULE_SET_WRAPPER else 0)
+              or (if (isAlias) NODE_FLAG_IS_ALIAS else 0))
     store.mutableNameIndex(NODE_PLUGIN).set(name.value, id)
 
     if (pluginId != null) {
@@ -175,6 +185,16 @@ internal class PluginGraphBuilder(
       store.aliases.put(id, pluginAliases.map { it.value }.toTypedArray())
     }
     return id
+  }
+
+  /** Add or get a synthetic plugin node representing a bundled alias target. */
+  fun addAliasPlugin(alias: PluginId, isTest: Boolean = false): Int {
+    return addPlugin(
+      name = aliasNodeName(alias),
+      isTest = isTest,
+      pluginId = alias,
+      isAlias = true,
+    )
   }
 
   /**

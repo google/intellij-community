@@ -1,4 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.jps.entities.impl
 
 import com.intellij.platform.workspace.jps.entities.FacetsOrderEntity
@@ -18,11 +20,10 @@ import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
 import com.intellij.platform.workspace.storage.impl.containers.MutableWorkspaceList
 import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceList
-import com.intellij.platform.workspace.storage.impl.extractOneToOneParent
-import com.intellij.platform.workspace.storage.impl.updateOneToOneParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import org.jetbrains.annotations.ApiStatus.Internal
 
@@ -45,7 +46,8 @@ internal class FacetsOrderEntityImpl(private val dataSource: FacetsOrderEntityDa
       return dataSource.orderOfFacets
     }
   override val moduleEntity: ModuleEntity
-    get() = snapshot.extractOneToOneParent(MODULEENTITY_CONNECTION_ID, this)!!
+    get() = snapshot.instrumentation.getParent(MODULEENTITY_CONNECTION_ID, this) as? ModuleEntity
+            ?: error("Parent moduleEntity not found for FacetsOrderEntity")
 
   override val entitySource: EntitySource
     get() {
@@ -92,7 +94,7 @@ internal class FacetsOrderEntityImpl(private val dataSource: FacetsOrderEntityDa
         error("Field FacetsOrderEntity#orderOfFacets should be initialized")
       }
       if (_diff != null) {
-        if (_diff.extractOneToOneParent<WorkspaceEntityBase>(MODULEENTITY_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getParentBuilder(MODULEENTITY_CONNECTION_ID, this) == null) {
           error("Field FacetsOrderEntity#moduleEntity should be initialized")
         }
       }
@@ -156,12 +158,13 @@ internal class FacetsOrderEntityImpl(private val dataSource: FacetsOrderEntityDa
       get() {
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(MODULEENTITY_CONNECTION_ID, this) as? ModuleEntityBuilder)
-          ?: (this.entityLinks[EntityLink(false, MODULEENTITY_CONNECTION_ID)]!! as ModuleEntityBuilder)
+          ?: (this.entityLinks[EntityLink(false, MODULEENTITY_CONNECTION_ID)] as? ModuleEntityBuilder)
+          ?: error("moduleEntity is null for FacetsOrderEntity")
         }
         else {
-          this.entityLinks[EntityLink(false, MODULEENTITY_CONNECTION_ID)]!! as ModuleEntityBuilder
+          (this.entityLinks[EntityLink(false, MODULEENTITY_CONNECTION_ID)] as? ModuleEntityBuilder)
+          ?: error("moduleEntity is null for FacetsOrderEntity")
         }
       }
       set(value) {
@@ -175,7 +178,7 @@ internal class FacetsOrderEntityImpl(private val dataSource: FacetsOrderEntityDa
           _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
         }
         if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)) {
-          _diff.updateOneToOneParentOfChild(MODULEENTITY_CONNECTION_ID, this, value)
+          _diff.instrumentation.addChild(MODULEENTITY_CONNECTION_ID, value, this)
         }
         else {
           if (value is ModifiableWorkspaceEntityBase<*, *>) {
@@ -205,7 +208,6 @@ internal class FacetsOrderEntityData : WorkspaceEntityData<FacetsOrderEntity>() 
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): FacetsOrderEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {

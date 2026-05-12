@@ -49,6 +49,7 @@ object WellKnownCommands {
     WellKnownCommand("matterhorn", CommandType.HEADLESS),
     WellKnownCommand("installCoursePlugins", CommandType.HEADLESS),
     WellKnownCommand("createCourse", CommandType.HEADLESS),
+    WellKnownCommand("mcpServer", CommandType.HEADLESS),
 
     WellKnownCommand("thinClient", CommandType.GUI),
     WellKnownCommand("thinClient-headless", CommandType.HEADLESS),

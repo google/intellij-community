@@ -10,7 +10,6 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Iconable;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.pom.java.LanguageLevel;
-import com.intellij.testFramework.IdeaTestUtil;
 import com.intellij.testFramework.TestDataPath;
 import com.intellij.testFramework.builders.JavaModuleFixtureBuilder;
 import com.intellij.testFramework.fixtures.JavaCodeInsightFixtureTestCase;
@@ -30,7 +29,7 @@ public class IntentionDescriptionNotFoundInspectionTest extends JavaCodeInsightF
   @Override
   protected void tuneFixture(JavaModuleFixtureBuilder moduleBuilder) {
     moduleBuilder.setLanguageLevel(LanguageLevel.JDK_17);
-    moduleBuilder.addJdk(IdeaTestUtil.getMockJdk18Path().getPath());
+    moduleBuilder.addJdkVersion(LanguageLevel.JDK_1_8);
     moduleBuilder.addLibrary("core", PathUtil.getJarPathForClass(Project.class));
     moduleBuilder.addLibrary("editor", PathUtil.getJarPathForClass(Editor.class));
     moduleBuilder.addLibrary("analysis-api", PathUtil.getJarPathForClass(IntentionActionBean.class));

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.k2.inspections.tests;
 
@@ -294,6 +294,48 @@ public abstract class K2MultiFileLocalInspectionTestGenerated extends AbstractK2
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/multiFileLocalInspections/convertSealedSubClassToObject")
+    public abstract static class ConvertSealedSubClassToObject extends AbstractK2MultiFileLocalInspectionTest {
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../../../idea/tests/testData/multiFileLocalInspections/convertSealedSubClassToObject/convertCallableReferenceUsages")
+        public static class ConvertCallableReferenceUsages extends AbstractK2MultiFileLocalInspectionTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("convertCallableReferenceUsages.test")
+            public void testConvertCallableReferenceUsages() throws Exception {
+                runTest("../../../idea/tests/testData/multiFileLocalInspections/convertSealedSubClassToObject/convertCallableReferenceUsages/convertCallableReferenceUsages.test");
+            }
+        }
+
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../../../idea/tests/testData/multiFileLocalInspections/convertSealedSubClassToObject/convertInOtherFiles")
+        public static class ConvertInOtherFiles extends AbstractK2MultiFileLocalInspectionTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("convertInOtherFiles.test")
+            public void testConvertInOtherFiles() throws Exception {
+                runTest("../../../idea/tests/testData/multiFileLocalInspections/convertSealedSubClassToObject/convertInOtherFiles/convertInOtherFiles.test");
+            }
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/multiFileLocalInspections/redundantQualifierName")
     public abstract static class RedundantQualifierName extends AbstractK2MultiFileLocalInspectionTest {
         @RunWith(JUnit3RunnerWithInners.class)
@@ -393,8 +435,158 @@ public abstract class K2MultiFileLocalInspectionTestGenerated extends AbstractK2
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/multiFileLocalInspections/moveFileToPackageMatchingDirectory")
+    public abstract static class MoveFileToPackageMatchingDirectory extends AbstractK2MultiFileLocalInspectionTest {
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../../../idea/tests/testData/multiFileLocalInspections/moveFileToPackageMatchingDirectory/moveToDefaultDirectory")
+        public static class MoveToDefaultDirectory extends AbstractK2MultiFileLocalInspectionTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("moveToDefaultDirectory.test")
+            public void testMoveToDefaultDirectory() throws Exception {
+                runTest("../../../idea/tests/testData/multiFileLocalInspections/moveFileToPackageMatchingDirectory/moveToDefaultDirectory/moveToDefaultDirectory.test");
+            }
+        }
+
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../../../idea/tests/testData/multiFileLocalInspections/moveFileToPackageMatchingDirectory/moveToDefaultDirectoryWithoutPackageKeyword")
+        public static class MoveToDefaultDirectoryWithoutPackageKeyword extends AbstractK2MultiFileLocalInspectionTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("moveToDefaultDirectoryWithoutPackageKeyword.test")
+            public void testMoveToDefaultDirectoryWithoutPackageKeyword() throws Exception {
+                runTest("../../../idea/tests/testData/multiFileLocalInspections/moveFileToPackageMatchingDirectory/moveToDefaultDirectoryWithoutPackageKeyword/moveToDefaultDirectoryWithoutPackageKeyword.test");
+            }
+        }
+
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../../../idea/tests/testData/multiFileLocalInspections/moveFileToPackageMatchingDirectory/moveToNonDefaultDirectory")
+        public static class MoveToNonDefaultDirectory extends AbstractK2MultiFileLocalInspectionTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("moveToNonDefaultDirectory.test")
+            public void testMoveToNonDefaultDirectory() throws Exception {
+                runTest("../../../idea/tests/testData/multiFileLocalInspections/moveFileToPackageMatchingDirectory/moveToNonDefaultDirectory/moveToNonDefaultDirectory.test");
+            }
+        }
+
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../../../idea/tests/testData/multiFileLocalInspections/moveFileToPackageMatchingDirectory/packageMatchesDirectory")
+        public static class PackageMatchesDirectory extends AbstractK2MultiFileLocalInspectionTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("packageMatchesDirectory.test")
+            public void testPackageMatchesDirectory() throws Exception {
+                runTest("../../../idea/tests/testData/multiFileLocalInspections/moveFileToPackageMatchingDirectory/packageMatchesDirectory/packageMatchesDirectory.test");
+            }
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/multiFileLocalInspections/usePropertyAccessSyntax")
+    public static class UsePropertyAccessSyntax extends AbstractK2MultiFileLocalInspectionTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("excludedCustomAccessor/excludedCustomAccessor.test")
+        public void testExcludedCustomAccessor_ExcludedCustomAccessor() throws Exception {
+            runTest("../../../idea/tests/testData/multiFileLocalInspections/usePropertyAccessSyntax/excludedCustomAccessor/excludedCustomAccessor.test");
+        }
+
+        @TestMetadata("notExcludedCustomAccessor/notExcludedCustomAccessor.test")
+        public void testNotExcludedCustomAccessor_NotExcludedCustomAccessor() throws Exception {
+            runTest("../../../idea/tests/testData/multiFileLocalInspections/usePropertyAccessSyntax/notExcludedCustomAccessor/notExcludedCustomAccessor.test");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("testData/multiFileInspectionsLocal")
     public abstract static class MultiFileInspectionsLocal extends AbstractK2MultiFileLocalInspectionTest {
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("testData/multiFileInspectionsLocal/convertSealedClassToSealedInterface")
+        public abstract static class ConvertSealedClassToSealedInterface extends AbstractK2MultiFileLocalInspectionTest {
+            @RunWith(JUnit3RunnerWithInners.class)
+            @TestMetadata("testData/multiFileInspectionsLocal/convertSealedClassToSealedInterface/basic")
+            public static class Basic extends AbstractK2MultiFileLocalInspectionTest {
+                @java.lang.Override
+                @org.jetbrains.annotations.NotNull
+                public final KotlinPluginMode getPluginMode() {
+                    return KotlinPluginMode.K2;
+                }
+
+                private void runTest(String testDataFilePath) throws Exception {
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+                }
+
+                @TestMetadata("basic.test")
+                public void testBasic() throws Exception {
+                    runTest("testData/multiFileInspectionsLocal/convertSealedClassToSealedInterface/basic/basic.test");
+                }
+            }
+        }
+
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("testData/multiFileInspectionsLocal/convertSealedInterfaceToSealedClass")
+        public abstract static class ConvertSealedInterfaceToSealedClass extends AbstractK2MultiFileLocalInspectionTest {
+            @RunWith(JUnit3RunnerWithInners.class)
+            @TestMetadata("testData/multiFileInspectionsLocal/convertSealedInterfaceToSealedClass/basic")
+            public static class Basic extends AbstractK2MultiFileLocalInspectionTest {
+                @java.lang.Override
+                @org.jetbrains.annotations.NotNull
+                public final KotlinPluginMode getPluginMode() {
+                    return KotlinPluginMode.K2;
+                }
+
+                private void runTest(String testDataFilePath) throws Exception {
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+                }
+
+                @TestMetadata("basic.test")
+                public void testBasic() throws Exception {
+                    runTest("testData/multiFileInspectionsLocal/convertSealedInterfaceToSealedClass/basic/basic.test");
+                }
+            }
+        }
+
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("testData/multiFileInspectionsLocal/removeSingleExpressionStringTemplate")
         public abstract static class RemoveSingleExpressionStringTemplate extends AbstractK2MultiFileLocalInspectionTest {

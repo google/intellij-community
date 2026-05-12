@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.codeInsight.typing
 
 import com.intellij.lang.Language
@@ -7,6 +7,7 @@ import com.intellij.psi.PsiComment
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiLanguageInjectionHost
 import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.util.parents
 import com.jetbrains.python.codeInsight.PyInjectionUtil
 import com.jetbrains.python.codeInsight.PyInjectorBase
 import com.jetbrains.python.codeInsight.functionTypeComments.PyFunctionTypeAnnotationDialect
@@ -15,6 +16,7 @@ import com.jetbrains.python.psi.PyAnnotation
 import com.jetbrains.python.psi.PyArgumentList
 import com.jetbrains.python.psi.PyAssignmentStatement
 import com.jetbrains.python.psi.PyCallExpression
+import com.jetbrains.python.psi.PyClass
 import com.jetbrains.python.psi.PyFile
 import com.jetbrains.python.psi.PyFunction
 import com.jetbrains.python.psi.PyKeywordArgument
@@ -23,8 +25,6 @@ import com.jetbrains.python.psi.PyStringLiteralExpression
 import com.jetbrains.python.psi.PySubscriptionExpression
 import com.jetbrains.python.psi.PyTupleExpression
 import com.jetbrains.python.psi.PyTypeParameter
-import com.jetbrains.python.psi.PyTypeParameterListOwner
-import com.jetbrains.python.psi.PyUtil
 import com.jetbrains.python.psi.impl.stubs.PyTypingAliasStubType
 import com.jetbrains.python.psi.resolve.PyResolveUtil
 import com.jetbrains.python.psi.types.TypeEvalContext
@@ -59,139 +59,167 @@ class PyTypingAnnotationInjector : PyInjectorBase() {
   }
 
   override fun getInjectedLanguage(context: PsiElement): Language? {
-    if (context is PyStringLiteralExpression) {
-      if (isTypingLiteralArgument(context) || isTypingAnnotatedMetadataArgument(context)) {
-        return null
-      }
-      if (PsiTreeUtil.getParentOfType(context, PyAnnotation::class.java, true, PyCallExpression::class.java) != null &&
-          isTypingAnnotation(context.stringValue)
-      ) {
-        return PyTypeHintDialect.INSTANCE
-      }
-      if (isInsideValueOfExplicitTypeAnnotation(context)) {
-        return PyTypeHintDialect.INSTANCE
-      }
-      if (isInsideNewStyleTypeVarBound(context)) {
-        return PyTypeHintDialect.INSTANCE
-      }
-      if (isTypingCastTypeArgument(context)) {
-        return PyTypeHintDialect.INSTANCE
-      }
-      if (isTypingTypeVarTypeArgument(context)) {
-        return PyTypeHintDialect.INSTANCE
-      }
-      if (isTypingNewTypeTypeArgument(context)) {
-        return PyTypeHintDialect.INSTANCE
-      }
-      if (isTypingAssertTypeTypeArgument(context)) {
-        return PyTypeHintDialect.INSTANCE
-      }
+    if (context !is PyStringLiteralExpression) return null
+
+    // Walk up the PSI tree to find the innermost decisive type boundary.
+    // Inner boundaries (e.g. call expression) shadow outer ones.
+    when (context.classifyAnnotationPosition()) {
+      TypeAnnotationPosition.TypeForm -> return PyTypeHintDialect.INSTANCE
+      TypeAnnotationPosition.NonTypeForm -> return null
+      null -> { /* no boundary found; fall through to secondary rules */ }
     }
+
+    // bare annotation context — x: "T", def foo(x: Optional["T"]) -> "T": ...
+    if (PsiTreeUtil.getParentOfType(context, PyAnnotation::class.java, true, PyCallExpression::class.java) != null &&
+        context.stringValue.isTypingAnnotation()
+    ) {
+      return PyTypeHintDialect.INSTANCE
+    }
+    if (context.isInsideValueOfExplicitTypeAnnotation()) {
+      return PyTypeHintDialect.INSTANCE
+    }
+
     return null
-  }
-
-  private fun isTypingCastTypeArgument(
-    expr: PyStringLiteralExpression,
-  ): Boolean {
-    val argList = PsiTreeUtil.getParentOfType(expr, PyArgumentList::class.java) ?: return false
-    val call = argList.getParent() as? PyCallExpression ?: return false
-    val callee = call.callee as? PyReferenceExpression ?: return false
-
-    val resolvedNames = resolveLocally(callee)
-    if (PyTypingTypeProvider.CAST !in resolvedNames && PyTypingTypeProvider.CAST_EXT !in resolvedNames) {
-      return false
-    }
-
-    val args = argList.arguments
-    if (args.isEmpty()) return false
-    argList.getKeywordArgument("typ")?.let {
-      return PsiTreeUtil.isAncestor(it, expr, false)
-    }
-
-    val firstArg = args[0]
-    return PsiTreeUtil.isAncestor(firstArg, expr, false)
-  }
-
-  private fun isTypingTypeVarTypeArgument(
-    expr: PyStringLiteralExpression,
-  ): Boolean {
-    val argList = PsiTreeUtil.getParentOfType(expr, PyArgumentList::class.java) ?: return false
-    val call = argList.getParent() as? PyCallExpression ?: return false
-    val callee = call.callee as? PyReferenceExpression ?: return false
-
-    val resolvedNames = resolveLocally(callee)
-    if (PyTypingTypeProvider.TYPE_VAR !in resolvedNames && PyTypingTypeProvider.TYPE_VAR_EXT !in resolvedNames) {
-      return false
-    }
-
-    // Positional constraints start from the second argument (index 1), the first one is the TypeVar name
-    for (arg in argList.arguments.drop(1)) {
-      if (arg is PyKeywordArgument) break
-      if (PsiTreeUtil.isAncestor(arg, expr, false)) return true
-    }
-
-    // Keyword 'bound'
-    val boundKw = argList.getKeywordArgument("bound")
-    if (boundKw != null) {
-      val value = boundKw.valueExpression
-      if (value != null && PsiTreeUtil.isAncestor(value, expr, false)) return true
-    }
-
-    // Keyword 'default' (PEP 696)
-    val defaultKw = argList.getKeywordArgument("default")
-    if (defaultKw != null) {
-      val value = defaultKw.valueExpression
-      if (value != null && PsiTreeUtil.isAncestor(value, expr, false)) return true
-    }
-
-    return false
-  }
-
-  private fun isTypingNewTypeTypeArgument(
-    expr: PyStringLiteralExpression,
-  ): Boolean {
-    val argList = PsiTreeUtil.getParentOfType(expr, PyArgumentList::class.java) ?: return false
-    val call = argList.getParent() as? PyCallExpression ?: return false
-    val callee = call.callee as? PyReferenceExpression ?: return false
-
-    val resolvedNames = resolveLocally(callee)
-    if (PyTypingTypeProvider.NEW_TYPE !in resolvedNames) {
-      return false
-    }
-
-    val args = argList.arguments
-    if (args.size < 2) return false
-
-    val secondArg = args[1]
-    return PsiTreeUtil.isAncestor(secondArg, expr, false)
-  }
-
-  private fun isTypingAssertTypeTypeArgument(
-    expr: PyStringLiteralExpression,
-  ): Boolean {
-    val argList = PsiTreeUtil.getParentOfType(expr, PyArgumentList::class.java) ?: return false
-    val call = argList.parent as? PyCallExpression ?: return false
-    val callee = call.callee as? PyReferenceExpression ?: return false
-
-    val resolvedNames = resolveLocally(callee)
-    if (PyTypingTypeProvider.ASSERT_TYPE !in resolvedNames) {
-      return false
-    }
-
-    val args = argList.arguments
-    if (args.size < 2) return false
-
-    val expectedTypeArg = args[1]
-    return PsiTreeUtil.isAncestor(expectedTypeArg, expr, false)
   }
 }
 
-private fun isInsideValueOfExplicitTypeAnnotation(expr: PyStringLiteralExpression): Boolean {
-  val assignment = PsiTreeUtil.getParentOfType(expr, PyAssignmentStatement::class.java)
-  if (assignment == null || !PsiTreeUtil.isAncestor(assignment.assignedValue, expr, false)) {
+/**
+ * Whether a string literal is in a TypeForm (type annotation) position or a NonTypeForm position.
+ * Null means no decisive ancestor was found.
+ */
+private sealed interface TypeAnnotationPosition {
+  data object TypeForm : TypeAnnotationPosition
+  data object NonTypeForm : TypeAnnotationPosition
+}
+
+/**
+ * Walks up the PSI tree from [this@classifyAnnotationPosition] and returns the innermost explicit TypeForm/NonTypeForm
+ * boundary decision, or null if no decisive boundary is found.
+ *
+ * Decisive boundaries are constructs that explicitly route their sub-expressions into type or
+ * non-type positions: `Annotated`, `Literal`, `cast`, `TypeVar`, `NewType`, `assert_type`,
+ * class base lists, and PEP 695 `PyTypeParameter` bounds.
+ *
+ * All other expressions (generic subscriptions like `List[...]`, attribute access, etc.) are
+ * transparent: they pass through the context from their parent.
+ */
+private fun PyStringLiteralExpression.classifyAnnotationPosition(): TypeAnnotationPosition? =
+  parents(false).firstNotNullOfOrNull {
+    this.classifyFromAncestor(it)
+  }
+
+/**
+ * Returns the [TypeAnnotationPosition] that [ancestor] establishes for [this@classifyFromAncestor], or null if
+ * [ancestor] is transparent and does not route type vs. non-type positions.
+ */
+private fun PsiElement.classifyFromAncestor(ancestor: PsiElement): TypeAnnotationPosition? = when (ancestor) {
+  is PySubscriptionExpression -> this.classifySubscriptionPosition(ancestor)
+  // Class bases are type positions: `class A(list["int"]): ...`
+  // But strings nested inside non-type-routing calls are not: `class A(namedtuple('C', 'x y')): ...`
+  is PyArgumentList -> when {
+    ancestor.parent !is PyClass -> null
+    this.parents(false).takeWhile { it !== ancestor }.any { it is PyCallExpression } ->
+      TypeAnnotationPosition.NonTypeForm
+    else -> TypeAnnotationPosition.TypeForm
+  }
+  // PEP 695 new-style TypeVar bound: `type X[T: "bound"] = ...`, `def foo[T: "bound"](): ...`
+  is PyTypeParameter -> TypeAnnotationPosition.TypeForm
+  is PyCallExpression -> this.classifyCallSitePosition(ancestor)
+  else -> null
+}
+
+private fun PsiElement.classifySubscriptionPosition(subscription: PySubscriptionExpression): TypeAnnotationPosition? {
+  val qualifier = subscription.qualifier as? PyReferenceExpression ?: return null
+  val resolved = qualifier.resolveLocally()
+  return when {
+    // Annotated[T, meta...]: T is TypeForm, all metadata args are NonTypeForm
+    resolved.any { it == PyTypingTypeProvider.ANNOTATED || it == PyTypingTypeProvider.ANNOTATED_EXT } -> {
+      val index = subscription.indexExpression ?: return TypeAnnotationPosition.NonTypeForm
+      val tuple = index as? PyTupleExpression
+        ?: return TypeAnnotationPosition.TypeForm // single arg — it must be the type arg
+      val firstArg = tuple.elements.firstOrNull() ?: return TypeAnnotationPosition.NonTypeForm
+      if (PsiTreeUtil.isAncestor(firstArg, this, false)) TypeAnnotationPosition.TypeForm
+      else TypeAnnotationPosition.NonTypeForm
+    }
+    // Literal[v, ...]: no argument is a type
+    resolved.any { it == PyTypingTypeProvider.LITERAL || it == PyTypingTypeProvider.LITERAL_EXT } ->
+      TypeAnnotationPosition.NonTypeForm
+    // Other subscriptions (List[...], Optional[...], Union[...], etc.) are transparent
+    else -> null
+  }
+}
+
+private fun PsiElement.classifyCallSitePosition(call: PyCallExpression): TypeAnnotationPosition? {
+  val callee = call.callee as? PyReferenceExpression ?: return null
+  val resolved = callee.resolveLocally()
+  val argList = call.argumentList ?: return null
+
+  return when {
+    // cast(T, v) — first positional arg (or `typ=`) is TypeForm
+    resolved.any { it == PyTypingTypeProvider.CAST || it == PyTypingTypeProvider.CAST_EXT } -> {
+      val typeArg = argList.getKeywordArgument("typ") ?: argList.arguments.firstOrNull()
+      if (typeArg != null && PsiTreeUtil.isAncestor(typeArg, this, false))
+        TypeAnnotationPosition.TypeForm
+      else
+        TypeAnnotationPosition.NonTypeForm
+    }
+
+    // TypeVar(name, *constraints, bound=T, default=T) — name is NonTypeForm, rest are TypeForm
+    resolved.any { it == PyTypingTypeProvider.TYPE_VAR || it == PyTypingTypeProvider.TYPE_VAR_EXT } -> {
+      val args = argList.arguments
+      // First positional arg is the TypeVar name — not a type
+      if (args.isNotEmpty() && args[0] !is PyKeywordArgument &&
+          PsiTreeUtil.isAncestor(args[0], this, false)) {
+        return TypeAnnotationPosition.NonTypeForm
+      }
+      // Remaining positional args are constraints
+      for (arg in args.drop(1)) {
+        if (arg is PyKeywordArgument) break
+        if (PsiTreeUtil.isAncestor(arg, this, false)) return TypeAnnotationPosition.TypeForm
+      }
+      // Keyword args `bound` and `default` (PEP 696) are types
+      for (kw in listOf("bound", "default")) {
+        val value = argList.getKeywordArgument(kw)?.valueExpression
+        if (value != null && PsiTreeUtil.isAncestor(value, this, false)) return TypeAnnotationPosition.TypeForm
+      }
+      TypeAnnotationPosition.NonTypeForm
+    }
+
+    // NewType(name, T) — second positional arg is TypeForm
+    resolved.any { it == PyTypingTypeProvider.NEW_TYPE } -> {
+      val args = argList.arguments
+      if (args.size >= 2 && PsiTreeUtil.isAncestor(args[1], this, false))
+        TypeAnnotationPosition.TypeForm
+      else
+        TypeAnnotationPosition.NonTypeForm
+    }
+
+    // assert_type(v, T) — second positional arg is TypeForm
+    resolved.any { it == PyTypingTypeProvider.ASSERT_TYPE } -> {
+      val args = argList.arguments
+      if (args.size >= 2 && PsiTreeUtil.isAncestor(args[1], this, false))
+        TypeAnnotationPosition.TypeForm
+      else
+        TypeAnnotationPosition.NonTypeForm
+    }
+
+    // For unknown calls, strings nested inside generic subscriptions are type arguments:
+    // `x: call(set['str'])` — 'str' is the type arg of set[...] and should inject.
+    // But only when the call itself is in an annotation context — otherwise something like
+    // `print(A["foo"])` would incorrectly inject.
+    else -> if (this.parents(false).takeWhile { it !== call }.any { it is PySubscriptionExpression } &&
+               PsiTreeUtil.getParentOfType(call, PyAnnotation::class.java) != null)
+      TypeAnnotationPosition.TypeForm
+    else null
+  }
+}
+
+private fun PyStringLiteralExpression.isInsideValueOfExplicitTypeAnnotation(): Boolean {
+  val assignment = PsiTreeUtil.getParentOfType(this, PyAssignmentStatement::class.java)
+  if (assignment == null || !PsiTreeUtil.isAncestor(assignment.assignedValue, this, false)) {
     return false
   }
-  return PyTypingTypeProvider.isExplicitTypeAlias(assignment, TypeEvalContext.codeAnalysis(expr.project, expr.containingFile))
+  return PyTypingTypeProvider.isExplicitTypeAlias(assignment, TypeEvalContext.codeAnalysis(project, this.containingFile))
 }
 
 private fun registerCommentInjection(
@@ -205,7 +233,7 @@ private fun registerCommentInjection(
     if (PyTypingTypeProvider.TYPE_IGNORE_PATTERN.matcher(text).matches()) {
       language = null
     }
-    else if (isFunctionTypeComment(host)) {
+    else if (host.isFunctionTypeComment()) {
       language = PyFunctionTypeAnnotationDialect.INSTANCE
     }
     else {
@@ -221,46 +249,13 @@ private fun registerCommentInjection(
   return PyInjectionUtil.InjectionResult.EMPTY
 }
 
-private fun isTypingLiteralArgument(element: PsiElement): Boolean {
-  var parent = element.parent
-  if (parent is PyTupleExpression) parent = parent.parent
-  val subscription = parent as? PySubscriptionExpression ?: return false
-  val operand = subscription.operand as? PyReferenceExpression ?: return false
-  val resolvedNames = resolveLocally(operand)
-  return resolvedNames.any {
-    PyTypingTypeProvider.LITERAL == it || PyTypingTypeProvider.LITERAL_EXT == it
-  }
+private fun PyReferenceExpression.resolveLocally(): List<String> =
+  PyResolveUtil.resolveImportedElementQNameLocally(this).map { it.toString() }
+
+private fun PsiElement.isFunctionTypeComment(): Boolean {
+  val function = PsiTreeUtil.getParentOfType(this, PyFunction::class.java)
+  return function != null && function.typeComment === this
 }
 
-private fun resolveLocally(operand: PyReferenceExpression): List<String> =
-  PyResolveUtil.resolveImportedElementQNameLocally(operand).map { it.toString() }
-
-private fun isTypingAnnotatedMetadataArgument(
-  element: PsiElement,
-): Boolean {
-  val tuple = PyUtil.`as`(element.parent, PyTupleExpression::class.java)
-  if (tuple == null) return false
-  val parent = PyUtil.`as`(tuple.parent, PySubscriptionExpression::class.java)
-  if (parent == null) return false
-
-  val operand = parent.operand as? PyReferenceExpression ?: return false
-  val resolvedNames = resolveLocally(operand)
-  if (resolvedNames.any { PyTypingTypeProvider.ANNOTATED == it || PyTypingTypeProvider.ANNOTATED_EXT == it }) {
-    return tuple.elements[0] !== element
-  }
-  return false
-}
-
-private fun isFunctionTypeComment(comment: PsiElement): Boolean {
-  val function = PsiTreeUtil.getParentOfType(comment, PyFunction::class.java)
-  return function != null && function.typeComment === comment
-}
-
-private fun isInsideNewStyleTypeVarBound(element: PsiElement): Boolean {
-  return PsiTreeUtil.getParentOfType(element, PyTypeParameter::class.java, true,
-                                     PyTypeParameterListOwner::class.java) != null
-}
-
-private fun isTypingAnnotation(s: String): Boolean {
-  return PyTypingAliasStubType.RE_TYPE_HINT_LIKE_STRING.toRegex() matches s
-}
+private fun String.isTypingAnnotation(): Boolean =
+  PyTypingAliasStubType.RE_TYPE_HINT_LIKE_STRING.toRegex() matches this

@@ -246,7 +246,6 @@ public final class PathManager {
 
     // classes compiled to .jar files with Bazel
     // but we're running not under Bazel, like with delegating compilation to Bazel
-    // (monorepo.devkit.use.bazel.compile=true)
     try {
       Path ideaHomeFromBazelOut = getIdeaHomeFromBazelExecRoot(root);
       if (ideaHomeFromBazelOut != null) {
@@ -270,8 +269,7 @@ public final class PathManager {
   /**
    * classes compiled to .jar files with Bazel,
    * but we're running not under Bazel, like with delegating compilation to Bazel
-   * (monorepo.devkit.use.bazel.compile=true)
-   * this is a temporary solution while we're still using JPS model for ultimate monorepo
+   * this is a temporary solution while we're still using JPS model for ultimate monorepo (old branches)
    */
   private static @Nullable Path getIdeaHomeFromBazelExecRoot(Path start) throws IOException {
     String workspacePrefix = "WORKSPACE: ";

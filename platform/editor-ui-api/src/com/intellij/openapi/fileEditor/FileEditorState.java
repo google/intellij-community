@@ -34,7 +34,7 @@ import org.jetbrains.annotations.NotNull;
  */
 @FunctionalInterface
 public interface FileEditorState {
-  FileEditorState INSTANCE = (__0, __1) -> true;
+  FileEditorState INSTANCE = (_, _) -> true;
 
   boolean canBeMergedWith(@NotNull FileEditorState otherState, @NotNull FileEditorStateLevel level);
 }

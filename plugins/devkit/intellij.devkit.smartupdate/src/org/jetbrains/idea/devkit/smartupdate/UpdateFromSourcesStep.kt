@@ -32,6 +32,6 @@ internal class UpdateFromSourcesStep: StepOption {
   override fun isAvailable(project: Project) = IntelliJProjectUtil.isIntelliJPlatformProject(project)
 
   override fun getDetailsComponent(project: Project): JComponent = panel {
-    optionsPanel(project, UpdateFromSourcesSettings.getState()).apply { childComponent.setMinimumAndPreferredWidth(-1) }
+    optionsPanel(project, UpdateFromSourcesSettings.getState()).apply { first.childComponent.setMinimumAndPreferredWidth(-1) }
   }
 }

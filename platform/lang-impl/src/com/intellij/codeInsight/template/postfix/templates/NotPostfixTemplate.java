@@ -3,6 +3,7 @@ package com.intellij.codeInsight.template.postfix.templates;
 
 import com.intellij.openapi.editor.Editor;
 import com.intellij.psi.PsiElement;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -48,6 +49,17 @@ public class NotPostfixTemplate extends PostfixTemplateWithExpressionSelector {
                             @Nullable PostfixTemplateProvider provider) {
     super(id, name, example, selector, provider);
     myPsiInfo = info;
+  }
+
+  @ApiStatus.Experimental
+  @Override
+  public @NotNull PostfixModExpander createModExpander() {
+    return createModExpander((ctx, updater, element) -> {
+      PsiElement writable = updater.getWritable(element);
+      PsiElement negated = myPsiInfo.getNegatedExpression(writable);
+      PsiElement replaced = writable.replace(negated);
+      updater.moveCaretTo(replaced.getTextRange().getEndOffset());
+    });
   }
 
   @Override

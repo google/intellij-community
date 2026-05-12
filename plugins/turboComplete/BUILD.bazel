@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.turboComplete` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "turboComplete_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "turboComplete",
   module_name = "intellij.turboComplete",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":turboComplete_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/analysis-api:analysis",
@@ -33,6 +28,7 @@ jvm_library(
 
 jvm_library(
   name = "turboComplete_test_lib",
+  testonly = True,
   module_name = "intellij.turboComplete",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -55,15 +51,23 @@ jvm_library(
 )
 ### auto-generated section `build intellij.turboComplete` end
 
+### auto-generated section `iml intellij.turboComplete` start
+exports_files([
+  "intellij.turboComplete.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.turboComplete` end
+
 ### auto-generated section `build intellij.turboComplete.tests` start
 jvm_library(
   name = "turboComplete-tests",
+  module_name = "intellij.turboComplete.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "turboComplete-tests_test_lib",
+  testonly = True,
   module_name = "intellij.turboComplete.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -80,6 +84,12 @@ jvm_library(
   runtime_deps = [":turboComplete-tests"]
 )
 ### auto-generated section `build intellij.turboComplete.tests` end
+
+### auto-generated section `iml intellij.turboComplete.tests` start
+exports_files([
+  "intellij.turboComplete.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.turboComplete.tests` end
 
 ### auto-generated section `test intellij.turboComplete.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

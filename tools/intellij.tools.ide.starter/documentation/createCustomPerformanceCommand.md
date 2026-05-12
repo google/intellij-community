@@ -70,7 +70,7 @@ class ExampleOfMyCommandTest {
 
   @Test
   fun invokeMyCommand() {
-    val context = Starter.newContext(testName = CurrentTestMethod.hyphenateWithClass(), testCase = TestCases.IU.JitPackAndroidExample)
+    val context = Starter.newContext(testName = CurrentTestMethod.hyphenateWithClass(), testCase = IdeaUltimateCases.JitPackAndroidExample)
       .skipIndicesInitialization() // skip indicies if indexing isn't necessary for test
 
     context.runIDE(

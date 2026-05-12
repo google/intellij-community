@@ -3,7 +3,9 @@
 
 package com.intellij.openapi.util.io
 
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.progress.ProcessCanceledException
+import com.intellij.openapi.progress.isInCancellableContext
 import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.vfs.DiskQueryRelay
 import com.intellij.testFramework.junit5.TestApplication
@@ -16,6 +18,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.io.IOException
 import org.junit.jupiter.api.Test
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
@@ -180,6 +183,43 @@ class DiskQueryRelayTest {
     }
     finally {
       nonCancellableComputation.terminateFor(arg) //don't waste a worker thread
+    }
+  }
+
+  @Test
+  fun ioExceptionIsProperlyPropagatedFromWithinComputeMethod() {
+    // Check non-cancellable context
+    assert(!isInCancellableContext()) { "Must not be in cancellable context" }
+    try {
+      val thread = Thread.currentThread()
+      DiskQueryRelay.compute<Unit, IOException> {
+        assert(thread == Thread.currentThread()) { "Expected same thread, got different thread" }
+        throw IOException("test")
+      }
+      throw AssertionError("Must throw IOException")
+    } catch (e: Throwable) {
+      assert(e is IOException) { "Expected IOException, got ${e::class.simpleName}" }
+    }
+
+    // Check cancellable context
+    runBlocking {
+      val job = launch(unlimited()) {
+        assert(isInCancellableContext()) { "Must be in a cancellable context" }
+        val thread = Thread.currentThread()
+        try {
+          DiskQueryRelay.compute<Unit, IOException> {
+            assert(thread != Thread.currentThread()) { "Expected different thread, got same thread" }
+            throw IOException("test")
+          }
+          throw AssertionError("Must throw IOException")
+        } catch (e: Throwable) {
+          if (e !is IOException) {
+            thisLogger().error("Expected IOException", e)
+            throw e
+          }
+        }
+      }
+      job.join()
     }
   }
 

@@ -9,6 +9,9 @@ import com.intellij.grazie.jlanguage.Lang
 import com.intellij.openapi.util.Disposer
 import com.intellij.spellchecker.SpellCheckerManager.Companion.getInstance
 import com.intellij.spellchecker.dictionary.Dictionary
+import com.intellij.spellchecker.dictionary.Dictionary.LookupStatus
+import com.intellij.spellchecker.dictionary.Dictionary.LookupStatus.Absent
+import com.intellij.spellchecker.dictionary.Dictionary.LookupStatus.Present
 
 
 class MarkdownSupportTest : GrazieTestBase() {
@@ -47,6 +50,11 @@ class MarkdownSupportTest : GrazieTestBase() {
       by the platform when the IDE is closed or the plugin providing the service is unloaded.
       Project-level services are disposed on project close or plugin upload events.
     """.trimIndent())
+    myFixture.checkHighlighting()
+  }
+
+  fun `test html entity excluded before grazie checks`() {
+    myFixture.configureByText("a.md", "You&#39;re here.")
     myFixture.checkHighlighting()
   }
 
@@ -99,7 +107,7 @@ class MarkdownSupportTest : GrazieTestBase() {
     val words = setOf("foldable", "rollable", "wearable")
     getInstance(project).spellChecker!!.addDictionary(object : Dictionary {
       override fun getName(): String = name
-      override fun contains(word: String): Boolean = word in words
+      override fun lookup(word: String): LookupStatus = if (word in words) Present else Absent
       override fun getWords(): Set<String> = words
     })
     Disposer.register(testRootDisposable) { getInstance(project).spellChecker!!.removeDictionary(name) }

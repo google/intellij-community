@@ -29,7 +29,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Set;
 
-import static com.jetbrains.python.SdkUiUtilKt.isVirtualEnv;
+import static com.jetbrains.python.SdkUiUtilKt.isNonToolVirtualEnv;
 
 
 public class PyInstalledPackagesPanel extends InstalledPackagesPanel {
@@ -77,7 +77,7 @@ public class PyInstalledPackagesPanel extends InstalledPackagesPanel {
     if (sdk == null) return false;
     if (!PyPackageUtil.packageManagementEnabled(sdk, false, false)) return false;
 
-    if (isVirtualEnv(sdk) && pkg instanceof PyPackage) {
+    if (isNonToolVirtualEnv(sdk) && pkg instanceof PyPackage) {
       final String location = ((PyPackage)pkg).getLocation();
       if (location != null && location.startsWith(PythonSdkUtil.getUserSite())) {
         return false;

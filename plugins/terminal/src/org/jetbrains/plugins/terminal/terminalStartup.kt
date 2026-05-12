@@ -5,7 +5,6 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.progress.runBlockingMaybeCancellable
-import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.io.OSAgnosticPathUtil
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.eel.EelApi
@@ -13,11 +12,13 @@ import com.intellij.platform.eel.EelDescriptor
 import com.intellij.platform.eel.EelExecApi
 import com.intellij.platform.eel.EelExecPosixApi
 import com.intellij.platform.eel.EelExecWindowsApi
+import com.intellij.platform.eel.EelPlatform
 import com.intellij.platform.eel.EelProcess
 import com.intellij.platform.eel.ExecuteProcessException
 import com.intellij.platform.eel.environmentVariables
 import com.intellij.platform.eel.isPosix
 import com.intellij.platform.eel.path.EelPath
+import com.intellij.platform.eel.path.EelPathException
 import com.intellij.platform.eel.provider.LocalEelDescriptor
 import com.intellij.platform.eel.provider.asEelPath
 import com.intellij.platform.eel.provider.localEel
@@ -27,9 +28,10 @@ import com.intellij.platform.eel.provider.utils.awaitProcessResult
 import com.intellij.platform.eel.provider.utils.stderrString
 import com.intellij.platform.eel.provider.utils.stdoutString
 import com.intellij.platform.eel.spawnProcess
+import com.intellij.platform.ide.productMode.IdeProductMode
 import com.intellij.util.EnvironmentUtil
-import com.intellij.util.PathUtil
 import com.intellij.util.io.awaitExit
+import com.intellij.util.system.LowLevelLocalMachineAccess
 import com.intellij.util.system.OS
 import com.jediterm.core.util.TermSize
 import com.jediterm.terminal.TtyConnector
@@ -37,10 +39,11 @@ import com.pty4j.PtyProcess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import org.jetbrains.plugins.terminal.runner.LocalTerminalStartCommandBuilder
+import org.jetbrains.plugins.terminal.startup.ShellExecCommand
+import org.jetbrains.plugins.terminal.startup.ShellExecCommandImpl
+import org.jetbrains.plugins.terminal.startup.WslShellExecCommand
 import org.jetbrains.plugins.terminal.util.ShellNameUtil
 import org.jetbrains.plugins.terminal.util.terminalApplicationScope
-import java.nio.file.InvalidPathException
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
@@ -73,66 +76,52 @@ internal fun logCommonStartupInfo(
 
 @Throws(ExecuteProcessException::class)
 internal fun startProcess(
+  eelDescriptor: EelDescriptor,
   command: List<String>,
   envs: Map<String, String>,
-  initialWorkingDirectory: Path,
+  workingDirectory: EelPath,
   initialTermSize: TermSize,
 ): ShellProcessHolder {
   return runBlockingMaybeCancellable {
-    val context = buildStartupEelContext(initialWorkingDirectory, command)
-    val eelApi = context.eelDescriptor.toEelApi()
-    val remoteCommand = convertCommandToRemote(eelApi, command)
-    val workingDirectory = context.workingDirectoryProvider(eelApi)
-    val process = doStartProcess(eelApi, remoteCommand, envs, workingDirectory, initialTermSize)
+    val eelApi = eelDescriptor.toEelApi()
+    val process = doStartProcess(eelApi, command, envs, workingDirectory, initialTermSize)
     ShellProcessHolder(process, eelApi)
   }
 }
 
-private suspend fun convertCommandToRemote(eelApi: EelApi, command: List<String>): List<String> {
-  if (eelApi.descriptor != LocalEelDescriptor && isWslCommand(command)) {
-    val shell = eelApi.fetchMinimalEnvironmentVariables()["SHELL"] ?: "/bin/sh"
-    return listOf(shell, LocalTerminalDirectRunner.LOGIN_CLI_OPTION, LocalTerminalStartCommandBuilder.INTERACTIVE_CLI_OPTION)
-  }
-  return command
-}
-
-internal fun isWslCommand(command: List<String>): Boolean {
-  if (SystemInfo.isWindows) {
-    val exePath = command.getOrNull(0) ?: return false
-    val exeFileName = PathUtil.getFileName(exePath)
-    return exeFileName.equals("wsl.exe", true) || exeFileName.equals("wsl", true)
-  }
-  return false
-}
-
-internal fun findEelDescriptor(workingDir: String?, shellCommand: List<String>): EelDescriptor {
+internal fun buildStartupEelContext(workingDir: Path, shellCommand: List<String>): TerminalStartupEelContext {
   if (!shouldUseEelApi()) {
-    return LocalEelDescriptor
+    return TerminalStartupEelContext(
+      workingDirectory = workingDir.asEelPath(LocalEelDescriptor),
+      shellCommand = ShellExecCommandImpl(shellCommand),
+      platform = localEel.platform,
+    )
   }
-  if (workingDir.isNullOrBlank()) {
-    log.info("Cannot find EelDescriptor due to empty working directory. Fallback to LocalEelDescriptor.")
-    return LocalEelDescriptor
-  }
-  val workingDirectoryNioPath: Path = try {
-    Path.of(workingDir)
-  }
-  catch (e: InvalidPathException) {
-    log.warn("Cannot find EelDescriptor due to invalid working directory ($workingDir). Fallback to LocalEelDescriptor", e)
-    return LocalEelDescriptor
-  }
-  return try {
-    buildStartupEelContext(workingDirectoryNioPath, shellCommand).eelDescriptor
-  }
-  catch (e: Exception) {
-    log.warn("Cannot find EelDescriptor: " + e.message)
-    LocalEelDescriptor
+  return runBlockingMaybeCancellable {
+    try {
+      doBuildStartupEelContext(workingDir, shellCommand)
+    }
+    catch (e: Exception) {
+      log.warn("Cannot find EelDescriptor", e)
+      TerminalStartupEelContext(
+        workingDirectory = workingDir.asEelPath(LocalEelDescriptor),
+        shellCommand = ShellExecCommandImpl(shellCommand),
+        platform = localEel.platform,
+      )
+    }
   }
 }
 
-private fun buildStartupEelContext(workingDirectory: Path, shellCommand: List<String>): TerminalStartupEelContext {
+@OptIn(LowLevelLocalMachineAccess::class)
+@Throws(EelPathException::class)
+private suspend fun doBuildStartupEelContext(workingDirectory: Path, shellCommand: List<String>): TerminalStartupEelContext {
   val executable = shellCommand.firstOrNull()
-  if (OS.CURRENT == OS.Windows && executable != null &&
-      (ShellNameUtil.isPowerShell(executable) || OSAgnosticPathUtil.isAbsoluteDosPath(executable))) {
+  // TODO: this check is very fragile and should be replaced with a more robust solution.
+  //  For example, delegating choosing the correct working directory / shell pair to the clients of this API.
+  if (!IdeProductMode.isFrontend  // This check targets only local Windows case
+      && OS.CURRENT == OS.Windows
+      && executable != null
+      && (ShellNameUtil.isPowerShell(executable) || OSAgnosticPathUtil.isAbsoluteDosPath(executable))) {
     // Enforce running a Windows shell locally even if the project is opened in WSL.
     //
     // Although WSL can run Windows processes, it's best to avoid it:
@@ -142,41 +131,36 @@ private fun buildStartupEelContext(workingDirectory: Path, shellCommand: List<St
     // 3. WSL fails to run a Windows process specified with an absolute Windows path,
     //    e.g. 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'.
     // 4. Using two interoperability layers to run a local Windows process is generally unnecessary.
-    return TerminalStartupEelContext(LocalEelDescriptor) {
-      EelPath.parse(workingDirectory.toString(), LocalEelDescriptor)
-    }
+    return TerminalStartupEelContext(
+      workingDirectory = EelPath.parse(workingDirectory.toString(), LocalEelDescriptor),
+      shellCommand = ShellExecCommandImpl(shellCommand),
+      platform = localEel.platform,
+    )
   }
 
-  if (isWslCommand(shellCommand)) {
-    // Enforce running `wsl.exe ...` process locally
-    //
-    // As an alternative, we can try to decode the command specified by the client and
-    // use these parameters to start the process remotely (it will bring shell integration and better support overall).
-    // But it is error-prone and requires careful implementation.
-    return TerminalStartupEelContext(LocalEelDescriptor) {
-      EelPath.parse(workingDirectory.toString(), LocalEelDescriptor)
-    }
+  WslShellExecCommand.parse(shellCommand)?.toIJEntStartupEelContext(workingDirectory)?.let {
+    log.info(
+      "Original WSL configuration (command: $shellCommand, workingDir: $workingDirectory) was translated to IJEnt configuration (" +
+      "command: ${it.shellCommand}, workingDir: ${it.workingDirectory}, eelDescriptor: ${it.eelDescriptor.name})"
+    )
+    return it
   }
 
   val workingDirectoryEelPath = workingDirectory.asEelPath()
-  return TerminalStartupEelContext(workingDirectoryEelPath.descriptor) {
-    workingDirectoryEelPath
-  }
+  return TerminalStartupEelContext(
+    workingDirectory = workingDirectoryEelPath,
+    shellCommand = ShellExecCommandImpl(shellCommand),
+    platform = workingDirectoryEelPath.descriptor.toEelApi().platform
+  )
 }
 
 internal class TerminalStartupEelContext(
-  val eelDescriptor: EelDescriptor,
-  val workingDirectoryProvider: suspend (eelApi: EelApi) -> EelPath,
-)
-
-private fun getWslDistributionNameFromCommand(command: List<String>): String? {
-  if (isWslCommand(command)) {
-    val distributionOptionName = command.getOrNull(1)
-    if (distributionOptionName == "-d" || distributionOptionName == "--distribution") {
-      return command.getOrNull(2)
-    }
-  }
-  return null
+  val workingDirectory: EelPath,
+  val shellCommand: ShellExecCommand,
+  val platform: EelPlatform,
+) {
+  val eelDescriptor: EelDescriptor
+    get() = workingDirectory.descriptor
 }
 
 @Throws(ExecuteProcessException::class)
@@ -239,7 +223,7 @@ internal fun fetchMinimalEnvironmentVariablesBlocking(eelDescriptor: EelDescript
   }
   return runBlockingMaybeCancellable {
     eelDescriptor.toEelApi().fetchMinimalEnvironmentVariables()
-  } 
+  }
 }
 
 internal suspend fun EelApi.fetchDefaultEnvironmentVariables(): Map<String, String> {

@@ -3,6 +3,7 @@
 package org.jetbrains.kotlin.idea.inspections
 
 import org.jetbrains.kotlin.K1Deprecation
+import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.idea.caches.resolve.analyze
 import org.jetbrains.kotlin.idea.codeinsight.utils.EmptinessCheckFunctionUtils
 import org.jetbrains.kotlin.idea.codeinsights.impl.base.RedundantIfInspectionBase
@@ -20,6 +21,12 @@ import org.jetbrains.kotlin.types.typeUtil.isFloat
 @K1Deprecation
 class RedundantIfInspection : RedundantIfInspectionBase() {
     override fun isBooleanExpression(expression: KtExpression): Boolean = expression.isBooleanExpression()
+
+    override fun isNotNullableBooleanExpression(expression: KtExpression): Boolean {
+        val context = expression.analyze(BodyResolveMode.PARTIAL)
+        val type = expression.getType(context) ?: return false
+        return KotlinBuiltIns.isBoolean(type) && !type.isMarkedNullable
+    }
 
     override fun invertEmptinessCheck(condition: KtExpression): KtExpression? {
         return EmptinessCheckFunctionUtils.invertFunctionCall(condition) {

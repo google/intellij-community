@@ -16,6 +16,7 @@ import com.intellij.platform.pluginSystem.parser.impl.PluginDescriptorBuilder
 import com.intellij.platform.pluginSystem.parser.impl.PluginDescriptorFromXmlStreamConsumer
 import com.intellij.platform.pluginSystem.parser.impl.XIncludeLoader
 import com.intellij.platform.pluginSystem.parser.impl.consume
+import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleVisibilityValue
 import com.intellij.platform.pluginSystem.parser.impl.readBasicDescriptorData
 import com.intellij.platform.util.putMoreLikelyPluginJarsFirst
 import com.intellij.util.PlatformUtils
@@ -123,7 +124,7 @@ fun loadDescriptorFromDir(
       pool = pool,
       id = id,
     )
-    descriptor.jarFiles = Collections.singletonList(dir)
+    descriptor.ownClassPath = Collections.singletonList(dir)
     return descriptor
   }
   catch (_: NoSuchFileException) {
@@ -167,7 +168,7 @@ fun loadDescriptorFromJar(
       pool = pool,
       id = id,
     )
-    descriptor.jarFiles = Collections.singletonList(descriptor.pluginPath)
+    descriptor.ownClassPath = Collections.singletonList(descriptor.pluginPath)
     return descriptor
   }
   catch (e: Throwable) {
@@ -236,7 +237,7 @@ fun loadPluginSubDescriptors(
       if (jarFile != null && Files.exists(jarFile)) {
         val subRaw = loadModuleFromSeparateJar(pool = pool, jarFile = jarFile, subDescriptorFile = subDescriptorFile, loadingContext = loadingContext)
         val subDescriptor = descriptor.createContentModule(subRaw, subDescriptorFile, module)
-        subDescriptor.jarFiles = Collections.singletonList(jarFile)
+        subDescriptor.ownClassPath = Collections.singletonList(jarFile)
         module.assignDescriptor(subDescriptor)
       }
       else {
@@ -245,7 +246,7 @@ fun loadPluginSubDescriptors(
         module.assignDescriptor(subDescriptor)
         val customRoots = pathResolver.resolveCustomModuleClassesRoots(module.moduleId)
         if (customRoots.isNotEmpty()) {
-          subDescriptor.jarFiles = customRoots
+          subDescriptor.ownClassPath = customRoots
         }
       }
     }
@@ -258,10 +259,10 @@ fun loadPluginSubDescriptors(
       if (subRaw.`package` == null || subRaw.isSeparateJar) {
         val customRoots = pathResolver.resolveCustomModuleClassesRoots(module.moduleId)
         if (customRoots.isNotEmpty()) {
-          subDescriptor.jarFiles = customRoots
+          subDescriptor.ownClassPath = customRoots
         }
         else {
-          subDescriptor.jarFiles = Collections.singletonList(pluginDir.resolve("lib/modules/${module.moduleId.name}.jar"))
+          subDescriptor.ownClassPath = Collections.singletonList(pluginDir.resolve("lib/modules/${module.moduleId.name}.jar"))
         }
       }
       module.assignDescriptor(subDescriptor)
@@ -356,7 +357,7 @@ private fun loadFromPluginDir(
         useCoreClassLoader = useCoreClassLoader,
         pluginDir = dir,
       )?.let {
-        it.jarFiles = pluginJarFiles
+        it.ownClassPath = pluginJarFiles
         return it
       }
     }
@@ -379,13 +380,13 @@ private fun loadFromPluginDir(
         )
       }?.let {
         if (pluginJarFiles.isNullOrEmpty()) {
-          it.jarFiles = Collections.singletonList(classDir)
+          it.ownClassPath = Collections.singletonList(classDir)
         }
         else {
           val classPath = ArrayList<Path>(pluginJarFiles.size + 1)
           classPath.add(classDir)
           classPath.addAll(pluginJarFiles)
-          it.jarFiles = classPath
+          it.ownClassPath = classPath
         }
         return it
       }
@@ -604,7 +605,7 @@ internal fun CoroutineScope.loadPluginDescriptorsForPathBasedLoader(
   bundledPluginDir: Path?,
 ): Deferred<List<DiscoveredPluginsList>> {
   val platformPrefix = PlatformUtils.getPlatformPrefix()
-  val jarFileForModule: (PluginModuleId, Path) -> Path? = { moduleId, moduleDir -> moduleDir.resolve("$moduleId.jar") }
+  val jarFileForModule: (PluginModuleId, Path) -> Path? = { moduleId, moduleDir -> moduleDir.resolve("${moduleId.name}.jar") }
 
   if (isUnitTestMode && !isInDevServerMode) {
     return loadPluginDescriptorsInDeprecatedUnitTestMode(
@@ -806,13 +807,13 @@ private fun loadPluginDescriptor(
 
     val subDescriptor = descriptor.createContentModule(subBuilder = subRaw, descriptorPath = subDescriptorFile, module = module)
     if (classPath != null) {
-      subDescriptor.jarFiles = classPath
+      subDescriptor.ownClassPath = classPath
     }
     module.assignDescriptor(subDescriptor)
   }
 
   loadPluginDependencyDescriptors(descriptor = descriptor, loadingContext = loadingContext, pathResolver = pluginPathResolver, dataLoader = dataLoader)
-  descriptor.jarFiles = fileItems.map { it.file }
+  descriptor.ownClassPath = fileItems.map { it.file }
   return descriptor
 }
 
@@ -893,6 +894,7 @@ fun isProductWithTheOnlyDescriptor(platformPrefix: String): Boolean {
          platformPrefix == PlatformUtils.DBE_PREFIX ||
          platformPrefix == PlatformUtils.DATASPELL_PREFIX ||
          platformPrefix == PlatformUtils.GATEWAY_PREFIX ||
+         platformPrefix == "IntelliJServer" ||
          platformPrefix == "CodeServer"
 }
 
@@ -972,8 +974,13 @@ private fun loadContentModuleDescriptors(
         !isRunningFromSourcesWithoutDevBuild &&
         // module-based loader is not supported, descriptorContent maybe null
         (!isDeprecatedLoader || module.descriptorContent != null) &&
-        (moduleId.name.startsWith("intellij.") || moduleId.name.startsWith("fleet.")) &&
-        loadProductModule(
+        moduleId.name.run {
+          startsWith("intellij.") ||
+          startsWith("fleet.") ||
+          startsWith("language-server.")
+        }
+    ) {
+      if (loadProductModule(
           jarFile = jarFileForModule,
           module = module,
           subDescriptorFile = subDescriptorFile,
@@ -981,7 +988,8 @@ private fun loadContentModuleDescriptors(
           xIncludeLoader = xIncludeLoader,
           containerDescriptor = descriptor,
         )) {
-      continue
+        continue
+      }
     }
 
     if (isDeprecatedLoader && jarFileForModule != null && Files.exists(jarFileForModule)) {
@@ -1005,7 +1013,7 @@ private fun loadContentModuleDescriptors(
       }
 
       val subDescriptor = descriptor.createContentModule(subBuilder = raw, descriptorPath = subDescriptorFile, module = module)
-      subDescriptor.jarFiles = listOf(jarFileForModule)
+      subDescriptor.ownClassPath = listOf(jarFileForModule)
       module.assignDescriptor(subDescriptor)
     }
     else {
@@ -1013,7 +1021,7 @@ private fun loadContentModuleDescriptors(
       val subDescriptor = descriptor.createContentModule(subBuilder = raw, descriptorPath = subDescriptorFile, module = module)
       val customModuleClassesRoots = pathResolver.resolveCustomModuleClassesRoots(moduleId)
       if (customModuleClassesRoots.isNotEmpty()) {
-        subDescriptor.jarFiles = customModuleClassesRoots
+        subDescriptor.ownClassPath = customModuleClassesRoots
       }
       module.assignDescriptor(subDescriptor)
     }
@@ -1032,12 +1040,13 @@ private fun loadProductModule(
   val moduleRaw: PluginDescriptorBuilder = if (jarFile == null) {
     // do not log - the severity of the error is determined by the loadingStrategy, the default strategy does not return null at all
     PluginDescriptorBuilder.builder().apply {
+      visibility = ModuleVisibilityValue.PUBLIC
       `package` = "unresolved.${moduleId.name}"
     }
   }
   else {
     val reader = createXmlStreamReader(requireNotNull(module.descriptorContent) {
-      "Product module ${module.moduleId} descriptor content is not embedded - corrupted distribution " +
+      "Product module ${module.moduleId.displayName} descriptor content is not embedded - corrupted distribution " +
       "(jarFile=$jarFile, containerDescriptor=$containerDescriptor, siblings=${containerDescriptor.content.modules.joinToString()})"
     })
     PluginDescriptorFromXmlStreamConsumer(readContext = loadingContext.readContext, xIncludeLoader = xIncludeLoader).let {
@@ -1046,7 +1055,7 @@ private fun loadProductModule(
     }
   }
   val subDescriptor = containerDescriptor.createContentModule(moduleRaw, subDescriptorFile, module)
-  subDescriptor.jarFiles = jarFile?.let { Java11Shim.INSTANCE.listOf(it) } ?: Java11Shim.INSTANCE.listOf()
+  subDescriptor.ownClassPath = jarFile?.let { Java11Shim.INSTANCE.listOf(it) } ?: Java11Shim.INSTANCE.listOf()
   module.assignDescriptor(subDescriptor)
   return true
 }
@@ -1307,7 +1316,7 @@ internal fun testOrDeprecatedLoadDescriptorFromResource(
         val subDescriptor = descriptor.createContentModule(subRaw, subDescriptorFile, module)
         if (runFromSources && subDescriptor.packagePrefix == null) {
           // no package in run from sources - load module from the main classpath
-          subDescriptor.jarFiles = Collections.emptyList()
+          subDescriptor.ownClassPath = Collections.emptyList()
         }
         module.assignDescriptor(subDescriptor)
       }
@@ -1354,15 +1363,16 @@ private fun loadPluginDependencyDescriptors(
 ) {
   for (dependency in descriptor.pluginDependencies) {
     // because of https://youtrack.jetbrains.com/issue/IDEA-206274, configFile maybe not only for optional dependencies
-    val configFile = dependency.configFile ?: continue
-    if (pathResolver.isFlat && context.checkOptionalConfigShortName(configFile, descriptor)) {
+
+    if (dependency.isOptional && dependency.configFile == null && context.createEmptyDependsDescriptorForOptionalDependsWithoutConfigFile) {
+      // generate an empty "depends" descriptor; this is needed so that new plugin set resolver can associate the dependency with the sub-descriptor
+      val subDescriptor = descriptor.createDependsSubDescriptor(PluginDescriptorBuilder.builder(), "", dependsTargetId = dependency.pluginId)
+      dependency.setSubDescriptor(subDescriptor)
       continue
     }
 
-    if (isKotlinPlugin(dependency.pluginId) && isIncompatibleWithKotlinPlugin(descriptor)) {
-      LOG.warn("Plugin ${descriptor} depends on Kotlin plugin via `${configFile}` " +
-               "but the plugin is not compatible with the Kotlin plugin in the  ${if (isKotlinPluginK1Mode()) "K1" else "K2"} mode. " +
-               "So, the `${configFile}` was not loaded")
+    val configFile = dependency.configFile ?: continue
+    if (pathResolver.isFlat && context.checkOptionalConfigShortName(configFile, descriptor)) {
       continue
     }
 
@@ -1376,7 +1386,7 @@ private fun loadPluginDependencyDescriptors(
     }
 
     if (raw == null) {
-      val message = "Plugin $descriptor misses optional descriptor $configFile"
+      val message = "Plugin '${descriptor.name}' (${descriptor.pluginId}) misses optional descriptor '$configFile' ($descriptor)"
       if (context.isMissingSubDescriptorIgnored) {
         LOG.info(message)
         if (resolveError != null) {
@@ -1392,7 +1402,7 @@ private fun loadPluginDependencyDescriptors(
     checkCycle(descriptor, configFile, visitedFiles)
     visitedFiles.add(configFile)
     try {
-      val subDescriptor = descriptor.createDependsSubDescriptor(raw, configFile)
+      val subDescriptor = descriptor.createDependsSubDescriptor(raw, configFile, dependsTargetId = dependency.pluginId)
       loadPluginDependencyDescriptors(descriptor = subDescriptor, context = context, pathResolver = pathResolver, dataLoader = dataLoader, visitedFiles = visitedFiles)
       dependency.setSubDescriptor(subDescriptor)
     }

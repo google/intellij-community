@@ -1,6 +1,7 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.coverage;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.project.Project;
@@ -22,7 +23,7 @@ import java.util.Set;
  */
 @Service(Service.Level.PROJECT)
 @ApiStatus.Internal
-public final class ExternalCoverageWatchManager {
+public final class ExternalCoverageWatchManager implements Disposable {
   private final Project myProject;
 
   private Set<LocalFileSystem.WatchRequest> myWatchRequests;
@@ -69,5 +70,10 @@ public final class ExternalCoverageWatchManager {
 
     myWatchRequests = null;
     myCurrentSuiteRoots = null;
+  }
+
+  @Override
+  public void dispose() {
+    clearWatches();
   }
 }

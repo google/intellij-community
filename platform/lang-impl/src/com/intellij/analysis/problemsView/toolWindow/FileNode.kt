@@ -12,6 +12,7 @@ import com.intellij.psi.util.PsiUtilCore.findFileSystemItem
 import com.intellij.ui.SimpleTextAttributes.GRAYED_ATTRIBUTES
 import com.intellij.ui.SimpleTextAttributes.REGULAR_ATTRIBUTES
 import com.intellij.ui.tree.LeafState
+import com.intellij.util.PathUtilRt
 import java.util.Objects.hash
 
 class FileNode(parent: Node, val file: VirtualFile) : Node(parent) {
@@ -32,7 +33,8 @@ class FileNode(parent: Node, val file: VirtualFile) : Node(parent) {
       else -> AllIcons.FileTypes.Any_type
     })
     if (parentDescriptor !is FileNode) {
-      val url = file.parent?.presentableUrl ?: return
+      val url = file.parent?.presentableUrl
+                ?: PathUtilRt.getParentPath(file.path) // in RD, deserialization of VirtualFile makes its parent to be null
       presentation.addText("  ${getLocationRelativeToUserHome(url)}", GRAYED_ATTRIBUTES)
     }
     val root = findAncestor(Root::class.java)

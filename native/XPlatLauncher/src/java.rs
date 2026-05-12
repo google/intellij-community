@@ -7,10 +7,12 @@ use std::sync::Mutex;
 use std::thread;
 use std::thread::JoinHandle;
 
-use anyhow::{anyhow, bail, Context, Error, Result};
-use jni::JNIEnv;
-use jni::objects::{JObject, JValue};
-use jni::sys::{jboolean, jint, jsize};
+use anyhow::{anyhow, bail, Context, Result};
+use jni::{jni_sig, jni_str, EnvUnowned, Outcome};
+use jni::objects::{JString, JValue};
+use jni::signature::MethodSignature;
+use jni::strings::{JNIStr, JNIString};
+use jni::sys::{jboolean, jint};
 use log::{debug, error};
 
 use crate::{jvm_property, ui};
@@ -19,8 +21,10 @@ use crate::{jvm_property, ui};
 use {
     core_foundation::base::{CFRelease, kCFAllocatorDefault, TCFTypeRef},
     core_foundation::date::CFTimeInterval,
-    core_foundation::runloop::{CFRunLoopAddTimer, CFRunLoopGetCurrent, CFRunLoopRunInMode, CFRunLoopTimerCreate,
-                               CFRunLoopTimerRef, kCFRunLoopDefaultMode, kCFRunLoopRunFinished}
+    core_foundation::runloop::{
+        CFRunLoopAddTimer, CFRunLoopGetCurrent, CFRunLoopRunInMode, CFRunLoopTimerCreate, CFRunLoopTimerRef,
+        kCFRunLoopDefaultMode, kCFRunLoopRunFinished
+    }
 };
 
 #[cfg(target_os = "windows")]
@@ -34,7 +38,7 @@ static DEBUG_MODE: AtomicBool = AtomicBool::new(true);
 static HOOK_MESSAGES: Mutex<Option<Vec<String>>> = Mutex::new(None);
 
 extern "C" fn vfprintf_hook(fp: *const c_void, format: *const c_char, args: va_list::VaList<'_>) -> jint {
-    extern "C" {
+    unsafe extern "C" {
         fn vfprintf(fp: *const c_void, format: *const c_char, args: va_list::VaList<'_>) -> c_int;
         fn vsnprintf(s: *mut c_char, n: usize, format: *const c_char, args: va_list::VaList<'_>) -> c_int;
     }
@@ -66,15 +70,23 @@ extern "C" fn abort_hook() {
     }
 }
 
-const MAIN_METHOD_NAME: &str = "main";
-const MAIN_METHOD_SIGNATURE: &str = "([Ljava/lang/String;)V";
+const MAIN_METHOD_NAME: &JNIStr = jni_str!("main");
+const MAIN_METHOD_SIGNATURE: MethodSignature<'_, '_> = jni_sig!("([Ljava/lang/String;)V");
 
 type CreateJvmCall<'lib> = libloading::Symbol<
     'lib,
     unsafe extern "C" fn(*mut *mut jni::sys::JavaVM, *mut *mut c_void, *mut c_void) -> jint
 >;
 
-pub fn run_jvm_and_event_loop(jre_home: &Path, vm_options: Vec<String>, main_class: &str, args: Vec<String>, debug_mode: bool) -> Result<()> {
+pub fn run_jvm_and_event_loop(
+    jre_home: &Path,
+    vm_options: Vec<String>,
+    main_class: &str,
+    args: Vec<String>,
+    debug_mode: bool,
+    redirect_stdout: bool,
+    is_musl: bool
+) -> Result<()> {
     debug!("Preparing a JVM environment");
     DEBUG_MODE.store(debug_mode, Ordering::Release);
 
@@ -87,6 +99,7 @@ pub fn run_jvm_and_event_loop(jre_home: &Path, vm_options: Vec<String>, main_cla
         reset_signal_handler(libc::SIGINT)?;
     }
 
+    let stdio_fd = if redirect_stdout { redirect_stdout_to_stderr()? } else { 0 };
     let jre_home = jre_home.to_owned();
     let main_class = main_class.to_owned();
     let (tx, rx) = std::sync::mpsc::channel();
@@ -98,6 +111,9 @@ pub fn run_jvm_and_event_loop(jre_home: &Path, vm_options: Vec<String>, main_cla
         debug!("[JVM] Thread started [{:?}]", thread::current().id());
 
         let mut vm_options = vm_options.clone();
+        if stdio_fd != 0 {
+            vm_options.push(jvm_property!("jb.launcher.stdout.fd", stdio_fd));
+        }
         let mut java_command = main_class.clone();
         args.iter().for_each(|arg| {
             java_command += " ";
@@ -105,7 +121,7 @@ pub fn run_jvm_and_event_loop(jre_home: &Path, vm_options: Vec<String>, main_cla
         });
         vm_options.push(jvm_property!("sun.java.command", java_command));
 
-        let jni_env_result = load_and_start_jvm(&jre_home, vm_options);
+        let jni_env_result = load_and_start_jvm(&jre_home, vm_options, is_musl);
         let jni_env = match jni_env_result {
             Ok(jni_env) => {
                 tx.send(None).unwrap();
@@ -118,12 +134,16 @@ pub fn run_jvm_and_event_loop(jre_home: &Path, vm_options: Vec<String>, main_cla
         };
 
         match call_main_method(jni_env, &main_class, args) {
-            Ok(_) => {
+            Outcome::Ok(_) => {
                 debug!("[JVM] main method finished peacefully");
                 std::process::exit(0);
             }
-            Err(e) => {
+            Outcome::Err(e) => {
                 error!("[JVM] main method failed: {e:?}");
+                std::process::exit(1);
+            }
+            Outcome::Panic(e) => {
+                error!("[JVM] main method panicked: {e:?}");
                 std::process::exit(1);
             }
         };
@@ -153,10 +173,39 @@ fn reset_signal_handler(signal: c_int) -> Result<()> {
     }
 }
 
-fn load_and_start_jvm(jre_home: &Path, vm_options: Vec<String>) -> Result<JNIEnv<'static>> {
+#[cfg(target_os = "windows")]
+fn redirect_stdout_to_stderr() -> Result<i64> {
+    use windows::Win32::Foundation::{DuplicateHandle, DUPLICATE_SAME_ACCESS, HANDLE};
+    use windows::Win32::System::Console::{GetStdHandle, SetStdHandle, STD_ERROR_HANDLE, STD_OUTPUT_HANDLE};
+    use windows::Win32::System::Threading::GetCurrentProcess;
+
+    unsafe {
+        let h_process = GetCurrentProcess();
+        let stdout = GetStdHandle(STD_OUTPUT_HANDLE)?;
+        let stderr = GetStdHandle(STD_ERROR_HANDLE)?;
+        let mut saved_handle = HANDLE::default();
+        DuplicateHandle(h_process, stdout, h_process, &mut saved_handle, 0, true, DUPLICATE_SAME_ACCESS)?;
+        SetStdHandle(STD_OUTPUT_HANDLE, stderr)?;
+        Ok(saved_handle.0 as i64)
+    }
+}
+
+#[cfg(target_family = "unix")]
+fn redirect_stdout_to_stderr() -> Result<i64> {
+    let saved_fd = unsafe { libc::dup(libc::STDOUT_FILENO) };
+    if saved_fd < 0 {
+        bail!("dup(stdout): {}", std::io::Error::last_os_error());
+    }
+    if unsafe { libc::dup2(libc::STDERR_FILENO, libc::STDOUT_FILENO) } < 0 {
+        bail!("dup2(stderr, stdout): {}", std::io::Error::last_os_error());
+    }
+    Ok(saved_fd as i64)
+}
+
+fn load_and_start_jvm<'a>(jre_home: &Path, vm_options: Vec<String>, is_musl: bool) -> Result<EnvUnowned<'a>> {
     let libjvm_path = jre_home.join(JVM_LIB_REL_PATH);
     debug!("[JVM] Loading {libjvm_path:?}");
-    let libjvm = load_libjvm(&libjvm_path)?;
+    let libjvm = load_libjvm(&libjvm_path, is_musl)?;
 
     debug!("[JVM] Looking for 'JNI_CreateJavaVM' symbol");
     let create_jvm_call: CreateJvmCall<'_> = unsafe { libjvm.get(b"JNI_CreateJavaVM\0")? };
@@ -190,20 +239,20 @@ fn load_and_start_jvm(jre_home: &Path, vm_options: Vec<String>) -> Result<JNIEnv
     *HOOK_MESSAGES.lock()
         .map_err(|x| anyhow!("failed to acquire HOOK_MESSAGES mutex {x:?}"))? = None;
 
-    let jni_env = unsafe { JNIEnv::from_raw(jni_env) }?;
+    let jni_env = unsafe { EnvUnowned::from_raw(jni_env) };
 
     Ok(jni_env)
 }
 
 #[cfg(target_os = "windows")]
-fn load_libjvm(libjvm_path: &Path) -> Result<libloading::Library> {
+fn load_libjvm(libjvm_path: &Path, _: bool) -> Result<libloading::Library> {
     unsafe { libloading::Library::new(libjvm_path) }
         .context("Failed to load 'jvm.dll'")
 }
 
 #[cfg(target_family = "unix")]
-fn load_libjvm(libjvm_path: &Path) -> Result<libloading::Library> {
-    let path_ref = Some(libjvm_path.as_os_str());
+fn load_libjvm(libjvm_path: &Path, is_musl: bool) -> Result<libloading::Library> {
+    let path_ref = if is_musl { libjvm_path.file_name() } else { Some(libjvm_path.as_os_str()) };
     let flags = libloading::os::unix::RTLD_LAZY;
     unsafe { libloading::os::unix::Library::open(path_ref, flags).map(From::from) }
         .with_context(|| format!("Failed to load '{}'", Path::new(libjvm_path.file_name().unwrap()).display()))
@@ -306,28 +355,27 @@ fn release_jvm_init_args(jni_options: Vec<jni::sys::JavaVMOption>) {
     jni_options.into_iter().for_each(|option| drop(unsafe { CString::from_raw(option.optionString) }));
 }
 
-fn call_main_method(mut jni_env: JNIEnv<'_>, main_class: &str, args: Vec<String>) -> Result<()> {
-    debug!("[JVM] Preparing args: {args:?}");
-    let main_class_name = main_class.replace('.', "/");
-    let args_array = jni_env.new_object_array(args.len() as jsize, "java/lang/String", JObject::null())?;
-    for (i, arg) in args.iter().enumerate() {
-        jni_env.set_object_array_element(&args_array, i as jsize, jni_env.new_string(arg)?)?;
-    }
-    let main_args = vec![JValue::from(&args_array)];
-
-    debug!("[JVM] Calling '{main_class_name}#main'");
-    match jni_env.call_static_method(main_class_name, MAIN_METHOD_NAME, MAIN_METHOD_SIGNATURE, &main_args) {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            if let jni::errors::Error::JavaException = e {
-                jni_env.exception_describe()?
-            };
-            Err(Error::from(e))
+fn call_main_method(mut jni_env: EnvUnowned<'_>, main_class_name: &str, args: Vec<String>) -> Outcome<(), jni::errors::Error> {
+    jni_env.with_env(|env| {
+        debug!("[JVM] Preparing args: {args:?}");
+        let args_array = env.new_object_type_array::<JString<'_>>(args.len(), JString::null())?;
+        for (i, arg) in args.iter().enumerate() {
+            let string_obj = env.new_string(arg)?;
+            args_array.set_element(env, i, string_obj)?;
         }
-    }
+        let main_args = vec![JValue::from(&args_array)];
+
+        debug!("[JVM] Calling '{main_class_name}#main'");
+        let main_class = env.find_class(JNIString::new(main_class_name.replace('.', "/")))?;
+        let result = env.call_static_method(main_class, MAIN_METHOD_NAME, MAIN_METHOD_SIGNATURE, &main_args).map(|_| ());
+        if let Err(e) = &result && let jni::errors::Error::JavaException = e {
+            env.exception_describe();
+        }
+        result
+    }).into_outcome()
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(not(target_os = "macos"))]
 fn run_event_loop(join_handle: JoinHandle<()>) -> thread::Result<()> {
     debug!("Joining the JVM thread");
     join_handle.join()
@@ -354,10 +402,4 @@ fn run_event_loop(_join_handle: JoinHandle<()>) -> thread::Result<()> {
     }
 
     Ok(())
-}
-
-#[cfg(target_os = "linux")]
-fn run_event_loop(join_handle: JoinHandle<()>) -> thread::Result<()> {
-    debug!("Joining the JVM thread");
-    join_handle.join()
 }

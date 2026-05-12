@@ -1,7 +1,9 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.modcommand;
 
 import com.intellij.codeInsight.intention.preview.IntentionPreviewInfo;
+import com.intellij.openapi.fileEditor.FileEditor;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileTypes.UserBinaryFileType;
 import com.intellij.openapi.util.text.HtmlChunk;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -106,5 +108,24 @@ public final class ModCommandTest extends LightPlatformCodeInsightTestCase {
     assertEquals("""
                    Create directory &#39;a&#39;<br/><br/><p><icon src="file"/>&nbsp;dummy.txt &rarr; \
                    <icon src="dir"/>&nbsp;$src$a</p>""".replace("$", File.separator), actual);
+  }
+
+  // IJPL-242842
+  public void testCreateFileInNestedDirectoryAndMoveTo() {
+    configureFromFileText("dummy.txt", "");
+    ModCommand command = ModCommand.psiUpdate(getFile(), (f, u) -> {
+      PsiDirectory d = u.getWritable(getFile().getContainingDirectory());
+      PsiDirectory dir1 = d.createSubdirectory("a");
+      PsiDirectory dir2 = dir1.createSubdirectory("b");
+      PsiDirectory dir3 = dir2.createSubdirectory("c");
+      PsiFile file = dir3.createFile("dummy.txt");
+      file.getFileDocument().insertString(0, "test");
+      u.moveCaretTo(file);
+    });
+    ModCommandExecutor.executeInteractively(ActionContext.from(null, getFile()), "", null, () -> command);
+    VirtualFile target = getVFile().findFileByRelativePath("../a/b/c/dummy.txt");
+    // An editor was created for a new file
+    FileEditor openEditor = FileEditorManager.getInstance(getProject()).getSelectedEditor(target);
+    assertNotNull(openEditor);
   }
 }

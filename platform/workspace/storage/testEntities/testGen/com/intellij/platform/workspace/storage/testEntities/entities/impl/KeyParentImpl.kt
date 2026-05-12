@@ -1,16 +1,24 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.storage.testEntities.entities.impl
 
-import com.intellij.platform.workspace.storage.*
+import com.intellij.platform.workspace.storage.ConnectionId
+import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
+import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
+import com.intellij.platform.workspace.storage.MutableEntityStorage
+import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
+import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.EntityLink
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
-import com.intellij.platform.workspace.storage.impl.extractOneToManyChildren
-import com.intellij.platform.workspace.storage.impl.updateOneToManyChildrenOfParent
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.testEntities.entities.KeyChild
 import com.intellij.platform.workspace.storage.testEntities.entities.KeyChildBuilder
@@ -23,12 +31,9 @@ import com.intellij.platform.workspace.storage.testEntities.entities.KeyParentBu
 internal class KeyParentImpl(private val dataSource: KeyParentData) : KeyParent, WorkspaceEntityBase(dataSource) {
 
   private companion object {
-    internal val CHILDREN_CONNECTION_ID: ConnectionId = ConnectionId.create(KeyParent::class.java, KeyChild::class.java,
-                                                                            ConnectionId.ConnectionType.ONE_TO_MANY, false)
-
-    private val connections = listOf<ConnectionId>(
-      CHILDREN_CONNECTION_ID,
-    )
+    internal val CHILDREN_CONNECTION_ID: ConnectionId =
+      ConnectionId.create(KeyParent::class.java, KeyChild::class.java, ConnectionId.ConnectionType.ONE_TO_MANY, false)
+    private val connections = listOf<ConnectionId>(CHILDREN_CONNECTION_ID)
 
   }
 
@@ -37,15 +42,14 @@ internal class KeyParentImpl(private val dataSource: KeyParentData) : KeyParent,
       readField("keyField")
       return dataSource.keyField
     }
-
   override val notKeyField: String
     get() {
       readField("notKeyField")
       return dataSource.notKeyField
     }
-
   override val children: List<KeyChild>
-    get() = snapshot.extractOneToManyChildren<KeyChild>(CHILDREN_CONNECTION_ID, this)!!.toList()
+    get() = (snapshot.instrumentation.getManyChildren(CHILDREN_CONNECTION_ID, this) as? Sequence<KeyChild>)?.toList()
+            ?: error("Children children not found for KeyParent")
 
   override val entitySource: EntitySource
     get() {
@@ -71,15 +75,13 @@ internal class KeyParentImpl(private val dataSource: KeyParentData) : KeyParent,
           error("Entity KeyParent is already created in a different builder")
         }
       }
-
       this.diff = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
-      // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
-      // Builder may switch to snapshot at any moment and lock entity data to modification
+// After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
+// Builder may switch to snapshot at any moment and lock entity data to modification
       this.currentEntityData = null
-
-      // Process linked entities that are connected without a builder
+// Process linked entities that are connected without a builder
       processLinkedEntities(builder)
       checkInitialization() // TODO uncomment and check failed tests
     }
@@ -95,9 +97,9 @@ internal class KeyParentImpl(private val dataSource: KeyParentData) : KeyParent,
       if (!getEntityData().isNotKeyFieldInitialized()) {
         error("Field KeyParent#notKeyField should be initialized")
       }
-      // Check initialization for list with ref type
+// Check initialization for list with ref type
       if (_diff != null) {
-        if (_diff.extractOneToManyChildren<WorkspaceEntityBase>(CHILDREN_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getManyChildrenBuilders(CHILDREN_CONNECTION_ID, this) == null) {
           error("Field KeyParent#children should be initialized")
         }
       }
@@ -130,7 +132,6 @@ internal class KeyParentImpl(private val dataSource: KeyParentData) : KeyParent,
         changedProperty.add("entitySource")
 
       }
-
     override var keyField: String
       get() = getEntityData().keyField
       set(value) {
@@ -138,7 +139,6 @@ internal class KeyParentImpl(private val dataSource: KeyParentData) : KeyParent,
         getEntityData(true).keyField = value
         changedProperty.add("keyField")
       }
-
     override var notKeyField: String
       get() = getEntityData().notKeyField
       set(value) {
@@ -151,44 +151,41 @@ internal class KeyParentImpl(private val dataSource: KeyParentData) : KeyParent,
     var _children: List<KeyChild>? = emptyList()
     override var children: List<KeyChildBuilder>
       get() {
-        // Getter of the list of non-abstract referenced types
+// Getter of the list of non-abstract referenced types
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
-          ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(CHILDREN_CONNECTION_ID,
-                                                                                  this)!!.toList() as List<KeyChildBuilder>) +
-          (this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<KeyChildBuilder> ?: emptyList())
+          ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(CHILDREN_CONNECTION_ID, this)!!
+            .toList() as List<KeyChildBuilder>) + (this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<KeyChildBuilder>
+                                                   ?: emptyList())
         }
         else {
           this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<KeyChildBuilder> ?: emptyList()
         }
       }
       set(value) {
-        // Setter of the list of non-abstract referenced types
+// Setter of the list of non-abstract referenced types
         checkModificationAllowed()
         val _diff = diff
         if (_diff != null) {
           for (item_value in value) {
             if (item_value is ModifiableWorkspaceEntityBase<*, *> && (item_value as? ModifiableWorkspaceEntityBase<*, *>)?.diff == null) {
-              // Backref setup before adding to store
+// Backref setup before adding to store
               if (item_value is ModifiableWorkspaceEntityBase<*, *>) {
                 item_value.entityLinks[EntityLink(false, CHILDREN_CONNECTION_ID)] = this
               }
-              // else you're attaching a new entity to an existing entity that is not modifiable
-
+// else you're attaching a new entity to an existing entity that is not modifiable
               _diff.addEntity(item_value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
             }
           }
-          _diff.updateOneToManyChildrenOfParent(CHILDREN_CONNECTION_ID, this, value)
+          _diff.instrumentation.replaceChildren(CHILDREN_CONNECTION_ID, this, value)
         }
         else {
           for (item_value in value) {
             if (item_value is ModifiableWorkspaceEntityBase<*, *>) {
               item_value.entityLinks[EntityLink(false, CHILDREN_CONNECTION_ID)] = this
             }
-            // else you're attaching a new entity to an existing entity that is not modifiable
+// else you're attaching a new entity to an existing entity that is not modifiable
           }
-
           this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] = value
         }
         changedProperty.add("children")
@@ -196,6 +193,7 @@ internal class KeyParentImpl(private val dataSource: KeyParentData) : KeyParent,
 
     override fun getEntityClass(): Class<KeyParent> = KeyParent::class.java
   }
+
 }
 
 @OptIn(WorkspaceEntityInternalApi::class)
@@ -213,7 +211,6 @@ internal class KeyParentData : WorkspaceEntityData<KeyParent>() {
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): KeyParent {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {
@@ -225,8 +222,7 @@ internal class KeyParentData : WorkspaceEntityData<KeyParent>() {
   }
 
   override fun getMetadata(): EntityMetadata {
-    return MetadataStorageImpl.getMetadataByTypeFqn(
-      "com.intellij.platform.workspace.storage.testEntities.entities.KeyParent") as EntityMetadata
+    return MetadataStorageImpl.getMetadataByTypeFqn("com.intellij.platform.workspace.storage.testEntities.entities.KeyParent") as EntityMetadata
   }
 
   override fun getEntityInterface(): Class<out WorkspaceEntity> {
@@ -234,8 +230,7 @@ internal class KeyParentData : WorkspaceEntityData<KeyParent>() {
   }
 
   override fun createDetachedEntity(parents: List<WorkspaceEntityBuilder<*>>): WorkspaceEntityBuilder<*> {
-    return KeyParent(keyField, notKeyField, entitySource) {
-    }
+    return KeyParent(keyField, notKeyField, entitySource)
   }
 
   override fun getRequiredParents(): List<Class<out WorkspaceEntity>> {
@@ -246,9 +241,7 @@ internal class KeyParentData : WorkspaceEntityData<KeyParent>() {
   override fun equals(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as KeyParentData
-
     if (this.entitySource != other.entitySource) return false
     if (this.keyField != other.keyField) return false
     if (this.notKeyField != other.notKeyField) return false
@@ -258,9 +251,7 @@ internal class KeyParentData : WorkspaceEntityData<KeyParent>() {
   override fun equalsIgnoringEntitySource(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as KeyParentData
-
     if (this.keyField != other.keyField) return false
     if (this.notKeyField != other.notKeyField) return false
     return true
@@ -283,9 +274,7 @@ internal class KeyParentData : WorkspaceEntityData<KeyParent>() {
   override fun equalsByKey(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as KeyParentData
-
     if (this.keyField != other.keyField) return false
     return true
   }

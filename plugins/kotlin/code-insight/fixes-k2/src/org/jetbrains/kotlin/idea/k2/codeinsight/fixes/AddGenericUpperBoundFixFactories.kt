@@ -17,13 +17,13 @@ internal object AddGenericUpperBoundFixFactories {
 
     val upperBoundViolatedFixFactory = KotlinQuickFixFactory.ModCommandBased { diagnostic: KaFirDiagnostic.UpperBoundViolated ->
         listOfNotNull(
-            createActionIfAvailable(diagnostic.expectedUpperBound, diagnostic.actualUpperBound)
+            createActionIfAvailable(diagnostic.expectedUpperBound, diagnostic.actualType)
         )
     }
 
     val upperBoundViolatedBasedOnJavaAnnotationsFixFactory = KotlinQuickFixFactory.ModCommandBased { diagnostic: KaFirDiagnostic.UpperBoundViolatedBasedOnJavaAnnotations ->
             listOfNotNull(
-                createActionIfAvailable(diagnostic.expectedUpperBound, diagnostic.actualUpperBound)
+                createActionIfAvailable(diagnostic.expectedUpperBound, diagnostic.actualType)
             )
         }
 

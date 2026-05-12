@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceJavaStaticMethodWithKotlinAnalog")
 
 package org.jetbrains.intellij.build.productLayout
@@ -21,27 +21,21 @@ import org.jetbrains.intellij.build.impl.PluginLayout
  * Default bundled plugins for all products.
  */
 val DEFAULT_BUNDLED_PLUGINS: PersistentList<String> = persistentListOf(
+  "intellij.dev",
+  "intellij.jcef.plugin",
+  "intellij.moduleSet.plugin.grid.core",
+  "intellij.moduleSet.plugin.recentFiles",
+  "intellij.moduleSet.plugin.vcs.frontend",
   "intellij.platform.images",
-  "intellij.dev"
 )
 
 class ProductModulesLayout {
   /**
-   * Names of the additional product-specific modules which need to be packed into product.jar in the product's 'lib' directory.
-   * 
-   * **Note that these modules will be loaded by the core classloader.**
-   * 
-   * It's better to include them as content modules in a regular or the core plugin instead, this way they'll be loaded by separate classloaders and you won't need to register
-   * them explicitly in the build scripts.
-   */
-  var productApiModules: List<String> = emptyList()
-
-  /**
-   * Names of the additional product-specific modules which need to be included in the product's 'lib' directory
+   * Names of the additional product-specific modules that need to be included in the product's 'lib' directory
    *
    * **Note that these modules will be loaded by the core classloader.**
    *
-   * It's better to include them as content modules in a regular or the core plugin instead, this way they'll be loaded by separate classloaders and you won't need to register
+   * It's better to include them as content modules in a regular or the core plugin instead, this way they'll be loaded by separate classloaders, and you won't need to register
    * them explicitly in the build scripts.
    */
   var productImplementationModules: List<String> = emptyList()
@@ -57,7 +51,7 @@ class ProductModulesLayout {
   var bundledPluginModules: PersistentList<String> = DEFAULT_BUNDLED_PLUGINS
 
   /**
-   * Main module names (containing META-INF/plugin.xml) of the plugins which aren't bundled with the product but may be installed into it.
+   * Main module names (containing META-INF/plugin.xml) of the plugins that aren't bundled with the product but may be installed into it.
    * Zip archives of these plugins will be built and placed under [org.jetbrains.intellij.build.BuildContext.nonBundledPlugins] directory in the build artifacts.
    * Layouts of the plugins are specified in [pluginLayouts] list.
    */

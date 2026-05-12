@@ -36,7 +36,7 @@ import com.intellij.psi.xml.XmlElement;
 import com.intellij.psi.xml.XmlFile;
 import com.intellij.psi.xml.XmlTag;
 import com.intellij.ui.EditorComboBox;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.util.ArrayUtilRt;
 import com.intellij.util.IncorrectOperationException;
@@ -137,7 +137,7 @@ public abstract class InputExpressionDialog<FormType extends InputForm> extends 
         });
         myComboBox = new EditorComboBox(myDocument, project, XPathFileType.XPATH);
         myComboBox.setModel(myModel);
-        myComboBox.setRenderer(SimpleListCellRenderer.<HistoryElement>create("", value -> value.expression));
+        myComboBox.setRenderer(BuilderKt.<HistoryElement>textListCellRenderer("", value -> value.expression));
 
         myComboBox.setEditable(true);
 

@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 internal class ShelveChangeManagerProjectActivity : ProjectActivity {
   override suspend fun execute(project: Project) {
     val manager = project.serviceAsync<ShelveChangesManager>()
-    manager.projectOpened()
+    manager.scheduleShelvesLoading().await()
   }
 }
 

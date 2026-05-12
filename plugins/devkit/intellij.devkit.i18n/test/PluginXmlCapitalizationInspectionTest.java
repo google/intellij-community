@@ -7,7 +7,7 @@ import com.intellij.openapi.project.IntelliJProjectUtil;
 import com.intellij.testFramework.TestDataPath;
 import com.intellij.testFramework.fixtures.LightJavaCodeInsightFixtureTestCase;
 
-@TestDataPath("$CONTENT_ROOT/testData/inspections/pluginXmlCapitalization/")
+@TestDataPath("$CONTENT_ROOT/../testData/inspections/pluginXmlCapitalization/")
 public class PluginXmlCapitalizationInspectionTest extends LightJavaCodeInsightFixtureTestCase {
 
   @Override

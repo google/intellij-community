@@ -1,19 +1,19 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.test.events.gradle
 
 import org.gradle.util.GradleVersion
 import org.jetbrains.kotlin.idea.testFramework.gradle.KotlinGradleTestExecutionTestCase
 import org.jetbrains.plugins.gradle.testFramework.annotations.AllGradleVersionsSource
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatGradleIsAtLeast
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatGradleIsOlderThan
+import org.jetbrains.plugins.gradle.testFramework.util.KOTLIN_SUPPORTED_VERSIONS
+import org.jetbrains.plugins.gradle.tooling.annotation.TargetVersions
 import org.junit.jupiter.params.ParameterizedTest
 
 class KotlinGradleTestNavigationTest : KotlinGradleTestExecutionTestCase() {
 
     @ParameterizedTest
+    @TargetVersions(KOTLIN_SUPPORTED_VERSIONS, "<7.0")
     @AllGradleVersionsSource
     fun `test display name and navigation with Kotlin and Junit 5 OLD`(gradleVersion: GradleVersion) {
-        assumeThatGradleIsOlderThan(gradleVersion, "7.0")
         testKotlinJunit5Project(gradleVersion) {
             writeText("src/test/kotlin/org/example/TestCase.kt", KOTLIN_JUNIT5_TEST)
             writeText("src/test/kotlin/org/example/DisplayNameTestCase.kt", KOTLIN_DISPLAY_NAME_JUNIT5_TEST)
@@ -70,9 +70,9 @@ class KotlinGradleTestNavigationTest : KotlinGradleTestExecutionTestCase() {
     }
 
     @ParameterizedTest
+    @TargetVersions("7.0+")
     @AllGradleVersionsSource
     fun `test display name and navigation with Kotlin and Junit 5`(gradleVersion: GradleVersion) {
-        assumeThatGradleIsAtLeast(gradleVersion, "7.0")
         testKotlinJunit5Project(gradleVersion) {
             writeText("src/test/kotlin/org/example/TestCase.kt", KOTLIN_JUNIT5_TEST)
             writeText("src/test/kotlin/org/example/DisplayNameTestCase.kt", KOTLIN_DISPLAY_NAME_JUNIT5_TEST)
@@ -147,6 +147,7 @@ class KotlinGradleTestNavigationTest : KotlinGradleTestExecutionTestCase() {
     }
 
     @ParameterizedTest
+    @TargetVersions(KOTLIN_SUPPORTED_VERSIONS)
     @AllGradleVersionsSource
     fun `test display name and navigation with Kotlin and Junit 4`(gradleVersion: GradleVersion) {
         testKotlinJunit4Project(gradleVersion) {
@@ -181,11 +182,9 @@ class KotlinGradleTestNavigationTest : KotlinGradleTestExecutionTestCase() {
     }
 
     @ParameterizedTest
+    @TargetVersions("6.8.3+", reason = "Kotlin multiplatform isn't supported by Gradle older than 6.8.3")
     @AllGradleVersionsSource
     fun `test display name and navigation with Kotlin Multiplatform and Kotlin Test`(gradleVersion: GradleVersion) {
-        assumeThatGradleIsAtLeast(gradleVersion, "6.8.3") {
-            "Kotlin multiplatform isn't supported by Gradle older than 6.8.3"
-        }
         testKotlinMultiplatformProject(gradleVersion) {
             writeText("src/jsTest/kotlin/Foo.kt", KOTLIN_TEST)
 
@@ -203,6 +202,7 @@ class KotlinGradleTestNavigationTest : KotlinGradleTestExecutionTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_SUPPORTED_VERSIONS)
     fun `test display name and navigation with Kotlin and Test NG`(gradleVersion: GradleVersion) {
         testKotlinTestNGProject(gradleVersion) {
             writeText("src/test/kotlin/org/example/TestCase.kt", KOTLIN_TESTNG_TEST)

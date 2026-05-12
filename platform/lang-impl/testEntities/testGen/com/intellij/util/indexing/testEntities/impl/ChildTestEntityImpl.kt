@@ -1,4 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.util.indexing.testEntities.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
@@ -13,11 +15,10 @@ import com.intellij.platform.workspace.storage.impl.EntityLink
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
-import com.intellij.platform.workspace.storage.impl.extractOneToOneParent
-import com.intellij.platform.workspace.storage.impl.updateOneToOneParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.util.indexing.testEntities.ChildTestEntity
 import com.intellij.util.indexing.testEntities.ChildTestEntityBuilder
@@ -37,7 +38,8 @@ internal class ChildTestEntityImpl(private val dataSource: ChildTestEntityData) 
   }
 
   override val parent: ParentTestEntity
-    get() = snapshot.extractOneToOneParent(PARENT_CONNECTION_ID, this)!!
+    get() = snapshot.instrumentation.getParent(PARENT_CONNECTION_ID, this) as? ParentTestEntity
+            ?: error("Parent parent not found for ChildTestEntity")
   override val customChildProperty: String
     get() {
       readField("customChildProperty")
@@ -86,7 +88,7 @@ internal class ChildTestEntityImpl(private val dataSource: ChildTestEntityData) 
         error("Field WorkspaceEntity#entitySource should be initialized")
       }
       if (_diff != null) {
-        if (_diff.extractOneToOneParent<WorkspaceEntityBase>(PARENT_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getParentBuilder(PARENT_CONNECTION_ID, this) == null) {
           error("Field ChildTestEntity#parent should be initialized")
         }
       }
@@ -125,12 +127,13 @@ internal class ChildTestEntityImpl(private val dataSource: ChildTestEntityData) 
       get() {
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(PARENT_CONNECTION_ID, this) as? ParentTestEntityBuilder)
-          ?: (this.entityLinks[EntityLink(false, PARENT_CONNECTION_ID)]!! as ParentTestEntityBuilder)
+          ?: (this.entityLinks[EntityLink(false, PARENT_CONNECTION_ID)] as? ParentTestEntityBuilder)
+          ?: error("parent is null for ChildTestEntity")
         }
         else {
-          this.entityLinks[EntityLink(false, PARENT_CONNECTION_ID)]!! as ParentTestEntityBuilder
+          (this.entityLinks[EntityLink(false, PARENT_CONNECTION_ID)] as? ParentTestEntityBuilder)
+          ?: error("parent is null for ChildTestEntity")
         }
       }
       set(value) {
@@ -144,7 +147,7 @@ internal class ChildTestEntityImpl(private val dataSource: ChildTestEntityData) 
           _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
         }
         if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)) {
-          _diff.updateOneToOneParentOfChild(PARENT_CONNECTION_ID, this, value)
+          _diff.instrumentation.addChild(PARENT_CONNECTION_ID, value, this)
         }
         else {
           if (value is ModifiableWorkspaceEntityBase<*, *>) {
@@ -182,7 +185,6 @@ internal class ChildTestEntityData : WorkspaceEntityData<ChildTestEntity>() {
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): ChildTestEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {

@@ -1452,7 +1452,7 @@ public class VirtualFilePointerTest extends BareTestFixtureTestCase {
     // also should not leak pointers, checked in tearDown()
     IntStream.range(0, 100_000)
       .parallel()
-      .forEach(__ -> {
+      .forEach(_ -> {
         Disposable disposable = Disposer.newDisposable();
         myVirtualFilePointerManager.create(myDir().getUrl() + "/" + "file.txt", disposable, null);
         Disposer.dispose(disposable);

@@ -191,13 +191,11 @@ internal object WrapWithSafeLetCallFixFactories {
     val forUnsafeImplicitInvokeCall = KotlinQuickFixFactory.ModCommandBased { diagnostic: KaFirDiagnostic.UnsafeImplicitInvokeCall ->
         val callExpression = diagnostic.psi.parentOfType<KtCallExpression>(withSelf = true)
             ?: return@ModCommandBased emptyList()
-        val callingFunctionalVariableInLocalScope =
-            isCallingFunctionalTypeVariableInLocalScope(callExpression)
-                ?: return@ModCommandBased emptyList()
+        val calleeExpression = callExpression.calleeExpression ?: return@ModCommandBased emptyList()
 
         createWrapWithSafeLetCallInputForNullableExpression(
-            callExpression.calleeExpression,
-            isImplicitInvokeCallToMemberProperty = !callingFunctionalVariableInLocalScope
+            calleeExpression,
+            isImplicitInvokeCallToMemberProperty = isCallingFunctionalTypeVariableInLocalScope(callExpression) == false,
         )
     }
 
@@ -251,7 +249,6 @@ internal object WrapWithSafeLetCallFixFactories {
     }
 
     context(session: KaSession)
-    @OptIn(KaExperimentalApi::class)
     private fun createWrapWithSafeLetCallInputForNullableExpression(
         nullableExpression: KtExpression?,
         isImplicitInvokeCallToMemberProperty: Boolean = false,

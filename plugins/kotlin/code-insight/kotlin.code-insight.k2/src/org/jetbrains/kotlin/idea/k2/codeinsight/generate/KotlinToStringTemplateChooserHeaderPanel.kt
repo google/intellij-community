@@ -5,8 +5,7 @@ import com.intellij.java.JavaBundle
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
-import com.intellij.ui.SimpleListCellRenderer
-import com.intellij.ui.components.JBLabel
+import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import org.jetbrains.java.generate.template.TemplateResource
 import org.jetbrains.java.generate.view.TemplatesPanel
 import java.awt.GridBagConstraints
@@ -31,10 +30,7 @@ internal class KotlinToStringTemplateChooserHeaderPanel(val project: Project) : 
 
     comboBox = ComboBox<TemplateResource>(templates.toTypedArray<TemplateResource>())
 
-    comboBox.setRenderer(SimpleListCellRenderer.create<TemplateResource>(
-      SimpleListCellRenderer.Customizer { label: JBLabel, value: TemplateResource, index: Int ->
-        label.setText(value.name)
-      }))
+    comboBox.setRenderer(textListCellRenderer("") { it.name })
     settingsButton.addActionListener(object : ActionListener {
       override fun actionPerformed(e: ActionEvent?) {
         val ui = TemplatesPanel(project, KotlinToStringTemplatesManager.getInstance())

@@ -10,4 +10,5 @@ internal class KotlinWhenPostfixTemplate(provider: PostfixTemplateProvider) : Su
     KtPostfixTemplatePsiInfo, createPostfixExpressionSelector(), provider
 ) {
     override fun getSurrounder(): KotlinWhenSurrounder = KotlinWhenSurrounder()
+    override fun isApplicableForModCommand(): Boolean = true
 }

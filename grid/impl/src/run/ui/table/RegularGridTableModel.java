@@ -105,6 +105,11 @@ public class RegularGridTableModel extends GridTableModel {
     }
 
     @Override
+    public void dropModelDependentCache() {
+      myIconCache = null;
+    }
+
+    @Override
     public @NlsContexts.ColumnName @NotNull String getHeaderValue() {
       String result = myGrid.getName(myColumn);
       String displayTypeName;

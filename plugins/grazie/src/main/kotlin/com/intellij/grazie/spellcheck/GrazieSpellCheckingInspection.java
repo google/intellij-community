@@ -18,6 +18,7 @@ import com.intellij.grazie.spellcheck.engine.GrazieSpellCheckerEngine;
 import com.intellij.lang.LanguageNamesValidation;
 import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.lang.refactoring.NamesValidator;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
@@ -56,6 +57,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -65,6 +67,9 @@ import static com.intellij.grazie.utils.HighlightingUtil.getTool;
 import static com.intellij.spellchecker.tokenizer.SpellcheckingStrategy.getSpellcheckingStrategy;
 
 public final class GrazieSpellCheckingInspection extends SpellCheckingInspection {
+
+  private static final Logger LOGGER = Logger.getInstance(GrazieSpellCheckingInspection.class);
+  private static final AtomicBoolean IS_LOGGED = new AtomicBoolean(false);
 
   public static Set<SpellCheckingScope> buildAllowedScopes(PsiElement element) {
     var tool = getTool(element.getContainingFile(), SPELL_CHECKING_INSPECTION_TOOL_NAME, GrazieSpellCheckingInspection.class);
@@ -391,6 +396,10 @@ public final class GrazieSpellCheckingInspection extends SpellCheckingInspection
                                       @NotNull TextRange range,
                                       boolean useRename,
                                       String word) {
+    if (!useRename && IS_LOGGED.compareAndSet(false, true)) {
+      LOGGER.warn("Consider migrating programming language '" + element.getLanguage().getDisplayName() + "' to text-level spellchecking. " +
+                  "See SpellcheckingStrategy#useTextLevelSpellchecking() documentation.");
+    }
     if (holder.isOnTheFly()) {
       addRegularDescriptor(element, range, holder, useRename, word);
     }

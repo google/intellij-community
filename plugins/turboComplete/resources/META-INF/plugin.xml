@@ -16,8 +16,10 @@
   </content>
 
   <dependencies>
-    <module name="intellij.platform.ml.impl"/>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
     <plugin id="com.intellij.completion.ml.ranking"/>
+    <module name="intellij.platform.ml.impl"/>
+    <!-- endregion -->
   </dependencies>
 
   <resource-bundle>messages.TurboComplete</resource-bundle>

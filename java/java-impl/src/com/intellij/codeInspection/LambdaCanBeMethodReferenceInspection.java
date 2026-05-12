@@ -2,7 +2,6 @@
 package com.intellij.codeInspection;
 
 import com.intellij.codeInsight.Nullability;
-import com.intellij.codeInspection.compiler.JavacQuirksInspectionVisitor;
 import com.intellij.codeInspection.dataFlow.NullabilityUtil;
 import com.intellij.modcommand.ModPsiUpdater;
 import com.intellij.modcommand.PsiUpdateModCommandQuickFix;
@@ -56,6 +55,7 @@ import com.intellij.psi.SmartTypePointerManager;
 import com.intellij.psi.SyntaxTraverser;
 import com.intellij.psi.codeStyle.JavaCodeStyleManager;
 import com.intellij.psi.codeStyle.JavaCodeStyleSettings;
+import com.intellij.psi.impl.source.resolve.JavaResolveUtil;
 import com.intellij.psi.impl.source.resolve.graphInference.FunctionalInterfaceParameterizationUtil;
 import com.intellij.psi.infos.MethodCandidateInfo;
 import com.intellij.psi.tree.IElementType;
@@ -427,7 +427,7 @@ public final class LambdaCanBeMethodReferenceInspection extends AbstractBaseJava
         return null;
       }
 
-      if (JavacQuirksInspectionVisitor.getInaccessibleMethodReferenceClass(element, psiMethod) != null) {
+      if (getInaccessibleMethodReferenceClass(element, psiMethod) != null) {
         return null;
       }
 
@@ -626,6 +626,25 @@ public final class LambdaCanBeMethodReferenceInspection extends AbstractBaseJava
     if (p.hasAnnotations()) return true;
     PsiTypeElement typeElement = p.getTypeElement();
     return typeElement != null && !typeElement.isInferredType() && PsiTypesUtil.hasTypeAnnotation(typeElement.getType());
+  }
+
+  /**
+   * @param context PsiElement where accessibility should be checked
+   * @param method method reference target method
+   * @return class that needs to be accessible at runtime to link the method reference but is not accessible at runtime;
+   * null if there's no accessibility problem
+   */
+  public static @Nullable PsiClass getInaccessibleMethodReferenceClass(@NotNull PsiElement context, @Nullable PsiMethod method) {
+    if (method == null) return null;
+    PsiClass targetClass = PsiUtil.resolveClassInType(TypeConversionUtil.erasure(method.getReturnType()));
+    if (targetClass == null) return null;
+    if (!targetClass.hasModifierProperty(PsiModifier.PACKAGE_LOCAL) && !targetClass.hasModifierProperty(PsiModifier.PRIVATE)) {
+      return null;
+    }
+    if (JavaResolveUtil.isAccessible(targetClass, targetClass.getContainingClass(), targetClass.getModifierList(), context, null, null)) {
+      return null;
+    }
+    return targetClass;
   }
 
   private static class ReplaceWithMethodRefFix extends PsiUpdateModCommandQuickFix {

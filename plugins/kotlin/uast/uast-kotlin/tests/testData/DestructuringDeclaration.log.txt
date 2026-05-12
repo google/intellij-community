@@ -6,7 +6,7 @@ UFile (package = )
             UBlockExpression
                 UDeclarationsExpression
                     ULocalVariable (name = var268d41a5)
-                        UAnnotation (fqName = null)
+                        UAnnotation (fqName = org.jetbrains.annotations.NotNull)
                         UBinaryExpression (operator = <other>)
                             UPolyadicExpression (operator = +)
                                 ULiteralExpression (value = "foo")
@@ -25,7 +25,7 @@ UFile (package = )
                                 UIdentifier (Identifier (component2))
                 UDeclarationsExpression
                     ULocalVariable (name = var465978a0)
-                        UAnnotation (fqName = null)
+                        UAnnotation (fqName = org.jetbrains.annotations.NotNull)
                         UAnnotation (fqName = kotlin.Suppress)
                             UNamedExpression (name = names)
                                 UPolyadicExpression (operator = +)

@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.driver.impl` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "driver-impl_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "driver-impl",
   module_name = "intellij.driver.impl",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":driver-impl_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/remote-driver/model",
     "@lib//:jetbrains-annotations",
@@ -20,6 +15,7 @@ jvm_library(
     "//platform/core-impl",
     "//platform/diagnostic/telemetry",
     "//platform/util",
+    "//platform/util/base",
     "@lib//:opentelemetry",
     "@lib//:opentelemetry-semconv",
     "//libraries/commons/lang3",
@@ -28,6 +24,7 @@ jvm_library(
 
 jvm_library(
   name = "driver-impl_test_lib",
+  testonly = True,
   module_name = "intellij.driver.impl",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -38,7 +35,14 @@ jvm_library(
     "//platform/core-impl:core-impl_test_lib",
     "//platform/diagnostic/telemetry:telemetry_test_lib",
     "//platform/util:util_test_lib",
+    "//platform/util/base:base_test_lib",
     "//libraries/commons/lang3:lang3_test_lib",
   ]
 )
 ### auto-generated section `build intellij.driver.impl` end
+
+### auto-generated section `iml intellij.driver.impl` start
+exports_files([
+  "intellij.driver.impl.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.driver.impl` end

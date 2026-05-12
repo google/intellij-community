@@ -440,7 +440,6 @@ c:com.intellij.codeInsight.daemon.LineMarkerInfo
 - separatorPlacement:com.intellij.openapi.editor.markup.SeparatorPlacement
 - f:startOffset:I
 - updatePass:I
-- <init>(com.intellij.psi.PsiElement,I,javax.swing.Icon,I,com.intellij.util.Function,com.intellij.codeInsight.daemon.GutterIconNavigationHandler):V
 - <init>(com.intellij.psi.PsiElement,com.intellij.openapi.util.TextRange):V
 - <init>(com.intellij.psi.PsiElement,com.intellij.openapi.util.TextRange,javax.swing.Icon,I,com.intellij.util.Function,com.intellij.codeInsight.daemon.GutterIconNavigationHandler,com.intellij.openapi.editor.markup.GutterIconRenderer$Alignment):V
 - <init>(com.intellij.psi.PsiElement,com.intellij.openapi.util.TextRange,javax.swing.Icon,com.intellij.util.Function,com.intellij.codeInsight.daemon.GutterIconNavigationHandler,com.intellij.openapi.editor.markup.GutterIconRenderer$Alignment):V
@@ -868,7 +867,6 @@ f:com.intellij.codeInsight.hints.declarative.PsiPointerInlayActionNavigationHand
 - sf:Companion:com.intellij.codeInsight.hints.declarative.PsiPointerInlayActionNavigationHandler$Companion
 - sf:HANDLER_ID:java.lang.String
 - <init>():V
-- handleClick(com.intellij.openapi.editor.Editor,com.intellij.codeInsight.hints.declarative.InlayActionPayload):V
 f:com.intellij.codeInsight.hints.declarative.PsiPointerInlayActionNavigationHandler$Companion
 f:com.intellij.codeInsight.hints.declarative.PsiPointerInlayActionPayload
 - com.intellij.codeInsight.hints.declarative.InlayActionPayload
@@ -1150,9 +1148,6 @@ c:com.intellij.codeInspection.ui.SingleIntegerFieldOptionsPanel
 - <init>(java.lang.String,com.intellij.codeInspection.InspectionProfileEntry,java.lang.String,I):V
 - s:createIntegerFieldTrackingValue(com.intellij.codeInspection.InspectionProfileEntry,java.lang.String,I):javax.swing.JFormattedTextField
 - s:setupIntegerFieldTrackingValue(javax.swing.JFormattedTextField,com.intellij.codeInspection.InspectionProfileEntry,java.lang.String):V
-c:com.intellij.execution.ExecutionAdapter
-- com.intellij.execution.ExecutionListener
-- <init>():V
 a:com.intellij.execution.ExecutionTargetProvider
 - sf:EXTENSION_NAME:com.intellij.openapi.extensions.ExtensionPointName
 - <init>():V
@@ -3573,7 +3568,6 @@ f:com.intellij.openapi.module.ModuleTypeEP
 - setPluginDescriptor(com.intellij.openapi.extensions.PluginDescriptor):V
 f:com.intellij.openapi.module.ModuleUtil
 - com.intellij.openapi.module.ModuleUtilCore
-- s:getModuleType(com.intellij.openapi.module.Module):com.intellij.openapi.module.ModuleType
 - s:getModulesOfType(com.intellij.openapi.project.Project,com.intellij.openapi.module.ModuleType):java.util.Collection
 - s:hasModulesOfType(com.intellij.openapi.project.Project,com.intellij.openapi.module.ModuleType):Z
 - s:hasTestSourceRoots(com.intellij.openapi.project.Project):Z
@@ -4370,8 +4364,9 @@ a:com.intellij.psi.impl.include.FileIncludeManager
 - a:resolveFileInclude(com.intellij.psi.impl.include.FileIncludeInfo,com.intellij.psi.PsiFile):com.intellij.psi.PsiFileSystemItem
 a:com.intellij.psi.impl.include.FileIncludeProvider
 - <init>():V
-- a:acceptFile(com.intellij.openapi.vfs.VirtualFile):Z
+- acceptFile(com.intellij.openapi.vfs.VirtualFile):Z
 - acceptFile(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.project.Project):Z
+- acceptFile(com.intellij.util.indexing.IndexedFile):Z
 - a:getId():java.lang.String
 - a:getIncludeInfos(com.intellij.util.indexing.FileContent):com.intellij.psi.impl.include.FileIncludeInfo[]
 - getIncludeName(com.intellij.psi.PsiFile,java.lang.String):java.lang.String
@@ -4988,7 +4983,6 @@ c:com.intellij.ui.popup.util.SplitterItem
 a:com.intellij.util.ActionRunner
 - <init>():V
 - s:runInsideWriteAction(com.intellij.util.ActionRunner$InterruptibleRunnable):V
-- s:runInsideWriteAction(com.intellij.util.ActionRunner$InterruptibleRunnableWithResult):java.lang.Object
 f:com.intellij.util.PsiNavigateUtil
 - <init>():V
 - s:getNavigatable(com.intellij.psi.PsiElement):com.intellij.pom.Navigatable

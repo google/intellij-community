@@ -21,7 +21,7 @@ internal class WelcomeScreenAwareActionsCustomizer : ActionConfigurationCustomiz
       replaceExistingAction("RenameProject") { hideActionOnWelcomeScreen(it) }
       replaceExistingAction("NewDir") { hideActionOnWelcomeScreen(it) }
       replaceExistingAction("NewFile") { WelcomeScreenProxyAction(it, CreateEmptyFileAction()) }
-      if (!PlatformUtils.isPyCharm()) {
+      if (!PlatformUtils.isPyCharm() && !PlatformUtils.isDataGrip()) {
         replaceExistingAction("NewElement") { WelcomeScreenProxyAction(it, WelcomeScreenLeftTabActionNew(), false) }
       }
 

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.ide.impl.wsl
 
 import com.intellij.execution.eel.MultiRoutingFileSystemUtils
@@ -6,7 +6,6 @@ import com.intellij.execution.wsl.WSLDistribution
 import com.intellij.execution.wsl.WslDistributionManager
 import com.intellij.execution.wsl.WslIjentAvailabilityService
 import com.intellij.execution.wsl.WslIjentManager
-import com.intellij.execution.wsl.WslPath
 import com.intellij.openapi.diagnostic.ControlFlowException
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.ProjectManager
@@ -16,8 +15,10 @@ import com.intellij.platform.eel.EelMachine
 import com.intellij.platform.eel.EelOsFamily
 import com.intellij.platform.eel.EelPathBoundDescriptor
 import com.intellij.platform.eel.annotations.MultiRoutingFileSystemPath
-import com.intellij.platform.eel.provider.EelProvider
-import com.intellij.platform.eel.provider.MultiRoutingFileSystemBackend
+import com.intellij.platform.eel.nioFs.impl.MultiRoutingFileSystemBackend
+import com.intellij.platform.eel.provider.EelAlternativeRootProvider
+import com.intellij.platform.eel.provider.EelEnvironmentInitializer
+import com.intellij.platform.eel.provider.getEelDescriptor
 import com.intellij.platform.ide.impl.wsl.ijent.nio.IjentWslNioFileSystemProvider
 import com.intellij.platform.ijent.community.impl.ijentFailSafeFileSystemApi
 import com.intellij.platform.ijent.community.impl.nio.IjentNioFileSystemProvider
@@ -61,7 +62,7 @@ class EelWslMrfsBackend(private val coroutineScope: CoroutineScope) : MultiRouti
   private val reportedNonExistentWslIds = AtomicReference<List<String>>(listOf())
 
   override fun compute(localFS: FileSystem, sanitizedPath: String): FileSystem? {
-    val (wslRoot, distributionId) = WslEelProvider.parsePath(sanitizedPath) ?: return null
+    val (wslRoot, distributionId) = WslPathParser.parsePath(sanitizedPath) ?: return null
 
     try {
       if (!WslIjentAvailabilityService.getInstance().useIjentForWslNioFileSystem()) {
@@ -124,6 +125,7 @@ class EelWslMrfsBackend(private val coroutineScope: CoroutineScope) : MultiRouti
             wslId = distributionId,
             ijentFsProvider = ijentFsProvider,
             originalFsProvider = localFS.provider(),
+            eelDescriptor = descriptor,
           ).getFileSystem(Path.of(wslRoot).toUri())
         }
         LOG.info("Switching $distributionId to IJent WSL nio.FS: $fileSystem")
@@ -170,21 +172,7 @@ class EelWslMrfsBackend(private val coroutineScope: CoroutineScope) : MultiRouti
 
 @ApiStatus.Internal
 @VisibleForTesting
-class WslEelProvider : EelProvider {
-  override fun getEelDescriptor(path: Path): WslEelDescriptor? {
-    if (!WslIjentAvailabilityService.getInstance().useIjentForWslNioFileSystem()) {
-      return null
-    }
-
-    val wslPath = WslPath.parseWindowsUncPath(path.toString()) ?: return null
-    val root = path.root ?: return null
-
-    return WslEelDescriptor(WSLDistribution(wslPath.distributionId), root.toString())
-  }
-
-  override fun getCustomRoots(eelDescriptor: EelDescriptor): Collection<@MultiRoutingFileSystemPath String>? =
-    (eelDescriptor as? WslEelDescriptor)?.distribution?.roots
-
+class WslEelEnvironmentInitializer : EelEnvironmentInitializer {
   override suspend fun tryInitialize(@MultiRoutingFileSystemPath path: String): EelMachine? {
     if (!WslIjentAvailabilityService.getInstance().useIjentForWslNioFileSystem()) {
       return null
@@ -201,7 +189,7 @@ class WslEelProvider : EelProvider {
       return null
     }
 
-    val wslPath = WslPath.parseWindowsUncPath(path) ?: return null
+    val descriptor = nioPath.getEelDescriptor() as? WslEelDescriptor ?: return null
 
     val project = ProjectManager.getInstance().openProjects.find { project ->
       try {
@@ -213,45 +201,52 @@ class WslEelProvider : EelProvider {
       }
     }
 
-    val descriptor = WslEelDescriptor(wslPath.distribution, wslPath.wslRoot)
+    WslIjentManager.instanceAsync().getIjentApi(descriptor, descriptor.distribution, project, false)
 
-    WslIjentManager.instanceAsync().getIjentApi(descriptor, wslPath.distribution, project, false)
+    (getDefault().provider() as MultiRoutingFileSystemProvider).theOnlyFileSystem.getBackend(descriptor.fsRoot)
 
-    (getDefault().provider() as MultiRoutingFileSystemProvider).theOnlyFileSystem.getBackend(wslPath.wslRoot + "\\")
-
-    return WslEelMachine(wslPath.distribution)
-  }
-
-  companion object {
-    // wsl root -> distribution id
-    internal fun parsePath(sanitizedPath: String): Pair<String, String>? {
-      @MultiRoutingFileSystemPath
-      val wslRoot: String
-      val distributionId: String
-
-      val serverNameEndIdx = when {
-        sanitizedPath.startsWith("//wsl.localhost/", ignoreCase = true) -> 16
-        sanitizedPath.startsWith("//wsl$/", ignoreCase = true) -> 7
-        else -> return null
-      }
-
-      val shareNameEndIdx = sanitizedPath.indexOf('/', startIndex = serverNameEndIdx)
-
-      if (shareNameEndIdx == -1) {
-        wslRoot = sanitizedPath + "\\"
-        distributionId = sanitizedPath.substring(serverNameEndIdx)
-      }
-      else {
-        wslRoot = sanitizedPath.take(shareNameEndIdx + 1)
-        distributionId = sanitizedPath.substring(serverNameEndIdx, shareNameEndIdx)
-      }
-
-      return wslRoot to distributionId
-    }
+    return WslEelMachine(descriptor.distribution)
   }
 }
 
-class WslEelDescriptor internal constructor(val distribution: WSLDistribution, internal val fsRoot: String) : EelPathBoundDescriptor {
+@ApiStatus.Internal
+class WslEelAlternativeRootProvider : EelAlternativeRootProvider {
+  override fun getAlternativeRoots(descriptor: EelDescriptor): Collection<@MultiRoutingFileSystemPath String>? =
+    (descriptor as? WslEelDescriptor)?.distribution?.roots
+}
+
+@ApiStatus.Internal
+object WslPathParser {
+  // wsl root -> distribution id
+  internal fun parsePath(sanitizedPath: String): Pair<String, String>? {
+    @MultiRoutingFileSystemPath
+    val wslRoot: String
+    val distributionId: String
+
+    val serverNameEndIdx = when {
+      sanitizedPath.startsWith("//wsl.localhost/", ignoreCase = true) -> 16
+      sanitizedPath.startsWith("//wsl$/", ignoreCase = true) -> 7
+      else -> return null
+    }
+
+    val shareNameEndIdx = sanitizedPath.indexOf('/', startIndex = serverNameEndIdx)
+
+    if (shareNameEndIdx == -1) {
+      wslRoot = sanitizedPath + "\\"
+      distributionId = sanitizedPath.substring(serverNameEndIdx)
+    }
+    else {
+      wslRoot = sanitizedPath.take(shareNameEndIdx + 1)
+      distributionId = sanitizedPath.substring(serverNameEndIdx, shareNameEndIdx)
+    }
+
+    return wslRoot to distributionId
+  }
+}
+
+class WslEelDescriptor internal constructor(val distribution: WSLDistribution, fsRoot: String) : EelPathBoundDescriptor {
+  internal val fsRoot = fsRoot.replace('/', '\\')
+
   constructor(distribution: WSLDistribution) : this(distribution, distribution.getUNCRootPath().pathString)
 
   override val rootPath: Path get() = fsRoot.let(::Path)
@@ -276,4 +271,6 @@ class WslEelDescriptor internal constructor(val distribution: WSLDistribution, i
     result = 31 * result + fsRoot.hashCode()
     return result
   }
+
+  override fun toString(): String = "WslEelDescriptor(distribution=$distribution, fsRoot='$fsRoot')"
 }

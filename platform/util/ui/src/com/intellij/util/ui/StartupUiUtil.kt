@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.util.ui
 
 import com.intellij.diagnostic.LoadingState
@@ -12,6 +12,7 @@ import com.intellij.ui.scale.ScaleType
 import com.intellij.ui.scale.isHiDPIEnabledAndApplicable
 import com.intellij.util.JBHiDPIScaledImage
 import com.intellij.util.concurrency.Semaphore
+import com.intellij.util.system.LowLevelLocalMachineAccess
 import com.intellij.util.system.OS
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
@@ -41,6 +42,7 @@ import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
+@OptIn(LowLevelLocalMachineAccess::class)
 object StartupUiUtil {
   @JvmStatic
   val isWayland: Boolean = OS.isGenericUnix() && System.getenv("WAYLAND_DISPLAY") != null
@@ -82,7 +84,7 @@ object StartupUiUtil {
     }
 
     val hints = Toolkit.getDefaultToolkit().getDesktopProperty(GraphicsUtil.DESKTOP_HINTS) as? Map<*, *>
-    val lcdContrastValue = hints?.get(RenderingHints.KEY_TEXT_LCD_CONTRAST) as Int? ?: return 140
+    val lcdContrastValue = hints?.get(RenderingHints.KEY_TEXT_LCD_CONTRAST) as? Int? ?: return 140
     return normalizeLcdContrastValue(lcdContrastValue)
   }
 
@@ -198,6 +200,7 @@ object StartupUiUtil {
    */
   @TestOnly
   fun pump() {
+    @Suppress("SwingIsEventDispatchThread")
     assert(!SwingUtilities.isEventDispatchThread())
     val lock = Semaphore(1)
     SwingUtilities.invokeLater { lock.up() }
@@ -207,7 +210,7 @@ object StartupUiUtil {
   @JvmStatic
   fun getFontWithFallback(
     familyName: String?,
-    @Suppress("DEPRECATION") @org.intellij.lang.annotations.JdkConstants.FontStyle style: Int,
+    @JdkConstants.FontStyle style: Int,
     size: Float,
   ): FontUIResource {
     // on macOS, font fallback is implemented in JRE by default
@@ -404,6 +407,6 @@ object StartupUiUtil {
 @Deprecated(level = DeprecationLevel.ERROR, message = "Please use StartupUiUtil.getFontWithFallback instead")
 fun getFontWithFallback(
   familyName: String?,
-  @Suppress("DEPRECATION") @org.intellij.lang.annotations.JdkConstants.FontStyle style: Int,
+  @JdkConstants.FontStyle style: Int,
   size: Float,
 ): FontUIResource = StartupUiUtil.getFontWithFallback(familyName, style, size)

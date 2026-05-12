@@ -6,6 +6,8 @@ jvm_library(
   module_name = "intellij.platform.ide.initialConfigImport",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/util-ex",
     "//platform/platform-impl:ide-impl",
@@ -17,13 +19,19 @@ jvm_library(
     "//libraries/jackson3/jackson:libraries-jackson3",
     "//platform/statistics",
     "//platform/core-ui",
+    "//platform/editor-ui-api:editor-ui",
+    "//platform/util:util-ui",
     "//platform/ide-core/plugins",
+    "//platform/ide-core",
     "//platform/platform-util-io-impl:ide-util-io-impl",
+    "//libraries/fastutil",
+    "//platform/util/concurrency",
   ]
 )
 
 jvm_library(
   name = "initial-config-import_test_lib",
+  testonly = True,
   module_name = "intellij.platform.ide.initialConfigImport",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -39,8 +47,19 @@ jvm_library(
     "//libraries/jackson3/jackson:libraries-jackson3_test_lib",
     "//platform/statistics:statistics_test_lib",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/editor-ui-api:editor-ui_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//platform/ide-core/plugins:plugins_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/platform-util-io-impl:ide-util-io-impl_test_lib",
+    "//libraries/fastutil:fastutil_test_lib",
+    "//platform/util/concurrency:concurrency_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.ide.initialConfigImport` end
+
+### auto-generated section `iml intellij.platform.ide.initialConfigImport` start
+exports_files([
+  "intellij.platform.ide.initialConfigImport.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.ide.initialConfigImport` end

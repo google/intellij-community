@@ -1,13 +1,15 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.storage.testEntities.entities.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
 import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
-import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
@@ -25,14 +27,12 @@ import com.intellij.platform.workspace.storage.testEntities.entities.CollectionF
 @GeneratedCodeApiVersion(3)
 @GeneratedCodeImplVersion(7)
 @OptIn(WorkspaceEntityInternalApi::class)
-internal class CollectionFieldEntityImpl(private val dataSource: CollectionFieldEntityData) : CollectionFieldEntity, WorkspaceEntityBase(
-  dataSource) {
+internal class CollectionFieldEntityImpl(private val dataSource: CollectionFieldEntityData) : CollectionFieldEntity,
+                                                                                              WorkspaceEntityBase(dataSource) {
 
   private companion object {
 
-
-    private val connections = listOf<ConnectionId>(
-    )
+    private val connections = listOf<ConnectionId>()
 
   }
 
@@ -41,7 +41,6 @@ internal class CollectionFieldEntityImpl(private val dataSource: CollectionField
       readField("versions")
       return dataSource.versions
     }
-
   override val names: List<String>
     get() {
       readField("names")
@@ -59,8 +58,8 @@ internal class CollectionFieldEntityImpl(private val dataSource: CollectionField
   }
 
 
-  internal class Builder(result: CollectionFieldEntityData?) : ModifiableWorkspaceEntityBase<CollectionFieldEntity, CollectionFieldEntityData>(
-    result), CollectionFieldEntityBuilder {
+  internal class Builder(result: CollectionFieldEntityData?) :
+    ModifiableWorkspaceEntityBase<CollectionFieldEntity, CollectionFieldEntityData>(result), CollectionFieldEntityBuilder {
     internal constructor() : this(CollectionFieldEntityData())
 
     override fun applyToBuilder(builder: MutableEntityStorage) {
@@ -73,15 +72,13 @@ internal class CollectionFieldEntityImpl(private val dataSource: CollectionField
           error("Entity CollectionFieldEntity is already created in a different builder")
         }
       }
-
       this.diff = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
-      // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
-      // Builder may switch to snapshot at any moment and lock entity data to modification
+// After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
+// Builder may switch to snapshot at any moment and lock entity data to modification
       this.currentEntityData = null
-
-      // Process linked entities that are connected without a builder
+// Process linked entities that are connected without a builder
       processLinkedEntities(builder)
       checkInitialization() // TODO uncomment and check failed tests
     }
@@ -132,7 +129,6 @@ internal class CollectionFieldEntityImpl(private val dataSource: CollectionField
         changedProperty.add("entitySource")
 
       }
-
     private val versionsUpdater: (value: Set<Int>) -> Unit = { value ->
 
       changedProperty.add("versions")
@@ -154,7 +150,6 @@ internal class CollectionFieldEntityImpl(private val dataSource: CollectionField
         getEntityData(true).versions = value
         versionsUpdater.invoke(value)
       }
-
     private val namesUpdater: (value: List<String>) -> Unit = { value ->
 
       changedProperty.add("names")
@@ -179,6 +174,7 @@ internal class CollectionFieldEntityImpl(private val dataSource: CollectionField
 
     override fun getEntityClass(): Class<CollectionFieldEntity> = CollectionFieldEntity::class.java
   }
+
 }
 
 @OptIn(WorkspaceEntityInternalApi::class)
@@ -196,7 +192,6 @@ internal class CollectionFieldEntityData : WorkspaceEntityData<CollectionFieldEn
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): CollectionFieldEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {
@@ -208,8 +203,7 @@ internal class CollectionFieldEntityData : WorkspaceEntityData<CollectionFieldEn
   }
 
   override fun getMetadata(): EntityMetadata {
-    return MetadataStorageImpl.getMetadataByTypeFqn(
-      "com.intellij.platform.workspace.storage.testEntities.entities.CollectionFieldEntity") as EntityMetadata
+    return MetadataStorageImpl.getMetadataByTypeFqn("com.intellij.platform.workspace.storage.testEntities.entities.CollectionFieldEntity") as EntityMetadata
   }
 
   override fun clone(): CollectionFieldEntityData {
@@ -225,8 +219,7 @@ internal class CollectionFieldEntityData : WorkspaceEntityData<CollectionFieldEn
   }
 
   override fun createDetachedEntity(parents: List<WorkspaceEntityBuilder<*>>): WorkspaceEntityBuilder<*> {
-    return CollectionFieldEntity(versions, names, entitySource) {
-    }
+    return CollectionFieldEntity(versions, names, entitySource)
   }
 
   override fun getRequiredParents(): List<Class<out WorkspaceEntity>> {
@@ -237,9 +230,7 @@ internal class CollectionFieldEntityData : WorkspaceEntityData<CollectionFieldEn
   override fun equals(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as CollectionFieldEntityData
-
     if (this.entitySource != other.entitySource) return false
     if (this.versions != other.versions) return false
     if (this.names != other.names) return false
@@ -249,9 +240,7 @@ internal class CollectionFieldEntityData : WorkspaceEntityData<CollectionFieldEn
   override fun equalsIgnoringEntitySource(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as CollectionFieldEntityData
-
     if (this.versions != other.versions) return false
     if (this.names != other.names) return false
     return true

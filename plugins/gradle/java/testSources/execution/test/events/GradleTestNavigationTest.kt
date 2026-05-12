@@ -1,20 +1,20 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.execution.test.events
 
 import org.gradle.util.GradleVersion
 import org.intellij.lang.annotations.Language
 import org.jetbrains.plugins.gradle.testFramework.GradleTestExecutionTestCase
 import org.jetbrains.plugins.gradle.testFramework.annotations.AllGradleVersionsSource
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatGradleIsAtLeast
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatGradleIsOlderThan
+import org.jetbrains.plugins.gradle.testFramework.util.JUNIT_5_SUPPORTED_VERSIONS
+import org.jetbrains.plugins.gradle.tooling.annotation.TargetVersions
 import org.junit.jupiter.params.ParameterizedTest
 
 class GradleTestNavigationTest : GradleTestExecutionTestCase() {
 
   @ParameterizedTest
+  @TargetVersions(JUNIT_5_SUPPORTED_VERSIONS, "<7.0")
   @AllGradleVersionsSource
   fun `test display name and navigation with Java and Junit Platform with Gradle before 7_0`(gradleVersion: GradleVersion) {
-    assumeThatGradleIsOlderThan(gradleVersion, "7.0")
     testJunitPlatformProject(gradleVersion) {
       writeText("src/test/java/org/example/TestCase.java", JAVA_JUNIT5_TEST)
       writeText("src/test/java/org/example/DisplayNameTestCase.java", JAVA_DISPLAY_NAME_JUNIT5_TEST)
@@ -83,6 +83,7 @@ class GradleTestNavigationTest : GradleTestExecutionTestCase() {
   }
 
   @ParameterizedTest
+  @TargetVersions(JUNIT_5_SUPPORTED_VERSIONS)
   @AllGradleVersionsSource
   fun `test display name generated and navigation with Java and Junit Platform`(gradleVersion: GradleVersion) {
     testJunitPlatformProject(gradleVersion) {
@@ -101,10 +102,9 @@ class GradleTestNavigationTest : GradleTestExecutionTestCase() {
   }
 
   @ParameterizedTest
+  @TargetVersions("7.0+", "<9.0")
   @AllGradleVersionsSource
   fun `test display name and navigation with Java and Junit Platform with Gradle from 7_0 before 9_0`(gradleVersion: GradleVersion) {
-    assumeThatGradleIsAtLeast(gradleVersion, "7.0")
-    assumeThatGradleIsOlderThan(gradleVersion, "9.0")
     testJunitPlatformProject(gradleVersion) {
       writeText("src/test/java/org/example/TestCase.java", JAVA_JUNIT5_TEST)
       writeText("src/test/java/org/example/DisplayNameTestCase.java", JAVA_DISPLAY_NAME_JUNIT5_TEST)
@@ -209,8 +209,8 @@ class GradleTestNavigationTest : GradleTestExecutionTestCase() {
    */
   @ParameterizedTest
   @AllGradleVersionsSource
+  @TargetVersions("9.0.0+")
   fun `test display name and navigation with Java and Junit Platform with Gradle 9_0 and newer`(gradleVersion: GradleVersion) {
-    assumeThatGradleIsAtLeast(gradleVersion, "9.0")
     testJunitPlatformProject(gradleVersion) {
       writeText("src/test/java/org/example/TestCase.java", JAVA_JUNIT5_TEST)
       writeText("src/test/java/org/example/DisplayNameTestCase.java", JAVA_DISPLAY_NAME_JUNIT5_TEST)
@@ -310,8 +310,8 @@ class GradleTestNavigationTest : GradleTestExecutionTestCase() {
 
   @ParameterizedTest
   @AllGradleVersionsSource
+  @TargetVersions("<9.3.0")
   fun `test display name and navigation with Java and Junit 4`(gradleVersion: GradleVersion) {
-    assumeThatGradleIsOlderThan(gradleVersion, "9.3")
     testJunit4Project(gradleVersion) {
       writeText("src/test/java/org/example/TestCase.java", JAVA_JUNIT4_TEST)
       writeText("src/test/java/org/example/ParametrizedTestCase.java", JAVA_PARAMETRIZED_JUNIT4_TEST)
@@ -349,8 +349,8 @@ class GradleTestNavigationTest : GradleTestExecutionTestCase() {
   */
   @ParameterizedTest
   @AllGradleVersionsSource
+  @TargetVersions("9.3.0+")
   fun `test display name and navigation with Java and Junit 4 for gradle 9_3 and newer`(gradleVersion: GradleVersion) {
-    assumeThatGradleIsAtLeast(gradleVersion, "9.3")
     testJunit4Project(gradleVersion) {
       writeText("src/test/java/org/example/TestCase.java", JAVA_JUNIT4_TEST)
       writeText("src/test/java/org/example/ParametrizedTestCase.java", JAVA_PARAMETRIZED_JUNIT4_TEST)

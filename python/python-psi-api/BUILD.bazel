@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.python.psi` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "psi_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "psi",
   module_name = "intellij.python.psi",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
-  resources = [":psi_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/core-api:core",
     "//platform/projectModel-api:projectModel",
@@ -24,8 +19,8 @@ jvm_library(
     "//python/python-ast:ast",
     "//python/python-syntax-core:syntax-core",
     "@lib//:kotlin-stdlib",
-    "@lib//:jetbrains-kotlin-annotations-jvm",
     "//platform/editor-ui-api:editor-ui",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
   ],
   exports = [
     "//python/python-parser:parser",
@@ -36,6 +31,7 @@ jvm_library(
 
 jvm_library(
   name = "psi_test_lib",
+  testonly = True,
   module_name = "intellij.python.psi",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -58,6 +54,13 @@ jvm_library(
     "//python/python-syntax-core:syntax-core_test_lib",
     "//platform/backend:backend_test_lib",
     "//platform/editor-ui-api:editor-ui_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
   ]
 )
 ### auto-generated section `build intellij.python.psi` end
+
+### auto-generated section `iml intellij.python.psi` start
+exports_files([
+  "intellij.python.psi.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.python.psi` end

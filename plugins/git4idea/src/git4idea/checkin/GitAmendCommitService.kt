@@ -12,15 +12,25 @@ import com.intellij.vcs.log.VcsCommitMetadata
 import git4idea.commands.Git
 import git4idea.commands.GitCommand
 import git4idea.commands.GitLineHandler
-import git4idea.commit.GitMyRecentCommitsProvider
+import git4idea.commit.GitRecentCommitsProvider
 import git4idea.config.GitVersionSpecialty
 import git4idea.repo.GitRepositoryManager
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.NonNls
 
 @Service(Service.Level.PROJECT)
-internal class GitAmendCommitService(project: Project) : AmendCommitService(project) {
+internal class GitAmendCommitService(project: Project, scope: CoroutineScope) : AmendCommitService(project) {
+  private val recentCommitsProvider = GitRecentCommitsProvider(
+    project, scope,
+    limit = COMMITS_LIMIT,
+    userScope = GitRecentCommitsProvider.UserScope.ALL_USERS,
+    stopAtFirstMergeCommit = true,
+    unpublishedOnly = true,
+    preload = true,
+  )
+
   override fun isAmendCommitSupported(): Boolean = true
   override fun isAmendSpecificCommitSupported(): Boolean = Registry.`is`("git.amend.specific.commit")
 
@@ -33,14 +43,19 @@ internal class GitAmendCommitService(project: Project) : AmendCommitService(proj
     return Git.getInstance().runCommand(h).getOutputOrThrow()
   }
 
-  override suspend fun getAmendSpecificCommitTargets(root: VirtualFile, limit: Int): List<CommitToAmend.Specific> =
+  override suspend fun getAmendSpecificCommitTargets(root: VirtualFile): List<CommitToAmend.Resolved> =
     withContext(Dispatchers.Default) {
       val repo = GitRepositoryManager.getInstance(project).repositories.singleOrNull() ?: return@withContext emptyList()
-      val commits: List<VcsCommitMetadata> = GitMyRecentCommitsProvider.getInstance(project).getRecentCommits(repo.root, limit)
+      val commits: List<VcsCommitMetadata> = recentCommitsProvider.getRecentCommits(repo.root)
 
-      commits.map { metadata ->
-        CommitToAmend.Specific(metadata.id, metadata.subject)
-      }.dropWhile { it.targetHash.asString() == repo.currentRevision } // don't include last commit
+      commits.mapIndexed { index, metadata ->
+        if (index == 0) {
+          CommitToAmend.Last.Known(metadata.id, metadata.subject)
+        }
+        else {
+          CommitToAmend.Specific(metadata.id, metadata.subject)
+        }
+      }
     }
 
   private fun getCommitMessageFormatPattern(): @NonNls String =
@@ -52,4 +67,8 @@ internal class GitAmendCommitService(project: Project) : AmendCommitService(proj
       // %s strips newlines from subject; there is no way to work around it before 1.7.2 with %B (unless parsing some fixed format)
       "%s%n%n%-b"
     }
+
+  companion object {
+    private const val COMMITS_LIMIT: Int = 20
+  }
 }

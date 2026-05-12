@@ -66,4 +66,6 @@ public final class MarkdownHighlighterColors {
   public static final TextAttributesKey DEFINITION_LIST_MARKER = createTextAttributesKey("MARKDOWN_DEFINITION_LIST_MARKER", LIST_MARKER);
 
   public static final TextAttributesKey FRONT_MATTER_HEADER_DELIMITER = createTextAttributesKey("MARKDOWN_FRONT_MATTER_HEADER_DELIMITER", LIST_MARKER);
+
+  public static final TextAttributesKey FOOTNOTE_DEFINITION = createTextAttributesKey("MARKDOWN_FOOTNOTE_DEFINITION", CODE_BLOCK);
 }

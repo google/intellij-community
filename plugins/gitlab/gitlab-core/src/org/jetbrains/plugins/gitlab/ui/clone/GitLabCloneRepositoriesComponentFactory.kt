@@ -2,6 +2,7 @@
 package org.jetbrains.plugins.gitlab.ui.clone
 
 import com.intellij.collaboration.async.launchNow
+import com.intellij.collaboration.auth.ui.AccountsPanelFactory.Companion.addWarningForEnabledCredentialHelper
 import com.intellij.collaboration.auth.ui.CompactAccountsPanelFactory
 import com.intellij.collaboration.messages.CollaborationToolsBundle
 import com.intellij.collaboration.ui.CollaborationToolsUIUtil
@@ -30,6 +31,7 @@ import com.intellij.util.ui.UIUtil
 import com.intellij.util.ui.cloneDialog.AccountMenuItem
 import com.intellij.util.ui.cloneDialog.VcsCloneDialogUiSpec
 import git4idea.GitUtil
+import git4idea.config.GitVcsApplicationSettings
 import git4idea.remote.GitRememberedInputs
 import git4idea.ui.GitShallowCloneComponentFactory
 import kotlinx.coroutines.CoroutineScope
@@ -95,6 +97,8 @@ internal object GitLabCloneRepositoriesComponentFactory {
           }
       }
       GitShallowCloneComponentFactory.appendShallowCloneRow(this, repositoriesVm.shallowCloneVm)
+      addWarningForEnabledCredentialHelper(GitVcsApplicationSettings.getInstance().isUseCredentialHelper, ::panel)
+        .align(AlignX.RIGHT)
     }.apply {
       border = JBEmptyBorder(UIUtil.getRegularPanelInsets())
     }

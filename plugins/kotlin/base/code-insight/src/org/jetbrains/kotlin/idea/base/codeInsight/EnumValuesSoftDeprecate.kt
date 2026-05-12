@@ -16,8 +16,8 @@ import org.jetbrains.kotlin.idea.base.projectStructure.languageVersionSettings
 import org.jetbrains.kotlin.name.FqName
 
 
-context(_: KaSession)
 @ApiStatus.Internal
+context(_: KaSession)
 fun isEnumValuesFunctionCall(symbol: KaCallableSymbol): Boolean = symbol.callableId?.asSingleFqName() == FqName("kotlin.enumValues")
 
 @ApiStatus.Internal
@@ -31,8 +31,8 @@ fun isSoftDeprecatedEnumValuesMethod(
             valuesMethodSymbol is KaFunctionSymbol && valuesMethodSymbol.valueParameters.isEmpty()
 }
 
-context(_: KaSession)
 @ApiStatus.Internal
+context(_: KaSession)
 fun getEntriesPropertyOfEnumClass(enumClassSymbol: KaClassSymbol): KaCallableSymbol? =
     enumClassSymbol.staticMemberScope.callables(StandardNames.ENUM_ENTRIES).firstOrNull()
 

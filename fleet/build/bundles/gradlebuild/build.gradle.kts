@@ -63,6 +63,8 @@ kotlin {
       isTransitive = false
     }
     implementation(project(":fleet.build.codecache"))
+    implementation(project(":fleet.build.platform"))
+    implementation(project(":fleet.build.scrambling"))
     implementation(project(":fleet.build.sign"))
     implementation(project(":fleet.codecache"))
     implementation(project(":fleet.build.fs"))

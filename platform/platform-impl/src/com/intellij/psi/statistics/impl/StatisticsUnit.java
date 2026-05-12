@@ -80,7 +80,7 @@ final class StatisticsUnit {
   }
 
   private @NotNull Object2IntMap<String> getValueStamps(String context) {
-    return myValueStamps.computeIfAbsent(context, __ -> {
+    return myValueStamps.computeIfAbsent(context, _ -> {
       Object2IntMap<String> result = new Object2IntOpenHashMap<>();
       result.defaultReturnValue(-1);
       return result;

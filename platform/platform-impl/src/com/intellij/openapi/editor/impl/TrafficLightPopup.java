@@ -403,7 +403,7 @@ final class TrafficLightPopup {
 
     private TrackableLinkLabel(@NotNull @NlsContexts.LinkLabel String text, @NotNull Runnable action) {
       super(text, null);
-      setListener((__, ___) -> {
+      setListener((_, _) -> {
         action.run();
         ActionsCollector.getInstance().record(null, myEvent, getClass());
       }, null);

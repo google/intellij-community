@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.vcs.log.ui
 
 import com.intellij.application.options.editor.CheckboxDescriptor
@@ -46,8 +46,11 @@ import com.intellij.vcsUtil.VcsUtil
 import org.jetbrains.annotations.Nls
 import org.jetbrains.annotations.PropertyKey
 
-internal class VcsLogConfigurable(private val project: Project) : BoundConfigurable(VcsLogBundle.message("vcs.log.settings.group.title")),
-                                                                  SearchableConfigurable {
+internal class VcsLogConfigurable(
+  private val project: Project,
+) : BoundConfigurable(VcsLogBundle.message("vcs.log.settings.group.title"),
+                      "reference.settings.VCS.Log"),
+    SearchableConfigurable {
   private val sharedSettings get() = project.service<VcsLogSharedSettings>()
   private val applicationSettings get() = ApplicationManager.getApplication().service<VcsLogApplicationSettings>()
   private val fileHistorySettings get() = project.service<FileHistoryUiProperties>()

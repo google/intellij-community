@@ -8,14 +8,43 @@ import com.intellij.ide.ui.colors.rpcId
 import com.intellij.ide.ui.icons.rpcId
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
-import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.application.smartReadAction
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
 import com.intellij.openapi.project.IndexNotReadyException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsContexts
-import com.intellij.platform.debugger.impl.rpc.*
+import com.intellij.platform.debugger.impl.rpc.ErrorOccurredEvent
+import com.intellij.platform.debugger.impl.rpc.LanguageDto
+import com.intellij.platform.debugger.impl.rpc.NewExecutionStackGroupsEvent
+import com.intellij.platform.debugger.impl.rpc.NewExecutionStacksEvent
+import com.intellij.platform.debugger.impl.rpc.SuspendData
+import com.intellij.platform.debugger.impl.rpc.XDebugSessionApi
+import com.intellij.platform.debugger.impl.rpc.XDebugSessionDataId
+import com.intellij.platform.debugger.impl.rpc.XDebugSessionId
+import com.intellij.platform.debugger.impl.rpc.XDebuggerEditorsProviderId
+import com.intellij.platform.debugger.impl.rpc.XDebuggerEvaluatorDto
+import com.intellij.platform.debugger.impl.rpc.XExecutionStackDto
+import com.intellij.platform.debugger.impl.rpc.XExecutionStackGroupDto
+import com.intellij.platform.debugger.impl.rpc.XExecutionStackGroupsEvent
+import com.intellij.platform.debugger.impl.rpc.XExecutionStackId
+import com.intellij.platform.debugger.impl.rpc.XExecutionStacksEvent
+import com.intellij.platform.debugger.impl.rpc.XExpressionDocumentDto
+import com.intellij.platform.debugger.impl.rpc.XExpressionDto
+import com.intellij.platform.debugger.impl.rpc.XSmartStepIntoTargetDto
+import com.intellij.platform.debugger.impl.rpc.XSmartStepIntoTargetId
+import com.intellij.platform.debugger.impl.rpc.XSourcePositionDto
+import com.intellij.platform.debugger.impl.rpc.XStackFrameBackgroundColor
+import com.intellij.platform.debugger.impl.rpc.XStackFrameCaptionInfo
+import com.intellij.platform.debugger.impl.rpc.XStackFrameDto
+import com.intellij.platform.debugger.impl.rpc.XStackFrameId
+import com.intellij.platform.debugger.impl.rpc.XStackFramePresentation
+import com.intellij.platform.debugger.impl.rpc.XStackFramePresentationFragment
+import com.intellij.platform.debugger.impl.rpc.XStackFrameStringEqualityObject
+import com.intellij.platform.debugger.impl.rpc.XSuspendContextDto
+import com.intellij.platform.debugger.impl.rpc.XSuspendContextId
+import com.intellij.platform.debugger.impl.rpc.toRpc
+import com.intellij.platform.debugger.impl.rpc.xExpression
 import com.intellij.platform.project.ProjectId
 import com.intellij.platform.project.findProject
 import com.intellij.platform.util.coroutines.attachAsChildTo
@@ -47,17 +76,24 @@ import com.intellij.xdebugger.stepping.XSmartStepIntoVariant
 import fleet.rpc.core.toRpc
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.buffer
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.future.asDeferred
+import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
 import org.jetbrains.concurrency.Promise
 import org.jetbrains.concurrency.await
 import org.jetbrains.concurrency.rejectedPromise
-import kotlin.collections.map
 
 internal class BackendXDebugSessionApi : XDebugSessionApi {
   override suspend fun createDocument(frontendDocumentId: FrontendDocumentId, sessionId: XDebugSessionId, expression: XExpressionDto, sourcePosition: XSourcePositionDto?, evaluationMode: EvaluationMode): XExpressionDocumentDto? {
@@ -129,7 +165,7 @@ internal class BackendXDebugSessionApi : XDebugSessionApi {
     val handler = session.debugProcess.smartStepIntoHandler ?: return
     withContext(Dispatchers.EDT) {
       @Suppress("UNCHECKED_CAST")
-      session.smartStepInto(handler as XSmartStepIntoHandler<XSmartStepIntoVariant?>, targetModel.target)
+      session.smartStepInto(handler as XSmartStepIntoHandler<XSmartStepIntoVariant>, targetModel.target)
     }
   }
 
@@ -412,7 +448,7 @@ internal suspend fun XDebugSessionImpl.suspendData(): SuspendData? {
   )
 }
 
-internal fun XStackFrame.toRpc(coroutineScope: CoroutineScope, session: XDebugSessionImpl): XStackFrameDto {
+internal suspend fun XStackFrame.toRpc(coroutineScope: CoroutineScope, session: XDebugSessionImpl): XStackFrameDto {
   val id = getOrStoreGlobally(coroutineScope, session)
   val serializedEqualityObject = when (val equalityObject = equalityObject) {
     is String -> XStackFrameStringEqualityObject(equalityObject)
@@ -443,9 +479,10 @@ internal suspend fun XExecutionStack.toRpc(coroutineScope: CoroutineScope, sessi
     stack.icon?.rpcId(),
     stack.iconFlow.map { it?.rpcId() }.toRpc(),
     stack.xExecutionStackDescriptorAsync?.asDeferred(),
-    stack.topFrameAsync.thenApply { frame ->
-      frame?.toRpc(coroutineScope, session)
-    }.asDeferred()
+    coroutineScope.async {
+      val topFrame = stack.topFrameAsync.await()
+      topFrame?.toRpc(coroutineScope, session)
+    }
   )
 }
 
@@ -467,12 +504,12 @@ private fun XStackFrame.captionInfo(): XStackFrameCaptionInfo {
   }
 }
 
-private fun XStackFrame.backgroundInfo(project: Project): XStackFrameBackgroundColor? {
+private suspend fun XStackFrame.backgroundInfo(project: Project): XStackFrameBackgroundColor? {
   if (this is XStackFrameWithCustomBackgroundColor) {
     return XStackFrameBackgroundColor(backgroundColor?.rpcId())
   }
   val file = sourcePosition?.file ?: return null
-  val fileColor = runReadAction {
+  val fileColor = readAction {
     FileColorManager.getInstance(project).getFileColor(file)
   } ?: return null
   return XStackFrameBackgroundColor(fileColor.rpcId())

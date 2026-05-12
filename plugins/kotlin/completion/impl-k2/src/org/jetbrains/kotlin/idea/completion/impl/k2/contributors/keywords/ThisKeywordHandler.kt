@@ -80,12 +80,12 @@ internal class ThisKeywordHandler(
     private fun canReferenceSymbolByThis(parameters: CompletionParameters, symbol: KaSymbol): Boolean {
         if (symbol !is KaClassSymbol) return true
         if (symbol.classKind != KaClassKind.COMPANION_OBJECT) return true
-        val companionPsi = symbol.psi as KtClassOrObject
+        val companionPsi = symbol.psi as? KtClassOrObject ?: return true
         return parameters.offset in companionPsi.textRange
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun createThisLookupElement(receiver: KaImplicitReceiver, labelName: Name?): LookupElement {
         return createKeywordElement(KtTokens.THIS_KEYWORD.value, labelName.labelNameToTail(), lookupObject = KeywordLookupObject())
             .withTypeText(receiver.type.renderVerbose())

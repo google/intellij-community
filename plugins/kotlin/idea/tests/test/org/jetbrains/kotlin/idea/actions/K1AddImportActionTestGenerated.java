@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.actions;
 
@@ -115,6 +115,16 @@ public abstract class K1AddImportActionTestGenerated extends AbstractK1AddImport
         @TestMetadata("ExtendingClass2.kt")
         public void testExtendingClass2() throws Exception {
             runTest("testData/idea/actions/kotlinAddImportAction/ExtendingClass2.kt");
+        }
+
+        @TestMetadata("FilteredNestedType.kt")
+        public void testFilteredNestedType() throws Exception {
+            runTest("testData/idea/actions/kotlinAddImportAction/FilteredNestedType.kt");
+        }
+
+        @TestMetadata("FilteredType.kt")
+        public void testFilteredType() throws Exception {
+            runTest("testData/idea/actions/kotlinAddImportAction/FilteredType.kt");
         }
 
         @TestMetadata("Flexible.kt")

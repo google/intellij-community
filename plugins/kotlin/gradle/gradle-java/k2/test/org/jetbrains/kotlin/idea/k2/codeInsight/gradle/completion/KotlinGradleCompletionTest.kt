@@ -7,7 +7,6 @@ import com.intellij.testFramework.TestDataPath
 import com.intellij.testFramework.runInEdtAndWait
 import org.gradle.util.GradleVersion
 import org.jetbrains.kotlin.gradle.AbstractGradleCodeInsightTest
-import org.jetbrains.kotlin.gradle.AbstractKotlinGradleNavigationTest
 import org.jetbrains.kotlin.gradle.GRADLE_KMP_KOTLIN_FIXTURE
 import org.jetbrains.kotlin.idea.base.test.TestRoot
 import org.jetbrains.kotlin.idea.test.AssertKotlinPluginMode
@@ -17,8 +16,8 @@ import org.jetbrains.kotlin.test.TestMetadata
 import org.jetbrains.plugins.gradle.testFramework.annotations.BaseGradleVersionSource
 import org.jetbrains.plugins.gradle.testFramework.annotations.GradleTestSource
 import org.jetbrains.plugins.gradle.testFramework.fixtures.application.GradleProjectTestApplication
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatGradleIsAtLeast
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatGradleIsOlderThan
+import org.jetbrains.plugins.gradle.testFramework.util.assertThatGradleIsAtLeast
+import org.jetbrains.plugins.gradle.testFramework.util.assertThatGradleIsOlderThan
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.params.ParameterizedTest
 import kotlin.test.assertEquals
@@ -128,10 +127,10 @@ class KotlinGradleCompletionTest : AbstractGradleCodeInsightTest() {
     }
 
     @ParameterizedTest
-    @BaseGradleVersionSource
+    @GradleTestSource("9.0.0")
     @TestMetadata("settingsGradleKts/topLevelSuggestionsCamelCaseInSettingsGradleKts.test")
     fun testTopLevelSuggestionsCamelCaseInSettingsGradleKts(gradleVersion: GradleVersion) {
-        assumeThatGradleIsOlderThan(gradleVersion, "9.2.0") {
+        assertThatGradleIsOlderThan(gradleVersion, "9.2.0") {
             "Gradle API changes"
         }
         verifyCompletion(gradleVersion)
@@ -141,7 +140,7 @@ class KotlinGradleCompletionTest : AbstractGradleCodeInsightTest() {
     @BaseGradleVersionSource
     @TestMetadata("settingsGradleKts/topLevelSuggestionsCamelCaseInSettingsGradle92Kts.test")
     fun testTopLevelSuggestionsCamelCaseInSettingsGradle92Kts(gradleVersion: GradleVersion) {
-        assumeThatGradleIsAtLeast(gradleVersion, "9.2.0") {
+        assertThatGradleIsAtLeast(gradleVersion, "9.2.0") {
             "Gradle API changes"
         }
         verifyCompletion(gradleVersion)

@@ -3,6 +3,7 @@ package org.jetbrains.kotlin.idea.base.plugin.artifacts
 
 import com.intellij.ide.caches.CachesInvalidator
 import com.intellij.openapi.application.PathManager
+import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.util.io.DigestUtil
 import java.io.File
 import java.security.MessageDigest
@@ -16,7 +17,8 @@ private const val BUFFER_SIZE = 512 * 1024
  * - Re-calculates output when one of the outputs changes
  * - Supports "Invalidate caches"
  */
-internal abstract class AbstractLazyFileOutputProducer<I : Any, C>(uniquePipelineId: String) : LazyFileOutputProducer<I, C> {
+@IntellijInternalApi
+abstract class AbstractLazyFileOutputProducer<I : Any, C>(uniquePipelineId: String) : LazyFileOutputProducer<I, C> {
     private val hashFile = ROOT.resolve("$uniquePipelineId.hash")
     private val outputsFile = ROOT.resolve("$uniquePipelineId.outputs")
 

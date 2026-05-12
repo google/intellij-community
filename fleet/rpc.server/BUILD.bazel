@@ -1,6 +1,6 @@
 ### auto-generated section `build fleet.rpc.server` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_rpc.server",
@@ -10,18 +10,13 @@ create_kotlinc_options(
   x_lambdas = "class"
 )
 
-resourcegroup(
-  name = "rpc.server_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "rpc.server",
   module_name = "fleet.rpc.server",
   visibility = ["//visibility:public"],
   srcs = glob(["srcCommonMain/**/*.kt", "srcCommonMain/**/*.java", "srcCommonMain/**/*.form", "srcJvmMain/**/*.kt", "srcJvmMain/**/*.java", "srcJvmMain/**/*.form"], allow_empty = True),
-  resources = [":rpc.server_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_rpc.server",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -38,6 +33,7 @@ jvm_library(
 
 jvm_library(
   name = "rpc.server_test_lib",
+  testonly = True,
   module_name = "fleet.rpc.server",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -52,3 +48,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build fleet.rpc.server` end
+
+### auto-generated section `iml fleet.rpc.server` start
+exports_files([
+  "fleet.rpc.server.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml fleet.rpc.server` end

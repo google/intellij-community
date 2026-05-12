@@ -1,5 +1,5 @@
 <!-- todo: register this as a content module (IJPL-210868); currently it's included via 'xi:include' tag -->
-<idea-plugin>
+<idea-plugin visibility="public">
 
   <extensions defaultExtensionNs="com.intellij">
     <registryKey
@@ -26,6 +26,7 @@
     <toolWindow id="TODO" anchor="bottom" icon="AllIcons.Toolwindows.ToolWindowTodo"
                 factoryClass="com.intellij.ide.todo.TodoToolWindowFactory" canCloseContents="true"/>
     <projectService serviceImplementation="com.intellij.ide.todo.TodoViewChangesSupport" open="true"/>
+    <projectSettings service="com.intellij.ide.todo.TodoView"/>
   </extensions>
 
   <actions>

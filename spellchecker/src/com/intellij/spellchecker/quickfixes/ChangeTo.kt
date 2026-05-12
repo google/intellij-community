@@ -26,6 +26,7 @@ import com.intellij.spellchecker.statistics.SpellcheckerRateTracker
 import com.intellij.spellchecker.util.SpellCheckerBundle
 import com.intellij.util.concurrency.ThreadingAssertions
 
+@Deprecated("Non-code like text constructs should be spellchecked via text level. See `SpellcheckingStrategy#useTextLevelSpellchecking()`")
 internal class ChangeTo @JvmOverloads constructor(
   typo: String,
   element: PsiElement,

@@ -55,7 +55,7 @@ public class PyIndexingTest extends PyTestCase {
     runWithAdditionalFileInLibDir(
       libraryWithTodoName,
       "# TODO: this should be updated",
-      (__) -> {
+      (_) -> {
         final List<VirtualFile> indexFiles = getTodoFiles(myFixture.getProject());
 
         // project file in the TodoIndex

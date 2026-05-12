@@ -34,19 +34,19 @@ internal class FrontendXBreakpointTypesManager(
     cs.launch {
       durable {
         val (initialBreakpointTypes, breakpointTypesFlow) = XBreakpointTypeApi.getInstance().getBreakpointTypeList(project.projectId())
-        handleBreakpointTypesFromBackend(initialBreakpointTypes)
+        handleBreakpointTypesFromBackend(cs, initialBreakpointTypes)
         typesInitialized.complete(Unit)
         breakpointTypesFlow.toFlow().collectLatest {
-          handleBreakpointTypesFromBackend(it)
+          handleBreakpointTypesFromBackend(cs, it)
           typesChanged.tryEmit(Unit)
         }
       }
     }
   }
 
-  private fun handleBreakpointTypesFromBackend(breakpointTypes: List<XBreakpointTypeDto>) {
+  private fun handleBreakpointTypesFromBackend(cs: CoroutineScope, breakpointTypes: List<XBreakpointTypeDto>) {
     for (dto in breakpointTypes) {
-      types.putIfAbsent(dto.id, createFrontendXBreakpointType(project, dto))
+      types.putIfAbsent(dto.id, createFrontendXBreakpointType(project, cs, dto))
     }
     val typesToRemove = types.keys - breakpointTypes.map { it.id }.toSet()
     for (typeToRemove in typesToRemove) {

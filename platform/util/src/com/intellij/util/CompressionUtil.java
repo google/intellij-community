@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.util;
 
 import com.intellij.openapi.util.ThreadLocalCachedByteArray;
@@ -30,34 +30,27 @@ public final class CompressionUtil {
   private static final LZ4FastDecompressor decompressor;
 
   static {
-    if (Boolean.getBoolean("idea.use.native.compression")) {
-      LZ4Factory factory = LZ4Factory.fastestInstance();
+    LZ4Compressor c = null;
+    LZ4FastDecompressor d = null;
+    try {
+      // java 9+ is required - util still has java 8 level
+      Class<?> cClass = CompressionUtil.class.getClassLoader().loadClass("com.intellij.util.io.LZ4Compressor");
+      MethodHandles.Lookup lookup = MethodHandles.lookup();
+      c = (LZ4Compressor)lookup.findStaticGetter(cClass, "INSTANCE", cClass).invoke();
+      Class<?> dClass = CompressionUtil.class.getClassLoader().loadClass("com.intellij.util.io.LZ4Decompressor");
+      d = (LZ4FastDecompressor)lookup.findStaticGetter(dClass, "INSTANCE", dClass).invoke();
+    }
+    catch (Throwable ignore) {
+    }
+
+    if (c == null || d == null) {
+      LZ4Factory factory = LZ4Factory.fastestJavaInstance();
       compressor = factory.fastCompressor();
       decompressor = factory.fastDecompressor();
     }
     else {
-      LZ4Compressor c = null;
-      LZ4FastDecompressor d = null;
-      try {
-        // java 9+ is required - util still has java 8 level
-        Class<?> cClass = CompressionUtil.class.getClassLoader().loadClass("com.intellij.util.io.LZ4Compressor");
-        MethodHandles.Lookup lookup = MethodHandles.lookup();
-        c = (LZ4Compressor)lookup.findStaticGetter(cClass, "INSTANCE", cClass).invoke();
-        Class<?> dClass = CompressionUtil.class.getClassLoader().loadClass("com.intellij.util.io.LZ4Decompressor");
-        d = (LZ4FastDecompressor)lookup.findStaticGetter(dClass, "INSTANCE", dClass).invoke();
-      }
-      catch (Throwable ignore) {
-      }
-
-      if (c == null || d == null) {
-        LZ4Factory factory = LZ4Factory.fastestJavaInstance();
-        compressor = factory.fastCompressor();
-        decompressor = factory.fastDecompressor();
-      }
-      else {
-        compressor = c;
-        decompressor = d;
-      }
+      compressor = c;
+      decompressor = d;
     }
   }
 

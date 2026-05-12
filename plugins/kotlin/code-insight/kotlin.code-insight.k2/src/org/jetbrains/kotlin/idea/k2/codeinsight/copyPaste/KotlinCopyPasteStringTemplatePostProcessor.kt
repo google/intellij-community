@@ -13,8 +13,8 @@ import com.intellij.openapi.util.Ref
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
+import com.intellij.psi.util.parentOfType
 import com.intellij.psi.util.startOffset
-import org.jetbrains.kotlin.analysis.utils.printer.parentOfType
 import org.jetbrains.kotlin.idea.codeinsights.impl.base.EntryUpdateDiff
 import org.jetbrains.kotlin.idea.codeinsights.impl.base.changeInterpolationPrefix
 import org.jetbrains.kotlin.idea.codeinsights.impl.base.templatePrefixLength

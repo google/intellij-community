@@ -492,7 +492,7 @@ FunctionEnd
 ; $R6(out) - the 'Top' position for the new checkbox
 Function getTopPosition
   IntOp $R9 $R8 - 1
-  ${If} $R9 = $control_fields 
+  ${If} $R9 = $control_fields
     !insertmacro INSTALLOPTIONS_READ $R6 "UninstallOldVersions.ini" "Field $R8" "Top"
   ${Else}
     !insertmacro INSTALLOPTIONS_READ $R6 "UninstallOldVersions.ini" "Field $R9" "Bottom"
@@ -606,7 +606,7 @@ Function ProductAssociation
   ${If} $R9 > ${INSTALL_OPTION_ELEMENTS}
     StrCpy $R8 ${INSTALL_OPTION_ELEMENTS}
     StrCpy $R1 "${PRODUCT_PATHS_SELECTOR}"
-    StrCpy $R2 "${PRODUCT_FULL_NAME}"
+    StrCpy $R2 "${MUI_PRODUCT}"
     ${DoWhile} $R8 < $R9
       !insertmacro INSTALLOPTIONS_READ $R3 "Desktop.ini" "Field $R8" "State"
       ${If} $R3 == 1

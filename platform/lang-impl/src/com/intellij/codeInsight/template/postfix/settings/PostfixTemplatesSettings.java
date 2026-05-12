@@ -51,7 +51,7 @@ public final class PostfixTemplatesSettings implements PersistentStateComponent<
   }
 
   public void disableTemplate(@NotNull PostfixTemplate template, @NotNull String providerId) {
-    Set<String> state = myProviderToDisabledTemplates.computeIfAbsent(providerId, __ -> new HashSet<>());
+    Set<String> state = myProviderToDisabledTemplates.computeIfAbsent(providerId, _ -> new HashSet<>());
     state.add(template.getId());
   }
 

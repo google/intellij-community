@@ -52,6 +52,34 @@ internal class TerminalGenericFileFilterAbsolutePathTest {
     getFilterResultAndCheckHighlightPositions("hello / world, hello \\ world", listOf(),false).checkFileLinks()
 
   @Test
+  fun `slash-only strings are not highlighted`() {
+    val slashStrings = listOf(
+      "/",
+      "//",
+      "///",
+      "////",
+      "\\",
+      "\\\\",
+      "\\\\\\",
+      "\\\\\\\\",
+      "/\\",
+      "\\/",
+      "//\\\\",
+    )
+
+    for (slashString in slashStrings) {
+      getFilterResultAndCheckHighlightPositions(
+        "hello $slashString world",
+        emptyList(),
+        checkHighlights = false
+      ).checkFileLinks()
+    }
+
+    getFilterResultAndCheckHighlightPositions("/// @param", emptyList(), false).checkFileLinks()
+    getFilterResultAndCheckHighlightPositions("// comment", emptyList(), false).checkFileLinks()
+  }
+
+  @Test
   fun `short names are highlighted`() =
     getFilterResultAndCheckHighlightPositions("hello /a world, hello C:\\ C:\\b world C:\\d", listOf("/a", "C:\\", "C:\\b"),false)
       .checkFileLinks("/a", "C:\\", "C:\\b")

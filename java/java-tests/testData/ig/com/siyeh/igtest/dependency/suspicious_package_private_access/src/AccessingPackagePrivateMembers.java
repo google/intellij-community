@@ -6,7 +6,7 @@ import static xxx.StaticMembers.*;
  * @see PackagePrivateClass
  * @see PublicClass#packagePrivateField
  */
-public class AccessingPackagePrivateMembers {
+public class AccessingPackagePrivateMembers extends InnerClasses {
   static Object staticField = new <warning descr="Class xxx.PackagePrivateClass is package-private, but declared in a different module 'dep'">PackagePrivateClass</warning>();
   Object field = new <warning descr="Class xxx.PackagePrivateClass is package-private, but declared in a different module 'dep'">PackagePrivateClass</warning>();
   {
@@ -38,7 +38,29 @@ public class AccessingPackagePrivateMembers {
     <warning descr="Method StaticMembers.importedMethod() is package-private, but declared in a different module 'dep'">importedMethod</warning>();
 
     new InnerClasses.<warning descr="Class xxx.InnerClasses.PackagePrivateInnerClass is package-private, but declared in a different module 'dep'">PackagePrivateInnerClass</warning>();
+    new InnerClasses.ProtectedInnerClass();
     new InnerClasses.<warning descr="Class xxx.InnerClasses.PackagePrivateInnerClassWithConstructor is package-private, but declared in a different module 'dep'"><warning descr="Constructor PackagePrivateInnerClassWithConstructor.PackagePrivateInnerClassWithConstructor() is package-private, but declared in a different module 'dep'">PackagePrivateInnerClassWithConstructor</warning></warning>();
     new InnerClasses.<warning descr="Constructor ClassWithPackagePrivateConstructor.ClassWithPackagePrivateConstructor() is package-private, but declared in a different module 'dep'">ClassWithPackagePrivateConstructor</warning>();
+
+    new InnerClasses.<warning descr="Class xxx.InnerClasses.PackagePrivateInnerClass is package-private, but declared in a different module 'dep'">PackagePrivateInnerClass</warning>() {
+      void foo() {
+        super.toString();
+      }
+    };
+    new InnerClasses.ProtectedInnerClass() {
+      void foo() {
+        super.toString();
+      }
+    };
+    new InnerClasses.<warning descr="Class xxx.InnerClasses.PackagePrivateInnerClassWithConstructor is package-private, but declared in a different module 'dep'">PackagePrivateInnerClassWithConstructor</warning>() {
+      void foo() {
+        super.toString();
+      }
+    };
+    new InnerClasses.ClassWithPackagePrivateConstructor() {
+      void foo() {
+        super.toString();
+      }
+    };
   }
 }

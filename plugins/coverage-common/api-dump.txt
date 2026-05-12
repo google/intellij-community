@@ -58,7 +58,8 @@ a:com.intellij.coverage.CoverageDataManager
 - a:activeSuites():java.util.Collection
 - a:addCoverageSuite(com.intellij.execution.configurations.coverage.CoverageEnabledConfiguration):com.intellij.coverage.CoverageSuite
 - a:addCoverageSuite(java.lang.String,com.intellij.coverage.CoverageFileProvider,java.lang.String[],J,java.lang.String,com.intellij.coverage.CoverageRunner,Z,Z):com.intellij.coverage.CoverageSuite
-- f:addExternalCoverageSuite(java.io.File,com.intellij.coverage.CoverageRunner):com.intellij.coverage.CoverageSuite
+- addExternalCoverageSuite(java.io.File,com.intellij.coverage.CoverageRunner):com.intellij.coverage.CoverageSuite
+- a:addExternalCoverageSuite(java.nio.file.Path,com.intellij.coverage.CoverageRunner):com.intellij.coverage.CoverageSuite
 - a:addSuiteListener(com.intellij.coverage.CoverageSuiteListener,com.intellij.openapi.Disposable):V
 - a:attachToProcess(com.intellij.execution.process.ProcessHandler,com.intellij.execution.configurations.RunConfigurationBase,com.intellij.execution.configurations.RunnerSettings):V
 - a:chooseSuitesBundle(com.intellij.coverage.CoverageSuitesBundle):V
@@ -133,6 +134,7 @@ a:com.intellij.coverage.CoverageRunner
 - <init>():V
 - a:acceptsCoverageEngine(com.intellij.coverage.CoverageEngine):Z
 - canBeLoaded(java.io.File):Z
+- canBeLoaded(java.nio.file.Path):Z
 - a:getDataFileExtension():java.lang.String
 - getDataFileExtensions():java.lang.String[]
 - a:getId():java.lang.String
@@ -140,7 +142,9 @@ a:com.intellij.coverage.CoverageRunner
 - a:getPresentableName():java.lang.String
 - loadCoverageData(java.io.File,com.intellij.coverage.CoverageSuite):com.intellij.rt.coverage.data.ProjectData
 - p:loadCoverageData(java.io.File,com.intellij.coverage.CoverageSuite,com.intellij.coverage.CoverageLoadErrorReporter):com.intellij.coverage.CoverageLoadingResult
+- p:loadCoverageData(java.nio.file.Path,com.intellij.coverage.CoverageSuite,com.intellij.coverage.CoverageLoadErrorReporter):com.intellij.coverage.CoverageLoadingResult
 - f:loadCoverageDataWithReporting(java.io.File,com.intellij.coverage.CoverageSuite):com.intellij.rt.coverage.data.ProjectData
+- f:loadCoverageDataWithReporting(java.nio.file.Path,com.intellij.coverage.CoverageSuite):com.intellij.rt.coverage.data.ProjectData
 c:com.intellij.coverage.CoverageRunnerData
 - com.intellij.execution.configurations.RunnerSettings
 - <init>():V
@@ -190,6 +194,8 @@ f:com.intellij.coverage.DefaultCoverageFileProvider
 - <init>(java.io.File):V
 - <init>(java.io.File,java.lang.String):V
 - <init>(java.lang.String):V
+- <init>(java.nio.file.Path):V
+- <init>(java.nio.file.Path,java.lang.String):V
 - ensureFileExists():Z
 - getCoverageDataFilePath():java.lang.String
 - getSourceProvider():java.lang.String
@@ -217,6 +223,7 @@ a:com.intellij.coverage.SimpleCoverageAnnotator
 - p:createRenewRequest(com.intellij.coverage.CoverageSuitesBundle,com.intellij.coverage.CoverageDataManager):java.lang.Runnable
 - p:fileInfoForCoveredFile(com.intellij.rt.coverage.data.ClassData):com.intellij.coverage.BaseCoverageAnnotator$FileCoverageInfo
 - p:fillInfoForUncoveredFile(java.io.File):com.intellij.coverage.BaseCoverageAnnotator$FileCoverageInfo
+- p:fillInfoForUncoveredFile(java.nio.file.Path):com.intellij.coverage.BaseCoverageAnnotator$FileCoverageInfo
 - ps:getClassData(java.lang.String,com.intellij.rt.coverage.data.ProjectData,java.util.Map):com.intellij.rt.coverage.data.ClassData
 - p:getDirCoverageInfo(com.intellij.openapi.vfs.VirtualFile,com.intellij.coverage.CoverageSuitesBundle):com.intellij.coverage.BaseCoverageAnnotator$DirCoverageInfo
 - getDirCoverageInformationString(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,com.intellij.coverage.CoverageSuitesBundle,com.intellij.coverage.CoverageDataManager):java.lang.String
@@ -251,6 +258,7 @@ f:com.intellij.coverage.lcov.LcovSerializationUtils
 - <init>():V
 - s:convertToProjectData(com.intellij.coverage.lcov.LcovCoverageReport,java.util.function.Function):com.intellij.rt.coverage.data.ProjectData
 - s:readLCOV(java.util.List):com.intellij.coverage.lcov.LcovCoverageReport
+- s:readLCOVFromPaths(java.util.List):com.intellij.coverage.lcov.LcovCoverageReport
 c:com.intellij.coverage.view.CoverageListNode
 - com.intellij.ide.util.treeView.AbstractTreeNode
 - pf:myBundle:com.intellij.coverage.CoverageSuitesBundle

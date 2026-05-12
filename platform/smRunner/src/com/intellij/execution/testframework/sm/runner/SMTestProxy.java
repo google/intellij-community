@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.testframework.sm.runner;
 
 import com.intellij.execution.Location;
@@ -68,6 +68,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -81,6 +82,21 @@ public class SMTestProxy extends AbstractTestProxy implements Navigatable {
   public static final Key<String> NODE_ID = Key.create("test.proxy.id");
 
   private static final Logger LOG = Logger.getInstance(SMTestProxy.class.getName());
+
+  private enum DurationState {
+    /**
+     * initial / after invalidation: {@link #getDuration} recomputes
+     */
+    NOT_SET,
+    /**
+     * duration is set by children or explicitly and is up to date: {@link #getDuration} returns cached value
+     */
+    COMPUTED,
+    /**
+     * duration is set explicitly by {@link #setDuration} and is up to date: {@link #getDuration} returns cached value
+     */
+    EXPLICIT
+  }
 
   private final String myName;
   private boolean myIsSuite;
@@ -108,7 +124,7 @@ public class SMTestProxy extends AbstractTestProxy implements Navigatable {
    * @see SMTestProxy#setTerminated(long)
    */
   @ApiStatus.Experimental volatile @Nullable Long myEndTime = null;
-  private boolean myDurationIsCached = false; // is used for separating unknown and unset duration
+  private volatile @NotNull DurationState myDurationState = DurationState.NOT_SET;
   private boolean myHasCriticalErrors = false;
   private boolean myHasPassedTests = false;
   private boolean myHasPassedTestsCached = false;
@@ -365,7 +381,7 @@ public class SMTestProxy extends AbstractTestProxy implements Navigatable {
     }
     Map<GlobalSearchScope, Ref<Location>> value = myLocationMapCachedValue.getValue();
     // Ref<Location> allows to cache null locations
-    Ref<Location> ref = value.computeIfAbsent(searchScope, scope -> Ref.create(computeLocation(project, searchScope, locationUrl)));
+    Ref<Location> ref = value.computeIfAbsent(searchScope, _ -> Ref.create(computeLocation(project, searchScope, locationUrl)));
     return ref.get();
   }
 
@@ -469,10 +485,15 @@ public class SMTestProxy extends AbstractTestProxy implements Navigatable {
    */
   @Override
   public @Nullable Long getDuration() {
-    // Returns duration value for tests
-    // or cached duration for suites
-    if (myDurationIsCached || durationShouldBeSetExplicitly()) {
+    if (myDurationState != DurationState.NOT_SET) {
       return myDuration;
+    }
+    if (durationShouldBeSetExplicitly()) {
+      // leaf test, or MANUAL suite with an explicitly set duration
+      if (!myIsSuite || myDuration != null) {
+        return myDuration;
+      }
+      // MANUAL suite with no explicit duration: fall through to compute from children
     }
 
     //For suites counts and caches durations of its children. Also it evaluates partial duration,
@@ -481,7 +502,7 @@ public class SMTestProxy extends AbstractTestProxy implements Navigatable {
     //if one of children is ignored - it's duration will be 0 and if child wasn't run,
     //then it's duration will be unknown
     myDuration = calcSuiteDuration();
-    myDurationIsCached = true;
+    myDurationState = DurationState.COMPUTED;
 
     return myDuration;
   }
@@ -571,18 +592,19 @@ public class SMTestProxy extends AbstractTestProxy implements Navigatable {
   public void setDuration(final long duration) {
     if (durationShouldBeSetExplicitly()) {
       invalidateCachedDurationForContainerSuites(duration - (myDuration != null ? myDuration : 0));
-      myDurationIsCached = true;
+      myDurationState = DurationState.EXPLICIT;
       myDuration = (duration >= 0) ? duration : null;
       return;
     }
-    else {
-      invalidateCachedDurationForContainerSuites(-1);
+    invalidateCachedDurationForContainerSuites(-1);
+    if (duration >= 0) {
+      myStartTime = Optional.ofNullable(myEndTime).orElseGet(() -> System.currentTimeMillis()) - duration;
     }
+  }
 
-    // Not allow to directly set duration for suites.
-    // It should be the sum of children. This requirement is only
-    // for safety of current model and may be changed
-    LOG.warn("Unsupported operation");
+  void resetDuration() {
+    myDuration = null;
+    myDurationState = DurationState.NOT_SET;
   }
 
   /**
@@ -1071,20 +1093,24 @@ public class SMTestProxy extends AbstractTestProxy implements Navigatable {
    * Recursively invalidates cached duration for container(parent) suites or updates their value
    */
   private void invalidateCachedDurationForContainerSuites(long duration) {
-    // Manual duration does not need any automatic calculation
-    if (!durationShouldBeSetExplicitly()) {
-      if (duration >= 0) {
-        if (myDuration == null) {
-          myDuration = duration;
+    if (myDurationState != DurationState.EXPLICIT) {
+      if (!durationShouldBeSetExplicitly()) {
+        // AUTOMATIC suite: update running sum incrementally, or invalidate on full reset
+        if (duration >= 0) {
+          if (myDuration == null) {
+            myDuration = duration;
+          }
+          else {
+            myDuration += duration;
+          }
         }
         else {
-          myDuration += duration;
+          resetDuration();
         }
       }
       else {
-        // Invalidates duration of this suite
-        myDuration = null;
-        myDurationIsCached = false;
+        // MANUAL suite with computed duration: invalidate so getDuration() recomputes from children
+        resetDuration();
       }
     }
 
@@ -1125,7 +1151,7 @@ public class SMTestProxy extends AbstractTestProxy implements Navigatable {
       myTestsReporterAttached = true;
     }
 
-    final void setDurationStrategy(final @NotNull TestDurationStrategy strategy) {
+    public final void setDurationStrategy(final @NotNull TestDurationStrategy strategy) {
       myDurationStrategy = strategy;
     }
 
@@ -1215,6 +1241,7 @@ public class SMTestProxy extends AbstractTestProxy implements Navigatable {
       }
       myStartTime = null;
       myEndTime = null;
+      resetDuration();
       clear();
     }
 

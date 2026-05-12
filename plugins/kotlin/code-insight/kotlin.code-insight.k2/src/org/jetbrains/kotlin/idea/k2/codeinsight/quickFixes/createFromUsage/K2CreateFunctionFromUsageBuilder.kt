@@ -27,7 +27,7 @@ import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.analysis.api.types.KaTypeParameterType
 import org.jetbrains.kotlin.asJava.toLightClass
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.buildClassTypeWithStarProjections
-import org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage.K2CreateFunctionFromUsageBuilder.buildRequestsAndActions
+import org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage.CreateMethodFromKotlinUsageRequest.Companion.createMethodRequest
 import org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage.K2CreateFunctionFromUsageUtil.canRefactor
 import org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage.K2CreateFunctionFromUsageUtil.convertToClass
 import org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage.K2CreateFunctionFromUsageUtil.getClassOfExpressionType
@@ -39,7 +39,9 @@ import org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage.K2Cre
 import org.jetbrains.kotlin.idea.quickfix.createFromUsage.CreateFromUsageUtil
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken
+import org.jetbrains.kotlin.lexer.KtToken
 import org.jetbrains.kotlin.lexer.KtTokens
+import org.jetbrains.kotlin.psi.KtBinaryExpression
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtConstructorDelegationCall
@@ -60,6 +62,7 @@ import org.jetbrains.kotlin.psi.psiUtil.getParentOfTypeAndBranch
 import org.jetbrains.kotlin.psi.psiUtil.getParentOfTypeAndBranches
 import org.jetbrains.kotlin.psi.psiUtil.getReceiverExpression
 import org.jetbrains.kotlin.psi.psiUtil.isExtensionDeclaration
+import org.jetbrains.kotlin.types.expressions.OperatorConventions
 
 object K2CreateFunctionFromUsageBuilder {
     /**
@@ -67,16 +70,17 @@ object K2CreateFunctionFromUsageBuilder {
      * and create `IntentionAction`s for the requests.
      */
     internal fun generateCreateMethodActions(element: KtElement): List<IntentionAction> {
-        val callExpression = getTargetCallExpression(element) ?: return emptyList()
-        val calleeExpression = callExpression.calleeExpression as? KtSimpleNameExpression ?: return emptyList()
-        if (!calleeExpression.referenceNameOfElement()) return emptyList()
-        return buildRequestsAndActions(callExpression)
-    }
-
-    private fun getTargetCallExpression(element: KtElement): KtCallExpression? {
-        if (element.isPartOfImportDirectiveOrAnnotation()) return null
+        if (element.isPartOfImportDirectiveOrAnnotation()) return emptyList()
         val parent = element.parent
-        return if (parent is KtCallExpression && parent.calleeExpression == element) parent else null
+        val callExpression = if (parent is KtCallExpression && parent.calleeExpression == element) parent else null
+        if (callExpression != null) {
+            val calleeExpression = callExpression.calleeExpression as? KtSimpleNameExpression ?: return emptyList()
+            if (!calleeExpression.referenceNameOfElement()) return emptyList()
+            return buildRequestsAndActions(callExpression)
+        }
+
+        val binaryExpression = element as? KtBinaryExpression ?: parent as? KtBinaryExpression ?: return emptyList()
+        return buildRequestsAndActions(binaryExpression)
     }
 
     private fun KtSimpleNameExpression.referenceNameOfElement(): Boolean = getReferencedNameElementType() == KtTokens.IDENTIFIER
@@ -91,14 +95,63 @@ object K2CreateFunctionFromUsageBuilder {
         }
     }
 
+    internal fun buildRequestsAndActions(binaryExpression: KtBinaryExpression): List<IntentionAction> {
+        val methodRequests = analyze(binaryExpression) { buildRequests(binaryExpression) }
+        val extensions = EP_NAME.extensions
+        return methodRequests.flatMap { (targetClass, request) ->
+            extensions.flatMap { ext ->
+                ext.createAddMethodActions(targetClass, request)
+            }
+        }
+    }
+
     context(_: KaSession)
     private fun buildRequests(callExpression: KtCallExpression): List<Pair<JvmClass, CreateMethodRequest>> {
         val calleeExpression = callExpression.calleeExpression as? KtSimpleNameExpression ?: return emptyList()
+        return buildRequests(
+            usageElement = callExpression,
+            calleeExpression = calleeExpression,
+            referenceName = (callExpression.calleeExpression as? KtSimpleNameExpression)?.getReferencedName().orEmpty(),
+            receiverExpression = calleeExpression.getReceiverExpression(),
+            implicitReceivers = computeImplicitReceiverType(calleeExpression),
+            operatorFunction = false,
+        )
+    }
+
+    context(_: KaSession)
+    private fun buildRequests(binaryExpression: KtBinaryExpression): List<Pair<JvmClass, CreateMethodRequest>> {
+        val inOperation = binaryExpression.operationToken in OperatorConventions.IN_OPERATIONS
+
+        val receiverExpr = if (inOperation) binaryExpression.right else binaryExpression.left
+        if (receiverExpr == null) return emptyList()
+
+        val token = binaryExpression.operationToken as KtToken
+        val operationName = when (token) {
+            KtTokens.IDENTIFIER -> binaryExpression.operationReference.getReferencedName()
+            else -> OperatorConventions.getNameForOperationSymbol(token, false, true)?.asString()
+        } ?: return emptyList()
+        return buildRequests(
+            usageElement = binaryExpression,
+            calleeExpression = binaryExpression.operationReference,
+            referenceName = operationName,
+            receiverExpression = receiverExpr,
+            implicitReceivers = emptyList(),
+            operatorFunction = true,
+        )
+    }
+
+    context(_: KaSession)
+    private fun buildRequests(
+        usageElement: KtElement,
+        calleeExpression: KtSimpleNameExpression,
+        referenceName: String,
+        receiverExpression: KtExpression?,
+        implicitReceivers: List<KaType>,
+        operatorFunction: Boolean,
+    ): List<Pair<JvmClass, CreateMethodRequest>> {
         val requests = mutableListOf<Pair<JvmClass, CreateMethodRequest>>()
-        val receiverExpression = calleeExpression.getReceiverExpression()
         // Register default create-from-usage request.
         // TODO: Check whether this class or file can be edited (Use `canRefactor()`).
-        val implicitReceivers = computeImplicitReceiverType(calleeExpression)
         val receiverClass = receiverExpression?.getClassOfExpressionType()
         val defaultContainers = when (receiverClass) {
             is PsiClass -> listOf(receiverClass)
@@ -114,38 +167,45 @@ object K2CreateFunctionFromUsageBuilder {
         defaultContainers.forEachIndexed { index, container ->
           val defaultClassForReceiverOrFile = calleeExpression.getReceiverOrContainerClass(container)
             if (defaultClassForReceiverOrFile != null) {
-                val shouldCreateCompanionClass = shouldCreateCompanionClass(calleeExpression)
+                val shouldCreateCompanionClass = shouldCreateCompanionClass(receiverExpression)
+                val effectiveContainer = container ?: calleeExpression.containingFile
                 val modifiers = computeModifiers(
-                    container ?: calleeExpression.containingFile,
+                    effectiveContainer,
+                    CreateFromUsageUtil.isTopLevelScriptContainer(effectiveContainer),
                     calleeExpression,
-                    callExpression,
-                    shouldCreateCompanionClass, false
+                    usageElement,
+                    shouldCreateCompanionClass,
+                    false,
                 )
-                requests.add(defaultClassForReceiverOrFile to CreateMethodFromKotlinUsageRequest(
-                    functionCall = callExpression,
+                requests.add(defaultClassForReceiverOrFile to createMethodRequest(
+                    functionCall = usageElement,
                     modifiers = modifiers,
+                    referenceName = referenceName,
                     receiverExpression = receiverExpression,
                     receiverType = implicitReceivers.getOrNull(index).takeUnless { receiverClass is KtClassOrObject || receiverClass is PsiClass },
                     isExtension = false,
                     isAbstractClassOrInterface = false,
-                    isForCompanion = shouldCreateCompanionClass
+                    isForCompanion = shouldCreateCompanionClass,
+                    operatorFunction = operatorFunction,
                 ))
             }
         }
         // Register create-abstract/extension-callable-from-usage request.
-        val abstractTypeOfContainer = calleeExpression.getAbstractTypeOfReceiver()
+        val abstractTypeOfContainer = calleeExpression.getAbstractTypeOfReceiver(receiverExpression)
         val abstractContainerClass = abstractTypeOfContainer?.convertToClass()
         if (abstractContainerClass != null) {
             val jvmClass = abstractContainerClass.toLightClass()
             if (jvmClass != null) {
-                requests.add(jvmClass to CreateMethodFromKotlinUsageRequest(
-                    callExpression,
-                    setOf(),
-                    receiverExpression,
+                requests.add(jvmClass to createMethodRequest(
+                    functionCall = usageElement,
+                    modifiers = emptySet(),
+                    referenceName = referenceName,
+                    receiverExpression = receiverExpression,
                     receiverType = null,
                     isAbstractClassOrInterface = true,
                     isExtension = false,
                     isForCompanion = false,
+                    operatorFunction = operatorFunction,
                 ))
             }
         }
@@ -156,16 +216,26 @@ object K2CreateFunctionFromUsageBuilder {
                 implicitReceiverType?.convertToClass() ?: calleeExpression.getNonStrictParentOfType<KtClassOrObject>()
                 ?: calleeExpression.containingKtFile
             val jvmClassWrapper = JvmClassWrapperForKtClass(containerClassForExtension)
-            val shouldCreateCompanionClass = shouldCreateCompanionClass(calleeExpression)
-            val modifiers = computeModifiers(defaultContainers.firstOrNull() ?:calleeExpression.containingFile, calleeExpression, callExpression, shouldCreateCompanionClass, true)
-            val request = CreateMethodFromKotlinUsageRequest(
-                callExpression,
-                modifiers,
-                receiverExpression,
+            val shouldCreateCompanionClass = shouldCreateCompanionClass(receiverExpression)
+            val containerIsScript = CreateFromUsageUtil.isTopLevelScriptContainer(containerClassForExtension)
+            val modifiers = computeModifiers(
+                container = defaultContainers.firstOrNull() ?:calleeExpression.containingFile,
+                containerIsScript = containerIsScript,
+                calleeExpression = calleeExpression,
+                callExpression = usageElement,
+                shouldCreateCompanionClass = shouldCreateCompanionClass,
+                isExtension = true,
+            )
+            val request = createMethodRequest(
+                functionCall = usageElement,
+                modifiers = modifiers,
+                referenceName = referenceName,
+                receiverExpression = receiverExpression,
                 receiverType = explicitReceiverType ?: implicitReceiverType,
                 isExtension = true,
                 isAbstractClassOrInterface = false,
                 isForCompanion = shouldCreateCompanionClass,
+                operatorFunction = operatorFunction,
             )
             if (explicitReceiverType !is KaErrorType && !hasExtensionFunction(containerClassForExtension, request.methodName)) {
                 requests.add(jvmClassWrapper to request)
@@ -179,8 +249,7 @@ object K2CreateFunctionFromUsageBuilder {
     }
 
     context(_: KaSession)
-    private fun shouldCreateCompanionClass(calleeExpression: KtSimpleNameExpression): Boolean {
-        val receiverExpression = calleeExpression.getReceiverExpression()
+    private fun shouldCreateCompanionClass(receiverExpression: KtExpression?): Boolean {
         val receiverResolved =
             (receiverExpression as? KtNameReferenceExpression)?.mainReference?.resolveToSymbol() as? KaClassSymbol
         return receiverResolved != null && receiverResolved.classKind != KaClassKind.OBJECT && receiverResolved.classKind != KaClassKind.COMPANION_OBJECT
@@ -197,8 +266,9 @@ object K2CreateFunctionFromUsageBuilder {
     context(_: KaSession)
     private fun computeModifiers(
         container: PsiElement,
+        containerIsScript: Boolean,
         calleeExpression: KtSimpleNameExpression,
-        callExpression: KtCallExpression,
+        callExpression: KtElement,
         shouldCreateCompanionClass: Boolean,
         isExtension: Boolean
     ): List<JvmModifier> {
@@ -222,6 +292,7 @@ object K2CreateFunctionFromUsageBuilder {
 
         val jvmModifier = CreateFromUsageUtil.computeDefaultVisibilityAsJvmModifier(
             container,
+            containerIsScript = containerIsScript,
             isAbstract = false,
             isExtension = isExtension,
             isConstructor = false,
@@ -237,7 +308,7 @@ object K2CreateFunctionFromUsageBuilder {
     context(_: KaSession)
     private fun samePackage(
         calleeExpression: KtSimpleNameExpression,
-        callExpression: KtCallExpression
+        callExpression: KtElement
     ): Boolean {
         val packageNameOfReceiver = calleeExpression.getReceiverOrContainerClassPackageName()
         val samePackage = packageNameOfReceiver != null && packageNameOfReceiver == callExpression.containingKtFile.packageFqName
@@ -248,7 +319,6 @@ object K2CreateFunctionFromUsageBuilder {
      * Returns the type of the class containing this [KtSimpleNameExpression] if the class is abstract. Otherwise, returns null.
      */
     context(_: KaSession)
-    @OptIn(KaExperimentalApi::class)
     private fun KtSimpleNameExpression.getAbstractTypeOfContainingClass(): KaType? {
         val containingClass = PsiTreeUtil.getParentOfType(
             /* element = */ this,
@@ -287,9 +357,9 @@ object K2CreateFunctionFromUsageBuilder {
      * Returns the receiver's type if it is abstract, or it has an abstract superclass. Otherwise, returns null.
      */
     context(_: KaSession)
-    private fun KtSimpleNameExpression.getAbstractTypeOfReceiver(): KaType? {
+    private fun KtSimpleNameExpression.getAbstractTypeOfReceiver(receiverExpression: KtExpression? = getReceiverExpression()): KaType? {
         // If no explicit receiver exists, the containing class can be an implicit receiver.
-        val receiver = getReceiverExpression() ?: return getAbstractTypeOfContainingClass()
+        val receiver = receiverExpression ?: return getAbstractTypeOfContainingClass()
         return receiver.getTypeOfAbstractSuperClass()
     }
 

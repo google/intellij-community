@@ -57,7 +57,7 @@ import java.util.Objects;
  * For "heavyweight" tests use {@link AdvHighlightingTest}
  */
 public class LightAdvHighlightingTest extends LightDaemonAnalyzerTestCase {
-  static final String BASE_PATH = "/codeInsight/daemonCodeAnalyzer/advHighlighting";
+  public static final String BASE_PATH = "/codeInsight/daemonCodeAnalyzer/advHighlighting";
 
   private UnusedDeclarationInspectionBase myUnusedDeclarationInspection;
 
@@ -99,6 +99,7 @@ public class LightAdvHighlightingTest extends LightDaemonAnalyzerTestCase {
   public void testInheritFinal() { doTest(false); }
   public void testBreakOutside() { doTest(false); }
   public void testLoop() { doTest(false); }
+  public void testForInitWithMultipleExpressions() { doTest(false); }
   public void testIllegalModifiersCombination() { doTest(false); }
   public void testModifierAllowed() { doTest(false); }
   public void testAbstractMethods() { doTest(false); }
@@ -486,4 +487,6 @@ public class LightAdvHighlightingTest extends LightDaemonAnalyzerTestCase {
   }
   
   public void testUninitializedFields() { doTest(false); }
+  
+  public void testUninitializedFieldsBeforeSuper() { IdeaTestUtil.withLevel(getModule(), LanguageLevel.JDK_25, () -> doTest(false)); }
 }

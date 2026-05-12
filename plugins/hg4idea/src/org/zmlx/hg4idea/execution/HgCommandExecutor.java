@@ -7,6 +7,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.newvfs.ManagingFS;
 import com.intellij.vcsUtil.VcsImplUtil;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -125,6 +126,8 @@ public class HgCommandExecutor {
       throw new IllegalStateException("Shouldn't be possible to run a Hg command in the safe mode");
     }
 
+
+    ManagingFS.getInstance().flushPendingUpdatesOrNotify();
     ShellCommand shellCommand = createShellCommandWithArgs(repo, operation, arguments, ignoreDefaultOptions);
     try {
       long startTime = System.currentTimeMillis();

@@ -15,10 +15,7 @@ import org.kodein.di.instance
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import kotlin.io.path.ExperimentalPathApi
-import kotlin.io.path.copyToRecursively
 import kotlin.io.path.createDirectories
-import kotlin.io.path.div
-import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -36,9 +33,11 @@ data class RemoteArchiveProjectInfo(
    */
   val projectHomeRelativePath: (Path) -> Path = { it },
   private val description: String = "",
+  private val stripRoot: Boolean = true,
+  private val unpackInplace: Boolean = false
 ) : ProjectInfoSpec {
 
-  private fun getTopMostFolderFromZip(zipFile: Path): String = JBZipFile(zipFile, StandardCharsets.UTF_8, false, ThreeState.UNSURE).entries.first().name.split("/").first()
+  private fun getTopMostFoldersFromZip(zipFile: Path): List<String> = JBZipFile(zipFile, StandardCharsets.UTF_8, true, ThreeState.UNSURE).entries.map { it.name.substringBefore('/') }.distinct()
 
   @OptIn(ExperimentalPathApi::class)
   override fun downloadAndUnpackProject(): Path {
@@ -48,19 +47,36 @@ data class RemoteArchiveProjectInfo(
 
     val zipFile = globalPaths.cacheDirForProjects.resolve("zip").resolve(projectURL.transformUrlToZipName())
 
-    HttpClient.downloadIfMissing(url = projectURL, targetFile = zipFile, timeout = downloadTimeout)
-    val imagePath: Path = zipFile
-
-    if (!imagePath.isRegularFile()) {
-      throw SetupException("Failed to download the project")
+    try {
+      HttpClient.downloadIfMissing(url = projectURL, targetFile = zipFile, timeout = downloadTimeout)
     }
+    catch (e: Exception) {
+      throw SetupException("Failed to download the project from $projectURL: ${e.message}")
+    }
+    check(zipFile.isRegularFile()) { "Expected .zip file, got: $zipFile" }
 
-    val projectHome = (projectsUnpacked / getTopMostFolderFromZip(zipFile)).let(projectHomeRelativePath)
+    val targetDir = if (unpackInplace) {
+      projectsUnpacked
+    } else {
+      projectsUnpacked.resolve("${zipFile.fileName}.d")
+    }
+    val projectHome = if (stripRoot) {
+      val roots = getTopMostFoldersFromZip(zipFile)
+        .filterNot { it == "__MACOSX" || it == "README.md" }  // ignore
+      check(roots.size == 1) {
+        "Expected exactly one top-level entry in .zip file to strip, got: ${roots.joinToString()}"
+      }
+
+      targetDir.resolve(roots.single())
+    }
+    else {
+      targetDir
+    }.let(projectHomeRelativePath)
 
     if (!isReusable) {
-      val isDeleted = projectHome.deleteRecursivelyQuietly()
+      val isDeleted = targetDir.deleteRecursivelyQuietly()
       if (!isDeleted) {
-        logOutput("Failed to delete $projectHome")
+        logOutput("Failed to delete $targetDir")
       }
     }
 
@@ -69,23 +85,22 @@ data class RemoteArchiveProjectInfo(
       return projectHome
     }
     else {
-      projectHome.deleteRecursivelyQuietly()
+      targetDir.deleteRecursivelyQuietly()
     }
 
-    when {
-      imagePath.isRegularFile() -> FileSystem.unpack(imagePath, projectsUnpacked)
-      imagePath.isDirectory() -> imagePath.copyToRecursively(projectsUnpacked, followLinks = true, overwrite = true)
-
-      else -> error("$imagePath does not exist!")
-    }
+    FileSystem.unpack(zipFile, targetDir)
 
     return projectHome
   }
 
   private fun String.transformUrlToZipName(): String {
+    val spaceVcsArchiveMirrorPrefix = "https://packages.jetbrains.team/files/p/ij/space-vcs-archive-mirror/"
     return when {
       projectURL.contains("https://github.com") -> {
         this.removePrefix("https://github.com/").split("/").joinToString("_", postfix = ".zip")
+      }
+      projectURL.startsWith(spaceVcsArchiveMirrorPrefix) -> {
+        this.removePrefix(spaceVcsArchiveMirrorPrefix).split("/").joinToString("_", postfix = ".zip")
       }
       projectURL.contains("https://kmp.jetbrains.com") -> {
         val regex = Regex("""[?&]name=([^&]+)""", RegexOption.IGNORE_CASE)

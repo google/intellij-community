@@ -1,8 +1,7 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.syntax.lexer
 
 import com.intellij.platform.syntax.SyntaxElementType
-import org.jetbrains.annotations.ApiStatus
 
 /**
  * Interface for breaking a file into a sequence of tokens.
@@ -10,7 +9,6 @@ import org.jetbrains.annotations.ApiStatus
  * @see [Implementing Lexer](https://plugins.jetbrains.com/docs/intellij/implementing-lexer.html)
  *
  */
-@ApiStatus.Experimental
 interface Lexer {
   /**
    * Prepare for lexing character data from `buffer` passed. Internal lexer state is supposed to be `initialState`. It is guaranteed

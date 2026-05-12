@@ -5,6 +5,7 @@ import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.ThrowableComputable;
 import com.intellij.openapi.util.io.FileUtil;
+import com.intellij.platform.testFramework.teamCity.TeamCityReporter;
 import com.intellij.util.ThrowableRunnable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -12,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Map;
 
 public final class TeamCityLogger {
   private static final Logger LOG = Logger.getInstance(TeamCityLogger.class);
@@ -84,8 +86,7 @@ public final class TeamCityLogger {
   }
 
   public static void publishArtifact(@NotNull Path artifactPath, @Nullable String artifactName) {
-    String suffix = artifactName != null ? "=>" + artifactName : "";
-    System.out.println("##teamcity[publishArtifacts '" + escapeTeamcityServiceMessage(artifactPath.toString()) + suffix + "']");
+    TeamCityReporter.INSTANCE.reportPublishArtifacts(artifactPath, artifactName);
   }
 
   @SuppressWarnings("UseOfSystemOutOrSystemErr")
@@ -94,44 +95,19 @@ public final class TeamCityLogger {
       return computable.compute();
     }
 
-    caption = escapeTeamcityServiceMessage(caption);
-
     // Printing in several small statements to avoid service messages tearing, causing the fold to expand.
     // Using .out instead of .err by the advice from Nikita Skvortsov.
     System.out.flush();
-    System.out.println("##teamcity[blockOpened name='" + caption + "']");
+    System.out.println(TeamCityReporter.INSTANCE.serviceMessage("blockOpened", Map.of("name", caption)));
     System.out.flush();
     try {
       return computable.compute();
     }
     finally {
       System.out.flush();
-      System.out.println("##teamcity[blockClosed name='" + caption + "']");
+      System.out.println(TeamCityReporter.INSTANCE.serviceMessage("blockClosed", Map.of("name", caption)));
       System.out.flush();
     }
   }
 
-  private static @NotNull String escapeTeamcityServiceMessage(@NotNull String s) {
-    StringBuilder sb = new StringBuilder(s.length());
-    for (int i = 0; i < s.length(); i++) {
-      char ch = s.charAt(i);
-      char escape = switch (ch) {
-        case '\n' -> 'n';
-        case '\r' -> 'r';
-        case '\'', '|', '[', ']' -> ch;
-        default -> 0;
-      };
-      if (escape != 0) {
-        sb.append('|').append(escape);
-      }
-      else if (ch < 0x20 /* space */ ||
-               ch >= 0x7f /* DEL */) {
-        sb.append(String.format("0x%04x", (short)ch));
-      }
-      else {
-        sb.append(ch);
-      }
-    }
-    return sb.toString();
-  }
 }

@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package com.intellij.pom.tree.events.impl;
 
@@ -10,6 +10,7 @@ import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.JBIterable;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -21,13 +22,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Tracks changes to the direct children of a single AST parent node.
+ * <p>
+ * On construction, snapshots the parent's current children and their text lengths.
+ * When the change set is queried, {@link ChildrenDiff} lazily diffs the snapshot against
+ * the parent's current children to produce a {@link ChangeInfoImpl} for each
+ * added, removed, replaced, or content-changed child.
+ * <p>
+ * Implements {@link Comparable} to sort changes in document order for event firing.
+ */
 @ApiStatus.Internal
 public class TreeChangeImpl implements TreeChange, Comparable<TreeChangeImpl> {
-  private final ASTNode myParent;
-  private final List<ASTNode> mySuperParents;
-  private final LinkedHashMap<ASTNode, Integer> myInitialLengths = new LinkedHashMap<>();
-  private final Set<ASTNode> myContentChangeChildren = new HashSet<>();
-  private Map<ASTNode, ChangeInfoImpl> myChanges;
+  private final @NotNull ASTNode myParent;
+  private final @NotNull List<ASTNode> mySuperParents;
+  private final @NotNull LinkedHashMap<ASTNode, Integer> myInitialLengths = new LinkedHashMap<>();
+  private final @NotNull Set<ASTNode> myContentChangeChildren = new HashSet<>();
+  private @Nullable Map<ASTNode, ChangeInfoImpl> myChanges; // cached value
 
   public TreeChangeImpl(@NotNull ASTNode parent) {
     myParent = parent;
@@ -38,7 +49,7 @@ public class TreeChangeImpl implements TreeChange, Comparable<TreeChangeImpl> {
     }
   }
 
-  List<ASTNode> getSuperParents() {
+  @NotNull List<ASTNode> getSuperParents() {
     return mySuperParents;
   }
 
@@ -61,7 +72,7 @@ public class TreeChangeImpl implements TreeChange, Comparable<TreeChangeImpl> {
 
   private static int compareNodePositions(ASTNode node1, ASTNode node2) {
     if (node1 == node2) return 0;
-    
+
     int o1 = node1.getStartOffsetInParent();
     int o2 = node2.getStartOffsetInParent();
     return o1 != o2 ? Integer.compare(o1, o2) : Integer.compare(getChildIndex(node1), getChildIndex(node2));
@@ -82,11 +93,12 @@ public class TreeChangeImpl implements TreeChange, Comparable<TreeChangeImpl> {
   private Map<ASTNode, ChangeInfoImpl> getAllChanges() {
     Map<ASTNode, ChangeInfoImpl> changes = myChanges;
     if (changes == null) {
-      myChanges = changes = new ChildrenDiff().calcChanges();
+      changes = new ChildrenDiff().calcChanges();
+      myChanges = changes;
     }
     return changes;
   }
-  
+
   private class ChildrenDiff {
     LinkedHashSet<ASTNode> currentChildren = getCurrentChildren().addAllTo(new LinkedHashSet<>());
     Iterator<ASTNode> itOld = myInitialLengths.keySet().iterator();
@@ -103,22 +115,29 @@ public class TreeChangeImpl implements TreeChange, Comparable<TreeChangeImpl> {
     void advanceNew() {
       newChild = itNew.hasNext() ? itNew.next() : null;
     }
-    
+
     Map<ASTNode, ChangeInfoImpl> calcChanges() {
-      advanceOld(); advanceNew();
+      advanceOld();
+      advanceNew();
 
       while (oldChild != null || newChild != null) {
         if (oldChild == newChild) {
           if (myContentChangeChildren.contains(oldChild)) {
             addChange(new ChangeInfoImpl(oldChild, oldChild, oldOffset, myInitialLengths.get(oldChild)));
           }
-          advanceOld(); advanceNew();
-        } else {
+          advanceOld();
+          advanceNew();
+        }
+        else {
           boolean oldDisappeared = oldChild != null && !currentChildren.contains(oldChild);
           boolean newAppeared = newChild != null && !myInitialLengths.containsKey(newChild);
-          addChange(new ChangeInfoImpl(oldDisappeared ? oldChild : null, newAppeared ? newChild : null,
-                                       oldOffset,
-                                       oldDisappeared ? myInitialLengths.get(oldChild) : 0));
+          ChangeInfoImpl change = new ChangeInfoImpl(
+            /*oldChild =*/ oldDisappeared ? oldChild : null,
+            /*newChild =*/ newAppeared ? newChild : null,
+            /*offset = */ oldOffset,
+            /*oldLength =*/ oldDisappeared ? myInitialLengths.get(oldChild) : 0);
+          addChange(change);
+
           if (oldDisappeared) {
             advanceOld();
           }
@@ -141,30 +160,34 @@ public class TreeChangeImpl implements TreeChange, Comparable<TreeChangeImpl> {
     return myParent;
   }
 
-  void fireEvents(PsiFile file) {
+  void fireEvents(@NotNull PsiFile file) {
     int start = myParent.getStartOffset();
     Collection<ChangeInfoImpl> changes = getAllChanges().values();
     if (ContainerUtil.exists(changes, c -> c.hasNoPsi())) {
       ChangeInfoImpl.childrenChanged(ChangeInfoImpl.createEvent(file, start), myParent, myParent.getTextLength() - getLengthDelta());
       return;
     }
-    
+
     for (ChangeInfoImpl change : changes) {
       change.fireEvent(start, file, myParent);
     }
   }
 
   @Override
-  public ASTNode @NotNull [] getAffectedChildren() {
+  public @NotNull ASTNode @NotNull [] getAffectedChildren() {
     return getAllChanges().keySet().toArray(ASTNode.EMPTY_ARRAY);
   }
 
   @Override
-  public ChangeInfoImpl getChangeByChild(ASTNode child) {
-    return getAllChanges().get(child);
+  public @NotNull ChangeInfoImpl getChangeByChild(@NotNull ASTNode child) {
+    ChangeInfoImpl info = getAllChanges().get(child);
+    if (info == null) {
+      throw new IllegalArgumentException("No change found for child: " + child);
+    }
+    return info;
   }
 
-  public List<ASTNode> getInitialChildren() {
+  public @NotNull List<ASTNode> getInitialChildren() {
     return new ArrayList<>(myInitialLengths.keySet());
   }
 

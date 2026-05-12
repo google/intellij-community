@@ -98,7 +98,7 @@ public class SdkEditor implements Configurable, Place.Navigator {
   private final Disposable myDisposable = Disposer.newDisposable();
 
   private boolean myIsDisposed = false;
-  private final Consumer<Boolean> myResetCallback = __ -> {
+  private final Consumer<Boolean> myResetCallback = _ -> {
     if (!myIsDisposed) reset();
   };
 

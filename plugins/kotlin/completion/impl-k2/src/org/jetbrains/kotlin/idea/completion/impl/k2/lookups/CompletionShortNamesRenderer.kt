@@ -19,8 +19,8 @@ import org.jetbrains.kotlin.types.Variance
 
 internal object CompletionShortNamesRenderer {
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     fun renderFunctionalTypeParameters(functionalType: KaFunctionType): String = functionalType.parameterTypes.joinToString(
         prefix = "(",
         postfix = ")",
@@ -31,8 +31,8 @@ internal object CompletionShortNamesRenderer {
         return renderReceiver(variable)
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun renderReceiver(variable: KaVariableSignature<*>): String {
         val receiverType = variable.receiverType ?: return ""
         return receiverType.renderVerbose() + "."
@@ -79,8 +79,8 @@ internal object CompletionShortNamesRenderer {
         }
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun <A : Appendable> A.appendParameter(
         parameterName: Name,
         parameterType: KaType,
@@ -99,8 +99,8 @@ internal object CompletionShortNamesRenderer {
     }
 }
 
-context(_: KaSession)
 @KaExperimentalApi
+context(_: KaSession)
 internal fun KaType.renderVerbose(): @NonNls String = render(
     renderer = CompletionShortNamesRenderer.rendererVerbose,
     position = Variance.INVARIANT,

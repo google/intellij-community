@@ -1,6 +1,6 @@
 package com.intellij.grazie.text
 
-import ai.grazie.nlp.tokenizer.sentence.StandardSentenceTokenizer
+import com.intellij.grazie.rule.SentenceTokenizer
 import com.intellij.grazie.text.TextContent.TextDomain.COMMENTS
 import com.intellij.grazie.text.TextContent.TextDomain.DOCUMENTATION
 import com.intellij.grazie.utils.ProblemFilterUtil
@@ -11,8 +11,6 @@ import com.intellij.psi.search.PsiTodoSearchHelper
 import com.intellij.psi.util.CachedValuesManager
 
 internal class CommentProblemFilter : ProblemFilter() {
-  private val tokenizer
-    get() = StandardSentenceTokenizer.Default
 
   override fun shouldIgnore(problem: TextProblem): Boolean {
     val text = problem.text
@@ -41,8 +39,12 @@ internal class CommentProblemFilter : ProblemFilter() {
     return false
   }
 
-  private fun isInFirstSentence(problem: TextProblem) =
-    tokenizer.tokenize(problem.text.substring(0, problem.highlightRanges[0].startOffset)).size <= 1
+  private fun isInFirstSentence(problem: TextProblem): Boolean {
+    return SentenceTokenizer.tokenize(problem.text)
+             .firstOrNull()
+             ?.range()
+             ?.containsOffset(problem.highlightRanges[0].startOffset) ?: false
+  }
 
   private fun isAboutIdentifierParts(problem: TextProblem, text: TextContent): Boolean {
     val ranges = problem.highlightRanges

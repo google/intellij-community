@@ -18,6 +18,9 @@ import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolModality
 import org.jetbrains.kotlin.analysis.api.symbols.KaValueParameterSymbol
 import org.jetbrains.kotlin.asJava.unwrapped
 import org.jetbrains.kotlin.idea.base.analysis.KotlinUastOutOfCodeBlockModificationTracker
+import org.jetbrains.kotlin.idea.search.ExpectActualUtils
+import org.jetbrains.kotlin.idea.search.ExpectActualUtils.actualsForExpect
+import org.jetbrains.kotlin.idea.searching.kmp.findAllActualForExpect
 import org.jetbrains.kotlin.psi.KtCallableDeclaration
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
@@ -49,6 +52,25 @@ fun KtCallableDeclaration.hasAnyOverridings(): Boolean =
         )
     }
 
+@RequiresBackgroundThread(generateAssertion = false)
+fun KtCallableDeclaration.hasAnyActuals(): Boolean =
+    CachedValuesManager.getCachedValue(this) {
+        val hasAnyActuals = findAllActualForExpect().firstOrNull() != null
+        CachedValueProvider.Result.create(
+            hasAnyActuals,
+            KotlinUastOutOfCodeBlockModificationTracker.getInstance(project)
+        )
+    }
+
+@RequiresBackgroundThread(generateAssertion = false)
+fun KtClass.hasAnyActuals(): Boolean =
+    CachedValuesManager.getCachedValue(this) {
+        val hasAnyActuals = findAllActualForExpect().firstOrNull() != null
+        CachedValueProvider.Result.create(
+            hasAnyActuals,
+            KotlinUastOutOfCodeBlockModificationTracker.getInstance(project)
+        )
+    }
 
 
 /**

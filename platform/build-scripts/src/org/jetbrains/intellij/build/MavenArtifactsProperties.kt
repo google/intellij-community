@@ -26,6 +26,12 @@ class MavenArtifactsProperties {
   var forIdeModules: Boolean = false
 
   /**
+   * If `true` Maven artifacts are generated for all library modules.
+   * @see org.jetbrains.intellij.build.impl.libraries.isLibraryModule
+   */
+  var publishLibraryModules: Boolean = false
+
+  /**
    * Names of additional modules for which Maven artifacts should be generated.
    */
   var additionalModules: PersistentList<String> = persistentListOf()
@@ -45,6 +51,18 @@ class MavenArtifactsProperties {
    *  </p>
    */
   var proprietaryModules: PersistentList<String> = persistentListOf()
+
+  /**
+   * Extra Maven "aggregator" artifacts to generate — each is a single pom.xml (packaging=pom, no jar)
+   * that declares runtime-scope &lt;dependency&gt; entries on every Maven artifact produced by this build
+   * matching the spec's filter. Downstream Maven consumers can depend on the aggregator with
+   * &lt;type&gt;pom&lt;/type&gt; (Maven) or `@pom` classifier (Gradle) to transitively pull the entire set.
+   *
+   * Typical use: expose a single entry point for downstream projects that need the IDE's full runtime
+   * classpath — including modules loaded at startup via the product descriptor that aren't reachable
+   * as JPS dependencies.
+   */
+  var aggregatorPomArtifacts: PersistentList<AggregatorPomSpec> = persistentListOf()
 
   /**
    * A predicate which returns `true` for modules which sources should be published as Maven artifacts.
@@ -74,3 +92,21 @@ class MavenArtifactsProperties {
   @ApiStatus.Internal
   var validate: suspend (BuildContext, Collection<GeneratedMavenArtifacts>) -> Unit = { _, _ -> }
 }
+
+/**
+ * Specifies a Maven aggregator artifact: a pom.xml with `packaging=pom` (no jar) whose `<dependencies>`
+ * are populated from Maven artifacts produced during the same build.
+ *
+ * @param groupId Maven groupId for the aggregator pom.
+ * @param artifactId Maven artifactId for the aggregator pom.
+ * @param description Optional `<description>` for the generated pom.
+ * @param includeModule Predicate over published JPS module names. Returning `true` includes that
+ *   module's artifact in the aggregator's `<dependencies>`. Defaults to including everything.
+ */
+@ApiStatus.Internal
+class AggregatorPomSpec(
+  val groupId: String,
+  val artifactId: String,
+  val description: String? = null,
+  val includeModule: (moduleName: String) -> Boolean = { true },
+)

@@ -2,8 +2,10 @@
 package com.intellij.analysis.problemsView.toolWindow
 
 import com.intellij.analysis.problemsView.ProblemsCollector
+import com.intellij.analysis.problemsView.toolWindow.splitApi.ProblemsCollectorProvider
 import com.intellij.icons.AllIcons.Toolwindows
 import com.intellij.openapi.project.Project
+import com.intellij.platform.ide.productMode.IdeProductMode
 import com.intellij.ui.ExperimentalUI
 import com.intellij.ui.IconManager
 import com.intellij.util.SingleAlarm
@@ -20,7 +22,9 @@ open class ProblemsViewIconUpdater(project: Project, coroutineScope: CoroutineSc
   private val empty = Toolwindows.ToolWindowProblemsEmpty
   private val badge by lazy { IconManager.getInstance().withIconBadge(empty, JBUI.CurrentTheme.IconBadge.ERROR) }
 
-  protected open fun getProblemCount(project: Project): Int = ProblemsCollector.getInstance(project).getProblemCount()
+  protected open fun getProblemCount(project: Project): Int {
+    return getProblemsCollector(project)?.getProblemCount() ?: 0
+  }
 
   protected open fun getIcon(problemCount: Int): Icon = when {
     problemCount == 0 -> empty
@@ -33,5 +37,14 @@ open class ProblemsViewIconUpdater(project: Project, coroutineScope: CoroutineSc
     fun update(project: Project):Unit? {
       return project.getService(ProblemsViewIconUpdater::class.java)?.alarm?.cancelAndRequest()
     }
+  }
+}
+
+
+private fun getProblemsCollector(project: Project): ProblemsCollector? {
+  if (IdeProductMode.isBackend) {
+    return ProblemsCollector.getInstance(project)
+  } else {
+    return ProblemsCollectorProvider.getInstance(project).getProblemsCollector()
   }
 }

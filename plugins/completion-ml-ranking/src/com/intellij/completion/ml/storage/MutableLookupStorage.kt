@@ -1,6 +1,7 @@
 // Copyright 2000-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.completion.ml.storage
 
+import com.intellij.codeInsight.completion.BaseCompletionParameters
 import com.intellij.codeInsight.completion.CompletionParameters
 import com.intellij.codeInsight.completion.ml.ContextFeatures
 import com.intellij.codeInsight.completion.ml.MLFeatureValue
@@ -75,9 +76,9 @@ class MutableLookupStorage(
       return storage
     }
 
-    fun get(parameters: CompletionParameters): MutableLookupStorage? {
+    fun get(parameters: BaseCompletionParameters): MutableLookupStorage? {
       var storage = parameters.getUserData(LOOKUP_STORAGE)
-      if (storage == null) {
+      if (storage == null && parameters is CompletionParameters) {
         val activeLookup = LookupManager.getActiveLookup(parameters.editor) as? LookupImpl
         if (activeLookup != null) {
           storage = get(activeLookup)
@@ -90,14 +91,14 @@ class MutableLookupStorage(
       return storage
     }
 
-    fun saveAsUserData(parameters: CompletionParameters, storage: MutableLookupStorage) {
+    fun saveAsUserData(parameters: BaseCompletionParameters, storage: MutableLookupStorage) {
       val completionProcess = parameters.process
       if (completionProcess is UserDataHolder) {
         completionProcess.putUserData(LOOKUP_STORAGE, storage)
       }
     }
 
-    private fun <T> CompletionParameters.getUserData(key: Key<T>): T? {
+    private fun <T> BaseCompletionParameters.getUserData(key: Key<T>): T? {
       return (process as? UserDataHolder)?.getUserData(key)
     }
   }

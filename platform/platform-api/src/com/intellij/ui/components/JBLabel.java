@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui.components;
 
 import com.intellij.ide.ui.AntialiasingType;
@@ -14,7 +14,8 @@ import com.intellij.util.ui.HTMLEditorKitBuilder;
 import com.intellij.util.ui.JBFont;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.components.JBComponent;
-import org.intellij.lang.annotations.JdkConstants;
+import com.intellij.util.ui.JdkConstants;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -461,5 +462,10 @@ public class JBLabel extends JLabel implements AnchorableComponent, JBComponent<
     if (myEditorPane != null) {
       myEditorPane.setToolTipText(text);
     }
+  }
+
+  @ApiStatus.Internal
+  public @Nullable JEditorPane getEditorPane() {
+    return myEditorPane;
   }
 }

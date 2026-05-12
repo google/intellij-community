@@ -8,8 +8,8 @@ import com.intellij.tasks.TaskBundle;
 import com.intellij.tasks.config.BaseRepositoryEditor;
 import com.intellij.tasks.gitlab.model.GitlabProject;
 import com.intellij.tasks.impl.TaskUiUtil;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBLabel;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.Consumer;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.UIUtil;
@@ -57,7 +57,7 @@ public class GitlabRepositoryEditor extends BaseRepositoryEditor<GitlabRepositor
   protected @Nullable JComponent createCustomPanel() {
     myProjectLabel = new JBLabel(TaskBundle.message("label.project"), SwingConstants.RIGHT);
     myProjectComboBox = new ComboBox<>(300);
-    myProjectComboBox.setRenderer(SimpleListCellRenderer.create(TaskBundle.message("label.set.server.url.token.first"), GitlabProject::getName));
+    myProjectComboBox.setRenderer(BuilderKt.textListCellRenderer(TaskBundle.message("label.set.server.url.token.first"), GitlabProject::getName));
     myProjectLabel.setLabelFor(myProjectComboBox);
     return new FormBuilder().addLabeledComponent(myProjectLabel, myProjectComboBox).getPanel();
   }

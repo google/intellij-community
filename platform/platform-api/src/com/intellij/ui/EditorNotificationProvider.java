@@ -32,7 +32,7 @@ public interface EditorNotificationProvider extends PossiblyDumbAware {
    * @deprecated Use {@code null}.
    */
   @Deprecated
-  Function<? super @NotNull FileEditor, ? extends @Nullable JComponent> CONST_NULL = __ -> null;
+  Function<? super @NotNull FileEditor, ? extends @Nullable JComponent> CONST_NULL = _ -> null;
 
   @RequiresReadLock
   @Nullable

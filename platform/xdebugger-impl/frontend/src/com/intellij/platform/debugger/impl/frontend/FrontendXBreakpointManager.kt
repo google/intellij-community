@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.debugger.impl.frontend
 
 import com.intellij.concurrency.ConcurrentCollectionFactory
@@ -12,6 +12,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Ref
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.debugger.impl.frontend.util.SequentialRpcRequestsExecutor
 import com.intellij.platform.debugger.impl.rpc.XBreakpointApi
 import com.intellij.platform.debugger.impl.rpc.XBreakpointDto
 import com.intellij.platform.debugger.impl.rpc.XBreakpointEvent
@@ -31,6 +32,7 @@ import com.intellij.platform.debugger.impl.shared.proxy.XLineBreakpointTypeProxy
 import com.intellij.platform.project.projectId
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.xdebugger.SplitDebuggerMode
+import com.intellij.xdebugger.breakpoints.XLineBreakpointVerticalPlacement
 import com.intellij.xdebugger.impl.breakpoints.XBreakpointItem
 import com.intellij.xdebugger.impl.breakpoints.XBreakpointsDialogState
 import com.intellij.xdebugger.impl.breakpoints.XLineBreakpointManager
@@ -65,6 +67,7 @@ private val log = logger<FrontendXBreakpointManager>()
 @ApiStatus.Internal
 @VisibleForTesting
 class FrontendXBreakpointManager(private val project: Project, private val cs: CoroutineScope) : XBreakpointManagerProxy {
+  private val sequentialExecutor = SequentialRpcRequestsExecutor.create(cs)
   private val breakpointsChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
   private val breakpointsChangedWithReplay = breakpointsChanged.shareIn(cs, SharingStarted.Eagerly, replay = 1)
 
@@ -196,6 +199,7 @@ class FrontendXBreakpointManager(private val project: Project, private val cs: C
     }
     val type = FrontendXBreakpointTypesManager.getInstance(project).getTypeById(breakpointDto.typeId) ?: return null
     val newBreakpoint = createXBreakpointProxy(project, cs, breakpointDto, type, this)
+    (newBreakpoint as? FrontendXLineBreakpointProxy)?.registerInManager(updateUI)
     newBreakpoint.installListener {
       breakpointsChanged.tryEmit(Unit)
       if (newBreakpoint is XLineBreakpointProxy) {
@@ -204,11 +208,11 @@ class FrontendXBreakpointManager(private val project: Project, private val cs: C
     }
     val previousBreakpoint = breakpoints.putIfAbsent(breakpointDto.id, newBreakpoint)
     if (previousBreakpoint != null) {
+      (newBreakpoint as? FrontendXLineBreakpointProxy)?.unregisterInManager()
       newBreakpoint.dispose()
       log.debug { "Breakpoint creation skipped for ${breakpointDto.id}, because it is already created" }
       return previousBreakpoint
     }
-    (newBreakpoint as? FrontendXLineBreakpointProxy)?.registerInManager(updateUI)
     log.debug { "Breakpoint created for ${breakpointDto.id}" }
     breakpointsChanged.tryEmit(Unit)
     return newBreakpoint
@@ -216,7 +220,7 @@ class FrontendXBreakpointManager(private val project: Project, private val cs: C
 
   private suspend fun canToggleLightBreakpoint(editor: Editor, info: XLineBreakpointInstallationInfo): Boolean {
     val type = info.types.singleOrNull() ?: return false
-    if (findBreakpointsAtLine(type, info.position.file, info.position.line).isNotEmpty()) {
+    if (findBreakpointsAtLine(type, info.position.file, info.position.line, info.placement).isNotEmpty()) {
       return false
     }
     if (info.isTemporary || info.isLogging) {
@@ -236,7 +240,7 @@ class FrontendXBreakpointManager(private val project: Project, private val cs: C
     if (editor == null || !canToggleLightBreakpoint(editor, info)) {
       return block()
     }
-    val lightBreakpointPosition = LightBreakpointPosition(info.position.file, info.position.line)
+    val lightBreakpointPosition = LightBreakpointPosition(info.position.file, info.position.line, info.placement)
     val type = info.types.first()
     return coroutineScope {
       val lightBreakpoint = createLightBreakpointIfPossible(lightBreakpointPosition, type, info, editor)
@@ -276,6 +280,8 @@ class FrontendXBreakpointManager(private val project: Project, private val cs: C
   private fun removeBreakpointLocally(breakpointId: XBreakpointId) {
     breakpointIdsRemovedLocally.add(breakpointId)
     val removedBreakpoint = breakpoints.remove(breakpointId)
+
+    // Attachments are automatically disposed when the breakpoint's coroutine scope is cancelled via dispose()
     removedBreakpoint?.dispose()
     if (removedBreakpoint == null) {
       log.debug { "Breakpoint removal has no effect for $breakpointId, because it doesn't exist locally" }
@@ -303,7 +309,7 @@ class FrontendXBreakpointManager(private val project: Project, private val cs: C
     if (group == defaultGroup) return
 
     defaultGroup = group
-    cs.launch {
+    sequentialExecutor.execute {
       XBreakpointApi.getInstance().setDefaultGroup(project.projectId(), group)
     }
   }
@@ -369,38 +375,39 @@ class FrontendXBreakpointManager(private val project: Project, private val cs: C
 
   override fun rememberRemovedBreakpoint(breakpoint: XBreakpointProxy) {
     lastRemovedBreakpoint = breakpoint
-    cs.launch {
+    sequentialExecutor.execute {
       XBreakpointTypeApi.getInstance().rememberRemovedBreakpoint(breakpoint.id)
     }
   }
 
   override fun restoreRemovedBreakpoint(breakpoint: XBreakpointProxy) {
     lastRemovedBreakpoint = null
-    cs.launch {
+    sequentialExecutor.execute {
       XBreakpointTypeApi.getInstance().restoreRemovedBreakpoint(breakpoint.project.projectId())
     }
   }
 
   override fun copyLineBreakpoint(breakpoint: XLineBreakpointProxy, file: VirtualFile, line: Int) {
-    cs.launch {
+    sequentialExecutor.execute {
       XBreakpointTypeApi.getInstance().copyLineBreakpoint(breakpoint.id, file.rpcId(), line)
     }
   }
 
   override fun onBreakpointRemoval(breakpoint: XLineBreakpointProxy, session: XDebugSessionProxy) {
-    cs.launch {
+    sequentialExecutor.execute {
       XBreakpointTypeApi.getInstance().onBreakpointRemoval(breakpoint.id, session.id)
     }
   }
 
-  override fun findBreakpointsAtLine(type: XLineBreakpointTypeProxy, file: VirtualFile, line: Int): List<XLineBreakpointProxy> {
+  override fun findBreakpointsAtLine(type: XLineBreakpointTypeProxy, file: VirtualFile, line: Int, placement: XLineBreakpointVerticalPlacement): List<XLineBreakpointProxy> {
     return breakpoints.values.filterIsInstance<XLineBreakpointProxy>().filter {
-      it.type == type && it.getFile()?.url == file.url && it.getLine() == line
+      it.type == type && it.getFile()?.url == file.url && it.getLine() == line &&
+      it.getPlacement() == placement
     }
   }
 
 
-  private data class LightBreakpointPosition(val file: VirtualFile, val line: Int)
+  private data class LightBreakpointPosition(val file: VirtualFile, val line: Int, val placement: XLineBreakpointVerticalPlacement)
 
   private fun FrontendXLineBreakpointProxy.registerInManager(updateUI: Boolean) {
     while (true) {

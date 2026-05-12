@@ -1,17 +1,13 @@
 ### auto-generated section `build intellij.platform.vcs.impl.lang.actions` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "actions_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "actions",
+  module_name = "intellij.platform.vcs.impl.lang.actions",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
-  resources = [":actions_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   runtime_deps = [
     "@lib//:kotlin-stdlib",
     "//platform/vcs-impl",
@@ -20,6 +16,7 @@ jvm_library(
 
 jvm_library(
   name = "actions_test_lib",
+  testonly = True,
   module_name = "intellij.platform.vcs.impl.lang.actions",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -29,3 +26,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.vcs.impl.lang.actions` end
+
+### auto-generated section `iml intellij.platform.vcs.impl.lang.actions` start
+exports_files([
+  "intellij.platform.vcs.impl.lang.actions.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.vcs.impl.lang.actions` end

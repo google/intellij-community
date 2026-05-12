@@ -40,5 +40,6 @@
                                  bundle="messages.YAMLBundle"
                                  key="yaml.smartkeys.option.title"/>
     <copyPastePreProcessor implementation="org.jetbrains.yaml.smart.YAMLCopyPasteProcessor"/>
+    <applicationSettings service="org.jetbrains.yaml.folding.YAMLFoldingSettings"/>
   </extensions>
 </idea-plugin>  

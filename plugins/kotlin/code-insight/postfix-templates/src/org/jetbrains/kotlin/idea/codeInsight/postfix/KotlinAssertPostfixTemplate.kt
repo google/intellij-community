@@ -15,4 +15,5 @@ internal class KotlinAssertPostfixTemplate : StringBasedPostfixTemplate {
 
     override fun getTemplateString(element: PsiElement): String = "kotlin.assert(\$expr$)\$END$"
     override fun getElementToRemove(expr: PsiElement): PsiElement = expr
+    override fun isApplicableForModCommand(): Boolean = true
 }

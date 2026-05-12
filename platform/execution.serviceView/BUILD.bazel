@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.execution.serviceView` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "execution.serviceView_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "execution.serviceView",
   module_name = "intellij.platform.execution.serviceView",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":execution.serviceView_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/util/concurrency",
@@ -33,6 +28,7 @@ jvm_library(
     "//fleet/rpc",
     "//platform/kernel/rpc",
     "//platform/platform-impl/rpc",
+    "//platform/ide-core",
     "//platform/project/shared:project",
     "//platform/object-serializer",
     "//libraries/kotlinx/serialization/core",
@@ -40,11 +36,15 @@ jvm_library(
     "//libraries/kotlinx/coroutines/core",
     "//platform/kernel/shared:kernel",
     "//platform/execution",
+    "//libraries/fastutil",
+    "//platform/util:util-ui",
+    "//fleet/rhizomedb",
   ]
 )
 
 jvm_library(
   name = "execution.serviceView_test_lib",
+  testonly = True,
   module_name = "intellij.platform.execution.serviceView",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -69,6 +69,7 @@ jvm_library(
     "//fleet/rpc:rpc_test_lib",
     "//platform/kernel/rpc:rpc_test_lib",
     "//platform/platform-impl/rpc:rpc_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/project/shared:project_test_lib",
     "//platform/object-serializer:object-serializer_test_lib",
     "//libraries/kotlinx/serialization/core:core_test_lib",
@@ -76,6 +77,15 @@ jvm_library(
     "//libraries/kotlinx/coroutines/core:core_test_lib",
     "//platform/kernel/shared:kernel_test_lib",
     "//platform/execution:execution_test_lib",
+    "//libraries/fastutil:fastutil_test_lib",
+    "//platform/util:util-ui_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.execution.serviceView` end
+
+### auto-generated section `iml intellij.platform.execution.serviceView` start
+exports_files([
+  "intellij.platform.execution.serviceView.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.execution.serviceView` end

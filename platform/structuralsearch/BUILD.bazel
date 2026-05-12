@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.structuralSearch` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "structuralSearch_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "structuralSearch",
   module_name = "intellij.platform.structuralSearch",
   visibility = ["//visibility:public"],
   srcs = glob(["source/**/*.kt", "source/**/*.java", "source/**/*.form"], allow_empty = True),
-  resources = [":structuralSearch_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
@@ -29,6 +24,7 @@ jvm_library(
     "//platform/usageView",
     "//platform/lang-api:lang",
     "//platform/platform-impl:ide-impl",
+    "//platform/ide-core",
     "//xml/xml-parser:parser",
     "//RegExpSupport:regexp",
     "//platform/refactoring",
@@ -38,11 +34,15 @@ jvm_library(
     "//xml/xml-psi-api:psi",
     "//libraries/fastutil",
     "//platform/core-impl",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//platform/util/concurrency",
+    "//platform/util:util-ui",
   ]
 )
 
 jvm_library(
   name = "structuralSearch_test_lib",
+  testonly = True,
   module_name = "intellij.platform.structuralSearch",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -62,6 +62,7 @@ jvm_library(
     "//platform/usageView:usageView_test_lib",
     "//platform/lang-api:lang_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//xml/xml-parser:parser_test_lib",
     "//RegExpSupport:regexp_test_lib",
     "//platform/refactoring:refactoring_test_lib",
@@ -71,13 +72,23 @@ jvm_library(
     "//xml/xml-psi-api:psi_test_lib",
     "//libraries/fastutil:fastutil_test_lib",
     "//platform/core-impl:core-impl_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/util/concurrency:concurrency_test_lib",
+    "//platform/util:util-ui_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.structuralSearch` end
 
+### auto-generated section `iml intellij.platform.structuralSearch` start
+exports_files([
+  "intellij.platform.structuralSearch.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.structuralSearch` end
+
 ### auto-generated section `build intellij.platform.structuralSearch.tests` start
 jvm_library(
   name = "structuralSearch-tests",
+  module_name = "intellij.platform.structuralSearch.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -88,6 +99,7 @@ jvm_library(
 
 jvm_library(
   name = "structuralSearch-tests_test_lib",
+  testonly = True,
   module_name = "intellij.platform.structuralSearch.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["testSource/**/*.kt", "testSource/**/*.java", "testSource/**/*.form"], allow_empty = True),
@@ -116,10 +128,24 @@ jvm_library(
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark_test_lib",
     "//platform/testRunner",
     "//platform/testRunner:testRunner_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/lang-api:lang",
+    "//platform/lang-api:lang_test_lib",
+    "//platform/ide-core",
   ],
-  runtime_deps = [":structuralSearch-tests"]
+  runtime_deps = [
+    ":structuralSearch-tests",
+    "//platform/ide-core:ide-core_test_lib",
+  ]
 )
 ### auto-generated section `build intellij.platform.structuralSearch.tests` end
+
+### auto-generated section `iml intellij.platform.structuralSearch.tests` start
+exports_files([
+  "intellij.platform.structuralSearch.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.structuralSearch.tests` end
 
 ### auto-generated section `test intellij.platform.structuralSearch.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

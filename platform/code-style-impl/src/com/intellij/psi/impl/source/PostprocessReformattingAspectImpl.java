@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.impl.source;
 
 import com.intellij.application.options.CodeStyle;
@@ -34,7 +34,7 @@ import com.intellij.pom.PomModelAspect;
 import com.intellij.pom.core.impl.PomModelImpl;
 import com.intellij.pom.event.PomModelEvent;
 import com.intellij.pom.tree.TreeAspect;
-import com.intellij.pom.tree.events.ChangeInfo;
+import com.intellij.pom.tree.events.ChangeInfoKind;
 import com.intellij.pom.tree.events.TreeChange;
 import com.intellij.pom.tree.events.TreeChangeEvent;
 import com.intellij.pom.tree.events.impl.ChangeInfoImpl;
@@ -257,10 +257,10 @@ public final class PostprocessReformattingAspectImpl extends PostprocessReformat
           getContext().myRaisingCandidates.putValue(viewProvider, node);
         }
 
-        final ChangeInfo childChange = treeChange.getChangeByChild(affectedChild);
-        switch (childChange.getChangeType()) {
-          case ChangeInfo.ADD, ChangeInfo.REPLACE -> postponeFormatting(viewProvider, affectedChild);
-          case ChangeInfo.CONTENTS_CHANGED -> {
+        final ChangeInfoKind changeType = treeChange.getChangeByChild(affectedChild).getChangeType();
+        switch (changeType) {
+          case Added, Replaced -> postponeFormatting(viewProvider, affectedChild);
+          case ContentsChanged -> {
             if (!CodeEditUtil.isNodeGenerated(affectedChild)) {
               ((TreeElement)affectedChild).acceptTree(new RecursiveTreeElementWalkingVisitor() {
                 @Override

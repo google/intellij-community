@@ -5,7 +5,7 @@
 fun main() {
     val k = K()
     with(k) {
-        <caret>getX()
+        getX()<caret>
     }
 }
 

@@ -10,7 +10,7 @@ class X {
     }
 
     fun f(): String {
-        return foo(<caret>)
+        return foo<caret>()
     }
 }
 
@@ -35,6 +35,6 @@ class X {
     }
 
     fun f(): String {
-        return foo(<caret>)
+        return foo<caret>()
     }
 }

@@ -249,12 +249,17 @@ public class AllIcons {
 
   public static final class Breakpoints {
     /** 14x14 */ public static final @NotNull Icon BreakpointFieldUnsuspendentDisabled = load("expui/breakpoints/breakpointFieldUnsuspendentDisabled.svg", -1363984560, 2);
-    /** 14x14 */ public static final @NotNull Icon BreakpointMethodUnsuspendentDisabled = load("expui/breakpoints/breakpointMethodUnsuspendentDisabled.svg", 2054364640, 2);
-    /** 14x14 */ public static final @NotNull Icon BreakpointUnsuspendentDisabled = load("expui/breakpoints/breakpointUnsuspendentDisabled.svg", 1020097126, 2);
-    /** 14x14 */ public static final @NotNull Icon ConditionalInstrumentation = load("expui/breakpoints/conditionalInstrumentation.svg", -814054787, 2);
-    /** 14x14 */ public static final @NotNull Icon LoggingInstrumentation = load("expui/breakpoints/loggingInstrumentation.svg", -1997548618, 2);
-    /** 14x14 */ public static final @NotNull Icon MultipleBreakpointsDisabled = load("expui/breakpoints/multipleBreakpointsDisabled.svg", -358532645, 2);
-    /** 14x14 */ public static final @NotNull Icon MultipleBreakpointsMuted = load("expui/breakpoints/multipleBreakpointsMuted.svg", -1544664600, 2);
+    /** 14x14 */ public static final @NotNull Icon BreakpointMethodUnsuspendentDisabled = load("expui/breakpoints/breakpointMethodUnsuspendentDisabled.svg", -1861354223, 2);
+    /** 14x14 */ public static final @NotNull Icon BreakpointUnsuspendentDisabled = load("expui/breakpoints/breakpointUnsuspendentDisabled.svg", 2023505582, 2);
+    /** 14x14 */ public static final @NotNull Icon ConditionalInstrumentation = load("expui/breakpoints/conditionalInstrumentation.svg", 992498060, 2);
+    /** 14x14 */ public static final @NotNull Icon LoggingInstrumentation = load("expui/breakpoints/loggingInstrumentation.svg", -158798346, 2);
+    /** 14x14 */ public static final @NotNull Icon MultipleBreakpointsDisabled = load("expui/breakpoints/multipleBreakpointsDisabled.svg", 1747749220, 2);
+    /** 14x14 */ public static final @NotNull Icon MultipleBreakpointsMuted = load("expui/breakpoints/multipleBreakpointsMuted.svg", -1709398389, 2);
+  }
+
+  public static final class Build {
+    /** 16x16 */ public static final @NotNull Icon CompletionCloud = load("expui/build/completionCloud.svg", -722637788, 2);
+    /** 16x16 */ public static final @NotNull Icon CompletionLocalCache = load("expui/build/completionLocalCache.svg", 1442858469, 2);
   }
 
   public static final class Chooser {
@@ -469,7 +474,7 @@ public class AllIcons {
     /** 16x16 */ public static final @NotNull Icon Dtd = load("expui/fileTypes/xml.svg", "fileTypes/dtd.svg", -1804958231, 0);
     /** 16x16 */ public static final @NotNull Icon Font = load("expui/fileTypes/font.svg", -1762443308, 2);
     /** 16x16 */ public static final @NotNull Icon Gitignore = load("expui/fileTypes/gitignore.svg", -264194071, 0);
-    /** 16x16 */ public static final @NotNull Icon Hprof = load("fileTypes/hprof.svg", 2107471584, 0);
+    /** 16x16 */ public static final @NotNull Icon Hprof = load("expui/fileTypes/hprof.svg", "fileTypes/hprof.svg", 2107471584, 0);
     /** 16x16 */ public static final @NotNull Icon Htaccess = load("fileTypes/htaccess.svg", -1026396371, 0);
     /** 16x16 */ public static final @NotNull Icon Html = load("expui/fileTypes/html.svg", "fileTypes/html.svg", 944305592, 0);
     /** 16x16 */ public static final @NotNull Icon Http = load("expui/fileTypes/http.svg", "fileTypes/http.svg", -990310078, 0);
@@ -988,6 +993,8 @@ public class AllIcons {
     /** 16x16 */ public static final @NotNull Icon Library = load("expui/nodes/library.svg", 954949276, 2);
     /** 16x16 */ public static final @NotNull Icon Locked = load("expui/nodes/locked.svg", "nodes/locked.svg", 1553434086, 0);
     /** 16x16 */ public static final @NotNull Icon LogFolder = load("expui/nodes/logFolder.svg", "nodes/logFolder.svg", 1356256727, 2);
+    /** 16x16 */ public static final @NotNull Icon McpServer = load("expui/nodes/mcpServer.svg", -688113088, 2);
+    /** 16x16 */ public static final @NotNull Icon McpServerWidget = load("expui/nodes/mcpServerWidget.svg", -794320158, 2);
     /** 16x16 */ public static final @NotNull Icon Method = load("expui/nodes/method.svg", "nodes/method.svg", 769751382, 1);
     /** 16x16 */ public static final @NotNull Icon MethodReference = load("expui/nodes/methodReference.svg", "nodes/methodReference.svg", -1852540687, 1);
     /** 16x16 */ public static final @NotNull Icon Mnemonic = load("expui/bookmarks/mnemonic.svg", "nodes/mnemonic.svg", 421519755, 2);
@@ -1232,7 +1239,7 @@ public class AllIcons {
     /** 16x16 */ public static final @NotNull Icon Snowflake = load("providers/snowflake.svg", -900289909, 0);
     /** 16x16 */ public static final @NotNull Icon Spark = load("providers/spark.svg", 505740135, 0);
     /** 16x16 */ public static final @NotNull Icon Sqlite = load("providers/sqlite.svg", -469619323, 2);
-    /** 16x16 */ public static final @NotNull Icon SqlServer = load("providers/sqlServer.svg", 33975713, 2);
+    /** 16x16 */ public static final @NotNull Icon SqlServer = load("providers/sqlServer.svg", 2084040364, 0);
     /** 16x16 */ public static final @NotNull Icon Sun = load("providers/sun.svg", -210021560, 2);
     /** 16x16 */ public static final @NotNull Icon Sybase = load("providers/sybase.svg", 174932757, 0);
     /** 16x16 */ public static final @NotNull Icon Tair = load("providers/tair.svg", 1322700262, 2);
@@ -1504,7 +1511,7 @@ public class AllIcons {
     /** 16x16 */ public static final @NotNull Icon MessageQueue = load("expui/webReferences/messageQueue.svg", "webreferences/messageQueue.svg", 697724752, 0);
     /** 16x16 */ public static final @NotNull Icon Openapi = load("expui/webReferences/openApi.svg", "webreferences/openapi.svg", -1218656258, 2);
     /** 16x16 */ public static final @NotNull Icon Server = load("expui/webReferences/server.svg", "webreferences/server.svg", -1538667407, 2);
-    /** 16x16 */ public static final @NotNull Icon WebSocket = load("webreferences/webSocket.svg", -144898297, 0);
+    /** 16x16 */ public static final @NotNull Icon WebSocket = load("expui/webReferences/webSocket.svg", "webreferences/webSocket.svg", -144898297, 0);
   }
 
   public static final class Welcome {

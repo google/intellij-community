@@ -531,11 +531,12 @@ public final class GenerateMembersUtil {
                                                                    @NotNull PsiTypeParameter typeParameter,
                                                                    @NotNull PsiSubstitutor substitutor,
                                                                    @NotNull PsiMethod sourceMethod) {
-    if (typeParameter instanceof LightElement) {
+    if (typeParameter instanceof LightElement || typeParameter instanceof PsiCompiledElement) {
       List<PsiClassType> substitutedSupers = ContainerUtil.map(typeParameter.getSuperTypes(), t -> ObjectUtils.notNull(toClassType(substitutor.substitute(t)), t));
       return factory.createTypeParameter(Objects.requireNonNull(typeParameter.getName()), substitutedSupers.toArray(PsiClassType.EMPTY_ARRAY));
     }
-    final PsiElement copy = ObjectUtils.notNull(typeParameter instanceof PsiCompiledElement ? ((PsiCompiledElement)typeParameter).getMirror() : typeParameter, typeParameter).copy();
+
+    PsiTypeParameter copy = (PsiTypeParameter)typeParameter.copy();
     LOG.assertTrue(copy != null, typeParameter);
     final Map<PsiElement, PsiElement> replacementMap = new HashMap<>();
     copy.accept(new JavaRecursiveElementVisitor() {
@@ -638,7 +639,7 @@ public final class GenerateMembersUtil {
     final PsiElement navigationElement = source.getNavigationElement();
     if (navigationElement instanceof PsiDocCommentOwner) {
       final PsiDocComment docComment = ((PsiDocCommentOwner)navigationElement).getDocComment();
-      if (docComment != null) {
+      if (docComment != null && !(docComment instanceof PsiCompiledElement)) {
         target.addAfter(factory.createDocCommentFromText(docComment.getText()), null);
       }
     }

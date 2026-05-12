@@ -2,13 +2,11 @@
 package com.intellij.platform.buildScripts.testFramework
 
 import com.intellij.platform.buildData.productInfo.ProductInfoLayoutItemKind
+import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.SoftAssertions
 import org.jetbrains.intellij.build.ProductProperties
 import org.jetbrains.intellij.build.ProprietaryBuildTools
 import org.jetbrains.intellij.build.impl.readBuiltinModulesFile
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.TestInfo
 import java.nio.file.Path
 
@@ -16,8 +14,11 @@ import java.nio.file.Path
  * Checks that frontend distribution (ex JetBrains Client) described by [frontendProperties] can be built successfully.
  */
 fun runTestBuildForFrontend(
-  homePath: Path, frontendProperties: ProductProperties, buildTools: ProprietaryBuildTools,
-  testInfo: TestInfo, softly: SoftAssertions,
+  homePath: Path,
+  frontendProperties: ProductProperties,
+  buildTools: ProprietaryBuildTools,
+  testInfo: TestInfo,
+  softly: SoftAssertions,
 ) {
   runTestBuild(
     homeDir = homePath,
@@ -26,9 +27,13 @@ fun runTestBuildForFrontend(
     testInfo = testInfo,
     onSuccess = { context ->
       verifyBuiltInModules(context.paths.artifactDir.resolve("${context.applicationInfo.productCode}-builtinModules.json"))
-      assertTrue(context.useModularLoader) { "Frontend distribution must use the modular loader, but $frontendProperties doesn't use it" }
+      assertThat(context.useModularLoader)
+        .withFailMessage { "Frontend distribution must use the modular loader, but $frontendProperties doesn't use it" }
+        .isTrue()
       val rootModule = frontendProperties.rootModuleForModularLoader
-      assertNotNull(rootModule) { "Root module for the modular loader is not specified in $frontendProperties" }
+      assertThat(rootModule)
+        .withFailMessage { "Root module for the modular loader is not specified in $frontendProperties" }
+        .isNotNull()
       RuntimeModuleRepositoryChecker.checkProductModules(rootModule!!, context, softly)
       RuntimeModuleRepositoryChecker.checkBundledPluginsArePresent(rootModule, context, isEmbeddedVariant = false, softly)
     }
@@ -37,9 +42,9 @@ fun runTestBuildForFrontend(
 
 private fun verifyBuiltInModules(file: Path) {
   val data = readBuiltinModulesFile(file)
-  assertTrue(data.fileExtensions.isEmpty())
+  assertThat(data.fileExtensions).isEmpty()
   val modules = data.layout.asSequence().filter { it.kind == ProductInfoLayoutItemKind.pluginAlias }.map { it.name }.toHashSet()
-  assertTrue(modules.contains("com.intellij.jetbrains.client"))
-  assertTrue(modules.contains("com.intellij.modules.platform"))
-  assertFalse(modules.contains("com.intellij.modules.externalSystem"))
+  assertThat(modules)
+    .contains("com.intellij.jetbrains.client", "com.intellij.modules.platform")
+    .doesNotContain("com.intellij.modules.externalSystem")
 }

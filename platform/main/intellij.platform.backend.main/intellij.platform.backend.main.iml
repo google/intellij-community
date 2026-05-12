@@ -28,5 +28,7 @@
     <orderEntry type="module" module-name="intellij.platform.buildView.backend" scope="RUNTIME" />
     <orderEntry type="module" module-name="intellij.platform.lang.impl.backend" scope="RUNTIME" />
     <orderEntry type="module" module-name="intellij.platform.pluginManager.backend" scope="RUNTIME" />
+    <orderEntry type="module" module-name="intellij.platform.backend.workspace.impl" scope="RUNTIME" />
+    <orderEntry type="module" module-name="fleet.rhizomedb" />
   </component>
 </module>

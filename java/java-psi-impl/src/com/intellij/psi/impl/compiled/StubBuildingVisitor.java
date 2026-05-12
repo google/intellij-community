@@ -2,6 +2,7 @@
 package com.intellij.psi.impl.compiled;
 
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.pom.java.LanguageLevel;
 import com.intellij.psi.PsiPackage;
@@ -279,6 +280,7 @@ public class StubBuildingVisitor<T> extends ClassVisitor {
 
   @Override
   public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+    if (!isSupportedAnnotationDescriptor(desc)) return null;
     return new AnnotationTextCollector(desc, myFirstPassData, text -> new PsiAnnotationStubImpl(myModList, text));
   }
 
@@ -584,6 +586,7 @@ public class StubBuildingVisitor<T> extends ClassVisitor {
 
     @Override
     public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+      if (!isSupportedAnnotationDescriptor(desc)) return null;
       return new AnnotationTextCollector(desc, myFirstPassData, text -> {
         new PsiAnnotationStubImpl(myModList, text);
       });
@@ -616,6 +619,7 @@ public class StubBuildingVisitor<T> extends ClassVisitor {
 
     @Override
     public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+      if (!isSupportedAnnotationDescriptor(desc)) return null;
       return new AnnotationTextCollector(desc, myFirstPassData, text -> {
         new PsiAnnotationStubImpl(myModList, text);
       });
@@ -673,6 +677,7 @@ public class StubBuildingVisitor<T> extends ClassVisitor {
 
     @Override
     public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+      if (!isSupportedAnnotationDescriptor(desc)) return null;
       return new AnnotationTextCollector(desc, myFirstPassData, text -> {
         new PsiAnnotationStubImpl(myModList, text);
       });
@@ -680,7 +685,8 @@ public class StubBuildingVisitor<T> extends ClassVisitor {
 
     @Override
     public AnnotationVisitor visitParameterAnnotation(int parameter, String desc, boolean visible) {
-      return parameter < myParamIgnoreCount ? null : new AnnotationTextCollector(desc, myFirstPassData, text -> {
+      if (parameter < myParamIgnoreCount || !isSupportedAnnotationDescriptor(desc)) return null;
+      return new AnnotationTextCollector(desc, myFirstPassData, text -> {
         int idx = parameter - myParamIgnoreCount;
         new PsiAnnotationStubImpl(myOwner.findParameter(idx).getModList(), text);
       });
@@ -856,7 +862,13 @@ public class StubBuildingVisitor<T> extends ClassVisitor {
       int start = canonicalText.lastIndexOf('/') + 2; // -1 => 1 if no package; skip first char in class name
       for (int p = start; p < sb.length(); p++) {
         char c = sb.charAt(p);
-        if (c == '$' && p < sb.length() - 1 && sb.charAt(p + 1) != '$') {
+        if (c == '$' && p < sb.length() - 1) {
+          char next = sb.charAt(p + 1);
+          // Keep '$' before another '$' (JVM-escaped '$' in names like `A$$Lambda`).
+          // Also, before a digit (anonymous / local classes such as `Outer$1`, `Outer$1Helper`),
+          // it is often used to create synthetic classes.
+          // writing those as `Outer.1` is inappropriate.
+          if (next == '$' || Registry.is("java.dont.convert.digits.after.dollar.name") && Character.isDigit(next)) continue;
           sb.setCharAt(p, '.');
           updated = true;
         }
@@ -872,6 +884,16 @@ public class StubBuildingVisitor<T> extends ClassVisitor {
   public static final TypeInfoProvider GUESSING_PROVIDER = TypeInfoProvider.from(GUESSING_MAPPER);
 
   public static AnnotationVisitor getAnnotationTextCollector(String desc, Consumer<? super String> consumer) {
+    if (!isSupportedAnnotationDescriptor(desc)) return null;
     return new AnnotationTextCollector(desc, GUESSING_PROVIDER, consumer);
+  }
+
+  /**
+   * Synthetic JDK markers such as {@code Ljdk/Profile+Annotation;} carry a {@code '+'} in their
+   * internal class name. Those names are legal in the class file format but are
+   * not a valid Java identifier reference. Skip them at the bytecode reader.
+   */
+  private static boolean isSupportedAnnotationDescriptor(@Nullable String desc) {
+    return desc == null || desc.indexOf('+') < 0;
   }
 }

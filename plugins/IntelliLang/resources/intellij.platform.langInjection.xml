@@ -1,9 +1,29 @@
 <idea-plugin visibility="public">
   <module value="org.intellij.intelliLang"/>
 
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
+    <module name="intellij.libraries.fastutil"/>
+    <module name="intellij.libraries.kotlinx.collections.immutable"/>
+    <module name="intellij.platform.analysis"/>
+    <module name="intellij.platform.analysis.impl"/>
+    <module name="intellij.platform.codeStyle"/>
+    <module name="intellij.platform.core"/>
+    <module name="intellij.platform.core.impl"/>
+    <module name="intellij.platform.core.ui"/>
+    <module name="intellij.platform.editor.ex"/>
+    <module name="intellij.platform.editor.ui"/>
+    <module name="intellij.platform.ide"/>
+    <module name="intellij.platform.ide.core"/>
+    <module name="intellij.platform.ide.impl"/>
+    <module name="intellij.platform.lang.core"/>
+    <module name="intellij.platform.lang.impl"/>
+    <module name="intellij.platform.projectModel"/>
+    <module name="intellij.platform.util.ui"/>
     <module name="intellij.regexp"/>
+    <module name="intellij.xml.parser"/>
   </dependencies>
+  <!-- endregion -->
 
   <extensionPoints>
     <extensionPoint qualifiedName="org.intellij.intelliLang.languageSupport"
@@ -48,6 +68,8 @@
 
     <registryKey key="org.intellij.intelliLang.comment.completion" defaultValue="true"
                  description="Enables completion of 'language=' in comments"/>
+    <projectSettings service="org.intellij.plugins.intelliLang.Configuration$Prj"/>
+    <applicationSettings service="org.intellij.plugins.intelliLang.Configuration$App"/>
   </extensions>
 
 </idea-plugin>

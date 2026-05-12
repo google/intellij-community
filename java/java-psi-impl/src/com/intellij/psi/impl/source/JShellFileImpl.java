@@ -41,11 +41,6 @@ public class JShellFileImpl extends PsiJavaFileBaseImpl implements PsiJShellFile
   }
 
   @Override
-  public boolean isPhysical() {
-    return getViewProvider().isPhysical();
-  }
-
-  @Override
   public Collection<PsiElement> getExecutableSnippets() {
     List<PsiElement> result = new SmartList<>();
     collectExecutableSnippets(this, result);

@@ -5,15 +5,18 @@ import com.intellij.codeEditor.printing.ExportToHTMLSettings;
 import com.intellij.execution.JavaExecutionUtil;
 import com.intellij.execution.configurations.SimpleJavaParameters;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.io.FileUtil;
+import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.GlobalSearchScopesCore;
 import com.intellij.psi.util.ClassUtil;
+import com.intellij.rt.coverage.data.LineData;
 import com.intellij.rt.coverage.data.ProjectData;
 import com.intellij.rt.coverage.instrumentation.UnloadedUtil;
 import jetbrains.coverage.report.ClassInfo;
@@ -28,6 +31,9 @@ import org.jetbrains.annotations.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
@@ -43,8 +49,11 @@ public abstract class JavaCoverageRunner extends CoverageRunner {
     return engine instanceof JavaCoverageEngine;
   }
 
-  public abstract void appendCoverageArgument(final String sessionDataFilePath, final String @Nullable [] patterns, final SimpleJavaParameters parameters,
-                                              final boolean testTracking, final boolean branchCoverage);
+  public abstract void appendCoverageArgument(final String sessionDataFilePath,
+                                              final String @Nullable [] patterns,
+                                              final SimpleJavaParameters parameters,
+                                              final boolean testTracking,
+                                              final boolean branchCoverage);
 
   public void appendCoverageArgument(final String sessionDataFilePath,
                                      final String @Nullable [] patterns,
@@ -94,7 +103,8 @@ public abstract class JavaCoverageRunner extends CoverageRunner {
               if (project.isDisposed()) return null;
               return psiFacade.findClass(aClass.getFQName(), productionScope);
             });
-            if (psiClass == null || !suite.getCoverageEngine().acceptedByFilters(ReadAction.compute(() -> psiClass.getContainingFile()), suite)) {
+            if (psiClass == null ||
+                !suite.getCoverageEngine().acceptedByFilters(ReadAction.computeBlocking(() -> psiClass.getContainingFile()), suite)) {
               iterator.remove();
             }
           }
@@ -108,20 +118,46 @@ public abstract class JavaCoverageRunner extends CoverageRunner {
     CoverageLogger.logHTMLReport(project, timeMs, generationTimeMs);
   }
 
+  public String generateBriefReport(@NotNull Editor editor,
+                                    @NotNull PsiFile psiFile,
+                                    @NotNull TextRange range,
+                                    @NotNull LineData lineData) {
+    return JavaCoverageEngine.createDefaultBriefReport(lineData);
+  }
+
   public static @Nullable String handleSpacesInAgentPath(@NotNull String agentPath) {
     return JavaExecutionUtil.handleSpacesInAgentPath(agentPath, "testAgent", JAVA_COVERAGE_AGENT_AGENT_PATH);
   }
 
+  /**
+   * @deprecated Use {@link #write2file(Path, String)} instead.
+   */
+  @SuppressWarnings("IO_FILE_USAGE")
+  @Deprecated
   protected static void write2file(File tempFile, @NonNls String arg) throws IOException {
-    FileUtil.writeToFile(tempFile, (arg + "\n").getBytes(StandardCharsets.UTF_8), true);
+    write2file(tempFile.toPath(), arg);
   }
 
+  protected static void write2file(Path path, @NonNls String arg) throws IOException {
+    Files.writeString(path, arg + "\n", StandardCharsets.UTF_8, StandardOpenOption.APPEND);
+  }
+
+  /**
+   * @deprecated Use {@link #createTempFilePath()} instead.
+   */
+  @SuppressWarnings("IO_FILE_USAGE")
+  @Deprecated
   protected static @NotNull File createTempFile() throws IOException {
-    File tempFile = FileUtil.createTempFile("coverage", "args");
-    if (tempFile.getAbsolutePath().contains(" ")) {
-      String path = JavaExecutionUtil.handleSpacesInAgentPath(tempFile.getAbsolutePath(), "coverage", JAVA_COVERAGE_AGENT_AGENT_PATH);
+    return createTempFilePath().toFile();
+  }
+
+  protected static @NotNull Path createTempFilePath() throws IOException {
+    Path tempFile = Files.createTempFile("coverage", "args");
+    String tempFilePath = tempFile.toAbsolutePath().toString();
+    if (tempFilePath.contains(" ")) {
+      String path = JavaExecutionUtil.handleSpacesInAgentPath(tempFilePath, "coverage", JAVA_COVERAGE_AGENT_AGENT_PATH);
       if (path == null) throw new IOException("Cannot create temporary file without spaces in path.");
-      tempFile = new File(path);
+      tempFile = Path.of(path);
     }
     return tempFile;
   }

@@ -10,13 +10,11 @@ import org.jetbrains.annotations.ApiStatus
  * Each full-sentence combination is then scored and sorted by probability.
  */
 @ApiStatus.Internal
-class SpellerSuggestionsGenerator(
+internal class SpellerSuggestionsGenerator(
   private val speller: GrazieSpeller,
+  private val nGramModelProvider: NGramModelProvider = NGramModelProvider(),
   private val suggestionLimit: Int = 5
 ) {
-
-  private val nGramModelProvider: NGramModelProvider = NGramModelProvider()
-
   /**
    * Holds a list of corrected sentence tokens plus the overall probability for that sentence.
    */

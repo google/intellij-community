@@ -11,8 +11,11 @@ import org.jetbrains.kotlin.idea.test.KotlinWithJdkAndRuntimeLightProjectDescrip
 import org.jetbrains.uast.UFile
 import org.jetbrains.uast.UastFacade
 import java.io.File
+import java.nio.file.Path
 
-val TEST_KOTLIN_MODEL_DIR = KotlinRoot.DIR.resolve("uast/uast-kotlin/tests/testData")
+private const val relativePathString = "uast/uast-kotlin/tests/testData"
+val TEST_KOTLIN_MODEL_DIR: File = KotlinRoot.DIR.resolve(relativePathString)
+val TEST_KOTLIN_MODEL_PATH: Path = KotlinRoot.PATH.resolve(relativePathString)
 
 abstract class AbstractKotlinUastLightCodeInsightFixtureTest : KotlinLightCodeInsightFixtureTestCase() {
 

@@ -30,6 +30,7 @@ create_kotlinc_options(
 
 jvm_library(
   name = "kotlin-jvm-debugger-test-k1",
+  module_name = "kotlin.jvm-debugger.test.k1",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -43,6 +44,7 @@ jvm_library(
 
 jvm_library(
   name = "kotlin-jvm-debugger-test-k1_test_lib",
+  testonly = True,
   module_name = "kotlin.jvm-debugger.test.k1",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -108,8 +110,8 @@ jvm_library(
     "//plugins/kotlin/compiler-plugins/kotlinx-serialization/common:common_test_lib",
     "//plugins/kotlin/base/code-insight",
     "//plugins/kotlin/base/code-insight:code-insight_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/base/fe10/analysis",
     "//plugins/kotlin/base/fe10/analysis:analysis_test_lib",
     "//plugins/kotlin/frontend-independent",
@@ -171,6 +173,10 @@ jvm_library(
     "//platform/execution:execution_test_lib",
     "//plugins/kotlin/jvm-debugger/test/kotlin.jvm-debugger.test.k1/testFramework",
     "//plugins/kotlin/jvm-debugger/test/kotlin.jvm-debugger.test.k1/testFramework:testFramework_test_lib",
+    "//plugins/stream-debugger:java-debugger-streams-tests",
+    "//plugins/stream-debugger:java-debugger-streams-tests_test_lib",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework_test_lib",
   ],
   runtime_deps = [
     ":kotlin-jvm-debugger-test-k1",
@@ -181,3 +187,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build kotlin.jvm-debugger.test.k1` end
+
+### auto-generated section `iml kotlin.jvm-debugger.test.k1` start
+exports_files([
+  "kotlin.jvm-debugger.test.k1.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.jvm-debugger.test.k1` end

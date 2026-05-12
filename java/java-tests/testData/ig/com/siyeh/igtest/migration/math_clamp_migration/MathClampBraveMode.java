@@ -17,7 +17,7 @@ class MathClampBraveMode {
 
 
   int fakeClamp(int input, int a, int b) {
-    return <warning descr="Can be replaced with 'Math.clamp()'">Math.max(a, Math.min(b, input))</warning>;
+    return <warning descr="Replace with 'Math.clamp()' (may change semantics)">Math.max(a, Math.min(b, input))</warning>;
   }
 
 }

@@ -3,11 +3,11 @@ package com.jetbrains.python
 
 import com.intellij.openapi.projectRoots.Sdk
 import com.jetbrains.python.sdk.PythonSdkAdditionalData
-import com.jetbrains.python.sdk.flavors.VirtualEnvSdkFlavor
+import com.intellij.python.venv.sdk.flavors.VirtualEnvSdkFlavor
 import com.jetbrains.python.sdk.flavors.conda.CondaEnvSdkFlavor
 
 
 // These functions get SDK type without touching IO, hence fast and save to be called from EDT
 
-internal val Sdk.isVirtualEnv: Boolean get() = (sdkAdditionalData as? PythonSdkAdditionalData)?.flavor is VirtualEnvSdkFlavor
+internal val Sdk.isNonToolVirtualEnv: Boolean get() = (sdkAdditionalData as? PythonSdkAdditionalData)?.flavor is VirtualEnvSdkFlavor
 internal val Sdk.isCondaVirtualEnv: Boolean get() = (sdkAdditionalData as? PythonSdkAdditionalData)?.flavor is CondaEnvSdkFlavor

@@ -99,7 +99,7 @@ class ModuleInfoModifyUsageDetector extends ModuleInfoUsageDetector {
         // so far we don't take into account a motion between separate JPMS-modules
         if (sourceModuleDescriptor == targetModuleDescriptor) {
           DirectoryWithModuleStatements dirWithStatements = targetModuleStatementsByModuleDescriptor
-            .computeIfAbsent(sourceModuleDescriptor, __ -> new DirectoryWithModuleStatements(targetDirectory, new SmartList<>()));
+            .computeIfAbsent(sourceModuleDescriptor, _ -> new DirectoryWithModuleStatements(targetDirectory, new SmartList<>()));
           dirWithStatements.myModuleStatements.addAll(sourceStatements);
         }
         else if (targetModuleDescriptor != null) {

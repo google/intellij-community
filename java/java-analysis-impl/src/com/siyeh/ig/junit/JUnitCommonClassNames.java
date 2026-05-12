@@ -73,6 +73,8 @@ public final @NonNls class JUnitCommonClassNames {
   public static final String ORG_JUNIT_JUPITER_API_EXTENSION_REGISTER_EXTENSION = "org.junit.jupiter.api.extension.RegisterExtension";
   public static final String ORG_JUNIT_JUPITER_API_EXTENSION_BEFORE_ALL_CALLBACK = "org.junit.jupiter.api.extension.BeforeAllCallback";
   public static final String ORG_JUNIT_JUPITER_API_EXTENSION_AFTER_ALL_CALLBACK = "org.junit.jupiter.api.extension.AfterAllCallback";
+  public static final String ORG_JUNIT_JUPITER_API_EXTENSION_BEFORE_EACH_CALLBACK = "org.junit.jupiter.api.extension.BeforeEachCallback";
+  public static final String ORG_JUNIT_JUPITER_API_EXTENSION_AFTER_EACH_CALLBACK = "org.junit.jupiter.api.extension.AfterEachCallback";
   public static final String ORG_JUNIT_JUPITER_API_EXTENSION_PARAMETER_RESOLVER = "org.junit.jupiter.api.extension.ParameterResolver";
   public static final String ORG_JUNIT_JUPITER_API_EXTENSION_EXTENSION = "org.junit.jupiter.api.extension.Extension";
   public static final String ORG_JUNIT_JUPITER_API_EXTENSION_EXTENSIONS = "org.junit.jupiter.api.extension.Extensions";

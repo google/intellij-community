@@ -1,13 +1,15 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.storage.testEntities.entities.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
 import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
-import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
@@ -28,9 +30,7 @@ internal class ListVFUEntityImpl(private val dataSource: ListVFUEntityData) : Li
 
   private companion object {
 
-
-    private val connections = listOf<ConnectionId>(
-    )
+    private val connections = listOf<ConnectionId>()
 
   }
 
@@ -39,7 +39,6 @@ internal class ListVFUEntityImpl(private val dataSource: ListVFUEntityData) : Li
       readField("data")
       return dataSource.data
     }
-
   override val fileProperty: List<VirtualFileUrl>
     get() {
       readField("fileProperty")
@@ -57,8 +56,8 @@ internal class ListVFUEntityImpl(private val dataSource: ListVFUEntityData) : Li
   }
 
 
-  internal class Builder(result: ListVFUEntityData?) : ModifiableWorkspaceEntityBase<ListVFUEntity, ListVFUEntityData>(
-    result), ListVFUEntityBuilder {
+  internal class Builder(result: ListVFUEntityData?) : ModifiableWorkspaceEntityBase<ListVFUEntity, ListVFUEntityData>(result),
+                                                       ListVFUEntityBuilder {
     internal constructor() : this(ListVFUEntityData())
 
     override fun applyToBuilder(builder: MutableEntityStorage) {
@@ -71,16 +70,14 @@ internal class ListVFUEntityImpl(private val dataSource: ListVFUEntityData) : Li
           error("Entity ListVFUEntity is already created in a different builder")
         }
       }
-
       this.diff = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
-      // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
-      // Builder may switch to snapshot at any moment and lock entity data to modification
+// After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
+// Builder may switch to snapshot at any moment and lock entity data to modification
       this.currentEntityData = null
-
       index(this, "fileProperty", this.fileProperty)
-      // Process linked entities that are connected without a builder
+// Process linked entities that are connected without a builder
       processLinkedEntities(builder)
       checkInitialization() // TODO uncomment and check failed tests
     }
@@ -127,7 +124,6 @@ internal class ListVFUEntityImpl(private val dataSource: ListVFUEntityData) : Li
         changedProperty.add("entitySource")
 
       }
-
     override var data: String
       get() = getEntityData().data
       set(value) {
@@ -135,7 +131,6 @@ internal class ListVFUEntityImpl(private val dataSource: ListVFUEntityData) : Li
         getEntityData(true).data = value
         changedProperty.add("data")
       }
-
     private val filePropertyUpdater: (value: List<VirtualFileUrl>) -> Unit = { value ->
       val _diff = diff
       if (_diff != null) index(this, "fileProperty", value)
@@ -161,6 +156,7 @@ internal class ListVFUEntityImpl(private val dataSource: ListVFUEntityData) : Li
 
     override fun getEntityClass(): Class<ListVFUEntity> = ListVFUEntity::class.java
   }
+
 }
 
 @OptIn(WorkspaceEntityInternalApi::class)
@@ -178,7 +174,6 @@ internal class ListVFUEntityData : WorkspaceEntityData<ListVFUEntity>() {
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): ListVFUEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {
@@ -190,8 +185,7 @@ internal class ListVFUEntityData : WorkspaceEntityData<ListVFUEntity>() {
   }
 
   override fun getMetadata(): EntityMetadata {
-    return MetadataStorageImpl.getMetadataByTypeFqn(
-      "com.intellij.platform.workspace.storage.testEntities.entities.ListVFUEntity") as EntityMetadata
+    return MetadataStorageImpl.getMetadataByTypeFqn("com.intellij.platform.workspace.storage.testEntities.entities.ListVFUEntity") as EntityMetadata
   }
 
   override fun clone(): ListVFUEntityData {
@@ -206,8 +200,7 @@ internal class ListVFUEntityData : WorkspaceEntityData<ListVFUEntity>() {
   }
 
   override fun createDetachedEntity(parents: List<WorkspaceEntityBuilder<*>>): WorkspaceEntityBuilder<*> {
-    return ListVFUEntity(data, fileProperty, entitySource) {
-    }
+    return ListVFUEntity(data, fileProperty, entitySource)
   }
 
   override fun getRequiredParents(): List<Class<out WorkspaceEntity>> {
@@ -218,9 +211,7 @@ internal class ListVFUEntityData : WorkspaceEntityData<ListVFUEntity>() {
   override fun equals(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as ListVFUEntityData
-
     if (this.entitySource != other.entitySource) return false
     if (this.data != other.data) return false
     if (this.fileProperty != other.fileProperty) return false
@@ -230,9 +221,7 @@ internal class ListVFUEntityData : WorkspaceEntityData<ListVFUEntity>() {
   override fun equalsIgnoringEntitySource(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as ListVFUEntityData
-
     if (this.data != other.data) return false
     if (this.fileProperty != other.fileProperty) return false
     return true

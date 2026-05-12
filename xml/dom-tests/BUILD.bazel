@@ -3,6 +3,7 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "dom-tests",
+  module_name = "intellij.xml.dom.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -10,11 +11,13 @@ jvm_library(
     "//xml/impl",
     "//java/testFramework",
     "//java/java-psi-impl:psi-impl",
+    "//java/java-psi-api:psi",
   ]
 )
 
 jvm_library(
   name = "dom-tests_test_lib",
+  testonly = True,
   module_name = "intellij.xml.dom.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["tests/**/*.kt", "tests/**/*.java", "tests/**/*.form"], allow_empty = True),
@@ -25,8 +28,12 @@ jvm_library(
     "//platform/core-api:core_test_lib",
     "//platform/lang-core",
     "//platform/lang-core:lang-core_test_lib",
+    "//platform/lang-api:lang",
+    "//platform/lang-api:lang_test_lib",
     "//platform/core-ui",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/editor-ui-api:editor-ui",
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//platform/indexing-api:indexing",
@@ -39,25 +46,44 @@ jvm_library(
     "//java/testFramework:testFramework_test_lib",
     "//java/java-psi-impl:psi-impl",
     "//java/java-psi-impl:psi-impl_test_lib",
+    "//java/java-psi-api:psi",
+    "//java/java-psi-api:psi_test_lib",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//java/java-impl:impl",
     "//java/java-impl:impl_test_lib",
-    "@lib//:assert_j",
+    "//libraries/assertj-core",
+    "//libraries/assertj-core:assertj-core_test_lib",
     "//java/openapi:java",
     "//java/openapi:java_test_lib",
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark",
     "//tools/intellij.tools.ide.metrics.benchmark:ide-metrics-benchmark_test_lib",
     "//xml/xml-psi-api:psi",
     "//xml/xml-psi-api:psi_test_lib",
+    "//xml/xml-parser:parser",
+    "//xml/xml-parser:parser_test_lib",
     "//platform/libraries/cglib",
     "//platform/libraries/cglib:cglib_test_lib",
     "//xml/xml-analysis-api:analysis",
     "//xml/xml-analysis-api:analysis_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/code-style-api:codeStyle",
+    "//platform/code-style-api:codeStyle_test_lib",
+    "//platform/util-ex",
+    "//platform/util-ex:util-ex_test_lib",
+    "//platform/statistics",
+    "//platform/statistics:statistics_test_lib",
   ],
   runtime_deps = [":dom-tests"]
 )
 ### auto-generated section `build intellij.xml.dom.tests` end
+
+### auto-generated section `iml intellij.xml.dom.tests` start
+exports_files([
+  "intellij.xml.dom.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.xml.dom.tests` end
 
 ### auto-generated section `test intellij.xml.dom.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

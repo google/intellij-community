@@ -1,11 +1,15 @@
 <idea-plugin package="org.jetbrains.kotlin.idea.maven">
   <dependencies>
-    <plugin id="org.jetbrains.idea.maven"/>
+    <module name="intellij.maven"/>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+    <module name="intellij.java.psi"/>
+    <!-- endregion -->
   </dependencies>
 
   <extensions defaultExtensionNs="org.jetbrains.kotlin">
     <projectConfigurator id="kotlinJavaMavenConfigurator" implementation="org.jetbrains.kotlin.idea.maven.configuration.KotlinJavaMavenConfigurator"/>
     <compilerPluginConfigurator implementation="org.jetbrains.kotlin.idea.maven.configuration.SpringMavenKotlinCompilerPluginProjectConfigurator"/>
+    <compilerPluginConfigurator implementation="org.jetbrains.kotlin.idea.maven.configuration.LombokMavenKotlinCompilerPluginProjectConfigurator"/>
     <compilerPluginConfigurator implementation="org.jetbrains.kotlin.idea.maven.configuration.JpaMavenKotlinCompilerPluginProjectConfigurator"/>
     <buildSystemTypeDetector implementation="org.jetbrains.kotlin.idea.maven.MavenDetector"/>
 

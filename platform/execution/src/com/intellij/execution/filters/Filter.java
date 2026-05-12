@@ -151,7 +151,7 @@ public interface Filter extends PossiblyDumbAware {
         ConcurrentHashMap<TextAttributesKey, TextAttributes> map = new ConcurrentHashMap<>(2);
         Application application = ApplicationManager.getApplication();
         if (application != null) {
-          application.getMessageBus().connect().subscribe(EditorColorsManager.TOPIC, __ -> {
+          application.getMessageBus().connect().subscribe(EditorColorsManager.TOPIC, _ -> {
             // invalidate cache on Appearance Theme/Editor Scheme change
             map.clear();
           });

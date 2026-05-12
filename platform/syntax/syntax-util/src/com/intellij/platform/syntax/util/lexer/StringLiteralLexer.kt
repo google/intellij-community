@@ -1,13 +1,10 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:ApiStatus.Experimental
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.syntax.util.lexer
 
 import com.intellij.platform.syntax.Logger
 import com.intellij.platform.syntax.SyntaxElementType
 import com.intellij.platform.syntax.logger.noopLogger
-import org.jetbrains.annotations.ApiStatus
 
-@ApiStatus.Experimental
 open class StringLiteralLexer(
   protected val quoteChar: Char,
   protected val originalLiteralToken: SyntaxElementType,
@@ -239,7 +236,6 @@ private inline fun Logger.assertTrue(condition: Boolean, message: (() -> String)
   return condition
 }
 
-@ApiStatus.Experimental
 fun Char.isHexDigit(): Boolean = when (this) {
   in '0'..'9' -> true
   in 'a'..'f' -> true
@@ -247,5 +243,4 @@ fun Char.isHexDigit(): Boolean = when (this) {
   else -> false
 }
 
-@ApiStatus.Experimental
 fun Char.isOctalDigit(): Boolean = this in '0'..'7'

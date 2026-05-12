@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.junit5.report;
 
 import org.junit.platform.engine.TestExecutionResult;
@@ -44,6 +44,7 @@ public class SuiteReporter extends AbstractTestReporter {
 
   @Override
   public List<String> start() {
+    state.onSuiteStarted(id());
     if (isSkipped()) return Collections.emptyList();
 
     state.resetFinishCount();
@@ -55,6 +56,7 @@ public class SuiteReporter extends AbstractTestReporter {
   @Override
   public List<String> finish(TestExecutionResult result) {
     if (isSkipped() && result.getStatus() != TestExecutionResult.Status.FAILED) {
+      state.onSuiteFinishedAndGetDurationMs(id());
       return Collections.emptyList();
     }
 
@@ -98,8 +100,13 @@ public class SuiteReporter extends AbstractTestReporter {
     }
 
     if (!isSkipped()) {
-      out.add(asString(TEST_SUITE_FINISHED, attributes(ReportedField.ID, ReportedField.NAME,
-                                                       ReportedField.NODE_ID, ReportedField.PARENT_NODE_ID)));
+      long duration = state.onSuiteFinishedAndGetDurationMs(id());
+      Map<String, String> attrs = attributes(ReportedField.ID, ReportedField.NAME,
+                                             ReportedField.NODE_ID, ReportedField.PARENT_NODE_ID);
+      if (duration > 0) {
+        attrs.put("duration", Long.toString(duration));
+      }
+      out.add(asString(TEST_SUITE_FINISHED, attrs));
     }
 
     return out;

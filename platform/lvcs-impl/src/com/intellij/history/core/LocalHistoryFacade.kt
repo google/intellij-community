@@ -20,9 +20,7 @@ import com.intellij.history.core.changes.StructuralChange
 import com.intellij.history.core.tree.Entry
 import com.intellij.history.core.tree.RootEntry
 import com.intellij.history.integration.IdeaGateway
-import com.intellij.history.utils.LocalHistoryLog
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
@@ -34,7 +32,6 @@ import com.intellij.psi.codeStyle.NameUtil
 import com.intellij.util.containers.ContainerUtil
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
-import java.nio.file.Path
 
 /**
  * Facade for managing local history operations.
@@ -43,31 +40,7 @@ import java.nio.file.Path
  * E.g., modifying content, renaming, changing read-only status, moving, and deleting.
  * It also allows adding and managing system and user labels and aggregate changes by [ActivityId]
  */
-open class LocalHistoryFacade internal constructor() {
-
-  internal val storageDir: Path
-    get() = Path.of(PathManager.getSystemPath(), "LocalHistory")
-
-  internal val changeList: ChangeList
-
-  init {
-    changeList = ChangeList(createStorage())
-  }
-
-  @ApiStatus.Internal
-  protected open fun createStorage(): ChangeListStorage {
-    var storage: ChangeListStorage
-    try {
-      storage = ChangeListStorageImpl(storageDir)
-    }
-    catch (e: Throwable) {
-      LocalHistoryLog.LOG.warn("cannot create storage, in-memory  implementation will be used", e)
-      storage = InMemoryChangeListStorage()
-    }
-
-    return storage
-  }
-
+class LocalHistoryFacade internal constructor(private val changeList: ChangeList) {
   private val listeners: MutableList<Listener> = ContainerUtil.createLockFreeCopyOnWriteList()
 
   @get:ApiStatus.Internal

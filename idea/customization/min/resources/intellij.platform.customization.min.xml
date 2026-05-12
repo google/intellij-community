@@ -22,6 +22,7 @@
     <moduleConfigurationEditorProvider implementation="com.intellij.openapi.module.WebModuleConfigurationEditorProvider"/>
 
     <editorNotificationProvider implementation="com.intellij.codeInsight.daemon.impl.SdkSetupNotificationProvider"/>
+    <applicationSettings service="com.intellij.platform.templates.ProjectTemplateExportable"/>
   </extensions>
 
   <actions resource-bundle="messages.ActionsBundle">

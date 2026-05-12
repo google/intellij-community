@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.groovy.compiler;
 
 import com.intellij.compiler.CompilerConfiguration;
@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Optional;
 
 public abstract class GroovycTestBase extends GroovyCompilerTest {
-  public void test_navigate_from_stub_to_source() {
+  public void testNavigateFromStubToSource() {
     myFixture.addFileToProject("a.groovy", "class Groovy3 { InvalidType type }").getVirtualFile();
     myFixture.addClass("class Java4 extends Groovy3 {}");
 
@@ -49,7 +49,7 @@ public abstract class GroovycTestBase extends GroovyCompilerTest {
     }));
   }
 
-  public void test_config_script() throws IOException {
+  public void testConfigScript() throws IOException {
     File script = FileUtil.createTempFile("configScriptTest", ".groovy", true);
     FileUtil.writeToFile(script, "import groovy.transform.*; withConfig(configuration) { ast(CompileStatic) }");
 
@@ -59,7 +59,7 @@ public abstract class GroovycTestBase extends GroovyCompilerTest {
     GroovyCompilerTestCase.shouldFail(make());
   }
 
-  public void test_user_level_diagnostic_for_missing_dependency_of_groovy_all() {
+  public void testUserLevelDiagnosticForMissingDependencyOfGroovyAll() {
     myFixture.addFileToProject("Bar.groovy", """
       import groovy.util.logging.Commons
       @Commons
@@ -71,7 +71,7 @@ public abstract class GroovycTestBase extends GroovyCompilerTest {
     assertTrue(message, message.contains("org.apache.commons.logging.Log"));
   }
 
-public void test_circular_dependency_with_in_process_class_loading_resolving() throws IOException {
+public void testCircularDependencyWithInProcessClassLoadingResolving() throws IOException {
     PsiFile groovyFile = myFixture.addFileToProject("mix/GroovyClass.groovy", """
       package mix
       @groovy.transform.CompileStatic

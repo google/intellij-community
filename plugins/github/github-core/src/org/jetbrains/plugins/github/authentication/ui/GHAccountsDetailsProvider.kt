@@ -4,8 +4,8 @@ package org.jetbrains.plugins.github.authentication.ui
 import com.intellij.collaboration.auth.ui.LazyLoadingAccountsDetailsProvider
 import com.intellij.collaboration.auth.ui.cancelOnRemoval
 import com.intellij.collaboration.messages.CollaborationToolsBundle
-import com.intellij.collaboration.ui.ExceptionUtil
 import com.intellij.openapi.components.service
+import com.intellij.openapi.util.text.StringUtil
 import icons.CollaborationToolsIcons
 import kotlinx.coroutines.CoroutineScope
 import org.jetbrains.annotations.ApiStatus
@@ -15,6 +15,7 @@ import org.jetbrains.plugins.github.api.data.GithubUserDetailed
 import org.jetbrains.plugins.github.api.executeSuspend
 import org.jetbrains.plugins.github.authentication.accounts.GHAccountManager
 import org.jetbrains.plugins.github.authentication.accounts.GithubAccount
+import org.jetbrains.plugins.github.exceptions.GHAPIExceptionUtil
 import org.jetbrains.plugins.github.exceptions.GithubAuthenticationException
 import org.jetbrains.plugins.github.util.CachingGHUserAvatarLoader
 import java.awt.Image
@@ -47,7 +48,7 @@ class GHAccountsDetailsProvider(
       executor.executeSuspend(GithubApiRequests.CurrentUser.get(account.server))
     }
     catch (e: Throwable) {
-      val errorMessage = ExceptionUtil.getPresentableMessage(e)
+      val errorMessage = StringUtil.removeHtmlTags(GHAPIExceptionUtil.getPresentableMessage(e))
       val needReLogin = e is GithubAuthenticationException
       return Result.Error(errorMessage, needReLogin)
     }

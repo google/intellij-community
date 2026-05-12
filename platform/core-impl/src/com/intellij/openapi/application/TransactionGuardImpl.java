@@ -133,7 +133,8 @@ public final class TransactionGuardImpl extends TransactionGuard {
     return Boolean.TRUE.equals(myWriteSafeModalities.get(state));
   }
 
-  public void assertWriteActionAllowed() {
+  @ApiStatus.Internal
+  public void assertWriteSafeEnvironment() {
     Application app = ApplicationManager.getApplication();
     if (!EDT.isCurrentThreadEdt()) {
       return;
@@ -144,6 +145,15 @@ public final class TransactionGuardImpl extends TransactionGuard {
       LOG.error(reportWriteUnsafeContext(ModalityState.current()));
       myErrorReported = true;
     }
+  }
+
+  /**
+   * @deprecated Use {@link assertWriteSafeEnvironment}. This function has unfortunate name
+   */
+  @Deprecated
+  @SuppressWarnings("unused")
+  public void assertWriteActionAllowed() {
+    assertWriteSafeEnvironment();
   }
 
   private static @NonNls String reportWriteUnsafeContext(@NotNull ModalityState modality) {

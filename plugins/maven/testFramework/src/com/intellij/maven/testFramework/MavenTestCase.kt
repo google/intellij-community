@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.maven.testFramework
 
 import com.intellij.UtilBundle
@@ -44,7 +44,6 @@ import com.intellij.util.containers.CollectionFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.intellij.lang.annotations.Language
-import org.jdom.JDOMException
 import org.jetbrains.annotations.NonNls
 import org.jetbrains.idea.maven.indices.MavenIndicesManager
 import org.jetbrains.idea.maven.model.MavenConstants
@@ -170,7 +169,8 @@ abstract class MavenTestCase : UsefulTestCase() {
   }
 
   private fun setupCustomJdk() {
-    val jdkPath = EelTestJdkProvider.getJdkPath()
+    val jdkPath = EelTestJdkProvider.getJdkPath(myProject!!.getEelDescriptor())
+    VfsRootAccess.allowRootAccess(testRootDisposable, jdkPath.toString())
     if (myJdk == null && jdkPath != null) {
       myJdk = JavaSdk.getInstance().createJdk("Maven Test JDK", jdkPath.toString())
       val jdkTable = ProjectJdkTable.getInstance(project)
@@ -386,8 +386,11 @@ abstract class MavenTestCase : UsefulTestCase() {
   protected fun createModule(name: String): Module = createModule(name, JavaModuleType.getModuleType())
 
 
-  protected fun createProjectPom(@Language(value = "XML", prefix = "<project>", suffix = "</project>") xml: String): VirtualFile {
-    return createPomFile(projectRoot, xml).also { myProjectPom = it }
+  protected fun createProjectPom(
+    @Language(value = "XML", prefix = "<project>", suffix = "</project>") xml: String,
+    omitModelVersionTag: Boolean = false,
+  ): VirtualFile {
+    return createPomFile(projectRoot, xml, omitModelVersionTag).also { myProjectPom = it }
   }
 
   protected fun updateProjectPom(@Language(value = "XML", prefix = "<project>", suffix = "</project>") xml: String): VirtualFile {
@@ -399,15 +402,17 @@ abstract class MavenTestCase : UsefulTestCase() {
   protected fun createModulePom(
     relativePath: String,
     @Language(value = "XML", prefix = "<project>", suffix = "</project>") xml: String,
+    omitModelVersionTag: Boolean = false,
   ): VirtualFile {
-    return createPomFile(createProjectSubDir(relativePath), xml)
+    return createPomFile(createProjectSubDir(relativePath), xml, omitModelVersionTag)
   }
 
   protected fun updateModulePom(
     relativePath: String,
     @Language(value = "XML", prefix = "<project>", suffix = "</project>") xml: String,
+    omitModelVersionTag: Boolean = false,
   ): VirtualFile {
-    val pom = createModulePom(relativePath, xml)
+    val pom = createModulePom(relativePath, xml, omitModelVersionTag)
     refreshFiles(listOf(pom))
     return pom
   }
@@ -415,16 +420,18 @@ abstract class MavenTestCase : UsefulTestCase() {
   protected fun createPomFile(
     dir: VirtualFile,
     @Language(value = "XML", prefix = "<project>", suffix = "</project>") xml: String,
+    omitModelVersionTag: Boolean = false,
   ): VirtualFile {
-    return createPomFile(dir, "pom.xml", xml)
+    return createPomFile(dir, "pom.xml", xml, omitModelVersionTag)
   }
 
   protected fun createPomFile(
     dir: VirtualFile, fileName: String = "pom.xml",
     @Language(value = "XML", prefix = "<project>", suffix = "</project>") xml: String,
+    omitModelVersionTag: Boolean = false,
   ): VirtualFile {
     val filePath = Path.of(dir.path, fileName)
-    setPomContent(filePath, xml)
+    setPomContent(filePath, xml, omitModelVersionTag)
     dir.refresh(false, false)
     val f = dir.findChild(fileName) ?: throw AssertionError("can't find file ${filePath.absolutePathString()} in VFS")
     myAllPoms.add(f)
@@ -625,12 +632,20 @@ abstract class MavenTestCase : UsefulTestCase() {
            "</profilesXml>"
   }
 
-  protected fun setPomContent(file: VirtualFile, @Language(value = "XML", prefix = "<project>", suffix = "</project>") xml: String?) {
-    setFileContent(file, createPomXml(xml))
+  protected fun setPomContent(
+    file: VirtualFile,
+    @Language(value = "XML", prefix = "<project>", suffix = "</project>") xml: String?,
+    omitModelVersionTag: Boolean = false,
+  ) {
+    setFileContent(file, createPomXml(xml, omitModelVersionTag))
   }
 
-  private fun setPomContent(file: Path, @Language(value = "XML", prefix = "<project>", suffix = "</project>") xml: String?) {
-    setFileContent(file, createPomXml(xml))
+  private fun setPomContent(
+    file: Path,
+    @Language(value = "XML", prefix = "<project>", suffix = "</project>") xml: String?,
+    omitModelVersionTag: Boolean = false,
+  ) {
+    setFileContent(file, createPomXml(xml, omitModelVersionTag))
   }
 
   private fun setFileContent(file: VirtualFile, content: String) {
@@ -763,8 +778,11 @@ abstract class MavenTestCase : UsefulTestCase() {
   }
 
   @Language("XML")
-  fun createPomXml(@Language(value = "XML", prefix = "<project>", suffix = "</project>") xml: @NonNls String?): @NonNls String {
-    return createPomXml(modelVersion, xml)
+  fun createPomXml(
+    @Language(value = "XML", prefix = "<project>", suffix = "</project>") xml: @NonNls String?,
+    omitModelVersionTag: Boolean = false,
+  ): @NonNls String {
+    return createPomXml(modelVersion, xml, omitModelVersionTag)
   }
 
   protected fun assumeOnLocalEnvironmentOnly(cause: String) {
@@ -848,15 +866,20 @@ abstract class MavenTestCase : UsefulTestCase() {
     fun createPomXml(
       modelVersion: String,
       @Language(value = "XML", prefix = "<project>", suffix = "</project>") xml: @NonNls String?,
+      omitModelVersionTag: Boolean,
     ): @NonNls String {
-      return """
-             <?xml version="1.0"?>
-             <project xmlns="http://maven.apache.org/POM/$modelVersion"
-                      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                      xsi:schemaLocation="http://maven.apache.org/POM/$modelVersion http://maven.apache.org/xsd/maven-$modelVersion.xsd">
-               <modelVersion>$modelVersion</modelVersion>
-             
-             """.trimIndent() + xml + "</project>"
+      val projectStartTag = """
+        <?xml version="1.0"?>
+        <project xmlns="http://maven.apache.org/POM/$modelVersion"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:schemaLocation="http://maven.apache.org/POM/$modelVersion http://maven.apache.org/xsd/maven-$modelVersion.xsd">
+      """.trimIndent()
+      return if (omitModelVersionTag) {
+        "$projectStartTag\n$xml</project>"
+      }
+      else {
+        "$projectStartTag\n  <modelVersion>$modelVersion</modelVersion>\n$xml</project>"
+      }
     }
   }
 

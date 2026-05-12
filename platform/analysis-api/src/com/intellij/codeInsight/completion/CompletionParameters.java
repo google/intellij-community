@@ -121,6 +121,7 @@ public final class CompletionParameters implements BaseCompletionParameters {
     return myEditor;
   }
 
+  @Override
   public @NotNull CompletionProcess getProcess() {
     return myProcess;
   }

@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.python.psi.impl` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "psi-impl_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "psi-impl",
   module_name = "intellij.python.psi.impl",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
-  resources = [":psi-impl_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
@@ -44,6 +39,7 @@ jvm_library(
     "//platform/lvcs-api:lvcs",
     "//platform/ide-core-impl",
     "//platform/util/jdom",
+    "//platform/util-ex",
     "//libraries/gson",
     "//platform/workspace/jps",
     "//platform/backend/workspace",
@@ -53,12 +49,16 @@ jvm_library(
     "//libraries/hash4j",
     "//python/python-sdk:sdk",
     "//platform/statistics",
+    "//libraries/hdr-histogram",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//python/python-requirements:requirements",
   ],
   exports = ["//python/python-syntax-core:syntax-core"]
 )
 
 jvm_library(
   name = "psi-impl_test_lib",
+  testonly = True,
   module_name = "intellij.python.psi.impl",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -97,6 +97,7 @@ jvm_library(
     "//platform/lvcs-api:lvcs_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
     "//platform/util/jdom:jdom_test_lib",
+    "//platform/util-ex:util-ex_test_lib",
     "//libraries/gson:gson_test_lib",
     "//platform/workspace/jps:jps_test_lib",
     "//platform/backend/workspace:workspace_test_lib",
@@ -106,6 +107,15 @@ jvm_library(
     "//libraries/hash4j:hash4j_test_lib",
     "//python/python-sdk:sdk_test_lib",
     "//platform/statistics:statistics_test_lib",
+    "//libraries/hdr-histogram:hdr-histogram_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//python/python-requirements:requirements_test_lib",
   ]
 )
 ### auto-generated section `build intellij.python.psi.impl` end
+
+### auto-generated section `iml intellij.python.psi.impl` start
+exports_files([
+  "intellij.python.psi.impl.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.python.psi.impl` end

@@ -29,6 +29,7 @@ internal object UnresolvedNameReferenceImportQuickFixFactory : AbstractImportQui
             is KaFirDiagnostic.UnresolvedImport,
             is KaFirDiagnostic.UnresolvedReference,
             is KaFirDiagnostic.UnresolvedReferenceWrongReceiver,
+            is KaFirDiagnostic.NotAnAnnotationClass,
             is KaFirDiagnostic.InvisibleReference -> {
                 val diagnosticPsi = diagnostic.psi.operationReferenceForBinaryExpressionOrThis as? KtElement ?: return null
                 DefaultImportContext(diagnosticPsi, ImportPositionTypeAndReceiver.detect(diagnosticPsi))
@@ -82,7 +83,7 @@ internal object UnresolvedNameReferenceImportQuickFixFactory : AbstractImportQui
         )
 
         is ImportPositionType.KDocNameReference -> sequenceOf(
-            // TODO this is currently reported by KDocUnresolvedReferenceInspection
+            // TODO this is currently reported by KDocUnresolvedLinkInspection
         )
 
         is ImportPositionType.CallableReference -> sequenceOf(

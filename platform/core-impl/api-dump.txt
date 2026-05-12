@@ -12,11 +12,15 @@ c:com.intellij.extapi.psi.StubBasedPsiElementBase
 - f:getRequiredStubOrPsiChild(com.intellij.psi.tree.IElementType,java.lang.Class):com.intellij.psi.PsiElement
 - f:getStubOrPsiChild(com.intellij.psi.tree.IElementType):com.intellij.psi.PsiElement
 - f:getStubOrPsiChild(com.intellij.psi.tree.IElementType,java.lang.Class):com.intellij.psi.PsiElement
+f:com.intellij.ide.plugins.PluginManagerCore
+- sf:getLoadedPluginIds():java.util.Collection
 com.intellij.lang.DefaultASTFactory
 - a:createComment(com.intellij.psi.tree.IElementType,java.lang.CharSequence):com.intellij.psi.impl.source.tree.LeafElement
 c:com.intellij.lang.impl.PsiBuilderAdapter
+- advanceToEOF():V
 - remapCurrentTokenAndRestoreOnRollback(com.intellij.psi.tree.IElementType):V
 c:com.intellij.lang.impl.PsiBuilderImpl
+- advanceToEOF():V
 - remapCurrentTokenAndRestoreOnRollback(com.intellij.psi.tree.IElementType):V
 com.intellij.lexer.FilterLexer$Filter
 - a:reject(com.intellij.psi.tree.IElementType):Z
@@ -30,6 +34,12 @@ com.intellij.lexer.FlexLexer
 - a:reset(java.lang.CharSequence,I,I,I):V
 - a:yybegin(I):V
 - a:yystate():I
+f:com.intellij.lexer.FuseMergingLexer
+- com.intellij.lexer.MergingLexerAdapterBase
+- <init>(com.intellij.lexer.Lexer,com.intellij.psi.tree.IElementType,com.intellij.psi.tree.TokenSet):V
+- getMergeFunction():com.intellij.lexer.MergeFunction
+c:com.intellij.mock.MockComponentManager
+- com.intellij.openapi.components.ComponentManagerEx
 com.intellij.openapi.application.ex.ApplicationEx
 - com.intellij.openapi.application.Application
 - sf:ELEVATE:I
@@ -141,6 +151,14 @@ com.intellij.openapi.wm.ex.ProgressIndicatorEx
 - a:isFinished(com.intellij.openapi.progress.TaskInfo):Z
 - a:processFinish():V
 - a:wasStarted():Z
+e:com.intellij.pom.tree.events.ChangeInfoKind
+- java.lang.Enum
+- sf:Added:com.intellij.pom.tree.events.ChangeInfoKind
+- sf:ContentsChanged:com.intellij.pom.tree.events.ChangeInfoKind
+- sf:Removed:com.intellij.pom.tree.events.ChangeInfoKind
+- sf:Replaced:com.intellij.pom.tree.events.ChangeInfoKind
+- s:valueOf(java.lang.String):com.intellij.pom.tree.events.ChangeInfoKind
+- s:values():com.intellij.pom.tree.events.ChangeInfoKind[]
 com.intellij.psi.CustomHighlighterTokenType
 - sf:CHARACTER:com.intellij.psi.tree.IElementType
 - sf:CUSTOM_CONTENT:com.intellij.psi.tree.IElementType
@@ -172,6 +190,16 @@ f:com.intellij.psi.ExternalChangeActionUtil
 - sf:externalDocumentChangeAction(java.lang.Runnable):java.lang.Runnable
 - sf:isExternalChangeInProgress():Z
 - sf:isExternalDocumentChangeInProgress():Z
+Fa:com.intellij.psi.PsiAnchor
+- com.intellij.model.Pointer
+- <init>():V
+- s:create(com.intellij.psi.PsiElement):com.intellij.psi.PsiAnchor
+- dereference():com.intellij.psi.PsiElement
+- a:getEndOffset():I
+- a:getFile():com.intellij.psi.PsiFile
+- a:getStartOffset():I
+- a:retrieve():com.intellij.psi.PsiElement
+- retrieveOrThrow():com.intellij.psi.PsiElement
 com.intellij.psi.impl.AnyPsiChangeListener
 - afterPsiChanged(Z):V
 - beforePsiChanged(Z):V
@@ -191,6 +219,8 @@ com.intellij.psi.impl.PsiFileEx
 com.intellij.psi.impl.PsiTreeChangePreprocessor
 - sf:EP:com.intellij.openapi.extensions.ProjectExtensionPointName
 - a:treeChanged(com.intellij.psi.impl.PsiTreeChangeEventImpl):V
+c:com.intellij.psi.impl.file.PsiDirectoryImpl
+- findFile(java.lang.String,com.intellij.psi.search.GlobalSearchScope):com.intellij.psi.PsiFile
 com.intellij.psi.impl.file.impl.FileManager
 - a:cleanupForNextTest():V
 - a:createFileViewProvider(com.intellij.openapi.vfs.VirtualFile,Z):com.intellij.psi.FileViewProvider
@@ -202,9 +232,6 @@ com.intellij.psi.impl.file.impl.FileManager
 - a:getCachedPsiFile(com.intellij.openapi.vfs.VirtualFile):com.intellij.psi.PsiFile
 - a:reloadFromDisk(com.intellij.psi.PsiFile):V
 - a:setViewProvider(com.intellij.openapi.vfs.VirtualFile,com.intellij.psi.FileViewProvider):V
-com.intellij.psi.impl.smartPointers.SmartPointerEx
-- com.intellij.psi.SmartPsiElementPointer
-- a:getCachedElement():com.intellij.psi.PsiElement
 com.intellij.psi.impl.source.HolderFactory
 - a:createHolder(com.intellij.psi.PsiManager,com.intellij.lang.Language,com.intellij.psi.PsiElement):com.intellij.psi.impl.source.DummyHolder
 - a:createHolder(com.intellij.psi.PsiManager,com.intellij.psi.PsiElement):com.intellij.psi.impl.source.DummyHolder
@@ -277,6 +304,10 @@ com.intellij.util.SequentialTask
 - iteration(com.intellij.openapi.progress.ProgressIndicator):Z
 - prepare():V
 - stop():V
+f:com.intellij.util.concurrency.CancellableClearableLazy
+- <init>(kotlin.jvm.functions.Function0):V
+- f:clear():V
+- f:getValue():java.lang.Object
 org.picocontainer.MutablePicoContainer
 - a:getComponentAdapter(java.lang.Object):org.picocontainer.ComponentAdapter
 - registerComponentImplementation(java.lang.Class):org.picocontainer.ComponentAdapter

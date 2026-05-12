@@ -4,8 +4,8 @@ package com.jetbrains.python.tools
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.testFramework.TestApplicationManager
 import com.intellij.util.io.Compressor
-import com.jetbrains.python.sdk.skeletons.DefaultPregeneratedSkeletonsProvider
 import com.jetbrains.python.sdk.skeletons.PySkeletonRefresher
+import com.jetbrains.python.sdk.skeletons.getPregeneratedSkeletonsName
 import com.jetbrains.python.tools.sdkTools.PySdkTools
 import com.jetbrains.python.tools.sdkTools.SdkCreationType
 import com.jetbrains.python.venvReader.VirtualEnvReader
@@ -42,7 +42,7 @@ fun main() {
         .inPrebuildingMode()
         .runGeneration(null)
 
-      val artifactName = DefaultPregeneratedSkeletonsProvider.getPregeneratedSkeletonsName(sdk, refresher.generatorVersion, true, true)
+      val artifactName = getPregeneratedSkeletonsName(sdk, refresher.generatorVersion, true, true)
       val dirPacked = File(skeletonsDir.parent, artifactName!!)
       println("Creating artifact $dirPacked")
       Compressor.Zip(dirPacked).use { it.addDirectory(skeletonsDir) }

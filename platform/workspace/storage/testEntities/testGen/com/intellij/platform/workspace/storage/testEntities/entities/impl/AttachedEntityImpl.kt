@@ -1,23 +1,24 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.storage.testEntities.entities.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
 import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
-import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.EntityLink
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
-import com.intellij.platform.workspace.storage.impl.extractOneToOneParent
-import com.intellij.platform.workspace.storage.impl.updateOneToOneParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.testEntities.entities.AttachedEntity
 import com.intellij.platform.workspace.storage.testEntities.entities.AttachedEntityBuilder
@@ -30,18 +31,14 @@ import com.intellij.platform.workspace.storage.testEntities.entities.MainEntityB
 internal class AttachedEntityImpl(private val dataSource: AttachedEntityData) : AttachedEntity, WorkspaceEntityBase(dataSource) {
 
   private companion object {
-    internal val REF_CONNECTION_ID: ConnectionId = ConnectionId.create(MainEntity::class.java, AttachedEntity::class.java,
-                                                                       ConnectionId.ConnectionType.ONE_TO_ONE, false)
-
-    private val connections = listOf<ConnectionId>(
-      REF_CONNECTION_ID,
-    )
+    internal val REF_CONNECTION_ID: ConnectionId =
+      ConnectionId.create(MainEntity::class.java, AttachedEntity::class.java, ConnectionId.ConnectionType.ONE_TO_ONE, false)
+    private val connections = listOf<ConnectionId>(REF_CONNECTION_ID)
 
   }
 
   override val ref: MainEntity
-    get() = snapshot.extractOneToOneParent(REF_CONNECTION_ID, this)!!
-
+    get() = snapshot.instrumentation.getParent(REF_CONNECTION_ID, this) as? MainEntity ?: error("Parent ref not found for AttachedEntity")
   override val data: String
     get() {
       readField("data")
@@ -59,8 +56,8 @@ internal class AttachedEntityImpl(private val dataSource: AttachedEntityData) : 
   }
 
 
-  internal class Builder(result: AttachedEntityData?) : ModifiableWorkspaceEntityBase<AttachedEntity, AttachedEntityData>(
-    result), AttachedEntityBuilder {
+  internal class Builder(result: AttachedEntityData?) : ModifiableWorkspaceEntityBase<AttachedEntity, AttachedEntityData>(result),
+                                                        AttachedEntityBuilder {
     internal constructor() : this(AttachedEntityData())
 
     override fun applyToBuilder(builder: MutableEntityStorage) {
@@ -73,15 +70,13 @@ internal class AttachedEntityImpl(private val dataSource: AttachedEntityData) : 
           error("Entity AttachedEntity is already created in a different builder")
         }
       }
-
       this.diff = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
-      // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
-      // Builder may switch to snapshot at any moment and lock entity data to modification
+// After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
+// Builder may switch to snapshot at any moment and lock entity data to modification
       this.currentEntityData = null
-
-      // Process linked entities that are connected without a builder
+// Process linked entities that are connected without a builder
       processLinkedEntities(builder)
       checkInitialization() // TODO uncomment and check failed tests
     }
@@ -92,7 +87,7 @@ internal class AttachedEntityImpl(private val dataSource: AttachedEntityData) : 
         error("Field WorkspaceEntity#entitySource should be initialized")
       }
       if (_diff != null) {
-        if (_diff.extractOneToOneParent<WorkspaceEntityBase>(REF_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getParentBuilder(REF_CONNECTION_ID, this) == null) {
           error("Field AttachedEntity#ref should be initialized")
         }
       }
@@ -127,17 +122,15 @@ internal class AttachedEntityImpl(private val dataSource: AttachedEntityData) : 
         changedProperty.add("entitySource")
 
       }
-
     override var ref: MainEntityBuilder
       get() {
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(REF_CONNECTION_ID, this) as? MainEntityBuilder)
-          ?: (this.entityLinks[EntityLink(false, REF_CONNECTION_ID)]!! as MainEntityBuilder)
+          ?: (this.entityLinks[EntityLink(false, REF_CONNECTION_ID)] as? MainEntityBuilder) ?: error("ref is null for AttachedEntity")
         }
         else {
-          this.entityLinks[EntityLink(false, REF_CONNECTION_ID)]!! as MainEntityBuilder
+          (this.entityLinks[EntityLink(false, REF_CONNECTION_ID)] as? MainEntityBuilder) ?: error("ref is null for AttachedEntity")
         }
       }
       set(value) {
@@ -147,18 +140,17 @@ internal class AttachedEntityImpl(private val dataSource: AttachedEntityData) : 
           if (value is ModifiableWorkspaceEntityBase<*, *>) {
             value.entityLinks[EntityLink(true, REF_CONNECTION_ID)] = this
           }
-          // else you're attaching a new entity to an existing entity that is not modifiable
+// else you're attaching a new entity to an existing entity that is not modifiable
           _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
         }
         if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)) {
-          _diff.updateOneToOneParentOfChild(REF_CONNECTION_ID, this, value)
+          _diff.instrumentation.addChild(REF_CONNECTION_ID, value, this)
         }
         else {
           if (value is ModifiableWorkspaceEntityBase<*, *>) {
             value.entityLinks[EntityLink(true, REF_CONNECTION_ID)] = this
           }
-          // else you're attaching a new entity to an existing entity that is not modifiable
-
+// else you're attaching a new entity to an existing entity that is not modifiable
           this.entityLinks[EntityLink(false, REF_CONNECTION_ID)] = value
         }
         changedProperty.add("ref")
@@ -174,6 +166,7 @@ internal class AttachedEntityImpl(private val dataSource: AttachedEntityData) : 
 
     override fun getEntityClass(): Class<AttachedEntity> = AttachedEntity::class.java
   }
+
 }
 
 @OptIn(WorkspaceEntityInternalApi::class)
@@ -189,7 +182,6 @@ internal class AttachedEntityData : WorkspaceEntityData<AttachedEntity>() {
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): AttachedEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {
@@ -201,8 +193,7 @@ internal class AttachedEntityData : WorkspaceEntityData<AttachedEntity>() {
   }
 
   override fun getMetadata(): EntityMetadata {
-    return MetadataStorageImpl.getMetadataByTypeFqn(
-      "com.intellij.platform.workspace.storage.testEntities.entities.AttachedEntity") as EntityMetadata
+    return MetadataStorageImpl.getMetadataByTypeFqn("com.intellij.platform.workspace.storage.testEntities.entities.AttachedEntity") as EntityMetadata
   }
 
   override fun getEntityInterface(): Class<out WorkspaceEntity> {
@@ -224,9 +215,7 @@ internal class AttachedEntityData : WorkspaceEntityData<AttachedEntity>() {
   override fun equals(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as AttachedEntityData
-
     if (this.entitySource != other.entitySource) return false
     if (this.data != other.data) return false
     return true
@@ -235,9 +224,7 @@ internal class AttachedEntityData : WorkspaceEntityData<AttachedEntity>() {
   override fun equalsIgnoringEntitySource(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as AttachedEntityData
-
     if (this.data != other.data) return false
     return true
   }

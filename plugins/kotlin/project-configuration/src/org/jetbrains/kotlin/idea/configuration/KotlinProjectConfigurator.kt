@@ -5,19 +5,17 @@ package org.jetbrains.kotlin.idea.configuration
 import com.intellij.openapi.command.undo.BasicUndoableAction
 import com.intellij.openapi.command.undo.UndoManager
 import com.intellij.openapi.extensions.ExtensionPointName
+import com.intellij.openapi.externalSystem.autoimport.ExternalSystemProjectTrackerSettings
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.roots.DependencyScope
-import com.intellij.openapi.roots.ExternalLibraryDescriptor
 import com.intellij.openapi.util.NlsSafe
-import com.intellij.psi.PsiElement
+import com.intellij.platform.backend.observation.Observation
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import org.jetbrains.kotlin.config.ApiVersion
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.idea.base.projectStructure.ModuleSourceRootGroup
 import org.jetbrains.kotlin.idea.base.projectStructure.toModuleGroup
 import org.jetbrains.kotlin.idea.compiler.configuration.IdeKotlinVersion
-import org.jetbrains.kotlin.idea.projectConfiguration.LibraryJarDescriptor
 import org.jetbrains.kotlin.idea.statistics.KotlinProjectSetupFUSCollector
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.platform.TargetPlatform
@@ -100,12 +98,13 @@ interface KotlinProjectConfigurator {
     @JvmSuppressWildcards
     fun configure(project: Project, excludeModules: Collection<Module>)
 
-    fun queueSyncIfNeeded(project: Project) {
-        // Do nothing here. Stub for not breaking external API implementations
-    }
-
     suspend fun queueSyncAndWaitForProjectToBeConfigured(project: Project) {
-        // Do nothing here. Stub for not breaking external API implementations
+        val projectSettings = ExternalSystemProjectTrackerSettings.getInstance(project)
+        if (projectSettings.autoReloadType != ExternalSystemProjectTrackerSettings.AutoReloadType.NONE) {
+            val configurationService = KotlinProjectConfigurationService.getInstance(project)
+            configurationService.queueSync()
+            Observation.awaitConfiguration(project)
+        }
     }
 
     val presentableText: String
@@ -138,21 +137,6 @@ interface KotlinProjectConfigurator {
         forTests: Boolean
     )
 
-    @Deprecated(
-        "Please implement/use the KotlinBuildSystemDependencyManager EP instead.", ReplaceWith(
-            "KotlinBuildSystemDependencyManager.findApplicableConfigurator(module)?.addDependency(module, library.withScope(scope))"
-        )
-    )
-    fun addLibraryDependency(
-        module: Module,
-        element: PsiElement,
-        library: ExternalLibraryDescriptor,
-        libraryJarDescriptor: LibraryJarDescriptor,
-        scope: DependencyScope
-    ) {
-        KotlinBuildSystemDependencyManager.findApplicableConfigurator(module)?.addDependency(module, library.withScope(scope))
-    }
-
     /**
      * Whether this configurator supports adding module-wide opt-ins via [addModuleWideOptIn].
      * If this configurator returns `true`, it must provide a valid implementation for [addModuleWideOptIn].
@@ -180,9 +164,10 @@ interface KotlinProjectConfigurator {
     ) {
         // Auto-config only ever works on a single module
         val theOnlyModule = modules.takeIf { isAutoConfig }?.singleOrNull()
+        val configurationService = KotlinProjectConfigurationService.getInstance(project)
         UndoManager.getInstance(project).undoableActionPerformed(object : BasicUndoableAction() {
             override fun undo() {
-                queueSyncIfNeeded(project)
+                configurationService.queueSyncIfPossible()
                 theOnlyModule?.let {
                     notificationHolder.showAutoConfigurationUndoneNotification(it)
                 }
@@ -190,7 +175,7 @@ interface KotlinProjectConfigurator {
             }
 
             override fun redo() {
-                queueSyncIfNeeded(project)
+                configurationService.queueSyncIfPossible()
                 theOnlyModule?.let {
                     notificationHolder.reshowAutoConfiguredNotification(it)
                 }
@@ -199,6 +184,7 @@ interface KotlinProjectConfigurator {
     }
 
     companion object {
-        val EP_NAME: ExtensionPointName<KotlinProjectConfigurator> = ExtensionPointName.create<KotlinProjectConfigurator>("org.jetbrains.kotlin.projectConfigurator")
+        val EP_NAME: ExtensionPointName<KotlinProjectConfigurator> =
+            ExtensionPointName.create("org.jetbrains.kotlin.projectConfigurator")
     }
 }

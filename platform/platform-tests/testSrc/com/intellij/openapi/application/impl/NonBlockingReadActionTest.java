@@ -40,6 +40,7 @@ import com.intellij.util.concurrency.Semaphore;
 import com.intellij.util.concurrency.SequentialTaskExecutor;
 import com.intellij.util.ui.UIUtil;
 import one.util.streamex.IntStreamEx;
+import org.assertj.core.api.Assertions;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.concurrency.CancellablePromise;
@@ -50,6 +51,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -95,7 +97,7 @@ public class NonBlockingReadActionTest extends LightPlatformTestCase {
     ExecutorService executor = SequentialTaskExecutor.createSequentialApplicationPoolExecutor(StringUtil.capitalize(getName()));
     CancellablePromise<Void> promise = ReadAction
       .nonBlocking(() -> {})
-      .finishOnUiThread(ModalityState.defaultModalityState(), __ -> semaphore.up())
+      .finishOnUiThread(ModalityState.defaultModalityState(), _ -> semaphore.up())
       .submit(executor);
     assertFalse(semaphore.isUp());
     executor.submit(() -> {}).get(10, TimeUnit.SECONDS); // shouldn't fail by timeout
@@ -440,17 +442,17 @@ public class NonBlockingReadActionTest extends LightPlatformTestCase {
       assertLogsAndThrowsUOE(promise, loggedError, executor);
 
       promise = ReadAction.nonBlocking(throwUOE).submit(executor);
-      promise.onProcessed(__ -> {});
+      promise.onProcessed(_ -> {});
       assertLogsAndThrowsUOE(promise, loggedError, executor);
 
-      promise = ReadAction.nonBlocking(throwUOE).submit(executor).onProcessed(__ -> {});
+      promise = ReadAction.nonBlocking(throwUOE).submit(executor).onProcessed(_ -> {});
       assertLogsAndThrowsUOE(promise, loggedError, executor);
 
       promise = ReadAction.nonBlocking(throwUOE).submit(AppExecutorUtil.getAppExecutorService());
-      promise.onError(__ -> {});
+      promise.onError(_ -> {});
       assertLogsAndThrowsUOE(promise, loggedError, executor);
 
-      promise = ReadAction.nonBlocking(throwUOE).submit(AppExecutorUtil.getAppExecutorService()).onError(__ -> {});
+      promise = ReadAction.nonBlocking(throwUOE).submit(AppExecutorUtil.getAppExecutorService()).onError(_ -> {});
       assertLogsAndThrowsUOE(promise, loggedError, executor);
     });
   }
@@ -560,7 +562,7 @@ public class NonBlockingReadActionTest extends LightPlatformTestCase {
   public void test_submit_doesNot_fail_without_readAction_when_parent_isDisposed() throws Exception {
     try (ExecutorService executor = AppExecutorUtil.createBoundedApplicationPoolExecutor(StringUtil.capitalize(getName()), 1000)) {
       for (int i = 0; i < 50; i++) {
-        List<Disposable> parents = IntStreamEx.range(100).mapToObj(__ -> Disposer.newDisposable()).toList();
+        List<Disposable> parents = IntStreamEx.range(100).mapToObj(_ -> Disposer.newDisposable()).toList();
         List<Future<?>> futures = new ArrayList<>();
         for (Disposable parent : parents) {
           futures.add(executor.submit(() -> ReadAction.nonBlocking(() -> {
@@ -607,7 +609,7 @@ public class NonBlockingReadActionTest extends LightPlatformTestCase {
   public void test_executeSynchronously_doesNot_return_null_with_not_nullable_callable() {
     try (ExecutorService executor = AppExecutorUtil.createBoundedApplicationPoolExecutor(StringUtil.capitalize(getName()), 1000)) {
       for (int i = 0; i < 50; i++) {
-        List<Disposable> disposables = IntStreamEx.range(100).mapToObj(__ -> Disposer.newDisposable()).toList();
+        List<Disposable> disposables = IntStreamEx.range(100).mapToObj(_ -> Disposer.newDisposable()).toList();
         List<Future<?>> futuresList = new ArrayList<>();
         for (Disposable disposable : disposables) {
           futuresList.add(executor.submit(() -> {
@@ -672,6 +674,38 @@ public class NonBlockingReadActionTest extends LightPlatformTestCase {
     });
     while (!promise.get().isDone()) {
       UIUtil.dispatchAllInvocationEvents(); // NBRA invokeLaters when sensed there's pending write action
+    }
+  }
+
+  public void testSyncrhonousNbraCanBeCanceledByExpireWith() {
+    Disposable d = Disposer.newDisposable();
+    CompletableFuture<?> readActionCanStart = new CompletableFuture<>();
+    CompletableFuture<?> writeActionCanFinish = new CompletableFuture<>();
+    Future<?> f = ApplicationManager.getApplication().executeOnPooledThread(() -> {
+      readActionCanStart.join();
+      try {
+        ReadAction.nonBlocking(() -> { }).expireWith(d).executeSynchronously();
+      } catch (Throwable e) {
+        writeActionCanFinish.complete(null);
+        throw e;
+      }
+      Assertions.fail("Read action should not complete successfully");
+    });
+    WriteAction.run(() -> {
+      readActionCanStart.complete(null);
+      try {
+        Thread.sleep(10);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+      Disposer.dispose(d);
+      writeActionCanFinish.join();
+    });
+    try {
+      f.get();
+    }
+    catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeException(e);
     }
   }
 }

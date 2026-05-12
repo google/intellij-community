@@ -23,6 +23,10 @@
     {
       "id": "DuplicatePropertyInspection",
       "codeQualityCategory": "Reliability"
+    },
+    {
+      "id": "IncompleteProperty",
+      "codeQualityCategory": "Reliability"
     }
   ]
 }

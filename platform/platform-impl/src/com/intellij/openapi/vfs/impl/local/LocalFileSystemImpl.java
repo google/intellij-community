@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vfs.impl.local;
 
 import com.intellij.openapi.Disposable;
@@ -15,6 +15,7 @@ import com.intellij.openapi.vfs.VFileProperty;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFilePointerCapableFileSystem;
+import com.intellij.openapi.vfs.impl.SymlinksCapableFileSystem;
 import com.intellij.openapi.vfs.newvfs.FileNavigator;
 import com.intellij.openapi.vfs.newvfs.ManagingFS;
 import com.intellij.openapi.vfs.newvfs.NewVirtualFile;
@@ -28,6 +29,7 @@ import com.intellij.util.ArrayUtil;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.io.PlatformNioHelper;
+import com.intellij.util.system.OS;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -35,10 +37,10 @@ import org.jetbrains.annotations.SystemDependent;
 import org.jetbrains.annotations.TestOnly;
 import org.jetbrains.annotations.Unmodifiable;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -47,21 +49,21 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.StreamSupport;
 
-import static com.intellij.openapi.vfs.VFileProperty.SYMLINK;
 import static com.intellij.openapi.vfs.impl.local.LocalFileSystemEelUtil.listWithAttributesUsingEel;
 import static com.intellij.openapi.vfs.impl.local.LocalFileSystemEelUtil.readAttributesUsingEel;
 import static com.intellij.openapi.vfs.newvfs.impl.VirtualDirectoryImpl.createCreateEvent;
 import static com.intellij.util.containers.CollectionFactory.createFilePathMap;
 import static java.util.Objects.requireNonNullElse;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 @ApiStatus.Internal
 @SuppressWarnings("removal")
-public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposable,
-                                                                        BatchingFileSystem,
-                                                                        VirtualFilePointerCapableFileSystem {
+public class LocalFileSystemImpl
+  extends LocalFileSystemBase
+  implements Disposable, BatchingFileSystem, VirtualFilePointerCapableFileSystem, SymlinksCapableFileSystem
+{
   @SuppressWarnings("SSBasedInspection")
   private static final Logger WATCH_ROOTS_LOG = Logger.getInstance("#com.intellij.openapi.vfs.WatchRoots");
   private static final int STATUS_UPDATE_PERIOD = 1000;
@@ -69,35 +71,47 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
   private static final FileAttributes UNC_ROOT_ATTRIBUTES =
     new FileAttributes(true, false, false, false, DEFAULT_LENGTH, DEFAULT_TIMESTAMP, false, FileAttributes.CaseSensitivity.INSENSITIVE);
 
+  /** copied from VfsImplUtil.refreshAndFindFileByPath, just without refreshing on childOf() path */
+  private static final FileNavigator<NewVirtualFile> NON_REFRESHING_NAVIGATOR = new FileNavigator<>() {
+    @Override
+    public @Nullable NewVirtualFile parentOf(@NotNull NewVirtualFile file) {
+
+      if (!file.is(VFileProperty.SYMLINK)) {
+        return file.getParent();
+      }
+      var canonicalPath = file.getCanonicalPath();
+      return canonicalPath != null ? VfsImplUtil.refreshAndFindFileByPath(file.getFileSystem(), canonicalPath) : null;
+    }
+
+    @Override
+    public @Nullable NewVirtualFile childOf(@NotNull NewVirtualFile parent, @NotNull String childName) {
+      return parent.findChild(childName);
+    }
+  };
+
   private final ManagingFS myManagingFS;
   private final FileWatcher myWatcher;
   private final WatchRootsManager myWatchRootsManager;
   private volatile boolean myDisposed;
 
-  private final ThreadLocal<Pair<VirtualFile, Map<String, FileAttributes>>> myFileAttributesCache = new ThreadLocal<>();
   private final DiskQueryRelay<VirtualFile, String[]> myChildrenGetter = new DiskQueryRelay<>(dir -> listChildren(dir));
   private final DiskQueryRelay<VirtualFile, Object> myContentGetter = new DiskQueryRelay<>(file -> readContent(file));
   private final DiskQueryRelay<VirtualFile, FileAttributes> myAttributeGetter = new DiskQueryRelay<>(file -> readAttributes(file));
   private final DiskQueryRelay<Pair<VirtualFile, @Nullable Set<String>>, Map<String, FileAttributes>> myChildrenAttrGetter =
-    new DiskQueryRelay<>(pair -> listWithAttributesUsingEel(pair.first, pair.second));
-
-  private final FileNavigator<NewVirtualFile> NON_REFRESHING_NAVIGATOR = new FileNavigator<>() {
-    @Override
-    public @Nullable NewVirtualFile parentOf(@NotNull NewVirtualFile file) {
-      // copied from VfsImplUtil.refreshAndFindFileByPath
-      if (!file.is(SYMLINK)) {
-        return file.getParent();
+    new DiskQueryRelay<>(pair -> {
+      if (!pair.first.isDirectory()) {
+        return Collections.emptyMap();
       }
-      String canonicalPath = file.getCanonicalPath();
-      return canonicalPath != null ? VfsImplUtil.refreshAndFindFileByPath(LocalFileSystemImpl.this, canonicalPath) : null;
-    }
+      Path path;
+      try {
+        path = Path.of(toIoPath(pair.first));
+      }
+      catch (InvalidPathException e) {
+        throw new RuntimeException(e);//TODO RC: why to wrap in RuntimeException?
+      }
+      return listWithAttributesUsingEel(path, pair.second);
+    });
 
-    @Override
-    public @Nullable NewVirtualFile childOf(@NotNull NewVirtualFile parent,
-                                            @NotNull String childName) {
-      return parent.findChild(childName);
-    }
-  };
 
   protected LocalFileSystemImpl() {
     myManagingFS = ManagingFS.getInstance();
@@ -109,7 +123,7 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
             storeRefreshStatusToFiles();
           }
         },
-        STATUS_UPDATE_PERIOD, STATUS_UPDATE_PERIOD, TimeUnit.MILLISECONDS
+        STATUS_UPDATE_PERIOD, STATUS_UPDATE_PERIOD, MILLISECONDS
       );
     });
     myWatchRootsManager = new WatchRootsManager(myWatcher, this);
@@ -224,7 +238,7 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
     path = FileUtil.toSystemDependentName(path);
     var aliases = new ArrayList<>(getFileWatcher().mapToAllSymlinks(path));
     assert !aliases.contains(path);
-    aliases.add(0, path);
+    aliases.addFirst(path);
     return aliases;
   }
 
@@ -254,7 +268,7 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
   @Override
   public void refreshWithoutFileWatcher(boolean asynchronous) {
     Runnable heavyRefresh = () -> {
-      for (VirtualFile root : myManagingFS.getRoots(this)) {
+      for (var root : myManagingFS.getRoots(this)) {
         ((NewVirtualFile)root).markDirtyRecursively();
       }
       refresh(asynchronous);
@@ -268,13 +282,6 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
     }
   }
 
-  @SuppressWarnings("IO_FILE_USAGE")
-  @Override
-  public void refreshIoFiles(@NotNull Iterable<? extends File> files, boolean async, boolean recursive, @Nullable Runnable onFinish) {
-    refreshNioFilesInternal(ContainerUtil.map(files, File::toPath));
-    refreshFiles(ContainerUtil.mapNotNull(files, this::findFileByIoFile), async, recursive, onFinish);
-  }
-
   @Override
   public void refreshNioFiles(@NotNull Iterable<? extends Path> files, boolean async, boolean recursive, @Nullable Runnable onFinish) {
     refreshNioFilesInternal(files);
@@ -285,16 +292,17 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
     // simulate logic in VirtualDirectoryImpl.findChild but for all files at once
     List<VFileCreateEvent> createEventsToFire = new ArrayList<>();
     for (var file : files) {
-      FileNavigator.NavigateResult<NewVirtualFile> result = FileNavigator.navigate(this, file.toAbsolutePath().toString(), NON_REFRESHING_NAVIGATOR);
+      var result = FileNavigator.navigate(this, file.toAbsolutePath().toString(), NON_REFRESHING_NAVIGATOR);
       if (result.isResolved()) {
         continue;
       }
-      NewVirtualFile lastResolvedFile = result.lastResolvedFile();
-      String nextChild = result.getUnresolvedChildName();
-      if (lastResolvedFile != null && nextChild != null) {
-        FakeVirtualFile fake = new FakeVirtualFile(lastResolvedFile, nextChild);
-        String canonicallyCasedName = this.getCanonicallyCasedName(fake);
-        VFileCreateEvent event = createCreateEvent(lastResolvedFile, fake, canonicallyCasedName, this);
+      var lastResolvedFile = result.lastResolvedFile();
+      var nextChild = result.getUnresolvedChildName();
+      if (lastResolvedFile != null && lastResolvedFile.isDirectory()
+          && nextChild != null) {
+        var fake = new FakeVirtualFile(lastResolvedFile, nextChild);
+        var canonicallyCasedName = this.getCanonicallyCasedName(fake);
+        var event = createCreateEvent(lastResolvedFile, fake, canonicallyCasedName, this);
         if (event != null) {
           // file exists on disk
           createEventsToFire.add(event);
@@ -306,6 +314,12 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
     }
   }
 
+  @Override
+  public boolean isSymlinksSupported() {
+    return true;
+  }
+
+  @Override
   @ApiStatus.Internal
   public final void symlinkUpdated(
     int fileId,
@@ -319,6 +333,7 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
     }
   }
 
+  @Override
   @ApiStatus.Internal
   public final void symlinkRemoved(int fileId) {
     myWatchRootsManager.removeSymlink(fileId);
@@ -333,9 +348,9 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
 
   private static boolean isRecursiveOrCircularSymlink(@Nullable VirtualFile parent, CharSequence name, String symlinkTarget) {
     if (startsWith(parent, name, symlinkTarget)) return true;
-    if (!(parent instanceof VirtualFileSystemEntry)) return false;
+    if (!(parent instanceof VirtualFileSystemEntry p)) return false;
     // check if it's circular - any symlink above resolves to my target too
-    for (var p = (VirtualFileSystemEntry)parent; p != null; p = p.getParent()) {
+    for (; p != null; p = p.getParent()) {
       // if the file has no symlinks up the hierarchy, it's not circular
       if (!p.thisOrParentHaveSymlink()) return false;
       if (p.is(VFileProperty.SYMLINK)) {
@@ -354,10 +369,7 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
 
   @Override
   public String @NotNull [] list(@NotNull VirtualFile file) {
-    if (!file.isDirectory()) {
-      return ArrayUtil.EMPTY_STRING_ARRAY;
-    }
-    return myChildrenGetter.accessDiskWithCheckCanceled(file);
+    return file.isDirectory() ? myChildrenGetter.accessDiskWithCheckCanceled(file) : ArrayUtil.EMPTY_STRING_ARRAY;
   }
 
   private final DiskQueryRelay<Pair<VirtualFile, String>, FileAttributes.CaseSensitivity> caseSensitivityGetter = new DiskQueryRelay<>(
@@ -365,62 +377,25 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
   );
 
   @Override
-  public @NotNull FileAttributes.CaseSensitivity fetchCaseSensitivity(@NotNull VirtualFile parent,
-                                                                      @NotNull String childName) {
+  public @NotNull FileAttributes.CaseSensitivity fetchCaseSensitivity(@NotNull VirtualFile parent, @NotNull String childName) {
     return caseSensitivityGetter.accessDiskWithCheckCanceled(Pair.createNonNull(parent, childName));
   }
 
   @Override
   public byte @NotNull [] contentsToByteArray(@NotNull VirtualFile file) throws IOException {
-    //if (SystemInfo.isUnix && file.is(VFileProperty.SPECIAL)) { // avoid opening FIFO files
-    //  throw new NoSuchFileException(file.getPath(), null, "Not a file");
-    //}
     var result = myContentGetter.accessDiskWithCheckCanceled(file);
     if (result instanceof IOException e) throw e;
     return (byte[])result;
   }
 
-  /**
-   * @deprecated prefer to use {@link #listWithAttributes(VirtualFile, Set)} instead -- it is stateless, hence its
-   * behavior is more predictable
-   */
-  @ApiStatus.Internal
-  @Deprecated(forRemoval = true)
-  public final String @NotNull [] listWithCaching(@NotNull VirtualFile dir,
-                                                  @Nullable Set<String> filter) {
-    var cache = myFileAttributesCache.get();
-    if (cache != null) {
-      LOG.error("unordered access to " + dir + " without cleaning after " + cache.first);
-    }
-    var result = myChildrenAttrGetter.accessDiskWithCheckCanceled(new Pair<>(dir, filter));
-    myFileAttributesCache.set(new Pair<>(dir, result));
-    return ArrayUtil.toStringArray(result.keySet());
-  }
-
-  /** @deprecated see {@link #listWithCaching(VirtualFile, Set)} docs for reasoning */
-  @ApiStatus.Internal
-  @Deprecated(forRemoval = true)
-  public void clearListCache() {
-    myFileAttributesCache.remove();
-  }
-
   @Override
   public FileAttributes getAttributes(@NotNull VirtualFile file) {
-    if (SystemInfo.isWindows && file.getParent() == null && file.getPath().startsWith("//")) {
+    if (OS.CURRENT == OS.Windows && file.getParent() == null && file.getPath().startsWith("//")) {
       return UNC_ROOT_ATTRIBUTES;
     }
 
-    var cache = myFileAttributesCache.get();
-    if (cache != null) {
-      if (!cache.first.equals(file.getParent())) {
-        LOG.error("unordered access to " + file + " outside " + cache.first);
-      }
-      else {
-        return cache.second.get(file.getName());
-      }
-    }
-
-    return myAttributeGetter.accessDiskWithCheckCanceled(file);
+    FileAttributes attributes = myAttributeGetter.accessDiskWithCheckCanceled(file);
+    return attributes;
   }
 
   private static String[] listChildren(VirtualFile dir) {
@@ -438,26 +413,16 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
   }
 
   @Override
-  public @NotNull Map<@NotNull String, @NotNull FileAttributes> listWithAttributes(@NotNull VirtualFile dir,
-                                                                                   @Nullable Set<String> childrenNames) {
+  public @NotNull Map<@NotNull String, @NotNull FileAttributes> listWithAttributes(@NotNull VirtualFile dir, @Nullable Set<String> childrenNames) {
     if (!dir.isDirectory()) {
       return Collections.emptyMap();
     }
     return myChildrenAttrGetter.accessDiskWithCheckCanceled(new Pair<>(dir, childrenNames));
   }
 
-  private static Map<String, FileAttributes> listWithAttributesImpl(@NotNull VirtualFile dir,
-                                                                    @Nullable Set<String> filter) {
-    if (!dir.isDirectory()) {
-      return Collections.emptyMap();
-    }
-    return listWithAttributesImpl(Path.of(toIoPath(dir)), filter);
-  }
-
-  protected static Map<String, FileAttributes> listWithAttributesImpl(@NotNull Path dir,
-                                                                      @Nullable Set<String> filter) {
+  protected static Map<String, FileAttributes> listWithAttributesImpl(@NotNull Path dir, @Nullable Set<String> filter) {
     try {
-      int expectedSize = (filter == null) ? 10 : filter.size();
+      var expectedSize = (filter == null) ? 10 : filter.size();
       //We must return a 'normal' (=case-sensitive) map from this method, see BatchingFileSystem.listWithAttributes() contract:
       Map<String, FileAttributes> childrenWithAttributes = createFilePathMap(expectedSize, /*caseSensitive: */true);
 
@@ -491,7 +456,7 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
   private static @Nullable FileAttributes readAttributes(VirtualFile file) {
     try {
       var nioFile = Path.of(toIoPath(file));
-      FileAttributes attributes = readAttributesUsingEel(nioFile);
+      var attributes = readAttributesUsingEel(nioFile);
       return amendAttributes(nioFile, attributes);
     }
     catch (NoSuchFileException e) { LOG.debug("File doesn't exist: " + e.getMessage()); }
@@ -500,14 +465,8 @@ public class LocalFileSystemImpl extends LocalFileSystemBase implements Disposab
     return null;
   }
 
-  private static FileAttributes amendAttributes(Path file, FileAttributes attributes) {
-    for (var provider : LocalFileSystemTimestampEvaluator.EP_NAME.getExtensionList()) {
-      var customTS = provider.getTimestamp(file);
-      if (customTS != null) {
-        return attributes.withTimeStamp(customTS);
-      }
-    }
-    return attributes;
+  protected static FileAttributes amendAttributes(Path file, FileAttributes attributes) {
+    return LocalFileSystemEelUtil.amendAttributes(file, attributes);
   }
 
   @Override

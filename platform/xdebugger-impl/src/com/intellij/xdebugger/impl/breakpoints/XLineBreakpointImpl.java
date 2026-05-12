@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger.impl.breakpoints;
 
 import com.intellij.openapi.editor.RangeMarker;
@@ -15,6 +15,7 @@ import com.intellij.xdebugger.XDebuggerUtil;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.breakpoints.XBreakpointProperties;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
+import com.intellij.xdebugger.breakpoints.XLineBreakpointVerticalPlacement;
 import com.intellij.xdebugger.breakpoints.XLineBreakpointType;
 import com.intellij.xdebugger.impl.proxy.MonolithBreakpointManagerKt;
 import com.intellij.xdebugger.impl.proxy.MonolithBreakpointProxyKt;
@@ -63,13 +64,18 @@ public final class XLineBreakpointImpl<P extends XBreakpointProperties> extends 
   }
 
   @Override
+  public @NotNull XLineBreakpointVerticalPlacement getPlacement() {
+    return withStateLock(() -> myState.getPlacement());
+  }
+
+  @Override
   public int getLine() {
-    return myState.getLine();
+    return withStateLock(() -> myState.getLine());
   }
 
   @Override
   public String getFileUrl() {
-    return myState.getFileUrl();
+    return withStateLock(() -> myState.getFileUrl());
   }
 
   @Override
@@ -154,6 +160,19 @@ public final class XLineBreakpointImpl<P extends XBreakpointProperties> extends 
   }
 
   @ApiStatus.Internal
+  public void setPlacement(@NotNull XLineBreakpointVerticalPlacement placement) {
+    setPlacement(-1, placement);
+  }
+
+  public void setPlacement(long requestId, @NotNull XLineBreakpointVerticalPlacement placement) {
+    updateStateIfNeededAndNotify(requestId, placement, this::getPlacement, (newPlacement) -> {
+      myState.setPlacement(newPlacement);
+      myVisualRepresentation.removeHighlighter();
+      myVisualRepresentation.redrawInlineInlays(getFile(), getLine());
+    });
+  }
+
+  @ApiStatus.Internal
   public void setLine(final int line) {
     setLine(-1, line, true);
   }
@@ -163,9 +182,6 @@ public final class XLineBreakpointImpl<P extends XBreakpointProperties> extends 
   }
 
   private void setLine(long requestId, final int line, boolean visualLineMightBeChanged) {
-    if (getLine() != line && visualLineMightBeChanged && !myType.lineShouldBeChanged(this, line, getProject())) {
-      return;
-    }
 
     updateStateIfNeededAndNotify(requestId, line, this::getLine, (l) -> {
       var oldLine = getLine();
@@ -193,7 +209,7 @@ public final class XLineBreakpointImpl<P extends XBreakpointProperties> extends 
 
   @Override
   public boolean isTemporary() {
-    return myState.isTemporary();
+    return withStateLock(() -> myState.isTemporary());
   }
 
   @Override

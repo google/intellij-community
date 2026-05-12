@@ -2,7 +2,7 @@
 package com.siyeh.ig.fixes.performance;
 
 import com.intellij.codeInspection.InspectionsBundle;
-import com.intellij.testFramework.IdeaTestUtil;
+import com.intellij.pom.java.LanguageLevel;
 import com.intellij.testFramework.builders.JavaModuleFixtureBuilder;
 import com.siyeh.InspectionGadgetsBundle;
 import com.siyeh.ig.IGQuickFixesTestCase;
@@ -28,6 +28,6 @@ public class DynamicRegexReplaceableByCompiledPatternFixTest extends IGQuickFixe
   @Override
   protected void tuneFixture(JavaModuleFixtureBuilder builder) throws Exception {
     super.tuneFixture(builder);
-    builder.addJdk(IdeaTestUtil.getMockJdk18Path().getPath());
+    builder.addJdkVersion(LanguageLevel.JDK_1_8);
   }
 }

@@ -1,19 +1,30 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.core.script.k1.ucache
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.roots.OrderRootType
+import com.intellij.openapi.util.io.toNioPathOrNull
+import com.intellij.openapi.vfs.StandardFileSystems.jar
+import com.intellij.openapi.vfs.StandardFileSystems.local
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileSystem
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.NonClasspathDirectoriesScope
+import com.intellij.util.io.URLUtil.JAR_SEPARATOR
 import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.idea.core.script.shared.HeavyScriptInfo
 import org.jetbrains.kotlin.idea.core.script.shared.LightScriptInfo
-import org.jetbrains.kotlin.idea.core.script.shared.ScriptClassPathUtil
+import org.jetbrains.kotlin.idea.core.script.v1.scriptingWarnLog
 import org.jetbrains.kotlin.scripting.resolve.ScriptCompilationConfigurationWrapper
+import java.io.File
 import java.lang.ref.SoftReference
+import kotlin.io.path.isDirectory
+import kotlin.io.path.isRegularFile
+import kotlin.io.path.notExists
+import kotlin.io.path.pathString
 
 @K1Deprecation
 class ScriptClassRootsCache(
@@ -74,7 +85,7 @@ class ScriptClassRootsCache(
     private fun computeHeavy(lightScriptInfo: LightScriptInfo): HeavyScriptInfo? {
         val configuration = lightScriptInfo.buildConfiguration() ?: return null
 
-        val vfsRoots = configuration.dependenciesClassPath.mapNotNull { ScriptClassPathUtil.Companion.findVirtualFile(it.path) }
+        val vfsRoots = configuration.dependenciesClassPath.mapNotNull { refreshAndLocateFile(it) }
         val sdk = sdks[SdkId.Companion(configuration.javaHome?.toPath())]
 
         fun heavyInfoForRoots(roots: List<VirtualFile>): HeavyScriptInfo {
@@ -98,7 +109,7 @@ class ScriptClassRootsCache(
             return if (classpathVfsHint?.containsKey(this) == true) {
                 classpathVfsHint[this]
             } else {
-                ScriptClassPathUtil.Companion.findVirtualFile(this).also { vFile ->
+                refreshIfPossibleAndFindFileByPath(this).also { vFile ->
                     classpathVfsHint?.put(this, vFile)
                 }
             }
@@ -133,9 +144,11 @@ class ScriptClassRootsCache(
 
     fun getScriptDependenciesSourceFiles(file: VirtualFile): List<VirtualFile> {
         return getHeavyScriptInfo(file.path)?.scriptConfiguration?.dependenciesSources?.mapNotNull { file ->
-            ScriptClassPathUtil.Companion.findVirtualFile(file.path)
+            refreshAndLocateFile(file)
         } ?: emptyList()
     }
+
+    private fun refreshAndLocateFile(file: File): VirtualFile? = refreshIfPossibleAndFindFileByPath(file.path)
 
     fun diff(old: ScriptClassRootsCache): Updates =
         when (old) {
@@ -216,4 +229,41 @@ class ScriptClassRootsCache(
         override val hasUpdatedScripts: Boolean get() = false
         override fun isScriptChanged(scriptPath: String): Boolean = false
     }
+}
+
+private fun refreshIfPossibleAndFindFileByPath(pathString: String): VirtualFile? {
+    val nioPath = pathString.toNioPathOrNull() ?: return null
+    return when {
+        nioPath.notExists() -> {
+            scriptingWarnLog("Invalid classpath entry '${nioPath.pathString}', notExists=true")
+            null
+        }
+
+        nioPath.isDirectory() -> {
+            refreshIfAllowedAndFindFile(local(), nioPath.pathString)
+        }
+
+        nioPath.isRegularFile() -> {
+            refreshIfAllowedAndFindFile(local(), nioPath.pathString)
+            refreshIfAllowedAndFindFile(jar(), nioPath.pathString + JAR_SEPARATOR)
+        }
+
+        else -> {
+            scriptingWarnLog("Invalid classpath entry '${nioPath.pathString}'")
+            null
+        }
+    }
+}
+
+private fun refreshIfAllowedAndFindFile(fileSystem: VirtualFileSystem, path: String): VirtualFile? {
+    val application = ApplicationManager.getApplication()
+
+    fileSystem.findFileByPath(path)?.let { return it }
+
+    //we cannot use `refreshAndFindFileByPath` under read lock
+    if (application.isDispatchThread || !application.isReadAccessAllowed) {
+        return fileSystem.refreshAndFindFileByPath(path)
+    }
+
+    return null
 }

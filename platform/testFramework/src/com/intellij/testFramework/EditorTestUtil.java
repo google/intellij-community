@@ -190,6 +190,7 @@ public final class EditorTestUtil {
       .add(CommonDataKeys.HOST_EDITOR, hostEditor)
       .add(CommonDataKeys.EDITOR, editor)
       .add(CommonDataKeys.VIRTUAL_FILE, editor.getVirtualFile())
+      .add(CommonDataKeys.PROJECT, editor.getProject())
       .build();
   }
 
@@ -360,7 +361,7 @@ public final class EditorTestUtil {
     SoftWrapApplianceManager applianceManager = model.getApplianceManager();
     applianceManager.setWidthProvider(new TestWidthProvider(visibleWidthInPixels));
     setEditorVisibleSizeInPixels(editor, visibleWidthInPixels, visibleHeightInPixels);
-    applianceManager.registerSoftWrapIfNecessary();
+    applianceManager.recalculateIfNecessary();
     return !model.getRegisteredSoftWraps().isEmpty();
   }
 

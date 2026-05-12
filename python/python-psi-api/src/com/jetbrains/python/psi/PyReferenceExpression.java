@@ -43,7 +43,7 @@ public interface PyReferenceExpression extends PyAstReferenceExpression, PyQuali
    * <i>Note: the returned list does not contain null values.</i>
    */
   default @NotNull List<QualifiedRatedResolveResult> multiFollowAssignmentsChain(@NotNull PyResolveContext resolveContext) {
-    return multiFollowAssignmentsChain(resolveContext, __ -> true);
+    return multiFollowAssignmentsChain(resolveContext, _ -> true);
   }
 
   /**

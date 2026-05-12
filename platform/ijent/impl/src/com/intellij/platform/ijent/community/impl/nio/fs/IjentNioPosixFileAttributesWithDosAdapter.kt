@@ -1,7 +1,6 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.ijent.community.impl.nio.fs
 
-import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.io.CaseSensitivityAttribute
 import com.intellij.openapi.util.io.FileAttributes
 import com.intellij.platform.eel.EelUserPosixInfo
@@ -9,6 +8,8 @@ import com.intellij.platform.ijent.community.impl.nio.EelPosixGroupPrincipal
 import com.intellij.platform.ijent.community.impl.nio.EelPosixUserPrincipal
 import com.intellij.platform.ijent.community.impl.nio.IjentNioPath
 import com.intellij.platform.ijent.community.impl.nio.IjentNioPosixFileAttributes
+import com.intellij.util.system.LowLevelLocalMachineAccess
+import com.intellij.util.system.OS
 import org.jetbrains.annotations.ApiStatus
 import java.nio.file.LinkOption
 import java.nio.file.Path
@@ -46,14 +47,10 @@ fun IjentNioPath.getCachedFileAttributesAndWrapToDosAttributesAdapter(): IjentNi
 }
 
 @ApiStatus.Internal
-internal fun IjentNioPath.getCachedFileAttributesAndWrapToDosAttributesAdapterIfNeeded(): BasicFileAttributes? {
-  if (SystemInfo.isWindows) {
-    return getCachedFileAttributesAndWrapToDosAttributesAdapter()
-  }
-  else {
-    return get()
-  }
-}
+@OptIn(LowLevelLocalMachineAccess::class)
+internal fun IjentNioPath.getCachedFileAttributesAndWrapToDosAttributesAdapterIfNeeded(): BasicFileAttributes? =
+  if (OS.CURRENT == OS.Windows) getCachedFileAttributesAndWrapToDosAttributesAdapter()
+  else get()
 
 @ApiStatus.Internal
 fun <A : BasicFileAttributes> FileSystemProvider.readAttributesUsingDosAttributesAdapter(
@@ -118,9 +115,9 @@ class IjentNioPosixFileAttributesWithDosAdapter(
 
   override fun isSystem(): Boolean = false
 
-  override fun getCaseSensitivity(): FileAttributes.CaseSensitivity {
-    if (fileInfo is CaseSensitivityAttribute) return fileInfo.caseSensitivity else return FileAttributes.CaseSensitivity.UNKNOWN
-  }
+  override fun getCaseSensitivity(): FileAttributes.CaseSensitivity =
+    if (fileInfo is CaseSensitivityAttribute) fileInfo.caseSensitivity
+    else FileAttributes.CaseSensitivity.UNKNOWN
 }
 
 @ApiStatus.Internal

@@ -1,15 +1,16 @@
 package com.intellij.database.run.ui.grid.editors;
 
 import com.intellij.database.DataGridBundle;
+import com.intellij.database.datagrid.CoreGrid;
 import com.intellij.database.datagrid.DataGrid;
+import com.intellij.database.datagrid.GridCellRequest;
+import com.intellij.database.datagrid.GridCellRequestKt;
 import com.intellij.database.datagrid.GridColumn;
-import com.intellij.database.datagrid.GridModel;
 import com.intellij.database.datagrid.GridRow;
 import com.intellij.database.datagrid.ModelIndex;
 import com.intellij.database.datagrid.ViewIndex;
 import com.intellij.database.extractors.ObjectFormatterUtil;
 import com.intellij.database.run.ReservedCellValue;
-import com.intellij.database.run.ui.DataAccessType;
 import com.intellij.database.run.ui.ResultViewWithCells;
 import com.intellij.database.run.ui.grid.renderers.DefaultBooleanRendererFactory;
 import com.intellij.database.run.ui.grid.renderers.DefaultTextRendererFactory;
@@ -73,10 +74,9 @@ public class DefaultBooleanEditorFactory implements GridCellEditorFactory {
 
 
   @Override
-  public int getSuitability(@NotNull DataGrid grid, @NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
-    int type = GridCellEditorHelper.get(grid).guessJdbcTypeForEditing(grid, row, column);
-    GridModel<GridRow, GridColumn> model = grid.getDataModel(DataAccessType.DATA_WITH_MUTATIONS);
-    GridColumn c = Objects.requireNonNull(model.getColumn(column));
+  public int getSuitability(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    int type = GridCellEditorHelper.get(request.getGrid()).guessJdbcTypeForEditing(request);
+    GridColumn c = Objects.requireNonNull(request.getColumn());
     return ObjectFormatterUtil.isBooleanColumn(c, type) ?
            SUITABILITY_MIN + 1 :
            SUITABILITY_UNSUITABLE;
@@ -88,12 +88,9 @@ public class DefaultBooleanEditorFactory implements GridCellEditorFactory {
   }
 
   @Override
-  public @NotNull GridCellEditor createEditor(@NotNull DataGrid grid,
-                                              @NotNull ModelIndex<GridRow> row,
-                                              @NotNull ModelIndex<GridColumn> column,
-                                              @Nullable Object object,
+  public @NotNull GridCellEditor createEditor(@NotNull GridCellRequest<GridRow, GridColumn> request,
                                               EventObject initiator) {
-    EnumSet<ReservedCellValue> opts = GridCellEditorHelper.get(grid).getSpecialValues(grid, column);
+    EnumSet<ReservedCellValue> opts = GridCellEditorHelper.get(request.getGrid()).getSpecialValues(request.getGrid(), request.getColumnIdx());
     KeyEvent keyEvent = ObjectUtils.tryCast(initiator, KeyEvent.class);
     Object typedValue = null;
     if (keyEvent != null) {
@@ -104,30 +101,30 @@ public class DefaultBooleanEditorFactory implements GridCellEditorFactory {
                    KeyEvent.VK_D == code && opts.contains(ReservedCellValue.DEFAULT) ? ReservedCellValue.DEFAULT :
                    KeyEvent.VK_C == code && opts.contains(ReservedCellValue.COMPUTED) ? ReservedCellValue.COMPUTED :
                    KeyEvent.VK_G == code && opts.contains(ReservedCellValue.GENERATED) ? ReservedCellValue.GENERATED :
-                   KeyEvent.VK_SPACE == code ? !Boolean.TRUE.equals(object) :
+                   KeyEvent.VK_SPACE == code ? !Boolean.TRUE.equals(request.getValue()) :
                    null;
     }
-    return grid.getAppearance().getBooleanMode() == DataGridAppearanceSettings.BooleanMode.TEXT
-           ? new TextBooleanCellEditor(grid, row, column, object == null ? ReservedCellValue.NULL : object, opts, typedValue)
-           : new CheckboxBooleanCellEditor(grid, row, column, object == null ? ReservedCellValue.NULL : object, typedValue);
+    GridCellRequest<GridRow, GridColumn> request2 =
+      request.getValue() == null ? GridCellRequestKt.overrideValue(request, ReservedCellValue.NULL) : request;
+    return ((DataGrid)request.getGrid()).getAppearance().getBooleanMode() == DataGridAppearanceSettings.BooleanMode.TEXT
+           ? new TextBooleanCellEditor(request2, opts, typedValue)
+           : new CheckboxBooleanCellEditor(request2, typedValue);
   }
 
   @Override
-  public @NotNull ValueParser getValueParser(@NotNull DataGrid grid,
-                                             @NotNull ModelIndex<GridRow> rowIdx,
-                                             @NotNull ModelIndex<GridColumn> columnIdx) {
+  public @NotNull ValueParser getValueParser(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    CoreGrid<GridRow, GridColumn> grid = request.getGrid();
+    ModelIndex<GridRow> rowIdx = request.getRowIdx();
+    ModelIndex<GridColumn> columnIdx = request.getColumnIdx();
     GridCellEditorHelper editorHelper = GridCellEditorHelper.get(grid);
     return new ValueParserWrapper(myParser, editorHelper.isNullable(grid, columnIdx),
-                                    editorHelper.getDefaultNullValue(grid, columnIdx),
-                                    (text, e) -> editorHelper.createUnparsedValue(text, e, grid, rowIdx, columnIdx));
+                                  editorHelper.getDefaultNullValue(grid, columnIdx),
+                                  (text, e) -> editorHelper.createUnparsedValue(text, e, grid, rowIdx, columnIdx));
   }
 
   @Override
-  public @NotNull GridCellEditorFactory.ValueFormatter getValueFormatter(@NotNull DataGrid grid,
-                                                                         @NotNull ModelIndex<GridRow> rowIdx,
-                                                                         @NotNull ModelIndex<GridColumn> columnIdx,
-                                                                         @Nullable Object value) {
-    return new DefaultValueToText(grid, columnIdx, value);
+  public @NotNull GridCellEditorFactory.ValueFormatter getValueFormatter(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    return new DefaultValueToText((DataGrid)request.getGrid(), request.getColumnIdx(), request.getValue());
   }
 
   private abstract static class AbstractBooleanCellEditor extends GridCellEditor.Adapter {
@@ -137,16 +134,13 @@ public class DefaultBooleanEditorFactory implements GridCellEditorFactory {
     final JComponent myComponent;
     Object myValue;
 
-    AbstractBooleanCellEditor(@NotNull DataGrid grid,
-                              @NotNull ModelIndex<GridRow> row,
-                              @NotNull ModelIndex<GridColumn> column,
-                              @NotNull Object value,
+    AbstractBooleanCellEditor(@NotNull GridCellRequest<GridRow, GridColumn> request,
                               @Nullable Object typedValue) {
-      myGrid = grid;
-      myInitialValue = value;
+      myGrid = (DataGrid)request.getGrid();
+      myInitialValue = request.getValue();
       shouldMoveFocus = typedValue == null;
       //noinspection AbstractMethodCallInConstructor
-      myComponent = createComponent(row, column, value);
+      myComponent = createComponent(request.getRowIdx(), request.getColumnIdx(), request.getValue());
       if (typedValue != null) {
         myComponent.addFocusListener(new FocusListener() {
           @Override
@@ -204,13 +198,10 @@ public class DefaultBooleanEditorFactory implements GridCellEditorFactory {
   private static final class TextBooleanCellEditor extends AbstractBooleanCellEditor {
     final EnumSet<ReservedCellValue> myAllowedValues;
 
-    private TextBooleanCellEditor(@NotNull DataGrid grid,
-                                  @NotNull ModelIndex<GridRow> row,
-                                  @NotNull ModelIndex<GridColumn> column,
-                                  @NotNull Object value,
+    private TextBooleanCellEditor(@NotNull GridCellRequest<GridRow, GridColumn> request,
                                   @NotNull EnumSet<ReservedCellValue> allowedValues,
                                   @Nullable Object typedValue) {
-      super(grid, row, column, value, typedValue);
+      super(request, typedValue);
       myAllowedValues = allowedValues;
       if (typedValue == null) {
         Ref<Boolean> popupShown = new Ref<>(false);
@@ -310,14 +301,11 @@ public class DefaultBooleanEditorFactory implements GridCellEditorFactory {
 
   private static class CheckboxBooleanCellEditor extends AbstractBooleanCellEditor {
 
-    CheckboxBooleanCellEditor(@NotNull DataGrid grid,
-                              @NotNull ModelIndex<GridRow> row,
-                              @NotNull ModelIndex<GridColumn> column,
-                              @NotNull Object value,
+    CheckboxBooleanCellEditor(@NotNull GridCellRequest<GridRow, GridColumn> request,
                               @Nullable Object typedValue) {
-      super(grid, row, column, value, typedValue != null
+      super(request, typedValue != null
                                       ? typedValue
-                                      : Boolean.TRUE.equals(value)
+                                      : Boolean.TRUE.equals(request.getValue())
                                         ? Boolean.FALSE
                                         : Boolean.TRUE);
     }

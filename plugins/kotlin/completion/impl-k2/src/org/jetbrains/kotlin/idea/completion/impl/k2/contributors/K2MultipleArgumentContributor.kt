@@ -8,6 +8,7 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.components.KaScopeKind
 import org.jetbrains.kotlin.analysis.api.components.resolveToCallCandidates
+import org.jetbrains.kotlin.analysis.api.components.upperBoundIfFlexible
 import org.jetbrains.kotlin.analysis.api.resolution.KaCallCandidateInfo
 import org.jetbrains.kotlin.analysis.api.resolution.KaFunctionCall
 import org.jetbrains.kotlin.analysis.api.signatures.KaFunctionSignature
@@ -16,6 +17,7 @@ import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.isPossiblySubTypeOf
 import org.jetbrains.kotlin.idea.completion.api.serialization.SerializableInsertHandler
 import org.jetbrains.kotlin.idea.completion.impl.k2.K2CompletionSectionContext
+import org.jetbrains.kotlin.idea.completion.impl.k2.K2CompletionSetupScope
 import org.jetbrains.kotlin.idea.completion.impl.k2.K2SimpleCompletionContributor
 import org.jetbrains.kotlin.idea.completion.impl.k2.handlers.K2SmartCompletionTailOffsetProviderImpl
 import org.jetbrains.kotlin.idea.completion.impl.k2.handlers.Tail
@@ -39,6 +41,10 @@ internal class K2MultipleArgumentContributor : K2SimpleCompletionContributor<Kot
     KotlinNameReferencePositionContext::class
 ) {
 
+    override fun K2CompletionSetupScope<KotlinNameReferencePositionContext>.isAppropriatePosition(): Boolean {
+        return position.nameExpression.getAppropriateCallParent() != null
+    }
+
     context(_: KaSession, context: K2CompletionSectionContext<KotlinNameReferencePositionContext>)
     override fun shouldExecute(): Boolean {
         return context.positionContext.explicitReceiver == null
@@ -59,6 +65,8 @@ internal class K2MultipleArgumentContributor : K2SimpleCompletionContributor<Kot
                 val valueArgumentList = nameExpressionParent.parent as? KtValueArgumentList ?: return null
                 // This contributor is only enabled for the last argument of either calls or array access expressions
                 if (valueArgumentList.arguments.lastOrNull() != nameExpressionParent) return null
+                // We do not want to complete positional arguments if a named argument is already present
+                if (valueArgumentList.arguments.any { it.isNamed() }) return null
                 valueArgumentList.parent as? KtElement
             }
 
@@ -94,7 +102,7 @@ internal class K2MultipleArgumentContributor : K2SimpleCompletionContributor<Kot
             // For this contributor, we need at least 2 missing arguments
             if (missingValueParameters.size <= 1) continue
 
-            val missingArgumentMapping = missingValueParameters.associateBy({ it.name }, { it.returnType })
+            val missingArgumentMapping = missingValueParameters.associateBy({ it.name }, { it.returnType.upperBoundIfFlexible() })
 
             signatures.add(MissingArgumentData(applicableCandidate.signature, missingArgumentMapping))
         }

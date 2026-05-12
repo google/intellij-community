@@ -9,6 +9,7 @@ import com.intellij.find.findUsages.PsiElement2UsageTargetAdapter;
 import com.intellij.java.refactoring.JavaRefactoringBundle;
 import com.intellij.lang.findUsages.DescriptiveNameUtil;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.fileTypes.BinaryFileTypeDecompilers;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.util.text.StringUtil;
@@ -50,6 +51,7 @@ import com.intellij.psi.PsiVariable;
 import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.psi.codeStyle.JavaCodeStyleManager;
 import com.intellij.psi.codeStyle.VariableKind;
+import com.intellij.psi.impl.compiled.ClsElementImpl;
 import com.intellij.psi.javadoc.PsiDocComment;
 import com.intellij.psi.search.searches.ClassInheritorsSearch;
 import com.intellij.psi.util.InheritanceUtil;
@@ -831,7 +833,16 @@ public final class InheritanceToDelegationProcessor extends BaseRefactoringProce
             PsiMethod outerMethod = MethodSignatureUtil.findMethodBySignature(myClass, signature, false);
             if (outerMethod == null) {
               String visibility = checkOuterClassAbstractMethod(signature);
-              PsiMethod newOuterMethod = (PsiMethod)myClass.add(myMethod);
+              PsiMethod newOuterMethod;
+              if (myMethod instanceof ClsElementImpl clsElement) {
+                StringBuilder buffer = new StringBuilder();
+                clsElement.appendMirrorText(0, buffer);
+                PsiMethod methodCopy = myFactory.createMethodFromText(buffer.toString(), myMethod);
+                newOuterMethod = (PsiMethod)myClass.add(methodCopy);
+              }
+              else {
+                newOuterMethod = (PsiMethod)myClass.add(myMethod);
+              }
               PsiUtil.setModifierProperty(newOuterMethod, visibility, true);
               if (containingClass.isInterface() &&
                   !innerClass.isInterface() &&

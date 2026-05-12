@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.dsl
 
 import com.intellij.psi.PsiMethod
@@ -6,7 +6,8 @@ import org.gradle.util.GradleVersion
 import org.jetbrains.plugins.gradle.service.resolve.GradleCommonClassNames.GRADLE_API_JAVA_PLUGIN_CONVENTION
 import org.jetbrains.plugins.gradle.testFramework.GradleCodeInsightTestCase
 import org.jetbrains.plugins.gradle.testFramework.annotations.AllGradleVersionsSource
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatTopLevelJavaConventionsIsSupported
+import org.jetbrains.plugins.gradle.testFramework.util.TOP_LEVEL_JAVA_CONVENTIONS_SUPPORTED_VERSIONS
+import org.jetbrains.plugins.gradle.tooling.annotation.TargetVersions
 import org.junit.jupiter.params.ParameterizedTest
 
 class GradleConventionsTest : GradleCodeInsightTestCase() {
@@ -16,8 +17,8 @@ class GradleConventionsTest : GradleCodeInsightTestCase() {
     "<caret>docsDir",
     "project.<caret>docsDir"
   """)
+  @TargetVersions(TOP_LEVEL_JAVA_CONVENTIONS_SUPPORTED_VERSIONS)
   fun `test property read`(gradleVersion: GradleVersion, decorator: String, expression: String) {
-    assumeThatTopLevelJavaConventionsIsSupported(gradleVersion)
     testJavaProject(gradleVersion) {
       testBuildscript(decorator, expression) {
         methodTest(resolveTest(PsiMethod::class.java), "getDocsDir", GRADLE_API_JAVA_PLUGIN_CONVENTION)
@@ -27,8 +28,8 @@ class GradleConventionsTest : GradleCodeInsightTestCase() {
 
   @ParameterizedTest
   @AllGradleVersionsSource(PROJECT_CONTEXTS)
+  @TargetVersions(TOP_LEVEL_JAVA_CONVENTIONS_SUPPORTED_VERSIONS)
   fun `test property write`(gradleVersion: GradleVersion, decorator: String) {
-    assumeThatTopLevelJavaConventionsIsSupported(gradleVersion)
     testJavaProject(gradleVersion) {
       testBuildscript(decorator, "<caret>sourceCompatibility = 42") {
         methodTest(resolveTest(PsiMethod::class.java), "setSourceCompatibility", GRADLE_API_JAVA_PLUGIN_CONVENTION)
@@ -39,8 +40,8 @@ class GradleConventionsTest : GradleCodeInsightTestCase() {
   // this test is wrong and exists only to preserve current behaviour and to fail when behaviour changes
   @ParameterizedTest
   @AllGradleVersionsSource(PROJECT_CONTEXTS)
+  @TargetVersions(TOP_LEVEL_JAVA_CONVENTIONS_SUPPORTED_VERSIONS)
   fun `test setter method`(gradleVersion: GradleVersion, decorator: String) {
-    assumeThatTopLevelJavaConventionsIsSupported(gradleVersion)
     testJavaProject(gradleVersion) {
       testBuildscript(decorator, "<caret>targetCompatibility('1.8')") {
         setterMethodTest("targetCompatibility", "setTargetCompatibility", GRADLE_API_JAVA_PLUGIN_CONVENTION)

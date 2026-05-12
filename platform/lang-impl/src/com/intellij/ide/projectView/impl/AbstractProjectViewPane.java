@@ -50,9 +50,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.ExtensionPointListener;
 import com.intellij.openapi.extensions.PluginDescriptor;
 import com.intellij.openapi.extensions.ProjectExtensionPointName;
-import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx;
-import com.intellij.openapi.fileEditor.impl.FileEditorManagerImpl;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleUtilCore;
 import com.intellij.openapi.module.UnloadedModuleDescription;
@@ -96,7 +94,6 @@ import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.JBIterable;
 import com.intellij.util.ui.EmptyIcon;
 import com.intellij.util.ui.ImageUtil;
-import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.tree.TreeUtil;
 import one.util.streamex.StreamEx;
 import org.jdom.Element;
@@ -117,11 +114,9 @@ import javax.swing.JLabel;
 import javax.swing.JTree;
 import javax.swing.SwingConstants;
 import javax.swing.event.TreeExpansionEvent;
-import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
@@ -343,6 +338,7 @@ public abstract class AbstractProjectViewPane implements UiCompatibleDataProvide
 
   public abstract void select(Object element, VirtualFile file, boolean requestFocus);
 
+  @ApiStatus.Internal
   @NotNull
   public final ActionCallback selectWithCallback(@Nullable Object element, @Nullable VirtualFile file, boolean requestFocus) {
     if (this instanceof ProjectViewPaneWithAsyncSelect async) {
@@ -352,18 +348,6 @@ public abstract class AbstractProjectViewPane implements UiCompatibleDataProvide
       select(element, file, requestFocus);
       return ActionCallback.DONE;
     }
-  }
-
-  public void selectModule(@NotNull Module module, final boolean requestFocus) {
-    doSelectModuleOrGroup(module, requestFocus);
-  }
-
-  private void doSelectModuleOrGroup(@NotNull Object toSelect, final boolean requestFocus) {
-    throw new UnsupportedOperationException("Not implemented");
-  }
-
-  public void selectModuleGroup(@NotNull ModuleGroup moduleGroup, boolean requestFocus) {
-    doSelectModuleOrGroup(moduleGroup, requestFocus);
   }
 
   public TreePath @Nullable [] getSelectionPaths() {
@@ -496,13 +480,6 @@ public abstract class AbstractProjectViewPane implements UiCompatibleDataProvide
   @Deprecated(forRemoval = true)
   public final @Nullable NodeDescriptor<?> getSelectedDescriptor() {
     return TreeUtil.getLastUserObject(NodeDescriptor.class, getSelectedPath());
-  }
-
-  /** @deprecated Use {@link #getSelectedPath} */
-  @Deprecated(forRemoval = true)
-  public final DefaultMutableTreeNode getSelectedNode() {
-    TreePath path = getSelectedPath();
-    return path == null ? null : ObjectUtils.tryCast(path.getLastPathComponent(), DefaultMutableTreeNode.class);
   }
 
   /** @deprecated Use {@link #getSelectedUserObjects()} and {@link #getElementsFromNode(Object)} */
@@ -986,57 +963,46 @@ public abstract class AbstractProjectViewPane implements UiCompatibleDataProvide
 
   protected void beforeDnDLeave() { }
 
-  @ApiStatus.Internal
   public boolean supportsAbbreviatePackageNames() {
     return true;
   }
 
-  @ApiStatus.Internal
   public boolean supportsCompactDirectories() {
     return false;
   }
 
-  @ApiStatus.Internal
   public boolean supportsFlattenModules() {
     return false;
   }
 
-  @ApiStatus.Internal
   public boolean supportsFoldersAlwaysOnTop() {
     return true;
   }
 
-  @ApiStatus.Internal
   public boolean supportsHideEmptyMiddlePackages() {
     return true;
   }
 
-  @ApiStatus.Internal
   public boolean supportsShowExcludedFiles() {
     return false;
   }
 
-  @ApiStatus.Internal
   public boolean supportsShowLibraryContents() {
     return false;
   }
 
-  @ApiStatus.Internal
   public boolean supportsShowModules() {
     return false;
   }
 
-  @ApiStatus.Internal
   public boolean supportsShowScratchesAndConsoles() {
     return false;
   }
 
-  @ApiStatus.Internal
   public boolean supportsSortByType() {
     return true;
   }
 
-  @ApiStatus.Internal
   public boolean supportsSortByTime() {
     return true;
   }
@@ -1048,14 +1014,6 @@ public abstract class AbstractProjectViewPane implements UiCompatibleDataProvide
       case BY_TYPE -> supportsSortByType();
       case BY_TIME_DESCENDING, BY_TIME_ASCENDING -> supportsSortByTime();
     };
-  }
-
-  private static @NotNull Color getFileForegroundColor(@NotNull Project project, @NotNull VirtualFile file) {
-    FileEditorManager manager = FileEditorManager.getInstance(project);
-    if (manager instanceof FileEditorManagerImpl) {
-      return ((FileEditorManagerImpl)manager).getFileColor(file);
-    }
-    return UIUtil.getLabelForeground();
   }
 
   private final class MyDragSource implements DnDSource {
@@ -1086,7 +1044,7 @@ public abstract class AbstractProjectViewPane implements UiCompatibleDataProvide
       return new DnDDragStartBean(new TransferableWrapper() {
         @Override
         public List<File> asFileList() {
-          return ReadAction.compute(() -> PsiCopyPasteManager.asFileList(psiElements));
+          return ReadAction.computeBlocking(() -> PsiCopyPasteManager.asFileList(psiElements));
         }
 
         @Override
@@ -1237,6 +1195,7 @@ public abstract class AbstractProjectViewPane implements UiCompatibleDataProvide
    * @deprecated temporary API
    */
   @TestOnly
+  @ApiStatus.Internal
   @Deprecated(forRemoval = true)
   public @NotNull Promise<TreePath> promisePathToElement(@NotNull Object element) {
     TreeVisitor visitor = createVisitor(element);
@@ -1350,6 +1309,7 @@ public abstract class AbstractProjectViewPane implements UiCompatibleDataProvide
     public void treeCollapsed(TreeExpansionEvent event) { }
   }
 
+  @ApiStatus.Internal
   public interface ProjectViewPaneWithAsyncSelect {
     @NotNull ActionCallback selectCB(Object element, VirtualFile file, boolean requestFocus);
   }

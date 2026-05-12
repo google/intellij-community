@@ -3,6 +3,7 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tests",
+  module_name = "intellij.tasks.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -16,7 +17,6 @@ jvm_library(
     "//libraries/xml-rpc",
     "//spellchecker",
     "//java/debugger/openapi:java-debugger",
-    "//plugins/xslt-debugger",
     "//libraries/gson",
     "//platform/core-ui",
   ]
@@ -24,9 +24,12 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "intellij.tasks.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
+  resources = glob(["testResources/**/*"]),
+  resource_strip_prefix = "testResources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/analysis-api:analysis_test_lib",
@@ -36,6 +39,8 @@ jvm_library(
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//platform/projectModel-api:projectModel",
     "//platform/projectModel-api:projectModel_test_lib",
+    "//platform/lang-api:lang",
+    "//platform/lang-api:lang_test_lib",
     "//plugins/tasks/tasks-api:tasks",
     "//plugins/tasks/tasks-api:tasks_test_lib",
     "//plugins/tasks/tasks-core:core",
@@ -50,6 +55,7 @@ jvm_library(
     "//platform/vcs-api:vcs_test_lib",
     "@lib//:junit4",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//platform/dvcs-impl:vcs-dvcs-impl",
     "//platform/dvcs-impl:vcs-dvcs-impl_test_lib",
     "//java/testFramework",
@@ -60,8 +66,6 @@ jvm_library(
     "//libraries/xml-rpc:xml-rpc_test_lib",
     "//java/debugger/openapi:java-debugger",
     "//java/debugger/openapi:java-debugger_test_lib",
-    "//plugins/xslt-debugger",
-    "//plugins/xslt-debugger:xslt-debugger_test_lib",
     "//platform/xdebugger-impl:debugger-impl",
     "//platform/xdebugger-impl:debugger-impl_test_lib",
     "//libraries/gson",
@@ -84,13 +88,18 @@ jvm_library(
     "@lib//:objenesis",
     "//libraries/http-client",
     "//libraries/http-client:http-client_test_lib",
-    "@lib//:assert_j",
+    "//libraries/assertj-core",
+    "//libraries/assertj-core:assertj-core_test_lib",
     "//libraries/stream",
     "//libraries/stream:stream_test_lib",
     "//platform/core-ui",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/util/jdom",
     "//platform/util/jdom:jdom_test_lib",
+    "//platform/util:util-ui",
+    "//platform/util:util-ui_test_lib",
     "//platform/bookmarks",
     "//platform/bookmarks:bookmarks_test_lib",
     "//plugins/git4idea/shared",
@@ -99,14 +108,33 @@ jvm_library(
     "//platform/dvcs-impl/shared:shared_test_lib",
     "//plugins/tasks/tasks-core/trac",
     "//plugins/tasks/tasks-core/trac:trac_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/code-style-api:codeStyle",
+    "//platform/code-style-api:codeStyle_test_lib",
+    "//platform/util/concurrency",
+    "//platform/util/concurrency:concurrency_test_lib",
+    "//platform/lang-core",
+    "//platform/lang-core:lang-core_test_lib",
+    "//plugins/git4idea:vcs-git-tests",
+    "//plugins/git4idea:vcs-git-tests_test_lib",
+    "//plugins/hg4idea:vcs-hg-tests",
+    "//plugins/hg4idea:vcs-hg-tests_test_lib",
   ],
   runtime_deps = [
     ":tests",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//spellchecker:spellchecker_test_lib",
   ]
 )
 ### auto-generated section `build intellij.tasks.tests` end
+
+### auto-generated section `iml intellij.tasks.tests` start
+exports_files([
+  "intellij.tasks.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.tasks.tests` end
 
 ### auto-generated section `test intellij.tasks.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

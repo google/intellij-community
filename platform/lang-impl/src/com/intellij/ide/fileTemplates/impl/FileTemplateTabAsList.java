@@ -36,7 +36,7 @@ abstract class FileTemplateTabAsList extends FileTemplateTab {
         label.setText(value.getFileName().isEmpty() ? IdeBundle.message("label.empty.file.name") : value.getFileName());  //NON-NLS
       }
     }));
-    myList.addListSelectionListener(__ -> onTemplateSelected());
+    myList.addListSelectionListener(_ -> onTemplateSelected());
     ListSpeedSearch.installOn(myList, FileTemplate::getName);
   }
 

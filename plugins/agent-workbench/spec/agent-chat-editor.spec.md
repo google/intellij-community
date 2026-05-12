@@ -1,135 +1,81 @@
 ---
 name: Agent Chat Editor
-description: Requirements for Agent chat editor tab lifecycle, persistence/restore, and terminal-backed initialization.
+description: Requirements for Agent Chat editor tab identity, restore, lifecycle, terminal integration, and pending context send behavior.
 targets:
-  - ../chat/src/*.kt
-  - ../chat/resources/intellij.agent.workbench.chat.xml
+  - ../chat/src/**/*.kt
+  - ../chat/resources/**/*.xml
   - ../chat/resources/messages/AgentChatBundle.properties
-  - ../common/src/icons/*.java
-  - ../sessions/src/*.kt
-  - ../sessions/resources/intellij.agent.workbench.sessions.xml
-  - ../sessions/resources/messages/AgentSessionsBundle.properties
-  - ../plugin/resources/META-INF/plugin.xml
-  - ../plugin-content.yaml
   - ../chat/testSrc/*.kt
+  - ../sessions/src/service/*.kt
   - ../sessions/testSrc/*.kt
 ---
 
 # Agent Chat Editor
 
 Status: Draft
-Date: 2026-02-22
+Date: 2026-05-09
 
 ## Summary
-Define how Agent chat tabs are opened, restored, reused, and rendered in editor tabs. This spec owns tab lifecycle and persistence behavior. Shared command mapping and shared editor-tab popup action semantics are owned by `spec/agent-core-contracts.spec.md`.
-
-## Goals
-- Open and reuse chat tabs deterministically from thread/sub-agent selection.
-- Restore all previously open Agent chat tabs across restart using protocol-backed virtual files.
-- Keep startup responsive through lazy terminal-session initialization.
-- Keep tab titles/icons stable and refreshable as session data evolves.
-
-## Non-goals
-- Defining sessions aggregation and tree-state behavior.
-- Defining dedicated-frame routing policy details.
-- Defining provider command mapping and shared popup-action contracts.
+Agent Chat tabs are protocol-backed editor tabs around terminal-backed agent sessions. This spec owns tab identity, restore, terminal lifetime, editor presentation, file drop, and pending-context send behavior.
 
 ## Requirements
-- Agent Workbench modules must register:
-  - `fileEditorProvider` for Agent chat files,
-  - `virtualFileSystem` key `agent-chat`,
-  - `editorTabTitleProvider` for Agent chat tabs.
+- Agent Chat registers an async file editor provider, virtual file system key `agent-chat`, and editor-tab title/icon providers.
   [@test] ../chat/testSrc/AgentChatFileEditorProviderTest.kt
 
-- Chat editor opening must use `AsyncFileEditorProvider` and terminal reworked frontend integration (`TerminalToolWindowTabsManager`) with `shouldAddToToolWindow(false)`.
+- Chat virtual files use v2 URLs `agent-chat://2/<tabKey>`, where `tabKey` is a lowercase base36 SHA-256 digest over full tab identity. Full restore metadata is stored in app-level cache state keyed by `tabKey`.
   [@test] ../chat/testSrc/AgentChatEditorServiceTest.kt
 
-- Chat tabs must reuse an existing tab for the same canonical thread identity (`provider:threadId`) and `subAgentId` when present.
+- Opening a chat must reuse an existing tab for the same canonical thread identity and sub-agent id. Already-open top-level concrete tabs are addressable by normalized path, provider, and thread id for ordered post-start dispatch.
+  [@test] ../chat/testSrc/AgentChatEditorServiceTest.kt
+  [@test] ../chat/testSrc/AgentChatOpenTopLevelDispatchTest.kt
+
+- Restore must restore all previously open Agent Chat tabs, prune stale/invalid tab state, and use persisted title/activity only as bootstrap fallback until live shared thread presentation is available.
   [@test] ../chat/testSrc/AgentChatEditorServiceTest.kt
 
-- Agent chat virtual files must use protocol-backed v2 URLs: `agent-chat://2/<tabKey>`.
-  [@test] ../chat/testSrc/AgentChatEditorServiceTest.kt
-
-- `tabKey` must be lowercase base36 (`0-9a-z`) encoding of SHA-256 digest over full tab identity.
-  [@test] ../chat/testSrc/AgentChatEditorServiceTest.kt
-
-- Restore metadata must be persisted in app-level cache-file-backed `AgentChatTabsStateService` keyed by `tabKey`.
-  [@test] ../chat/testSrc/AgentChatEditorServiceTest.kt
-
-- Persisted tab-state payload must include project hash/path, thread identity/sub-agent, thread id, shell command, title, activity, and updated timestamp.
-  [@test] ../chat/testSrc/AgentChatEditorServiceTest.kt
-
-- Chat restore must restore all previously open Agent chat tabs, not only the selected one.
-  [@test] ../chat/testSrc/AgentChatEditorServiceTest.kt
-
-- Persisted tab-state entries are canonical restore source; legacy descriptor URL format and legacy `<config>/agent-workbench-chat-frame/tabs/*.awchat.json` metadata are out of compatibility scope and may be removed best-effort.
-  [@test] ../chat/testSrc/AgentChatEditorServiceTest.kt
-
-- Stale or invalid tab-state entries must be pruned periodically.
-  [@test] ../chat/testSrc/AgentChatEditorServiceTest.kt
-
-- Terminal content initialization must be lazy:
-  - lightweight tab/editor shell is created immediately,
-  - terminal session starts only on first explicit tab selection/focus.
+- Terminal content initialization is lazy: the lightweight editor shell appears immediately, and the terminal starts only after explicit tab selection/focus.
   [@test] ../chat/testSrc/AgentChatTabSelectionServiceTest.kt
 
-- Editor tab title must come from thread title with fallback `Agent Chat`, via `EditorTabTitleProvider` (no virtual-file-name mutation dependency), and must be middle-truncated to 50 characters for presentation while tooltip keeps full title.
-  [@test] ../chat/testSrc/AgentChatEditorServiceTest.kt
+- The live terminal belongs to the logical open chat tab (`tabKey`), not a transient `FileEditor` instance. Reordering, splitter movement, detach/reattach, or editor recreation must not restart the live terminal.
+  [@test] ../chat/testSrc/AgentChatFileEditorLifecycleTest.kt
+  [@test] ../chat/testSrc/AgentChatTerminalTabCloseTest.kt
+
+- Agent Chat files are unsplittable. Closing the final chat file releases terminal resources; disposing a transient editor instance releases only editor-local controllers.
   [@test] ../chat/testSrc/AgentChatFileEditorProviderTest.kt
+  [@test] ../chat/testSrc/AgentChatFileEditorLifecycleTest.kt
 
-- Reopening an already-open tab with a newer thread title must update existing tab presentation.
-  [@test] ../chat/testSrc/AgentChatEditorServiceTest.kt
+- Dropping files onto the terminal area pastes ordered file paths without executing; dropping files onto the pending context panel creates a pending `Files` context chip.
+  [@test] ../chat/testSrc/AgentChatFileDropSupportTest.kt
 
-- Editor tab icon must be provider-specific using canonical identity and must include activity badge mapping; unknown provider must use default chat icon and unknown activity must default to `READY`.
+- `Add to Agent Context` into an open top-level concrete chat adds de-duplicated pending context and does not mutate terminal input until the user submits.
+  [@test] ../chat/testSrc/AgentChatOpenTopLevelDispatchTest.kt
+
+- Plain Enter with pending context sends the current terminal prompt plus one `### IDE Context` envelope, then clears pending context only after the terminal accepts the send. Context over the soft cap requires explicit send-full, auto-trim, or cancel.
+  [@test] ../chat/testSrc/AgentChatOpenTopLevelDispatchTest.kt
+
+- Concrete tab title/icon presentation resolves live data from shared thread presentation; sub-agent tabs keep their own stored title while inheriting parent activity.
   [@test] ../chat/testSrc/AgentChatFileEditorProviderTest.kt
-
-- Provider icon lookup in chat/editor tab providers must use shared typed icon holder (`AgentWorkbenchCommonIcons`), not inline path-based icon loading.
-  [@test] ../chat/testSrc/AgentChatFileEditorProviderTest.kt
-
-- Successful archive must close matching open chat tabs for the same normalized path + canonical thread identity and delete corresponding persisted tab-state entries.
-  [@test] ../sessions/testSrc/AgentSessionsServiceArchiveIntegrationTest.kt
   [@test] ../chat/testSrc/AgentChatEditorServiceTest.kt
 
-- Restore validation failures and terminal initialization failures must close the tab, delete the corresponding tab-state entry immediately, and surface deduplicated non-blocking warning notifications.
+- Pending-thread and concrete `/new` rebinding follow `spec/actions/codex-thread-rebinding.spec.md`.
+
+- Initial prompt dispatch is readiness-gated and follows shared command/dispatch contracts in `spec/agent-core-contracts.spec.md`.
+  [@test] ../chat/testSrc/AgentChatFileEditorLifecycleTest.kt
+  [@test] ../sessions/testSrc/AgentSessionPromptLauncherBridgeTest.kt
+
+- Archive of a matching top-level thread closes the open chat tab and removes persisted tab state.
+  [@test] ../sessions/testSrc/AgentSessionArchiveServiceIntegrationTest.kt
   [@test] ../chat/testSrc/AgentChatEditorServiceTest.kt
 
-- Terminal initialization failures caused by command lookup must include actionable warning text with attempted command and startup `PATH` snapshot when available.
+- Restore validation and terminal initialization failures close the tab, delete its tab state, and emit de-duplicated warning notifications. Command lookup failures include the attempted command and startup `PATH` snapshot when available.
   [@test] ../chat/testSrc/AgentChatRestoreNotificationServiceTest.kt
 
-- Dedicated-frame vs current-project target frame selection must follow `spec/agent-dedicated-frame.spec.md`.
-  [@test] ../sessions/testSrc/AgentSessionsOpenModeRoutingTest.kt
-
-- Shared command mapping and editor-tab popup action contract must follow `spec/agent-core-contracts.spec.md`.
-  [@test] ../sessions/testSrc/AgentSessionCliTest.kt
-  [@test] ../sessions/testSrc/AgentSessionsEditorTabActionsTest.kt
-
-## User Experience
-- Clicking a thread opens its chat tab.
-- Clicking a sub-agent opens a separate tab scoped to that sub-agent.
-- Restored tabs appear immediately, while terminal startup is deferred until first explicit selection.
-
-## Data & Backend
-- Chat terminal sessions use source project/worktree `cwd`.
-- Sessions service provides identity and command inputs to chat open flow.
-- URL path carries only short stable `tabKey`; full restore payload is read from state service.
-
-## Error Handling
-- Invalid project path or project-open failure must not crash UI or open a broken tab.
-- Missing/invalid identity context must fail safely without editor-tab corruption.
-- Restore/initialization warning notifications must be deduplicated per tab+reason for the IDE session.
-- Command lookup failures should expose actionable diagnostics (command + startup `PATH`) without adding fallback launch behavior.
-
 ## Testing / Local Run
-- `./tests.cmd '-Dintellij.build.test.patterns=com.intellij.agent.workbench.chat.AgentChatEditorServiceTest'`
-- `./tests.cmd '-Dintellij.build.test.patterns=com.intellij.agent.workbench.chat.AgentChatFileEditorProviderTest'`
-- `./tests.cmd '-Dintellij.build.test.patterns=com.intellij.agent.workbench.chat.AgentChatTabSelectionServiceTest'`
-- `./tests.cmd '-Dintellij.build.test.patterns=com.intellij.agent.workbench.chat.AgentChatRestoreNotificationServiceTest'`
-- `./tests.cmd '-Dintellij.build.test.patterns=com.intellij.agent.workbench.sessions.AgentSessionsOpenModeRoutingTest'`
-
-## Open Questions / Risks
-- If product policy changes restart-restore scope (for example single-tab restore), this spec requires explicit revision and migration behavior.
+- `./tests.cmd --module intellij.agent.workbench.chat.tests --test "com.intellij.agent.workbench.chat.AgentChat*Test"`
+- `./tests.cmd --module intellij.agent.workbench.sessions.tests --test com.intellij.agent.workbench.sessions.AgentSessionPromptLauncherBridgeTest`
+- `./tests.cmd --module intellij.agent.workbench.sessions.tests --test com.intellij.agent.workbench.sessions.AgentSessionArchiveServiceIntegrationTest`
 
 ## References
 - `spec/agent-core-contracts.spec.md`
-- `spec/agent-dedicated-frame.spec.md`
+- `spec/actions/codex-thread-rebinding.spec.md`
+- `spec/actions/add-to-agent-context.spec.md`
 - `spec/agent-sessions.spec.md`

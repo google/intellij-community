@@ -64,8 +64,8 @@ internal fun withCallableSignatureInfo(
     .withTypeText(getTypeTextForCallable(signature, treatAsFunctionCall = elementBuilder.`object` is FunctionCallLookupObject))
     .withStrikeoutness(signature.symbol.requireStrikeoutness())
 
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class)
+context(_: KaSession)
 private fun KaDeclarationSymbol.requireStrikeoutness(): Boolean = when {
     deprecationStatus != null -> true
     this is KaPropertySymbol -> getterDeprecationStatus != null && (isVal || setterDeprecationStatus != null)

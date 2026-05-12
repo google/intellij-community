@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diff.merge
 
 import com.intellij.diff.InvalidDiffRequestException
@@ -31,6 +31,7 @@ import com.intellij.util.EventDispatcher
 import com.intellij.util.concurrency.annotations.RequiresBlockingContext
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.concurrency.annotations.RequiresWriteLock
+import it.unimi.dsi.fastutil.ints.IntArrayList
 import it.unimi.dsi.fastutil.ints.IntList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -62,6 +63,8 @@ class MergeConflictModel(
     private set
 
   var contentModified: Boolean = false
+  var wasReviewed: Boolean = false
+    private set
 
   @RequiresBlockingContext
   @Throws(DiffTooBigException::class, InvalidDiffRequestException::class)
@@ -127,6 +130,7 @@ class MergeConflictModel(
 
   fun getAllChanges(): List<TextMergeChange> = mergeChanges.toList()
   fun getUnresolvedChanges(): List<TextMergeChange> = mergeChanges.filterNot { it.isResolved }
+  fun getResolvedChanges(): List<TextMergeChange> = mergeChanges.filter { it.isResolved }
   fun getAutoResolvableChanges(): List<TextMergeChange> = mergeChanges.filter { canResolveChangeAutomatically(it.index, ThreeSide.BASE) }
   fun getImportChanges(): List<TextMergeChange> = mergeChanges.filter { it.isImportChange }
   fun getSemanticallyResolvableChanges(): List<TextMergeChange> = getAutoResolvableChanges()
@@ -149,6 +153,42 @@ class MergeConflictModel(
     else {
       markChangeResolved(change, side)
     }
+  }
+
+  @RequiresWriteLock
+  fun resolveAllChangesAutomatically() {
+    val autoResolvableChanges = getAutoResolvableChanges()
+    if (autoResolvableChanges.isEmpty()) return
+    val affected = autoResolvableChanges.mapTo(IntArrayList()) { it.index }
+    val success = executeMergeCommand(
+      DiffBundle.message("action.presentation.merge.resolve.automatically.text"),
+      null,
+      UndoConfirmationPolicy.DEFAULT,
+      true,
+      affected
+    ) {
+      autoResolvableChanges.forEach { change: TextMergeChange -> resolveChangeAutomatically(change.index, ThreeSide.BASE) }
+    }
+    if (success) {
+      wasReviewed = false
+    }
+  }
+
+  fun acceptRevisionForSide(side: Side) {
+    val affected = getAllChanges().mapTo(IntArrayList()) { it.index }
+
+    executeMergeCommand(commandName = DiffBundle.message("merge.dialog.resolve.conflict.command"),
+                        commandGroupId = null,
+                        undoConfirmationPolicy = UndoConfirmationPolicy.DEFAULT,
+                        bulkUpdate = true,
+                        affectedIndexes = affected) {
+      resetAllChanges()
+      replaceAllChanges(side)
+    }
+  }
+
+  fun markReviewed() {
+    wasReviewed = true
   }
 
   @RequiresWriteLock
@@ -208,6 +248,7 @@ class MergeConflictModel(
     val baseContent = DiffUtil.getLines(content, startLine, endLine)
 
     resultModel.replaceChange(change.index, baseContent)
+    fireChangeReset(change)
     change.resetState()
     resultModel.invalidateChange(change.index)
   }
@@ -364,8 +405,11 @@ class MergeConflictModel(
     affectedIndexes: IntList?,
     task: () -> Unit,
   ): Boolean {
-    contentModified = true
-    return resultModel.executeMergeCommand(commandName, commandGroupId, undoConfirmationPolicy, bulkUpdate, affectedIndexes, task)
+    return resultModel.executeMergeCommand(commandName, commandGroupId, undoConfirmationPolicy, bulkUpdate, affectedIndexes, task).also {
+      if (it) {
+        contentModified = true
+      }
+    }
   }
 
   private fun getByIndex(index: Int): TextMergeChange {
@@ -406,6 +450,7 @@ class MergeConflictModel(
   private fun fireChangeResolved(change: TextMergeChange) = fireEvent(MergeEvent.ChangeResolved(change))
   private fun fireChangeProcessed(change: TextMergeChange) = fireEvent(MergeEvent.ChangeProcessed(change))
   private fun fireBulkProcessingFinished() = fireEvent(MergeEvent.BulkProcessingFinished)
+  private fun fireChangeReset(change: TextMergeChange) = fireEvent(MergeEvent.ChangeReset(change))
 }
 
 @ApiStatus.Internal
@@ -427,6 +472,9 @@ sealed class MergeEvent {
 
   @ApiStatus.Internal
   class ChangeSideResolved(val change: TextMergeChange, val side: Side) : MergeEvent()
+
+  @ApiStatus.Internal
+  class ChangeReset(val change: TextMergeChange) : MergeEvent()
 
   @ApiStatus.Internal
   class ChangeProcessed(val change: TextMergeChange) : MergeEvent()

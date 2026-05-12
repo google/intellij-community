@@ -12,6 +12,7 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.util.TextRange
+import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.tree.IElementType
 import com.intellij.psi.util.PsiTreeUtil
@@ -51,6 +52,11 @@ abstract class BaseToggleStateAction: ToggleAction(), DumbAware {
     val file = event.getData(CommonDataKeys.PSI_FILE) ?: return false
     val caretSnapshots = SelectionUtil.obtainCaretSnapshots(this, event)?.asSequence() ?: return false
     val selectionElements = caretSnapshots.map { getElementsUnderCaretOrSelection(file, it.selectionStart, it.selectionEnd) }
+    if (shouldIgnoreCodeSpanElement(selectionElements)) {
+      event.presentation.isEnabled = false
+      return false
+    }
+
     val commonParents = selectionElements.map { (left, right) -> getCommonParentOfType(left, right, targetNodeType) }
     val hasMissingParents = commonParents.any { it == null }
     val hasValidParents = commonParents.any { it != null }
@@ -154,6 +160,10 @@ abstract class BaseToggleStateAction: ToggleAction(), DumbAware {
       caret.moveCaretRelatively(boundString.length, 0, false, false)
     }
   }
+
+  private fun shouldIgnoreCodeSpanElement(selectionElements: Sequence<Pair<PsiElement, PsiElement>>) =
+    targetNodeType != MarkdownElementTypes.CODE_SPAN
+    && selectionElements.any { getCommonParentOfType(it.first, it.second, MarkdownElementTypes.CODE_SPAN) != null }
 
   companion object {
     private val elementsToIgnore = setOf(

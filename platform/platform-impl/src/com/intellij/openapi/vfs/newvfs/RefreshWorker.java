@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vfs.newvfs;
 
 import com.intellij.openapi.application.ApplicationManager;
@@ -40,6 +40,7 @@ import com.intellij.openapi.vfs.newvfs.persistent.PersistentFSImpl;
 import com.intellij.util.MathUtil;
 import com.intellij.util.SmartList;
 import com.intellij.util.TimeoutUtil;
+import com.intellij.util.concurrency.AppScheduledExecutorService;
 import com.intellij.util.concurrency.Semaphore;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.Stack;
@@ -92,8 +93,13 @@ final class RefreshWorker {
     1, Runtime.getRuntime().availableProcessors()
   );
 
-  private static final Executor executor = ExecutorsKt.asExecutor(
-    Dispatchers.getIO().limitedParallelism(PARALLELISM, "RefreshWorkerDispatcher")
+  private static final Executor rawExecutor = ExecutorsKt.asExecutor(
+      Dispatchers.getIO().limitedParallelism(PARALLELISM, "RefreshWorkerDispatcher")
+  );
+
+  /** Wraps {@link #rawExecutor} to propagate IntelliJ thread context to worker threads. */
+  private static final Executor executor = command -> rawExecutor.execute(
+    AppScheduledExecutorService.capturePropagationAndCancellationContext(command)
   );
 
   private static final Object REQUESTOR = VFileEvent.REFRESH_REQUESTOR;
@@ -197,7 +203,7 @@ final class RefreshWorker {
     }
   }
 
-  private void processQueue(List<VFileEvent> events) throws RefreshCancelledException {
+  private void processQueue(/*OutParam*/ List<VFileEvent> events) throws RefreshCancelledException {
     nextDir:
     while (!semaphore.isUp()) {
       var file = refreshQueue.poll();
@@ -207,6 +213,16 @@ final class RefreshWorker {
       }
 
       var fs = file.getFileSystem();
+
+      if (fs instanceof AsyncableFileSystem afs) {
+        //can't refresh file that has async ops still in flight => flush them:
+        try {
+          afs.fsync(file);
+        }
+        catch (IOException e) {
+          continue;
+        }
+      }
 
       try {
         if (roots.contains(file)) {
@@ -264,7 +280,7 @@ final class RefreshWorker {
 
   private boolean fullDirRefresh(List<VFileEvent> events, NewVirtualFileSystem fs, VirtualDirectoryImpl dir) {
     var t = System.nanoTime();
-    Pair<VirtualFile[], List<String>> snapshot = ReadAction.compute(() -> {
+    Pair<VirtualFile[], List<String>> snapshot = ReadAction.computeBlocking(() -> {
       VirtualFile[] children = dir.getChildren();
       return new Pair<>(children, getNames(children));
     });
@@ -352,7 +368,7 @@ final class RefreshWorker {
 
   private boolean isDirectoryChanged(VirtualDirectoryImpl dir, VirtualFile[] children, List<String> names) {
     var t = System.nanoTime();
-    var changed = ReadAction.compute(() -> {
+    var changed = ReadAction.computeBlocking(() -> {
       VirtualFile[] currentChildren = dir.getChildren();
       return !Arrays.equals(children, currentChildren) || !names.equals(getNames(currentChildren));
     });
@@ -362,7 +378,7 @@ final class RefreshWorker {
 
   private boolean partialDirRefresh(List<VFileEvent> events, NewVirtualFileSystem fs, VirtualDirectoryImpl dir) {
     var t = System.nanoTime();
-    Pair<List<VirtualFile>, List<String>> snapshot = ReadAction.compute(
+    Pair<List<VirtualFile>, List<String>> snapshot = ReadAction.computeBlocking(
       () -> new Pair<>(dir.getCachedChildren(), dir.getSuspiciousNames())
     );
     vfsTime.addAndGet(System.nanoTime() - t);
@@ -431,7 +447,7 @@ final class RefreshWorker {
 
   private boolean isDirectoryChanged(VirtualDirectoryImpl dir, List<VirtualFile> cached, List<String> wanted) {
     var t = System.nanoTime();
-    var changed = ReadAction.compute(() -> !cached.equals(dir.getCachedChildren()) || !wanted.equals(dir.getSuspiciousNames()));
+    var changed = ReadAction.computeBlocking(() -> !cached.equals(dir.getCachedChildren()) || !wanted.equals(dir.getSuspiciousNames()));
     vfsTime.addAndGet(System.nanoTime() - t);
     return changed;
   }
@@ -590,10 +606,10 @@ final class RefreshWorker {
     ChildInfo[] children = null;
     if (attributes.isDirectory() && !attributes.isSymLink() && parent.getFileSystem() instanceof LocalFileSystem) {
       try {
-        Path childPath = getChildPath(parent.getPath(), childName);
+        var childPath = getChildPath(parent.getPath(), childName);
         if (childPath != null && shouldScanDirectory(parent, childPath, childName)) {
-          List<Path> relevantExcluded = ContainerUtil.mapNotNull(ProjectManagerEx.getInstanceEx().getAllExcludedUrls(), url -> {
-            Path path = Path.of(VirtualFileManager.extractPath(url));
+          var relevantExcluded = ContainerUtil.mapNotNull(ProjectManagerEx.getInstanceEx().getAllExcludedUrls(null), url -> {
+            var path = Path.of(VirtualFileManager.extractPath(url));
             return path.startsWith(childPath) ? path : null;
           });
           var t = System.nanoTime();
@@ -627,7 +643,7 @@ final class RefreshWorker {
   private static boolean shouldScanDirectory(VirtualFile parent, Path child, String childName) {
     if (FileTypeManager.getInstance().isFileIgnored(childName)) return false;
     for (Project openProject : ProjectManager.getInstance().getOpenProjects()) {
-      if (ReadAction.compute(() -> {
+      if (ReadAction.computeBlocking(() -> {
         List<WorkspaceFileSet> indexableFileSet = WorkspaceFileIndex.getInstance(openProject)
           .findFileSets(parent, true, true, /*includeContentNonIndexableSets*/ false, true, true, /*includeExternalNonIndexableSets*/ false, true);
         return ContainerUtil.exists(indexableFileSet, set -> set instanceof WorkspaceFileSetWithCustomData && ((WorkspaceFileSetWithCustomData<?>)set).getRecursive());
@@ -743,11 +759,15 @@ final class RefreshWorker {
       long oldTimestamp = persistentFS.getTimeStamp(child), newTimestamp = childAttributes.lastModified;
       long oldLength = persistentFS.getLastRecordedLength(child), newLength = childAttributes.length;
       if (oldTimestamp != newTimestamp || oldLength != newLength) {
-        if (LOG.isTraceEnabled()) LOG.trace(
-          "update file=" + child +
-          (oldTimestamp != newTimestamp ? " TS=" + oldTimestamp + "->" + newTimestamp : "") +
-          (oldLength != newLength ? " len=" + oldLength + "->" + newLength : ""));
-        events.add(new VFileContentChangeEvent(REQUESTOR, child, child.getModificationStamp(), VFileContentChangeEvent.UNDEFINED_TIMESTAMP_OR_LENGTH, oldTimestamp, newTimestamp, oldLength, newLength));
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("update file=" + child +
+                    (oldTimestamp != newTimestamp ? " TS=" + oldTimestamp + "->" + newTimestamp : "") +
+                    (oldLength != newLength ? " len=" + oldLength + "->" + newLength : ""));
+        }
+
+        events.add(new VFileContentChangeEvent(REQUESTOR, child, child.getModificationStamp(),
+                                               VFileContentChangeEvent.UNDEFINED_TIMESTAMP_OR_LENGTH, oldTimestamp, newTimestamp,
+                                               oldLength, newLength));
       }
       child.markClean();
     }

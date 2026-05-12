@@ -43,6 +43,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.EditorNotificationPanel
 import com.intellij.ui.EditorNotifications
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
+import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.containers.MultiMap
 import com.intellij.util.io.computeDetached
 import com.intellij.util.system.CpuArch
@@ -403,6 +404,7 @@ open class PluginAdvertiserServiceImpl(
       .toList()
   }
 
+  @RequiresEdt
   private fun notifyUser(
     bundledPlugins: List<String>,
     suggestionPlugins: List<PluginDownloader>,

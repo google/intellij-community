@@ -11,8 +11,8 @@ import com.intellij.openapi.application.TransactionGuardImpl
 import com.intellij.openapi.application.readLockCompensationTimeout
 import com.intellij.openapi.application.useBackgroundWriteAction
 import com.intellij.openapi.progress.ProcessCanceledException
+import com.intellij.openapi.progress.util.SuvorovProgress
 import com.intellij.openapi.util.Ref
-import com.intellij.openapi.util.ThrowableComputable
 import com.intellij.platform.locking.impl.getGlobalThreadingSupport
 import com.intellij.util.SlowOperations
 import com.intellij.util.ThrowableRunnable
@@ -24,7 +24,11 @@ import com.intellij.util.ui.UIUtil
 import io.opentelemetry.api.metrics.BatchCallback
 import io.opentelemetry.api.metrics.Meter
 import kotlinx.coroutines.CompletableJob
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.future.asCompletableFuture
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
@@ -120,9 +124,8 @@ fun setCompensationTimeout(timeout: Duration?): Duration? {
   return currentTimeout
 }
 
-internal fun runnableUnitFunction(runnable: Runnable): () -> Unit = runnable::run
+
 internal fun rethrowCheckedExceptions(f: ThrowableRunnable<*>): () -> Unit = f::run
-internal fun <T> rethrowCheckedExceptions(f: ThrowableComputable<T, *>): () -> T = f::compute
 
 @TestOnly
 @ApiStatus.Experimental
@@ -191,12 +194,12 @@ object InternalThreading {
   @JvmStatic
   fun invokeAndWaitWithTransferredWriteAction(runnable: Runnable) {
     val lock = getGlobalThreadingSupport()
-    assert(lock.isWriteAccessAllowed()) { "Transferring of write action is permitted only if write lock is acquired" }
+    assert(lock.isWriteAccessAllowed()) { "Transferring of write action to EDT is permitted only if write lock is acquired" }
     if (!useBackgroundWriteAction) {
       runnable.run()
       return
     }
-    assert(!EDT.isCurrentThreadEdt()) { "Transferring of write action is permitted only on background thread" }
+    assert(!EDT.isCurrentThreadEdt()) { "Transferring of write action to EDT is permitted only on background thread" }
     val exceptionRef = Ref.create<Throwable?>()
     val capturedRunnable = AppScheduledExecutorService.captureContextCancellationForRunnableThatDoesNotOutliveContextScope {
       try {
@@ -222,6 +225,48 @@ object InternalThreading {
                                      }, capturedRunnable)
     exceptionRef.get()?.let { throw it }
   }
+
+  @RequiresBackgroundThread(generateAssertion = false)
+  @RequiresWriteLock(generateAssertion = false)
+  @Throws(Throwable::class)
+  @JvmStatic
+  fun executeOnPooledThreadWithTransferredWriteAction(runnable: Runnable) {
+    val lock = getGlobalThreadingSupport()
+    assert(lock.isWriteAccessAllowed()) { "Transferring of write action to BG thread is permitted only if write lock is acquired" }
+    if (!useBackgroundWriteAction) {
+      runnable.run()
+      return
+    }
+    assert(EDT.isCurrentThreadEdt()) { "Transferring of write action to BG thread is permitted only on EDT" }
+    val exceptionRef = Ref.create<Throwable?>()
+    val capturedRunnable = AppScheduledExecutorService.captureContextCancellationForRunnableThatDoesNotOutliveContextScope {
+      try {
+        // we can appear here if someone tries to acquire a read action in a forced slow-op section
+        // the users have no control over computations that run inside transferred write action, hence we reset the slow-op section
+        SlowOperations.startSection(SlowOperations.RESET).use {
+          runnable.run()
+        }
+      }
+      catch (e: Throwable) {
+        exceptionRef.set(e)
+      }
+    }
+    lock.transferWriteActionAndBlock({ toRun: RunnableWithTransferredWriteAction ->
+                                       @OptIn(DelicateCoroutinesApi::class)
+                                       val future = GlobalScope.async(transferredWriteActionBackgroundDispatcher) {
+                                         toRun.run()
+                                       }
+                                       try {
+                                         SuvorovProgress.dispatchEventsUntilComputationCompletes(future)
+                                       }
+                                       catch (e: InterruptedException) {
+                                         exceptionRef.set(e)
+                                       }
+                                     }, capturedRunnable)
+    exceptionRef.get()?.let { throw it }
+  }
+
+  private val transferredWriteActionBackgroundDispatcher = Dispatchers.IO.limitedParallelism(1, "Transferred Write Action Background Dispatcher")
 
   @ApiStatus.Internal
   class TransferredWriteActionEvent private constructor(
@@ -252,4 +297,3 @@ object InternalThreading {
     }
   }
 }
-

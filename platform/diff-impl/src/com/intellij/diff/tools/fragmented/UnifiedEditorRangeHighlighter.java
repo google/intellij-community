@@ -10,16 +10,19 @@ import com.intellij.openapi.editor.markup.MarkupModel;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 
-class UnifiedEditorRangeHighlighter {
+@ApiStatus.Internal
+public class UnifiedEditorRangeHighlighter {
   private final @NotNull List<Element> myPieces = new ArrayList<>();
 
-  UnifiedEditorRangeHighlighter(@Nullable Project project,
+  @ApiStatus.Internal
+  public UnifiedEditorRangeHighlighter(@Nullable Project project,
                                 @NotNull Document document1,
                                 @NotNull Document document2,
                                 @NotNull List<? extends HighlightRange> ranges) {

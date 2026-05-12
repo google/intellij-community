@@ -16,16 +16,17 @@ import com.intellij.python.processOutput.common.TraceContextDto
 import com.intellij.python.processOutput.common.TraceContextKind
 import com.intellij.python.processOutput.common.TraceContextUuid
 import com.intellij.python.processOutput.common.sendProcessOutputTopicEvent
-import com.intellij.util.io.awaitExit
 import com.jetbrains.python.NON_INTERACTIVE_ROOT_TRACE_CONTEXT
 import com.jetbrains.python.TraceContext
 import com.jetbrains.python.errorProcessing.Exe
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.future.await
 import kotlinx.coroutines.launch
 import org.jetbrains.annotations.ApiStatus
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Clock
@@ -83,10 +84,9 @@ class LoggingProcess(
       target = target,
       id = nextId.getAndAdd(1),
     )
-  private val lineCounter = AtomicInteger(0)
 
-  private val stdoutStream = LoggingInputStream(loggedProcess.id, backingProcess.inputStream, OutputKindDto.OUT, lineCounter)
-  private val stderrStream = LoggingInputStream(loggedProcess.id, backingProcess.errorStream, OutputKindDto.ERR, lineCounter)
+  private val stdoutStream = LoggingInputStream(loggedProcess.id, backingProcess.inputStream, OutputKindDto.OUT)
+  private val stderrStream = LoggingInputStream(loggedProcess.id, backingProcess.errorStream, OutputKindDto.ERR)
 
   init {
     ApplicationManager.getApplication().service<LoggingService>().scope.launch {
@@ -102,7 +102,10 @@ class LoggingProcess(
         ProcessOutputEventDto.NewProcess(loggedProcess, traceHierarchy)
       )
 
-      awaitExit()
+      // PY-89717: avoid awaitExit() on this app-scoped coroutine to stop
+      // ThreadLeakTracker false-positives. See processAwaiter.kt for the full rationale.
+      // (LoggingProcess.onExit() below already delegates to the JDK process reaper.)
+      onExit().await()
 
       sendProcessOutputTopicEvent(
         ProcessOutputEventDto.ProcessExit(
@@ -143,6 +146,13 @@ class LoggingProcess(
   override fun toHandle(): ProcessHandle? =
     backingProcess.toHandle()
 
+  // PY-89717: delegate to backingProcess.onExit() (which on JDK ProcessImpl uses
+  // ProcessHandleImpl.completion / the whitelisted "process reaper" daemon).
+  // Default java.lang.Process.onExit() would do CompletableFuture.supplyAsync(this::waitForInternal),
+  // spawning a ForkJoinPool worker stuck in ProcessImpl.waitFor.
+  override fun onExit(): CompletableFuture<Process> =
+    backingProcess.onExit().thenApply { this }
+
   override fun supportsNormalTermination(): Boolean =
     backingProcess.supportsNormalTermination()
 
@@ -155,7 +165,6 @@ private class LoggingInputStream(
   private val processId: Int,
   private val backingInputStream: InputStream,
   private val kind: OutputKindDto,
-  private val lineCounter: AtomicInteger,
 ) : InputStream() {
   private var closed = AtomicBoolean(false)
   private var outputSize = 0
@@ -249,7 +258,6 @@ private class LoggingInputStream(
         OutputLineDto(
           kind = kind,
           text = line,
-          lineNo = lineCounter.getAndAdd(1),
         )
       )
     )

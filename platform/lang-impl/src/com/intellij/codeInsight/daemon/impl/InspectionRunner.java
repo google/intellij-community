@@ -54,6 +54,9 @@ import com.intellij.util.AstLoadingFilter;
 import com.intellij.util.CommonProcessors;
 import com.intellij.util.InjectionUtils;
 import com.intellij.util.Processor;
+import com.intellij.util.concurrency.ThreadingAssertions;
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
+import com.intellij.util.concurrency.annotations.RequiresReadLock;
 import com.intellij.util.containers.CollectionFactory;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.HashSetQueue;
@@ -124,6 +127,8 @@ final class InspectionRunner {
     }
   }
 
+  @RequiresBackgroundThread
+  @RequiresReadLock
   @Unmodifiable
   @NotNull
   List<InspectionContext> inspect(@NotNull List<? extends LocalInspectionToolWrapper> toolWrappers,
@@ -190,7 +195,7 @@ final class InspectionRunner {
           }
           tool.inspectionStarted(session, myIsOnTheFly);
 
-          List<? extends PsiElement> sortedInside = highlightInfoUpdater.sortByPsiElementFertility(myPsiFile, toolWrapper, toolWrapper.runForWholeFile() ? wholeInside : restrictedInside);
+          List<? extends PsiElement> sortedInside = HighlightInfoUpdaterImpl.sortByPsiElementFertility(myPsiFile, toolWrapper, toolWrapper.runForWholeFile() ? wholeInside : restrictedInside);
           List<? extends PsiElement> outside = toolWrapper.runForWholeFile() ? wholeOutside : restrictedOutside;
           InspectionContext context = new InspectionContext(toolWrapper, holder, visitor, sortedInside, outside, InspectionVisitorOptimizer.getAcceptingPsiTypes(visitor), myPsiFile);
           init.add(context);
@@ -198,7 +203,7 @@ final class InspectionRunner {
       }
       //sort `init`, according to the priorities, saved earlier to run in order
       // but only for visible elements, because we don't care about the order in 'outside', and spending CPU on their rearrangement would be counterproductive
-      InspectionProfilerDataHolder.sortByLatencies(myPsiFile, init, highlightInfoUpdater);
+      InspectionProfilerDataHolder.sortByLatencies(myPsiFile, init);
 
       Processor<? super InspectionContext> contextProcessor = (context) -> {
         executeInImpatientReadAction(()-> {
@@ -318,19 +323,21 @@ final class InspectionRunner {
 
   private void registerSuppressedElements(@NotNull PsiElement element, @NotNull LocalInspectionToolWrapper tool) {
     String id = tool.getID();
-    mySuppressedElements.computeIfAbsent(id, __ -> new HashSet<>()).add(element);
+    mySuppressedElements.computeIfAbsent(id, _ -> new HashSet<>()).add(element);
     String alternativeID = tool.getAlternativeID();
     if (alternativeID != null && !alternativeID.equals(id)) {
-      mySuppressedElements.computeIfAbsent(alternativeID, __ -> new HashSet<>()).add(element);
+      mySuppressedElements.computeIfAbsent(alternativeID, _ -> new HashSet<>()).add(element);
     }
     InspectionElementsMerger elementsMerger = InspectionElementsMerger.getMerger(tool.getShortName());
     if (elementsMerger != null) {
       for (String suppressId : elementsMerger.getSuppressIds()) {
-        mySuppressedElements.computeIfAbsent(suppressId, __ -> new HashSet<>()).add(element);
+        mySuppressedElements.computeIfAbsent(suppressId, _ -> new HashSet<>()).add(element);
       }
     }
   }
 
+  @RequiresReadLock
+  @RequiresBackgroundThread
   private void addRedundantSuppressions(@NotNull List<? extends InspectionContext> init,
                                         @NotNull List<? extends LocalInspectionToolWrapper> toolWrappers,
                                         @NotNull List<? super InspectionContext> result,
@@ -664,9 +671,11 @@ final class InspectionRunner {
     }
   }
 
+  @RequiresBackgroundThread
+  @RequiresReadLock
   private static boolean shouldInspect(@NotNull PsiFile psiFile) {
-    ApplicationManager.getApplication().assertIsNonDispatchThread();
-    ApplicationManager.getApplication().assertReadAccessAllowed();
+    ThreadingAssertions.assertBackgroundThread();
+    ThreadingAssertions.assertReadAccess();
     HighlightingLevelManager highlightingLevelManager = HighlightingLevelManager.getInstance(psiFile.getProject());
     // for ESSENTIAL mode, it depends on the current phase: when we run regular LocalInspectionPass then don't, when we run Save All handler then run everything
     return highlightingLevelManager != null

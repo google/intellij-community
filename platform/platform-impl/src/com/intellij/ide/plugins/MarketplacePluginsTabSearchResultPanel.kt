@@ -189,7 +189,7 @@ internal class MarketplacePluginsTabSearchResultPanel(
               val updates = PluginModelAsyncOperationsExecutor.loadUpdates()
               if (updates.isNotEmpty()) {
                 withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
-                  PluginManagerConfigurablePanel.applyUpdates(myPanel, updates)
+                  PluginManagerConfigurablePanel.setUpdateDescriptors(myPanel, updates)
                   mySelectionListener.accept(myMarketplacePanelSupplier.get())
                   mySelectionListener.accept(panel)
                   fullRepaint()
@@ -235,7 +235,7 @@ internal class MarketplacePluginsTabSearchResultPanel(
         customPlugins,
         false
       )
-    result.addModels(0, ArrayList<PluginUiModel?>(plugins))
+    result.addModels(0, ArrayList<PluginUiModel>(plugins))
 
     if (parser.searchQuery != null) {
       val descriptors = customPlugins.filter { descriptor: PluginUiModel ->

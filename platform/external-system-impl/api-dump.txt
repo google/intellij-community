@@ -177,6 +177,7 @@ c:com.intellij.openapi.externalSystem.service.execution.DefaultExternalSystemExe
 - com.intellij.openapi.externalSystem.execution.ExternalSystemExecutionConsoleManager
 - <init>():V
 - attachExecutionConsole(com.intellij.openapi.project.Project,com.intellij.openapi.externalSystem.model.task.ExternalSystemTask,com.intellij.execution.runners.ExecutionEnvironment,com.intellij.execution.process.ProcessHandler):com.intellij.execution.ui.ExecutionConsole
+- p:createConsoleView(com.intellij.openapi.project.Project,com.intellij.openapi.externalSystem.model.task.ExternalSystemTask,com.intellij.execution.runners.ExecutionEnvironment):com.intellij.execution.ui.ConsoleView
 - getExternalSystemId():com.intellij.openapi.externalSystem.model.ProjectSystemId
 - getRestartActions(com.intellij.execution.ui.ExecutionConsole):com.intellij.openapi.actionSystem.AnAction[]
 - isApplicableFor(com.intellij.openapi.externalSystem.model.task.ExternalSystemTask):Z
@@ -349,10 +350,6 @@ f:com.intellij.openapi.externalSystem.service.execution.configuration.fragments.
 - sf:addSettingsEditorFragment(com.intellij.openapi.externalSystem.service.execution.configuration.fragments.SettingsEditorFragmentContainer,com.intellij.openapi.externalSystem.service.ui.util.SettingsFragmentInfo,kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function2,kotlin.jvm.functions.Function2):com.intellij.execution.ui.SettingsEditorFragment
 - sf:addSettingsEditorFragment(com.intellij.openapi.externalSystem.service.execution.configuration.fragments.SettingsEditorFragmentContainer,com.intellij.openapi.externalSystem.service.ui.util.SettingsFragmentInfo,kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function2,kotlin.jvm.functions.Function2,kotlin.jvm.functions.Function1):com.intellij.execution.ui.SettingsEditorFragment
 - sf:addTag(com.intellij.openapi.externalSystem.service.execution.configuration.fragments.SettingsEditorFragmentContainer,java.lang.String,java.lang.String,java.lang.String,java.lang.String,kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function2):com.intellij.execution.ui.SettingsEditorFragment
-f:com.intellij.openapi.externalSystem.service.execution.configuration.fragments.SettingsEditorFragmentBuildersKt$sam$i$com_intellij_util_Function$0
-- com.intellij.util.Function
-- <init>(kotlin.jvm.functions.Function1):V
-- bf:fun(java.lang.Object):java.lang.Object
 f:com.intellij.openapi.externalSystem.service.execution.configuration.fragments.SettingsEditorFragmentBuildersKt$sam$i$java_util_function_BiConsumer$0
 - java.util.function.BiConsumer
 - <init>(kotlin.jvm.functions.Function2):V

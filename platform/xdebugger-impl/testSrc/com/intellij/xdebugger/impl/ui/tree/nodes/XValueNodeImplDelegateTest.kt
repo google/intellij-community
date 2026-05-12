@@ -29,12 +29,19 @@ class XValueNodeImplDelegateTest : UsefulTestCase() {
 
   private fun getAllOverridableMethods(clazz: Class<*>?): Set<String> {
     val methods = mutableSetOf<String>()
+    val finalMethods = mutableSetOf<String>()
     var current = clazz
     while (current != null && current != Object::class.java) {
       for (m in current.getDeclaredMethods()) {
+        val signatureKey = m.signatureKey()
+        if (signatureKey in finalMethods) continue
         val mod = m.modifiers
-        if (!Modifier.isStatic(mod) && !Modifier.isFinal(mod) && !Modifier.isPrivate(mod)) {
-          methods.add(m.signatureKey())
+        if (Modifier.isFinal(mod)) {
+          finalMethods.add(signatureKey)
+          continue
+        }
+        if (!Modifier.isStatic(mod) && !Modifier.isPrivate(mod)) {
+          methods.add(signatureKey)
         }
       }
       current = current.getSuperclass()

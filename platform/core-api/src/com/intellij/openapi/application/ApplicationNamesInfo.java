@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.application;
 
 import com.intellij.idea.AppMode;
@@ -171,9 +171,9 @@ public final class ApplicationNamesInfo {
   }
 
   /**
-   * <p>Returns full product name with edition. Vendor prefix is not included.</p>
+   * <p>Returns the full product name with the edition. Vendor prefix is not included.</p>
    *
-   * <p>Use only when omitting an edition may potentially cause a confusion.<br/>
+   * <p>Use only when omitting an edition may potentially cause confusion.<br/>
    * Example #1: include the edition in generated shortcuts, since a user may have several editions installed.<br/>
    * Example #2: exclude the edition from "Restart ...?" confirmation, as it only hampers readability.</p>
    *
@@ -187,8 +187,7 @@ public final class ApplicationNamesInfo {
   }
 
   /**
-   * Returns edition name of the product, if applicable
-   * (e.g. {@code "Ultimate Edition"} or {@code "Community Edition"} for IntelliJ IDEA, {@code null} for WebStorm).
+   * Returns edition name of the product, if applicable (e.g., {@code "Educational Edition"}).
    */
   public @NlsSafe @Nullable String getEditionName() {
     return myEditionName;
@@ -213,7 +212,7 @@ public final class ApplicationNamesInfo {
   }
 
   /**
-   * Returns motto of the product. Used as a comment for a desktop entry on XDG-compliant systems (read "Linux").
+   * Returns the motto of the product. Used as a comment for a desktop entry on XDG-compliant systems (read "Linux").
    */
   public @NotNull String getMotto() {
     return myMotto;

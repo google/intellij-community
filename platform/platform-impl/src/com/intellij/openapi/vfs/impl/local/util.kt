@@ -10,7 +10,6 @@ import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.impl.local.LocalFileSystemBase.LOG
-import com.intellij.openapi.vfs.impl.local.LocalFileSystemBase.toIoPath
 import com.intellij.openapi.vfs.limits.FileSizeLimit
 import com.intellij.platform.eel.channels.EelDelicateApi
 import com.intellij.platform.eel.fs.EelFileInfo
@@ -23,23 +22,28 @@ import com.intellij.platform.eel.fs.listDirectoryWithAttrs
 import com.intellij.platform.eel.fs.readFile
 import com.intellij.platform.eel.fs.stat
 import com.intellij.platform.eel.getOr
+import com.intellij.platform.eel.getOrNull
 import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.path.EelPathException
+import com.intellij.platform.eel.provider.EelMountProvider
 import com.intellij.platform.eel.provider.EelMountRoot
 import com.intellij.platform.eel.provider.LocalEelDescriptor
 import com.intellij.platform.eel.provider.asEelPath
 import com.intellij.platform.eel.provider.asNioPath
-import com.intellij.platform.eel.provider.canReadPermissionsDirectly
 import com.intellij.platform.eel.provider.getEelDescriptor
-import com.intellij.platform.eel.provider.mountProvider
 import com.intellij.platform.eel.provider.toEelApi
 import com.intellij.platform.eel.provider.toEelApiBlocking
 import com.intellij.platform.eel.provider.transformPath
+import com.intellij.platform.eel.provider.PrefetchDataElement
+import com.intellij.platform.eel.provider.buildPrefetchContext
+import com.intellij.platform.eel.provider.canReadPermissionsDirectly
 import com.intellij.platform.eel.provider.utils.EelPathUtils
 import com.intellij.platform.eel.provider.utils.getOrThrowFileSystemException
 import com.intellij.platform.ijent.community.impl.nio.fsBlocking
 import com.intellij.util.containers.CollectionFactory
 import com.intellij.util.io.toByteArray
+import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.VisibleForTesting
 import java.io.IOException
 import java.nio.file.AccessDeniedException
 import java.nio.file.AccessMode
@@ -52,6 +56,146 @@ import java.nio.file.Path
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.FileTime
 import java.time.Instant
+
+//Eel-specific optimizations: mostly about reducing the number of Eel network calls with batching.
+// The methods are not to be used outside the package.
+// Most of the methods should have been (private) methods in [LocalFileSystemImpl]
+// (Probably, extracted here just to use Kotlin?)
+
+@ApiStatus.Internal
+@VisibleForTesting
+@Throws(IOException::class)
+fun readAttributesUsingEel(nioPath: Path): FileAttributes {
+  val eelDescriptor = nioPath.getEelDescriptor()
+  if (eelDescriptor == LocalEelDescriptor) {
+    val nioAttributes = Files.readAttributes(nioPath, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+    return FileAttributes.fromNio(nioPath, nioAttributes)
+  }
+  else {
+    val eelPath = nioPath.asEelPath(eelDescriptor)
+    val directAccessPath = (nioPath.fileSystem as? EelMountProvider)?.getMountRoot(eelPath)?.takeIf {
+      fsBlocking {
+        it.canReadPermissionsDirectly(EelMountRoot.DirectAccessOptions.BasicAttributesAndWritable)
+      }
+    }?.transformPath(eelPath)
+    if (directAccessPath != null && directAccessPath.descriptor == LocalEelDescriptor) {
+      val directAccessNioPath = directAccessPath.asNioPath()
+      val nioAttributes = Files.readAttributes(directAccessNioPath, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+      return FileAttributes.fromNio(directAccessNioPath, nioAttributes)
+    }
+    return fsBlocking {
+      val eelFsApi = eelPath.descriptor.toEelApi().fs
+      val fileInfo = eelFsApi.stat(eelPath).eelIt().getOrThrowFileSystemException()
+      toVfs(eelPath, fileInfo, eelFsApi)
+    }
+  }
+}
+
+@ApiStatus.Internal
+@VisibleForTesting
+fun listWithAttributesUsingEel(
+  nioPath: Path,
+  filter: Set<String>?,
+): Map<String, FileAttributes> {
+  try {
+    val eelDescriptor = nioPath.getEelDescriptor()
+    if (eelDescriptor === LocalEelDescriptor) {
+      return LocalFileSystemImpl.listWithAttributesImpl(nioPath, filter)
+    }
+    val eelPath = nioPath.asEelPath(eelDescriptor)
+    val directAccessPath = (nioPath.fileSystem as? EelMountProvider)?.getMountRoot(eelPath)?.takeIf {
+      fsBlocking {
+        it.canReadPermissionsDirectly(EelMountRoot.DirectAccessOptions.BasicAttributesAndWritable)
+      }
+    }?.transformPath(eelPath)
+    if (directAccessPath != null && directAccessPath.descriptor === LocalEelDescriptor) {
+      return LocalFileSystemImpl.listWithAttributesImpl(directAccessPath.asNioPath(), filter)
+    }
+
+    val expectedSize = filter?.size ?: 10
+    //We must return a 'normal' (=case-sensitive) map from this method, see BatchingFileSystem.listWithAttributes() contract:
+    val childrenWithAttributes = CollectionFactory.createFilePathMap<FileAttributes>(expectedSize,  /*caseSensitive: */true)
+
+    visitDirectory(eelPath, filter) { file: EelPath, attributes: EelFileInfo, eelFsApi: EelFileSystemApi ->
+      try {
+        val childAttributes = toVfs(file, attributes, eelFsApi)
+        childrenWithAttributes[file.fileName] = amendAttributes(childAttributes) { file.asNioPath() }
+      }
+      catch (e: Exception) {
+        LOG.debug(e)
+      }
+      true
+    }
+
+    return childrenWithAttributes
+  }
+  catch (e: AccessDeniedException) {
+    LOG.debug(e)
+  }
+  catch (e: NoSuchFileException) {
+    LOG.debug(e)
+  }
+  catch (e: IOException) {
+    LOG.warn(e)
+  }
+  catch (e: RuntimeException) {
+    LOG.warn(e)
+  }
+  return emptyMap()
+}
+
+/**
+ * Prefetches remote directory trees for VFS refresh and runs [block] with the
+ * prefetch cache installed in the thread context. The cache propagates automatically
+ * to child threads via [IntelliJContextElement] (through context-propagating executors).
+ *
+ * If no remote roots are found among [roots], [block] is called directly without prefetch.
+ */
+@ApiStatus.Internal
+fun withPrefetchForRemoteRoots(roots: Collection<@JvmWildcard VirtualFile>, block: () -> Unit) {
+  if (!Registry.`is`("vfs.eel.scanning.prefetch.enabled", true)) {
+    block()
+    return
+  }
+  val remoteRoots = roots.mapNotNull { root ->
+    try {
+      val nioPath = root.fileSystem.getNioPath(root) ?: return@mapNotNull null
+      val descriptor = nioPath.getEelDescriptor()
+      if (descriptor === LocalEelDescriptor) return@mapNotNull null
+      val eelPath = nioPath.asEelPath(descriptor)
+      // Skip FS root — prefetching entire remote filesystem is wasteful,
+      // VFS refresh from root only checks cached children anyway
+      if (eelPath.parent == null) return@mapNotNull null
+      // Skip paths with direct local mount — they bypass gRPC entirely
+      if ((nioPath.fileSystem as? EelMountProvider)?.getMountRoot(eelPath) != null) return@mapNotNull null
+      descriptor to eelPath
+    }
+    catch (_: Exception) {
+      null
+    }
+  }
+  if (remoteRoots.isEmpty()) {
+    block()
+    return
+  }
+
+  val element = try {
+    val ctx = fsBlocking { buildPrefetchContext(remoteRoots) }
+    ctx[PrefetchDataElement]
+  }
+  catch (e: Exception) {
+    LOG.warn("Failed to prefetch remote roots for VFS refresh", e)
+    null
+  }
+  if (element != null) {
+    LOG.info("VFS refresh prefetch: ${element.size} directories cached for ${remoteRoots.size} remote roots")
+    val context = com.intellij.concurrency.currentThreadContext() + element
+    com.intellij.concurrency.installThreadContext(context, replace = true, block)
+  }
+  else {
+    block()
+  }
+}
 
 /**
  * [java.nio.file.Files.readAllBytes] takes five separate syscalls to complete.
@@ -73,7 +217,7 @@ internal fun readWholeFileIfNotTooLargeWithEel(path: Path): ByteArray? {
 
   val eelPath = path.asEelPath()
 
-  if (eelDescriptor.mountProvider()?.getMountRoot(eelPath) != null) {
+  if ((path.fileSystem as? EelMountProvider)?.getMountRoot(eelPath) != null) {
     return null
   }
 
@@ -104,7 +248,7 @@ internal fun toEelPath(parent: VirtualFile, childName: String): EelPath? =
   }
 
 internal fun fetchCaseSensitivityUsingEel(eelPath: EelPath): FileAttributes.CaseSensitivity {
-  val directAccessPath = eelPath.descriptor.mountProvider()?.getMountRoot(eelPath)?.takeIf {
+  val directAccessPath = (eelPath.asNioPath().fileSystem as? EelMountProvider)?.getMountRoot(eelPath)?.takeIf {
     fsBlocking {
       it.canReadPermissionsDirectly(EelMountRoot.DirectAccessOptions.CaseSensitivity)
     }
@@ -148,105 +292,48 @@ internal fun fetchCaseSensitivityUsingEel(eelPath: EelPath): FileAttributes.Case
   }
 }
 
-@Throws(IOException::class)
-internal fun readAttributesUsingEel(nioPath: Path): FileAttributes {
-  val eelDescriptor = nioPath.getEelDescriptor()
-  if (eelDescriptor == LocalEelDescriptor) {
-    val nioAttributes = Files.readAttributes(nioPath, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
-    return FileAttributes.fromNio(nioPath, nioAttributes)
+private suspend fun toVfs(eelPath: EelPath, eelFileInfo: EelFileInfo, eelFsApi: EelFileSystemApi): FileAttributes {
+  val resolvedFileInfo = if (eelFileInfo.type is EelPosixFileInfo.Type.Symlink) {
+    eelFsApi
+      .stat(eelPath)
+      .symlinkPolicy(EelFileSystemApi.SymlinkPolicy.RESOLVE_AND_FOLLOW)
+      .eelIt().getOrNull() ?: return FileAttributes.BROKEN_SYMLINK
   }
   else {
-    val eelPath = nioPath.asEelPath(eelDescriptor)
-    val directAccessPath = eelPath.descriptor.mountProvider()?.getMountRoot(eelPath)?.takeIf {
-      fsBlocking {
-        it.canReadPermissionsDirectly(EelMountRoot.DirectAccessOptions.BasicAttributesAndWritable)
-      }
-    }?.transformPath(eelPath)
-    if (directAccessPath != null && directAccessPath.descriptor == LocalEelDescriptor) {
-      val directAccessNioPath = directAccessPath.asNioPath()
-      val nioAttributes = Files.readAttributes(directAccessNioPath, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
-      return FileAttributes.fromNio(directAccessNioPath, nioAttributes)
-    }
-    return fsBlocking {
-      val eelFsApi = eelPath.descriptor.toEelApi().fs
-      val fileInfo = eelFsApi.stat(eelPath).eelIt().getOrThrowFileSystemException()
-      toVfs(fileInfo, eelFsApi)
-    }
+    eelFileInfo
   }
-}
 
-private fun toVfs(eelFileInfo: EelFileInfo, eelFsApi: EelFileSystemApi): FileAttributes {
+  val isSymLink = eelFileInfo.type is EelPosixFileInfo.Type.Symlink
   return when {
-    eelFsApi is EelFileSystemPosixApi && eelFileInfo is EelPosixFileInfo -> {
-      eelFileInfo.toVfs(eelFileInfo.isWritable(eelFsApi))
+    eelFsApi is EelFileSystemPosixApi && resolvedFileInfo is EelPosixFileInfo -> {
+      resolvedFileInfo.toVfs(resolvedFileInfo.isWritable(eelFsApi), isSymLink)
     }
-    eelFsApi is EelFileSystemWindowsApi && eelFileInfo is EelWindowsFileInfo -> {
-      eelFileInfo.toVfs(!eelFileInfo.permissions.isReadOnly)
+    eelFsApi is EelFileSystemWindowsApi && resolvedFileInfo is EelWindowsFileInfo -> {
+      resolvedFileInfo.toVfs(!resolvedFileInfo.permissions.isReadOnly, isSymLink)
     }
-    else -> error("EelFileInfo ${eelFileInfo} does not belong to EelFileSystemApi ${eelFsApi}")
+    else -> error("EelFileInfo ${resolvedFileInfo} does not belong to EelFileSystemApi ${eelFsApi}")
   }
 }
 
-internal fun listWithAttributesUsingEel(
-  dir: VirtualFile,
-  filter: Set<String>?,
-): Map<String, FileAttributes> {
-  if (!dir.isDirectory()) {
-    return emptyMap()
-  }
-  try {
-    val nioPath = Path.of(toIoPath(dir))
-    val eelDescriptor = nioPath.getEelDescriptor()
-    if (eelDescriptor === LocalEelDescriptor) {
-      return LocalFileSystemImpl.listWithAttributesImpl(nioPath, filter)
-    }
-    val eelPath = nioPath.asEelPath(eelDescriptor)
-    val directAccessPath = eelPath.descriptor.mountProvider()?.getMountRoot(eelPath)?.takeIf {
-      fsBlocking {
-        it.canReadPermissionsDirectly(EelMountRoot.DirectAccessOptions.BasicAttributesAndWritable)
-      }
-    }?.transformPath(eelPath)
-    if (directAccessPath != null && directAccessPath.descriptor === LocalEelDescriptor) {
-      return LocalFileSystemImpl.listWithAttributesImpl(directAccessPath.asNioPath(), filter)
-    }
+internal fun amendAttributes(file: Path, attributes: FileAttributes): FileAttributes {
+  return amendAttributes(attributes) { file }
+}
 
-    val expectedSize = filter?.size ?: 10
-    //We must return a 'normal' (=case-sensitive) map from this method, see BatchingFileSystem.listWithAttributes() contract:
-    val childrenWithAttributes = CollectionFactory.createFilePathMap<FileAttributes>(expectedSize,  /*caseSensitive: */true)
-
-    visitDirectory(eelPath, filter) { file: EelPath, attributes: EelFileInfo, eelFsApi: EelFileSystemApi ->
-      try {
-        //val attributes = amendAttributes(file, fromNio(file, attributes))
-        childrenWithAttributes[file.fileName] = toVfs(attributes, eelFsApi)
-      }
-      catch (e: Exception) {
-        LOG.debug(e)
-      }
-      true
+private inline fun amendAttributes(attributes: FileAttributes, file: () -> Path): FileAttributes {
+  for (provider in LocalFileSystemTimestampEvaluator.EP_NAME.extensionList) {
+    val customTS = provider.getTimestamp(file())
+    if (customTS != null) {
+      return attributes.withLastModified(customTS)
     }
-
-    return childrenWithAttributes
   }
-  catch (e: AccessDeniedException) {
-    LOG.debug(e)
-  }
-  catch (e: NoSuchFileException) {
-    LOG.debug(e)
-  }
-  catch (e: IOException) {
-    LOG.warn(e)
-  }
-  catch (e: RuntimeException) {
-    LOG.warn(e)
-  }
-  return emptyMap()
+  return attributes
 }
 
 @Throws(IOException::class, SecurityException::class)
 private fun visitDirectory(
   directory: EelPath,
   filter: Set<String>?,
-  consumer: (EelPath, EelFileInfo, EelFileSystemApi) -> Boolean,
+  consumer: suspend (EelPath, EelFileInfo, EelFileSystemApi) -> Boolean,
 ) {
   if (filter != null && filter.isEmpty()) {
     return  //nothing to read
@@ -254,7 +341,7 @@ private fun visitDirectory(
   fsBlocking {
     val eelFsApi = directory.descriptor.toEelApi().fs
     val directoryList =
-      eelFsApi.listDirectoryWithAttrs(directory).symlinkPolicy(EelFileSystemApi.SymlinkPolicy.RESOLVE_AND_FOLLOW).eelIt()
+      eelFsApi.listDirectoryWithAttrs(directory).symlinkPolicy(EelFileSystemApi.SymlinkPolicy.DO_NOT_RESOLVE).eelIt()
         .getOrThrowFileSystemException()
     for ((childName, childStat) in directoryList) {
       val childIjentPath = directory.getChild(childName)
@@ -268,16 +355,15 @@ private fun visitDirectory(
   }
 }
 
-fun EelPosixFileInfo.isWritable(eelFsApi: EelFileSystemPosixApi): Boolean {
+private fun EelPosixFileInfo.isWritable(eelFsApi: EelFileSystemPosixApi): Boolean {
   return EelPathUtils.checkAccess(eelFsApi.user, this, AccessMode.WRITE) == null
 }
 
-fun EelFileInfo.toVfs(isWritable: Boolean): FileAttributes {
+private fun EelFileInfo.toVfs(isWritable: Boolean, isSymLink: Boolean): FileAttributes {
   val attrs = this
 
   val isDirectory = attrs.type is EelFileInfo.Type.Directory
   val isSpecial = attrs.type is EelFileInfo.Type.Other
-  val isSymLink = attrs.type is EelPosixFileInfo.Type.Symlink
   val isHidden = false
   val length = (attrs.type as? EelFileInfo.Type.Regular)?.size ?: 0
   val lastModified = FileTime.from(attrs.lastModifiedTime?.toInstant() ?: Instant.MIN).toMillis()

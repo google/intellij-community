@@ -47,6 +47,7 @@ import org.jetbrains.plugins.github.pullrequest.data.provider.GHPRReviewDataProv
 import org.jetbrains.plugins.github.pullrequest.data.provider.changesComputationState
 import org.jetbrains.plugins.github.pullrequest.ui.comment.GHPRReviewThreadCommentViewModel
 import org.jetbrains.plugins.github.pullrequest.ui.comment.GHPRReviewThreadViewModel
+import org.jetbrains.plugins.github.pullrequest.ui.comment.GHViewModelWithTextCompletion
 import org.jetbrains.plugins.github.pullrequest.ui.comment.UpdateableGHPRReviewThreadCommentViewModel
 import org.jetbrains.plugins.github.ui.icons.GHAvatarIconsProvider
 import java.util.Date
@@ -84,6 +85,7 @@ internal class UpdateableGHPRTimelineThreadViewModel internal constructor(
   parentCs: CoroutineScope,
   private val dataContext: GHPRDataContext,
   private val dataProvider: GHPRDataProvider,
+  private val viewModelWithTextCompletion: GHViewModelWithTextCompletion,
   initialData: GHPullRequestReviewThread,
 ) : GHPRTimelineThreadViewModel {
   private val cs = parentCs.childScope("GitHub Pull Request Timeline Thread View Model")
@@ -238,7 +240,7 @@ internal class UpdateableGHPRTimelineThreadViewModel internal constructor(
 
   private fun CoroutineScope.createComment(comment: IndexedValue<GHPullRequestReviewComment>): UpdateableGHPRReviewThreadCommentViewModel =
     UpdateableGHPRReviewThreadCommentViewModel(project, this, dataContext, dataProvider,
-                                               this@UpdateableGHPRTimelineThreadViewModel, comment)
+                                               this@UpdateableGHPRTimelineThreadViewModel, viewModelWithTextCompletion, comment)
 
   private fun Collection<RefComparisonChange>.findByFilePath(path: String): RefComparisonChange? {
     val repoRoot = dataContext.repositoryDataService.remoteCoordinates.repository.root
@@ -248,8 +250,10 @@ internal class UpdateableGHPRTimelineThreadViewModel internal constructor(
     }
   }
 
-  private inner class ReplyViewModel
-    : CodeReviewSubmittableTextViewModelBase(project, cs, ""), GHPRNewThreadCommentViewModel {
+  private inner class ReplyViewModel()
+    : CodeReviewSubmittableTextViewModelBase(project, cs, ""),
+      GHPRNewThreadCommentViewModel,
+      GHViewModelWithTextCompletion by viewModelWithTextCompletion {
 
     override val currentUser: GHActor = dataContext.securityService.currentUser
 

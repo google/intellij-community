@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.hierarchy;
 
 import com.intellij.ide.scratch.ScratchUtil;
@@ -16,6 +16,7 @@ import com.intellij.psi.PsiCompiledElement;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiManager;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.GlobalSearchScopesCore;
 import com.intellij.psi.search.LocalSearchScope;
@@ -56,12 +57,12 @@ public abstract class HierarchyTreeStructure extends AbstractTreeStructure {
   }
 
   @Override
-  public final @NotNull NodeDescriptor createDescriptor(@NotNull Object element, NodeDescriptor parentDescriptor) {
-    if (element instanceof HierarchyNodeDescriptor) {
-      return (HierarchyNodeDescriptor)element;
+  public final @NotNull NodeDescriptor<?> createDescriptor(@NotNull Object element, NodeDescriptor parentDescriptor) {
+    if (element instanceof HierarchyNodeDescriptor descriptor) {
+      return descriptor;
     }
-    if (element instanceof String) {
-      return new TextInfoNodeDescriptor(parentDescriptor, (String)element, myProject);
+    if (element instanceof String s) {
+      return new TextInfoNodeDescriptor(parentDescriptor, s, myProject);
     }
     throw new IllegalArgumentException("Unknown element type: " + element);
   }
@@ -100,8 +101,8 @@ public abstract class HierarchyTreeStructure extends AbstractTreeStructure {
 
   @Override
   public final Object getParentElement(@NotNull Object element) {
-    if (element instanceof HierarchyNodeDescriptor) {
-      return ((HierarchyNodeDescriptor)element).getParentDescriptor();
+    if (element instanceof HierarchyNodeDescriptor descriptor) {
+      return descriptor.getParentDescriptor();
     }
 
     return null;
@@ -167,7 +168,10 @@ public abstract class HierarchyTreeStructure extends AbstractTreeStructure {
       return module != null && module.getModuleScope().contains(virtualFile);
     }
     if (HierarchyBrowserBaseEx.SCOPE_PROJECT.equals(scopeType)) {
-      if (srcElement.getContainingFile() instanceof PsiCompiledElement) return false;
+      // Kotlin declarations in source code that are referenced from Java are exposed as compiled PSI elements that are present in the project.
+      // The `PsiManager#isInProject()` check keeps such wrappers in the project scope while still filtering out
+      // real compiled classes (e.g. loaded from library JARs).
+      if (srcElement.getContainingFile() instanceof PsiCompiledElement && !PsiManager.getInstance(myProject).isInProject(srcElement)) return false;
       VirtualFile virtualFile = srcElement.getContainingFile().getVirtualFile();
       return virtualFile == null || !TestSourcesFilter.isTestSources(virtualFile, myProject);
     }
@@ -194,7 +198,7 @@ public abstract class HierarchyTreeStructure extends AbstractTreeStructure {
     return namedScopePattern.contains(psiFile, holder);
   }
 
-  private static final class TextInfoNodeDescriptor extends NodeDescriptor {
+  private static final class TextInfoNodeDescriptor extends NodeDescriptor<String> {
     TextInfoNodeDescriptor(NodeDescriptor parentDescriptor, String text, Project project) {
       super(project, parentDescriptor);
       myName = text;
@@ -202,7 +206,7 @@ public abstract class HierarchyTreeStructure extends AbstractTreeStructure {
     }
 
     @Override
-    public Object getElement() {
+    public String getElement() {
       return myName;
     }
 

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.inlayHints
 
 import com.intellij.idea.TestFor
@@ -47,11 +47,11 @@ class PyTypeInlayHintsProviderTest : DeclarativeInlayHintsProviderTestCase() {
     doTest("""    
     from typing import reveal_type
     
-    def example(x: int, y: float)/*<# -> float #>*/:
-        reveal_type(x + y)/*<# float #>*/
+    def example(x: int, y: float)/*<# -> float | int #>*/:
+        reveal_type(x + y)/*<# float | int #>*/
         return x + y
     
-    reveal_type(example(1, 2.5))/*<# float #>*/
+    reveal_type(example(1, 2.5))/*<# float | int #>*/
     """)
   }
 
@@ -122,6 +122,17 @@ class PyTypeInlayHintsProviderTest : DeclarativeInlayHintsProviderTestCase() {
     class A[/*<# in #>*/T1, /*<# out #>*/T2]:
         def method(self, t1: T1): pass
         def method(self) -> T2: pass
+    """, VARIANCE_OPTION_ID)
+  }
+
+  fun `test variance on all parameter kinds`() {
+    doTest("""
+      from typing import Callable
+      
+      class A[/*<# in #>*/T, /*<# out #>*/*Ts, in **P]:
+          def method1(self, t: T): pass
+          def method2(self) -> tuple[*Ts]: pass
+          def method3(self) -> Callable[P, None]: pass
     """, VARIANCE_OPTION_ID)
   }
 

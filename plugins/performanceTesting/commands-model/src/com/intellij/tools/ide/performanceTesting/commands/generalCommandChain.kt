@@ -21,6 +21,7 @@ import kotlin.io.path.listDirectoryEntries
 import kotlin.reflect.KFunction
 import kotlin.reflect.jvm.javaMethod
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 private const val CMD_PREFIX = '%'
 
@@ -283,8 +284,8 @@ fun <T : CommandChain> T.project(project: File): T = apply {
   addCommand("%%project ${project.absolutePath}")
 }
 
-fun <T : CommandChain> T.exitApp(forceExit: Boolean = true): T = apply {
-  takeScreenshot("exitApp")
+fun <T : CommandChain> T.exitApp(forceExit: Boolean = true, takeScreenshot: Boolean = true): T = apply {
+  if (takeScreenshot) takeScreenshot("exitApp")
   addCommand("${CMD_PREFIX}exitApp", forceExit.toString())
 }
 
@@ -633,8 +634,13 @@ fun <T : CommandChain> T.selectText(startLine: Int, startColumn: Int, endLine: I
   addCommand("${CMD_PREFIX}selectText", startLine.toString(), startColumn.toString(), endLine.toString(), endColumn.toString())
 }
 
-fun <T : CommandChain> T.showFileStructureDialog(): T = apply {
-  addCommand("${CMD_PREFIX}showFileStructureDialog")
+fun <T : CommandChain> T.showFileStructureDialog(isSplitFileStructure: Boolean): T = apply {
+  if (!isSplitFileStructure) {
+    addCommand("${CMD_PREFIX}showFileStructureDialogClassic")
+  }
+  else {
+    addCommand("${CMD_PREFIX}showFileStructureDialogSplit")
+  }
 }
 
 fun <T : CommandChain> T.importMavenProject(): T = apply {
@@ -916,8 +922,9 @@ fun <T : CommandChain> T.selectAll(): T = apply {
   executeEditorAction("\$SelectAll")
 }
 
-fun <T : CommandChain> T.checkoutBranch(branch: String, newBranchName: String = branch): T = apply {
-  addCommand("${CMD_PREFIX}gitCheckout $branch $newBranchName")
+fun <T : CommandChain> T.checkoutBranch(branch: String, newBranchName: String = branch, alwaysSmartCheckout: Boolean = false): T = apply {
+  val alwaysSmart = if (alwaysSmartCheckout) " --alwaysSmartCheckout " else ""
+  addCommand("${CMD_PREFIX}gitCheckout $branch $newBranchName $alwaysSmart")
 }
 
 fun <T : CommandChain> T.showFileHistory(): T = apply {
@@ -1047,6 +1054,10 @@ fun <T : CommandChain> T.stopDebugProcess(): T = apply {
   addCommand("${CMD_PREFIX}stopDebugProcess")
 }
 
+fun <T : CommandChain> T.waitForDebugSessionsEnd(timeout: Duration = 1.minutes): T = apply {
+  addCommand("${CMD_PREFIX}waitForNoDebugSessions ${timeout.inWholeMilliseconds}")
+}
+
 fun <T : CommandChain> T.waitForCodeAnalysisFinished(): T = apply {
   addCommand("${CMD_PREFIX}waitForFinishedCodeAnalysis")
 }
@@ -1120,10 +1131,6 @@ fun <T : CommandChain> T.registerCompletionMockResponse(code: String, language: 
 
 fun <T : CommandChain> T.waitInlineCompletion(): T = apply {
   addCommand("${CMD_PREFIX}waitInlineCompletion")
-}
-
-fun <T : CommandChain> T.logInlineCompletion(): T = apply {
-  addCommand("${CMD_PREFIX}logInlineCompletion")
 }
 
 fun <T : CommandChain> T.waitInlineCompletionWarmup(): T = apply {

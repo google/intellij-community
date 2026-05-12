@@ -95,11 +95,11 @@ import org.jetbrains.annotations.Nls
 import org.jetbrains.plugins.github.api.data.GHLabel
 import org.jetbrains.plugins.github.api.data.GHUser
 import org.jetbrains.plugins.github.api.data.pullrequest.GHPullRequestRequestedReviewer
+import org.jetbrains.plugins.github.exceptions.GHAPIExceptionUtil
 import org.jetbrains.plugins.github.i18n.GithubBundle
 import org.jetbrains.plugins.github.i18n.GithubBundle.message
 import org.jetbrains.plugins.github.pullrequest.ui.toolwindow.create.GHPRCreateViewModel.BranchesCheckResult
 import org.jetbrains.plugins.github.pullrequest.ui.toolwindow.create.GHPRCreateViewModel.CreationState
-import org.jetbrains.plugins.github.ui.component.GHHtmlErrorPanel
 import org.jetbrains.plugins.github.ui.component.LabeledListPanelViewModel
 import org.jetbrains.plugins.github.ui.icons.GHAvatarIconsProvider
 import org.jetbrains.plugins.github.ui.util.GHUIUtil
@@ -272,8 +272,8 @@ internal object GHPRCreateComponentFactory {
   @OptIn(FlowPreview::class)
   private fun CoroutineScope.changesPanel(vm: GHPRCreateViewModel): JComponent {
     val wrapper = Wrapper()
-    val errorStatusPresenter = ErrorStatusPresenter.simple(message("pull.request.create.failed.to.load.commits"),
-                                                           descriptionProvider = GHHtmlErrorPanel::getLoadingErrorText)
+    val errorStatusPresenter = ErrorStatusPresenter.simpleHTML(message("pull.request.create.failed.to.load.commits"),
+                                                               descriptionProvider = GHAPIExceptionUtil::getPresentableMessage)
     launchNow {
       vm.changesVm.debounce(50).collectScoped { changesResult ->
         val content = changesResult?.fold({ moveToCenter(LoadingTextLabel()) },
@@ -319,8 +319,8 @@ internal object GHPRCreateComponentFactory {
       })
     }
 
-    val errorStatusPresenter = ErrorStatusPresenter.simple(message("pull.request.create.failed.to.load.changes"),
-                                                           descriptionProvider = GHHtmlErrorPanel::getLoadingErrorText)
+    val errorStatusPresenter = ErrorStatusPresenter.simpleHTML(message("pull.request.create.failed.to.load.changes"),
+                                                               descriptionProvider = GHAPIExceptionUtil::getPresentableMessage)
     cs.launchNow {
       changesVm.commitChangesVm.collectScoped { commitChangesVm ->
         commitChangesVm.changeListVm.debounce(50).collectScoped { changeListVmResult ->
@@ -570,8 +570,8 @@ private fun <T : Any> LabeledListPanelViewModel<T>.getSelectableItemsFlow(): Flo
 private fun ErrorLink(error: Throwable) =
   ActionLink(message("pull.request.create.error.details")).also { link ->
     link.addActionListener {
-      val errorStatusPresenter = ErrorStatusPresenter.simple(message("pull.request.create.error"),
-                                                             descriptionProvider = GHHtmlErrorPanel::getLoadingErrorText)
+      val errorStatusPresenter = ErrorStatusPresenter.simpleHTML(message("pull.request.create.error"),
+                                                                 descriptionProvider = GHAPIExceptionUtil::getPresentableMessage)
       val errorTextPane = ErrorStatusPanelFactory.create(error, errorStatusPresenter, ErrorStatusPanelFactory.Alignment.LEFT).let {
         ScrollPaneFactory.createScrollPane(it, true)
       }.apply {

@@ -159,8 +159,8 @@ class PluginDescriptorTest {
     val descriptor = loadDescriptorInTest(tempDir)
     assertThat(descriptor).isNotNull
     assertThat(descriptor.pluginId.idString).isEqualTo("foo.bar")
-    assertThat(descriptor.jarFiles).isNotNull()
-    assertThat(descriptor.jarFiles!!.map { it.name }).isEqualTo(listOf("classes", "empty.jar"))
+    assertThat(descriptor.ownClassPath).isNotNull()
+    assertThat(descriptor.ownClassPath!!.map { it.name }).isEqualTo(listOf("classes", "empty.jar"))
   }
 
   @Test
@@ -182,8 +182,8 @@ class PluginDescriptorTest {
     val descriptor = loadDescriptorInTest(tempDir)
     assertThat(descriptor).isNotNull
     assertThat(descriptor.pluginId.idString).isEqualTo("foo.bar")
-    assertThat(descriptor.jarFiles).isNotNull()
-    assertThat(descriptor.jarFiles!!.map { it.name }).isEqualTo(listOf("classes", "empty.jar"))
+    assertThat(descriptor.ownClassPath).isNotNull()
+    assertThat(descriptor.ownClassPath!!.map { it.name }).isEqualTo(listOf("classes", "empty.jar"))
   }
 
   @Test
@@ -548,9 +548,8 @@ class PluginDescriptorTest {
     assertThat(loadDescriptorsFromClassPathInTest(TestLoader("jar:", "/jar spaces.jar!/")).plugins).hasSize(1)
   }
 
-  // todo equals of IdeaPluginDescriptorImpl is also dependent on sub-descriptor location (depends optional)
   @Test
-  fun testEqualityById() {
+  fun testEqualityByIdentity() {
     val tempFile = rootPath.resolve(PluginManagerCore.PLUGIN_XML_PATH)
     tempFile.write("""
 <idea-plugin>
@@ -562,13 +561,15 @@ class PluginDescriptorTest {
     tempFile.write("""
 <idea-plugin>
   <id>ID</id>
-  <name>B</name>
+  <name>A</name>
 </idea-plugin>""")
     val impl2 = loadDescriptorInTest(rootPath)
 
-    assertEquals(impl1, impl2)
-    assertEquals(impl1.hashCode(), impl2.hashCode())
-    assertNotEquals(impl1.name, impl2.name)
+    assert(impl1 !== impl2)
+    assertNotEquals(impl1, impl2)
+    assertEquals(impl1.name, impl2.name)
+    assertEquals(impl1.pluginId, impl2.pluginId)
+    assertEquals(impl1.descriptorPath, impl2.descriptorPath)
   }
 
   companion object {

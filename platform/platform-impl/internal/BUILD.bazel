@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.ide.internal` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "internal_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "internal",
   module_name = "intellij.platform.ide.internal",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":internal_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/code-style-api:codeStyle",
@@ -30,6 +25,7 @@ jvm_library(
     "//platform/platform-impl:ide-impl",
     "//platform/platform-impl/ui",
     "//platform/core-ui",
+    "//platform/util:util-ui",
     "//platform/statistics",
     "//platform/editor-ui-ex:editor-ex",
     "//platform/analysis-impl",
@@ -41,6 +37,7 @@ jvm_library(
     "//platform/workspace/jps",
     "//platform/jbr",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//platform/util/coroutines",
     "//platform/forms_rt:java-guiForms-rt",
     "//platform/statistics/uploader",
@@ -58,15 +55,19 @@ jvm_library(
     "//platform/workspace/storage",
     "//platform/platform-impl/concurrency",
     "//platform/platform-impl/update-checker",
+    "//platform/progress/shared:ide-progress",
     "//libraries/jbr",
     "//platform/projectModel-impl",
     "//platform/execution",
     "//platform/kernel/rpc",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//platform/locking-impl",
   ]
 )
 
 jvm_library(
   name = "internal_test_lib",
+  testonly = True,
   module_name = "intellij.platform.ide.internal",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -88,6 +89,7 @@ jvm_library(
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/platform-impl/ui:ui_test_lib",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//platform/statistics:statistics_test_lib",
     "//platform/editor-ui-ex:editor-ex_test_lib",
     "//platform/analysis-impl:analysis-impl_test_lib",
@@ -99,6 +101,7 @@ jvm_library(
     "//platform/workspace/jps:jps_test_lib",
     "//platform/jbr:jbr_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/util/coroutines:coroutines_test_lib",
     "//platform/forms_rt:java-guiForms-rt_test_lib",
     "//platform/statistics/uploader:uploader_test_lib",
@@ -115,10 +118,19 @@ jvm_library(
     "//platform/workspace/storage:storage_test_lib",
     "//platform/platform-impl/concurrency:concurrency_test_lib",
     "//platform/platform-impl/update-checker:update-checker_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
     "//libraries/jbr:jbr_test_lib",
     "//platform/projectModel-impl:projectModel-impl_test_lib",
     "//platform/execution:execution_test_lib",
     "//platform/kernel/rpc:rpc_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/locking-impl:locking-impl_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.ide.internal` end
+
+### auto-generated section `iml intellij.platform.ide.internal` start
+exports_files([
+  "intellij.platform.ide.internal.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.ide.internal` end

@@ -1,7 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.searchEverywhere.frontend.tabs
 
-import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.util.Disposer
 import com.intellij.platform.searchEverywhere.SeItemData
 import com.intellij.platform.searchEverywhere.SeParams
@@ -24,8 +23,8 @@ abstract class SeDefaultTabBase(
   override suspend fun itemSelected(item: SeItemData, modifiers: Int, searchText: String): Boolean = delegate.itemSelected(item, modifiers, searchText)
   override suspend fun canBeShownInFindResults(): Boolean = delegate.canBeShownInFindResults()
 
-  override suspend fun openInFindToolWindow(session: SeSession, params: SeParams, initEvent: AnActionEvent): Boolean =
-    if (canBeShownInFindResults()) delegate.openInFindToolWindow(session, params, initEvent, false) else false
+  override suspend fun openInFindToolWindow(session: SeSession, params: SeParams): Boolean =
+    if (canBeShownInFindResults()) delegate.openInFindToolWindow(session, params, false) else false
 
   override suspend fun performExtendedAction(item: SeItemData): Boolean = delegate.performExtendedAction(item)
   override suspend fun isPreviewEnabled(): Boolean = delegate.isPreviewEnabled()

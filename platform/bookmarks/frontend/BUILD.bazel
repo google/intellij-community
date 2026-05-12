@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.bookmarks.frontend` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "frontend_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "frontend",
   module_name = "intellij.platform.bookmarks.frontend",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":frontend_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/core-api:core",
@@ -24,12 +19,14 @@ jvm_library(
     "//platform/bookmarks",
     "//platform/kernel/shared:kernel",
     "//platform/project/shared:project",
+    "//fleet/rhizomedb",
   ],
   exports = ["//platform/bookmarks"]
 )
 
 jvm_library(
   name = "frontend_test_lib",
+  testonly = True,
   module_name = "intellij.platform.bookmarks.frontend",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -48,6 +45,13 @@ jvm_library(
     "//platform/bookmarks:bookmarks_test_lib",
     "//platform/kernel/shared:kernel_test_lib",
     "//platform/project/shared:project_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.bookmarks.frontend` end
+
+### auto-generated section `iml intellij.platform.bookmarks.frontend` start
+exports_files([
+  "intellij.platform.bookmarks.frontend.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.bookmarks.frontend` end

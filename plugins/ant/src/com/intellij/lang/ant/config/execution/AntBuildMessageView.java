@@ -831,7 +831,7 @@ public final class AntBuildMessageView extends JPanel
   void buildFinished(boolean isProgressAborted, final long buildTimeInMilliseconds, final @NotNull AntBuildListener antBuildListener, OutputPacketProcessor dispatcher) {
     final boolean aborted = isProgressAborted || myIsAborted;
 
-    dispatcher.processOutput(__ -> {
+    dispatcher.processOutput(_ -> {
       if (!myProject.isDisposed()) { // if not disposed
         final String message = getFinishStatusText(aborted, buildTimeInMilliseconds);
         addCommand(new FinishBuildCommand(message));

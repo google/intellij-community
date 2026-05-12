@@ -43,6 +43,16 @@ class VarHandleWrapperUnsafe extends VarHandleWrapper implements VarHandleWrappe
   }
 
   @Override
+  public Object getVolatile(Object thisObject) {
+    return Unsafe.getObjectVolatile(thisObject, OFFSET);
+  }
+
+  @Override
+  public void setVolatile(Object thisObject, Object value) {
+    Unsafe.putObjectVolatile(thisObject, OFFSET, value);
+  }
+
+  @Override
   public @NotNull VarHandleWrapper createForArrayElement(@NotNull Class<?> arrayClass) {
     assert arrayClass.isArray();
     int ABASE = Unsafe.arrayBaseOffset(arrayClass);

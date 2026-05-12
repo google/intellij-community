@@ -60,5 +60,8 @@
     <projectService serviceInterface="com.intellij.pom.PomModel"
                     serviceImplementation="com.intellij.psi.impl.source.PostprocessReformattingAspectImpl$LangPomModel" overrides="true"
                     preload="await"/>
+    <projectSettings service="com.intellij.psi.codeStyle.LegacyCodeStyleSettingsManager"/>
+    <applicationSettings service="com.intellij.psi.codeStyle.AppCodeStyleSettingsManager"/>
+    <projectSettings service="com.intellij.psi.codeStyle.ProjectCodeStyleSettingsManager"/>
   </extensions>
 </idea-plugin>

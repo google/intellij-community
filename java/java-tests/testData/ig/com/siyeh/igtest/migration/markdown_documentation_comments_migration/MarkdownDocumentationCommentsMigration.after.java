@@ -8,6 +8,9 @@ import java.util.HashMap;
 /// [java.util.ArrayList]
 /// [`description`][java.util.HashMap]
 /// @author Bas
+///
+/// @see <a href="https://jetbrains.com">Check out our cool website !</a>
+/// and our even better [merch](https://www.jetbrainsmerchandise.com) !
 public class MarkdownDocumentationCommentsMigration {
   /// {@return a hash code value for this object} This method is
   /// supported for the benefit of hash tables such as those provided by
@@ -520,17 +523,6 @@ class Matcher {
   /// methods.  The following code, for example, writes `one dog two dogs
   /// in the yard` to the standard-output stream: 
   ///
-  /// ```
-  /// Pattern p = Pattern.compile("cat");
-  /// Matcher m = p.matcher("one cat two cats in the yard");
-  /// StringBuffer sb = new StringBuffer();
-  /// while (m.find()) {
-  ///     m.appendReplacement(sb, "dog");
-  /// }
-  /// m.appendTail(sb);
-  /// System.out.println(sb.toString());
-  /// ```
-  ///
   /// @param  sb
   ///         The target string buffer
   ///
@@ -553,43 +545,6 @@ class Matcher {
   void appendReplacement(){}
 }
 
-class File {
-  /// Finds the definition expression of a given variable or reference expression within the provided context.
-  ///
-  /// Consider the following code:
-  ///
-  /// ```
-  /// class A {
-  ///   void sample() {
-  ///     String[] names = {"charlie", "joe"};
-  ///     Assert.assertEquals(Arrays.asList(names), List.of("charlie", "joe"));
-  ///   }
-  /// }
-  /// ```
-  /// ```
-  /// Single line
-  /// ```
-  /// ```
-  ///     Single line but tags at different lines
-  /// ```
-  /// ```
-  /// Single line but end tags at different lines
-  /// ```
-  /// ```
-  ///    Single line but start tags at different lines
-  /// ```
-  ///
-  /// The usage of `names` in a call to `assertEquals` is a [PsiReferenceExpression].
-  ///
-  /// When this method is called on that [PsiReferenceExpression], it returns [PsiExpression] that defined `names`.
-  /// In our example, it will be an instance of [PsiArrayInitializerExpression].
-  ///
-  /// @param referenceExpression the reference expression whose definition is to be found.
-  /// @param variable the optional variable that is associated with the reference expression.
-  /// @return the definition expression if found, otherwise null.
-  public void find() {}
-}
-
 class indentHandling {
   
   /// I have no space before the asterisks.
@@ -599,3 +554,12 @@ class indentHandling {
   /// hello
   void weloveSpace(){}
 }
+
+
+/// <pre>
+///   {@link String LeString}
+///   {@linkplain String LePlainString}
+///   {@literal KILL<String>}
+///   {@systemProperty I don't know how this one works}
+/// </pre>
+interface PreTagHell {}

@@ -58,13 +58,20 @@ public record ModStartTemplate(@NotNull VirtualFile file, @NotNull List<@NotNull
       return new ExpressionField(range, varName, expression);
     }
   }
-  
+
   public record DependantVariableField(@NotNull TextRange range, @NotNull String varName,
                                        @NotNull String dependantVariableName,
-                                       boolean alwaysStopAt) implements TemplateField {
+                                       boolean alwaysStopAt,
+                                       @Nullable String defaultValue) implements TemplateField {
+    public DependantVariableField(@NotNull TextRange range, @NotNull String varName,
+                                  @NotNull String dependantVariableName,
+                                  boolean alwaysStopAt) {
+      this(range, varName, dependantVariableName, alwaysStopAt, null);
+    }
+
     @Override
     public @NotNull TemplateField withRange(@NotNull TextRange range) {
-      return new DependantVariableField(range, varName, dependantVariableName, alwaysStopAt);
+      return new DependantVariableField(range, varName, dependantVariableName, alwaysStopAt, defaultValue);
     }
   }
 

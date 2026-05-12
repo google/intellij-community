@@ -4,11 +4,13 @@
 package org.jetbrains.intellij.build.productLayout.xml
 
 import com.intellij.openapi.util.JDOMUtil
+import org.jdom.Element
 import org.jetbrains.intellij.build.ModuleOutputProvider
 import org.jetbrains.intellij.build.findFileInModuleLibraryDependencies
 import org.jetbrains.intellij.build.findFileInModuleSources
 import org.jetbrains.intellij.build.isModuleNameLikeFilename
 import org.jetbrains.intellij.build.productLayout.ProductModulesContentSpec
+import org.jetbrains.jps.model.module.JpsModule
 
 /**
  * Appends XML header comments (placed BEFORE the opening tag, outside <idea-plugin>).
@@ -61,21 +63,12 @@ internal fun generateXIncludes(
   outputProvider: ModuleOutputProvider,
   inlineXmlIncludes: Boolean,
   sb: StringBuilder,
-  isUltimateBuild: Boolean,
 ) {
   for (include in spec.deprecatedXmlIncludes) {
-    // When inlining: skip ultimate-only `xi-includes` in Community builds
-    if (inlineXmlIncludes && include.ultimateOnly && !isUltimateBuild) {
-      continue
-    }
-
     // Find the module and file
     val module = outputProvider.findModule(include.contentModuleName.value)
     val resourcePath = include.resourcePath
     if (module == null) {
-      if (include.ultimateOnly) {
-        error("Ultimate-only module '${include.contentModuleName.value}' not found in Ultimate build - this is a configuration error (referenced in xi:include for '$resourcePath')")
-      }
       error("Module '${include.contentModuleName.value}' not found (referenced in xi:include for '$resourcePath')")
     }
 
@@ -85,6 +78,7 @@ internal fun generateXIncludes(
                ?: error("Resource '$resourcePath' not found in module '${module.name}' sources or libraries (referenced in xi:include)")
 
     if (inlineXmlIncludes && !include.optional) {
+      resolveIncludes(data, ModuleScopedXIncludeResolver(module, outputProvider))
       withEditorFold(sb, "  ", "Inlined from ${include.contentModuleName}/$resourcePath") {
         // Inline the actual XML content
         for (element in data.children) {
@@ -97,7 +91,7 @@ internal fun generateXIncludes(
     else {
       // Generate xi:include with absolute path (resources are in /META-INF/... in jars)
       // Wrap ultimate-only and optional xi-includes with xi:fallback for graceful handling
-      if (include.ultimateOnly || include.optional) {
+      if (include.optional) {
         sb.append("""  <xi:include href="${resourcePathToXIncludePath(resourcePath)}">""")
         sb.append("\n")
         sb.append("""    <xi:fallback/>""")
@@ -118,4 +112,39 @@ internal fun generateXIncludes(
  */
 internal fun resourcePathToXIncludePath(resourcePath: String): String {
   return if (isModuleNameLikeFilename(resourcePath)) resourcePath else "/$resourcePath"
+}
+
+/**
+ * Resolves nested `<xi:include>` elements inside a `deprecatedInclude` resource against
+ * the **owning** module's sources and libraries.
+ *
+ * The `deprecatedInclude("<module>", "<resource>")` API unambiguously identifies the
+ * owning module; xi:includes inside that resource are expected to live in the same
+ * module, which is the convention throughout the platform. Expanding them eagerly at
+ * render time removes the need for the late descriptor-search-scope resolver to carry
+ * module-origin information across the shallow inlining step.
+ *
+ * Returning `null` for an unresolvable href signals a cross-module xi:include (e.g., an
+ * `intellij.*.xml` content-module reference). The shared [resolveIncludes] will leave
+ * such elements in place so the late resolver can handle them with its broader scope.
+ */
+private class ModuleScopedXIncludeResolver(
+  private val module: JpsModule,
+  private val outputProvider: ModuleOutputProvider,
+) : XIncludeElementResolver {
+  override fun resolveElement(relativePath: String, isOptional: Boolean, isDynamic: Boolean): Element? {
+    if (isOptional || isDynamic) return null
+    val loadPath = hrefToLoadPath(relativePath)
+    return findFileInModuleSources(module, loadPath)?.let { JDOMUtil.load(it) }
+           ?: findFileInModuleLibraryDependencies(module = module, relativePath = loadPath, outputProvider = outputProvider)
+             ?.let { JDOMUtil.load(it) }
+  }
+}
+
+// mirrors org.jetbrains.intellij.build.impl.toLoadPath
+private fun hrefToLoadPath(href: String): String = when {
+  href.isEmpty() -> href
+  href[0] == '/' -> href.substring(1)
+  isModuleNameLikeFilename(href) -> href
+  else -> "META-INF/$href"
 }

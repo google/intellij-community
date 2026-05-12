@@ -3,6 +3,7 @@ package org.jetbrains.kotlin.idea.base.fir.analysisApiPlatform
 
 import com.intellij.ide.highlighter.JavaClassFileType
 import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.util.filteringIsInstance
 import org.jetbrains.kotlin.analysis.api.platform.declarations.KotlinDirectInheritorsProvider
 import org.jetbrains.kotlin.analysis.decompiler.konan.KlibMetaFileType
 import org.jetbrains.kotlin.analysis.decompiler.psi.KotlinBuiltInFileType
@@ -33,6 +34,6 @@ class FirIdeKotlinDirectInheritorsProvider : KotlinDirectInheritorsProvider {
             includeLocal = includeLocalInheritors,
         )
 
-        return DirectKotlinClassInheritorsSearch.search(searchParameters).asIterable().filterIsInstance<KtClassOrObject>().toList()
+        return DirectKotlinClassInheritorsSearch.search(searchParameters).filteringIsInstance<KtClassOrObject>().findAll()
     }
 }

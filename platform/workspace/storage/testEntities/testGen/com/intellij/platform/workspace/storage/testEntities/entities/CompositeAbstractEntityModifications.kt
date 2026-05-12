@@ -16,7 +16,8 @@ interface CompositeAbstractEntityBuilder<T : CompositeAbstractEntity> : Workspac
   var parentEntity: ParentChainEntityBuilder?
 }
 
-internal object CompositeAbstractEntityType : EntityType<CompositeAbstractEntity, CompositeAbstractEntityBuilder<CompositeAbstractEntity>>() {
+internal object CompositeAbstractEntityType :
+  EntityType<CompositeAbstractEntity, CompositeAbstractEntityBuilder<CompositeAbstractEntity>>() {
   override val entityClass: Class<CompositeAbstractEntity> get() = CompositeAbstractEntity::class.java
   operator fun invoke(
     entitySource: EntitySource,

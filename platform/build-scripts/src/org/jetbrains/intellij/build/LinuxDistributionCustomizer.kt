@@ -1,11 +1,11 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build
 
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.plus
-import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.intellij.build.impl.support.RepairUtilityBuilder
+import org.jetbrains.intellij.build.impl.support.bundleRepairUtility
 import org.jetbrains.intellij.build.kotlin.KotlinBinaries
 import java.nio.file.Path
 
@@ -51,22 +51,20 @@ inline fun linuxCustomizer(projectHome: Path, configure: LinuxCustomizerBuilder.
 @LinuxCustomizerDsl
 class LinuxCustomizerBuilder @PublishedApi internal constructor(private val projectHome: Path) {
   /**
-   * Path to 128x128 PNG product icon for Linux distribution, relative to projectHome.
+   * Path to a 128x128 .png product icon for the Linux distribution, relative to [projectHome].
    * Specify as a relative string path (e.g., "build/images/linux/icon.png").
-   * Will be automatically resolved against projectHome during build.
    * If omitted, only an SVG icon will be included.
    */
   var iconPngPath: String? = null
 
   /**
-   * Path to PNG product icon for EAP builds, relative to projectHome.
-   * If null, [iconPngPath] will be used.
-   * Specify as a relative string path - will be resolved against projectHome during build.
+   * Path to PNG product icon for EAP builds, relative to [projectHome].
+   * If `null`, [iconPngPath] will be used.
    */
   var iconPngPathForEAP: String? = null
 
   /**
-   * Relative paths to files in the Linux distribution which should take 'executable' permissions.
+   * Relative paths to files in the Linux distribution which should have 'executable' permissions.
    */
   var extraExecutables: PersistentList<String> = persistentListOf()
 
@@ -76,7 +74,7 @@ class LinuxCustomizerBuilder @PublishedApi internal constructor(private val proj
   var buildArtifactWithoutRuntime: Boolean = false
 
   /**
-   * Add an instance of [Snap] if a .snap package should be produced.
+   * Add an instance of [LinuxDistributionCustomizer.Snap] if a .snap package should be produced.
    */
   var snaps: PersistentList<LinuxDistributionCustomizer.Snap> = persistentListOf()
 
@@ -87,7 +85,7 @@ class LinuxCustomizerBuilder @PublishedApi internal constructor(private val proj
 
   /**
    * Gets the current copyAdditionalFiles handler for wrapping purposes.
-   * @return the current handler, or null if none is set
+   * @return the current handler, or `null` if none is set
    */
   fun getCopyAdditionalFilesHandler(): (suspend (Path, JvmArchitecture, BuildContext) -> Unit)? = copyAdditionalFilesHandler
 
@@ -95,26 +93,24 @@ class LinuxCustomizerBuilder @PublishedApi internal constructor(private val proj
    * Adds custom logic for copying additional files to the Linux distribution.
    * This handler is called after the base copyAdditionalFiles logic.
    *
-   * @param handler Lambda receiving targetDir, arch, and context
+   * @see [ProductProperties.copyAdditionalOsSpecificFiles]
    */
   fun copyAdditionalFiles(handler: suspend (targetDir: Path, arch: JvmArchitecture, context: BuildContext) -> Unit) {
-    this.copyAdditionalFilesHandler = handler
+    copyAdditionalFilesHandler = handler
   }
 
   /**
    * Sets a custom root directory name inside the .tar.gz archive.
-   *
-   * @param handler Lambda receiving ApplicationInfoProperties and buildNumber, returning the root directory name
    */
   fun rootDirectoryName(handler: (ApplicationInfoProperties, String) -> String) {
-    this.rootDirectoryNameHandler = handler
+    rootDirectoryNameHandler = handler
   }
 
   /**
    * Sets custom executable file patterns generator.
    * The handler receives base patterns from the parent customizer, making it easy to extend or filter them.
    *
-   * Note: Linux-specific parameter `targetLibcImpl` indicates GLIBC vs MUSL variant.
+   * Note: Linux-specific parameter `targetLibcImpl` indicates Glibc or Musl variant.
    *
    * Example:
    * ```kotlin
@@ -122,20 +118,16 @@ class LinuxCustomizerBuilder @PublishedApi internal constructor(private val proj
    *   base + listOf("bin/custom/$arch/tool")
    * }
    * ```
-   *
-   * @param handler Lambda receiving base patterns, includeRuntime flag, arch, targetLibcImpl, and context, returning a sequence of patterns
    */
   fun executableFilePatterns(handler: (basePatterns: Sequence<String>, Boolean, JvmArchitecture, LibcImpl, BuildContext) -> Sequence<String>) {
-    this.executableFilePatternsHandler = handler
+    executableFilePatternsHandler = handler
   }
 
   /**
    * Builds the [LinuxDistributionCustomizer] with the configured settings.
-   * Automatically resolves relative paths against projectHome.
+   * Automatically prefixes relative paths with [projectHome].
    */
-  fun build(): LinuxDistributionCustomizer {
-    return LinuxDistributionCustomizerImpl(builder = this, projectHome = projectHome)
-  }
+  fun build(): LinuxDistributionCustomizer = LinuxDistributionCustomizerImpl(builder = this, projectHome)
 
   private class LinuxDistributionCustomizerImpl(
     private val builder: LinuxCustomizerBuilder,
@@ -151,6 +143,7 @@ class LinuxCustomizerBuilder @PublishedApi internal constructor(private val proj
 
     override suspend fun copyAdditionalFiles(targetDir: Path, arch: JvmArchitecture, context: BuildContext) {
       super.copyAdditionalFiles(targetDir = targetDir, arch = arch, context = context)
+      context.productProperties.copyAdditionalOsSpecificFiles(targetDir, OsFamily.LINUX, arch, context)
       builder.copyAdditionalFilesHandler?.invoke(targetDir, arch, context)
     }
 
@@ -172,42 +165,41 @@ class LinuxCustomizerBuilder @PublishedApi internal constructor(private val proj
 }
 
 /**
- * Creates a [LinuxDistributionCustomizer] with Community edition defaults using a builder DSL.
+ * Creates a [LinuxDistributionCustomizer] with open source build defaults using a builder DSL.
  *
  * Example usage:
  * ```kotlin
  * communityLinuxCustomizer(projectHome) {
- *   // Override or extend Community defaults
+ *   // override or extend the defaults
  *   extraExecutables += "bin/custom-tool"
  * }
  * ```
  */
-inline fun communityLinuxCustomizer(projectHome: Path, configure: LinuxCustomizerBuilder.() -> Unit = {}): LinuxDistributionCustomizer {
-  return linuxCustomizer(projectHome) {
-    // Set Community defaults
-    iconPngPath = "build/conf/ideaCE/linux/images/icon_CE_128.png"
-    iconPngPathForEAP = "build/conf/ideaCE/linux/images/icon_CE_EAP_128.png"
-    snaps += LinuxDistributionCustomizer.Snap(
-      name = "intellij-idea",
-      description =
-        "The most intelligent Java IDE. Every aspect of IntelliJ IDEA is specifically designed to maximize developer productivity. " +
-        "Together, powerful static code analysis and ergonomic design make development not only productive but also an enjoyable experience."
-    )
+inline fun communityLinuxCustomizer(
+  projectHome: Path,
+  configure: LinuxCustomizerBuilder.() -> Unit = {}
+): LinuxDistributionCustomizer = linuxCustomizer(projectHome) {
+  iconPngPath = "build/conf/ideaCE/linux/images/icon_CE_128.png"
+  iconPngPathForEAP = "build/conf/ideaCE/linux/images/icon_CE_EAP_128.png"
+  snaps += LinuxDistributionCustomizer.Snap(
+    name = "intellij-idea",
+    description =
+      "The most intelligent Java IDE. Every aspect of IntelliJ IDEA is specifically designed to maximize developer productivity. " +
+      "Together, powerful static code analysis and ergonomic design make development not only productive but also an enjoyable experience."
+  )
 
-    rootDirectoryName { _, buildNumber -> "idea-IC-$buildNumber" }
+  rootDirectoryName { _, buildNumber -> "idea-IC-$buildNumber" }
 
-    executableFilePatterns { base, _, _, _, _ ->
-      base.plus(KotlinBinaries.kotlinCompilerExecutables).filterNot { it == "plugins/**/*.sh" }
-    }
-
-    // Apply user configuration
-    configure()
+  executableFilePatterns { base, _, _, _, _ ->
+    base.plus(KotlinBinaries.kotlinCompilerExecutables).filterNot { it == "plugins/**/*.sh" }
   }
+
+  configure()
 }
 
 open class LinuxDistributionCustomizer {
   /**
-   * Path to a 128x128 PNG product icon for Linux distribution.
+   * Path to a 128x128 .png product icon for the Linux distribution.
    * If omitted, only an SVG icon will be included.
    */
   var iconPngPath: Path? = null
@@ -217,22 +209,14 @@ open class LinuxDistributionCustomizer {
    */
   var iconPngPathForEAP: Path? = null
 
-  @Suppress("unused")
-  @ApiStatus.ScheduledForRemoval
-  @Deprecated("New native launcher is always enabled")
   /**
-   * Enables the use of the new cross-platform launcher (which loads launch data from `product-info.json` instead of hardcoding into a script).
-   * It's now recommended to use the new launcher, so it must always be built. Setting this property to `false` will have no effect.
-   */
-  var useXPlatLauncher: Boolean = true
-
-  /**
-   * Relative paths to files in the Linux distribution which should take 'executable' permissions
+   * Relative paths to files in the Linux distribution which should have 'executable' permissions.
    */
   var extraExecutables: PersistentList<String> = persistentListOf()
 
   open fun generateExecutableFilesPatterns(includeRuntime: Boolean, arch: JvmArchitecture, targetLibcImpl: LibcImpl, context: BuildContext): Sequence<String> {
-    val basePatterns = sequenceOf(
+    val basePatterns = if (context.isLanguageServer) sequenceOf("bin/${context.productProperties.baseFileName}")
+    else sequenceOf(
       "bin/*.sh",
       "plugins/**/*.sh",
       "bin/fsnotifier",
@@ -298,6 +282,6 @@ open class LinuxDistributionCustomizer {
    * Override this method to copy additional files to the Linux distribution of the product.
    */
   open suspend fun copyAdditionalFiles(targetDir: Path, arch: JvmArchitecture, context: BuildContext) {
-    RepairUtilityBuilder.bundle(OsFamily.LINUX, arch, targetDir, context)
+    bundleRepairUtility(os = OsFamily.LINUX, arch = arch, distributionDir = targetDir, context = context)
   }
 }

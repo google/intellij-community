@@ -118,8 +118,10 @@ fun updateFromSources(project: Project, beforeRestart: () -> Unit, restartAutoma
 
   val deployDir = devIdeaHome.resolve("out/deploy")
   val builtDistDir = deployDir.resolve("dist")
+  val additionalVmOptionsForBuildScripts = state.additionalVmOptionsForBuildScripts
   val params = createScriptJavaParameters(
-    project, deployDir, builtDistDir, buildEnabledPluginsOnly, bundledPluginDirsToSkip, nonBundledPluginDirsToInclude
+    project, deployDir, builtDistDir, buildEnabledPluginsOnly, bundledPluginDirsToSkip, nonBundledPluginDirsToInclude,
+    additionalVmOptionsForBuildScripts
   ) ?: return
   params.workingDirectory = devIdeaHome.pathString
   val taskManager = ProjectTaskManager.getInstance(project)
@@ -351,6 +353,7 @@ private fun createScriptJavaParameters(
   buildEnabledPluginsOnly: Boolean,
   bundledPluginDirsToSkip: List<String>,
   nonBundledPluginDirsToInclude: List<String>,
+  additionalVmOptionsForBuildScripts: String?,
 ): JavaParameters? {
   val sdk = ProjectRootManager.getInstance(project).projectSdk
   if (sdk == null) {
@@ -394,5 +397,7 @@ private fun createScriptJavaParameters(
   }
   params.vmParametersList.add("-Dintellij.build.output.root=${deployDir}")
   params.vmParametersList.add("-DdistOutputRelativePath=${deployDir.relativize(builtDistPath)}")
+  params.vmParametersList.addParametersString(additionalVmOptionsForBuildScripts)
+
   return params
 }

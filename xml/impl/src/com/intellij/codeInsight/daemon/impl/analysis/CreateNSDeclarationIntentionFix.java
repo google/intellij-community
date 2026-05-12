@@ -462,7 +462,7 @@ public class CreateNSDeclarationIntentionFix implements HintAction, LocalQuickFi
         marker = null;
       }
       final XmlNamespaceHelper helper = XmlNamespaceHelper.getHelper(myXmlFile);
-      helper.insertNamespaceDeclaration(myXmlFile, myEditor, Collections.singleton(namespace), prefix, __ -> {
+      helper.insertNamespaceDeclaration(myXmlFile, myEditor, Collections.singleton(namespace), prefix, _ -> {
         if (myEditor != null && !namespace.isEmpty()) {
           myEditor.getCaretModel().moveToOffset(marker.getStartOffset());
         }

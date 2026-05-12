@@ -242,14 +242,15 @@ public final class CompilerConfigurationImpl extends CompilerConfiguration imple
       state.addContent(annotationProcessingSettings);
     }
 
-    List<String> moduleNames = getFilteredModuleNameList(myProject, myModuleBytecodeTarget, false);
+    Map<String, String> bytecodeTargetSnapshot = Map.copyOf(myModuleBytecodeTarget);
+    List<String> moduleNames = getFilteredModuleNameList(myProject, bytecodeTargetSnapshot, false);
     if (!StringUtil.isEmpty(myBytecodeTargetLevel) || !moduleNames.isEmpty()) {
       final Element bytecodeTarget = new Element(JpsJavaCompilerConfigurationSerializer.BYTECODE_TARGET_LEVEL);
       state.addContent(bytecodeTarget);
       if (!StringUtil.isEmpty(myBytecodeTargetLevel)) {
         bytecodeTarget.setAttribute(JpsJavaCompilerConfigurationSerializer.TARGET_ATTRIBUTE, myBytecodeTargetLevel);
       }
-      writeBytecodeTarget(moduleNames, myModuleBytecodeTarget, bytecodeTarget);
+      writeBytecodeTarget(moduleNames, bytecodeTargetSnapshot, bytecodeTarget);
     }
     return state;
   }

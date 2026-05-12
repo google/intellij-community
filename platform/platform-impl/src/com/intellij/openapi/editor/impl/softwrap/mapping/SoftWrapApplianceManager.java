@@ -11,6 +11,7 @@ import com.intellij.openapi.editor.EditorThreading;
 import com.intellij.openapi.editor.FoldRegion;
 import com.intellij.openapi.editor.LanguageLineWrapPositionStrategy;
 import com.intellij.openapi.editor.LineWrapPositionStrategy;
+import com.intellij.openapi.editor.SoftWrap;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.ex.DocumentEx;
 import com.intellij.openapi.editor.ex.ScrollingModelEx;
@@ -20,6 +21,7 @@ import com.intellij.openapi.editor.impl.SoftWrapEngine;
 import com.intellij.openapi.editor.impl.TextChangeImpl;
 import com.intellij.openapi.editor.impl.softwrap.SoftWrapHelper;
 import com.intellij.openapi.editor.impl.softwrap.SoftWrapImpl;
+import com.intellij.openapi.editor.impl.softwrap.SoftWrapNotifier;
 import com.intellij.openapi.editor.impl.softwrap.SoftWrapPainter;
 import com.intellij.openapi.editor.impl.softwrap.SoftWrapsStorage;
 import com.intellij.openapi.project.Project;
@@ -27,7 +29,6 @@ import com.intellij.openapi.util.Segment;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.EditorNotifications;
 import com.intellij.util.DocumentUtil;
-import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -43,7 +44,7 @@ import java.util.List;
  * ({@code 'logical position -> visual position'}, {@code 'offset -> logical position'} etc) and update it incrementally
  * on events like document modification fold region(s) expanding/collapsing etc.
  * <p/>
- * This class encapsulates document parsing logic. It notifies {@link SoftWrapAwareDocumentParsingListener registered listeners}
+ * This class encapsulates document parsing logic. It notifies {@link SoftWrapParsingListener registered listeners}
  * about parsing and they are free to store necessary information for further usage.
  * <p/>
  * Not thread-safe.
@@ -67,13 +68,12 @@ public final class SoftWrapApplianceManager implements Dumpable {
     CUSTOM
   }
 
-  private final List<SoftWrapAwareDocumentParsingListener> myListeners = ContainerUtil.createLockFreeCopyOnWriteList();
-
   private final SoftWrapsStorage myStorage;
   private final EditorImpl myEditor;
   private final DocumentEx myDocument;
   private SoftWrapPainter myPainter;
   private final CachingSoftWrapDataMapper myDataMapper;
+  private final @NotNull SoftWrapNotifier mySoftWrapNotifier;
 
   /**
    * Visual area width change causes soft wraps addition/removal, so, we want to update {@code 'y'} coordinate
@@ -93,7 +93,8 @@ public final class SoftWrapApplianceManager implements Dumpable {
   private int                            myVisibleAreaWidth;
   private boolean                        myInProgress;
   private boolean                        myIsDirty = true;
-  private IncrementalCacheUpdateEvent    myDocumentChangedEvent;
+  private int                            myDocumentChangeStartOffset = -1;
+  private int                            myDocumentChangeEndOffset = -1;
   private int                            myAvailableWidth = QUICK_DUMMY_WRAPPING;
   private @Nullable LineWrapPositionStrategy myLineWrapPositionStrategy;
 
@@ -102,13 +103,15 @@ public final class SoftWrapApplianceManager implements Dumpable {
   public SoftWrapApplianceManager(@NotNull SoftWrapsStorage storage,
                                   @NotNull EditorImpl editor,
                                   @NotNull SoftWrapPainter painter,
-                                  CachingSoftWrapDataMapper dataMapper)
+                                  @NotNull CachingSoftWrapDataMapper dataMapper,
+                                  @NotNull SoftWrapNotifier softWrapNotifier)
   {
     myStorage = storage;
     myEditor = editor;
-    myDocument = editor.getUiDocument();
+    myDocument = editor.getElfDocument();
     myPainter = painter;
     myDataMapper = dataMapper;
+    mySoftWrapNotifier = softWrapNotifier;
     myWidthProvider = new DefaultVisibleAreaWidthProvider();
     myEditor.getScrollingModel().addVisibleAreaListener(e -> EditorThreading.run(() -> {
       updateAvailableArea();
@@ -122,16 +125,9 @@ public final class SoftWrapApplianceManager implements Dumpable {
   }
 
   @ApiStatus.Internal
-  public void registerSoftWrapIfNecessary() {
-    recalculateIfNecessary();
-  }
-
-  @ApiStatus.Internal
   public void reset() {
     myIsDirty = true;
-    for (SoftWrapAwareDocumentParsingListener listener : myListeners) {
-      listener.reset();
-    }
+    mySoftWrapNotifier.notifyReset();
   }
 
   private void recalculate(IncrementalCacheUpdateEvent e) {
@@ -158,30 +154,8 @@ public final class SoftWrapApplianceManager implements Dumpable {
       return;
     }
 
-    ranges = ContainerUtil.sorted(ranges, (o1, o2) -> {
-      int startDiff = o1.getStartOffset() - o2.getStartOffset();
-      return startDiff == 0 ? o2.getEndOffset() - o1.getEndOffset() : startDiff;
-    });
-    final int[] lastRecalculatedOffset = {0};
-    SoftWrapAwareDocumentParsingListenerAdapter listener = new SoftWrapAwareDocumentParsingListenerAdapter() {
-      @Override
-      public void onRecalculationEnd(@NotNull IncrementalCacheUpdateEvent event) {
-        lastRecalculatedOffset[0] = event.getActualEndOffset();
-      }
-    };
-    myListeners.add(listener);
-    try {
-      for (Segment range : ranges) {
-        int lastOffset = lastRecalculatedOffset[0];
-        if (range.getEndOffset() > lastOffset) {
-          recalculateSoftWraps(new IncrementalCacheUpdateEvent(Math.max(range.getStartOffset(), lastOffset), range.getEndOffset(),
-                                                               myEditor));
-        }
-      }
-    }
-    finally {
-      myListeners.remove(listener);
-    }
+    SoftWrapHelper.recalculateSegments(ranges, mySoftWrapNotifier,
+                                       (startOffset, endOffset) -> recalculateSoftWraps(createEventForVisualChange(startOffset, endOffset)));
 
     onRecalculationEnd();
   }
@@ -190,6 +164,7 @@ public final class SoftWrapApplianceManager implements Dumpable {
   public void recalculateAll() {
     reset();
     myStorage.removeAll();
+    mySoftWrapNotifier.notifySoftWrapsChanged();
     myVisibleAreaWidth = myAvailableWidth;
     myCustomIndentUsedLastTime = myEditor.getSettings().isUseCustomSoftWrapIndent();
     myCustomIndentValueUsedLastTime = myEditor.getSettings().getCustomSoftWrapIndent();
@@ -210,7 +185,7 @@ public final class SoftWrapApplianceManager implements Dumpable {
     }
     myIsDirty = false;
 
-    recalculateSoftWraps(new IncrementalCacheUpdateEvent(myDocument));
+    recalculateSoftWraps(IncrementalCacheUpdateEvent.forWholeDocument(myDocument));
 
     onRecalculationEnd();
 
@@ -219,9 +194,7 @@ public final class SoftWrapApplianceManager implements Dumpable {
 
   private void onRecalculationEnd() {
     updateLastTopLeftCornerOffset();
-    for (SoftWrapAwareDocumentParsingListener listener : myListeners) {
-      listener.recalculationEnds();
-    }
+    mySoftWrapNotifier.notifyAllDirtyRegionsReparsed();
   }
 
   private void recalculateSoftWraps(@NotNull IncrementalCacheUpdateEvent event) {
@@ -232,7 +205,7 @@ public final class SoftWrapApplianceManager implements Dumpable {
     myInProgress = true;
     try {
       myEventBeingProcessed = event;
-      notifyListenersOnCacheUpdateStart(event);
+      mySoftWrapNotifier.notifyRegionReparseStart(event);
       int endOffsetUpperEstimate = SoftWrapHelper.getEndOffsetUpperEstimate(myEditor, myDocument, event);
       if (myVisibleAreaWidth == QUICK_DUMMY_WRAPPING) {
         doRecalculateSoftWrapsRoughly(event);
@@ -247,7 +220,7 @@ public final class SoftWrapApplianceManager implements Dumpable {
       if (event.getActualEndOffset() > endOffsetUpperEstimate) {
         LOG.error("Unexpected error at soft wrap recalculation", new Attachment("softWrapModel.txt", myEditor.getSoftWrapModel().toString()));
       }
-      notifyListenersOnCacheUpdateEnd(event);
+      mySoftWrapNotifier.notifyRegionReparseEnd(event);
       myEventBeingProcessed = null;
     }
     finally {
@@ -360,6 +333,7 @@ public final class SoftWrapApplianceManager implements Dumpable {
     // Drop information about processed lines.
     reset();
     myStorage.removeAll();
+    mySoftWrapNotifier.notifySoftWrapsChanged();
     myVisibleAreaWidth = currentVisibleAreaWidth;
     final boolean result = recalculateSoftWraps();
     if (!result) {
@@ -401,57 +375,36 @@ public final class SoftWrapApplianceManager implements Dumpable {
     return myEditor.getSettings().isUseCustomSoftWrapIndent() ? IndentType.CUSTOM : IndentType.NONE;
   }
 
-  /**
-   * Registers given listener within the current manager.
-   *
-   * @param listener    listener to register
-   * @return            {@code true} if this collection changed as a result of the call; {@code false} otherwise
-   */
   @ApiStatus.Internal
-  public boolean addListener(@NotNull SoftWrapAwareDocumentParsingListener listener) {
-    return myListeners.add(listener);
-  }
-
-  @ApiStatus.Internal
-  public boolean removeListener(@NotNull SoftWrapAwareDocumentParsingListener listener) {
-    return myListeners.remove(listener);
-  }
-
-
-  private void notifyListenersOnCacheUpdateStart(IncrementalCacheUpdateEvent event) {
-    //noinspection ForLoopReplaceableByForEach
-    for (int i = 0; i < myListeners.size(); i++) {
-      // Avoid unnecessary Iterator object construction as this method is expected to be called frequently.
-      SoftWrapAwareDocumentParsingListener listener = myListeners.get(i);
-      listener.onCacheUpdateStart(event);
-    }
-  }
-
-  private void notifyListenersOnCacheUpdateEnd(IncrementalCacheUpdateEvent event) {
-    //noinspection ForLoopReplaceableByForEach
-    for (int i = 0; i < myListeners.size(); i++) {
-      // Avoid unnecessary Iterator object construction as this method is expected to be called frequently.
-      SoftWrapAwareDocumentParsingListener listener = myListeners.get(i);
-      listener.onRecalculationEnd(event);
-    }
+  public void beforeFoldRegionDisposed(FoldRegion region) {
+    myDocumentChangeEndOffset = Math.max(region.getEndOffset(), myDocumentChangeEndOffset);
   }
 
   @ApiStatus.Internal
   public void beforeDocumentChange(DocumentEvent event) {
-    myDocumentChangedEvent = new IncrementalCacheUpdateEvent(event, myEditor);
+    // We call it before the change, because a folding may become invalidated by the change,
+    // and the expanded range would not be covered by soft-wrap recalculation.
+    myDocumentChangeStartOffset = getIncrementalUpdateStartOffset(event.getOffset());
+    myDocumentChangeEndOffset = event.getOffset() + event.getNewLength();
   }
 
   @ApiStatus.Internal
   public void documentChanged(DocumentEvent event, boolean processAlsoLineEnd) {
-    LOG.assertTrue(myDocumentChangedEvent != null);
-    recalculate(myDocumentChangedEvent);
+    LOG.assertTrue(myDocumentChangeStartOffset != -1);
+    IncrementalCacheUpdateEvent cacheUpdateEvent = new IncrementalCacheUpdateEvent(
+      myDocumentChangeStartOffset,
+      SoftWrapHelper.coerceToValidOffset(myDocumentChangeEndOffset, event.getDocument()),
+      event.getNewLength() - event.getOldLength()
+    );
+    recalculate(cacheUpdateEvent);
     if (processAlsoLineEnd) {
-      int lineEndOffset = DocumentUtil.getLineEndOffset(myDocumentChangedEvent.getMandatoryEndOffset(), event.getDocument());
-      if (lineEndOffset > myDocumentChangedEvent.getActualEndOffset()) {
-        recalculate(new IncrementalCacheUpdateEvent(lineEndOffset, lineEndOffset, myEditor));
+      int lineEndOffset = DocumentUtil.getLineEndOffset(cacheUpdateEvent.getMandatoryEndOffset(), event.getDocument());
+      if (lineEndOffset > cacheUpdateEvent.getActualEndOffset()) {
+        recalculate(createEventForVisualChange(lineEndOffset, lineEndOffset));
       }
     }
-    myDocumentChangedEvent = null;
+    myDocumentChangeStartOffset = -1;
+    myDocumentChangeEndOffset = -1;
   }
 
   //@ApiStatus.Internal
@@ -555,6 +508,73 @@ public final class SoftWrapApplianceManager implements Dumpable {
         if (rightMargin > 0) width = Math.min(width, rightMargin * EditorUtil.getPlainSpaceWidth(myEditor));
       }
       return width;
+    }
+  }
+
+  /**
+   * Creates new {@code IncrementalCacheUpdateEvent} object for the event not changing document length
+   * (like expansion of folded region).
+   */
+  private IncrementalCacheUpdateEvent createEventForVisualChange(int startOffset, int endOffset) {
+    return new IncrementalCacheUpdateEvent(
+      getIncrementalUpdateStartOffset(startOffset),
+      endOffset,
+      0
+    );
+  }
+
+  private int getIncrementalUpdateStartOffset(int eventStartOffset) {
+    VisualLineInfo info = getVisualLineInfo(eventStartOffset, false);
+    if (info.startsWithSoftWrap()) {
+      info = getVisualLineInfo(info.startOffset, true);
+    }
+    // cannot start recalculation from a custom wrap:
+    //   SoftWrapEngine relies on the first soft-wrap to calculate indent for further soft wraps within the same logical line
+    while (info.startsWithCustomSoftWrap()) {
+      info = getVisualLineInfo(info.startOffset, true);
+    }
+    return info.startOffset;
+  }
+
+  /** Finds information about visual line start without using coordinate mapping. */
+  private VisualLineInfo getVisualLineInfo(int offset, boolean beforeSoftWrap) {
+    int textLength = myDocument.getTextLength();
+    if (offset <= 0 || textLength == 0) return new VisualLineInfo(0, null);
+    offset = Math.min(offset, textLength);
+
+    // if the startOffset of the logical line is folded, then we find the startOffset corresponding to the start of that folding, recursively
+    int startOffset = EditorUtil.getNotFoldedLineStartOffset(myEditor, offset);
+
+    int wrapIndex = myStorage.getSoftWrapIndex(offset);
+
+    int prevSoftWrapIndex = wrapIndex < 0 ?
+                            // if not found: the one closest to offset backwards
+                            -wrapIndex - 2 :
+                            // if soft-wrap at startOffset: beforeSoftWrap decides if to consider this one or the previous one, tie-braker
+                            wrapIndex - (beforeSoftWrap ? 1 : 0);
+    SoftWrap prevSoftWrap = prevSoftWrapIndex < 0 ? null : myStorage.getSoftWraps().get(prevSoftWrapIndex);
+
+    // the start of the visual line is then whichever is closer to the offset: some soft-wrap or the logical start of the line
+    int visualLineStartOffset = prevSoftWrap == null ? startOffset : Math.max(startOffset, prevSoftWrap.getStart());
+    return new VisualLineInfo(visualLineStartOffset,
+                              prevSoftWrap != null && prevSoftWrap.getStart() == visualLineStartOffset ? prevSoftWrap : null);
+  }
+
+  private static final class VisualLineInfo {
+    private final int startOffset;
+    private final SoftWrap startSoftWrap;
+
+    private VisualLineInfo(int startOffset, SoftWrap wrap) {
+      this.startOffset = startOffset;
+      startSoftWrap = wrap;
+    }
+
+    private boolean startsWithSoftWrap() {
+      return startSoftWrap != null;
+    }
+
+    private boolean startsWithCustomSoftWrap() {
+      return startSoftWrap != null && startSoftWrap.isCustomSoftWrap();
     }
   }
 }

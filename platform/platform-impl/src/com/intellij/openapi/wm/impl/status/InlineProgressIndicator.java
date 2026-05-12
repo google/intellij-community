@@ -148,7 +148,7 @@ public class InlineProgressIndicator extends ProgressIndicatorBase implements Di
       new IconButton(info.getCancelTooltipText(),
                      isCompact ? AllIcons.Process.StopSmall : AllIcons.Process.Stop,
                      isCompact ? AllIcons.Process.StopSmallHovered : AllIcons.Process.StopHovered),
-      __ -> cancelRequest()).setFillBg(false);
+      _ -> cancelRequest()).setFillBg(false);
 
     cancelButton.setVisible(info.isCancellable());
 

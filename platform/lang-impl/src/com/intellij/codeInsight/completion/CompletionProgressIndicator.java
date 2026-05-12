@@ -701,7 +701,12 @@ public final class CompletionProgressIndicator extends ProgressIndicatorBase imp
   }
 
   /**
-   * Waits for the lookup to be shown (usually it happens when the first item comes) and then checks if processing all candidates is finished.
+   * Waits for the lookup to be shown (usually it happens when the first item comes) and then checks if all candidates have been computed already.
+   * <p>
+   * The result might be:
+   * 1. Lookup is shown, and all candidates are computed => returns true
+   * 2. Lookup is not shown, and none candidates are collected => returns false
+   * 3. Lookup is not shown, some candidates are collected, but not all the contributors have finished processing => returns false
    */
   boolean blockingWaitForFinish(int timeoutMs) {
     if (handler.isTestingMode() && !TestModeFlags.is(CompletionAutoPopupHandler.ourTestingAutopopup)) {

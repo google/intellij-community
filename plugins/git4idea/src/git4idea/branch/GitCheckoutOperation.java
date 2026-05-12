@@ -105,7 +105,7 @@ class GitCheckoutOperation extends GitBranchOperation {
   @Override
   protected void execute() {
     Tracer tracer = TelemetryManager.getInstance().getTracer(VcsScope);
-    TraceKt.use(tracer.spanBuilder(Operation.Checkout.getName()).setAttribute("branch", myNewBranch != null ? myNewBranch : "null"), __ -> {
+    TraceKt.use(tracer.spanBuilder(Operation.Checkout.getName()).setAttribute("branch", myNewBranch != null ? myNewBranch : "null"), _ -> {
       StructuredIdeActivity checkoutActivity = CHECKOUT_ACTIVITY.started(myProject, () -> List.of(
         IS_BRANCH_PROTECTED.with(isBranchProtected()),
         IS_NEW_BRANCH.with(myNewBranch != null)

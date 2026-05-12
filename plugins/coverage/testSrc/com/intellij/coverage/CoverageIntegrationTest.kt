@@ -3,6 +3,7 @@ package com.intellij.coverage
 
 import com.intellij.codeEditor.printing.ExportToHTMLSettings
 import com.intellij.coverage.analysis.CoverageInfoCollector
+import com.intellij.coverage.analysis.JavaCoverageAnnotator
 import com.intellij.coverage.analysis.JavaCoverageClassesAnnotator
 import com.intellij.coverage.analysis.JavaCoverageReportEnumerator
 import com.intellij.coverage.analysis.PackageAnnotator.ClassCoverageInfo
@@ -11,10 +12,15 @@ import com.intellij.coverage.analysis.PackageAnnotator.SummaryCoverageInfo
 import com.intellij.coverage.xml.XMLReportAnnotator
 import com.intellij.idea.ExcludeFromTestDiscovery
 import com.intellij.openapi.application.readAction
+import com.intellij.openapi.module.ModuleManager
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.CompilerModuleExtension
+import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.rt.coverage.data.LineCoverage
+import com.intellij.testFramework.PsiTestUtil
 import com.intellij.util.concurrency.ThreadingAssertions
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert
@@ -23,7 +29,10 @@ import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
+import java.util.jar.JarEntry
+import java.util.jar.JarOutputStream
 
 @RunWith(JUnit4::class)
 @ExcludeFromTestDiscovery
@@ -52,9 +61,16 @@ class CoverageIntegrationTest : CoverageIntegrationBaseTest() {
   @Test
   fun testSingleClassFilter() {
     Assert.assertTrue(JavaCoverageOptionsProvider.getInstance(myProject).ignoreImplicitConstructors)
-    val filters = arrayOf("foo.bar.BarClass")
-    val bundle = loadIJSuite(filters)
+    assertSingleClassFilter(loadIJSuite(arrayOf("foo.bar.BarClass")))
+  }
 
+  @Test
+  fun testJaCoCoSingleClassFilter() {
+    Assert.assertTrue(JavaCoverageOptionsProvider.getInstance(myProject).ignoreImplicitConstructors)
+    assertSingleClassFilter(loadJaCoCoSuite(arrayOf("foo.bar.BarClass")))
+  }
+
+  private fun assertSingleClassFilter(bundle: CoverageSuitesBundle) {
     val projectData = bundle.coverageData!!
     projectData.getClassData("foo.bar.BarClass")!!
 
@@ -86,6 +102,12 @@ class CoverageIntegrationTest : CoverageIntegrationBaseTest() {
   fun testJaCoCo() = assertHits(loadJaCoCoSuite())
 
   @Test
+  fun `test ij coverage reads classes from jar output roots`() = assertHitsWithJarOutputRoots { loadIJSuite() }
+
+  @Test
+  fun `test jacoco reads classes from jar output roots`() = assertHitsWithJarOutputRoots { loadJaCoCoSuite() }
+
+  @Test
   fun testJaCoCoWithoutUnloaded() {
     Assert.assertTrue(JavaCoverageOptionsProvider.getInstance(myProject).ignoreImplicitConstructors)
     val bundle = loadJaCoCoSuite()
@@ -110,16 +132,28 @@ class CoverageIntegrationTest : CoverageIntegrationBaseTest() {
 
   @Test
   fun testHTMLReport() {
-    val bundle = loadIJSuite()
+    assertHTMLReportGenerated(loadIJSuite(), IDEACoverageRunner())
+  }
+
+  @Test
+  fun testJaCoCoHTMLReport() {
+    assertHTMLReportGenerated(loadJaCoCoSuite(), JaCoCoCoverageRunner())
+  }
+
+  private fun assertHTMLReportGenerated(bundle: CoverageSuitesBundle, runner: JavaCoverageRunner) {
+    val settings = ExportToHTMLSettings.getInstance(myProject)
+    val originalOutputDirectory = settings.OUTPUT_DIRECTORY
     val htmlDir = Files.createTempDirectory("html").toFile()
     try {
-      ExportToHTMLSettings.getInstance(myProject).OUTPUT_DIRECTORY = htmlDir.absolutePath
-      IDEACoverageRunner().generateReport(bundle, myProject)
+      settings.OUTPUT_DIRECTORY = htmlDir.absolutePath
+      runner.generateReport(bundle, myProject)
       assertTrue(htmlDir.exists())
       assertTrue(File(htmlDir, "index.html").exists())
+      assertTrue(htmlDir.walkTopDown().filter { it.isFile }.any { it.readText().contains("FooClass") })
     }
     finally {
-      htmlDir.delete()
+      settings.OUTPUT_DIRECTORY = originalOutputDirectory
+      htmlDir.deleteRecursively()
     }
   }
 
@@ -262,13 +296,67 @@ class CoverageIntegrationTest : CoverageIntegrationBaseTest() {
     }
   }
 
+  private fun assertHitsWithJarOutputRoots(loadSuite: () -> CoverageSuitesBundle) {
+    val module = ModuleManager.getInstance(myProject).findModuleByName("simple") ?: error("Module 'simple' is not found")
+    val originalOutputUrl = CompilerModuleExtension.getInstance(module)?.compilerOutputUrl ?: error("Module output URL is not configured")
+    val originalOutputPath = Path.of(VfsUtilCore.urlToPath(originalOutputUrl))
+    val jarOutput = Files.createTempFile("coverage-output", ".jar")
+    try {
+      createJarFromDirectory(originalOutputPath, jarOutput)
+      PsiTestUtil.setCompilerOutputPath(module, VfsUtilCore.pathToUrl(jarOutput.toString()), false)
+      assertHits(loadSuite())
+    }
+    finally {
+      PsiTestUtil.setCompilerOutputPath(module, originalOutputUrl, false)
+      Files.deleteIfExists(jarOutput)
+    }
+  }
+
+  private fun createJarFromDirectory(sourceDir: Path, targetJar: Path) {
+    JarOutputStream(Files.newOutputStream(targetJar)).use { output ->
+      Files.walk(sourceDir).use { paths ->
+        paths
+          .filter { Files.isRegularFile(it) }
+          .forEach { file ->
+            val relativePath = sourceDir.relativize(file).toString().replace('\\', '/')
+            output.putNextEntry(JarEntry(relativePath))
+            Files.copy(file, output)
+            output.closeEntry()
+          }
+      }
+    }
+  }
+
   private fun assertHits(suite: CoverageSuitesBundle, ignoreConstructor: Boolean, ignoreBranches: Boolean) {
     JavaCoverageOptionsProvider.getInstance(myProject).ignoreImplicitConstructors = ignoreConstructor
-    val consumer = PackageAnnotationConsumer()
-    JavaCoverageClassesAnnotator(suite, myProject, consumer).visitSuite()
+    val annotator = TestJavaCoverageAnnotator(myProject)
+    annotator.collectSummaryInfo(suite)
     val expected = if (ignoreConstructor) if (ignoreBranches) IGNORE_BRANCHES_REPORT else IGNORE_CONSTRUCTOR_REPORT else FULL_REPORT
-    assertEquals(expected, consumer.collectInfo(ignoreBranches))
-    assertEquals(2, consumer.myDirectoryCoverage.size)
+    assertEquals(expected, annotator.collectInfo(ignoreBranches))
+  }
+}
+
+private class TestJavaCoverageAnnotator(project: Project) : JavaCoverageAnnotator(project) {
+  fun collectSummaryInfo(suite: CoverageSuitesBundle) = collectSummaryInfo(suite, project)
+
+  fun collectInfo(ignoreBranches: Boolean = false) = buildString {
+    fun Map<String, SummaryCoverageInfo>.collectInfo() = toSortedMap().forEach { (fqn, summary) ->
+      appendLine("$fqn: ${summary.collectToString(ignoreBranches)}")
+    }
+
+    appendLine("Classes: ")
+    classesCoverage.collectInfo()
+    appendLine("Packages: ")
+    collectPackages(false, listOf("", "foo", "foo.bar"), ignoreBranches)
+    appendLine("Flatten packages: ")
+    collectPackages(true, listOf("foo", "foo.bar"), ignoreBranches)
+  }
+
+  private fun StringBuilder.collectPackages(flattenPackages: Boolean, packageNames: List<String>, ignoreBranches: Boolean) {
+    for (packageName in packageNames) {
+      val info = getPackageCoverageInfo(packageName, flattenPackages) ?: continue
+      appendLine("$packageName: ${info.collectToString(ignoreBranches)}")
+    }
   }
 }
 
@@ -361,4 +449,3 @@ private val FULL_REPORT = """
   foo.bar: TC=2 CC=1 TM=9 CM=2 TL=9 CL=2 TB=0 CB=0 
 
 """.trimIndent()
-

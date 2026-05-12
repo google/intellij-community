@@ -1,12 +1,13 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.javaFX.fxml.refs;
 
+import com.intellij.codeInsight.completion.InsertHandler;
 import com.intellij.codeInsight.completion.PrioritizedLookupElement;
 import com.intellij.codeInsight.lookup.LookupElement;
 import com.intellij.codeInsight.lookup.LookupElementBuilder;
+import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
-import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiClassType;
 import com.intellij.psi.PsiElement;
@@ -31,7 +32,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.plugins.javaFX.fxml.FxmlConstants;
 import org.jetbrains.plugins.javaFX.fxml.JavaFxPsiUtil;
-import org.jetbrains.plugins.javaFX.fxml.descriptors.JavaFxPropertyAttributeDescriptor;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -49,13 +49,13 @@ public final class JavaFxComponentIdReferenceProvider extends PsiReferenceProvid
                                                          @NotNull ProcessingContext context) {
     final XmlAttributeValue xmlAttributeValue = (XmlAttributeValue)element;
     final String value = xmlAttributeValue.getValue();
-    if (JavaFxPsiUtil.isIncorrectExpressionBinding(value)) {
+    if (JavaFxPsiUtil.isIncorrectExpressionBinding(value) && !JavaFxPsiUtil.isIncompleteExpressionBinding(value)) {
       return PsiReference.EMPTY_ARRAY;
     }
     final XmlTag currentTag = PsiTreeUtil.getParentOfType(xmlAttributeValue, XmlTag.class);
     final Map<String, XmlAttributeValue> fileIds = JavaFxPsiUtil.collectFileIds(currentTag);
 
-    if (JavaFxPsiUtil.isExpressionBinding(value)) {
+    if (JavaFxPsiUtil.isExpressionBinding(value) || JavaFxPsiUtil.isIncompleteExpressionBinding(value)) {
       return getExpressionReferences(element, xmlAttributeValue, value, fileIds);
     }
     if (value.startsWith("$")) {
@@ -78,35 +78,61 @@ public final class JavaFxComponentIdReferenceProvider extends PsiReferenceProvid
                                                                   @NotNull XmlAttributeValue xmlAttributeValue,
                                                                   @NotNull String value,
                                                                   @NotNull Map<String, XmlAttributeValue> fileIds) {
-    if (FxmlConstants.NULL_EXPRESSION.equals(value)) return PsiReference.EMPTY_ARRAY;
-    final String expressionBody = value.substring(2, value.length() - 1);
-    final List<String> propertyNames = StringUtil.split(expressionBody, ".", true, false);
-    if (JavaFxPropertyAttributeDescriptor.isIncompletePropertyChain(propertyNames)) return PsiReference.EMPTY_ARRAY;
-    if (propertyNames.size() == 1) {
-      return getSinglePropertyReferences(xmlAttributeValue, fileIds, expressionBody, 2);
+    final String expressionBody = value.endsWith("}") ? value.substring(2, value.length() - 1) : value.substring(2);
+    final JavaFxBindingExpressionParser.ParsedBinding parsed = JavaFxBindingExpressionParser.parse(expressionBody);
+    final boolean incompleteBinding = JavaFxPsiUtil.isIncompleteExpressionBinding(value);
+    if (!parsed.syntacticallyValid && !incompleteBinding) return PsiReference.EMPTY_ARRAY;
+    if (parsed.chains.isEmpty()) return PsiReference.EMPTY_ARRAY;
+
+    // The single-chain case keeps the existing single property reference behavior
+    if (!parsed.hasNonChainTokens && parsed.chains.size() == 1) {
+      final JavaFxBindingExpressionParser.PropertyChain only = parsed.chains.getFirst();
+      if (only.incomplete) return PsiReference.EMPTY_ARRAY;
+      if (only.segments.size() == 1) {
+        return getSinglePropertyReferences(xmlAttributeValue, fileIds, only.segments.getFirst().name, 2);
+      }
     }
 
     final PsiClass controllerClass = JavaFxPsiUtil.getControllerClass(element.getContainingFile());
-    final String firstPropertyName = propertyNames.get(0);
-    int positionInExpression = 2;
     final List<PsiReference> result = new ArrayList<>();
-    final PsiReferenceBase firstReference =
-      getIdReferenceBase(xmlAttributeValue, firstPropertyName, fileIds, Collections.emptyMap(), controllerClass);
-    positionInExpression = adjustTextRange(firstPropertyName, firstReference, positionInExpression);
-    PsiClass propertyOwnerClass = FxmlConstants.CONTROLLER.equals(firstPropertyName) ?
-                                  controllerClass : JavaFxPsiUtil.getTagClass(fileIds.get(firstPropertyName));
-    result.add(firstReference);
-
-    final List<String> remainingPropertyNames = propertyNames.subList(1, propertyNames.size());
-    for (String propertyName : remainingPropertyNames) {
-      final JavaFxExpressionReferenceBase reference =
-        new JavaFxExpressionReferenceBase(xmlAttributeValue, propertyOwnerClass, propertyName);
-      positionInExpression = adjustTextRange(propertyName, reference, positionInExpression);
-      final PsiType propertyType = JavaFxPsiUtil.getReadablePropertyType(reference.resolve());
-      propertyOwnerClass = propertyType instanceof PsiClassType ? ((PsiClassType)propertyType).resolve() : null;
-      result.add(reference);
+    for (JavaFxBindingExpressionParser.PropertyChain chain : parsed.chains) {
+      if (chain.incomplete) continue;
+      addChainReferences(xmlAttributeValue, fileIds, controllerClass, chain, result);
     }
     return result.toArray(PsiReference.EMPTY_ARRAY);
+  }
+
+  private static void addChainReferences(@NotNull XmlAttributeValue xmlAttributeValue,
+                                         @NotNull Map<String, XmlAttributeValue> fileIds,
+                                         PsiClass controllerClass,
+                                         @NotNull JavaFxBindingExpressionParser.PropertyChain chain,
+                                         @NotNull List<PsiReference> out) {
+    final List<JavaFxBindingExpressionParser.Segment> segments = chain.segments;
+    final JavaFxBindingExpressionParser.Segment first = segments.getFirst();
+    final PsiReferenceBase<?> firstReference =
+      getIdReferenceBase(xmlAttributeValue, first.name, fileIds, Collections.emptyMap(), controllerClass);
+    setSegmentRange(firstReference, first);
+    out.add(firstReference);
+
+    PsiClass propertyOwnerClass = FxmlConstants.CONTROLLER.equals(first.name)
+                                  ? controllerClass
+                                  : JavaFxPsiUtil.getTagClass(fileIds.get(first.name));
+    for (int i = 1; i < segments.size(); i++) {
+      JavaFxBindingExpressionParser.Segment seg = segments.get(i);
+      JavaFxExpressionReferenceBase reference =
+        new JavaFxExpressionReferenceBase(xmlAttributeValue, propertyOwnerClass, seg.name);
+      setSegmentRange(reference, seg);
+      PsiType propertyType = JavaFxPsiUtil.getReadablePropertyType(reference.resolve());
+      propertyOwnerClass = propertyType instanceof PsiClassType ? ((PsiClassType)propertyType).resolve() : null;
+      out.add(reference);
+    }
+  }
+
+  private static void setSegmentRange(@NotNull PsiReferenceBase<?> reference,
+                                      @NotNull JavaFxBindingExpressionParser.Segment segment) {
+    int valueStart = reference.getRangeInElement().getStartOffset();
+    int start = valueStart + 2 + segment.offsetInBody;
+    reference.setRangeInElement(new TextRange(start, start + segment.name.length()));
   }
 
   private static PsiReference @NotNull [] getSinglePropertyReferences(@NotNull XmlAttributeValue xmlAttributeValue,
@@ -220,8 +246,9 @@ public final class JavaFxComponentIdReferenceProvider extends PsiReferenceProvid
 
     @Override
     public Object @NotNull [] getVariants() {
+      boolean incomplete = JavaFxPsiUtil.isIncompleteExpressionBinding(getElement().getValue());
       return myAcceptableIds.stream()
-        .map(id -> PrioritizedLookupElement.withPriority(LookupElementBuilder.create(id), TypeMatch.getPriority(myTypeMatches.get(id))))
+        .map(id -> PrioritizedLookupElement.withPriority(applyInsertHandler(LookupElementBuilder.create(id), incomplete), TypeMatch.getPriority(myTypeMatches.get(id))))
         .toArray(LookupElement[]::new);
     }
 
@@ -246,15 +273,16 @@ public final class JavaFxComponentIdReferenceProvider extends PsiReferenceProvid
     @Override
     public Object @NotNull [] getVariants() {
       final XmlAttributeValue xmlAttributeValue = getElement();
+      boolean incomplete = JavaFxPsiUtil.isIncompleteExpressionBinding(xmlAttributeValue.getValue());
       final PsiElement declaration = JavaFxPsiUtil.getAttributeDeclaration(xmlAttributeValue);
       final PsiType propertyType = JavaFxPsiUtil.getWritablePropertyType(myPsiClass, declaration);
       if (propertyType != null) {
-        return collectProperties(propertyType, xmlAttributeValue.getProject());
+        return collectProperties(propertyType, xmlAttributeValue.getProject(), incomplete);
       }
       return ArrayUtilRt.EMPTY_OBJECT_ARRAY;
     }
 
-    private Object[] collectProperties(@NotNull PsiType propertyType, @NotNull Project project) {
+    private Object[] collectProperties(@NotNull PsiType propertyType, @NotNull Project project, boolean incomplete) {
       final PsiType resolvedType = JavaFxPsiUtil.getWritablePropertyType(propertyType, project);
       final List<LookupElement> objs = new ArrayList<>();
       final Collection<PsiMember> readableProperties = JavaFxPsiUtil.getReadableProperties(myPsiClass).values();
@@ -265,7 +293,7 @@ public final class JavaFxComponentIdReferenceProvider extends PsiReferenceProvid
             resolvedType != null && TypeConversionUtil.isAssignable(resolvedType, readableType)) {
           final String propertyName = PropertyUtilBase.getPropertyName(readableMember);
           if (propertyName != null) {
-            objs.add(LookupElementBuilder.create(readableMember, propertyName));
+            objs.add(applyInsertHandler(LookupElementBuilder.create(readableMember, propertyName), incomplete));
           }
         }
       }
@@ -283,4 +311,19 @@ public final class JavaFxComponentIdReferenceProvider extends PsiReferenceProvid
       return super.handleElementRename(newPropertyName);
     }
   }
+
+  private static @NotNull LookupElementBuilder applyInsertHandler(@NotNull LookupElementBuilder builder, boolean incomplete) {
+    if (!incomplete) return builder;
+    return builder.withInsertHandler(CLOSING_BRACE_INSERT_HANDLER);
+  }
+
+  private static final InsertHandler<LookupElement> CLOSING_BRACE_INSERT_HANDLER = (context, ignored) -> {
+    Editor editor = context.getEditor();
+    int offset = editor.getCaretModel().getOffset();
+    CharSequence text = editor.getDocument().getCharsSequence();
+    // Only insert } if not already present right after the inserted text
+    if (offset >= text.length() || text.charAt(offset) != '}') {
+      editor.getDocument().insertString(offset, "}");
+    }
+  };
 }

@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.uiDesigner` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "uiDesigner_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "uiDesigner",
   module_name = "intellij.uiDesigner",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
-  resources = [":uiDesigner_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
@@ -22,6 +17,7 @@ jvm_library(
     "//platform/util",
     "//platform/icons",
     "//platform/platform-api:ide",
+    "//platform/util:util-ui",
     "//platform/platform-impl:ide-impl",
     "//platform/lang-impl",
     "//libraries/fastutil",
@@ -29,14 +25,18 @@ jvm_library(
     "//platform/core-ui",
     "//platform/util/jdom",
     "//platform/platform-impl/designer",
+    "//platform/ide-core",
     "//platform/core-impl",
     "//platform/forms_rt:java-guiForms-rt",
     "//platform/backend",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//platform/util/concurrency",
   ]
 )
 
 jvm_library(
   name = "uiDesigner_test_lib",
+  testonly = True,
   module_name = "intellij.uiDesigner",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -50,6 +50,7 @@ jvm_library(
     "//platform/util:util_test_lib",
     "//platform/icons:icons_test_lib",
     "//platform/platform-api:ide_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/lang-impl:lang-impl_test_lib",
     "//libraries/fastutil:fastutil_test_lib",
@@ -57,9 +58,18 @@ jvm_library(
     "//platform/core-ui:core-ui_test_lib",
     "//platform/util/jdom:jdom_test_lib",
     "//platform/platform-impl/designer:designer_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/core-impl:core-impl_test_lib",
     "//platform/forms_rt:java-guiForms-rt_test_lib",
     "//platform/backend:backend_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/util/concurrency:concurrency_test_lib",
   ]
 )
 ### auto-generated section `build intellij.uiDesigner` end
+
+### auto-generated section `iml intellij.uiDesigner` start
+exports_files([
+  "intellij.uiDesigner.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.uiDesigner` end

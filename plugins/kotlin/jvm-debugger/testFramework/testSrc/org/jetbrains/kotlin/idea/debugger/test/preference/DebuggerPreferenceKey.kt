@@ -13,7 +13,7 @@ private inline fun <reified T : Any> debuggerPreferenceKey(defaultValue: T): Rea
     return ReadOnlyProperty { _, property -> DebuggerPreferenceKey(property.name, T::class.java, defaultValue) }
 }
 
-internal object DebuggerPreferenceKeys {
+object DebuggerPreferenceKeys {
     val SKIP_SYNTHETIC_METHODS by debuggerPreferenceKey(true)
     val SKIP_CONSTRUCTORS: DebuggerPreferenceKey<Boolean> by debuggerPreferenceKey(false)
     val SKIP_CLASSLOADERS by debuggerPreferenceKey(true)

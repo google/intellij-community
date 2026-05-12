@@ -4,7 +4,7 @@ import com.intellij.codeInsight.inline.completion.InlineCompletionEditorInsertHa
 import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiFile
 import com.intellij.terminal.frontend.view.impl.TerminalInput
-import com.intellij.terminal.frontend.view.impl.TerminalTypeAhead
+import com.intellij.terminal.frontend.view.typeahead.TerminalTypeAhead
 
 internal class TerminalInlineCompletionEditorInsertHandler : InlineCompletionEditorInsertHandler {
   override fun insert(editor: Editor, textToInsert: String, offset: Int, file: PsiFile) {

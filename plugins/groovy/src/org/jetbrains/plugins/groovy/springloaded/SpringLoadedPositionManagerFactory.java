@@ -6,8 +6,13 @@ import com.intellij.debugger.PositionManagerFactory;
 import com.intellij.debugger.engine.DebugProcess;
 import com.intellij.debugger.engine.jdi.VirtualMachineProxy;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.roots.ProjectRootModificationTracker;
 import com.intellij.openapi.util.Key;
 import com.intellij.psi.JavaPsiFacade;
+import com.intellij.psi.util.CachedValue;
+import com.intellij.psi.util.CachedValueProvider;
+import com.intellij.psi.util.CachedValuesManager;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -16,6 +21,8 @@ import org.jetbrains.annotations.NotNull;
 public final class SpringLoadedPositionManagerFactory extends PositionManagerFactory {
 
   public static final Key<Boolean> FORCE_SPRINGLOADED = Key.create("springloaded.debugger.force");
+
+  private static final Key<CachedValue<Boolean>> SPRING_LOADED_IN_PROJECT_CACHE_KEY = Key.create("springloaded.debugger.in.project.cache");
 
   @Override
   public PositionManager createPositionManager(final @NotNull DebugProcess process) {
@@ -26,14 +33,26 @@ public final class SpringLoadedPositionManagerFactory extends PositionManagerFac
     Boolean force = process.getProcessHandler().getUserData(FORCE_SPRINGLOADED);
     if (force == Boolean.TRUE) return true;
 
-    if (ReadAction.compute(()->{
-      JavaPsiFacade facade = JavaPsiFacade.getInstance(process.getProject());
-      if (facade.findPackage("com.springsource.loaded") != null ||
-          facade.findPackage("org.springsource.loaded") != null) {
-        return true;
-      }
-      return false;
-    })) {
+    Project project = process.getProject();
+    boolean isSpringSourceLoaded = CachedValuesManager.getManager(project).getCachedValue(
+      project,
+      SPRING_LOADED_IN_PROJECT_CACHE_KEY,
+      () -> {
+        boolean result = ReadAction.nonBlocking(() -> {
+          JavaPsiFacade facade = JavaPsiFacade.getInstance(project);
+          return facade.findPackage("com.springsource.loaded") != null ||
+                 facade.findPackage("org.springsource.loaded") != null;
+        }).inSmartMode(project).executeSynchronously();
+
+        return CachedValueProvider.Result.create(
+          result,
+          ProjectRootModificationTracker.getInstance(project)
+        );
+      },
+      false
+    );
+
+    if (isSpringSourceLoaded) {
       return true;
     }
 

@@ -16,7 +16,7 @@ import org.jetbrains.annotations.Nls
 import java.util.function.Supplier
 import javax.swing.Icon
 
-class PythonLanguageRuntimeType : LanguageRuntimeType<PythonLanguageRuntimeConfiguration>(TYPE_ID), CustomToolLanguageRuntimeType {
+class PythonLanguageRuntimeType : LanguageRuntimeType<PythonLanguageRuntimeConfiguration>(PythonLanguageRuntimeConfiguration.TYPE_ID), CustomToolLanguageRuntimeType {
   override val displayName: @NlsSafe String = "Python"
 
   override val icon: Icon
@@ -55,10 +55,5 @@ class PythonLanguageRuntimeType : LanguageRuntimeType<PythonLanguageRuntimeConfi
   object Helper {
     @JvmStatic
     fun getInstance(): PythonLanguageRuntimeType = EXTENSION_NAME.findExtensionOrFail(PythonLanguageRuntimeType::class.java)
-  }
-
-  companion object {
-    const val TYPE_ID: String = "PythonLanguageRuntime"
-
   }
 }

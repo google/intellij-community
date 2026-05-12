@@ -105,7 +105,7 @@ import java.util.concurrent.ConcurrentHashMap;
       return icon;
     }
 
-    return cache.computeIfAbsent(new Pair<>(width, preScaled), __ -> {
+    return cache.computeIfAbsent(new Pair<>(width, preScaled), _ -> {
       EmptyIcon icon = new EmptyIcon(width, height, true);
       icon.setIconPreScaled(preScaled);
       return icon;

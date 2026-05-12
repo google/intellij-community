@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.execution.test.runner.events;
 
 import com.intellij.execution.testframework.sm.runner.SMTestProxy;
@@ -27,9 +27,11 @@ public class AfterSuiteEventProcessor extends AbstractTestEventProcessor {
   public void process(@NotNull ExternalSystemProgressEvent<? extends TestOperationDescriptor> testEvent) {
     var finishEvent = (ExternalSystemFinishEvent<? extends TestOperationDescriptor>)testEvent;
     var testId = testEvent.getEventId();
-    var result = TestEventResult.fromOperationResult(finishEvent.getOperationResult());
+    var operationResult = finishEvent.getOperationResult();
+    var result = TestEventResult.fromOperationResult(operationResult);
 
-    doProcess(testId, result);
+    long duration = operationResult.getEndTime() - operationResult.getStartTime();
+    doProcess(testId, duration, result);
   }
 
   @Override
@@ -37,14 +39,19 @@ public class AfterSuiteEventProcessor extends AbstractTestEventProcessor {
     final String testId = eventXml.getTestId();
     TestEventResult result = TestEventResult.fromValue(eventXml.getTestEventResultType());
 
-    doProcess(testId, result);
+    var operationResult = GradleXmlTestEventConverter.convertOperationResult(eventXml);
+    long duration = operationResult.getEndTime() - operationResult.getStartTime();
+    doProcess(testId, duration, result);
   }
 
-  private void doProcess(String testId, TestEventResult result) {
+  private void doProcess(String testId, long duration, TestEventResult result) {
     final SMTestProxy testProxy = findTestProxy(testId);
     if (testProxy == null) return;
 
     if (testProxy != getResultsViewer().getTestsRootNode()) {
+      if (duration > 0) {
+        testProxy.setDuration(duration);
+      }
       if (testProxy instanceof GradleSMTestProxy) {
         TestEventResult lastResult = ((GradleSMTestProxy)testProxy).getLastResult();
         if (lastResult == TestEventResult.FAILURE) {

@@ -3,7 +3,6 @@
 
 package org.jetbrains.intellij.build.productLayout
 
-import org.jetbrains.intellij.build.productLayout.CommunityModuleSets.essential
 import org.jetbrains.intellij.build.productLayout.CoreModuleSets.coreLang
 import org.jetbrains.intellij.build.productLayout.CoreModuleSets.librariesKtor
 import org.jetbrains.intellij.build.productLayout.CoreModuleSets.librariesMisc
@@ -72,6 +71,9 @@ object CommunityModuleSets {
     // Lang includes corePlatform (which includes librariesPlatform) as nested set
     moduleSet(coreLang())
 
+    embeddedModule("intellij.libraries.download.pgp.verifier")
+    embeddedModule("intellij.remoteDev.util")
+
     // RPC backend functionality (base RPC/kernel already in corePlatform via rpcMinimal)
     moduleSet(rpcBackend())
 
@@ -79,7 +81,6 @@ object CommunityModuleSets {
     moduleSet(librariesKtor())  // For RPC/Remote Dev
     moduleSet(librariesMisc())  // For specialized uses (XML-RPC, CSV, document store)
 
-    // Credential store (needed by 36 products)
     embeddedModule("intellij.platform.credentialStore.ui")
     embeddedModule("intellij.platform.credentialStore.impl")
 
@@ -105,13 +106,17 @@ object CommunityModuleSets {
 
     // Completion
     module("intellij.platform.inline.completion")
+
+    embeddedModule("intellij.platform.ide.initialConfigImport")
+    embeddedModule("intellij.platform.markdown.utils")
+    embeddedModule("intellij.platform.ml")
   }
 
   /**
    * Recent files support (both backend and frontend).
    * Provides recently opened files UI and persistence.
    */
-  fun recentFiles(): ModuleSet = moduleSet("recentFiles") {
+  fun recentFiles(): ModuleSet = plugin("recentFiles") {
     module("intellij.platform.recentFiles")
     module("intellij.platform.recentFiles.frontend")
     module("intellij.platform.recentFiles.backend")
@@ -126,6 +131,8 @@ object CommunityModuleSets {
 
     // TODO: may be debugger shouldn't be essential? E.g. gateway doesn't need it.
     moduleSet(debugger())
+
+    moduleSet(problemsView())
 
     // The loading="embedded" attribute is required here because the intellij.platform.find module (which is loaded
     // in embedded mode) has a compile dependency on intellij.platform.scopes. Without marking scopes as embedded,
@@ -142,6 +149,7 @@ object CommunityModuleSets {
     module("intellij.platform.navbar.monolith")
     module("intellij.platform.clouds")
 
+    embeddedModule("intellij.platform.structureView.impl")
     module("intellij.platform.structureView.backend")
     module("intellij.platform.structureView.frontend")
 
@@ -159,7 +167,7 @@ object CommunityModuleSets {
     embeddedModule("intellij.platform.find")
     module("intellij.platform.find.backend")
     module("intellij.platform.editor.frontend")
-    embeddedModule("intellij.platform.managed.cache")
+    module("intellij.platform.managed.cache")
     module("intellij.platform.managed.cache.backend")
 
     module("intellij.platform.todo")
@@ -167,8 +175,6 @@ object CommunityModuleSets {
 
     module("intellij.platform.bookmarks.backend")
     module("intellij.platform.bookmarks.frontend")
-
-    moduleSet(recentFiles())
 
     module("intellij.platform.pluginManager.shared")
     module("intellij.platform.pluginManager.backend")
@@ -193,6 +199,7 @@ object CommunityModuleSets {
     embeddedModule("intellij.platform.externalProcessAuthHelper")
 
     module("intellij.java.aetherDependencyResolver")
+    module("intellij.platform.util.commonsLangV2Shim")
   }
 
   /**
@@ -208,6 +215,15 @@ object CommunityModuleSets {
     embeddedModule("intellij.platform.debugger.impl")
   }
 
+  /**
+   * Provides the platform for Problems View ToolWindow.
+   */
+  fun problemsView(): ModuleSet = moduleSet("problemsView", includeDependencies = true) {
+    module("intellij.platform.problemsView.frontend")
+    module("intellij.platform.problemsView.backend")
+    module("intellij.platform.problemsView.shared")
+  }
+
   // endregion
 
   // region Feature Module Sets
@@ -218,6 +234,7 @@ object CommunityModuleSets {
   fun vcs(): ModuleSet = moduleSet("vcs") {
     module("intellij.platform.vcs.impl")
     module("intellij.platform.vcs.impl.exec")
+    module("intellij.platform.vcs.impl.debugger")
     module("intellij.platform.vcs.impl.lang")
     module("intellij.platform.vcs.impl.lang.actions")
     module("intellij.platform.vcs.log")
@@ -229,7 +246,6 @@ object CommunityModuleSets {
     embeddedModule("intellij.platform.vcs")
 
     moduleSet(vcsShared())
-    moduleSet(vcsFrontend())
   }
 
   /**
@@ -245,7 +261,8 @@ object CommunityModuleSets {
   /**
    * VCS frontend modules.
    */
-  fun vcsFrontend(): ModuleSet = moduleSet("vcs.frontend") {
+  @Suppress("unused")
+  fun vcsFrontend(): ModuleSet = plugin("vcs.frontend") {
     module("intellij.platform.vcs.impl.frontend")
   }
 
@@ -262,6 +279,7 @@ object CommunityModuleSets {
     embeddedModule("intellij.xml.analysis")
     module("intellij.xml.emmet")
     module("intellij.xml.emmet.backend")
+    module("intellij.xml.emmet.frontend")
     embeddedModule("intellij.xml.ui.common")
     embeddedModule("intellij.xml.parser")
     embeddedModule("intellij.xml.syntax")
@@ -285,7 +303,8 @@ object CommunityModuleSets {
   /**
    * Stream debugger modules.
    */
-  fun debuggerStreams(): ModuleSet = moduleSet("debugger.streams") {
+  @Suppress("unused")
+  fun debuggerStreams(): ModuleSet = plugin("debugger.streams", addToMainModule = false) {
     module("intellij.debugger.streams.core")
     module("intellij.debugger.streams.shared")
     module("intellij.debugger.streams.backend")
@@ -326,7 +345,8 @@ object CommunityModuleSets {
   /**
    * Grid/data viewer core modules.
    */
-  fun gridCore(): ModuleSet = moduleSet("grid.core") {
+  @Suppress("unused")
+  fun gridCore(): ModuleSet = plugin("grid.core") {
     module("intellij.grid")
     module("intellij.grid.types")
     module("intellij.grid.csv.core.impl")
@@ -345,6 +365,9 @@ object CommunityModuleSets {
     module("intellij.platform.testFramework.core")
     module("intellij.platform.testFramework.impl")
     module("intellij.platform.testFramework.teamCity")
+    module("intellij.codeowners")
+    module("intellij.codeowners.monorepo.resolver")
+    module("intellij.codeowners.runtime.resolver")
   }
 
   /**
@@ -355,8 +378,8 @@ object CommunityModuleSets {
     module("intellij.platform.testFramework.junit5")
     module("intellij.platform.testFramework.junit5.projectStructure")
     module("intellij.platform.testFramework.junit5.codeInsight")
-    module("intellij.platform.testFramework.junit5._test")
-    module("intellij.platform.testFramework.junit5.eel._test")
+    module("intellij.platform.testFramework.junit5.tests")
+    module("intellij.platform.testFramework.junit5.eel.tests")
     module("intellij.platform.testFramework.junit5.wsl._test")
   }
 
@@ -369,10 +392,11 @@ object CommunityModuleSets {
     module("intellij.rd.ide.model.generated")
     module("intellij.rd.platform")
     module("intellij.rd.ui")
+    module("intellij.platform.split.protocol")
   }
 
   /**
-   * IDE common modules (includes essential, compose, grid.core, vcs, xml, duplicates).
+   * IDE common modules (includes essential, compose, vcs, xml, duplicates).
    */
   fun ideCommon(): ModuleSet = moduleSet("ide.common") {
     // Include essential first (which includes coreLang from CoreModuleSets)
@@ -390,7 +414,9 @@ object CommunityModuleSets {
     module("intellij.platform.scriptDebugger.ui")
     module("intellij.platform.scriptDebugger.backend")
     module("intellij.platform.scriptDebugger.protocolReaderRuntime")
+
     module("intellij.platform.ml.impl")
+
     module("intellij.libraries.microba")
     module("intellij.platform.diagnostic.freezeAnalyzer")
     module("intellij.platform.diagnostic.freezes")
@@ -414,12 +440,15 @@ object CommunityModuleSets {
     module("intellij.libraries.grpc.netty.shaded")
     module("intellij.libraries.jspecify")
 
-    moduleSet(gridCore())
     moduleSet(vcs())
     moduleSet(xml())
     moduleSet(duplicates())
     module("intellij.platform.structuralSearch")
     embeddedModule("intellij.libraries.batik")
+
+    // IJent platform modules
+    module("intellij.platform.ijent.impl")
+    module("intellij.platform.ijent.wsl")
 
     // Note: rd.common is intentionally NOT included in ide.common
     // Reason: Rider uses custom module loading mode due to early backend startup requirements.

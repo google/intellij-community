@@ -14,16 +14,14 @@ import com.intellij.openapi.vcs.rollback.RollbackEnvironment;
 import com.intellij.openapi.vcs.rollback.RollbackProgressListener;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.vcsUtil.VcsFileUtil;
 import git4idea.GitUtil;
-import git4idea.commands.Git;
 import git4idea.commands.GitCommand;
-import git4idea.commands.GitLineHandler;
 import git4idea.i18n.GitBundle;
 import git4idea.index.vfs.GitIndexFileSystemRefresher;
 import git4idea.repo.GitRepository;
 import git4idea.repo.GitUntrackedFilesHolder;
 import git4idea.util.GitFileUtils;
+import kotlin.Unit;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 
@@ -164,13 +162,10 @@ public final class GitRollbackEnvironment implements RollbackEnvironment {
    * @throws VcsException Id it breaks.
    */
   public void revert(@NotNull VirtualFile root, @NotNull List<? extends FilePath> files) throws VcsException {
-    for (List<String> paths : VcsFileUtil.chunkPaths(root, files)) {
-      GitLineHandler handler = new GitLineHandler(myProject, root, GitCommand.CHECKOUT);
+    GitFileUtils.executeForFiles(myProject, root, GitCommand.CHECKOUT, files, handler -> {
       handler.addParameters("HEAD");
-      handler.endOptions();
-      handler.addParameters(paths);
-      Git.getInstance().runCommand(handler).throwOnError();
-    }
+      return Unit.INSTANCE;
+    });
   }
 
   /**

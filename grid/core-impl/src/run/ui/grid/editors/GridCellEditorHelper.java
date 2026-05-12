@@ -1,6 +1,7 @@
 package com.intellij.database.run.ui.grid.editors;
 
 import com.intellij.database.datagrid.CoreGrid;
+import com.intellij.database.datagrid.GridCellRequest;
 import com.intellij.database.datagrid.GridColumn;
 import com.intellij.database.datagrid.GridRow;
 import com.intellij.database.datagrid.ModelIndex;
@@ -130,7 +131,7 @@ public interface GridCellEditorHelper {
     GRID_CELL_EDITOR_HELPER_KEY.set(grid, helper);
   }
 
-  int guessJdbcTypeForEditing(@NotNull CoreGrid<GridRow, GridColumn> grid, @Nullable ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column);
+  int guessJdbcTypeForEditing(@NotNull GridCellRequest<GridRow, GridColumn> request);
 
   boolean areValuesEqual(Object v1, Object v2, @Nullable CoreGrid<GridRow, GridColumn> grid);
 

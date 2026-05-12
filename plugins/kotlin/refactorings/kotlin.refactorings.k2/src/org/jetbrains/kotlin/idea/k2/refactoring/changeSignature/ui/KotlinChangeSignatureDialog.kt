@@ -315,6 +315,6 @@ internal fun KtTypeCodeFragment.getCanonicalText(forPreview: Boolean): String {
     }
 }
 
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class)
+context(_: KaSession)
 private fun KaType.getPresentableText(): String = render(KaTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.INVARIANT)

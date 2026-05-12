@@ -62,12 +62,12 @@ wasmjs_library = rule(
             providers = [[KtWasmJsInfo], [KtWasmJsInfo, _KtJvmInfo]],
         ),
         "_wasmjs_builder": attr.label(
-            default = "//src/kotlin/kotlin-builder-wasmjs:kotlin-builder-wasmjs_deploy.jar",
+            default = "//kotlin-builder-wasmjs:kotlin-builder-wasmjs_deploy.jar",
             allow_single_file = True,
             cfg = scrubbed_host_platform_transition,
         ),
         "_wasmjs_builder_jvm_flags": attr.label(
-            default = "//src/kotlin/kotlin-builder-wasmjs:kotlin-builder-wasmjs-jvm_flags",
+            default = "//kotlin-builder-wasmjs:kotlin-builder-wasmjs-jvm_flags",
         ),
         "_wasmjs_builder_launcher": attr.label(
             default = "//:rules/impl/MemoryLauncher.java",

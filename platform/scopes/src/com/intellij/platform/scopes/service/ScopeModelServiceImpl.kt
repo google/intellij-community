@@ -1,7 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.scopes.service
 
-import com.intellij.ide.rpc.performRpcWithRetries
 import com.intellij.ide.rpc.rpcId
 import com.intellij.ide.util.scopeChooser.ScopeDescriptor
 import com.intellij.ide.util.scopeChooser.ScopeModelService
@@ -15,6 +14,7 @@ import com.intellij.platform.scopes.ScopeModelRemoteApi
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.util.cancelOnDispose
 import fleet.rpc.client.RpcTimeoutException
+import fleet.rpc.client.durable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -38,13 +38,13 @@ internal class ScopeModelServiceImpl(private val project: Project, private val c
   ) {
     itemsLoadingJob = coroutineScope.childScope("ScopesStateService.subscribeToScopeStates").launch {
       val dataContext = dataContextPromise.await()
-      LOG.performRpcWithRetries {
+      durable {
         val scopesFlow = ScopeModelRemoteApi.getInstance().createModelAndSubscribe(
           project.projectId(), modelId, filterConditionType, dataContext.rpcId())
         if (scopesFlow == null) {
           LOG.error("Failed to subscribe to model updates for modelId: $modelId")
           onScopesUpdate(null, null)
-          return@performRpcWithRetries
+          return@durable
         }
         scopesFlow.collect { scopesInfo ->
           val fetchedScopes = scopesInfo.getScopeDescriptors()

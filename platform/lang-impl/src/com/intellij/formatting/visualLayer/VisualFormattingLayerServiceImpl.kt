@@ -10,8 +10,10 @@ import com.intellij.formatting.visualLayer.VisualFormattingLayerElement.Folding
 import com.intellij.formatting.visualLayer.VisualFormattingLayerElement.InlineInlay
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.editor.CustomWrapModel
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.ex.FoldingModelEx
 import com.intellij.openapi.editor.ex.util.EditorScrollingPositionKeeper
 import com.intellij.openapi.editor.impl.LineSet
 import com.intellij.openapi.util.Disposer
@@ -41,8 +43,8 @@ class VisualFormattingLayerServiceImpl : VisualFormattingLayerService() {
         oldInlineInlays.forEach(Disposer::dispose)
         oldBlockInlays.forEach(Disposer::dispose)
 
-        newInlineInlays.forEach { it.applyToEditor(editor) }
-        newBlockInlays.forEach { it.applyToEditor(editor) }
+        newInlineInlays.forEach { it.insertInlineInlay(editor) }
+        newBlockInlays.forEach { it.insertBlockInlay(editor) }
       }
     }
 
@@ -55,8 +57,19 @@ class VisualFormattingLayerServiceImpl : VisualFormattingLayerService() {
 
         elements.asSequence()
           .filterIsInstance<Folding>()
-          .forEach { it.applyToEditor(editor) }
+          .forEach { it.insertFolding(editor) }
       }, true, false)
+
+    val customWrapModel = editor.customWrapModel
+    customWrapModel.runBatchMutation {
+      customWrapModel.getWraps()
+        .filter { it.getUserData(visualFormattingElementKey) == true }
+        .forEach { removeWrap(it) }
+
+      elements.asSequence()
+        .filterIsInstance<VisualFormattingLayerElement.Wrap>()
+        .forEach { it.insertWrap(this) }
+    }
 
     // IJPL-165293 -- the height of rendered docs should be recomputed if we've changed indentation size
     DocRenderItemUpdater.updateRenderers(editor, false)
@@ -105,6 +118,17 @@ class VisualFormattingLayerServiceImpl : VisualFormattingLayerService() {
     // This case needs soft wraps to visually split the existing line.
     // Not supported by API yet, so we will just skip it for now.
     if (1 == n && n < m) {
+      // We do not render changes to trailing whitespace in wrapped lines ==> we only need to consider the last line of replacement
+      val lastFormattedLineIndex = formattedTextLineSet.findLineIndex(mismatch.postFormatRange.endOffset)
+      val lastFormattedLineStart = formattedTextLineSet.getLineStart(lastFormattedLineIndex)
+      val (columns, _) = countColumnsWithinLine(
+        sequence = formattedText,
+        lineStartOffset = lastFormattedLineStart,
+        fromOffset = lastFormattedLineStart,
+        untilOffset = mismatch.postFormatRange.endOffset,
+        tabSize = tabSize
+      )
+      yield(VisualFormattingLayerElement.Wrap(mismatch.preFormatRange.endOffset, columns))
       return@sequence
     }
 
@@ -259,4 +283,41 @@ private fun countColumns(sequence: CharSequence,
     }
   }
   return Pair(cols, containsTabs)
+}
+
+private fun InlineInlay.insertInlineInlay(editor: Editor) {
+  editor.inlayModel
+    .addInlineElement(
+      offset,
+      false,
+      // Visual formatting inlays should always be displayed as part of the preceding whitespace
+      Integer.MAX_VALUE,
+      InlayPresentation(editor, length)
+    )
+}
+
+private fun BlockInlay.insertBlockInlay(editor: Editor) {
+  editor.inlayModel
+    .addBlockElement(
+      offset,
+      true,
+      true,
+      0,
+      InlayPresentation(editor, lines, vertical = true)
+    )
+}
+
+private fun Folding.insertFolding(editor: Editor) {
+  (editor.foldingModel as? FoldingModelEx)
+    ?.createFoldRegion(offset, offset + length, "", null, true)
+    ?.apply {
+      putUserData(visualFormattingElementKey, true)
+    }
+}
+
+private fun VisualFormattingLayerElement.Wrap.insertWrap(mutator: CustomWrapModel.Mutator) {
+  mutator.addWrap(offset, indent)
+    ?.apply {
+      putUserData(visualFormattingElementKey, true)
+    }
 }

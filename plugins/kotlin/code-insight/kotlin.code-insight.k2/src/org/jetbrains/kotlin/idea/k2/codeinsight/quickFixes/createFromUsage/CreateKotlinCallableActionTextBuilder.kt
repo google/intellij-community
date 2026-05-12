@@ -102,8 +102,8 @@ object CreateKotlinCallableActionTextBuilder {
         }
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun KaSymbol.renderAsReceiver(request: CreateMethodFromKotlinUsageRequest, ktType: KaType?, renderer: KaTypeRenderer): String? {
         val isAbstract = request.isAbstractClassOrInterface
         return when (this) {
@@ -171,8 +171,8 @@ object CreateKotlinCallableActionTextBuilder {
         }
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     fun renderTypeName(expectedType: ExpectedType, container: KtElement): String? {
         val ktType = if (expectedType is ExpectedKotlinType) expectedType.kaType else expectedType.toKtTypeWithNullability(container)
         if (ktType == null || ktType.isUnitType) return null

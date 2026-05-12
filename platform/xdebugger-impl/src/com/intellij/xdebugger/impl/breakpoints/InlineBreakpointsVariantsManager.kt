@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger.impl.breakpoints
 
 import com.intellij.openapi.application.readAction
@@ -15,6 +15,7 @@ import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.util.containers.toMutableSmartList
 import com.intellij.xdebugger.XDebuggerManager
 import com.intellij.xdebugger.breakpoints.XBreakpointProperties
+import com.intellij.xdebugger.breakpoints.XLineBreakpointVerticalPlacement
 import com.intellij.xdebugger.breakpoints.XLineBreakpointType
 import com.intellij.xdebugger.impl.XDebuggerUtilImpl
 import com.intellij.xdebugger.impl.XSourcePositionImpl
@@ -148,9 +149,14 @@ class InlineBreakpointsVariantsManager(private val project: Project) {
     }
   }
 
+  /**
+   * Returns document breakpoints that participate in inline variant matching.
+   * Only breakpoints which can be placed on a line are taken into account.
+   */
   private fun allBreakpointsIn(document: Document): Collection<XLineBreakpointImpl<*>> {
     val lineBreakpointManager = (XDebuggerManager.getInstance(project).breakpointManager as XBreakpointManagerImpl).lineBreakpointManager
     return XDebuggerUtilImpl.getDocumentBreakpoints(document, lineBreakpointManager)
+      .filter { it.placement == XLineBreakpointVerticalPlacement.ON_LINE }
   }
 
   private suspend fun <T> withSemaphorePermit(action: suspend () -> T): T {

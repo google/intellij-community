@@ -14,13 +14,10 @@ import com.intellij.openapi.vcs.update.RefreshVFsSynchronously;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.containers.MultiMap;
-import com.intellij.vcsUtil.VcsFileUtil;
 import git4idea.GitUtil;
 import git4idea.branch.GitBranchWorker;
-import git4idea.commands.Git;
 import git4idea.commands.GitCommand;
-import git4idea.commands.GitCommandResult;
-import git4idea.commands.GitLineHandler;
+import kotlin.Unit;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
@@ -84,14 +81,10 @@ public class GitLocalCommitCompareInfo extends LocalCommitCompareInfo {
       VirtualFile root = entry.getKey();
       Collection<FilePath> rootPaths = entry.getValue();
 
-      for (List<String> paths : VcsFileUtil.chunkPaths(root, rootPaths)) {
-        GitLineHandler handler = new GitLineHandler(myProject, root, GitCommand.CHECKOUT);
+      GitFileUtils.executeForFiles(myProject, root, GitCommand.CHECKOUT, rootPaths, handler -> {
         handler.addParameters(myBranchName);
-        handler.endOptions();
-        handler.addParameters(paths);
-        GitCommandResult result = Git.getInstance().runCommand(handler);
-        result.throwOnError();
-      }
+        return Unit.INSTANCE;
+      });
 
       GitFileUtils.addPaths(myProject, root, rootPaths);
     }

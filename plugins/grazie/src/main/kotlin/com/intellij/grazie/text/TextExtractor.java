@@ -6,6 +6,7 @@ import com.intellij.diagnostic.PluginException;
 import com.intellij.grazie.grammar.strategy.GrammarCheckingStrategy;
 import com.intellij.grazie.ide.language.LanguageGrammarChecking;
 import com.intellij.grazie.utils.HighlightingUtil;
+import com.intellij.injected.editor.DocumentWindow;
 import com.intellij.lang.ASTNode;
 import com.intellij.lang.Language;
 import com.intellij.lang.LanguageExtension;
@@ -13,6 +14,7 @@ import com.intellij.lang.LanguageExtensionPoint;
 import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.extensions.ExtensionPoint;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.RecursionGuard;
@@ -49,6 +51,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
+import static com.intellij.grazie.utils.GrazieUtilsKt.EXTRACTOR_SOURCE;
 import static com.intellij.util.containers.ContainerUtil.createConcurrentWeakKeyWeakValueMap;
 
 /**
@@ -69,30 +72,26 @@ public abstract class TextExtractor {
   private static final Pattern KEY_PATTERN = Pattern.compile("-----BEGIN PUBLIC KEY-----.*?(-----END PUBLIC KEY-----)", Pattern.DOTALL);
 
   /**
+   * <h2>Text extracting</h2>
    * Extract text from the given PSI element, if possible.
    * The returned text is most often fully embedded in {@code element},
    * but it may also include other PSI elements (e.g., adjacent comments).
    * In the latter case, this extension should return an equal {@link TextContent} for every one of those adjacent elements.
-   * <p>
-   * Typical usage:
    *
+   * <h2>Typical usage</h2>
    * <pre><code class="java">TextContentBuilder.FromPsi.build(element, textDomain)</code></pre>
    *
-   * Implementation guidance:
+   * <h2>Common Pitfalls to Avoid</h2>
+   * <ul>
+   * <li><b>Adjacent elements text extraction:</b> Extracting text from adjacent elements must return identical results to avoid cache corruption.</li>
+   * <li><b>IDE:</b> Ignore IDE non-textual fragments like references or JSON Schemas. For example, {@code JavaTextExtractor#shouldBeIgnored}</li>
+   * <li><b>Forgotten exclusions:</b></li> There are three different types of exclusions: {@code excluding}, {@code withUnknown}, {@code withMarkup}.
+   * Lack of exclusions can cause unintended code or markup fragments being analyzed as part of text, leading to false positives.
+   * Read more at {@link TextContent.ExclusionKind} and {@link TextContent#excludeRanges(List)}</li>
+   * <li><b>Escapes:</b> {@code \n}, {@code \t}, escaped quotes etc. should be normalized to match language behavior.
+   * {@code \n}, {@code \t} should be replaced with whitespaces and the rest marked as unknown fragments.</li>
+   * </ul>
    * <p>
-   * To maximize performance, guard against unnecessary (and sometimes quite expensive) operations by checking that
-   * the requested textDomain is contained in allowedDomains before extracting.
-   *
-   * <pre><code class="java">
-   * if (shouldExtractTextContent(root) && allowedDomains.contains(textDomain)) {
-   *   // some other potentially performance-intensive operations
-   *   return TextContentBuilder.FromPsi.build(root, textDomain)
-   * }
-   * </code></pre>
-   *
-   * See concrete implementations (e.g., in ChatInputTextExtractor, JsonTextExtractor, GoTextExtractor, etc.) for
-   * examples.
-
    * @param allowedDomains the set of the text domains that are expected by the caller.
    * @see TextContentBuilder
    * @see #buildTextContents
@@ -182,6 +181,7 @@ public abstract class TextExtractor {
       }
 
       if (!contents.isEmpty()) {
+        contents.forEach(content -> content.putUserData(EXTRACTOR_SOURCE, psi));
         return ContainerUtil.filter(
           contents,
           c -> Boolean.FALSE.equals(c.getUserData(IGNORED)) && allowedDomains.contains(c.getDomain()) && c.intersectsRange(psiRange)
@@ -235,18 +235,38 @@ public abstract class TextExtractor {
 
     // deduplicate equal contents created by different threads to avoid O(token_count) 'equals' checks later on
     var interner = obtainInterner(file);
-    contents = ContainerUtil.map(contents, content -> interner.computeIfAbsent(content, __ -> content));
+    contents = ContainerUtil.map(contents, content -> interner.computeIfAbsent(content, _ -> content));
 
     for (TextContent content : contents) {
       if (content.getUserData(IGNORED) != null) continue;
       content.putUserData(IGNORED, shouldIgnore(content));
     }
 
+    contents = ContainerUtil.map(contents, content -> excludeNonEditableFragments(content));
+
     if (stamp.mayCacheNow()) {
       obtainQueryCache(psi).compareAndSet(null, contents);
       cacheOnSiblings(psi, contents);
     }
     return contents;
+  }
+
+  private static boolean hasIntersectingInjection(TextContent content) {
+    PsiFile file = content.getContainingFile();
+    return InjectedLanguageManager.getInstance(file.getProject()).findInjectedElementAt(file, content.textOffsetToFile(0)) != null;
+  }
+
+  private static TextContent excludeNonEditableFragments(TextContent content) {
+    if (Boolean.TRUE.equals(content.getUserData(IGNORED))) return content;
+    PsiFile file = content.getContainingFile();
+    Document document = file.getViewProvider().getDocument();
+    if (!(document instanceof DocumentWindow documentWindow)) return content;
+    List<TextRange> ranges = ContainerUtil.mapNotNull(
+      InjectedLanguageManager.getInstance(file.getProject()).getNonEditableFragments(documentWindow),
+      range -> content.fileRangeToText(range)
+    );
+    if (ranges.isEmpty()) return content;
+    return content.excludeRanges(ContainerUtil.map(ranges, range -> TextContent.Exclusion.exclude(range)));
   }
 
   private static void cacheOnSiblings(PsiElement psi, List<TextContent> contents) {
@@ -284,7 +304,7 @@ public abstract class TextExtractor {
     return isSuppressionComment(content) ||
            isCopyrightComment(content) ||
            isKeyLike(content) ||
-           hasIntersectingInjection(content, content.getContainingFile());
+           hasIntersectingInjection(content);
   }
 
   private static boolean isKeyLike(TextContent content) {
@@ -342,10 +362,6 @@ public abstract class TextExtractor {
       }
     }
     return allContents;
-  }
-
-  private static boolean hasIntersectingInjection(TextContent content, PsiFile file) {
-    return InjectedLanguageManager.getInstance(file.getProject()).findInjectedElementAt(file, content.textOffsetToFile(0)) != null;
   }
 
   @SuppressWarnings("deprecation")

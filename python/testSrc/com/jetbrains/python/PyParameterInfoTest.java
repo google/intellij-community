@@ -1,6 +1,7 @@
 // Copyright 2000-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.jetbrains.python;
 
+import com.intellij.idea.TestFor;
 import com.intellij.lang.parameterInfo.CreateParameterInfoContext;
 import com.intellij.lang.parameterInfo.ParameterInfoHandler;
 import com.intellij.lang.parameterInfo.ParameterInfoUIContextEx;
@@ -665,8 +666,8 @@ public class PyParameterInfoTest extends LightMarkedTestCase {
   public void testInitializingDataclass() {
     final Map<String, PsiElement> marks = loadMultiFileTest(11);
 
-    feignCtrlP(marks.get("<arg1>").getTextOffset()).check("x: int, y: str, z: float = 0.0", new String[]{"x: int, "});
-    feignCtrlP(marks.get("<arg2>").getTextOffset()).check("x: int, y: str, z: float = 0.0", new String[]{"x: int, "});
+    feignCtrlP(marks.get("<arg1>").getTextOffset()).check("x: int, y: str, z: float | int = 0.0", new String[]{"x: int, "});
+    feignCtrlP(marks.get("<arg2>").getTextOffset()).check("x: int, y: str, z: float | int = 0.0", new String[]{"x: int, "});
 
     feignCtrlP(marks.get("<arg3>").getTextOffset()).check("self: Self@object", ArrayUtilRt.EMPTY_STRING_ARRAY,
                                                           new String[]{"self: Self@object"});
@@ -678,7 +679,7 @@ public class PyParameterInfoTest extends LightMarkedTestCase {
 
     feignCtrlP(marks.get("<arg8>").getTextOffset()).check("a: int, b: int, d: int = ..., e: int = ...", new String[]{"a: int, "});
 
-    feignCtrlP(marks.get("<arg9>").getTextOffset()).check("x: int, y: str, z: float = 0.0", new String[]{"x: int, "});
+    feignCtrlP(marks.get("<arg9>").getTextOffset()).check("x: int, y: str, z: float | int = 0.0", new String[]{"x: int, "});
     feignCtrlP(marks.get("<arg10>").getTextOffset()).check(Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     feignCtrlP(marks.get("<arg11>").getTextOffset()).check("baz: str", new String[]{"baz: str"});
   }
@@ -721,8 +722,8 @@ public class PyParameterInfoTest extends LightMarkedTestCase {
       () -> {
         final Map<String, PsiElement> marks = loadTest(9);
 
-        feignCtrlP(marks.get("<arg1>").getTextOffset()).check("x: int, y: str, z: float = 0.0", new String[]{"x: int, "});
-        feignCtrlP(marks.get("<arg2>").getTextOffset()).check("x: int, y: str, z: float = 0.0", new String[]{"x: int, "});
+        feignCtrlP(marks.get("<arg1>").getTextOffset()).check("x: int, y: str, z: float | int = 0.0", new String[]{"x: int, "});
+        feignCtrlP(marks.get("<arg2>").getTextOffset()).check("x: int, y: str, z: float | int = 0.0", new String[]{"x: int, "});
 
         feignCtrlP(marks.get("<arg3>").getTextOffset()).check("self: Self@object", ArrayUtilRt.EMPTY_STRING_ARRAY,
                                                               new String[]{"self: Self@object"});
@@ -1048,7 +1049,7 @@ public class PyParameterInfoTest extends LightMarkedTestCase {
     feignCtrlP(test.get("<arg1>").getTextOffset()).check("*, name: str, year: int, based_on: str = ...",
                                                          ArrayUtilRt.EMPTY_STRING_ARRAY,
                                                          ArrayUtilRt.EMPTY_STRING_ARRAY);
-    feignCtrlP(test.get("<arg2>").getTextOffset()).check("*, name: str, year: int, based_on: str = ..., rating: float",
+    feignCtrlP(test.get("<arg2>").getTextOffset()).check("*, name: str, year: int, based_on: str = ..., rating: float | int",
                                                          ArrayUtilRt.EMPTY_STRING_ARRAY,
                                                          ArrayUtilRt.EMPTY_STRING_ARRAY);
   }
@@ -1057,7 +1058,7 @@ public class PyParameterInfoTest extends LightMarkedTestCase {
   public void testDefiningTypedDictTypeAlternativeSyntax() {
     final Map<String, PsiElement> test = loadTest(1);
 
-    feignCtrlP(test.get("<arg1>").getTextOffset()).check("typename: str, fields: dict[str, type], *, /, total: bool = True",
+    feignCtrlP(test.get("<arg1>").getTextOffset()).check("typename: str, fields: dict[str, type], *, /, total: bool = True, closed: bool = False, extra_items: type = None",
                                                          new String[]{"typename: str, "},
                                                          ArrayUtilRt.EMPTY_STRING_ARRAY);
   }
@@ -1096,7 +1097,7 @@ public class PyParameterInfoTest extends LightMarkedTestCase {
   public void testNotAnnotatedDecoratorPreservesParametersOfOriginalFunction() {
     final Map<String, PsiElement> marks = loadTest(1);
 
-    feignCtrlP(marks.get("<arg1>").getTextOffset()).check("input_a: int, input_b: float",
+    feignCtrlP(marks.get("<arg1>").getTextOffset()).check("input_a: int, input_b: float | int",
                                                           new String[]{"input_a: int, "},
                                                           new String[]{""});
   }
@@ -1105,7 +1106,7 @@ public class PyParameterInfoTest extends LightMarkedTestCase {
   public void testNotAnnotatedDecoratorRetainsParametersOfOriginalFunctionEvenIfItChangesItsSignature() {
     final Map<String, PsiElement> marks = loadTest(1);
 
-    feignCtrlP(marks.get("<arg1>").getTextOffset()).check("input_a: int, input_b: float",
+    feignCtrlP(marks.get("<arg1>").getTextOffset()).check("input_a: int, input_b: float | int",
                                                           new String[]{"input_a: int, "},
                                                           new String[]{""});
   }
@@ -1114,7 +1115,7 @@ public class PyParameterInfoTest extends LightMarkedTestCase {
   public void testAnnotatedDecoratorPreservesParametersOfOriginalFunctionWithParamSpec() {
     final Map<String, PsiElement> marks = loadTest(1);
 
-    feignCtrlP(marks.get("<arg1>").getTextOffset()).check("input_a: int, input_b: float",
+    feignCtrlP(marks.get("<arg1>").getTextOffset()).check("input_a: int, input_b: float | int",
                                                           new String[]{"input_a: int, "},
                                                           new String[]{""});
   }
@@ -1122,7 +1123,7 @@ public class PyParameterInfoTest extends LightMarkedTestCase {
   // PY-48338
   public void testAnnotatedDecoratorAddsParametersToOriginalFunctionWithConcatenate() {
     final Map<String, PsiElement> marks = loadTest(1);
-    feignCtrlP(marks.get("<arg1>").getTextOffset()).check("...: str, input_a: int, input_b: float",
+    feignCtrlP(marks.get("<arg1>").getTextOffset()).check("...: str, input_a: int, input_b: float | int",
                                                           new String[]{"...: str, "},
                                                           new String[]{""});
   }
@@ -1381,8 +1382,8 @@ public class PyParameterInfoTest extends LightMarkedTestCase {
     feignCtrlPWithHintsForHighlightedOnly(marks.get("<arg1>").getTextOffset()).check("a: int, b, c, d, e", new String[]{"a: int, "});
     feignCtrlPWithHintsForHighlightedOnly(marks.get("<arg2>").getTextOffset()).check("a, b: str, c, d, e", new String[]{"b: str, "});
     feignCtrlPWithHintsForHighlightedOnly(marks.get("<arg3>").getTextOffset()).check("a, b, c: bool, d, e", new String[]{"c: bool, "});
-    feignCtrlPWithHintsForHighlightedOnly(marks.get("<arg4>").getTextOffset()).check("a, b, c, d: list, e", new String[]{"d: list, "});
-    feignCtrlPWithHintsForHighlightedOnly(marks.get("<arg5>").getTextOffset()).check("a, b, c, d, e: set", new String[]{"e: set"});
+    feignCtrlPWithHintsForHighlightedOnly(marks.get("<arg4>").getTextOffset()).check("a, b, c, d: list[Any], e", new String[]{"d: list[Any], "});
+    feignCtrlPWithHintsForHighlightedOnly(marks.get("<arg5>").getTextOffset()).check("a, b, c, d, e: set[Any]", new String[]{"e: set[Any]"});
   }
 
   // PY-58497
@@ -1413,6 +1414,87 @@ public class PyParameterInfoTest extends LightMarkedTestCase {
       feignCtrlP(marks.get("<arg1>").getTextOffset()).check("x: T", new String[]{"x: T"});
       feignCtrlP(marks.get("<arg2>").getTextOffset()).check("x: T", new String[]{"x: T"});
     });
+  }
+
+  // PY-78911
+  public void testPydanticFieldPositionalDefault() {
+    myFixture.copyDirectoryToProject("stubs/pydantic", "pydantic");
+    final Map<String, PsiElement> marks = loadTest(1);
+
+    feignCtrlP(marks.get("<arg1>").getTextOffset()).check("*, a: str | None = ..., b: str | None", ArrayUtilRt.EMPTY_STRING_ARRAY);
+  }
+
+  @TestFor(issues = "PY-89101")
+  public void testPydanticPopulateByNameKeepsBothSignaturesKeywordOnly() {
+    myFixture.copyDirectoryToProject("stubs/pydantic", "pydantic");
+    final Map<String, PsiElement> marks = loadTest(1);
+
+    final List<String> texts = Arrays.asList("*, z: str", "*, a: str");
+    final List<String[]> highlighted = Arrays.asList(ArrayUtilRt.EMPTY_STRING_ARRAY, ArrayUtilRt.EMPTY_STRING_ARRAY);
+    final List<String[]> disabled = Arrays.asList(ArrayUtilRt.EMPTY_STRING_ARRAY, ArrayUtilRt.EMPTY_STRING_ARRAY);
+
+    feignCtrlP(marks.get("<arg1>").getTextOffset()).check(texts, highlighted, disabled);
+  }
+
+  @TestFor(issues = "PY-89260")
+  public void testPydanticPopulateByNameDeduplicatesSignatures() {
+    myFixture.copyDirectoryToProject("stubs/pydantic", "pydantic");
+    final Map<String, PsiElement> marks = loadTest(1);
+
+    feignCtrlP(marks.get("<arg1>").getTextOffset()).check("*, my_field: str", ArrayUtilRt.EMPTY_STRING_ARRAY);
+  }
+
+  @TestFor(issues = "PY-89012")
+  public void testPydanticFieldInsideAnnotatedContributesDefaultAndAliasToConstructorSignature() {
+    myFixture.copyDirectoryToProject("stubs/pydantic", "pydantic");
+    final Map<String, PsiElement> marks = loadTest(1);
+
+    feignCtrlP(marks.get("<arg1>").getTextOffset())
+      .check("*, A: str | None = ..., B: str | None = ...", ArrayUtilRt.EMPTY_STRING_ARRAY);
+  }
+
+  @TestFor(issues = "PY-89012")
+  public void testPydanticFieldInsideAnnotatedContributesDefaultAndAliasToConstructorSignatureExtraMetadataAfter() {
+    myFixture.copyDirectoryToProject("stubs/pydantic", "pydantic");
+    final Map<String, PsiElement> marks = loadTest(1);
+
+    feignCtrlP(marks.get("<arg1>").getTextOffset())
+      .check("*, A: str | None = ..., B: str | None = ...", ArrayUtilRt.EMPTY_STRING_ARRAY);
+  }
+
+  @TestFor(issues = "PY-89012")
+  public void testPydanticFieldInsideAnnotatedContributesDefaultAndAliasToConstructorSignatureExtraMetadataBefore() {
+    myFixture.copyDirectoryToProject("stubs/pydantic", "pydantic");
+    final Map<String, PsiElement> marks = loadTest(1);
+
+    feignCtrlP(marks.get("<arg1>").getTextOffset())
+      .check("*, A: str | None = ..., B: str | None = ...", ArrayUtilRt.EMPTY_STRING_ARRAY);
+  }
+
+  @TestFor(issues = "PY-88897")
+  public void testPydanticDataclassParametersFromImportedDecoratorConfig() {
+    myFixture.copyDirectoryToProject("stubs/pydantic", "pydantic");
+    final Map<String, PsiElement> marks = loadMultiFileTest(1);
+
+    final List<String> texts = Arrays.asList("a2: str", "a1: str");
+    final List<String[]> highlighted = Arrays.asList(
+      new String[]{"a2: str"},
+      new String[]{"a1: str"}
+    );
+    final List<String[]> disabled = Arrays.asList(
+      ArrayUtilRt.EMPTY_STRING_ARRAY,
+      ArrayUtilRt.EMPTY_STRING_ARRAY
+    );
+
+    feignCtrlP(marks.get("<arg1>").getTextOffset()).check(texts, highlighted, disabled);
+  }
+
+  @TestFor(issues = "PY-88897")
+  public void testPydanticDataclassDecoratorConfigTakesPrecedenceOverPydanticConfig() {
+    myFixture.copyDirectoryToProject("stubs/pydantic", "pydantic");
+    final Map<String, PsiElement> marks = loadTest(1);
+
+    feignCtrlP(marks.get("<arg1>").getTextOffset()).check("a2: str", new String[]{"a2: str"});
   }
 
   @NotNull

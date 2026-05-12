@@ -6,9 +6,7 @@ public class UsingReadOnlyInterfaces {
             iCollection.add(elem);
             iCollection.isEmpty();
             iCollection.clear();
-            // this is not an error when analyzing against kotlin sources (which is a bug), this inconsistency is hard to fix with the current approach
-            // KT-22594
-            // iCollection.getSize();
+            iCollection.<error descr="Cannot resolve method 'getSize' in 'ICollection'">getSize</error>();
             iCollection.size();
         }
 

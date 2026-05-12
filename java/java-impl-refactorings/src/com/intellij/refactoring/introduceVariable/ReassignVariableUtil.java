@@ -41,8 +41,9 @@ import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiUtil;
 import com.intellij.psi.util.TypeConversionUtil;
 import com.intellij.refactoring.rename.inplace.InplaceRefactoring;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.awt.RelativePoint;
+import com.intellij.ui.dsl.listCellRenderer.LcrJavaHelper;
+import com.intellij.ui.dsl.listCellRenderer.RendererPresentation;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.TestOnly;
 import org.jetbrains.annotations.VisibleForTesting;
@@ -99,12 +100,10 @@ public final class ReassignVariableUtil {
           .createPopupChooserBuilder(vars)
           .setTitle(JavaRefactoringBundle.message("introduce.local.variable.to.reassign.title"))
           .setRequestFocus(true)
-          .setRenderer(SimpleListCellRenderer.create((label, value, index) -> {
-            if (value != null) {
-              label.setText(value.getName());
-              label.setIcon(value.getIcon(0));
-            }
-          }))
+          .setRenderer(LcrJavaHelper.create(
+            "",
+            value -> new RendererPresentation(value.getIcon(0), value.getName())
+          ))
           .setItemChosenCallback((selectedValue) -> replaceWithAssignment(declaration, selectedValue, editor))
           .createPopup();
         if (ApplicationManager.getApplication().isHeadlessEnvironment()) {

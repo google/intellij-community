@@ -73,6 +73,11 @@ public final class ThreadDumper {
       }
       writer.write(coroutineDump);
     }
+    String progressIndicatorDump = ProgressIndicatorDumper.INSTANCE.dumpProgressIndicatorState();
+    if (progressIndicatorDump != null) {
+      writer.write("\n" + ProgressIndicatorDumper.PROGRESS_INDICATOR_DUMP_HEADER + "\n");
+      writer.write(progressIndicatorDump);
+    }
     return new ThreadDump(writer.toString(), edtStack, threadInfos);
   }
 

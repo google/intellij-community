@@ -22,5 +22,7 @@
     <highlightRangeExtension implementation="com.jetbrains.python.validation.PyKeywordHighlightingAnnotator"/>
     <lang.commenter language="Python" implementationClass="com.jetbrains.python.PythonCommenter"/>
     <lang.lineWrapStrategy language="Python" implementationClass="com.jetbrains.python.formatter.PyLineWrapPositionStrategy"/>
+    <applicationSettings service="com.jetbrains.python.codeInsight.PyCodeInsightSettings"/>
+    <applicationSettings service="com.jetbrains.python.documentation.PyDocumentationSettings$AppService"/>
   </extensions>
 </idea-plugin>

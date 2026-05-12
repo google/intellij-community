@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.python.externalIndex` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "externalIndex_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "externalIndex",
   module_name = "intellij.python.externalIndex",
   visibility = ["//visibility:public"],
   srcs = glob(["gen/**/*.kt", "gen/**/*.java", "src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":externalIndex_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:jetbrains-annotations",
@@ -26,11 +21,13 @@ jvm_library(
     "//platform/projectModel-api:projectModel",
     "//platform/analysis-api:analysis",
     "//platform/platform-impl:ide-impl",
+    "//platform/welcome-screen",
   ]
 )
 
 jvm_library(
   name = "externalIndex_test_lib",
+  testonly = True,
   module_name = "intellij.python.externalIndex",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -46,6 +43,13 @@ jvm_library(
     "//platform/projectModel-api:projectModel_test_lib",
     "//platform/analysis-api:analysis_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/welcome-screen:welcome-screen_test_lib",
   ]
 )
 ### auto-generated section `build intellij.python.externalIndex` end
+
+### auto-generated section `iml intellij.python.externalIndex` start
+exports_files([
+  "intellij.python.externalIndex.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.python.externalIndex` end

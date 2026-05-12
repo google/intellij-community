@@ -1,11 +1,12 @@
 from collections.abc import Callable, Sequence
-from typing import Any, TypeVar, overload
+from typing import Any, overload
 
 from django.contrib.admin import ModelAdmin
 from django.contrib.admin.sites import AdminSite
 from django.db.models.base import Model
 from django.db.models.expressions import BaseExpression, Combinable
 from django.utils.functional import _StrOrPromise
+from typing_extensions import TypeVar
 
 _ModelAdmin = TypeVar("_ModelAdmin", bound=ModelAdmin[Any])
 _F = TypeVar("_F", bound=Callable[..., Any])
@@ -31,6 +32,15 @@ def display(
     boolean: bool | None = ...,
     ordering: str | Combinable | BaseExpression | None = ...,
     description: _StrOrPromise | None = ...,
+    empty_value: None = ...,
+) -> _F: ...
+@overload
+def display(
+    function: _F,
+    *,
+    boolean: None = ...,
+    ordering: str | Combinable | BaseExpression | None = ...,
+    description: _StrOrPromise | None = ...,
     empty_value: str | None = ...,
 ) -> _F: ...
 @overload
@@ -38,6 +48,14 @@ def display(
     function: None = None,
     *,
     boolean: bool | None = ...,
+    ordering: str | Combinable | BaseExpression | None = ...,
+    description: _StrOrPromise | None = ...,
+    empty_value: None = ...,
+) -> Callable[[_F], _F]: ...
+@overload
+def display(
+    *,
+    boolean: None = ...,
     ordering: str | Combinable | BaseExpression | None = ...,
     description: _StrOrPromise | None = ...,
     empty_value: str | None = ...,

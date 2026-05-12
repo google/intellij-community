@@ -1,9 +1,11 @@
-<idea-plugin xmlns:xi="http://www.w3.org/2001/XInclude" allow-bundled-update="true">
+<idea-plugin xmlns:xi="http://www.w3.org/2001/XInclude" allow-bundled-update="false">
   <id>com.intellij.java</id>
-  <version>253.28294.105-3</version>
-  <idea-version since-build="253.28294" until-build="263.*" />
+  <version>261.23567.999-mps</version>
+  <idea-version since-build="261.22158" until-build="263.*" />
   <name>Java</name>
-  <description><![CDATA[FUBAR#3]]></description>
+  <description><![CDATA[
+    Adds support for the Java language, including Java projects, language syntax highlighting, inspections, and all other coding assistance features.
+  ]]></description>
   <vendor>JetBrains</vendor>
   <category>Languages</category>
   <resource-bundle>messages.ActionsBundle</resource-bundle>
@@ -16,6 +18,26 @@
 
   <content namespace="jetbrains">
     <module name="intellij.java.frontback.psi.impl" loading="embedded"/>
+
+    <module name="intellij.java" loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
+    <module name="intellij.java.analysis"  loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
+    <module name="intellij.java.analysis.impl" loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
+    <module name="intellij.java.compiler" loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
+    <module name="intellij.java.compiler.impl" loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
+    <module name="intellij.java.debugger" loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
+    <module name="intellij.java.debugger.impl" loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
+    <module name="intellij.java.frontback.psi" loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
+    <module name="intellij.java.impl" loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
+    <module name="intellij.java.indexing" loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
+    <module name="intellij.java.psi" loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
+    <module name="intellij.java.psi.impl" loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
+    <module name="intellij.java.syntax" loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
+    <module name="intellij.jsp" loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
+    <module name="intellij.java.compiler.instrumentationUtil" loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
+    <module name="intellij.platform.jps.build.javac.rt" loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
+    <module name="intellij.platform.jps.build" loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
+    <module name="intellij.platform.uast" loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
+    <module name="intellij.platform.uast.ide" loading="embedded"><![CDATA[<idea-plugin visibility="public"></idea-plugin>]]></module>
   </content>
 
   <module value="com.intellij.modules.java" />

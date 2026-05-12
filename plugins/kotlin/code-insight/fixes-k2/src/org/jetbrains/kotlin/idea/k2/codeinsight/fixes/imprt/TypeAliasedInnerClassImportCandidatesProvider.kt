@@ -38,7 +38,8 @@ internal class TypeAliasedInnerClassImportCandidatesProvider(importContext: Impo
 
     override fun acceptsJavaClass(javaClass: PsiClass): Boolean = false
 
-    context(_: KaSession) @OptIn(KaExperimentalApi::class)
+    @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     override fun collectCandidates(
         name: Name,
         indexProvider: KtSymbolFromIndexProvider,

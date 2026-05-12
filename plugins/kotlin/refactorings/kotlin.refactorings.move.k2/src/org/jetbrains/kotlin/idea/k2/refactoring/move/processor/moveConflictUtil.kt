@@ -119,10 +119,10 @@ internal fun findAllMoveConflicts(
     }
 }
 
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class)
 @NlsSafe
 @ApiStatus.Internal
+context(_: KaSession)
 fun KaSymbol.renderForConflict(declarationRenderer: KaDeclarationRenderer = KaDeclarationRendererForSource.WITH_SHORT_NAMES): String {
     return when (this) {
         is KaClassSymbol -> {

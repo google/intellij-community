@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diff.tools.simple;
 
 import com.intellij.diff.DiffContext;
@@ -85,10 +85,12 @@ public class SimpleThreesideDiffViewer extends ThreesideTextDiffViewerEx {
     group.add(diffGroup);
     group.add(Separator.getInstance());
 
-    group.addAll(myTextDiffProvider.getToolbarActions());
+    List<AnAction> diffActions = new ArrayList<>();
+    diffActions.add(new MyToggleExpandByDefaultAction());
+    diffActions.add(new MyToggleAutoScrollAction());
+    diffActions.addAll(myTextDiffProvider.getDiffSettingsActions());
+    myEditorSettingsAction.setDiffActions(diffActions);
 
-    group.add(new MyToggleExpandByDefaultAction());
-    group.add(new MyToggleAutoScrollAction());
     group.add(new MyEditorReadOnlyLockAction());
     group.add(myEditorSettingsAction);
 
@@ -100,9 +102,10 @@ public class SimpleThreesideDiffViewer extends ThreesideTextDiffViewerEx {
 
   @Override
   protected @NotNull List<AnAction> createPopupActions() {
-    List<AnAction> group = new ArrayList<>(myTextDiffProvider.getPopupActions());
-    group.add(new MyToggleAutoScrollAction());
+    List<AnAction> group = new ArrayList<>();
     group.add(new MyToggleExpandByDefaultAction());
+    group.add(new MyToggleAutoScrollAction());
+    group.addAll(myTextDiffProvider.getDiffSettingsActions());
 
     group.add(Separator.getInstance());
     group.addAll(super.createPopupActions());

@@ -7,27 +7,21 @@ import com.intellij.openapi.vfs.VirtualFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
-import java.nio.file.Path
 
 /**
  * Creates and persists sdk.
- * [projectPath] is used to suggest name
  */
 @ApiStatus.Internal
 suspend fun createSdk(
   pythonBinaryPath: VirtualFile,
-  associatedPath: Path?,
   existingSdks: Array<Sdk>,
 ): Sdk {
   val newSdk = withContext(Dispatchers.IO) {
-    val suggestedName = suggestAssociatedSdkName(pythonBinaryPath.path, associatedPath?.toString())
     SdkConfigurationUtil.setupSdk(existingSdks, pythonBinaryPath,
                                   PythonSdkType.getInstance(),
-                                  null, suggestedName)
+                                  null, null)
   }
 
   newSdk.persist()
   return newSdk
 }
-
-

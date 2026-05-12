@@ -18,18 +18,12 @@ create_kotlinc_options(
 
 resourcegroup(
   name = "idea_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
-resourcegroup(
-  name = "idea_resources_1",
   srcs = glob(["resources-en/**/*"]),
   strip_prefix = "resources-en"
 )
 
 resourcegroup(
-  name = "idea_resources_2",
+  name = "idea_resources_1",
   srcs = glob(["resources-completion/**/*"]),
   strip_prefix = "resources-completion"
 )
@@ -39,10 +33,11 @@ jvm_library(
   module_name = "kotlin.idea",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
+  resource_jars = [
     ":idea_resources",
     ":idea_resources_1",
-    ":idea_resources_2",
   ],
   kotlinc_opts = ":custom_idea",
   deps = [
@@ -54,7 +49,9 @@ jvm_library(
     "//libraries/kotlinx/coroutines/core",
     "//libraries/guava",
     "//java/java-indexing-api:indexing",
+    "//java/java-psi-api:psi",
     "//platform/analysis-api:analysis",
+    "//platform/lang-api:lang",
     "//platform/code-style-api:codeStyle",
     "//platform/editor-ui-api:editor-ui",
     "//platform/indexing-api:indexing",
@@ -120,6 +117,7 @@ jvm_library(
     "//platform/statistics",
     "//jvm/jvm-analysis-api:analysis",
     "//java/openapi:java",
+    "//java/java-syntax:syntax",
     "//java/java-impl:impl",
     "//java/idea-ui:ui",
     "//java/execution/openapi:java-execution",
@@ -136,10 +134,12 @@ jvm_library(
     "//platform/built-in-server:builtInServer-impl",
     "//platform/ide-core",
     "//platform/platform-util-io-impl:ide-util-io-impl",
+    "//platform/platform-util-io:ide-util-io",
     "//libraries/jsoup",
     "//platform/workspace/storage",
     "//java/java-impl-refactorings:impl-refactorings",
     "//java/execution/impl",
+    "//java/java-frontback-psi-api:frontback-psi",
     "//plugins/kotlin/code-insight/api",
     "//plugins/kotlin/code-insight/utils",
     "//plugins/kotlin/code-insight/impl-base:kotlin-codeInsight-shared",
@@ -156,25 +156,30 @@ jvm_library(
     "//plugins/kotlin/code-insight/intentions-shared:kotlin-code-insight-intentions-shared",
     "//plugins/kotlin/kotlin.searching/base",
     "//platform/util/text-matching",
+    "//platform/util:util-ui",
+    "//platform/util-ex",
     "//plugins/kotlin/code-insight/line-markers-shared:kotlin-code-insight-line-markers-shared",
     "//platform/workspace/jps",
     "//platform/backend/workspace",
     "//platform/core-api:core",
+    "//platform/core-impl",
     "//plugins/kotlin/base/analysis-api/analysis-api-utils:kotlin-base-analysis-utils",
     "//plugins/kotlin/code-insight/inspections-shared:kotlin-code-insight-inspections-shared",
     "//plugins/kotlin/kotlin.ide",
     "@lib//:kotlinc-analysis-api-platform-interface",
     "//plugins/kotlin/base/scripting/scripting.shared",
+    "//plugins/kotlin/base/fe10/project-structure",
+    "//platform/util/concurrency",
   ],
   exports = [
     "//plugins/kotlin/highlighting/highlighting-k1:kotlin-highlighting-k1",
     "//plugins/kotlin/frontend-independent",
-    "//platform/statistics",
   ]
 )
 
 jvm_library(
   name = "idea_test_lib",
+  testonly = True,
   module_name = "kotlin.idea",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -184,8 +189,6 @@ jvm_library(
     "//plugins/kotlin/highlighting/highlighting-k1:kotlin-highlighting-k1_test_lib",
     "//plugins/kotlin/frontend-independent",
     "//plugins/kotlin/frontend-independent:frontend-independent_test_lib",
-    "//platform/statistics",
-    "//platform/statistics:statistics_test_lib",
   ],
   runtime_deps = [
     ":idea",
@@ -193,7 +196,9 @@ jvm_library(
     "//libraries/kotlinx/coroutines/core:core_test_lib",
     "//libraries/guava:guava_test_lib",
     "//java/java-indexing-api:indexing_test_lib",
+    "//java/java-psi-api:psi_test_lib",
     "//platform/analysis-api:analysis_test_lib",
+    "//platform/lang-api:lang_test_lib",
     "//platform/code-style-api:codeStyle_test_lib",
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//platform/indexing-api:indexing_test_lib",
@@ -252,6 +257,7 @@ jvm_library(
     "//platform/statistics:statistics_test_lib",
     "//jvm/jvm-analysis-api:analysis_test_lib",
     "//java/openapi:java_test_lib",
+    "//java/java-syntax:syntax_test_lib",
     "//java/java-impl:impl_test_lib",
     "//java/idea-ui:ui_test_lib",
     "//java/execution/openapi:java-execution_test_lib",
@@ -267,10 +273,12 @@ jvm_library(
     "//platform/built-in-server:builtInServer-impl_test_lib",
     "//platform/ide-core:ide-core_test_lib",
     "//platform/platform-util-io-impl:ide-util-io-impl_test_lib",
+    "//platform/platform-util-io:ide-util-io_test_lib",
     "//libraries/jsoup:jsoup_test_lib",
     "//platform/workspace/storage:storage_test_lib",
     "//java/java-impl-refactorings:impl-refactorings_test_lib",
     "//java/execution/impl:impl_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
     "//plugins/kotlin/code-insight/api:api_test_lib",
     "//plugins/kotlin/code-insight/utils:utils_test_lib",
     "//plugins/kotlin/code-insight/impl-base:kotlin-codeInsight-shared_test_lib",
@@ -285,14 +293,25 @@ jvm_library(
     "//plugins/kotlin/code-insight/intentions-shared:kotlin-code-insight-intentions-shared_test_lib",
     "//plugins/kotlin/kotlin.searching/base:base_test_lib",
     "//platform/util/text-matching:text-matching_test_lib",
+    "//platform/util:util-ui_test_lib",
+    "//platform/util-ex:util-ex_test_lib",
     "//plugins/kotlin/code-insight/line-markers-shared:kotlin-code-insight-line-markers-shared_test_lib",
     "//platform/workspace/jps:jps_test_lib",
     "//platform/backend/workspace:workspace_test_lib",
     "//platform/core-api:core_test_lib",
+    "//platform/core-impl:core-impl_test_lib",
     "//plugins/kotlin/base/analysis-api/analysis-api-utils:kotlin-base-analysis-utils_test_lib",
     "//plugins/kotlin/code-insight/inspections-shared:kotlin-code-insight-inspections-shared_test_lib",
     "//plugins/kotlin/kotlin.ide:kotlin.ide_test_lib",
     "//plugins/kotlin/base/scripting/scripting.shared:scripting.shared_test_lib",
+    "//plugins/kotlin/base/fe10/project-structure:project-structure_test_lib",
+    "//platform/util/concurrency:concurrency_test_lib",
   ]
 )
 ### auto-generated section `build kotlin.idea` end
+
+### auto-generated section `iml kotlin.idea` start
+exports_files([
+  "kotlin.idea.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.idea` end

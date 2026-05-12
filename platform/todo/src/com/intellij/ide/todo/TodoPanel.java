@@ -11,10 +11,11 @@ import com.intellij.ide.OccurenceNavigator;
 import com.intellij.ide.TreeExpander;
 import com.intellij.ide.actions.NextOccurenceToolbarAction;
 import com.intellij.ide.actions.PreviousOccurenceToolbarAction;
+import com.intellij.ide.todo.nodes.LeafTodoItemNode;
 import com.intellij.ide.todo.nodes.TodoFileNode;
 import com.intellij.ide.todo.nodes.TodoItemNode;
+import com.intellij.ide.todo.nodes.TodoRemoteItemNode;
 import com.intellij.ide.todo.nodes.TodoTreeHelper;
-import com.intellij.ide.util.PsiNavigationSupport;
 import com.intellij.ide.util.treeView.NodeDescriptor;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.ActionManager;
@@ -41,6 +42,7 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.ToolWindow;
+import com.intellij.pom.Navigatable;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.search.TodoItem;
@@ -383,6 +385,25 @@ public abstract class TodoPanel extends SimpleToolWindowPanel implements Occuren
     myContent.setDisplayName(tabName);
   }
 
+  private @Nullable VirtualFile getVirtualFile(NodeDescriptor<?> selection) {
+    if (selection instanceof LeafTodoItemNode leaf) {
+      return leaf.getVirtualFile();
+    }
+    return PsiUtilCore.getVirtualFile(TodoTreeBuilder.getFileForNodeDescriptor(selection));
+  }
+
+  protected @Nullable Navigatable getNavigatable(Project project, NodeDescriptor<?> selection) {
+    if (selection instanceof LeafTodoItemNode leafTodoItemNode) {
+      return leafTodoItemNode.createNavigatable(project);
+    }
+    Object element = selection.getElement();
+    if (!(element instanceof TodoFileNode || element instanceof LeafTodoItemNode)) { // allow user to use F4 only on files an TODOs
+      return null;
+    }
+    LeafTodoItemNode leaf = myTodoTreeBuilder.getFirstLeafForElement(element);
+    return leaf == null ? null : leaf.createNavigatable(project);
+  }
+
   @Override
   public void uiDataSnapshot(@NotNull DataSink sink) {
     super.uiDataSnapshot(sink);
@@ -392,8 +413,7 @@ public abstract class TodoPanel extends SimpleToolWindowPanel implements Occuren
     NodeDescriptor<?> selection = ObjectUtils.tryCast(TreeUtil.getLastUserObject(myTree.getSelectionPath()), NodeDescriptor.class);
     if (selection == null) return;
     sink.lazy(CommonDataKeys.VIRTUAL_FILE, () -> {
-      PsiFile file = TodoTreeBuilder.getFileForNodeDescriptor(selection);
-      return PsiUtilCore.getVirtualFile(file);
+      return getVirtualFile(selection);
     });
     sink.lazy(CommonDataKeys.PSI_ELEMENT, () -> {
       PsiElement selectedElement = TodoTreeHelper.getInstance(myProject).getSelectedElement(selection);
@@ -401,20 +421,11 @@ public abstract class TodoPanel extends SimpleToolWindowPanel implements Occuren
       return TodoTreeBuilder.getFileForNodeDescriptor(selection);
     });
     sink.lazy(CommonDataKeys.VIRTUAL_FILE_ARRAY, () -> {
-      VirtualFile file = PsiUtilCore.getVirtualFile(TodoTreeBuilder.getFileForNodeDescriptor(selection));
+      VirtualFile file = getVirtualFile(selection);
       return file == null ? null : new VirtualFile[]{file};
     });
     sink.lazy(CommonDataKeys.NAVIGATABLE, () -> {
-      Object element = selection.getElement();
-      if (!(element instanceof TodoFileNode || element instanceof TodoItemNode)) { // allow user to use F4 only on files an TODOs
-        return null;
-      }
-      TodoItemNode pointer = myTodoTreeBuilder.getFirstPointerForElement(element);
-      SmartTodoItemPointer value = pointer == null ? null : pointer.getValue();
-      return value == null ? null : PsiNavigationSupport.getInstance().createNavigatable(
-        myProject,
-        value.getTodoItem().getFile().getVirtualFile(),
-        value.getRangeMarker().getStartOffset());
+      return getNavigatable(myProject, selection);
     });
   }
 
@@ -497,12 +508,11 @@ public abstract class TodoPanel extends SimpleToolWindowPanel implements Occuren
       if (userObject == null) {
         return false;
       }
-      if (userObject instanceof NodeDescriptor && ((NodeDescriptor<?>)userObject).getElement() instanceof TodoItemNode) {
+      if (userObject instanceof NodeDescriptor && ((NodeDescriptor<?>)userObject).getElement() instanceof LeafTodoItemNode) {
         return myTree.getRowCount() != myTree.getRowForPath(path) + 1;
       }
       else {
-        TreeModel model = myTree.getModel();
-        return !model.isLeaf(node);
+        return node.getChildCount() > 0;
       }
     }
 
@@ -524,12 +534,12 @@ public abstract class TodoPanel extends SimpleToolWindowPanel implements Occuren
 
     @Override
     public @Nullable OccurenceInfo goNextOccurence() {
-      return goToPointer(getNextPointer());
+      return goToLeaf(getNextLeaf());
     }
 
     @Override
     public @Nullable OccurenceInfo goPreviousOccurence() {
-      return goToPointer(getPreviousPointer());
+      return goToLeaf(getPreviousLeaf());
     }
 
     @Override
@@ -542,19 +552,13 @@ public abstract class TodoPanel extends SimpleToolWindowPanel implements Occuren
       return IdeBundle.message("action.previous.todo");
     }
 
-    private @Nullable OccurenceInfo goToPointer(TodoItemNode pointer) {
-      if (pointer == null) return null;
-      myTodoTreeBuilder.select(pointer);
-      return new OccurenceInfo(
-        PsiNavigationSupport.getInstance()
-                            .createNavigatable(myProject, pointer.getValue().getTodoItem().getFile().getVirtualFile(),
-                                               pointer.getValue().getRangeMarker().getStartOffset()),
-        -1,
-        -1
-      );
+    private @Nullable OccurenceInfo goToLeaf(@Nullable LeafTodoItemNode leaf) {
+      if (leaf == null) return null;
+      myTodoTreeBuilder.select(leaf);
+      return new OccurenceInfo(leaf.createNavigatable(myProject), -1, -1);
     }
 
-    private @Nullable TodoItemNode getNextPointer() {
+    private @Nullable LeafTodoItemNode getNextLeaf() {
       TreePath path = myTree.getSelectionPath();
       if (path == null) {
         return null;
@@ -565,17 +569,13 @@ public abstract class TodoPanel extends SimpleToolWindowPanel implements Occuren
         return null;
       }
       Object element = ((NodeDescriptor<?>)userObject).getElement();
-      TodoItemNode pointer;
-      if (element instanceof TodoItemNode) {
-        pointer = myTodoTreeBuilder.getNextPointer((TodoItemNode)element);
+      if (element instanceof LeafTodoItemNode leaf) {
+        return myTodoTreeBuilder.getNextLeaf(leaf);
       }
-      else {
-        pointer = myTodoTreeBuilder.getFirstPointerForElement(element);
-      }
-      return pointer;
+      return myTodoTreeBuilder.getFirstLeafForElement(element);
     }
 
-    private @Nullable TodoItemNode getPreviousPointer() {
+    private @Nullable LeafTodoItemNode getPreviousLeaf() {
       TreePath path = myTree.getSelectionPath();
       if (path == null) {
         return null;
@@ -586,18 +586,11 @@ public abstract class TodoPanel extends SimpleToolWindowPanel implements Occuren
         return null;
       }
       Object element = ((NodeDescriptor<?>)userObject).getElement();
-      TodoItemNode pointer;
-      if (element instanceof TodoItemNode) {
-        pointer = myTodoTreeBuilder.getPreviousPointer((TodoItemNode)element);
+      if (element instanceof LeafTodoItemNode leaf) {
+        return myTodoTreeBuilder.getPreviousLeaf(leaf);
       }
-      else {
-        Object sibling = myTodoTreeBuilder.getPreviousSibling(element);
-        if (sibling == null) {
-          return null;
-        }
-        pointer = myTodoTreeBuilder.getLastPointerForElement(sibling);
-      }
-      return pointer;
+      Object sibling = myTodoTreeBuilder.getPreviousSibling(element);
+      return sibling == null ? null : myTodoTreeBuilder.getLastLeafForElement(sibling);
     }
 
     @Override

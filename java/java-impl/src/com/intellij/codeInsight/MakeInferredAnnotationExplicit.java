@@ -138,7 +138,7 @@ public final class MakeInferredAnnotationExplicit extends BaseIntentionAction {
     if (needToAddDependency(file, annotations)) {
       SmartPsiElementPointer<PsiModifierListOwner> ownerPointer = SmartPointerManager.createPointer(owner);
       InferNullityAnnotationsAction.addAnnotationsDependency(project, Collections.singleton(module), AnnotationUtil.NOT_NULL, getFamilyName())
-        .onSuccess(__ -> ApplicationManager.getApplication()
+        .onSuccess(_ -> ApplicationManager.getApplication()
           .invokeLater(() -> doStartWriteAction(project, file, ownerPointer.getElement(), annotations),
                        ModalityState.nonModal(),
                        module.getDisposed()));

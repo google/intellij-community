@@ -98,6 +98,9 @@
       <language>UAST</language>
       <className>com.intellij.xdebugger.impl.codeinsight.ControlExceptionBreakpointIntentionAction</className>
     </intentionAction>
+    <projectSettings service="com.intellij.xdebugger.memory.component.InstancesTracker"/>
+    <applicationSettings service="com.intellij.xdebugger.memory.component.MemoryViewManager"/>
+    <projectSettings service="com.intellij.xdebugger.impl.XDebuggerManagerImpl"/>
   </extensions>
 
   <actions resource-bundle="messages.XDebuggerImplBundle">

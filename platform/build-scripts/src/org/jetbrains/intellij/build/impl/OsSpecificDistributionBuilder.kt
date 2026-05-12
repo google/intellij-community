@@ -5,6 +5,8 @@ import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.util.io.PosixFilePermissionsUtil
 import com.intellij.util.text.nullize
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.archivers.zip.ZipFile
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
@@ -74,12 +76,15 @@ interface OsSpecificDistributionBuilder {
         .toSet()
       if (unmatchedPatterns.isNotEmpty()) {
         context.messages.warning(matchedFiles.joinToString(prefix = "Matched files ${distribution.name}:\n", separator = "\n"))
-        if (TeamCityHelper.isUnderTeamCity) {
-          context.messages.reportBuildProblem(
-            unmatchedPatterns.joinToString(prefix = "Unmatched executable permissions patterns in ${distribution.name}: ") {
-              patterns.getValue(it)
-            }
-          )
+        unmatchedPatterns.joinToString(prefix = "Unmatched executable permissions patterns in ${distribution.name}: ") {
+          patterns.getValue(it)
+        }.let { message ->
+          if (TeamCityHelper.isUnderTeamCity) {
+            context.messages.reportBuildProblem(message)
+          }
+          else {
+            context.messages.warning(message)
+          }
         }
       }
     }
@@ -93,6 +98,31 @@ interface OsSpecificDistributionBuilder {
   fun distributionFilesBuilt(arch: JvmArchitecture): List<Path>
 
   fun isRuntimeBundled(file: Path): Boolean
+
+  suspend fun createChecksumAndGpgSignFiles(context: BuildContext, buildArtifact: suspend () -> Path): Path {
+    val artifactFile = buildArtifact.invoke()
+
+    coroutineScope {
+      val checksums = Checksums.compute(artifactFile, Checksums.Algorithm.SHA256, Checksums.Algorithm.SHA512)
+
+      launch {
+        checksums.verifyOrWriteChecksumFile(Checksums.Algorithm.SHA256).also {
+          sign(context, it)
+        }
+        checksums.verifyOrWriteChecksumFile(Checksums.Algorithm.SHA512).also {
+          sign(context, it)
+        }
+      }
+    }
+
+    return artifactFile
+  }
+
+  private suspend fun sign(context: BuildContext, hashFile: Path) {
+    context.proprietaryBuildTools.signTool.signFilesWithGpg(
+      listOf(hashFile), context
+    )
+  }
 }
 
 private fun checkDirectory(distribution: Path, patterns: Collection<PathMatcher>): List<MatchedFile> {

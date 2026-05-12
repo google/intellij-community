@@ -1,12 +1,17 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gitlab.mergerequest.ui.create
 
+import com.intellij.collaboration.ui.ExceptionUtil
 import com.intellij.collaboration.ui.HorizontalListPanel
 import com.intellij.collaboration.ui.LoadingLabel
 import com.intellij.collaboration.ui.VerticalListPanel
 import com.intellij.collaboration.ui.util.bindTextIn
 import com.intellij.collaboration.ui.util.bindVisibilityIn
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.ui.MessageType
+import com.intellij.openapi.ui.popup.Balloon
+import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.ui.awt.AnchoredPoint
 import com.intellij.ui.components.ActionLink
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.JLabelUtil
@@ -15,7 +20,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import org.jetbrains.plugins.gitlab.mergerequest.ui.create.model.GitLabMergeRequestCreateViewModel
 import org.jetbrains.plugins.gitlab.mergerequest.ui.create.model.MergeRequestRequirementsErrorType
 import org.jetbrains.plugins.gitlab.util.GitLabBundle
@@ -35,10 +39,27 @@ internal object GitLabMergeRequestCreateStatusComponentFactory {
   }
 
   private fun creatingErrorLabel(cs: CoroutineScope, createVm: GitLabMergeRequestCreateViewModel): JComponent {
-    return JLabel(AllIcons.Ide.FatalError).apply {
-      border = JBUI.Borders.empty(STATUS_COMPONENT_BORDER, 0)
+    val iconLabel = JLabel(AllIcons.Ide.FatalError).apply {
       text = GitLabBundle.message("merge.request.create.error.creating")
       JLabelUtil.setTrimOverflow(this, true)
+    }
+    val detailsLink = ActionLink(GitLabBundle.message("merge.request.create.error.creating.show.details")) {
+      createVm.reviewCreatingError.value?.let {
+        ExceptionUtil.getPresentableMessage(it)
+      }?.let { error ->
+        val point = AnchoredPoint(AnchoredPoint.Anchor.TOP, it.source as? JComponent ?: return@let)
+        JBPopupFactory.getInstance()
+          .createHtmlTextBalloonBuilder(error, MessageType.ERROR, null)
+          .setBlockClicksThroughBalloon(true)
+          .createBalloon()
+          .show(point, Balloon.Position.above)
+      }
+    }
+
+    return HorizontalListPanel(gap = 4).apply {
+      border = JBUI.Borders.empty(STATUS_COMPONENT_BORDER, 0)
+      add(iconLabel)
+      add(detailsLink)
       bindVisibilityIn(cs, createVm.reviewCreatingError.map { it != null })
     }
   }

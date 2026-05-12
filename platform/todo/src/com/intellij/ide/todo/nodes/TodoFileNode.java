@@ -9,7 +9,6 @@ import com.intellij.ide.projectView.impl.nodes.PsiFileNode;
 import com.intellij.ide.todo.SmartTodoItemPointer;
 import com.intellij.ide.todo.TodoFilter;
 import com.intellij.ide.todo.TodoTreeBuilder;
-import com.intellij.ide.todo.rpc.TodoHelperKt;
 import com.intellij.ide.todo.rpc.TodoResult;
 import com.intellij.ide.util.treeView.AbstractTreeNode;
 import com.intellij.injected.editor.DocumentWindow;
@@ -64,14 +63,11 @@ public final class TodoFileNode extends PsiFileNode {
           return Collections.emptyList();
         }
 
-        TodoFilter filter = getToDoFilter();
-
-        List<TodoResult> results = TodoHelperKt.findAllTodos(getProject(), virtualFile, filter);
+        List<TodoResult> results = myBuilder.getCachedRemoteTodos(virtualFile);
 
         List<TodoRemoteItemNode> children = new ArrayList<>(results.size());
         for (TodoResult result : results) {
-          String lineText = result.getPresentation().isEmpty() ? "" : result.getPresentation().getFirst().getText();
-          TodoRemoteItemNode.Value value = new TodoRemoteItemNode.Value(virtualFile, result.getNavigationOffset(), result.getLength(), result.getLine(), lineText);
+          TodoRemoteItemNode.Value value = new TodoRemoteItemNode.Value(virtualFile, result.getNavigationOffset(), result.getLength(), result.getLine(), result.getPresentation());
           children.add(new TodoRemoteItemNode(getProject(), value, myBuilder));
         }
         return Collections.unmodifiableList(children);

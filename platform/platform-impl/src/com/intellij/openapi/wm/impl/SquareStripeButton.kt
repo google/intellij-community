@@ -33,6 +33,8 @@ import com.intellij.ui.MouseDragHelper
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.RelativeFont
 import com.intellij.ui.UIBundle
+import com.intellij.ui.icons.HoledIcon
+import com.intellij.ui.icons.IconReplacer
 import com.intellij.ui.icons.loadIconCustomVersionOrScale
 import com.intellij.ui.icons.toStrokeIcon
 import com.intellij.util.concurrency.SynchronizedClearableLazy
@@ -277,7 +279,7 @@ internal class SquareStripeButton(action: SquareAnActionButton, val toolWindow: 
   override fun updateToolTipText() {
     @Suppress("DialogTitleCapitalization")
     HelpTooltip()
-      .setTitle(toolWindow.stripeTitleProvider)
+      .setPlainTextTitle(toolWindow.stripeTitleProvider)
       .setLocation(getAlignment(toolWindow.anchor, toolWindow.isSplitMode))
       .setShortcut(ActionManager.getInstance().getKeyboardShortcut(ActivateToolWindowAction.Manager.getActionIdForToolWindow(toolWindow.id)))
       .setInitialDelay(0)
@@ -331,7 +333,16 @@ private fun createPresentation(toolWindow: ToolWindowImpl): Presentation {
 
 private fun scaleIcon(icon: ScalableIcon): Icon {
   val iconSize = JBUI.CurrentTheme.Toolbar.stripeToolbarButtonIconSize()
-  return loadIconCustomVersionOrScale(icon = icon, size = iconSize)
+  return if (icon is HoledIcon && icon.icon is ScalableIcon) {
+    icon.replaceBy(object : IconReplacer {
+      override fun replaceIcon(icon: Icon): Icon {
+        return loadIconCustomVersionOrScale(icon = icon as ScalableIcon, size = iconSize)
+      }
+    })
+  }
+  else {
+    loadIconCustomVersionOrScale(icon = icon, size = iconSize)
+  }
 }
 
 private fun createPopupGroup(toolWindow: ToolWindowImpl): DefaultActionGroup {

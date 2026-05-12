@@ -7,6 +7,7 @@ import com.intellij.openapi.util.BuildNumber
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.platform.diagnostic.telemetry.TelemetryManager
 import com.intellij.teamcity.TeamCityClient
+import com.intellij.testFramework.BenchmarkTestInfo
 import com.intellij.testFramework.UsefulTestCase
 import com.intellij.tools.ide.metrics.collector.MetricsCollector
 import com.intellij.tools.ide.metrics.collector.metrics.PerformanceMetrics
@@ -20,7 +21,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 import java.util.Properties
-import java.util.ServiceLoader
 import kotlin.io.path.Path
 import kotlin.io.path.writer
 import kotlin.time.Duration.Companion.milliseconds
@@ -31,6 +31,7 @@ import kotlin.time.Duration.Companion.seconds
  * Charts can be found at [IJ Perf Dashboard](https://ij-perf.labs.jb.gg/intellij/testsDev) - link is prone to change, though.
  */
 internal class IJPerfBenchmarksMetricsPublisher {
+
 
   companion object {
 
@@ -54,10 +55,6 @@ internal class IJPerfBenchmarksMetricsPublisher {
       }
 
       return tempPropertiesFile.toPath()
-    }
-
-    private val codeOwnerResolver: BenchmarkCodeOwnerResolver? by lazy {
-      ServiceLoader.load(BenchmarkCodeOwnerResolver::class.java).firstOrNull()
     }
 
     private val teamCityClient = TeamCityClient(
@@ -92,7 +89,7 @@ internal class IJPerfBenchmarksMetricsPublisher {
         methodName = uniqueTestIdentifier,
         buildNumber = BuildNumber.currentVersion(),
         metrics = metrics,
-        owner = testClass?.let { codeOwnerResolver?.getOwnerGroupName(it) } ?: ""
+        owner = testClass?.let { runCatching { codeOwners?.getOwnerGroupName(it) }.getOrNull() } ?: ""
       )
     }
 

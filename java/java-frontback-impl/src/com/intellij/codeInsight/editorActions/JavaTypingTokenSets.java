@@ -23,4 +23,17 @@ public final class JavaTypingTokenSets {
     TokenSet.orSet(
       TokenSet.create(JavaTokenType.OR, JavaTokenType.XOR, JavaTokenType.AND),
       ElementType.SHIFT_OPS, ElementType.ADDITIVE_OPS, ElementType.MULTIPLICATIVE_OPS);
+
+  static final TokenSet KEYWORDS_BEFORE_METHOD_TYPE_PARAMETERS = TokenSet.create(
+    JavaTokenType.PUBLIC_KEYWORD,
+    JavaTokenType.PROTECTED_KEYWORD,
+    JavaTokenType.PRIVATE_KEYWORD,
+    JavaTokenType.STATIC_KEYWORD,
+    JavaTokenType.FINAL_KEYWORD,
+    JavaTokenType.ABSTRACT_KEYWORD,
+    JavaTokenType.DEFAULT_KEYWORD,
+    JavaTokenType.SYNCHRONIZED_KEYWORD,
+    JavaTokenType.NATIVE_KEYWORD,
+    JavaTokenType.STRICTFP_KEYWORD
+  );
 }

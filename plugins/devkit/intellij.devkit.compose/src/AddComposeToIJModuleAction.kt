@@ -37,7 +37,7 @@ internal class AddComposeToIJModuleAction : DumbAwareAction() {
 
   override fun update(e: AnActionEvent) {
     val modules = e.getData(LangDataKeys.MODULE_CONTEXT_ARRAY)
-    val isRelevantProject = e.project?.let { isIntelliJPlatformProject(it) } ?: false
+    val isRelevantProject = isComposeToolingEnabled() && e.project?.let { isIntelliJPlatformProject(it) } ?: false
 
     e.presentation.isVisible = isRelevantProject
     e.presentation.isEnabled = isRelevantProject && !modules.isNullOrEmpty()

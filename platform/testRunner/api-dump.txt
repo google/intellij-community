@@ -319,6 +319,7 @@ com.intellij.execution.testframework.actions.ConsolePropertiesProvider
 - createTestConsoleProperties(com.intellij.execution.Executor):com.intellij.execution.testframework.TestConsoleProperties
 com.intellij.execution.testframework.actions.TestDiffProvider
 - a:findExpected(com.intellij.openapi.project.Project,java.lang.String,java.lang.String):com.intellij.psi.PsiElement
+- getExpectedValue(com.intellij.psi.PsiElement):java.lang.String
 - s:getProviderByLanguage(com.intellij.lang.Language):com.intellij.execution.testframework.actions.TestDiffProvider
 - a:updateExpected(com.intellij.psi.PsiElement,java.lang.String):V
 f:com.intellij.execution.testframework.actions.TestDiffRequestProcessor

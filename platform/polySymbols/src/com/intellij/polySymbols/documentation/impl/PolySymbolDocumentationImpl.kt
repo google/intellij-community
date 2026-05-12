@@ -27,6 +27,7 @@ internal data class PolySymbolDocumentationImpl(
   override val descriptionSections: Map<@Nls String, @Nls String>,
   override val footnote: @Nls String?,
   override val header: @Nls String?,
+  private val iconProviders: List<(String) -> Icon?>,
 ) : PolySymbolDocumentation {
   override fun isNotEmpty(): Boolean =
     name != definition || description != null || docUrl != null || (apiStatus != null && apiStatus != PolySymbolApiStatus.Stable)
@@ -72,7 +73,7 @@ internal data class PolySymbolDocumentationImpl(
   override fun withHeader(header: @Nls String?): PolySymbolDocumentation =
     copy(header = header)
 
-  override fun build(iconProvider: (String) -> Icon?): DocumentationResult {
+  fun build(): DocumentationResult {
     val url2ImageMap = mutableMapOf<String, Image>()
 
     @Suppress("HardCodedStringLiteral")
@@ -83,7 +84,7 @@ internal data class PolySymbolDocumentationImpl(
       .appendSections()
       .appendFootnote()
       .toString()
-      .loadLocalImages(iconProvider, url2ImageMap)
+      .loadLocalImages(iconProviders, url2ImageMap)
     return DocumentationResult.documentation(contents).images(url2ImageMap).externalUrl(docUrl)
       .definitionDetails(definitionDetails)
   }
@@ -191,12 +192,13 @@ internal data class PolySymbolDocumentationImpl(
 
   private val imgSrcRegex = Regex("<img [^>]*src\\s*=\\s*['\"]([^'\"]+)['\"]")
 
-  private fun String.loadLocalImages(iconProvider: (String) -> Icon?, url2ImageMap: MutableMap<String, Image>): String {
+  private fun String.loadLocalImages(iconProviders: List<(String) -> Icon?>, url2ImageMap: MutableMap<String, Image>): String {
+    if (iconProviders.isEmpty()) return this
     val replaces = imgSrcRegex.findAll(this)
       .mapNotNull { it.groups[1] }
       .filter { !it.value.contains(':') }
       .mapNotNull { group ->
-        iconProvider(group.value)
+        iconProviders.firstNotNullOfOrNull { it(group.value) }
           ?.let { IconUtil.toBufferedImage(it, true) }
           ?.let {
             val url = "https://img${url2ImageMap.size}"

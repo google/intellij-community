@@ -168,12 +168,29 @@ class CachedTreePresentation(rootPresentation: CachedTreePresentationData) {
   fun childrenLoaded(parent: Any, children: List<Any>) {
     val cachedParent = getCachedNode(parent) ?: return
     val cachedChildren = getCachedChildren(cachedParent) ?: return
-    if (cachedChildren.size != children.size) return
-    for (index in children.indices) {
-      val cached = cachedChildren[index]
-      val real = children[index]
+
+    // here we match two arrays of possibly different sizes allowing extra items on one (any) side
+    var realIndex = 0
+    var cachedIndex = 0
+    while (realIndex < children.size && cachedIndex < cachedChildren.size) {
+      val cached = cachedChildren[cachedIndex]
+      val real = children[realIndex]
       if (cached.matches(real)) {
         cachedNodeByRealNode[real] = cached
+        realIndex++
+        cachedIndex++
+      }
+      else {
+        val realRemaining = children.size - realIndex
+        val cachedRemaining = cachedChildren.size - cachedIndex
+        when  {
+          realRemaining > cachedRemaining -> realIndex++
+          realRemaining < cachedRemaining -> cachedIndex++
+          else -> {
+            realIndex++
+            cachedIndex++
+          }
+        }
       }
     }
   }

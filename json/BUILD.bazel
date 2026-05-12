@@ -1,23 +1,19 @@
 ### auto-generated section `build intellij.json` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "json_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "json",
   module_name = "intellij.json",
   visibility = ["//visibility:public"],
   srcs = glob(["gen/**/*.kt", "gen/**/*.java", "src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":json_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/code-style-api:codeStyle",
     "//platform/core-api:core",
     "//platform/platform-impl:ide-impl",
+    "//platform/ide-core",
     "//platform/core-impl",
     "//platform/analysis-impl",
     "//platform/lang-api:lang",
@@ -31,12 +27,14 @@ jvm_library(
     "//json/syntax",
     "//platform/syntax/syntax-psi:psi",
     "//platform/syntax/syntax-util:util",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
   ],
   exports = ["//json/syntax"]
 )
 
 jvm_library(
   name = "json_test_lib",
+  testonly = True,
   module_name = "intellij.json",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -50,6 +48,7 @@ jvm_library(
     "//platform/code-style-api:codeStyle_test_lib",
     "//platform/core-api:core_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/core-impl:core-impl_test_lib",
     "//platform/analysis-impl:analysis-impl_test_lib",
     "//platform/lang-api:lang_test_lib",
@@ -62,6 +61,13 @@ jvm_library(
     "//json/syntax:syntax_test_lib",
     "//platform/syntax/syntax-psi:psi_test_lib",
     "//platform/syntax/syntax-util:util_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
   ]
 )
 ### auto-generated section `build intellij.json` end
+
+### auto-generated section `iml intellij.json` start
+exports_files([
+  "intellij.json.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.json` end

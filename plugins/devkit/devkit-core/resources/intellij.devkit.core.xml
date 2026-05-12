@@ -1,16 +1,19 @@
 <idea-plugin visibility="public">
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
     <plugin id="com.intellij.properties"/>
     <module name="intellij.java.backend"/>
-    <module name="intellij.spellchecker"/>
+    <module name="intellij.java.aetherDependencyResolver"/>
     <module name="intellij.json.backend"/>
+    <module name="intellij.libraries.xerces"/>
     <module name="intellij.properties.backend"/>
     <module name="intellij.properties.backend.psi"/>
-    <module name="intellij.libraries.xerces"/>
-    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
-    <module name="intellij.java.aetherDependencyResolver"/>
-    <!-- endregion -->
+    <module name="intellij.spellchecker"/>
+    <module name="intellij.xml.dom.impl"/>
+    <module name="intellij.xml.parser"/>
+    <module name="intellij.xml.psi"/>
   </dependencies>
+  <!-- endregion -->
 
   <resource-bundle>messages.DevKitBundle</resource-bundle>
 
@@ -24,6 +27,7 @@
     <codeInsight.lineMarkerProvider language="UAST"
                                     implementationClass="org.jetbrains.idea.devkit.testAssistant.TestDataLineMarkerProvider"/>
     <fileEditorProvider implementation="org.jetbrains.idea.devkit.testAssistant.TestDataGroupEditorProvider"/>
+    <editorNotificationProvider implementation="org.jetbrains.idea.devkit.module.icons.GeneratedPluginIconNotificationProvider"/>
     <gotoRelatedProvider implementation="org.jetbrains.idea.devkit.testAssistant.TestDataAsRelatedFileProvider"/>
     <gotoRelatedProvider implementation="org.jetbrains.idea.devkit.testAssistant.TestCaseAsRelatedFileProvider"/>
     <gotoRelatedProvider implementation="org.jetbrains.idea.devkit.navigation.DescriptionInspectionGotoRelatedProvider"/>
@@ -106,10 +110,11 @@
     <properties.implicitPropertyUsageProvider implementation="org.jetbrains.idea.devkit.inspections.RegistryImplicitPropertyUsageProvider"/>
 
     <configurationType implementation="org.jetbrains.idea.devkit.run.PluginConfigurationType"/>
+    <!--suppress PluginXmlValidity -->
     <moduleType id="PLUGIN_MODULE" implementationClass="org.jetbrains.idea.devkit.module.PluginModuleType" classpathProvider="true"/>
     <registryKey key="devkit.web.based.plugin.generator.enabled"
                  description="Enables the new IDE Plugin module builder based on web backend"
-                 defaultValue="false"/>
+                 defaultValue="true"/>
     <moduleBuilder builderClass="org.jetbrains.idea.devkit.module.IdePluginModuleBuilder"/>
     <moduleBuilder builderClass="org.jetbrains.idea.devkit.module.webstarter.IdePluginModuleWebBasedBuilder"/>
     <sdkType implementation="org.jetbrains.idea.devkit.projectRoots.IdeaJdk"/>
@@ -131,6 +136,17 @@
 
     <registryKey defaultValue="false" description="Enables experimental new remote dev module in intellij repository"
                  key="devkit.new.remdev.module.action"/>
+    <registryKey key="devkit.remote.dev.split.mode.analysis.transitive.dependencies" defaultValue="true"
+                 description="Enables transitive descriptor dependency analysis for DevKit split-mode inspections."/>
+    <registryKey key="devkit.remote.dev.split.mode.analysis.containing.plugins" defaultValue="false"
+                 description="Enables containing plugin descriptor analysis for DevKit split-mode inspections."/>
+    <registryKey key="devkit.remote.dev.split.mode.inspections.skip.predefined" defaultValue="true"
+                 description="Skips DevKit Split Mode inspections in modules and XML descriptors with predefined module kinds."/>
+    <registryKey key="devkit.remote.dev.split.mode.inspections.enable.xml.for.non.native.plugin" defaultValue="false"
+                 description="Keeps XML split-mode inspections enabled in plugin.xml files that are indirectly frontend-only, backend-only, or mixed."/>
+    <registryKey key="devkit.remote.dev.split.mode.analysis.predefined.module.kinds.additional.file" defaultValue=""
+                 description="Optional filesystem path to an extra predefined split-mode module kinds JSON file loaded in addition to the bundled DevKit data."
+                 restartRequired="true"/>
     <registryKey key="devkit.obsolete.new.file.actions.enabled" defaultValue="false"
                  description="Enables old-fashioned File-New actions for plugin modules"/>
 
@@ -153,6 +169,18 @@
                      enabledByDefault="true" level="WEAK WARNING"
                      implementationClass="org.jetbrains.idea.devkit.inspections.PluginXmlPluginLogoInspection"
                      key="inspection.plugin.xml.plugin.logo.display.name"/>
+    <localInspection language="XML" shortName="SplitModeXmlApiUsage" applyToDialects="false"
+                     projectType="INTELLIJ_PLUGIN"
+                     groupPathKey="inspections.group.path" groupKey="inspections.group.descriptor"
+                     enabledByDefault="true" level="WARNING"
+                     implementationClass="org.jetbrains.idea.devkit.inspections.remotedev.SplitModeXmlApiUsageInspection"
+                     key="inspection.split.mode.xml.api.usage.display.name"/>
+    <localInspection language="XML" shortName="SplitModeMixedDependencies" applyToDialects="false"
+                     projectType="INTELLIJ_PLUGIN"
+                     groupPathKey="inspections.group.path" groupKey="inspections.group.descriptor"
+                     enabledByDefault="true" level="ERROR"
+                     implementationClass="org.jetbrains.idea.devkit.inspections.remotedev.SplitModeMixedDependenciesInspection"
+                     key="inspection.split.mode.mixed.dependencies.display.name"/>
     <localInspection language="XML" applyToDialects="false"
                      projectType="INTELLIJ_PLUGIN"
                      groupPathKey="inspections.group.path" groupKey="inspections.group.descriptor"
@@ -223,6 +251,13 @@
                      enabledByDefault="true" level="WARNING"
                      implementationClass="org.jetbrains.idea.devkit.inspections.internal.UndesirableClassUsageInspection"
                      key="inspection.undesirable.class.usage.display.name"/>
+
+    <localInspection language="UAST" shortName="SplitModeApiUsage"
+                     projectType="INTELLIJ_PLUGIN"
+                     groupPathKey="inspections.group.path" groupKey="inspections.group.code"
+                     enabledByDefault="true" level="WARNING"
+                     implementationClass="org.jetbrains.idea.devkit.inspections.remotedev.SplitModeApiUsageInspection"
+                     key="inspection.split.mode.api.usage.display.name"/>
     <localInspection language="UAST" shortName="FileEqualsUsage"
                      projectType="INTELLIJ_PLUGIN"
                      groupPathKey="inspections.group.path" groupKey="inspections.group.code"
@@ -253,6 +288,12 @@
                      enabledByDefault="true" level="WARNING"
                      implementationClass="org.jetbrains.idea.devkit.inspections.UseIntelliJVirtualThreadsInspection"
                      key="inspection.use.intellij.virtual.threads.display.name"/>
+    <localInspection language="UAST" shortName="UseHtmlChunkToolTip"
+                     projectType="INTELLIJ_PLUGIN"
+                     groupPathKey="inspections.group.path" groupKey="inspections.group.code"
+                     enabledByDefault="true" level="WARNING"
+                     implementationClass="org.jetbrains.idea.devkit.inspections.UseHtmlChunkToolTipInspection"
+                     key="inspection.use.html.chunk.tooltip.display.name"/>
     <localInspection language="UAST" shortName="UseDPIAwareInsets"
                      projectType="INTELLIJ_PLUGIN"
                      groupPathKey="inspections.group.path" groupKey="inspections.group.code"
@@ -358,6 +399,12 @@
                      enabledByDefault="true" level="ERROR"
                      implementationClass="org.jetbrains.idea.devkit.inspections.IncorrectServiceRetrievingInspection"
                      key="inspection.incorrect.service.retrieving.display.name"/>
+    <localInspection language="UAST" shortName="UnsafeOpenServiceCast"
+                     projectType="INTELLIJ_PLUGIN"
+                     groupPathKey="inspections.group.path" groupKey="inspections.group.code"
+                     enabledByDefault="true" level="WARNING"
+                     implementationClass="org.jetbrains.idea.devkit.inspections.UnsafeOpenServiceCastInspection"
+                     key="inspection.unsafe.open.service.cast.display.name"/>
     <localInspection language="UAST"
                      projectType="INTELLIJ_PLUGIN"
                      groupPathKey="inspections.group.path" groupKey="inspections.group.code"
@@ -652,6 +699,7 @@
     <stacktrace.fold substring="at com.intellij.testFramework.ExpectedHighlightingData"/>
     <stacktrace.fold substring="at com.intellij.testFramework.HeavyPlatformTestCase"/>
     <stacktrace.fold substring="at com.intellij.testFramework.LightPlatformCodeInsightTestCase"/>
+    <!--suppress DeprecatedClassUsageInspection -->
     <stacktrace.fold substring="at com.intellij.testFramework.LightPlatformTestCase"/>
     <!--suppress DeprecatedClassUsageInspection -->
     <stacktrace.fold substring="at com.intellij.testFramework.PlatformTestCase"/>
@@ -717,7 +765,6 @@
     <console.folding order="first" implementation="org.jetbrains.idea.devkit.run.FailedTestDebugLogConsoleFolding"/>
 
     <applicationService serviceImplementation="org.jetbrains.idea.devkit.actions.updateFromSources.UpdateFromSourcesSettings"/>
-
     <projectService serviceImplementation="org.jetbrains.idea.devkit.run.JUnitDevKitUnitTestingSettings"
                     configurationSchemaKey="unitTesting"/>
 
@@ -760,6 +807,8 @@
     <useScopeEnlarger implementation="org.jetbrains.idea.devkit.references.DomTargetUseScopeEnlarger"/>
 
     <postStartupActivity implementation="org.jetbrains.idea.devkit.templates.UpdateFileTemplatesSchemeToProjectActivity"/>
+    <projectSettings service="org.jetbrains.idea.devkit.inspections.missingApi.resolve.LibrariesWithIntellijClassesSetting"/>
+    <applicationSettings service="org.jetbrains.idea.devkit.actions.updateFromSources.UpdateFromSourcesSettings"/>
   </extensions>
 
   <extensions defaultExtensionNs="DevKit.lang">
@@ -769,6 +818,9 @@
     <cancellationCheckInLoopsFixProvider
       language="JAVA"
       implementationClass="org.jetbrains.idea.devkit.inspections.quickfix.JavaCancellationCheckInLoopsFixProvider"/>
+    <useHtmlChunkToolTipFixProvider
+      language="JAVA"
+      implementationClass="org.jetbrains.idea.devkit.inspections.quickfix.JavaUseHtmlChunkToolTipFixProvider"/>
     <visitorProviderForRBCInspection
       language="JAVA"
       implementationClass="org.jetbrains.idea.devkit.inspections.CallingMethodShouldBeRequiresBlockingContextInspection$VisitorProviderForJava"/>
@@ -829,6 +881,12 @@
                     dynamic="true">
       <with attribute="implementationClass"
             implements="org.jetbrains.idea.devkit.inspections.quickfix.CancellationCheckInLoopsFixProvider"/>
+    </extensionPoint>
+    <extensionPoint qualifiedName="DevKit.lang.useHtmlChunkToolTipFixProvider"
+                    beanClass="com.intellij.lang.LanguageExtensionPoint"
+                    dynamic="true">
+      <with attribute="implementationClass"
+            implements="org.jetbrains.idea.devkit.inspections.quickfix.UseHtmlChunkToolTipFixProvider"/>
     </extensionPoint>
     <extensionPoint qualifiedName="DevKit.lang.visitorProviderForRBCInspection"
                     beanClass="com.intellij.lang.LanguageExtensionPoint"

@@ -5,8 +5,5 @@ public final class Cls : <ErrorType> {
         UIdentifier (Identifier (this))(a, a, a)
     }
     public final fun component1() : long = UastEmptyExpression
-    public final fun copy(a: long, b: long) : Cls = UastEmptyExpression
-    public fun toString() : java.lang.String = UastEmptyExpression
-    public fun hashCode() : int = UastEmptyExpression
-    public fun equals(@org.jetbrains.annotations.Nullable other: java.lang.Object) : boolean = UastEmptyExpression
+    public final fun copy(a: long) : Cls = UastEmptyExpression
 }

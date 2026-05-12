@@ -1,14 +1,14 @@
 package com.intellij.terminal.frontend.view.impl
 
-import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.UI
 import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.platform.util.coroutines.childScope
+import com.intellij.terminal.frontend.view.TerminalView
 import com.intellij.terminal.frontend.view.impl.TerminalHeuristicsBasedCommandFinishTracker.Companion.MAX_LINE_LENGTH
 import com.intellij.util.asDisposable
-import com.intellij.util.concurrency.annotations.RequiresEdt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -25,13 +25,14 @@ import org.jetbrains.plugins.terminal.view.TerminalOffset
 import org.jetbrains.plugins.terminal.view.TerminalOutputModel
 import org.jetbrains.plugins.terminal.view.TerminalOutputModelListener
 import java.awt.event.KeyEvent
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * This is a heuristic-based tracker that allows to guess when command is finished in the terminal
  * and call the provided [onCommandFinish] function.
  *
  * This tracker analyzes key events passed to [handleKeyPressed] method to guess if command execution is started.
- * Then it analyzes [outputModel] updates by checking if line with cursor contains the same prompt,
+ * Then it analyzes [TerminalOutputModel] updates by checking if line with cursor contains the same prompt,
  * that was before command execution started.
  *
  * **Limitation**: the tracker will fail to detect command finish if the prompt text is changed after command finish.
@@ -40,11 +41,14 @@ import java.awt.event.KeyEvent
  *
  * Stops operating once the provided coroutine scope is canceled.
  */
-internal class TerminalHeuristicsBasedCommandFinishTracker(
-  private val outputModel: TerminalOutputModel,
+internal class TerminalHeuristicsBasedCommandFinishTracker private constructor(
+  private val terminalView: TerminalView,
   coroutineScope: CoroutineScope,
   private val onCommandFinish: () -> Unit,
 ) {
+  private val outputModel: TerminalOutputModel
+    get() = terminalView.outputModels.regular
+
   // Guarded by EDT
   private var curLineInfo: LineInfo? = null
 
@@ -52,17 +56,25 @@ internal class TerminalHeuristicsBasedCommandFinishTracker(
   private val modelUpdatesFlow = createModelUpdatesFlow(coroutineScope.childScope("TerminalOutputModel updates"))
 
   init {
-    coroutineScope.launch(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+    coroutineScope.launch(Dispatchers.UI + ModalityState.any().asContextElement()) {
       commandStartRequests.collectLatest { lineInfo ->
         trackCommandFinish(lineInfo)
       }
     }
+
+    coroutineScope.launch(Dispatchers.UI) {
+      terminalView.keyEventsFlow.collect {
+        handleKeyPressed(it.awtEvent)
+      }
+    }
   }
 
-  @RequiresEdt
-  fun handleKeyPressed(e: KeyEvent) {
+  private fun handleKeyPressed(e: KeyEvent) {
     try {
       doHandleKeyPressed(e)
+    }
+    catch (ex: CancellationException) {
+      throw ex
     }
     catch (ex: Exception) {
       LOG.error(ex)
@@ -156,5 +168,13 @@ internal class TerminalHeuristicsBasedCommandFinishTracker(
     private const val MAX_LINE_LENGTH = 1000
 
     private val LOG = logger<TerminalHeuristicsBasedCommandFinishTracker>()
+
+    fun install(
+      terminalView: TerminalView,
+      coroutineScope: CoroutineScope,
+      onCommandFinish: () -> Unit,
+    ) {
+      TerminalHeuristicsBasedCommandFinishTracker(terminalView, coroutineScope, onCommandFinish)
+    }
   }
 }

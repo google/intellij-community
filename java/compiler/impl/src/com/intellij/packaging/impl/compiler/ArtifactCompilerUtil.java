@@ -34,7 +34,7 @@ public final class ArtifactCompilerUtil {
       for (Artifact artifact : ArtifactManager.getInstance(project).getArtifacts()) {
         String outputPath = artifact.getOutputFilePath();
         if (!StringUtil.isEmpty(outputPath)) {
-          result.computeIfAbsent(outputPath, __ -> new SmartList<>()).add(artifact);
+          result.computeIfAbsent(outputPath, _ -> new SmartList<>()).add(artifact);
         }
       }
     });

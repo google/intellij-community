@@ -55,7 +55,7 @@ import javax.swing.KeyStroke
 private class TerminalEventDispatcher(
   private val editor: EditorEx,
   private val settings: JBTerminalSystemSettingsProviderBase,
-  private val eventsHandler: TerminalEventsHandler,
+  private val eventsHandler: TerminalKeyEventsHandler,
   private val parentDisposable: Disposable,
 ) : IdeEventQueue.EventDispatcher {
   private val sendShortcutAction = SendShortcutToTerminalAction(eventsHandler)
@@ -263,7 +263,7 @@ private class TerminalEventDispatcher(
 
 private class TerminalKeyListener(
   private val settings: JBTerminalSystemSettingsProviderBase,
-  private val eventsHandler: TerminalEventsHandler,
+  private val eventsHandler: TerminalKeyEventsHandler,
 ) : KeyAdapter() {
   override fun keyTyped(e: KeyEvent) {
     handleEvent(e)
@@ -282,10 +282,10 @@ private class TerminalKeyListener(
   }
 }
 
-internal fun setupKeyEventHandling(
+internal fun setupKeyEventsHandling(
   editor: EditorEx,
   settings: JBTerminalSystemSettingsProviderBase,
-  eventsHandler: TerminalEventsHandler,
+  eventsHandler: TerminalKeyEventsHandler,
   disposable: Disposable,
 ) {
   // Key events forwarding from the editor to the shell
@@ -308,11 +308,11 @@ internal fun setupKeyEventHandling(
   editor.contentComponent.addKeyListener(TerminalKeyListener(settings, eventsHandler))
 }
 
-internal fun setupMouseListener(
+internal fun setupMouseEventsHandling(
   editor: EditorEx,
   sessionModel: TerminalSessionModel,
   settings: JBTerminalSystemSettingsProviderBase,
-  eventsHandler: TerminalEventsHandler,
+  eventsHandler: TerminalMouseEventsHandler,
   disposable: Disposable,
 ) {
   fun isRemoteMouseAction(e: MouseEvent): Boolean {

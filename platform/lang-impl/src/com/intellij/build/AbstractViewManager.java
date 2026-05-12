@@ -4,6 +4,8 @@ package com.intellij.build;
 import com.intellij.build.events.BuildEvent;
 import com.intellij.build.events.StartBuildEvent;
 import com.intellij.concurrency.ConcurrentCollectionFactory;
+import com.intellij.frontend.FrontendApplicationInfo;
+import com.intellij.frontend.FrontendType;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
@@ -56,7 +58,10 @@ public abstract class AbstractViewManager implements ViewManager, BuildProgressL
     });
     myPinnedViews = ConcurrentCollectionFactory.createConcurrentSet();
     @Nullable BuildViewProblemsService buildViewProblemsService = project.getService(BuildViewProblemsService.class);
-    if (buildViewProblemsService != null) {
+
+    FrontendType frontendType = FrontendApplicationInfo.INSTANCE.getFrontendType();
+    boolean isCwmClient = (frontendType instanceof FrontendType.Remote remote) && remote.isGuest();
+    if (buildViewProblemsService != null && !isCwmClient) { //todo: @marina remove isCwmClient flag from if check once cwm is sunset
       buildViewProblemsService.listenToBuildView(this);
     }
   }

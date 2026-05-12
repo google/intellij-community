@@ -114,6 +114,10 @@ class TerminalCommandCompletionService(
     editor.caretModel.primaryCaret.moveToOffset(cursorOffset.toRelative(outputModel))
 
     val activeBlock = shellIntegration.blocksModel.activeBlock as TerminalCommandBlock
+    val commandStartOffset = activeBlock.commandStartOffset ?: return
+    if (cursorOffset < commandStartOffset) {
+      return // Something is definitely wrong, so let's do not trigger completion
+    }
     val commandText = getRawCommandText(activeBlock, outputModel) ?: return
 
     val context = TerminalCommandCompletionContext(
@@ -122,7 +126,7 @@ class TerminalCommandCompletionService(
       editor = editor,
       outputModel = outputModel,
       shellIntegration = shellIntegration,
-      commandStartOffset = activeBlock.commandStartOffset!!,
+      commandStartOffset = commandStartOffset,
       initialCursorOffset = cursorOffset,
       commandText = commandText,
       isAutoPopup = isAutoPopup,
@@ -268,7 +272,7 @@ class TerminalCommandCompletionService(
 
   /**
    * Returns command text with possible trailing new lines and spaces.
-   * Returns null if the cursor is in the incorrect place or the block is invalid.
+   * Returns null if the block is invalid.
    */
   private fun getRawCommandText(block: TerminalCommandBlock, model: TerminalOutputModel): String? {
     val start = block.commandStartOffset ?: return null

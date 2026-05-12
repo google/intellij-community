@@ -4,13 +4,15 @@ package org.jetbrains.kotlin.idea.k2.codeinsight.hierarchy.types
 import com.intellij.codeInsight.navigation.GotoTargetHandler
 import com.intellij.ide.hierarchy.HierarchyNodeDescriptor
 import com.intellij.ide.hierarchy.type.TypeHierarchyNodeDescriptor
-import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ui.util.CompositeAppearance
 import com.intellij.openapi.util.Comparing
+import com.intellij.openapi.util.NlsSafe
 import com.intellij.psi.PsiElement
+import org.jetbrains.kotlin.idea.base.facet.platform.platform
+import org.jetbrains.kotlin.platform.presentableDescription
 import org.jetbrains.kotlin.psi.KtClassOrObject
-import java.awt.Font
+import org.jetbrains.kotlin.psi.psiUtil.isActualDeclaration
 
 class KotlinTypeHierarchyNodeDescriptor(
     project: Project,
@@ -36,15 +38,15 @@ class KotlinTypeHierarchyNodeDescriptor(
 
         myHighlightedText = CompositeAppearance()
 
-        var classNameAttributes: TextAttributes? = null
-        if (myColor != null) {
-            classNameAttributes = TextAttributes(myColor, null, null, null, Font.PLAIN)
-        }
-
         if (psiElement is KtClassOrObject) {
             val targetPresentation = GotoTargetHandler.computePresentation(psiElement, false)
-            myHighlightedText.ending.addText(targetPresentation.presentableText, classNameAttributes)
+            myHighlightedText.ending.addText(targetPresentation.presentableText, textAttributesFor(psiElement))
             myHighlightedText.ending.addText(" (" + (targetPresentation.containerText ?: "") + ")", getPackageNameAttributes())
+            if (psiElement.isActualDeclaration()) {
+                psiElement.platform.presentableDescription.takeUnless { it.isEmpty() }?.let { platformName: @NlsSafe String ->
+                    myHighlightedText.ending.addText(" [$platformName]", getPackageNameAttributes())
+                }
+            }
         }
 
         myName = myHighlightedText.text

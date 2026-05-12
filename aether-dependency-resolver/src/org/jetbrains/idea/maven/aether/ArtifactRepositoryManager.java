@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.idea.maven.aether;
 
 import com.intellij.openapi.application.ClassPathUtil;
@@ -246,7 +246,7 @@ public final class ArtifactRepositoryManager {
       org.apache.commons.logging.LogFactory.class, // commons-logging
       org.slf4j.Marker.class, // slf4j, - required for aether resolver at runtime
       org.slf4j.jul.JDK14LoggerFactory.class, // slf4j-jdk14 - required for aether resolver at runtime
-      org.eclipse.aether.named.providers.NoopNamedLockFactory.class, // resolver-named-locks
+      org.eclipse.aether.named.providers.LocalReadWriteLockNamedLockFactory.class, // resolver-named-locks
       org.apache.commons.codec.binary.Base64.class // commons-codec
     ));
     result.addAll(List.of(ClassPathUtil.getUtilClasses())); // intellij.platform.util module

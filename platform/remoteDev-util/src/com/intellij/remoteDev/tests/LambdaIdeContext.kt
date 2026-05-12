@@ -1,15 +1,15 @@
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.remoteDev.tests
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.util.Disposer
 import com.intellij.remoteDev.tests.impl.utils.runLogged
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.job
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
 import java.util.function.IntFunction
 import kotlin.coroutines.CoroutineContext
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Provides access to all essential entities on this agent required to perform test operations
@@ -66,12 +66,8 @@ abstract class LambdaIdeContextClass(
       }
     }
 
-    runLogged("Disposing global disposable") {
+    runLogged("Disposing global disposable", 10.seconds) {
       Disposer.dispose(globalDisposable)
-    }
-
-    runLogged("Cancelling scopes in after each") {
-      coroutineContext.job.cancelAndJoin()
     }
 
     testFixtures.clear()

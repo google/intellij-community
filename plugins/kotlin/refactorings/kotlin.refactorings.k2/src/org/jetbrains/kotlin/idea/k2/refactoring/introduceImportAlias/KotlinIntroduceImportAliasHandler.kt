@@ -12,6 +12,7 @@ import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiMember
+import com.intellij.psi.PsiMethod
 import com.intellij.psi.SmartPsiElementPointer
 import com.intellij.psi.createSmartPointer
 import com.intellij.psi.search.searches.ReferencesSearch
@@ -59,7 +60,6 @@ import org.jetbrains.kotlin.psi.psiUtil.siblings
 object KotlinIntroduceImportAliasHandler : RefactoringActionHandler {
     private val REFACTORING_NAME = KotlinBundle.message("name.introduce.import.alias")
 
-    @OptIn(KaImplementationDetail::class)
     fun doRefactoring(project: Project, editor: Editor, element: KtNameReferenceExpression) {
         val file = element.containingKtFile
         val declaration = element.mainReference.resolve() ?: return
@@ -67,6 +67,7 @@ object KotlinIntroduceImportAliasHandler : RefactoringActionHandler {
             is KtConstructor<*> -> declaration.getContainingClassOrObject().fqName
             is KtNamedDeclaration -> declaration.fqName
             is PsiClass -> declaration.qualifiedName?.let(::FqName)
+            is PsiMethod if (declaration.isConstructor) -> declaration.containingClass?.qualifiedName?.let(::FqName)
             is PsiMember if declaration.name != null -> declaration.containingClass?.qualifiedName?.let { FqName("$it.${declaration.name}") }
             else -> null
         } ?: return

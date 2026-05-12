@@ -46,10 +46,10 @@ fun Iterable<LogEvent>.filterByEventDataKey(dataKey: String): List<LogEvent> {
 /**
  * Shortcut for filtering, using internal field `data` of event
  */
-fun Iterable<LogEvent>.filterByEventDataKey(dataKey: String, expectedPropertyValue: String): List<LogEvent> {
+fun <T> Iterable<LogEvent>.filterByEventDataKey(dataKey: String, expectedPropertyValue: T): List<LogEvent> {
   return this
     .filter {
-      it.getDataFromEvent<String>(dataKey) == expectedPropertyValue
+      it.getDataFromEvent<T>(dataKey) == expectedPropertyValue
     }
 }
 

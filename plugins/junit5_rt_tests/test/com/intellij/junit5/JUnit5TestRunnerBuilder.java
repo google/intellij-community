@@ -215,6 +215,7 @@ public class JUnit5TestRunnerBuilder {
 
   /// Normalizes TeamCity service messages for stable tests.
   /// - `duration` is different from run to run
+  /// - `durationStrategy` depends on the test.use.suite.duration system property
   /// - `stacktrace` and "line numbers" can change between JUnit versions
   /// - `##teamcity[` must be changed to avoid TeamCity/IDEA parsing it as a service message
   public String getNormalizedTestOutput() {
@@ -223,6 +224,7 @@ public class JUnit5TestRunnerBuilder {
       .replaceAll("\\|r", "")
       .replaceAll("##teamcity\\[", "##TC[")
       .replaceAll(" duration='[0-9]+'", "")
+      .replaceAll(" durationStrategy='[^']*'", "")
       .replaceAll("details='.*?']", "details='TRACE']");
   }
 

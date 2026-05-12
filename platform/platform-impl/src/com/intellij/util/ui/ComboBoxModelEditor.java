@@ -6,7 +6,7 @@ import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.FixedComboBoxEditor;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.MutableCollectionComboBoxModel;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.event.DocumentEvent;
@@ -19,7 +19,7 @@ public final class ComboBoxModelEditor<T> extends ListModelEditorBase<T> {
 
     comboBox = new ComboBox<>(model);
     comboBox.setEditor(new NameEditor());
-    comboBox.setRenderer(SimpleListCellRenderer.create("", value -> itemEditor.getName(value)));
+    comboBox.setRenderer(BuilderKt.textListCellRenderer("", value -> itemEditor.getName(value)));
   }
 
   @Override

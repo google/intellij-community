@@ -7,8 +7,8 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
-import java.util.concurrent.ConcurrentHashMap
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 internal object AgentChatRestoreNotificationService {
   private val LOG = logger<AgentChatRestoreNotificationService>()
@@ -27,7 +27,8 @@ internal object AgentChatRestoreNotificationService {
       file = file,
       reason = reason,
     )
-    ApplicationManager.getApplication().invokeLater {
+    val application = ApplicationManager.getApplication() ?: return
+    application.invokeLater {
       if (!project.isDisposed) {
         FileEditorManager.getInstance(project).closeFile(file)
       }
@@ -101,6 +102,6 @@ private val START_FAILURE_COMMAND_REGEX = Regex("""Failed to start \[(.+?)] in "
 private val START_FAILURE_PATH_REGEX = Regex("""(?:^|[,{ ])PATH=([^,}]+)""")
 
 private data class TerminalStartDiagnostic(
-  val command: String,
-  val path: String?,
+  @JvmField val command: String,
+  @JvmField val path: String?,
 )

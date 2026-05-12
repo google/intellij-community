@@ -2,10 +2,6 @@
 package org.jetbrains.intellij.build.impl.maven
 
 import com.intellij.util.io.Compressor
-import com.intellij.util.io.DigestUtil.md5
-import com.intellij.util.io.DigestUtil.sha1
-import com.intellij.util.io.DigestUtil.sha256
-import com.intellij.util.io.DigestUtil.sha512
 import io.opentelemetry.api.trace.Span
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -32,7 +28,6 @@ import org.jetbrains.intellij.build.telemetry.TraceManager.spanBuilder
 import org.jetbrains.intellij.build.telemetry.use
 import java.nio.file.Path
 import java.util.Base64
-import java.util.concurrent.TimeUnit
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.PathWalkOption
 import kotlin.io.path.deleteIfExists
@@ -42,11 +37,11 @@ import kotlin.io.path.inputStream
 import kotlin.io.path.isDirectory
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
-import kotlin.io.path.readLines
 import kotlin.io.path.relativeTo
 import kotlin.io.path.walk
-import kotlin.io.path.writeText
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * @param workDir is expected to contain:
@@ -77,6 +72,9 @@ class MavenCentralPublication(
     private const val STATUS_URI_BASE = "$URI_BASE/status"
     private val JSON = Json { ignoreUnknownKeys = true }
     private val SUPPORTED_CHECKSUMS = setOf("md5", "sha1", "sha256", "sha512")
+    private val SONATYPE_TIMEOUT: Duration = 5.minutes
+    private val DEPLOYMENT_TIMEOUT: Duration = 45.minutes
+    private val DEPLOYMENT_STATUS_POLL_DELAY: Duration = 15.seconds
   }
 
   /**
@@ -205,11 +203,19 @@ class MavenCentralPublication(
       for (artifact in artifacts) {
         for (file in artifact.distributionFiles.minus(artifact.checksums.toSet())) {
           launch(CoroutineName("checksums for $file")) {
-            val checksums = Checksums(file, sha1(), sha256(), sha512(), md5())
-            generateOrVerifyChecksum(file, extension = "sha1", checksums.sha1sum)
-            generateOrVerifyChecksum(file, extension = "sha256", checksums.sha256sum)
-            generateOrVerifyChecksum(file, extension = "sha512", checksums.sha512sum)
-            generateOrVerifyChecksum(file, extension = "md5", checksums.md5sum)
+            val checksumAlgorithms = listOf(
+              Checksums.Algorithm.SHA1,
+              Checksums.Algorithm.SHA256,
+              Checksums.Algorithm.SHA512,
+              Checksums.Algorithm.MD5
+            )
+            val checksums = Checksums.compute(
+              file,
+              *checksumAlgorithms.toTypedArray(),
+            )
+            checksumAlgorithms.forEach {
+              generateOrVerifyChecksum(checksums, it)
+            }
           }
         }
       }
@@ -224,29 +230,11 @@ class MavenCentralPublication(
   }
 
   @VisibleForTesting
-  class ChecksumMismatch(message: String) : RuntimeException(message)
-
-  @VisibleForTesting
   class SuppliedSignatures(message: String) : RuntimeException(message)
 
-  private fun CoroutineScope.generateOrVerifyChecksum(file: Path, extension: String, value: String) {
-    launch(CoroutineName("checksum $extension for $file")) {
-      spanBuilder("checksum").setAttribute("file", "$file").setAttribute("extension", extension).use {
-        val checksumFile = file.resolveSibling("${file.name}.$extension")
-        if (checksumFile.exists()) {
-          val suppliedValue = checksumFile.readLines().asSequence()
-            // sha256sum command output is a line with checksum,
-            // a character indicating type ('*' for --binary, ' ' for --text),
-            // and the supplied file argument
-            .flatMap { it.splitToSequence(" ") }
-            .firstOrNull()
-          if (suppliedValue != value) {
-            throw ChecksumMismatch("The supplied file $checksumFile content mismatch: '$suppliedValue' != '$value'")
-          }
-        }
-        // a checksum file should contain only a checksum itself
-        checksumFile.writeText(value)
-      }
+  private fun CoroutineScope.generateOrVerifyChecksum(checksums: Checksums, algorithm: Checksums.Algorithm) {
+    launch(CoroutineName("checksum ${algorithm.name} for ${checksums.path}")) {
+      checksums.verifyOrWriteChecksumFile(algorithm, false)
     }
   }
 
@@ -294,7 +282,11 @@ class MavenCentralPublication(
       .toString(Charsets.UTF_8)
     val span = Span.current()
     span.addEvent("Sending request to $uri...")
-    val client = OkHttpClient()
+    val client = OkHttpClient.Builder()
+      .connectTimeout(SONATYPE_TIMEOUT)
+      .readTimeout(SONATYPE_TIMEOUT)
+      .writeTimeout(SONATYPE_TIMEOUT)
+      .build()
     val request = Request.Builder().url(uri)
       .header("Authorization", "Bearer $base64Auth")
       .let { builder(it) }
@@ -342,7 +334,7 @@ class MavenCentralPublication(
    */
   private suspend fun wait(deploymentId: String) {
     spanBuilder("waiting").setAttribute("deploymentId", deploymentId).use { span ->
-      withTimeout(30.minutes) {
+      withTimeout(DEPLOYMENT_TIMEOUT) {
         while (true) {
           val deploymentState = callSonatype("$STATUS_URI_BASE?id=$deploymentId", builder = {
             it.post("{}".toRequestBody("application/json".toMediaType()))
@@ -361,7 +353,7 @@ class MavenCentralPublication(
               }
               break
             }
-            else -> delay(TimeUnit.SECONDS.toMillis(15))
+            else -> delay(DEPLOYMENT_STATUS_POLL_DELAY)
           }
         }
       }

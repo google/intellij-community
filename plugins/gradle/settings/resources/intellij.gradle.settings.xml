@@ -1,0 +1,6 @@
+<idea-plugin visibility="internal">
+  <extensions defaultExtensionNs="com.intellij">
+    <projectSettings service="org.jetbrains.plugins.gradle.settings.GradleSettingsMigration"/>
+    <projectSettings service="org.jetbrains.plugins.gradle.settings.GradleLocalSettings"/>
+  </extensions>
+</idea-plugin>

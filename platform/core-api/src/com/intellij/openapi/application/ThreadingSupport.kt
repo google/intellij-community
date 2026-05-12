@@ -147,10 +147,10 @@ interface ThreadingSupport {
    */
   @ApiStatus.Internal
   @Throws(LockAccessDisallowed::class)
-  fun prohibitTakingLocksInsideAndRun(action: () -> Unit, advice: String)
+  fun <T> withLocksProhibited(advice: String, action: () -> T): T
 
   /**
-   * If locking is prohibited for this thread (via [prohibitTakingLocksInsideAndRun]),
+   * If locking is prohibited for this thread (via [withLocksProhibited]),
    * this function will return not-null string with advice on how to fix the problem
    */
   @ApiStatus.Internal
@@ -273,10 +273,10 @@ interface ThreadingSupport {
   fun executeSuspendingWriteAction(action: () -> Unit)
 
   @ApiStatus.Internal
-  fun setWriteLockReacquisitionListener(listener: WriteLockReacquisitionListener)
+  fun setWriteLockReacquisitionListener(listener: WriteLockReacquisitionListener<*>)
 
   @ApiStatus.Internal
-  fun removeWriteLockReacquisitionListener(listener: WriteLockReacquisitionListener)
+  fun removeWriteLockReacquisitionListener(listener: WriteLockReacquisitionListener<*>)
 
   /**
    * Returns `true` if there is a currently executing write action of the specified class.

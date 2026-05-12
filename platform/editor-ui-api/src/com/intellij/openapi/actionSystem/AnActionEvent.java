@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.actionSystem;
 
 import com.intellij.ide.DataManager;
@@ -7,7 +7,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.ui.PlaceProvider;
 import kotlinx.coroutines.CoroutineScope;
-import org.intellij.lang.annotations.JdkConstants;
+import com.intellij.util.ui.JdkConstants;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -48,23 +48,6 @@ public class AnActionEvent implements PlaceProvider {
                        @NotNull ActionManager actionManager,
                        @JdkConstants.InputEventMask int modifiers) {
     this(dataContext, presentation, place, ActionUiKind.NONE, inputEvent, modifiers, actionManager);
-  }
-
-  /** @deprecated Use {@link #AnActionEvent(DataContext, Presentation, String, ActionUiKind, InputEvent, int, ActionManager)} instead. */
-  @Deprecated(forRemoval = true)
-  public AnActionEvent(@Nullable InputEvent inputEvent,
-                       @NotNull DataContext dataContext,
-                       @NotNull @NonNls String place,
-                       @NotNull Presentation presentation,
-                       @NotNull ActionManager actionManager,
-                       @JdkConstants.InputEventMask int modifiers,
-                       boolean isContextMenuAction,
-                       boolean isActionToolbar) {
-    this(dataContext, presentation, place,
-         isContextMenuAction ? ActionUiKind.POPUP :
-         isActionToolbar ? ActionUiKind.TOOLBAR :
-         ActionUiKind.NONE,
-         inputEvent, modifiers, actionManager);
   }
 
   public AnActionEvent(@NotNull DataContext dataContext,
@@ -345,7 +328,6 @@ public class AnActionEvent implements PlaceProvider {
    *   <li>If an action is bound to the {@link com.intellij.openapi.application.Application} (via {@link Presentation#setApplicationScope}), then the scope lives as long as the application is opened.</li>
    * </ul>
    */
-  @ApiStatus.Experimental
   public final @NotNull CoroutineScope getCoroutineScope() {
     CoroutineScope scope = myPerformCoroutineScope;
     if (scope == null) {

@@ -25,6 +25,7 @@ import com.intellij.util.ui.JBInsets
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UI
 import com.intellij.util.ui.UIUtil
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
 import java.awt.Font
 import java.awt.GridBagConstraints
@@ -167,7 +168,8 @@ open class ComponentPanelBuilder(private val myComponent: JComponent) : GridBagP
    * @param topRightComponent the component to be added
    * @return `this`
    */
-  open fun withTopRightComponent(topRightComponent: JComponent): ComponentPanelBuilder {
+  @ApiStatus.Internal
+  fun withTopRightComponent(topRightComponent: JComponent): ComponentPanelBuilder {
     myTopRightComponent = topRightComponent
     valid = StringUtil.isEmpty(myCommentText) || StringUtil.isEmpty(myHTDescription)
     return this
@@ -303,11 +305,11 @@ open class ComponentPanelBuilder(private val myComponent: JComponent) : GridBagP
       }
     }
 
-    open fun setCommentTextImpl(commentText: String?) {
+    fun setCommentTextImpl(commentText: String?) {
       setCommentText(comment, commentText, myCommentBelow, MAX_COMMENT_WIDTH)
     }
 
-    open fun addToPanel(panel: JPanel, gc: GridBagConstraints) {
+    fun addToPanel(panel: JPanel, gc: GridBagConstraints) {
       gc.gridx = 0
       gc.gridwidth = 1
       gc.weightx = 0.0
@@ -378,13 +380,13 @@ open class ComponentPanelBuilder(private val myComponent: JComponent) : GridBagP
                                                                                                                    myHTLinkText!!,
                                                                                                                    myHTAction!!)
           else ContextHelpLabel.create(myHTDescription!!)
-          JBUI.Borders.emptyLeft(7).wrap<ContextHelpLabel?>(lbl)
+          JBUI.Borders.emptyLeft(7).wrap(lbl)
           componentPanel.add(lbl)
 
           ComponentValidator.getInstance(myComponent).ifPresent(Consumer { _ ->
             val iconLabel = JLabel()
-            JBUI.Borders.emptyLeft(7).wrap<JLabel?>(iconLabel)
-            iconLabel.setVisible(false)
+            JBUI.Borders.emptyLeft(7).wrap(iconLabel)
+            iconLabel.isVisible = false
             componentPanel.add(iconLabel)
 
             iconLabel.addMouseListener(object : MouseAdapter() {
@@ -399,19 +401,19 @@ open class ComponentPanelBuilder(private val myComponent: JComponent) : GridBagP
               }
             })
             myComponent.addPropertyChangeListener("JComponent.outline", PropertyChangeListener { evt: PropertyChangeEvent? ->
-              if (evt!!.getNewValue() == null) {
-                iconLabel.setVisible(false)
-                lbl.setVisible(true)
+              if (evt!!.newValue == null) {
+                iconLabel.isVisible = false
+                lbl.isVisible = true
               }
-              else if ("warning" == evt.getNewValue()) {
+              else if ("warning" == evt.newValue) {
                 iconLabel.setIcon(AllIcons.General.BalloonWarning)
-                iconLabel.setVisible(true)
-                lbl.setVisible(false)
+                iconLabel.isVisible = true
+                lbl.isVisible = false
               }
-              else if ("error" == evt.getNewValue()) {
+              else if ("error" == evt.newValue) {
                 iconLabel.setIcon(AllIcons.General.BalloonError)
-                iconLabel.setVisible(true)
-                lbl.setVisible(false)
+                iconLabel.isVisible = true
+                lbl.isVisible = false
               }
               componentPanel.revalidate()
               componentPanel.repaint()

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.codeInsight;
 
@@ -28,11 +28,6 @@ public class MultiFileInspectionTestGenerated extends AbstractMultiFileInspectio
 
     private void runTest(String testDataFilePath) throws Exception {
         KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
-    }
-
-    @TestMetadata("fakeJvmFieldConstant/fakeJvmFieldConstant.test")
-    public void testFakeJvmFieldConstant_FakeJvmFieldConstant() throws Exception {
-        runTest("testData/multiFileInspections/fakeJvmFieldConstant/fakeJvmFieldConstant.test");
     }
 
     @TestMetadata("invalidBundleOrProperty/invalidBundleOrProperty.test")
@@ -83,10 +78,5 @@ public class MultiFileInspectionTestGenerated extends AbstractMultiFileInspectio
     @TestMetadata("mismatchedProjectAndDirectory/mismatchedProjectAndDirectory.test")
     public void testMismatchedProjectAndDirectory_MismatchedProjectAndDirectory() throws Exception {
         runTest("testData/multiFileInspections/mismatchedProjectAndDirectory/mismatchedProjectAndDirectory.test");
-    }
-
-    @TestMetadata("platformExtensionReceiverOfInline/platformExtensionReceiverOfInline.test")
-    public void testPlatformExtensionReceiverOfInline_PlatformExtensionReceiverOfInline() throws Exception {
-        runTest("testData/multiFileInspections/platformExtensionReceiverOfInline/platformExtensionReceiverOfInline.test");
     }
 }

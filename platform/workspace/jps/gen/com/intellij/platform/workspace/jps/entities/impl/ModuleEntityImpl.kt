@@ -1,4 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.jps.entities.impl
 
 import com.intellij.platform.workspace.jps.entities.ContentRootEntity
@@ -32,12 +34,11 @@ import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
 import com.intellij.platform.workspace.storage.impl.containers.MutableWorkspaceList
 import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceList
-import com.intellij.platform.workspace.storage.impl.extractOneToManyChildren
 import com.intellij.platform.workspace.storage.impl.indices.WorkspaceMutableIndex
-import com.intellij.platform.workspace.storage.impl.updateOneToManyChildrenOfParent
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
 @GeneratedCodeApiVersion(3)
@@ -72,9 +73,11 @@ internal class ModuleEntityImpl(private val dataSource: ModuleEntityData) : Modu
       return dataSource.dependencies
     }
   override val contentRoots: List<ContentRootEntity>
-    get() = snapshot.extractOneToManyChildren<ContentRootEntity>(CONTENTROOTS_CONNECTION_ID, this)!!.toList()
+    get() = (snapshot.instrumentation.getManyChildren(CONTENTROOTS_CONNECTION_ID, this) as? Sequence<ContentRootEntity>)?.toList() ?: error(
+      "Children contentRoots not found for ModuleEntity")
   override val facets: List<FacetEntity>
-    get() = snapshot.extractOneToManyChildren<FacetEntity>(FACETS_CONNECTION_ID, this)!!.toList()
+    get() = (snapshot.instrumentation.getManyChildren(FACETS_CONNECTION_ID, this) as? Sequence<FacetEntity>)?.toList()
+            ?: error("Children facets not found for ModuleEntity")
 
   override val entitySource: EntitySource
     get() {
@@ -125,7 +128,7 @@ internal class ModuleEntityImpl(private val dataSource: ModuleEntityData) : Modu
       }
 // Check initialization for list with ref type
       if (_diff != null) {
-        if (_diff.extractOneToManyChildren<WorkspaceEntityBase>(CONTENTROOTS_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getManyChildrenBuilders(CONTENTROOTS_CONNECTION_ID, this) == null) {
           error("Field ModuleEntity#contentRoots should be initialized")
         }
       }
@@ -136,7 +139,7 @@ internal class ModuleEntityImpl(private val dataSource: ModuleEntityData) : Modu
       }
 // Check initialization for list with ref type
       if (_diff != null) {
-        if (_diff.extractOneToManyChildren<WorkspaceEntityBase>(FACETS_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getManyChildrenBuilders(FACETS_CONNECTION_ID, this) == null) {
           error("Field ModuleEntity#facets should be initialized")
         }
       }
@@ -221,7 +224,6 @@ internal class ModuleEntityImpl(private val dataSource: ModuleEntityData) : Modu
 // Getter of the list of non-abstract referenced types
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(CONTENTROOTS_CONNECTION_ID, this)!!
             .toList() as List<ContentRootEntityBuilder>) + (this.entityLinks[EntityLink(true,
                                                                                         CONTENTROOTS_CONNECTION_ID)] as? List<ContentRootEntityBuilder>
@@ -246,7 +248,7 @@ internal class ModuleEntityImpl(private val dataSource: ModuleEntityData) : Modu
               _diff.addEntity(item_value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
             }
           }
-          _diff.updateOneToManyChildrenOfParent(CONTENTROOTS_CONNECTION_ID, this, value)
+          _diff.instrumentation.replaceChildren(CONTENTROOTS_CONNECTION_ID, this, value)
         }
         else {
           for (item_value in value) {
@@ -267,7 +269,6 @@ internal class ModuleEntityImpl(private val dataSource: ModuleEntityData) : Modu
 // Getter of the list of non-abstract referenced types
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(FACETS_CONNECTION_ID, this)!!
             .toList() as List<FacetEntityBuilder>) + (this.entityLinks[EntityLink(true, FACETS_CONNECTION_ID)] as? List<FacetEntityBuilder>
                                                       ?: emptyList())
@@ -291,7 +292,7 @@ internal class ModuleEntityImpl(private val dataSource: ModuleEntityData) : Modu
               _diff.addEntity(item_value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
             }
           }
-          _diff.updateOneToManyChildrenOfParent(FACETS_CONNECTION_ID, this, value)
+          _diff.instrumentation.replaceChildren(FACETS_CONNECTION_ID, this, value)
         }
         else {
           for (item_value in value) {
@@ -469,7 +470,6 @@ internal class ModuleEntityData : WorkspaceEntityData<ModuleEntity>(), SoftLinka
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): ModuleEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {

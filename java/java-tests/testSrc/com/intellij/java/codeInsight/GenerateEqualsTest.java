@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.java.codeInsight;
 
 import com.intellij.application.options.CodeStyle;
@@ -171,8 +171,10 @@ public class GenerateEqualsTest extends LightJavaCodeInsightTestCase {
   }
 
   private void doTestWithTemplate(String templateName) {
+    EqualsHashCodeTemplatesManager templatesManager = EqualsHashCodeTemplatesManager.getInstance();
+    String defaultTemplateName = templatesManager.getDefaultTemplateBaseName();
+    templatesManager.setDefaultTemplate(templateName);
     try {
-      EqualsHashCodeTemplatesManager.getInstance().setDefaultTemplate(templateName);
       doTest(Function.identity(), Function.identity(), Function.identity(), true);
     }
     catch (Throwable throwable) {
@@ -185,7 +187,7 @@ public class GenerateEqualsTest extends LightJavaCodeInsightTestCase {
       }
     }
     finally {
-      EqualsHashCodeTemplatesManager.getInstance().setDefaultTemplate(EqualsHashCodeTemplatesManager.INTELLI_J_DEFAULT);
+      templatesManager.setDefaultTemplate(defaultTemplateName);
     }
   }
 
@@ -195,10 +197,18 @@ public class GenerateEqualsTest extends LightJavaCodeInsightTestCase {
     EqualsHashCodeTemplatesManager.getInstance().setDefaultTemplate(EqualsHashCodeTemplatesManager.INTELLI_J_DEFAULT);
   }
 
-  protected void doTest(final int[] equals,
-                        final int[] hashCode,
-                        final int[] nonNull,
-                        boolean insertOverride) {
+  @Override
+  public void tearDown() throws Exception {
+    try {
+      EqualsHashCodeTemplatesManager templatesManager = EqualsHashCodeTemplatesManager.getInstance();
+      templatesManager.setDefaultTemplate(templatesManager.getInitialTemplateName());
+    }
+    finally {
+      super.tearDown();
+    }
+  }
+
+  protected void doTest(int[] equals, int[] hashCode, int[] nonNull, boolean insertOverride) {
     doTest(fields -> getIndexed(fields, equals), fields -> getIndexed(fields, hashCode), fields -> getIndexed(fields, nonNull), insertOverride);
   }
 

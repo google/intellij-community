@@ -10,10 +10,12 @@ import com.intellij.openapi.util.NlsSafe
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.jetbrains.plugins.github.api.data.GHPullRequestReviewEvent
+import org.jetbrains.plugins.github.api.data.GHUser
 import org.jetbrains.plugins.github.api.data.pullrequest.GHPullRequestReviewComment
 import org.jetbrains.plugins.github.api.data.pullrequest.GHPullRequestReviewThread
 import org.jetbrains.plugins.github.api.data.request.GHPullRequestDraftReviewThread
 import org.jetbrains.plugins.github.pullrequest.data.GHPullRequestPendingReview
+import org.jetbrains.plugins.github.pullrequest.ui.comment.GHPRReviewCommentLocation
 
 @CodeReviewDomainEntity
 interface GHPRReviewDataProvider {
@@ -23,6 +25,7 @@ interface GHPRReviewDataProvider {
 
   val pendingReviewNeedsReloadSignal: Flow<Unit>
   val threadsNeedReloadSignal: Flow<Unit>
+  val participantsNeedReloadSignal: Flow<Unit>
 
   suspend fun loadPendingReview(): GHPullRequestPendingReview?
   suspend fun loadThreads(): List<GHPullRequestReviewThread>
@@ -47,12 +50,13 @@ interface GHPRReviewDataProvider {
   /**
    * Only for cases when the comment is created on the diff of an individual commit and there's an active review.
    */
-  suspend fun addComment(reviewId: String,
-                         body: String,
-                         commitSha: String,
-                         fileName: String,
-                         side: Side,
-                         line: Int): GHPullRequestReviewComment
+  suspend fun addComment(
+    reviewId: String,
+    body: String,
+    commitSha: String,
+    fileName: String,
+    location: GHPRReviewCommentLocation,
+  ): GHPullRequestReviewComment
 
   suspend fun addComment(replyToCommentId: String, body: String): GHPullRequestReviewComment
 
@@ -73,6 +77,8 @@ interface GHPRReviewDataProvider {
   suspend fun resolveThread(id: String): GHPullRequestReviewThread
 
   suspend fun unresolveThread(id: String): GHPullRequestReviewThread
+
+  fun participantsBatches(): Flow<List<GHUser>>
 }
 
 val GHPRReviewDataProvider.pendingReviewComputationFlow: Flow<ComputedResult<GHPullRequestPendingReview?>>

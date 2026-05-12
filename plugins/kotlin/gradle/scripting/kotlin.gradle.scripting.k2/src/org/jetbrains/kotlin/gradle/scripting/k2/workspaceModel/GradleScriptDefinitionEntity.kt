@@ -2,12 +2,12 @@
 package org.jetbrains.kotlin.gradle.scripting.k2.workspaceModel
 
 import com.intellij.openapi.util.NlsSafe
-import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.SymbolicEntityId
 import com.intellij.platform.workspace.storage.WorkspaceEntityWithSymbolicId
 import org.jetbrains.kotlin.idea.core.script.k2.modules.ScriptCompilationConfigurationData
 import org.jetbrains.kotlin.idea.core.script.k2.modules.ScriptEvaluationConfigurationEntity
 import org.jetbrains.kotlin.idea.core.script.k2.modules.ScriptingHostConfigurationEntity
+import org.jetbrains.plugins.gradle.service.syncAction.GradleEntitySource
 
 data class GradleScriptDefinitionEntityId(val id: String) : SymbolicEntityId<GradleScriptDefinitionEntity> {
     override val presentableName: @NlsSafe String = id
@@ -15,7 +15,7 @@ data class GradleScriptDefinitionEntityId(val id: String) : SymbolicEntityId<Gra
 
 interface GradleScriptDefinitionEntity : WorkspaceEntityWithSymbolicId {
     val definitionId: String
-    val compilationConfiguration: ScriptCompilationConfigurationData
+    val compilationConfigurationData: ScriptCompilationConfigurationData
     val hostConfiguration: ScriptingHostConfigurationEntity
     val evaluationConfiguration: ScriptEvaluationConfigurationEntity?
 
@@ -23,4 +23,4 @@ interface GradleScriptDefinitionEntity : WorkspaceEntityWithSymbolicId {
         get() = GradleScriptDefinitionEntityId(definitionId)
 }
 
-object KotlinGradleScriptEntitySource : EntitySource
+interface GradleKotlinScriptEntitySource : GradleEntitySource

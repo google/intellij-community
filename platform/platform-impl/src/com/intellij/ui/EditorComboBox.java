@@ -15,6 +15,7 @@ import com.intellij.openapi.fileTypes.FileTypes;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.TextComponentAccessor;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.JBInsets;
@@ -273,7 +274,7 @@ public class EditorComboBox extends ComboBox implements DocumentListener {
     myEditorField = createEditorTextField(myDocument, myProject, myFileType, myIsViewer);
     final ComboBoxEditor editor = new MyEditor();
     setEditor(editor);
-    setRenderer(new EditorComboBoxRenderer(editor));
+    setRenderer(BuilderKt.comboBoxEditorRenderer(editor));
   }
 
   protected ComboboxEditorTextField createEditorTextField(Document document, Project project, FileType fileType, boolean isViewer) {

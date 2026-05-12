@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.testFramework;
 
 import com.intellij.lang.TokenWrapper;
@@ -6,7 +6,6 @@ import com.intellij.lexer.Lexer;
 import com.intellij.lexer.LexerPosition;
 import com.intellij.lexer.RestartableLexer;
 import com.intellij.openapi.editor.highlighter.HighlighterIterator;
-import com.intellij.openapi.util.Trinity;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.tree.IElementType;
@@ -20,6 +19,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 public abstract class LexerTestCase extends UsefulTestCase {
@@ -29,6 +29,7 @@ public abstract class LexerTestCase extends UsefulTestCase {
 
   protected void doTest(@NotNull String text, @Nullable String expected) {
     doTest(text, expected, createLexer());
+    checkCorrectRestart(text);
   }
 
   protected void doTest(@NotNull String text, @Nullable String expected, @NotNull Lexer lexer) {
@@ -54,7 +55,7 @@ public abstract class LexerTestCase extends UsefulTestCase {
     return ".txt";
   }
 
-  protected void checkZeroState(@NotNull String text, TokenSet tokenTypes) {
+  protected void checkZeroState(@NotNull String text, @NotNull TokenSet tokenTypes) {
     Lexer lexer = createLexer();
     lexer.start(text);
 
@@ -74,9 +75,17 @@ public abstract class LexerTestCase extends UsefulTestCase {
     return printTokens(text, start, createLexer());
   }
 
+  /**
+   * Verifies that the lexer produces the same token sequence when restarted from any position
+   * where {@link Lexer#getState()} returns zero or {@link RestartableLexer#isRestartableState(int)} returns {@code true}.
+   *
+   * <p>For every such position the lexer is restarted via {@link Lexer#start(CharSequence, int, int, int)}
+   * with the recorded offset and state, and the resulting tokens are compared against the tail of the
+   * initial full-text tokenization.
+   */
   protected void checkCorrectRestart(@NotNull String text) {
     Lexer mainLexer = createLexer();
-    List<Trinity<IElementType, Integer, Integer>> allTokens = tokenize(text, 0, 0, mainLexer);
+    List<TokenState> allTokens = tokenize(text, 0, 0, mainLexer);
     Lexer auxLexer = createLexer();
     auxLexer.start(text);
     int index = 0;
@@ -88,8 +97,8 @@ public abstract class LexerTestCase extends UsefulTestCase {
       int state = auxLexer.getState();
       if (state == 0 || (auxLexer instanceof RestartableLexer && ((RestartableLexer)auxLexer).isRestartableState(state))) {
         int tokenStart = auxLexer.getTokenStart();
-        List<Trinity<IElementType, Integer, Integer>> expectedTokens = allTokens.subList(index, allTokens.size());
-        List<Trinity<IElementType, Integer, Integer>> restartedTokens = tokenize(text, tokenStart, state, mainLexer);
+        List<TokenState> expectedTokens = allTokens.subList(index, allTokens.size());
+        List<TokenState> restartedTokens = tokenize(text, tokenStart, state, mainLexer);
         assertEquals(
           "Restarting impossible from offset " + tokenStart + " - " + auxLexer.getTokenText() + "\n" +
           "All tokens <type, offset, lexer state>: " + allTokens + "\n",
@@ -102,14 +111,28 @@ public abstract class LexerTestCase extends UsefulTestCase {
     }
   }
 
+  /**
+   * Verifies that the lexer produces the same token sequence when restored to any position
+   * captured by {@link Lexer#getCurrentPosition()}.
+   *
+   * <p>Unlike {@link #checkCorrectRestart(String)}, which restarts the lexer via
+   * {@link Lexer#start(CharSequence, int, int, int)} using only the integer offset and state
+   * (and therefore can only test positions where the integer state is sufficient for a faithful restart),
+   * this method uses {@link Lexer#restore(LexerPosition)} and tests <em>every</em> token position.
+   *
+   * <p>This is possible because {@link LexerPosition} implementations may carry additional internal
+   * state beyond the integer returned by {@link Lexer#getState()} (e.g. delegate positions,
+   * lookahead caches, or embedment info), allowing {@code restore()} to reconstruct the full
+   * lexer state at any point.
+   */
   protected void checkCorrectRestartUsingPosition(@NotNull String text) {
     Lexer mainLexer = createLexer();
-    List<Trinity<IElementType, Integer, Integer>> allTokens = tokenize(text, 0, 0, mainLexer);
+    List<TokenState> allTokens = tokenize(text, 0, 0, mainLexer);
     List<LexerPosition> allPositions = buildPositions(text, 0, mainLexer);
     for (int i = 0; i < allPositions.size(); i++) {
       LexerPosition position = allPositions.get(i);
-      List<Trinity<IElementType, Integer, Integer>> expectedTokens = allTokens.subList(i, allTokens.size());
-      List<Trinity<IElementType, Integer, Integer>> restartedTokens = tokenize(position, mainLexer);
+      List<TokenState> expectedTokens = allTokens.subList(i, allTokens.size());
+      List<TokenState> restartedTokens = tokenize(position, mainLexer);
       mainLexer.restore(position);
       assertEquals(
         "Restarting using position impossible from offset " + position.getOffset() + " - " + mainLexer.getTokenText() + "\n" +
@@ -120,11 +143,11 @@ public abstract class LexerTestCase extends UsefulTestCase {
     }
   }
 
-  private static @NotNull List<Trinity<IElementType, Integer, Integer>> tokenize(@NotNull String text,
-                                                                                 int start,
-                                                                                 int state,
-                                                                                 @NotNull Lexer lexer) {
-    List<Trinity<IElementType, Integer, Integer>> allTokens = new ArrayList<>();
+  private static @NotNull List<TokenState> tokenize(@NotNull String text,
+                                                    int start,
+                                                    int state,
+                                                    @NotNull Lexer lexer) {
+    List<TokenState> allTokens = new ArrayList<>();
     try {
       lexer.start(text, start, text.length(), state);
     }
@@ -133,7 +156,7 @@ public abstract class LexerTestCase extends UsefulTestCase {
       throw new RuntimeException(t);
     }
     while (lexer.getTokenType() != null) {
-      allTokens.add(Trinity.create(lexer.getTokenType(), lexer.getTokenStart(), lexer.getState()));
+      allTokens.add(new TokenState(lexer.getTokenType(), lexer.getTokenStart(), lexer.getState()));
       lexer.advance();
     }
     return allTokens;
@@ -158,9 +181,9 @@ public abstract class LexerTestCase extends UsefulTestCase {
     return result;
   }
 
-  private static @NotNull List<Trinity<IElementType, Integer, Integer>> tokenize(@NotNull LexerPosition position,
-                                                                                 @NotNull Lexer lexer) {
-    List<Trinity<IElementType, Integer, Integer>> allTokens = new ArrayList<>();
+  private static @NotNull List<TokenState> tokenize(@NotNull LexerPosition position,
+                                                    @NotNull Lexer lexer) {
+    List<TokenState> allTokens = new ArrayList<>();
     try {
       lexer.restore(position);
     }
@@ -169,7 +192,7 @@ public abstract class LexerTestCase extends UsefulTestCase {
       throw new RuntimeException(t);
     }
     while (lexer.getTokenType() != null) {
-      allTokens.add(Trinity.create(lexer.getTokenType(), lexer.getTokenStart(), lexer.getState()));
+      allTokens.add(new TokenState(lexer.getTokenType(), lexer.getTokenStart(), lexer.getState()));
       lexer.advance();
     }
     return allTokens;
@@ -229,7 +252,39 @@ public abstract class LexerTestCase extends UsefulTestCase {
            : StringUtil.replace(sequence.subSequence(start, end).toString(), "\n", "\\n");
   }
 
+  /**
+   * If you need to customize the lexer creation, see {@link WithLexerFactory}.
+   */
   protected abstract @NotNull Lexer createLexer();
 
   protected abstract @NotNull String getDirPath();
+
+  private record TokenState(@NotNull IElementType type, int offset, int state) {
+  }
+
+  /**
+   * Utility class for lexer testing with a custom lexer factory.
+   */
+  public abstract static class WithLexerFactory extends LexerTestCase {
+    private @Nullable Supplier<? extends @NotNull Lexer> myLexerFactory = null;
+
+    @Override
+    protected void tearDown() throws Exception {
+      myLexerFactory = null;
+      super.tearDown();
+    }
+
+    public final void setLexerFactory(@NotNull Supplier<? extends @NotNull Lexer> lexerFactory) {
+      myLexerFactory = lexerFactory;
+    }
+
+    @Override
+    protected final @NotNull Lexer createLexer() {
+      if (myLexerFactory == null) {
+        throw new AssertionError("Lexer factory is not set, you must call `setLexerFactory(...)` before calling doTest(...)");
+      }
+
+      return myLexerFactory.get();
+    }
+  }
 }

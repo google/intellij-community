@@ -11,6 +11,7 @@ jvm_library(
 
 jvm_library(
   name = "java-guiForms-rt_test_lib",
+  testonly = True,
   module_name = "intellij.java.guiForms.rt",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -18,3 +19,9 @@ jvm_library(
   runtime_deps = [":java-guiForms-rt"]
 )
 ### auto-generated section `build intellij.java.guiForms.rt` end
+
+### auto-generated section `iml intellij.java.guiForms.rt` start
+exports_files([
+  "intellij.java.guiForms.rt.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.java.guiForms.rt` end

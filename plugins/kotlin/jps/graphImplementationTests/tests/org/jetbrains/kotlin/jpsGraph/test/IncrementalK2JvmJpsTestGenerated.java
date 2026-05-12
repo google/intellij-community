@@ -41,6 +41,8 @@ public class IncrementalK2JvmJpsTestGenerated extends AbstractIncrementalK2JvmJp
         return unpackedDistDir.toFile();
     }
 
+    public void testRootClassIsNotEmpty() {}
+
     @TestMetadata("pureKotlin")
     @TestDataPath("$PROJECT_ROOT")
     @RunWith(JUnit3RunnerWithInners.class)
@@ -976,6 +978,12 @@ public class IncrementalK2JvmJpsTestGenerated extends AbstractIncrementalK2JvmJp
         @TestMetadata("propertyNullabilityChanged")
         public void testPropertyNullabilityChanged() throws Exception {
             runTest("classHierarchyAffected/propertyNullabilityChanged/");
+        }
+
+
+        @TestMetadata("removeImportedClass")
+        public void testRemoveImportedClass() throws Exception {
+            runTest("classHierarchyAffected/removeImportedClass/");
         }
 
         @TestMetadata("sealedClassImplAdded")

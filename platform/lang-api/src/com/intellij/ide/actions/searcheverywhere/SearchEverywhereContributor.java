@@ -5,6 +5,7 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.actionSystem.DataKey;
+import com.intellij.openapi.actionSystem.DataSink;
 import com.intellij.openapi.extensions.ExtensionPointName;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.PossiblyDumbAware;
@@ -18,6 +19,7 @@ import java.awt.event.InputEvent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.BiConsumer;
 
 /**
  * Contributor which provides and processes items for <i>Search Everywhere</i> dialog.
@@ -198,9 +200,21 @@ public interface SearchEverywhereContributor<Item> extends PossiblyDumbAware, Di
    *
    * @see DataKey
    * @see DataContext
+   * @deprecated Use {@link #getDataProviders()} instead.
    */
+  @Deprecated
   default @Nullable Object getDataForItem(@NotNull Item element, @NotNull String dataId) {
     return null;
+  }
+
+  /**
+   * Get providers of the context data for the selected element into the given {@link DataSink}.
+   * <p>
+   * Override this method to provide type-safe data for search results.
+   * If the returned list is empty, the calculation is delegated to the legacy {@link #getDataForItem(Object, String)}.
+   */
+  default @NotNull List<@NotNull BiConsumer<@NotNull Item, @NotNull DataSink>> getDataProviders() {
+    return Collections.emptyList();
   }
 
   /**

@@ -97,15 +97,15 @@ public class CompositeFilterTest extends LightPlatformTestCase {
   }
 
   private static Filter returnNullFilter() {
-    return (__1, __2) -> null;
+    return (_, _) -> null;
   }
 
   private static Filter returnResultFilter() {
-    return (__1, __2) -> createFilterResult();
+    return (_, _) -> createFilterResult();
   }
 
   private static Filter returnContinuingResultFilter() {
-    return (__1, __2) -> {
+    return (_, _) -> {
       Filter.Result result = createFilterResult();
       result.setNextAction(Filter.NextAction.CONTINUE_FILTERING);
       return result;

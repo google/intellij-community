@@ -13,9 +13,9 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
-open class BackgroundRun(override val startResult: Deferred<IDEStartResult>, driverWithoutAwaitedConnection: Driver, override val process: IDEHandle) : IBackgroundRun {
+open class BackgroundRun(val startResult: Deferred<IDEStartResult>, driverWithoutAwaitedConnection: Driver, val process: IDEHandle) {
 
-  override val driver: Driver by lazy {
+  val driver: Driver by lazy {
     if (!driverWithoutAwaitedConnection.isConnected) {
       runCatching {
         waitFor("Driver is connected", 3.minutes) {
@@ -31,24 +31,25 @@ open class BackgroundRun(override val startResult: Deferred<IDEStartResult>, dri
         throw t
       }
     }
+    TestNameSynchronizer(driverWithoutAwaitedConnection).start()
     driverWithoutAwaitedConnection
   }
 
   /**
    * Alias for [useDriverAndCloseIde] to make it possible apply `fun test() = bgRun.test { }` syntax in tests.
    */
-  fun <R> test(closeIdeTimeout: Duration = 1.minutes, shutdownHook: Driver.() -> Unit = {}, block: Driver.() -> R) {
-    useDriverAndCloseIde(closeIdeTimeout, shutdownHook, block)
+  fun <R> test(closeIdeTimeout: Duration = 1.minutes, takeScreenshot: Boolean = true, shutdownHook: Driver.() -> Unit = {}, block: Driver.() -> R) {
+    useDriverAndCloseIde(closeIdeTimeout, takeScreenshot, shutdownHook, block)
   }
 
-  open fun <R> useDriverAndCloseIde(closeIdeTimeout: Duration = 1.minutes, shutdownHook: Driver.() -> Unit = {}, block: Driver.() -> R): IDEStartResult {
+  open fun <R> useDriverAndCloseIde(closeIdeTimeout: Duration = 1.minutes, takeScreenshot: Boolean = true, shutdownHook: Driver.() -> Unit = {}, block: Driver.() -> R): IDEStartResult {
     val ideStartResult: IDEStartResult
     try {
       driver.withContext { block(this) }
     }
     finally {
       catchAll { shutdownHook(driver) }
-      ideStartResult = driver.closeIdeAndWait(closeIdeTimeout)
+      ideStartResult = driver.closeIdeAndWait(closeIdeTimeout, takeScreenshot)
     }
     return ideStartResult
   }
@@ -83,7 +84,7 @@ open class BackgroundRun(override val startResult: Deferred<IDEStartResult>, dri
     return ideStartResult
   }
 
-  override fun closeIdeAndWait(closeIdeTimeout: Duration, takeScreenshot: Boolean) {
+  open fun closeIdeAndWait(closeIdeTimeout: Duration = 1.minutes, takeScreenshot: Boolean = true) {
     driver.closeIdeAndWait(closeIdeTimeout, takeScreenshot)
   }
 
@@ -146,7 +147,7 @@ open class BackgroundRun(override val startResult: Deferred<IDEStartResult>, dri
     }
   }
 
-  override fun forceKill() {
+  open fun forceKill() {
     logOutput("[Closing ${process.id}] Performing force kill")
     process.kill()
   }

@@ -101,7 +101,7 @@ public class ProjectTemplateList extends JPanel {
       }
     };
     myList.setCellRenderer(renderer);
-    myList.getSelectionModel().addListSelectionListener(__ -> updateSelection());
+    myList.getSelectionModel().addListSelectionListener(_ -> updateSelection());
 
     if (!ApplicationManager.getApplication().isUnitTestMode()) {
       Messages.installHyperlinkSupport(myDescriptionPane);
@@ -167,7 +167,7 @@ public class ProjectTemplateList extends JPanel {
         myList.setSelectedValue(template, true);
       }
     }
-    myList.getSelectionModel().addListSelectionListener(__ -> {
+    myList.getSelectionModel().addListSelectionListener(_ -> {
       ProjectTemplate template = getSelectedTemplate();
       if (template != null) {
         PropertiesComponent.getInstance().setValue(PROJECT_WIZARD_TEMPLATE, template.getName());

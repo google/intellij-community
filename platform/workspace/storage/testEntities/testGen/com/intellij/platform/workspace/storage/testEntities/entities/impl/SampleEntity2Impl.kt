@@ -1,13 +1,15 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.storage.testEntities.entities.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
 import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
-import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
@@ -25,9 +27,7 @@ internal class SampleEntity2Impl(private val dataSource: SampleEntity2Data) : Sa
 
   private companion object {
 
-
-    private val connections = listOf<ConnectionId>(
-    )
+    private val connections = listOf<ConnectionId>()
 
   }
 
@@ -36,7 +36,6 @@ internal class SampleEntity2Impl(private val dataSource: SampleEntity2Data) : Sa
       readField("data")
       return dataSource.data
     }
-
   override val boolData: Boolean
     get() {
       readField("boolData")
@@ -59,8 +58,8 @@ internal class SampleEntity2Impl(private val dataSource: SampleEntity2Data) : Sa
   }
 
 
-  internal class Builder(result: SampleEntity2Data?) : ModifiableWorkspaceEntityBase<SampleEntity2, SampleEntity2Data>(
-    result), SampleEntity2Builder {
+  internal class Builder(result: SampleEntity2Data?) : ModifiableWorkspaceEntityBase<SampleEntity2, SampleEntity2Data>(result),
+                                                       SampleEntity2Builder {
     internal constructor() : this(SampleEntity2Data())
 
     override fun applyToBuilder(builder: MutableEntityStorage) {
@@ -73,15 +72,13 @@ internal class SampleEntity2Impl(private val dataSource: SampleEntity2Data) : Sa
           error("Entity SampleEntity2 is already created in a different builder")
         }
       }
-
       this.diff = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
-      // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
-      // Builder may switch to snapshot at any moment and lock entity data to modification
+// After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
+// Builder may switch to snapshot at any moment and lock entity data to modification
       this.currentEntityData = null
-
-      // Process linked entities that are connected without a builder
+// Process linked entities that are connected without a builder
       processLinkedEntities(builder)
       checkInitialization() // TODO uncomment and check failed tests
     }
@@ -119,7 +116,6 @@ internal class SampleEntity2Impl(private val dataSource: SampleEntity2Data) : Sa
         changedProperty.add("entitySource")
 
       }
-
     override var data: String
       get() = getEntityData().data
       set(value) {
@@ -127,7 +123,6 @@ internal class SampleEntity2Impl(private val dataSource: SampleEntity2Data) : Sa
         getEntityData(true).data = value
         changedProperty.add("data")
       }
-
     override var boolData: Boolean
       get() = getEntityData().boolData
       set(value) {
@@ -135,7 +130,6 @@ internal class SampleEntity2Impl(private val dataSource: SampleEntity2Data) : Sa
         getEntityData(true).boolData = value
         changedProperty.add("boolData")
       }
-
     override var optionalData: String?
       get() = getEntityData().optionalData
       set(value) {
@@ -146,6 +140,7 @@ internal class SampleEntity2Impl(private val dataSource: SampleEntity2Data) : Sa
 
     override fun getEntityClass(): Class<SampleEntity2> = SampleEntity2::class.java
   }
+
 }
 
 @OptIn(WorkspaceEntityInternalApi::class)
@@ -164,7 +159,6 @@ internal class SampleEntity2Data : WorkspaceEntityData<SampleEntity2>() {
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): SampleEntity2 {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {
@@ -176,8 +170,7 @@ internal class SampleEntity2Data : WorkspaceEntityData<SampleEntity2>() {
   }
 
   override fun getMetadata(): EntityMetadata {
-    return MetadataStorageImpl.getMetadataByTypeFqn(
-      "com.intellij.platform.workspace.storage.testEntities.entities.SampleEntity2") as EntityMetadata
+    return MetadataStorageImpl.getMetadataByTypeFqn("com.intellij.platform.workspace.storage.testEntities.entities.SampleEntity2") as EntityMetadata
   }
 
   override fun getEntityInterface(): Class<out WorkspaceEntity> {
@@ -198,9 +191,7 @@ internal class SampleEntity2Data : WorkspaceEntityData<SampleEntity2>() {
   override fun equals(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as SampleEntity2Data
-
     if (this.entitySource != other.entitySource) return false
     if (this.data != other.data) return false
     if (this.boolData != other.boolData) return false
@@ -211,9 +202,7 @@ internal class SampleEntity2Data : WorkspaceEntityData<SampleEntity2>() {
   override fun equalsIgnoringEntitySource(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as SampleEntity2Data
-
     if (this.data != other.data) return false
     if (this.boolData != other.boolData) return false
     if (this.optionalData != other.optionalData) return false

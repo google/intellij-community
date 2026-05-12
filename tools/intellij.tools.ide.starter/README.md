@@ -130,7 +130,7 @@ init {
 ```kotlin
 Starter.newContext(
   CurrentTestMethod.hyphenateWithClass(), TestCase(
-  IdeProductProvider.IU.copy(downloadURI = URI("www.example.com")), GitHubProject.fromGithub(
+  IdeInfo.IdeaUltimate.copy(downloadURI = URI("www.example.com")), GitHubProject.fromGithub(
   branchName = "master",
   repoRelativeUrl = "jitpack/gradle-simple.git"
 )
@@ -138,8 +138,11 @@ Starter.newContext(
 )
 ```
 
-`IdeProductProvider.IU.copy(downloadURI = URI("[www.example.com](http://www.example.com)"))` - this is the main part, we say that we will
-use `IU` (Idea Ultimate) so we copy all the properties except that we also provide URL from which it should be dowloaded.
+`IdeInfo.IdeaUltimate.copy(downloadURI = URI("[www.example.com](http://www.example.com)"))` - this is the main part, we say that we will
+use `IdeaUltimate` (Idea Ultimate) so we copy all the properties except that we also provide URL from which it should be downloaded.
+
+Note: To use `IdeInfo.IdeaUltimate`, you must add a dependency on `intellij.tools.ide.starter.build.server.idea.ultimate` module.
+This compile-time dependency ensures the IDE build server knows which IDEs your tests require.
 
 ### Modifying VM Options
 

@@ -19,6 +19,7 @@ jvm_library(
 
 jvm_library(
   name = "generator_test_lib",
+  testonly = True,
   module_name = "intellij.devkit.runtimeModuleRepository.generator",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -32,3 +33,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.devkit.runtimeModuleRepository.generator` end
+
+### auto-generated section `iml intellij.devkit.runtimeModuleRepository.generator` start
+exports_files([
+  "intellij.devkit.runtimeModuleRepository.generator.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.devkit.runtimeModuleRepository.generator` end

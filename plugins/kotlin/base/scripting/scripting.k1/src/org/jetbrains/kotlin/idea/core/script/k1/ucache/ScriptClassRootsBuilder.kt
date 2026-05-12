@@ -6,7 +6,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.idea.core.script.k1.configuration.utils.ScriptClassRootsStorage
 import org.jetbrains.kotlin.idea.core.script.shared.LightScriptInfo
-import org.jetbrains.kotlin.idea.core.script.v1.logger
+import org.jetbrains.kotlin.idea.core.script.v1.kotlinScriptLogger
 import org.jetbrains.kotlin.scripting.resolve.ScriptCompilationConfigurationWrapper
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.notExists
@@ -62,7 +62,7 @@ class ScriptClassRootsBuilder(
             val path = file.toPath()
             val absolutePath = path.absolutePathString()
             if (shouldWarnAboutDependenciesExistence && path.notExists()) {
-                logger.warn("configuration dependency classpath $absolutePath does not exist")
+                kotlinScriptLogger.warn("configuration dependency classpath $absolutePath does not exist")
             }
 
             classes.add(absolutePath)
@@ -72,7 +72,7 @@ class ScriptClassRootsBuilder(
             val path = file.toPath()
             val absolutePath = path.absolutePathString()
             if (shouldWarnAboutDependenciesExistence && path.notExists()) {
-                logger.warn("configuration dependency sources $absolutePath does not exist")
+                kotlinScriptLogger.warn("configuration dependency sources $absolutePath does not exist")
             }
 
             sources.add(absolutePath)

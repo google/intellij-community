@@ -1,8 +1,8 @@
 # encoding: utf-8
-import collections
+from __future__ import print_function
+
 import fnmatch
-import json
-import logging
+import sys
 from copy import deepcopy
 
 from generator3.util_methods import *
@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     GenerationStatusId = NewType('GenerationStatusId', str)
     GeneratorVersion = Tuple[int, int]
 
-quiet = False
 _parent_dir = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -405,11 +404,11 @@ def progress(text=None, fraction=None, minor=False):
 
 def control_message(msg_type, data):
     data['type'] = msg_type
-    say(json.dumps(data))
-
-
-def trace(msg, *args, **kwargs):
-    logging.log(logging.getLevelName('TRACE'), msg, *args, **kwargs)
+    if sys.version_info >= (3, 3):
+        print(json.dumps(data), flush=True)
+    else:
+        print(json.dumps(data))
+        sys.stdout.flush()
 
 
 class SkeletonGenerator(object):
@@ -418,14 +417,35 @@ class SkeletonGenerator(object):
                  roots=None,  # type: List[str]
                  state_json=None,  # type: Dict[str, Any]
                  write_state_json=False,
+                 use_worker_process_pool=False,
+                 no_cache=False,
                  ):
         self.output_dir = output_dir.rstrip(os.path.sep)
         # TODO make cache directory configurable via CLI
-        self.cache_dir = os.path.join(os.path.dirname(self.output_dir), CACHE_DIR_NAME)
+        if not no_cache:
+            self.cache_dir = os.path.join(os.path.dirname(self.output_dir), CACHE_DIR_NAME)
+        else:
+            self.cache_dir = None
         self.roots = roots
         self.in_state_json = state_json
         self.out_state_json = {'sdk_skeletons': {}}
         self.write_state_json = write_state_json
+        if use_worker_process_pool and sys.version_info >= (3, 7):
+            self.executor = PooledWorkerProcessExecutor(
+                max_workers=1,
+                failure_result=GenerationStatus.FAILED,
+            )
+        else:
+            self.executor = StandaloneWorkerProcessExecutor(failure_result=GenerationStatus.FAILED)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.shutdown()
+
+    def shutdown(self):
+        self.executor.shutdown()
 
     def discover_and_process_all_modules(self, name_pattern=None, builtins_only=False):
         if name_pattern is None:
@@ -539,8 +559,7 @@ class SkeletonGenerator(object):
 
     def reuse_or_generate_skeleton(self, mod_name, mod_path, mod_state_json):
         # type: (str, str, Dict[str, Any]) -> GenerationStatusId
-        if not quiet:
-            logging.info('%s (%r)', mod_name, mod_path or 'built-in')
+        trace('%s (%r)', mod_name, mod_path or 'built-in')
         action("doing nothing")
 
         try:
@@ -555,17 +574,19 @@ class SkeletonGenerator(object):
             if mod_state_json:
                 mod_state_json.clear()
 
-            mod_cache_dir = build_cache_dir_path(self.cache_dir, mod_name, mod_path)
-            cached_skeleton_status = skeleton_status(mod_cache_dir, mod_name, mod_path, mod_state_json)
+            if self.cache_dir:
+                mod_cache_dir = build_cache_dir_path(self.cache_dir, mod_name, mod_path)
+                cached_skeleton_status = skeleton_status(mod_cache_dir, mod_name, mod_path, mod_state_json)
+            else:
+                mod_cache_dir = None
+                cached_skeleton_status = sdk_skeleton_status
             if cached_skeleton_status == SkeletonStatus.OUTDATED:
-                return execute_in_subprocess_synchronously(name='Skeleton Generator Worker',
-                                                           func=generate_skeleton,
-                                                           args=(mod_name,
-                                                                 mod_path,
-                                                                 mod_cache_dir,
-                                                                 self.output_dir),
-                                                           kwargs={},
-                                                           failure_result=GenerationStatus.FAILED)
+                with timed("Processed module {} in {{elapsed:.2f}} ms".format(mod_name)):
+                    return self.executor.submit(generate_skeleton,
+                                                mod_name,
+                                                mod_path,
+                                                mod_cache_dir,
+                                                self.output_dir)
             elif cached_skeleton_status == SkeletonStatus.FAILING:
                 logging.info('Cache entry for %s at %r indicates failed generation', mod_name, mod_cache_dir)
                 return GenerationStatus.FAILED
@@ -606,23 +627,29 @@ def imported_names_collected():
 
 
 def generate_skeleton(name, mod_file_name, mod_cache_dir, output_dir):
-    # type: (str, str, str, str) -> GenerationStatusId
+    # type: (str, str, str | None, str) -> GenerationStatusId
 
-    logging.info('Updating cache for %s at %r', name, mod_cache_dir)
+    logging.info('Updating skeleton for %s at %r', name, mod_cache_dir or output_dir)
     doing_builtins = mod_file_name is None
     # All builtin modules go into the same directory
-    if not doing_builtins:
-        delete(mod_cache_dir)
-    mkdir(mod_cache_dir)
+    if mod_cache_dir:
+        if not doing_builtins:
+            delete(mod_cache_dir)
+        mkdir(mod_cache_dir)
 
-    create_failed_version_stamp(mod_cache_dir, name)
+        create_failed_version_stamp(mod_cache_dir, name)
+    else:
+        # Otherwise it will be created on copying from the cache to the output dir
+        mkdir(output_dir)
 
     action("importing")
     old_modules = list(sys.modules.keys())
     with imported_names_collected() as imported_module_names:
         __import__(name)  # sys.modules will fill up with what we want
 
-    redo_module(name, mod_file_name, mod_cache_dir, output_dir)
+    with timed("Restored module {name} in {{elapsed:.3f}} ms".format(name=name)):
+        redo_module(name, mod_file_name, mod_cache_dir, output_dir)
+
     # The C library may have called Py_InitModule() multiple times to define several modules (gtk._gtk and gtk.gdk);
     # restore all of them
     path = name.split(".")
@@ -643,8 +670,7 @@ def generate_skeleton(name, mod_file_name, mod_cache_dir, output_dir):
                 continue
             # Synthetic module, not explicitly imported
             if m not in imported_module_names and not hasattr(sys.modules[m], '__file__'):
-                if not quiet:
-                    logging.info('Processing submodule %s of %s', m, name)
+                trace('Processing submodule %s of %s', m, name)
                 action("opening %r", mod_cache_dir)
                 try:
                     redo_module(m, mod_file_name, cache_dir=mod_cache_dir, output_dir=output_dir)
@@ -658,7 +684,7 @@ def generate_skeleton(name, mod_file_name, mod_cache_dir, output_dir):
 
 
 def redo_module(module_name, module_file_name, cache_dir, output_dir):
-    # type: (str, str, str, str) -> None
+    # type: (str, str, str | None, str) -> None
     # gobject does 'del _gobject' in its __init__.py, so the chained attribute lookup code
     # fails to find 'gobject._gobject'. thus we need to pull the module directly out of
     # sys.modules
@@ -667,15 +693,18 @@ def redo_module(module_name, module_file_name, cache_dir, output_dir):
     if mod:
         action("restoring")
         from generator3.module_redeclarator import ModuleRedeclarator
-        r = ModuleRedeclarator(mod, module_name, module_file_name, cache_dir=cache_dir,
+        r = ModuleRedeclarator(mod, module_name, module_file_name,
+                               output_dir=(cache_dir or output_dir),
                                doing_builtins=(module_file_name is None))
-        create_failed_version_stamp(cache_dir, module_name)
+        if cache_dir:
+            create_failed_version_stamp(cache_dir, module_name)
         r.redo(module_name, ".".join(mod_path[:-1]) in MODULES_INSPECT_DIR)
         action("flushing")
         r.flush()
-        delete_failed_version_stamp(cache_dir, module_name)
-        # Incrementally copy whatever we managed to successfully generate so far
-        copy_skeletons(cache_dir, output_dir, get_module_origin(module_file_name, module_name))
+        if cache_dir:
+            delete_failed_version_stamp(cache_dir, module_name)
+            # Incrementally copy whatever we managed to successfully generate so far
+            copy_skeletons(cache_dir, output_dir, get_module_origin(module_file_name, module_name))
     else:
         report("Failed to find imported module in sys.modules " + module_name)
 

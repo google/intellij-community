@@ -30,6 +30,7 @@ import kotlinx.coroutines.future.future
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.VisibleForTesting
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
@@ -161,12 +162,32 @@ internal class GitRecentProjectsBranchesService(private val coroutineScope: Coro
         if (Files.exists(headFile)) headFile.readText().trim() else null
       } ?: return GitRecentProjectCachedBranch.Unknown
 
-      val targetRef =
-        (if (GitRefUtil.parseHash(headFileContent) == null) GitRefUtil.getTarget(headFileContent) else null)
+      val targetRef = (if (GitRefUtil.parseHash(headFileContent) == null) GitRefUtil.getTarget(headFileContent) else null)
         ?: return GitRecentProjectCachedBranch.NotOnBranch(headFile.absolutePathString())
 
       val branchName = GitBranchUtil.stripRefsPrefix(targetRef)
-      if (branchName == INVALID) return GitRecentProjectCachedBranch.Invalid
+      if (branchName == INVALID) {
+        // Reftable format: .git/HEAD is a stub; resolve HEAD from reftable binary files
+        val gitDir = headFile.parent // .git/ directory (or worktree git dir)
+        val target = try {
+          withContext(Dispatchers.IO) { GitReftableReader.readHeadTarget(gitDir) }
+        }
+        catch (e: IOException) {
+          LOG.warn("Failed to read reftable HEAD from: $gitDir", e)
+          null
+        }
+
+        return if (target != null) {
+          GitRecentProjectCachedBranch.KnownBranch(
+            branchName = GitBranchUtil.stripRefsPrefix(target),
+            headFilePath = headFile.absolutePathString(),
+          )
+        }
+        else {
+          // IOException or HEAD was not found in reftable
+          GitRecentProjectCachedBranch.NotOnBranch(headFile.absolutePathString())
+        }
+      }
 
       return GitRecentProjectCachedBranch.KnownBranch(branchName = branchName, headFilePath = headFile.absolutePathString())
     }

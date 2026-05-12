@@ -8,8 +8,7 @@ import com.intellij.openapi.project.Project;
 import com.jetbrains.python.PyBundle;
 import org.jetbrains.annotations.NotNull;
 
-
-public class PyDependenciesConfigurable extends ModuleAwareProjectConfigurable {
+public class PyDependenciesConfigurable extends ModuleAwareProjectConfigurable<UnnamedConfigurable> {
   public PyDependenciesConfigurable(Project project) {
     super(project, PyBundle.message("configurable.PyDependenciesConfigurable.display.name"), "reference.settingsdialog.project.dependencies");
   }

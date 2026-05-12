@@ -15,6 +15,7 @@ import com.sun.jna.platform.win32.WinioctlUtil
 import com.sun.jna.ptr.IntByReference
 import org.jetbrains.annotations.ApiStatus
 import java.nio.ByteBuffer
+import java.io.IOException
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.listDirectoryEntries
@@ -53,14 +54,25 @@ private const val storeMarker = "DesktopAppInstaller"
  */
 
 @ApiStatus.Internal
-fun getAppxFiles(expectedProduct: String?, filePattern: Regex): Collection<Path> =
-  userAppxFolder?.listDirectoryEntries()
-    ?.filter { filePattern.matches(it.name) }
-    ?.sortedBy { it.nameWithoutExtension }
-    ?.mapNotNull { file -> file.appxProduct?.let { product -> Pair(product, file) } }
-    ?.toMap()
-    ?.filterKeys { expectedProduct == null || expectedProduct in it }
-    ?.values ?: emptyList()
+fun getAppxFiles(expectedProduct: String?, filePattern: Regex): Collection<Path> {
+  val folder = userAppxFolder ?: return emptyList()
+  val entries = try {
+    folder.listDirectoryEntries()
+  }
+  catch (e: IOException) {
+    appxFilesLogger.info("Cannot list AppX folder $folder", e)
+    return emptyList()
+  }
+  return entries
+    .filter { filePattern.matches(it.name) }
+    .sortedBy { it.nameWithoutExtension }
+    .mapNotNull { file -> file.appxProduct?.let { product -> Pair(product, file) } }
+    .toMap()
+    .filterKeys { expectedProduct == null || expectedProduct in it }
+    .values
+}
+
+private val appxFilesLogger = Logger.getInstance("com.jetbrains.python.sdk.WinAppxTools")
 
 
 /**

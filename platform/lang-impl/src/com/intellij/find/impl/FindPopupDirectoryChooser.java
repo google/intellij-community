@@ -83,7 +83,7 @@ public final class FindPopupDirectoryChooser extends JPanel {
 
     // TODO: Remove this 'if' branch once FindKey is enabled by default. Keep only the 'else' branch.
     if (!FindKey.isEnabled()) {
-        mySelectDirectoryButton.addActionListener(__ -> {
+        mySelectDirectoryButton.addActionListener(_ -> {
         FileChooserDescriptor descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor();
         descriptor.setForcedToUseIdeaFileChooser(true);
         myFindPopupPanel.getCanClose().set(false);
@@ -110,7 +110,7 @@ public final class FindPopupDirectoryChooser extends JPanel {
         });
       });
     } else {
-      mySelectDirectoryButton.addActionListener(__ -> {
+      mySelectDirectoryButton.addActionListener(_ -> {
         OpenFileChooserService.getInstance(myProject).chooseDirectory(getDirectory(), (result) -> {
           ApplicationManager.getApplication().invokeLater(() -> {
             IdeFocusManager.getInstance(myProject).requestFocus(myDirectoryComboBox.getEditor().getEditorComponent(), true);

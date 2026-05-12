@@ -5,7 +5,7 @@ import com.intellij.java.frontback.impl.JavaFrontbackBundle;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.psi.codeStyle.CodeStyleSettings;
 import com.intellij.psi.codeStyle.JavaCodeStyleSettings;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.ui.JBUI;
 import org.jetbrains.annotations.NotNull;
 
@@ -60,7 +60,7 @@ public class FullyQualifiedNamesInJavadocOptionProvider {
     for (QualifyJavadocOptions options : QualifyJavadocOptions.values()) {
       myComboBox.addItem(options);
     }
-    myComboBox.setRenderer(SimpleListCellRenderer.create("", QualifyJavadocOptions::getPresentableText));
+    myComboBox.setRenderer(BuilderKt.textListCellRenderer("", QualifyJavadocOptions::getPresentableText));
 
     JLabel title = new JLabel(JavaFrontbackBundle.message("radio.use.fully.qualified.class.names.in.javadoc"));
     myPanel.setBorder(BorderFactory.createEmptyBorder(5, 0, 5, 0));

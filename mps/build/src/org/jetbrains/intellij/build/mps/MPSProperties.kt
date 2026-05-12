@@ -18,7 +18,9 @@ import org.jetbrains.intellij.build.OsFamily
 import org.jetbrains.intellij.build.WindowsDistributionCustomizer
 import org.jetbrains.intellij.build.impl.LibraryPackMode
 import org.jetbrains.intellij.build.impl.PlatformLayout
+import org.jetbrains.intellij.build.productLayout.CommunityModuleSets
 import org.jetbrains.intellij.build.productLayout.ProductModulesContentSpec
+import org.jetbrains.intellij.build.productLayout.productModules
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -51,14 +53,18 @@ class MPSProperties : JetBrainsProductProperties() {
             "intellij.platform.starter",
             "intellij.idea.community.customization",
             "intellij.java.ide.resources",
+            "intellij.platform.buildData",
             "intellij.platform.whatsNew",
             "intellij.platform.configurationStore.impl",
+            "intellij.platform.diagnostic.startUpPerformanceReporter",
+            "intellij.platform.jps.build.javac.rt",
             "intellij.platform.resources",
             "intellij.platform.resources.en",
             "intellij.platform.ide.codeinsight.inline",
             "intellij.platform.ide.recentProjects",
             "intellij.platform.ide.util.netty",
             "intellij.platform.util.diff",
+            "intellij.platform.util.text.matching",
             "intellij.platform.syntax.psi",
             "intellij.json.syntax",
         )
@@ -96,11 +102,8 @@ class MPSProperties : JetBrainsProductProperties() {
         productLayout.pluginLayouts = pluginLayouts.toPersistentList()
 
         productLayout.addPlatformSpec { layout, _ ->
-
             for (moduleName in listOf("intellij.platform.testFramework", "intellij.platform.testFramework.common", "intellij.java.testFramework", "intellij.platform.testFramework.core", "intellij.platform.testFramework.teamCity")) {
-                if (!productLayout.productApiModules.contains(moduleName)) {
-                    layout.withModule(moduleName, "testFramework.jar")
-                }
+              layout.withModule(moduleName, "testFramework.jar")
             }
 
             // Contains the expanded plugin.xml inside
@@ -114,6 +117,7 @@ class MPSProperties : JetBrainsProductProperties() {
             layout.withProjectLibrary("Eclipse", LibraryPackMode.MERGED)
             layout.withProjectLibrary("JUnit4", LibraryPackMode.STANDALONE_MERGED)
             layout.withProjectLibrary("http-client", LibraryPackMode.MERGED)
+            layout.withProjectLibrary("hamcrest", LibraryPackMode.STANDALONE_MERGED)
             layout.withoutProjectLibrary("Ant")
             layout.withoutProjectLibrary("Gradle")
             layout.withProjectLibrary("maven-resolver-provider", LibraryPackMode.STANDALONE_MERGED)
@@ -180,7 +184,19 @@ class MPSProperties : JetBrainsProductProperties() {
     override val customProductCode: String
         get() = "MPS"
 
-    override fun getProductContentDescriptor(): ProductModulesContentSpec? = null
+    override fun getProductContentDescriptor(): ProductModulesContentSpec = productModules {
+        alias("com.intellij.modules.java-capable")
+
+        deprecatedInclude("intellij.platform.resources", "META-INF/PlatformLangPlugin.xml")
+
+        moduleSet(CommunityModuleSets.ideCommon())
+
+        module("intellij.platform.tips")
+        module("intellij.ide.startup.importSettings")
+
+        module("intellij.platform.customization.min")
+        module("intellij.idea.customization.base")
+    }
 
     override fun getSystemSelector(appInfo: ApplicationInfoProperties, buildNumber: String): String {
         return "MPS${appInfo.majorVersion}.${appInfo.minorVersionMainPart}"
@@ -192,13 +208,9 @@ class MPSProperties : JetBrainsProductProperties() {
         return MPSWindowsDistributionCustomizer(MPSBuilder.MPS_HOME)
     }
 
-    override fun createLinuxCustomizer(projectHome: String): LinuxDistributionCustomizer? {
-        return null
-    }
+    override fun createLinuxCustomizer(projectHome: Path): LinuxDistributionCustomizer? = null
 
-    override fun createMacCustomizer(projectHome: Path): MacDistributionCustomizer? {
-        return null
-    }
+    override fun createMacCustomizer(projectHome: Path): MacDistributionCustomizer? = null
 
     private class MPSWindowsDistributionCustomizer(projectHome: Path) : WindowsDistributionCustomizer() {
         override val fileAssociations: List<String>

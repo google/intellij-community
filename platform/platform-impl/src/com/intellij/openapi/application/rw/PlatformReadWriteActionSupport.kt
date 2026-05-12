@@ -14,12 +14,12 @@ import com.intellij.openapi.application.ReadWriteActionSupport
 import com.intellij.openapi.application.ThreadingSupport
 import com.intellij.openapi.application.impl.AsyncExecutionServiceImpl
 import com.intellij.openapi.application.impl.InternalThreading
+import com.intellij.openapi.application.lambdaToComputable
 import com.intellij.openapi.application.useBackgroundWriteAction
 import com.intellij.openapi.application.useTrueSuspensionForWriteAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.Computable
 import com.intellij.openapi.util.Ref
 import com.intellij.openapi.util.ThrowableComputable
 import com.intellij.util.ObjectUtils
@@ -121,9 +121,7 @@ class PlatformReadWriteActionSupport : ReadWriteActionSupport {
     return withContext(Dispatchers.EDT) {
       val writeStamp = AsyncExecutionServiceImpl.getWriteActionCounter()
       if (originalStamp == writeStamp) {
-        application.runWriteAction(Computable {
-          action()
-        })
+        application.runWriteAction(lambdaToComputable(action))
       }
       else {
         retryMarker
@@ -195,9 +193,7 @@ ${dump.rawDump}""")
           InternalThreading.incrementBackgroundWriteActionCount()
           try {
             executeWriteActionWithPossibleRetry {
-              lock.runWriteAction {
-                action()
-              }
+              lock.runWriteAction(action)
             }
           } finally {
             InternalThreading.decrementBackgroundWriteActionCount()
@@ -205,7 +201,7 @@ ${dump.rawDump}""")
         }
         else {
           @Suppress("ForbiddenInSuspectContextMethod")
-          application.runWriteAction(ThrowableComputable(action))
+          application.runWriteAction(lambdaToComputable(action))
         }
       }
       finally {

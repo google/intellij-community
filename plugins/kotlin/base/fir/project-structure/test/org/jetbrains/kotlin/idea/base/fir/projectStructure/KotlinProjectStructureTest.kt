@@ -10,7 +10,6 @@ import com.intellij.openapi.module.impl.scopes.LibraryScope
 import com.intellij.openapi.projectRoots.ProjectJdkTable
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.roots.ModuleRootModificationUtil
-import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.roots.libraries.Library
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
@@ -22,7 +21,6 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 import com.intellij.psi.search.FileTypeIndex
 import com.intellij.psi.search.GlobalSearchScope
-import com.intellij.testFramework.ExtensionTestUtil
 import com.intellij.testFramework.IdeaTestUtil
 import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.assertInstanceOf
@@ -58,16 +56,12 @@ import org.jetbrains.kotlin.idea.artifacts.TestKotlinArtifacts
 import org.jetbrains.kotlin.idea.base.fir.projectStructure.modules.library.KaLibraryModuleImpl
 import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode
 import org.jetbrains.kotlin.idea.base.projectStructure.KaSourceModuleKind
-import org.jetbrains.kotlin.idea.base.projectStructure.ProjectStructureInsightsProvider
-import org.jetbrains.kotlin.idea.base.projectStructure.RootKindFilter
 import org.jetbrains.kotlin.idea.base.projectStructure.getKaModuleOfType
 import org.jetbrains.kotlin.idea.base.projectStructure.getKaModuleOfTypeSafe
-import org.jetbrains.kotlin.idea.base.projectStructure.matches
 import org.jetbrains.kotlin.idea.base.projectStructure.openapiSdk
 import org.jetbrains.kotlin.idea.base.projectStructure.toKaLibraryModules
 import org.jetbrains.kotlin.idea.base.projectStructure.toKaSourceModule
 import org.jetbrains.kotlin.idea.base.projectStructure.toKaSourceModuleForProduction
-import org.jetbrains.kotlin.idea.base.util.K1ModeProjectStructureApi
 import org.jetbrains.kotlin.idea.core.util.toPsiFile
 import org.jetbrains.kotlin.idea.test.AbstractMultiModuleTest
 import org.jetbrains.kotlin.idea.test.addDependency
@@ -94,28 +88,6 @@ class KotlinProjectStructureTest : AbstractMultiModuleTest() {
         get() = KotlinPluginMode.K2
 
     override fun getTestDataDirectory(): File = throw UnsupportedOperationException()
-
-    override fun setUp() {
-        super.setUp()
-
-        val testProjectStructureInsightsProvider = object : ProjectStructureInsightsProvider {
-            override fun isInSpecialSrcDirectory(psiElement: PsiElement): Boolean {
-                if (!RootKindFilter.Companion.projectSources.matches(psiElement)) return false
-                val containingFile = psiElement.containingFile as? KtFile ?: return false
-                val virtualFile = containingFile.virtualFile
-                val index = ProjectFileIndex.getInstance(psiElement.project)
-                val module = index.getModuleForFile(virtualFile) ?: return false
-                return module.name == "buildSrc"
-            }
-        }
-
-        ExtensionTestUtil.maskExtensions(
-          ProjectStructureInsightsProvider.Companion.EP_NAME,
-          ProjectStructureInsightsProvider.Companion.EP_NAME.extensionList +
-          listOf(testProjectStructureInsightsProvider),
-          testRootDisposable
-        )
-    }
 
     fun `test unrelated library`() {
         val moduleWithLibrary = createModule(
@@ -274,19 +246,19 @@ class KotlinProjectStructureTest : AbstractMultiModuleTest() {
         assertEquals("Files from libraries A and B must be the same due to sharing", libraryAFile, libraryBFile)
 
         // -------> A module logic (the first one in the order)
-        val libraryAModuleWithoutContext = kaModuleWithAssertion<KaLibraryModule>(libraryAFile)
-        assertEquals(libraryAName, libraryAModuleWithoutContext.libraryName)
+        var libraryBModuleWithoutContext = kaModuleWithAssertion<KaLibraryModule>(libraryAFile)
+        assertEquals("Should be first module with sources", libraryBName, libraryBModuleWithoutContext.libraryName)
 
         val sourceAModule = kaModuleWithAssertion<KaSourceModule>(sourceAFile)
         val libraryAModuleWithContext = kaModuleWithAssertion<KaLibraryModule>(libraryAFile, contextualModule = sourceAModule)
-        assertEquals(libraryAModuleWithoutContext, libraryAModuleWithContext)
+        assertNotSame("Modules with sources are preferred to module without sources", libraryBModuleWithoutContext, libraryAModuleWithContext)
         assertTrue("The library module must be in dependencies", libraryAModuleWithContext in sourceAModule.directRegularDependencies)
 
         // -------> B module logic (the last one in the order)
-        val libraryBModuleWithoutContext = kaModuleWithAssertion<KaLibraryModule>(libraryBFile)
+        libraryBModuleWithoutContext = kaModuleWithAssertion<KaLibraryModule>(libraryBFile)
         assertEquals(
-            "The library name should be from the first module due to a context absence",
-            libraryAName,
+            "The library name should be from the first module with sources due to a context absence",
+            libraryBName,
             libraryBModuleWithoutContext.libraryName,
         )
 
@@ -298,7 +270,7 @@ class KotlinProjectStructureTest : AbstractMultiModuleTest() {
             libraryBModuleWithContext.libraryName,
         )
 
-      Assert.assertNotEquals(
+      Assert.assertEquals(
         "The library module must be from the corresponding module if a context passed",
         libraryBModuleWithoutContext,
         libraryBModuleWithContext,
@@ -808,7 +780,6 @@ class KotlinProjectStructureTest : AbstractMultiModuleTest() {
         }
     }
 
-    @OptIn(K1ModeProjectStructureApi::class)
     fun `test different jdks attached to project modules`() {
         val mockJdkA = IdeaTestUtil.getMockJdk17("module A JDK")
         val mockJdkB = IdeaTestUtil.getMockJdk17("module B JDK")
@@ -831,7 +802,9 @@ class KotlinProjectStructureTest : AbstractMultiModuleTest() {
         }
 
         //a class from "jdk" which belongs to 2 order entries
-        val stringClass = JavaPsiFacade.getInstance(project).findClass("java.lang.String", GlobalSearchScope.allScope(project))!!
+        val stringClass = JavaPsiFacade.getInstance(project).findClasses("java.lang.String", GlobalSearchScope.allScope(project))
+            // default module is created with jdk 11 and as it's un
+            .find { it.containingFile.virtualFile.path.contains("1.7") }!!
 
         val contextualModuleB = moduleB.toKaSourceModuleForProduction()!!
         val module1 = stringClass.getKaModuleOfTypeSafe<KaLibraryModule>(project, contextualModuleB)

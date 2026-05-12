@@ -3,7 +3,7 @@ package com.intellij.notebooks.visualization.ui
 import com.intellij.notebooks.ui.visualization.NotebookUtil.isOrdinaryNotebookEditor
 import com.intellij.notebooks.ui.visualization.NotebookUtil.notebookAppearance
 import com.intellij.notebooks.visualization.ui.cellsDnD.EditorCellDragAssistant
-import com.intellij.notebooks.visualization.ui.providers.bounds.JupyterBoundsChangeHandler
+import com.intellij.notebooks.visualization.ui.providers.bounds.JupyterBoundsChangeNotifier
 import com.intellij.notebooks.visualization.useG2D
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.runInEdt
@@ -12,12 +12,12 @@ import com.intellij.ui.ExperimentalUI
 import com.intellij.ui.paint.LinePainter2D
 import com.intellij.ui.paint.RectanglePainter2D
 import org.jetbrains.annotations.ApiStatus
+import java.awt.AWTEvent
 import java.awt.Color
 import java.awt.Cursor
 import java.awt.Graphics
 import java.awt.Rectangle
 import java.awt.RenderingHints
-import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.JComponent
 import javax.swing.SwingUtilities
@@ -41,12 +41,13 @@ class EditorCellFoldingBar(
       if (!editor.isOrdinaryNotebookEditor()) return
 
       if (value) {
-        val panel = createFoldingBar()
+        val panel = EditorCellFoldingBarComponent()
         editor.gutterComponentEx.add(panel)
         this.panel = panel
         updateBounds()
       }
       else {
+        if (draggableAdapter?.isDragging == true) return
         removePanel()
       }
     }
@@ -55,7 +56,7 @@ class EditorCellFoldingBar(
     set(value) {
       if (field != value) {
         field = value
-        panel?.background = getBarColor()
+        panel?.repaint()
       }
     }
 
@@ -64,13 +65,7 @@ class EditorCellFoldingBar(
   }
 
   private fun registerListeners() {
-    JupyterBoundsChangeHandler.get(editor).subscribe(this, ::updateBounds)
-    editor.notebookAppearance.cellStripeSelectedColor.afterChange(this) {
-      updateBarColor()
-    }
-    editor.notebookAppearance.cellStripeHoveredColor.afterChange(this) {
-      updateBarColor()
-    }
+    JupyterBoundsChangeNotifier.get(editor).subscribe(this, ::updateBounds)
   }
 
   override fun dispose() {
@@ -95,52 +90,61 @@ class EditorCellFoldingBar(
     }
   }
 
-  private fun createFoldingBar() = EditorCellFoldingBarComponent().apply {
-    background = getBarColor()
-  }
-
   inner class EditorCellFoldingBarComponent : JComponent() {
     private var mouseOver = false
 
     init {
-      addMouseListener(object : MouseAdapter() {
-        override fun mouseEntered(e: MouseEvent) {
+      enableEvents(AWTEvent.MOUSE_EVENT_MASK)
+
+      if (draggableAdapter != null) {
+        enableEvents(AWTEvent.MOUSE_MOTION_EVENT_MASK)
+      }
+
+      cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+    }
+
+    override fun processMouseEvent(e: MouseEvent) {
+      when (e.id) {
+        MouseEvent.MOUSE_ENTERED -> {
           mouseOver = true
           repaint()
         }
-
-        override fun mouseExited(e: MouseEvent) {
+        MouseEvent.MOUSE_EXITED -> {
           mouseOver = false
           repaint()
         }
-
-        override fun mousePressed(e: MouseEvent) {
+        MouseEvent.MOUSE_CLICKED -> {
+          if (draggableAdapter?.isDragging == true) return
+          toggleListener.invoke()
+        }
+        MouseEvent.MOUSE_PRESSED -> {
           if (SwingUtilities.isLeftMouseButton(e)) {
             draggableAdapter?.initDrag(e)
           }
         }
-
-        override fun mouseReleased(e: MouseEvent) {
+        MouseEvent.MOUSE_RELEASED -> {
           if (SwingUtilities.isLeftMouseButton(e)) {
             draggableAdapter?.finishDrag(e)
           }
         }
+      }
+    }
 
-        override fun mouseClicked(e: MouseEvent) {
-          when (draggableAdapter) {
-            null -> toggleListener.invoke()
-            else -> if (!draggableAdapter.isDragging) toggleListener.invoke()
-          }
-        }
-      })
-
-      addMouseMotionListener(object : MouseAdapter() {
-        override fun mouseDragged(e: MouseEvent) {
+    override fun processMouseMotionEvent(e: MouseEvent) {
+      when (e.id) {
+        MouseEvent.MOUSE_DRAGGED -> {
           draggableAdapter?.updateDragOperation(e)
         }
-      })
+      }
+    }
 
-      cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+    private fun getBackgroundColor(): Color {
+      return if (selected) {
+        editor.notebookAppearance.cellStripeSelectedColor()
+      }
+      else {
+        editor.notebookAppearance.cellStripeHoveredColor()
+      }
     }
 
     override fun paintComponent(g: Graphics) {
@@ -154,7 +158,7 @@ class EditorCellFoldingBar(
         null
       }
       g.useG2D { g2 ->
-        g2.color = background
+        g2.color = getBackgroundColor()
         RectanglePainter2D.FILL.paint(g2, rect, arc, LinePainter2D.StrokeType.INSIDE, 1.0, RenderingHints.VALUE_ANTIALIAS_ON)
       }
     }
@@ -172,14 +176,5 @@ class EditorCellFoldingBar(
         Rectangle(1, 1, width - 2, height - 2)
       }
     }
-  }
-
-  private fun updateBarColor() = panel?.background = getBarColor()
-
-  private fun getBarColor(): Color = if (selected) {
-    editor.notebookAppearance.cellStripeSelectedColor.get()
-  }
-  else {
-    editor.notebookAppearance.cellStripeHoveredColor.get()
   }
 }

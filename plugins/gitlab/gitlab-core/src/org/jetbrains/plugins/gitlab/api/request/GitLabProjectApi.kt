@@ -20,6 +20,7 @@ import org.jetbrains.plugins.gitlab.api.GitLabServerMetadata
 import org.jetbrains.plugins.gitlab.api.GitLabVersion
 import org.jetbrains.plugins.gitlab.api.SinceGitLab
 import org.jetbrains.plugins.gitlab.api.dto.GitLabGroupDTO
+import org.jetbrains.plugins.gitlab.api.dto.GitLabGroupRestDTO
 import org.jetbrains.plugins.gitlab.api.dto.GitLabLabelGQLDTO
 import org.jetbrains.plugins.gitlab.api.dto.GitLabNamespaceDTO
 import org.jetbrains.plugins.gitlab.api.dto.GitLabNamespaceRestDTO
@@ -33,6 +34,7 @@ import org.jetbrains.plugins.gitlab.api.dto.GitLabUserRestDTO
 import org.jetbrains.plugins.gitlab.api.dto.GitLabWorkItemDTO
 import org.jetbrains.plugins.gitlab.api.dto.WithGitLabNamespace
 import org.jetbrains.plugins.gitlab.api.gitLabQuery
+import org.jetbrains.plugins.gitlab.api.projectApiUri
 import org.jetbrains.plugins.gitlab.api.projectApiUrl
 import org.jetbrains.plugins.gitlab.api.withErrorStats
 import org.jetbrains.plugins.gitlab.api.withQuery
@@ -142,6 +144,22 @@ suspend fun GitLabApi.Rest.getProjectUsers(uri: URI): HttpResponse<out List<GitL
   }
 }
 
+/**
+ * Returns up to 20 users that match the search string.
+ * If a search string is less than 3 characters, the endpoint returns nothing, so let's not use a search parameter then.
+ */
+@SinceGitLab("14.0", note = "No exact version")
+suspend fun GitLabApi.Rest.getProjectSearchUsers(projectId: String, searchString: String): HttpResponse<out List<GitLabUserRestDTO>> {
+  val uri = projectApiUrl(projectId).resolveRelative("search").withQuery {
+    "scope" eq "users"
+    "search" eq searchString
+  }
+  val request = request(uri).GET().build()
+  return withErrorStats(GitLabApiRequestName.REST_GET_PROJECT_SEARCH_USERS) {
+    loadJsonList(request)
+  }
+}
+
 @ApiStatus.Internal
 @SinceGitLab("13.0")
 fun GitLabApi.GraphQL.getCloneableProjects(): Flow<List<GitLabProjectForCloneDTO>> =
@@ -165,9 +183,7 @@ suspend fun GitLabApi.Rest.getProjectNamespace(namespaceId: String): HttpRespons
 @ApiStatus.Internal
 @SinceGitLab("14.3", note = "Doesn't fetch subgroups before 17.10")
 fun GitLabApi.GraphQL.getMemberNamespacesForShare(glMetadata: GitLabServerMetadata): Flow<List<WithGitLabNamespace>> =
-  ApiPageUtil.createGQLPagesFlow { initialPage ->
-    val page = GraphQLRequestPagination(initialPage.afterCursor, 10)
-
+  ApiPageUtil.createGQLPagesFlow(startPage = GraphQLRequestPagination(10)) { page ->
     val parameters = page.asParameters()
 
     val result = if (glMetadata.version < GitLabVersion(17, 10)) {
@@ -182,14 +198,17 @@ fun GitLabApi.GraphQL.getMemberNamespacesForShare(glMetadata: GitLabServerMetada
       }
     }.body()
 
-    val namespaces = (if (page.afterCursor == null) listOf(result.currentUser.namespace) else listOf()) +
-                     result.groups.nodes.filter { it.userPermissions.createProjects }
-    GraphQLConnectionDTO<WithGitLabNamespace>(result.groups.pageInfo, namespaces)
+    val namespaces = buildList {
+      if (page.afterCursor == null) add(result.currentUser.namespace)
+      if (result.groups != null) addAll(result.groups.nodes.filter { it.userPermissions.createProjects })
+    }
+    val pageInfo = result.groups?.pageInfo ?: GraphQLCursorPageInfoDTO(null, false, null, false)
+    GraphQLConnectionDTO(pageInfo, namespaces)
   }.map { it.nodes }
 
 private data class GitLabUserNamespacesResult(
   val currentUser: CurrentUser,
-  val groups: GraphQLConnectionDTO<GitLabGroupDTO>,
+  val groups: GraphQLConnectionDTO<GitLabGroupDTO>?,
 ) {
   data class CurrentUser(val namespace: GitLabNamespaceDTO)
 }

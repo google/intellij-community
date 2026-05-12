@@ -120,7 +120,7 @@ final class AsyncFilterRunner {
       highlightAvailableResults();
     }
     else {
-      promise.onSuccess(__ -> {
+      promise.onSuccess(_ -> {
         if (hasResults()) {
           ApplicationManager.getApplication().invokeLater(this::highlightAvailableResults, ModalityState.any());
         }

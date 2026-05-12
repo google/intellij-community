@@ -33,12 +33,6 @@ public class PsiSwitchExpressionImpl extends PsiSwitchBlockImpl implements PsiSw
 
   @Override
   public PsiType getType() {
-    if (PsiUtil.isLanguageLevel8OrHigher(this) &&
-        PsiPolyExpressionUtil.isPolyExpression(this) &&
-        !MethodCandidateInfo.isOverloadCheck(PsiUtil.skipParenthesizedExprUp(getParent()))) {
-      return InferenceSession.getTargetType(this);
-    }
-
     List<PsiExpression> resultExpressions = PsiUtil.getSwitchResultExpressions(this);
 
     Set<PsiType> resultTypes = new HashSet<>();
@@ -46,6 +40,19 @@ public class PsiSwitchExpressionImpl extends PsiSwitchBlockImpl implements PsiSw
       PsiType resultExpressionType = expression.getType();
       if (resultExpressionType == null) return null;
       resultTypes.add(resultExpressionType);
+    }
+
+    if (PsiUtil.isLanguageLevel8OrHigher(this) &&
+        PsiPolyExpressionUtil.isPolyExpression(this) &&
+        !MethodCandidateInfo.isOverloadCheck(PsiUtil.skipParenthesizedExprUp(getParent()))) {
+      PsiType targetType = InferenceSession.getTargetType(this);
+      if (MethodCandidateInfo.isOverloadCheck() && targetType != null &&
+          ContainerUtil.exists(resultTypes, t -> !targetType.isAssignableFrom(t))) {
+        return null;
+      }
+      if (targetType != null) {
+        return targetType;
+      }
     }
 
     if (resultTypes.isEmpty()) return null;

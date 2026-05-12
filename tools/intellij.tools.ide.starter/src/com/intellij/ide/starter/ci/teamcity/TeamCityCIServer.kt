@@ -5,6 +5,10 @@ import com.intellij.ide.starter.config.ConfigurationStorage
 import com.intellij.ide.starter.config.ignoredTestFailuresPattern
 import com.intellij.ide.starter.di.di
 import com.intellij.ide.starter.runner.CurrentTestMethod
+import com.intellij.platform.testFramework.teamCity.TeamCityReporter.TestMetadata
+import com.intellij.platform.testFramework.teamCity.TeamCityReporter.TestOutcome
+import com.intellij.platform.testFramework.teamCity.TeamCityReporter.SyntheticTestKind
+import com.intellij.platform.testFramework.teamCity.TeamCityReporter
 import com.intellij.tools.ide.util.common.logOutput
 import org.kodein.di.direct
 import org.kodein.di.instance
@@ -13,7 +17,6 @@ import java.nio.file.Path
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Properties
-import java.util.UUID
 import kotlin.io.path.Path
 import kotlin.io.path.bufferedReader
 
@@ -33,72 +36,39 @@ open class TeamCityCIServer(
     TeamCityClient.publishTeamCityArtifacts(source = source, artifactPath = artifactPath, artifactName = artifactName)
   }
 
-  fun reportTest(testName: String, message: String, details: String, linkToLogs: String? = null, isFailure: Boolean) {
-    val flowId = UUID.randomUUID().toString()
+  fun addBisectMetadata(testName: String? = null, flowId: String? = null, testClassFqn: String? = CurrentTestMethod.get()?.clazz) {
+    val meta = bisectMetadata(testClassFqn)
+    TeamCityReporter.reportTestMetadata(testName = testName, type = meta.type, flowId = flowId, name = meta.name, value = meta.value)
+  }
 
-    val generifiedTestName = testName.processStringForTC()
+  private fun bisectMetadata(testClassFqn: String? = CurrentTestMethod.get()?.clazz): TestMetadata {
+    val url = "https://ij-perf.labs.jb.gg/bisect/launcher?buildId=$buildId" +
+              (testClassFqn?.let { "&testPatterns=$it" } ?: "")
+    return TestMetadata(name = "Start bisect", value = url, type = TeamCityReporter.MetadataType.LINK)
+  }
 
-    logOutput(String.format("##teamcity[testStarted name='%s' flowId='%s' nodeId='%s' parentNodeId='0']", generifiedTestName, flowId, generifiedTestName))
-    if (isFailure) {
-      logOutput(String.format(
-        "##teamcity[testFailed name='%s' message='%s' details='%s' flowId='%s' nodeId='%s' parentNodeId='0']",
-        generifiedTestName, message.processStringForTC(), details.processStringForTC(), flowId, generifiedTestName
-      ))
-      addCodeOwnerMetadata(generifiedTestName, flowId)
+  override fun reportTestFailure(
+    testName: String, message: String, details: String, linkToLogs: String?,
+    kind: SyntheticTestKind, generifyTestName: Boolean
+  ) {
+    val metadata = buildList {
+      linkToLogs?.let { add(TestMetadata(name = "Link to Logs and artifacts", value = it, type = TeamCityReporter.MetadataType.LINK)) }
+      CurrentTestMethod.get()?.let { add(TestMetadata(name = "Test name", value = it.fullName())) }
       if (isJetbrainsBuildserver) {
-        addTestMetadata(testName = generifiedTestName, TeamCityMetadataType.LINK, flowId = flowId, name = "Start bisect", value = "https://ij-perf.labs.jb.gg/bisect/launcher?buildId=$buildId")
+        add(bisectMetadata())
       }
     }
-    linkToLogs?.let { addTestMetadata(testName = generifiedTestName, TeamCityMetadataType.LINK, flowId = flowId, name = "Link to Logs and artifacts", value = it) }
-    CurrentTestMethod.get()?.let {
-      addTestMetadata(
-        testName = generifiedTestName,
-        TeamCityMetadataType.TEXT,
-        flowId = flowId,
-        name = "Test name",
-        value = it.fullName(),
-      )
-    }
-    logOutput(String.format("##teamcity[testFinished name='%s' flowId='%s' nodeId='%s' parentNodeId='0']", generifiedTestName, flowId, generifiedTestName))
+    TeamCityReporter.reportTestLifecycle(testName, TestOutcome.FAILED, message, details,
+                                         owner = codeOwnerResolver.getOwnerGroupName(),
+                                         metadata = metadata, syntheticTestKind = kind, generifyTestName = generifyTestName)
   }
 
-  private fun addCodeOwnerMetadata(testName: String, flowId: String) {
-    val owner = codeOwnerResolver.getOwnerGroupName() ?: return
-    addTestMetadata(
-      testName = testName,
-      type = TeamCityMetadataType.TEXT,
-      flowId = flowId,
-      name = CODE_OWNER_METADATA_NAME,
-      value = owner,
-    )
-  }
-
-  override fun reportTestFailure(testName: String, message: String, details: String, linkToLogs: String?) {
-    reportTest(testName, message, details, linkToLogs, isFailure = true)
-  }
-
-  fun reportPassedTest(testName: String, message: String, details: String, linkToLogs: String? = null) {
-    reportTest(testName, message, details, linkToLogs, isFailure = false)
-  }
-
-  override fun ignoreTestFailure(testName: String, message: String, details: String?) {
-    val flowId = UUID.randomUUID().toString()
-    val generifiedTestName = testName.processStringForTC()
-    logOutput(String.format("##teamcity[testStarted name='%s' flowId='%s' nodeId='%s' parentNodeId='0']",
-                            generifiedTestName, flowId, generifiedTestName))
-    logOutput(String.format("##teamcity[testIgnored name='%s' message='%s' flowId='%s' nodeId='%s']",
-                            generifiedTestName, message.processStringForTC(), flowId, generifiedTestName))
-    details?.let {
-      addTestMetadataWithoutStringProcessing(
-        testName = generifiedTestName,
-        TeamCityMetadataType.TEXT,
-        flowId = flowId,
-        name = "Details",
-        value = details,
-      )
-    }
-    logOutput(String.format("##teamcity[testFinished name='%s' flowId='%s' nodeId='%s' parentNodeId='0']",
-                            generifiedTestName, flowId, generifiedTestName))
+  override fun ignoreTestFailure(
+    testName: String, message: String, details: String?,
+    kind: SyntheticTestKind,
+  ) {
+    val metadata = details?.let { listOf(TestMetadata(name = "Details", value = it)) } ?: emptyList()
+    TeamCityReporter.reportTestLifecycle(testName, TestOutcome.IGNORED, message, metadata = metadata, syntheticTestKind = kind)
   }
 
   override fun isTestFailureShouldBeIgnored(message: String): Boolean {
@@ -179,7 +149,7 @@ open class TeamCityCIServer(
   /**
    * @return String or Null if parameters aren't found
    */
-  private fun getBuildParam(name: String, impreciseNameMatch: Boolean = false): String? {
+  fun getBuildParam(name: String, impreciseNameMatch: Boolean = false): String? {
     val totalParams = systemProperties.plus(buildParams)
 
     val paramValue = if (impreciseNameMatch) {
@@ -199,7 +169,6 @@ open class TeamCityCIServer(
   val isJetbrainsBuildserver by lazy { getBuildParam("teamcity.serverUrl")?.contains("buildserver.labs.intellij.net") == true }
   val configurationName by lazy { getBuildParam("teamcity.buildConfName") }
   val buildVcsNumber by lazy { getBuildParam("build.vcs.number") ?: "Unknown" }
-  val buildConfigName: String? by lazy { getBuildParam("teamcity.buildConfName") }
   override val buildParams by lazy {
     val configurationPropertiesFile = systemProperties["teamcity.configuration.properties.file"]
 
@@ -263,94 +232,5 @@ open class TeamCityCIServer(
 
   companion object {
     const val LOCAL_RUN_ID = "LOCAL_RUN_SNAPSHOT"
-    private const val CODE_OWNER_METADATA_NAME = "Code Owner"
-
-    fun String.processStringForTC(): String {
-      //todo replace to intellij.platform.testFramework.util.teamcity.escapeStringForTeamCity when module is published
-      return this.substring(0, kotlin.math.min(7000, this.length))
-        .replace("\\|", "||")
-        .replace("\\[", "|[")
-        .replace("]", "|]")
-        .replace("\n", "|n")
-        .replace("'", "|'")
-        .replace("\r", "|r")
-    }
-
-    fun setStatusTextPrefix(text: String) {
-      logOutput(" ##teamcity[buildStatus text='$text {build.status.text}'] ")
-    }
-
-    fun reportTeamCityStatistics(key: String, value: Int) {
-      logOutput(" ##teamcity[buildStatisticValue key='${key}' value='${value}']")
-    }
-
-    fun reportTeamCityStatistics(key: String, value: Long) {
-      logOutput(" ##teamcity[buildStatisticValue key='${key}' value='${value}']")
-    }
-
-    fun reportTeamCityMessage(text: String) {
-      logOutput(" ##teamcity[message text='$text']")
-    }
-
-    fun testSuiteStarted(suiteName: String, flowId: String) {
-      println("##teamcity[testSuiteStarted name='${suiteName.processStringForTC()}' flowId='$flowId']")
-    }
-
-    fun testSuiteFinished(suiteName: String, flowId: String) {
-      println("##teamcity[testSuiteFinished name='${suiteName.processStringForTC()}' flowId='$flowId']")
-    }
-
-    fun testStarted(testName: String, flowId: String) {
-      println("##teamcity[testStarted name='${testName.processStringForTC()}' flowId='$flowId']")
-    }
-
-    fun testFinished(testName: String, flowId: String) {
-      println("##teamcity[testFinished name='${testName.processStringForTC()}' flowId='$flowId']")
-    }
-
-    fun testIgnored(testName: String, message: String, flowId: String) {
-      println("##teamcity[testIgnored name='${testName.processStringForTC()}' message='${message.processStringForTC()}' flowId='$flowId']")
-    }
-
-    fun testFailed(testName: String, message: String, flowId: String) {
-      println("##teamcity[testFailed name='${testName.processStringForTC()}' message='${message.processStringForTC()}' flowId='$flowId']")
-    }
-
-    fun addTextMetadata(testName: String, value: String, flowId: String) {
-      addTestMetadata(testName, TeamCityMetadataType.TEXT, flowId, null, value)
-    }
-
-    /**
-     * Use testName=null and flowId=null if you want to add test metadata to the current running test
-     */
-    fun addTestMetadata(testName: String?, type: TeamCityMetadataType, flowId: String?, name: String?, value: String) {
-      val nameAttr = name?.let { "name='${it.processStringForTC()}'" } ?: ""
-      val flow = flowId?.let { "flowId='$it'" } ?: ""
-      val testName = testName?.let { "testName='${it.processStringForTC()}'" } ?: ""
-      println("##teamcity[testMetadata $testName type='${type.name.lowercase()}' ${nameAttr} value='${value.processStringForTC()}' ${flow}]")
-    }
-
-    fun addTestMetadataWithoutStringProcessing(testName: String?, type: TeamCityCIServer.TeamCityMetadataType, flowId: String?, name: String?, value: String) {
-      val nameAttr = name?.let { "name='${it}'" } ?: ""
-      val flow = flowId?.let { "flowId='$it'" } ?: ""
-      val testName = testName?.let { "testName='${it}'" } ?: ""
-      println("##teamcity[testMetadata $testName type='${type.name.lowercase()}' ${nameAttr} value='${value.processStringForTC()}' ${flow}]")
-    }
-
-    fun progressStart(activityName: String) {
-      println("##teamcity[progressStart '${activityName.processStringForTC()}']")
-    }
-
-    fun progressFinish(activityName: String) {
-      println("##teamcity[progressFinish '${activityName.processStringForTC()}']")
-    }
-  }
-
-  enum class TeamCityMetadataType {
-    NUMBER,
-    TEXT,
-    LINK,
-    ARTIFACT,
-    IMAGE
   }
 }

@@ -1,4 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.jps.entities.impl
 
 import com.intellij.platform.workspace.jps.entities.ContentRootEntity
@@ -18,11 +20,10 @@ import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
 import com.intellij.platform.workspace.storage.impl.containers.MutableWorkspaceList
 import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceList
-import com.intellij.platform.workspace.storage.impl.extractOneToOneParent
-import com.intellij.platform.workspace.storage.impl.updateOneToOneParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import org.jetbrains.annotations.ApiStatus.Internal
@@ -47,7 +48,8 @@ internal class SourceRootOrderEntityImpl(private val dataSource: SourceRootOrder
       return dataSource.orderOfSourceRoots
     }
   override val contentRootEntity: ContentRootEntity
-    get() = snapshot.extractOneToOneParent(CONTENTROOTENTITY_CONNECTION_ID, this)!!
+    get() = snapshot.instrumentation.getParent(CONTENTROOTENTITY_CONNECTION_ID, this) as? ContentRootEntity
+            ?: error("Parent contentRootEntity not found for SourceRootOrderEntity")
 
   override val entitySource: EntitySource
     get() {
@@ -95,7 +97,7 @@ internal class SourceRootOrderEntityImpl(private val dataSource: SourceRootOrder
         error("Field SourceRootOrderEntity#orderOfSourceRoots should be initialized")
       }
       if (_diff != null) {
-        if (_diff.extractOneToOneParent<WorkspaceEntityBase>(CONTENTROOTENTITY_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getParentBuilder(CONTENTROOTENTITY_CONNECTION_ID, this) == null) {
           error("Field SourceRootOrderEntity#contentRootEntity should be initialized")
         }
       }
@@ -160,13 +162,14 @@ internal class SourceRootOrderEntityImpl(private val dataSource: SourceRootOrder
       get() {
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(CONTENTROOTENTITY_CONNECTION_ID,
                                                                            this) as? ContentRootEntityBuilder)
-          ?: (this.entityLinks[EntityLink(false, CONTENTROOTENTITY_CONNECTION_ID)]!! as ContentRootEntityBuilder)
+          ?: (this.entityLinks[EntityLink(false, CONTENTROOTENTITY_CONNECTION_ID)] as? ContentRootEntityBuilder)
+          ?: error("contentRootEntity is null for SourceRootOrderEntity")
         }
         else {
-          this.entityLinks[EntityLink(false, CONTENTROOTENTITY_CONNECTION_ID)]!! as ContentRootEntityBuilder
+          (this.entityLinks[EntityLink(false, CONTENTROOTENTITY_CONNECTION_ID)] as? ContentRootEntityBuilder)
+          ?: error("contentRootEntity is null for SourceRootOrderEntity")
         }
       }
       set(value) {
@@ -180,7 +183,7 @@ internal class SourceRootOrderEntityImpl(private val dataSource: SourceRootOrder
           _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
         }
         if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)) {
-          _diff.updateOneToOneParentOfChild(CONTENTROOTENTITY_CONNECTION_ID, this, value)
+          _diff.instrumentation.addChild(CONTENTROOTENTITY_CONNECTION_ID, value, this)
         }
         else {
           if (value is ModifiableWorkspaceEntityBase<*, *>) {
@@ -210,7 +213,6 @@ internal class SourceRootOrderEntityData : WorkspaceEntityData<SourceRootOrderEn
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): SourceRootOrderEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {

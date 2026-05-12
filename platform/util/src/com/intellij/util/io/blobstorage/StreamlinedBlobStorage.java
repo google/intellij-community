@@ -149,15 +149,21 @@ public interface StreamlinedBlobStorage extends Closeable, AutoCloseable, Forcea
   void deleteRecord(int recordId) throws IOException;
 
   /**
-   * Scan all records (even deleted one), and deliver their content to processor. ByteBuffer is read-only, and
+   * Scan all records (even deleted one), and deliver their content to the processor. ByteBuffer is read-only, and
    * prepared for reading (i.e. position=0, limit=payload.length). For deleted/moved records recordLength is negative
    * see {@link #isRecordActual(int)}.
-   * Scanning stops prematurely if processor returns false.
+   * Scanning stops prematurely if the processor returns false.
    *
    * @return how many records were processed
    */
   <E extends Exception> int forEach(@NotNull Processor<E> processor) throws IOException, E;
 
+  /**
+   * To be used with {@link #forEach(Processor)}: for-each iterates over all records, including
+   * non-actual (=moved/removed).
+   * For non-actual records a length has some special bits to identify them, and this method does
+   * that.
+   */
   boolean isRecordActual(int recordActualLength);
 
   int liveRecordsCount() throws IOException;

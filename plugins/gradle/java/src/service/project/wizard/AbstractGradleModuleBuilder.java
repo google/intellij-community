@@ -321,7 +321,7 @@ public abstract class AbstractGradleModuleBuilder extends AbstractExternalModule
     var vcs = GitSilentFileAdderProvider.create(project);
     vcs.markFileForAdding(GradleDaemonJvmPropertiesFile.getPropertyPath(rootProjectPath), false);
     GradleDaemonJvmHelper.updateProjectDaemonJvmCriteria(project, NioPathUtil.toCanonicalPath(rootProjectPath), daemonJvmCriteria)
-      .whenComplete((__, ___) -> vcs.finish())
+      .whenComplete((_, _) -> vcs.finish())
       .whenComplete((isSuccess, exception) -> {
         if (exception != null || !isSuccess) {
           LOG.warn("Unable to update to set up Daemon JVM criteria");

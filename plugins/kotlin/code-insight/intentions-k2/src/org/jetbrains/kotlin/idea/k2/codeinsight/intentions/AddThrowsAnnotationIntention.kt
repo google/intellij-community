@@ -169,8 +169,8 @@ internal class AddThrowsAnnotationIntention : KotlinApplicableModCommandAction<K
     }
 }
 
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class)
+context(_: KaSession)
 private fun KaType.asAnnotationArgumentText(): String {
     // Account for typealiases: we want to render `RuntimeException` instead of `java.lang.RuntimeException`
     val typeToRender = this.abbreviation ?: this

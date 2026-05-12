@@ -1474,7 +1474,7 @@ public class Tree extends JTree implements ComponentWithEmptyText, ComponentWith
       expandPaths(collectCachedExpandedPaths(parent));
     }
 
-    private @NotNull Iterable<TreePath> collectCachedExpandedPaths(@NotNull TreePath parent) {
+    private @NotNull Collection<TreePath> collectCachedExpandedPaths(@NotNull TreePath parent) {
       var model = getModel();
       if (model == null) return emptyList();
       return cachedTree.getExpandedDescendants(model, parent);
@@ -1641,6 +1641,7 @@ public class Tree extends JTree implements ComponentWithEmptyText, ComponentWith
         started = System.currentTimeMillis();
       }
       var pathList = toList(paths);
+      if (pathList.isEmpty()) return;
       if (pathList.size() == 1) {
         var path = pathList.get(0);
         if (isNotLeaf(path)) {
@@ -1717,6 +1718,7 @@ public class Tree extends JTree implements ComponentWithEmptyText, ComponentWith
         started = System.currentTimeMillis();
       }
       var pathList = toList(paths);
+      if (pathList.isEmpty()) return;
       if (pathList.size() == 1) {
         var path = pathList.get(0);
         if (isNotLeaf(path)) {
@@ -2019,6 +2021,7 @@ public class Tree extends JTree implements ComponentWithEmptyText, ComponentWith
         if (model == null || path == null) return;
         var parent = path.getLastPathComponent();
         var childCount = model.getChildCount(parent);
+        @Nullable ArrayList<TreePath> expandedPaths = null;
         for (int i : e.getChildIndices()) {
           if (i < 0 || i >= childCount) continue; // Sanity check. This actually happens with some models.
           var newChild = model.getChild(parent, i);
@@ -2031,14 +2034,20 @@ public class Tree extends JTree implements ComponentWithEmptyText, ComponentWith
               applyNewNodeExpandedState(model, childPath);
             });
           }
-          // This has to be done AFTER applying the model's state,
-          // as we should preserve the cached presentation's state to avoid
-          // expand/collapse flickering.
-          // So what happens is that we first apply the model's state (usually collapsed) to the tree
-          // and then reset it right back in case it was expanded in the cached state.
           if (cachedPresentation != null) {
-            cachedPresentation.updateExpandedNodes(childPath);
+            if (expandedPaths == null) {
+              expandedPaths = new ArrayList<>();
+            }
+            expandedPaths.addAll(cachedPresentation.collectCachedExpandedPaths(childPath));
           }
+        }
+        // This has to be done AFTER applying the model's state,
+        // as we should preserve the cached presentation's state to avoid
+        // expand/collapse flickering.
+        // So what happens is that we first apply the model's state (usually collapsed) to the tree
+        // and then reset it right back in case it was expanded in the cached state.
+        if (expandedPaths != null) {
+          expandPaths(expandedPaths);
         }
       }
 

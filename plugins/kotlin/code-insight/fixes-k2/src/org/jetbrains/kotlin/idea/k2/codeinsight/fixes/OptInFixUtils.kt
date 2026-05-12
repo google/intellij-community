@@ -38,8 +38,8 @@ internal object OptInFixUtils {
     fun findAnnotation(classId: ClassId): KaNamedClassSymbol? =
         findClass(classId) as? KaNamedClassSymbol
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     fun annotationIsVisible(annotation: KaNamedClassSymbol, from: KtElement): Boolean {
         val file = from.containingKtFile.symbol
         val visibilityChecker = createUseSiteVisibilityChecker(file, receiverExpression = null, from)

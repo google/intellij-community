@@ -30,7 +30,14 @@ fun JavaCodeInsightTestFixture.configureByK2ModeCodeFragment(filePath: String) {
     file.putCopyableUserData(KotlinK2CodeFragmentUtils.RUNTIME_TYPE_EVALUATOR_K2) { expression ->
         if (typeStr != null) {
             analyze(expression) {
-                val kaType = buildClassType(ClassId.topLevel(FqName(typeStr)))
+                // Accept either a single class FQN or an intersection like "A & B & C".
+                val conjuncts = typeStr.split(" & ").map { name ->
+                    typeCreator.classType(ClassId.topLevel(FqName(name)))
+                }
+                val kaType = when (conjuncts.size) {
+                    1 -> conjuncts.single()
+                    else -> typeCreator.intersectionType { conjuncts(conjuncts) }
+                }
                 kaType.createPointer()
             }
         } else {

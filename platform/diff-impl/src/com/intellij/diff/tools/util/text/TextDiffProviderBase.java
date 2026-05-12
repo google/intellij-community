@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diff.tools.util.text;
 
 import com.intellij.diff.tools.util.base.HighlightPolicy;
@@ -8,13 +8,15 @@ import com.intellij.diff.tools.util.base.TextDiffViewerUtil.HighlightPolicySetti
 import com.intellij.diff.tools.util.base.TextDiffViewerUtil.IgnorePolicySettingAction;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.actionSystem.Constraints;
 import com.intellij.openapi.actionSystem.Separator;
+import com.intellij.openapi.diff.DiffBundle;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 
 @ApiStatus.Internal
@@ -33,14 +35,18 @@ public class TextDiffProviderBase implements TextDiffProvider {
   }
 
   @Override
-  public @NotNull List<AnAction> getToolbarActions() {
-    return Arrays.asList(myIgnorePolicySettingAction, myHighlightPolicySettingAction);
-  }
+  public @NotNull List<AnAction> getDiffSettingsActions() {
+    List<AnAction> actions = new ArrayList<>();
+    var ignorePolicyGroup = myIgnorePolicySettingAction.getActions();
+    ignorePolicyGroup.add(Separator.create(DiffBundle.message("option.ignore.policy.group.name")), Constraints.FIRST);
+    actions.add(ignorePolicyGroup);
 
-  @Override
-  public @NotNull List<AnAction> getPopupActions() {
-    return Arrays.asList(Separator.getInstance(), myIgnorePolicySettingAction.getActions(), Separator.getInstance(),
-                         myHighlightPolicySettingAction.getActions(), Separator.getInstance());
+    actions.add(Separator.getInstance());
+
+    var highlightPolicyGroup = myHighlightPolicySettingAction.getActions();
+    highlightPolicyGroup.add(Separator.create(DiffBundle.message("option.highlighting.policy.group.name")), Constraints.FIRST);
+    actions.add(highlightPolicyGroup);
+    return actions;
   }
 
   public @NotNull IgnorePolicy getIgnorePolicy() {

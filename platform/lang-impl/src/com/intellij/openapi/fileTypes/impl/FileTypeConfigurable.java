@@ -116,12 +116,12 @@ public final class FileTypeConfigurable implements SearchableConfigurable, Confi
 
     myFileTypePanel.myUpperPanel.add(splitter, BorderLayout.CENTER);
 
-    myRecognizedFileType.myFileTypesList.addListSelectionListener(__ -> updateExtensionList());
+    myRecognizedFileType.myFileTypesList.addListSelectionListener(_ -> updateExtensionList());
     myFileTypePanel.myAssociatePanel.setVisible(OSAssociateFileTypesUtil.isAvailable());
     myFileTypePanel.myAssociatePanel.setBorder(JBUI.Borders.emptyTop(16));
     myFileTypePanel.myAssociateButton.setText(
       FileTypesBundle.message("filetype.associate.button", ApplicationNamesInfo.getInstance().getFullProductName()));
-    myFileTypePanel.myAssociateButton.addActionListener(__ -> OSAssociateFileTypesUtil.chooseAndAssociate(
+    myFileTypePanel.myAssociateButton.addActionListener(_ -> OSAssociateFileTypesUtil.chooseAndAssociate(
       new OSAssociateFileTypesUtil.Callback() {
         @Override
         public void beforeStart() {
@@ -496,9 +496,9 @@ public final class FileTypeConfigurable implements SearchableConfigurable, Confi
       ToolbarDecorator toolbarDecorator = ToolbarDecorator.createDecorator(myFileTypesList)
         .setScrollPaneBorder(JBUI.Borders.empty())
         .setPanelBorder(JBUI.Borders.customLine(JBColor.border(),1,1,0,1))
-        .setAddAction(__ -> addFileType())
-        .setRemoveAction(__ -> removeFileType())
-        .setEditAction(__ -> editFileType())
+        .setAddAction(_ -> addFileType())
+        .setRemoveAction(_ -> removeFileType())
+        .setEditAction(_ -> editFileType())
         .setEditActionUpdater(e -> selectedTypeCanBeModified())
         .setRemoveActionUpdater(e -> selectedTypeCanBeModified())
         .disableUpDownActions();
@@ -641,9 +641,9 @@ public final class FileTypeConfigurable implements SearchableConfigurable, Confi
       ToolbarDecorator decorator = ToolbarDecorator.createDecorator(myList)
         .setScrollPaneBorder(JBUI.Borders.empty())
         .setPanelBorder(JBUI.Borders.customLine(JBColor.border(),1,1,0,1))
-        .setAddAction(__ -> addPattern())
-        .setEditAction(__ -> editPattern())
-        .setRemoveAction(__ -> removePattern())
+        .setAddAction(_ -> addPattern())
+        .setEditAction(_ -> editPattern())
+        .setRemoveAction(_ -> removePattern())
         .disableUpDownActions();
       add(decorator.createPanel(), BorderLayout.NORTH);
       JScrollPane scrollPane = new JBScrollPane(myList);
@@ -705,10 +705,10 @@ public final class FileTypeConfigurable implements SearchableConfigurable, Confi
       ToolbarDecorator decorator = ToolbarDecorator.createDecorator(myList)
         .setScrollPaneBorder(JBUI.Borders.empty())
         .setPanelBorder(JBUI.Borders.customLine(JBColor.border(),1,1,0,1))
-        .setAddAction(__ -> editHashBang(null))
+        .setAddAction(_ -> editHashBang(null))
         .setAddActionName(LangBundle.message("action.HashBangPanel.add.hashbang.pattern.text"))
-        .setEditAction(__ -> editHashBang())
-        .setRemoveAction(__ -> removeHashBang())
+        .setEditAction(_ -> editHashBang())
+        .setRemoveAction(_ -> removeHashBang())
         .disableUpDownActions();
 
       add(decorator.createPanel(), BorderLayout.NORTH);

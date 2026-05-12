@@ -35,6 +35,7 @@ import com.intellij.execution.runToolbar.RunToolbarSlotManager
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.runners.ExecutionUtil
 import com.intellij.execution.runners.ProgramRunner
+import com.intellij.execution.ui.RunConfigurationStartHistory
 import com.intellij.ide.ActivityTracker
 import com.intellij.ide.plugins.DynamicPluginListener
 import com.intellij.ide.plugins.IdeaPluginDescriptor
@@ -46,6 +47,7 @@ import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.application.readAction
+import com.intellij.openapi.application.runReadActionBlocking
 import com.intellij.openapi.components.ComponentManagerEx
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
@@ -69,7 +71,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.impl.ProjectManagerImpl
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.UnknownFeature
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.UnknownFeaturesCollector
-import com.intellij.openapi.util.Computable
 import com.intellij.openapi.util.Condition
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.io.FileUtilRt
@@ -459,9 +460,9 @@ open class RunManagerImpl @NonInjectable constructor(val project: Project, priva
     removeConfigurations(deletedRunConfigs, deleteFileIfStoredInArbitraryFile = false)
 
     for (filePath in updatedFilePaths) {
-      val deletedAndAddedRunConfigs = ApplicationManager.getApplication().runReadAction( Computable {
+      val deletedAndAddedRunConfigs = runReadActionBlocking {
         lock.read { rcInArbitraryFileManager.loadChangedRunConfigsFromFile(this, filePath) }
-      })
+      }
 
       for (runConfig in deletedAndAddedRunConfigs.addedRunConfigs) {
         addConfiguration(runConfig)
@@ -598,17 +599,18 @@ open class RunManagerImpl @NonInjectable constructor(val project: Project, priva
   }
 
   fun checkRecentsLimit() {
+    val pinnedIds = RunConfigurationStartHistory.getInstance(project).pinned()
     var removed: MutableList<RunnerAndConfigurationSettings>? = null
     lock.write {
       trimUsageListToLimit()
 
-      var excess = idToSettings.values.count { it.isTemporary } - config.recentsLimit
+      var excess = idToSettings.values.count { it.isTemporary && !pinnedIds.contains(it.uniqueID) } - config.recentsLimit
       if (excess <= 0) {
         return
       }
 
       for (settings in idToSettings.values) {
-        if (settings.isTemporary && !recentlyUsedTemporaries.contains(settings)) {
+        if (settings.isTemporary && !recentlyUsedTemporaries.contains(settings) && !pinnedIds.contains(settings.uniqueID)) {
           if (removed == null) {
             removed = ArrayList()
           }

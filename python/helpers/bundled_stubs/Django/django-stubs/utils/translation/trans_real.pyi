@@ -4,9 +4,10 @@ from gettext import NullTranslations
 from re import Pattern
 
 # switch to tuple once https://github.com/python/mypy/issues/11098 is fixed
-from typing import Any, Literal, Protocol, TypeAlias, TypeVar, type_check_only
+from typing import Any, Literal, Protocol, TypeAlias, type_check_only
 
 from django.http.request import HttpRequest
+from typing_extensions import TypeVar, override
 
 CONTEXT_SEPARATOR: Literal["\x04"]
 LANGUAGE_CODE_MAX_LENGTH: int
@@ -45,6 +46,7 @@ class DjangoTranslation(gettext_module.GNUTranslations):
     def merge(self, other: NullTranslations) -> None: ...
     def language(self) -> str: ...
     def to_language(self) -> str: ...
+    @override
     def ngettext(self, msgid1: str, msgid2: str, n: int) -> str: ...
 
 def translation(language: str) -> DjangoTranslation: ...

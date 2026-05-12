@@ -1,6 +1,7 @@
 // Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.packaging.conda
 
+import com.intellij.openapi.util.NlsSafe
 import com.intellij.python.community.impl.conda.icons.PythonCommunityImplCondaIcons
 import com.jetbrains.python.PyBundle
 import com.jetbrains.python.packaging.common.PythonPackage
@@ -30,7 +31,7 @@ class CondaPackageDetails(
   override val name: String,
   override val availableVersions: List<String> = emptyList(),
   override val summary: String? = null,
-  override val description: String? = null,
+  override val description: @NlsSafe String? = null,
   override val descriptionContentType: String? = null,
   override val documentationUrl: String? = null,
 ) : PythonPackageDetails {

@@ -115,7 +115,7 @@ public class LombokCallHierarchyTest extends AbstractLombokLightCodeInsightTestC
     String plainDumpedNormalized = plainDumped.replaceAll(plainJavaClassName, lombokClassName);
     plainDumpedNormalized = plainDumpedNormalized.replaceAll(plainJavaCallerClassName, lombokCallerClassName);
 
-    final String equalsMethodCall = lombokClassName + ".equals(Object)";
+    final String equalsMethodCall = "equals(Object) (" + lombokClassName + ")";
     if(StringUtil.getOccurrenceCount(plainDumpedNormalized, equalsMethodCall) > 1) {
       plainDumpedNormalized = removeFirstLineWithSubstring(plainDumpedNormalized, equalsMethodCall);
     }

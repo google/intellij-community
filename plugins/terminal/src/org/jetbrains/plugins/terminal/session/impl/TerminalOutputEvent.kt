@@ -23,6 +23,8 @@ data class TerminalContentUpdatedEvent(
   val text: String,
   val styles: List<StyleRangeDto>,
   val startLineLogicalIndex: Long,
+  val cursorLogicalLineIndex: Long,
+  val cursorColumnIndex: Int,
   /** This value is used only on Backend. It is always null on the Frontend. */
   @Transient
   val readTime: TimeMark? = null,

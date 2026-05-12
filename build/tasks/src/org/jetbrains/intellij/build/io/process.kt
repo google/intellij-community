@@ -20,6 +20,7 @@ import java.nio.charset.MalformedInputException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Collections
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
@@ -138,7 +139,9 @@ suspend fun runJava(
         }
       }
       finally {
-        process?.waitFor()
+        if (process?.waitFor(timeout.inWholeSeconds, TimeUnit.SECONDS) == false) {
+          process.destroyForcibly()
+        }
         toDelete.forEach(FileUtilRt::deleteRecursively)
         logFreeDiskSpace(workingDir, "after $commandLine")
       }
@@ -300,7 +303,9 @@ suspend fun runProcess(
           }
         }
         finally {
-          process?.waitFor()
+          if (process?.waitFor(timeout.inWholeSeconds, TimeUnit.SECONDS) == false) {
+            process.destroyForcibly()
+          }
           logFreeDiskSpace(workingDir, "after $phase")
         }
     }

@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.java.ide.customization.training` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "training_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "training",
   module_name = "intellij.java.ide.customization.training",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":training_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//java/java-features-trainer:featuresTrainer",
     "//platform/util:util-ui",
@@ -26,6 +21,7 @@ jvm_library(
 
 jvm_library(
   name = "training_test_lib",
+  testonly = True,
   module_name = "intellij.java.ide.customization.training",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -39,3 +35,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.java.ide.customization.training` end
+
+### auto-generated section `iml intellij.java.ide.customization.training` start
+exports_files([
+  "intellij.java.ide.customization.training.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.java.ide.customization.training` end

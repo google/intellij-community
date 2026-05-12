@@ -1,8 +1,11 @@
 // "Create member function 'A.foo'" "true"
 // KEEP_ACTIONS_LIST_ORDER
-// K2_ACTIONS_LIST: Create extension function 'A<U>.foo'
 // K2_ACTIONS_LIST: Create member function 'A.foo'
+// K2_ACTIONS_LIST: Create parameter 'foo'
+// K2_ACTIONS_LIST: Rename reference
 // K2_ACTIONS_LIST: Create annotation 'foo'
+// K2_ACTIONS_LIST: Create extension function 'A<U>.foo'
+// K2_ERROR: Unresolved reference 'foo' on receiver of type 'A<U (of fun <U> A<U>.test)>'.
 
 // FUS_QUICKFIX_NAME: org.jetbrains.kotlin.idea.quickfix.createFromUsage.createCallable.CreateCallableFromUsageFix
 // FUS_K2_QUICKFIX_NAME: org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage.CreateKotlinCallableAction

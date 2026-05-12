@@ -1,7 +1,5 @@
 // PROBLEM: none
-// K2_ERROR: 'infix' modifier is required on 'fun hashCode(): Int'.
-// K2_ERROR: Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'E (of fun <E> E.foo)'.
-// K2_ERROR: Too many arguments for 'fun hashCode(): Int'.
+// K2_ERROR: None of the following candidates is applicable:<br><br>fun hashCode(): Int:<br>  Too many arguments for 'fun hashCode(): Int'.<br>  Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'E (of fun <E> E.foo)'.<br>  'infix' modifier is required on 'fun hashCode(): Int'.<br><br>fun Any?.hashCode(): Int:<br>  Too many arguments for 'fun Any?.hashCode(): Int'.<br>  'infix' modifier is required on 'fun Any?.hashCode(): Int'.
 package my.simple.name
 
 fun <T, E, D> foo(a: T, b: E, c: D) = a!!.hashCode() + b!!.hashCode() + c!!.hashCode()

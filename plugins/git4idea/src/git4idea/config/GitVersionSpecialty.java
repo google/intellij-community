@@ -345,6 +345,18 @@ public enum GitVersionSpecialty {
     public boolean existsIn(@NotNull GitVersion version) {
       return version.isLaterOrEqual(new GitVersion(2, 40, 0, 0));
     }
+  },
+
+  /**
+   * Options "--pathspec-from-file=" and "--pathspec-file-nul" for git commands that take paths
+   *
+   * @see git4idea.util.GitFileUtils#PATHSPEC_FROM_FILE_SUPPORTED_COMMANDS
+   */
+  PATHSPEC_FROM_FILE_SUPPORTED {
+    @Override
+    public boolean existsIn(@NotNull GitVersion version) {
+      return version.isLaterOrEqual(new GitVersion(2, 26, 0, 0));
+    }
   };
 
   public abstract boolean existsIn(@NotNull GitVersion version);

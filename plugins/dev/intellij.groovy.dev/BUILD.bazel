@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.groovy.dev` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "groovy-dev_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "groovy-dev",
   module_name = "intellij.groovy.dev",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":groovy-dev_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//plugins/dev/intellij.dev.codeInsight:codeInsight",
     "//platform/util",
@@ -20,11 +15,14 @@ jvm_library(
     "//platform/analysis-api:analysis",
     "//platform/analysis-impl",
     "//plugins/groovy/groovy-psi:psi",
-  ]
+    "//libraries/fastutil",
+  ],
+  runtime_deps = ["//plugins/groovy"]
 )
 
 jvm_library(
   name = "groovy-dev_test_lib",
+  testonly = True,
   module_name = "intellij.groovy.dev",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -36,6 +34,14 @@ jvm_library(
     "//platform/analysis-api:analysis_test_lib",
     "//platform/analysis-impl:analysis-impl_test_lib",
     "//plugins/groovy/groovy-psi:psi_test_lib",
+    "//plugins/groovy:groovy_test_lib",
+    "//libraries/fastutil:fastutil_test_lib",
   ]
 )
 ### auto-generated section `build intellij.groovy.dev` end
+
+### auto-generated section `iml intellij.groovy.dev` start
+exports_files([
+  "intellij.groovy.dev.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.groovy.dev` end

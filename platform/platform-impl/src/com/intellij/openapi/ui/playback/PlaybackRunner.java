@@ -272,7 +272,7 @@ public class PlaybackRunner {
       if (error != null) {
         commandStartStopProcessor.endOfCommand(error.getMessage());
         callback.message(null, "Stopped: " + error, StatusCallback.Type.message);
-        LOG.warn("Callback step stopped with error: " + error, error);
+        LOG.warn("Callback step stopped with error: " + error, Logger.shouldRethrow(error) ? error.getCause() : error);
         actionCallback.completeExceptionally(error);
         return;
       }

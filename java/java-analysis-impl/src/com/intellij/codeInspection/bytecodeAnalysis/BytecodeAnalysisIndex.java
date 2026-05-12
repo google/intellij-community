@@ -6,6 +6,7 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.io.DataInputOutputUtilRt;
+import com.intellij.openapi.vfs.DiskQueryRelay;
 import com.intellij.util.SystemProperties;
 import com.intellij.util.indexing.DataIndexer;
 import com.intellij.util.indexing.DefaultFileTypeSpecificInputFilter;
@@ -164,8 +165,9 @@ public final class BytecodeAnalysisIndex extends ScalarIndexExtension<HMember> {
 
     @Override
     public Map<HMember, Equations> read(@NotNull DataInput in) throws IOException {
-      return StreamEx.of(DataInputOutputUtilRt.readSeq(in, () -> Pair.create(HKeyDescriptor.INSTANCE.read(in), readEquations(in)))).
-        toMap(p -> p.getFirst(), p -> p.getSecond(), ClassDataIndexer.MERGER);
+      return DiskQueryRelay.compute(() -> StreamEx.of(
+          DataInputOutputUtilRt.readSeq(in, () -> Pair.create(HKeyDescriptor.INSTANCE.read(in), readEquations(in))))
+        .toMap(p -> p.getFirst(), p -> p.getSecond(), ClassDataIndexer.MERGER));
     }
 
     private static void saveEquations(@NotNull DataOutput out, Equations eqs) throws IOException {

@@ -5,11 +5,14 @@ import com.intellij.codeInsight.daemon.impl.analysis.JavaHighlightUtil
 import com.intellij.codeInsight.daemon.impl.quickfix.RenameElementFix
 import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.codeInsight.intention.QuickFixFactory
+import com.intellij.codeInspection.InspectionManager
+import com.intellij.codeInspection.ProblemHighlightType
 import com.intellij.codeInspection.deadCode.UnusedDeclarationInspectionBase
 import com.intellij.codeInspection.ex.EntryPointsManager
 import com.intellij.codeInspection.ex.EntryPointsManagerBase
+import com.intellij.codeInspection.ex.QuickFixWrapper
 import com.intellij.find.FindManager
-import com.intellij.find.impl.FindManagerImpl
+import com.intellij.find.impl.FindManagerBase
 import com.intellij.injected.editor.VirtualFileWindow
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiClass
@@ -85,6 +88,7 @@ import org.jetbrains.kotlin.idea.codeinsight.utils.isReferenceToBuiltInEnumFunct
 import org.jetbrains.kotlin.idea.codeinsight.utils.isSynthesizedFunction
 import org.jetbrains.kotlin.idea.codeinsights.impl.base.isCheapEnoughToSearchUsages
 import org.jetbrains.kotlin.idea.codeinsights.impl.base.isExplicitlyIgnoredByName
+import org.jetbrains.kotlin.idea.codeinsights.impl.base.quickFix.RemoveUnusedVariableFix
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.idea.search.ideaExtensions.KotlinReferencesSearchParameters
 import org.jetbrains.kotlin.idea.searching.inheritors.findAllInheritors
@@ -103,6 +107,8 @@ import org.jetbrains.kotlin.psi.KtCallableReferenceExpression
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtConstructor
+import org.jetbrains.kotlin.psi.KtContainerNode
+import org.jetbrains.kotlin.psi.KtContainerNodeForControlStructureBody
 import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtEnumEntry
@@ -110,6 +116,7 @@ import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtFunction
 import org.jetbrains.kotlin.psi.KtFunctionLiteral
 import org.jetbrains.kotlin.psi.KtImportDirective
+import org.jetbrains.kotlin.psi.KtLambdaExpression
 import org.jetbrains.kotlin.psi.KtModifierListOwner
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
@@ -131,6 +138,7 @@ import org.jetbrains.kotlin.psi.KtTypeParameterListOwner
 import org.jetbrains.kotlin.psi.KtTypeReference
 import org.jetbrains.kotlin.psi.KtUserType
 import org.jetbrains.kotlin.psi.KtValueArgumentName
+import org.jetbrains.kotlin.psi.KtWhenEntry
 import org.jetbrains.kotlin.psi.psiUtil.anyDescendantOfType
 import org.jetbrains.kotlin.psi.psiUtil.containingClass
 import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
@@ -256,8 +264,8 @@ object K2UnusedSymbolUtil {
         return declaration is KtParameter && !(declaration.parent.parent is KtPrimaryConstructor && declaration.hasValOrVar())
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     fun getPsiToReportProblem(declaration: KtNamedDeclaration, isJavaEntryPointInspection: UnusedDeclarationInspectionBase): PsiElement? {
         val symbol = declaration.symbol
         if (declaration.languageVersionSettings.getFlag(
@@ -523,7 +531,7 @@ object K2UnusedSymbolUtil {
             }
         }
 
-        val handler = (FindManager.getInstance(project) as FindManagerImpl).findUsagesManager.getFindUsagesHandler(declaration, true)
+        val handler = (FindManager.getInstance(project) as FindManagerBase).findUsagesManager.getFindUsagesHandler(declaration, true)
         if (handler != null) {
             val options = handler.findUsagesOptions
             // effectively disable search for text occurrences for classes which are processed earlier but faster
@@ -842,7 +850,23 @@ object K2UnusedSymbolUtil {
                 return emptyList()
             }
             if (ownerFunction is KtFunctionLiteral) {
-                return listOf(RenameElementFix(declaration, "_"))
+
+                val lambda = ownerFunction.parent as? KtLambdaExpression
+                val lambdaParent = lambda?.parent
+
+                val action = if (ownerFunction.valueParameters.size != 1 ||
+                    (lambdaParent as? KtQualifiedExpression)?.receiverExpression == lambda ||
+                    lambdaParent is KtWhenEntry || lambdaParent is KtContainerNodeForControlStructureBody ||
+                    lambdaParent is KtProperty && lambdaParent.typeReference == null
+                ) {
+                    RenameElementFix(declaration, "_")
+                } else {
+                    val fix = RemoveUnusedVariableFix(declaration, true, false)
+                    val descriptor = InspectionManager.getInstance(ownerFunction.project)
+                        .createProblemDescriptor(declaration, "", fix, ProblemHighlightType.GENERIC_ERROR_OR_WARNING, true)
+                    QuickFixWrapper.wrap(descriptor, fix)
+                }
+                return listOf(action)
             }
         }
 

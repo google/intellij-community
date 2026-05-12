@@ -5,10 +5,10 @@ import com.intellij.openapi.externalSystem.autoimport.AutoImportProjectNotificat
 import com.intellij.openapi.externalSystem.autolink.UnlinkedProjectStartupActivity
 import com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
 import com.intellij.openapi.externalSystem.util.ExternalSystemUtil
-import com.intellij.openapi.externalSystem.util.awaitOpenProjectActivity
-import com.intellij.openapi.externalSystem.util.awaitProjectActivity
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.io.toCanonicalPath
+import com.intellij.platform.externalSystem.testFramework.ExternalSystemTestObservation.awaitOpenProjectActivity
+import com.intellij.platform.externalSystem.testFramework.ExternalSystemTestObservation.awaitProjectActivity
 import com.intellij.testFramework.closeOpenedProjectsIfFailAsync
 import com.intellij.testFramework.openProjectAsync
 import org.jetbrains.plugins.gradle.service.project.open.linkAndSyncGradleProject

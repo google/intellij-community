@@ -270,6 +270,11 @@ public abstract class K2SmartCompletionTestGenerated extends AbstractK2SmartComp
             runTest("../../completion/testData/smart/constructor/InnerClass.kt");
         }
 
+        @TestMetadata("InternalConstructorForOpenSameModule.kt")
+        public void testInternalConstructorForOpenSameModule() throws Exception {
+            runTest("../../completion/testData/smart/constructor/InternalConstructorForOpenSameModule.kt");
+        }
+
         @TestMetadata("JavaClass.kt")
         public void testJavaClass() throws Exception {
             runTest("../../completion/testData/smart/constructor/JavaClass.kt");
@@ -295,9 +300,19 @@ public abstract class K2SmartCompletionTestGenerated extends AbstractK2SmartComp
             runTest("../../completion/testData/smart/constructor/PrivateConstructorForAbstract.kt");
         }
 
+        @TestMetadata("PrivateConstructorForOpen.kt")
+        public void testPrivateConstructorForOpen() throws Exception {
+            runTest("../../completion/testData/smart/constructor/PrivateConstructorForOpen.kt");
+        }
+
         @TestMetadata("ProtectedConstructorForAbstract.kt")
         public void testProtectedConstructorForAbstract() throws Exception {
             runTest("../../completion/testData/smart/constructor/ProtectedConstructorForAbstract.kt");
+        }
+
+        @TestMetadata("ProtectedConstructorForOpen.kt")
+        public void testProtectedConstructorForOpen() throws Exception {
+            runTest("../../completion/testData/smart/constructor/ProtectedConstructorForOpen.kt");
         }
 
         @TestMetadata("Simple.kt")
@@ -790,60 +805,93 @@ public abstract class K2SmartCompletionTestGenerated extends AbstractK2SmartComp
 
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../completion/testData/smart/inheritors")
-    public static class Inheritors extends AbstractK2SmartCompletionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
+    public abstract static class Inheritors extends AbstractK2SmartCompletionTest {
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../../completion/testData/smart/inheritors/throwable")
+        public static class Throwable extends AbstractK2SmartCompletionTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("JavaStdlib.kt")
+            public void testJavaStdlib() throws Exception {
+                runTest("../../completion/testData/smart/inheritors/throwable/JavaStdlib.kt");
+            }
+
+            @TestMetadata("KotlinAndJava.kt")
+            public void testKotlinAndJava() throws Exception {
+                runTest("../../completion/testData/smart/inheritors/throwable/KotlinAndJava.kt");
+            }
+
+            @TestMetadata("KotlinOnly.kt")
+            public void testKotlinOnly() throws Exception {
+                runTest("../../completion/testData/smart/inheritors/throwable/KotlinOnly.kt");
+            }
         }
 
-        private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
-        }
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../../completion/testData/smart/inheritors")
+        public static class Uncategorized extends AbstractK2SmartCompletionTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
 
-        @TestMetadata("1.kt")
-        public void test1() throws Exception {
-            runTest("../../completion/testData/smart/inheritors/1.kt");
-        }
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
 
-        @TestMetadata("2.kt")
-        public void test2() throws Exception {
-            runTest("../../completion/testData/smart/inheritors/2.kt");
-        }
+            @TestMetadata("1.kt")
+            public void test1() throws Exception {
+                runTest("../../completion/testData/smart/inheritors/1.kt");
+            }
 
-        @TestMetadata("3.kt")
-        public void test3() throws Exception {
-            runTest("../../completion/testData/smart/inheritors/3.kt");
-        }
+            @TestMetadata("2.kt")
+            public void test2() throws Exception {
+                runTest("../../completion/testData/smart/inheritors/2.kt");
+            }
 
-        @TestMetadata("GenericClass1.kt")
-        public void testGenericClass1() throws Exception {
-            runTest("../../completion/testData/smart/inheritors/GenericClass1.kt");
-        }
+            @TestMetadata("3.kt")
+            public void test3() throws Exception {
+                runTest("../../completion/testData/smart/inheritors/3.kt");
+            }
 
-        @TestMetadata("GenericClass2.kt")
-        public void testGenericClass2() throws Exception {
-            runTest("../../completion/testData/smart/inheritors/GenericClass2.kt");
-        }
+            @TestMetadata("GenericClass1.kt")
+            public void testGenericClass1() throws Exception {
+                runTest("../../completion/testData/smart/inheritors/GenericClass1.kt");
+            }
 
-        @TestMetadata("GenericClass3.kt")
-        public void testGenericClass3() throws Exception {
-            runTest("../../completion/testData/smart/inheritors/GenericClass3.kt");
-        }
+            @TestMetadata("GenericClass2.kt")
+            public void testGenericClass2() throws Exception {
+                runTest("../../completion/testData/smart/inheritors/GenericClass2.kt");
+            }
 
-        @TestMetadata("GenericClass4.kt")
-        public void testGenericClass4() throws Exception {
-            runTest("../../completion/testData/smart/inheritors/GenericClass4.kt");
-        }
+            @TestMetadata("GenericClass3.kt")
+            public void testGenericClass3() throws Exception {
+                runTest("../../completion/testData/smart/inheritors/GenericClass3.kt");
+            }
 
-        @TestMetadata("GenericClass5.kt")
-        public void testGenericClass5() throws Exception {
-            runTest("../../completion/testData/smart/inheritors/GenericClass5.kt");
-        }
+            @TestMetadata("GenericClass4.kt")
+            public void testGenericClass4() throws Exception {
+                runTest("../../completion/testData/smart/inheritors/GenericClass4.kt");
+            }
 
-        @TestMetadata("GenericClass6.kt")
-        public void testGenericClass6() throws Exception {
-            runTest("../../completion/testData/smart/inheritors/GenericClass6.kt");
+            @TestMetadata("GenericClass5.kt")
+            public void testGenericClass5() throws Exception {
+                runTest("../../completion/testData/smart/inheritors/GenericClass5.kt");
+            }
+
+            @TestMetadata("GenericClass6.kt")
+            public void testGenericClass6() throws Exception {
+                runTest("../../completion/testData/smart/inheritors/GenericClass6.kt");
+            }
         }
     }
 
@@ -982,6 +1030,16 @@ public abstract class K2SmartCompletionTestGenerated extends AbstractK2SmartComp
         @TestMetadata("notFirstArgumentBrackets.kt")
         public void testNotFirstArgumentBrackets() throws Exception {
             runTest("../../completion/testData/smart/multipleArgsItem/notFirstArgumentBrackets.kt");
+        }
+
+        @TestMetadata("notForExistingNamedArguments.kt")
+        public void testNotForExistingNamedArguments() throws Exception {
+            runTest("../../completion/testData/smart/multipleArgsItem/notForExistingNamedArguments.kt");
+        }
+
+        @TestMetadata("notForExistingNamedArguments2.kt")
+        public void testNotForExistingNamedArguments2() throws Exception {
+            runTest("../../completion/testData/smart/multipleArgsItem/notForExistingNamedArguments2.kt");
         }
 
         @TestMetadata("shadowing.kt")
@@ -1126,6 +1184,80 @@ public abstract class K2SmartCompletionTestGenerated extends AbstractK2SmartComp
         @TestMetadata("VarInGenericClass.kt")
         public void testVarInGenericClass() throws Exception {
             runTest("../../completion/testData/smart/propertyDelegate/VarInGenericClass.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../completion/testData/smart/SAM")
+    public static class SAM extends AbstractK2SmartCompletionTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("GenericKotlinFunInterface.kt")
+        public void testGenericKotlinFunInterface() throws Exception {
+            runTest("../../completion/testData/smart/SAM/GenericKotlinFunInterface.kt");
+        }
+
+        @TestMetadata("JavaConsumer.kt")
+        public void testJavaConsumer() throws Exception {
+            runTest("../../completion/testData/smart/SAM/JavaConsumer.kt");
+        }
+
+        @TestMetadata("KotlinFunInterface.kt")
+        public void testKotlinFunInterface() throws Exception {
+            runTest("../../completion/testData/smart/SAM/KotlinFunInterface.kt");
+        }
+
+        @TestMetadata("KotlinFunInterfaceMultiParam.kt")
+        public void testKotlinFunInterfaceMultiParam() throws Exception {
+            runTest("../../completion/testData/smart/SAM/KotlinFunInterfaceMultiParam.kt");
+        }
+
+        @TestMetadata("KotlinFunInterfaceWithDefaultMethod.kt")
+        public void testKotlinFunInterfaceWithDefaultMethod() throws Exception {
+            runTest("../../completion/testData/smart/SAM/KotlinFunInterfaceWithDefaultMethod.kt");
+        }
+
+        @TestMetadata("KotlinFunInterfaceWithParam.kt")
+        public void testKotlinFunInterfaceWithParam() throws Exception {
+            runTest("../../completion/testData/smart/SAM/KotlinFunInterfaceWithParam.kt");
+        }
+
+        @TestMetadata("SAMConstructorForTypeAlias.kt")
+        public void testSAMConstructorForTypeAlias() throws Exception {
+            runTest("../../completion/testData/smart/SAM/SAMConstructorForTypeAlias.kt");
+        }
+
+        @TestMetadata("SAMExpected1.kt")
+        public void testSAMExpected1() throws Exception {
+            runTest("../../completion/testData/smart/SAM/SAMExpected1.kt");
+        }
+
+        @TestMetadata("SAMExpected2.kt")
+        public void testSAMExpected2() throws Exception {
+            runTest("../../completion/testData/smart/SAM/SAMExpected2.kt");
+        }
+
+        @TestMetadata("SamAsArgument.kt")
+        public void testSamAsArgument() throws Exception {
+            runTest("../../completion/testData/smart/SAM/SamAsArgument.kt");
+        }
+
+        @TestMetadata("SamInReturnStatement.kt")
+        public void testSamInReturnStatement() throws Exception {
+            runTest("../../completion/testData/smart/SAM/SamInReturnStatement.kt");
+        }
+
+        @TestMetadata("SamInheritor.kt")
+        public void testSamInheritor() throws Exception {
+            runTest("../../completion/testData/smart/SAM/SamInheritor.kt");
         }
     }
 
@@ -1375,6 +1507,11 @@ public abstract class K2SmartCompletionTestGenerated extends AbstractK2SmartComp
             runTest("../../completion/testData/smart/GroupBySubstitutor.kt");
         }
 
+        @TestMetadata("HideInternalObject.kt")
+        public void testHideInternalObject() throws Exception {
+            runTest("../../completion/testData/smart/HideInternalObject.kt");
+        }
+
         @TestMetadata("HighOrderFunction.kt")
         public void testHighOrderFunction() throws Exception {
             runTest("../../completion/testData/smart/HighOrderFunction.kt");
@@ -1620,6 +1757,21 @@ public abstract class K2SmartCompletionTestGenerated extends AbstractK2SmartComp
             runTest("../../completion/testData/smart/ParameterWithDefaultValue.kt");
         }
 
+        @TestMetadata("PreferInstantiationOverAnonymousObject.kt")
+        public void testPreferInstantiationOverAnonymousObject() throws Exception {
+            runTest("../../completion/testData/smart/PreferInstantiationOverAnonymousObject.kt");
+        }
+
+        @TestMetadata("PreferNonDeprecated.kt")
+        public void testPreferNonDeprecated() throws Exception {
+            runTest("../../completion/testData/smart/PreferNonDeprecated.kt");
+        }
+
+        @TestMetadata("PreferNonDeprecatedObjects.kt")
+        public void testPreferNonDeprecatedObjects() throws Exception {
+            runTest("../../completion/testData/smart/PreferNonDeprecatedObjects.kt");
+        }
+
         @TestMetadata("PreviousArgError.kt")
         public void testPreviousArgError() throws Exception {
             runTest("../../completion/testData/smart/PreviousArgError.kt");
@@ -1638,21 +1790,6 @@ public abstract class K2SmartCompletionTestGenerated extends AbstractK2SmartComp
         @TestMetadata("QualifiedOverloadedMethodCallArgument2.kt")
         public void testQualifiedOverloadedMethodCallArgument2() throws Exception {
             runTest("../../completion/testData/smart/QualifiedOverloadedMethodCallArgument2.kt");
-        }
-
-        @TestMetadata("SAMConstructorForTypeAlias.kt")
-        public void testSAMConstructorForTypeAlias() throws Exception {
-            runTest("../../completion/testData/smart/SAMConstructorForTypeAlias.kt");
-        }
-
-        @TestMetadata("SAMExpected1.kt")
-        public void testSAMExpected1() throws Exception {
-            runTest("../../completion/testData/smart/SAMExpected1.kt");
-        }
-
-        @TestMetadata("SAMExpected2.kt")
-        public void testSAMExpected2() throws Exception {
-            runTest("../../completion/testData/smart/SAMExpected2.kt");
         }
 
         @TestMetadata("SealedMembers.kt")

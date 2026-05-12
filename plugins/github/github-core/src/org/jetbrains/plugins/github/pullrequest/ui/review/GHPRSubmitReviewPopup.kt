@@ -16,8 +16,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import org.jetbrains.plugins.github.api.data.GHPullRequestReviewEvent
+import org.jetbrains.plugins.github.exceptions.GHAPIExceptionUtil
 import org.jetbrains.plugins.github.i18n.GithubBundle
-import org.jetbrains.plugins.github.ui.component.GHHtmlErrorPanel
 import java.awt.event.ActionListener
 import javax.swing.JButton
 import javax.swing.JComponent
@@ -92,9 +92,9 @@ internal object GHPRSubmitReviewPopup : CodeReviewSubmitPopupHandler<GHPRSubmitR
   }
 
   override val errorPresenter: ErrorStatusPresenter<Throwable> by lazy {
-    ErrorStatusPresenter.simple(
+    ErrorStatusPresenter.simpleHTML(
       CollaborationToolsBundle.message("review.submit.failed"),
-      descriptionProvider = GHHtmlErrorPanel::getLoadingErrorText
+      descriptionProvider = GHAPIExceptionUtil::getPresentableMessage
     )
   }
 }

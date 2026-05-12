@@ -3,11 +3,11 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tests",
+  module_name = "kotlin.copyright.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlinc-kotlin-compiler-tests",
     "@lib//:junit4",
     "//plugins/kotlin/copyright",
     "//plugins/kotlin/tests-common:common-tests",
@@ -20,6 +20,7 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "kotlin.copyright.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -37,8 +38,8 @@ jvm_library(
     "//plugins/kotlin/copyright:copyright_test_lib",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//java/testFramework",
     "//java/testFramework:testFramework_test_lib",
     "//plugins/kotlin/tests-common:common-tests",
@@ -55,6 +56,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build kotlin.copyright.tests` end
+
+### auto-generated section `iml kotlin.copyright.tests` start
+exports_files([
+  "kotlin.copyright.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.copyright.tests` end
 
 ### auto-generated section `test kotlin.copyright.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

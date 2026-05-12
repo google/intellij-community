@@ -1,12 +1,29 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.terminal.session.impl
 
+import com.intellij.platform.eel.EelDescriptor
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.Flow
 import org.jetbrains.annotations.ApiStatus
 
 @ApiStatus.Internal
 interface TerminalSession {
+  /**
+   * Scope in which all session-related activities are executed.
+   * The lifecycle of the session is bound to it.
+   * If it cancels, then the shell process will be terminated.
+   * And if the process is terminated on its own, then the scope will be canceled as well.
+   */
+  val coroutineScope: CoroutineScope
+
+  /**
+   * Environment where the terminal process is running.
+   */
+  val eelDescriptor: EelDescriptor
+
+  val processId: Long
+
   /**
    * Use this channel to send the input events to the Terminal session.
    *
@@ -20,6 +37,8 @@ interface TerminalSession {
    * Use this flow to handle the output events of the Terminal session.
    *
    * Underlying logic should continue reading the PTYs output stream only if there is some collector of this flow.
+   * If the flow collector is too slow (can't handle event in 3 seconds), the flow can be terminated, and
+   * you need to request a new flow and receive a state snapshot.
    */
   suspend fun getOutputFlow(): Flow<List<TerminalOutputEvent>>
 

@@ -534,10 +534,10 @@ class AppUIExecutorTest : LightPlatformTestCase() {
   fun `test use write-safe context if called from write-unsafe context`() {
     GlobalScope.async(SwingDispatcher) {
       launch(AppUIExecutor.onWriteThread().coroutineDispatchingContext()) {
-        (TransactionGuard.getInstance() as TransactionGuardImpl).assertWriteActionAllowed()
+        (TransactionGuard.getInstance() as TransactionGuardImpl).assertWriteSafeEnvironment()
       }
       launch(AppUIExecutor.onUiThread().coroutineDispatchingContext()) {
-        (TransactionGuard.getInstance() as TransactionGuardImpl).assertWriteActionAllowed()
+        (TransactionGuard.getInstance() as TransactionGuardImpl).assertWriteSafeEnvironment()
       }
       launch(AppUIExecutor.onUiThread(ModalityState.any()).coroutineDispatchingContext()) {
         assertFalse("Passing write-unsafe modality should not lead to write-safety checks",

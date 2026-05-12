@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.jsp.spi` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "jsp-spi_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "jsp-spi",
   module_name = "intellij.jsp.spi",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":jsp-spi_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//java/jsp-openapi:jsp",
     "//java/openapi:java",
@@ -22,6 +17,8 @@ jvm_library(
     "//platform/projectModel-api:projectModel",
     "//xml/xml-psi-api:psi",
     "//java/jsp-base-openapi:jsp-base",
+    "//platform/ide-core",
+    "//java/java-psi-api:psi",
   ],
   exports = [
     "//java/jsp-openapi:jsp",
@@ -32,6 +29,7 @@ jvm_library(
 
 jvm_library(
   name = "jsp-spi_test_lib",
+  testonly = True,
   module_name = "intellij.jsp.spi",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -52,6 +50,14 @@ jvm_library(
     "//xml/xml-psi-api:psi_test_lib",
     "//java/jsp-base-openapi:jsp-base_test_lib",
     "//platform/backend:backend_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
+    "//java/java-psi-api:psi_test_lib",
   ]
 )
 ### auto-generated section `build intellij.jsp.spi` end
+
+### auto-generated section `iml intellij.jsp.spi` start
+exports_files([
+  "intellij.jsp.spi.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.jsp.spi` end

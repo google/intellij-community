@@ -8,6 +8,7 @@ import com.intellij.psi.PsiClassType;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.PsiModifier;
+import com.intellij.psi.PsiParameter;
 import com.intellij.psi.PsiType;
 import com.intellij.psi.PsiTypes;
 import com.intellij.psi.util.InheritanceUtil;
@@ -25,7 +26,11 @@ final class DevKitImplicitUsageProvider implements ImplicitUsageProvider {
     }
 
     if (element instanceof PsiMethod psiMethod) {
-      return isDomElementMethod(psiMethod);
+      return isDomElementMethod(psiMethod) || isMcpToolMethod(psiMethod);
+    }
+
+    if (element instanceof PsiParameter psiParameter) {
+      return isMcpDescriptionParameter(psiParameter);
     }
 
     return false;
@@ -100,6 +105,23 @@ final class DevKitImplicitUsageProvider implements ImplicitUsageProvider {
 
     final PsiType psiType = Objects.requireNonNull(method.getParameterList().getParameter(0)).getType();
     return isDomElementInheritor(psiType);
+  }
+
+  private static boolean isMcpToolMethod(PsiMethod psiMethod) {
+    if (!psiMethod.hasAnnotation("com.intellij.mcpserver.annotations.McpTool")) {
+      return false;
+    }
+
+    PsiClass containingClass = psiMethod.getContainingClass();
+    if (containingClass == null) {
+      return false;
+    }
+
+    return InheritanceUtil.isInheritor(containingClass, "com.intellij.mcpserver.McpToolset");
+  }
+
+  private static boolean isMcpDescriptionParameter(PsiParameter psiParameter) {
+    return psiParameter.hasAnnotation("com.intellij.mcpserver.annotations.McpDescription");
   }
 
   private static boolean isDomElementInheritor(@Nullable PsiType psiType) {

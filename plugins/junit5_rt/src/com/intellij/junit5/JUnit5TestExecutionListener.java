@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.junit5;
 
 import com.intellij.junit5.report.ExecutionState;
@@ -23,8 +23,11 @@ public class JUnit5TestExecutionListener implements TestExecutionListener {
     this(System.out);
   }
 
+  public static final String SUITE_DURATION = "test.use.suite.duration";
+
   public JUnit5TestExecutionListener(PrintStream printStream) {
-    myState = new ExecutionState(printStream);
+    boolean useSuiteDuration = Boolean.parseBoolean(System.getProperty(SUITE_DURATION, "true"));
+    myState = new ExecutionState(printStream, useSuiteDuration);
     myState.print("##teamcity[enteredTheMatrix]");
   }
 

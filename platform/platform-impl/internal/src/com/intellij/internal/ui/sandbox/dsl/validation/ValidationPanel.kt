@@ -2,6 +2,7 @@
 package com.intellij.internal.ui.sandbox.dsl.validation
 
 import com.intellij.internal.ui.sandbox.UISandboxPanel
+import com.intellij.internal.ui.sandbox.intList
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.ui.dsl.builder.panel
@@ -35,7 +36,7 @@ internal class ValidationPanel : UISandboxPanel {
       }
 
       row("Segmented Button:") {
-        val segmentedButton = segmentedButton((1..4).toList()) { text = "Item $it" }
+        val segmentedButton = segmentedButton(intList(4)) { text = "Item $it" }
           .validation {
             enabledIf(cbValidationEnabled.selected)
             addApplyRule("Cannot be empty") { it.selectedItem == null }

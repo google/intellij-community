@@ -1,3 +1,5 @@
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.workspaceModel.test.api.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
@@ -13,11 +15,10 @@ import com.intellij.platform.workspace.storage.impl.EntityLink
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
-import com.intellij.platform.workspace.storage.impl.extractOneToOneChild
-import com.intellij.platform.workspace.storage.impl.updateOneToOneChildOfParent
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.workspaceModel.test.api.ChildEntityType1
 import com.intellij.workspaceModel.test.api.ChildEntityType1Builder
@@ -44,9 +45,9 @@ readField("name")
 return dataSource.name
 }
 override val propertyChild: ChildEntityType1?
-get() = snapshot.extractOneToOneChild(PROPERTYCHILD_CONNECTION_ID, this)           
+get() = snapshot.instrumentation.getOneChild(PROPERTYCHILD_CONNECTION_ID, this) as? ChildEntityType1           
 override val typeChild: ChildEntityType2?
-get() = snapshot.extractOneToOneChild(TYPECHILD_CONNECTION_ID, this)
+get() = snapshot.instrumentation.getOneChild(TYPECHILD_CONNECTION_ID, this) as? ChildEntityType2
 
 override val entitySource: EntitySource
 get() {
@@ -123,10 +124,9 @@ override var propertyChild: ChildEntityType1Builder?
 get(){
 val _diff = diff
 return if (_diff != null) {
-@OptIn(EntityStorageInstrumentationApi::class)
 ((_diff as MutableEntityStorageInstrumentation).getOneChildBuilder(PROPERTYCHILD_CONNECTION_ID, this) as? ChildEntityType1Builder) ?: (this.entityLinks[EntityLink(true, PROPERTYCHILD_CONNECTION_ID)] as? ChildEntityType1Builder)
 } else {
-this.entityLinks[EntityLink(true, PROPERTYCHILD_CONNECTION_ID)] as? ChildEntityType1Builder
+(this.entityLinks[EntityLink(true, PROPERTYCHILD_CONNECTION_ID)] as? ChildEntityType1Builder)
 }
 }
 set(value){
@@ -140,7 +140,7 @@ value.entityLinks[EntityLink(false, PROPERTYCHILD_CONNECTION_ID)] = this
 _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
 }
 if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)){
-_diff.updateOneToOneChildOfParent(PROPERTYCHILD_CONNECTION_ID, this, value)
+_diff.instrumentation.replaceChildren(PROPERTYCHILD_CONNECTION_ID, this, listOfNotNull(value))
 }
 else{
 if (value is ModifiableWorkspaceEntityBase<*, *>){
@@ -156,10 +156,9 @@ override var typeChild: ChildEntityType2Builder?
 get(){
 val _diff = diff
 return if (_diff != null) {
-@OptIn(EntityStorageInstrumentationApi::class)
 ((_diff as MutableEntityStorageInstrumentation).getOneChildBuilder(TYPECHILD_CONNECTION_ID, this) as? ChildEntityType2Builder) ?: (this.entityLinks[EntityLink(true, TYPECHILD_CONNECTION_ID)] as? ChildEntityType2Builder)
 } else {
-this.entityLinks[EntityLink(true, TYPECHILD_CONNECTION_ID)] as? ChildEntityType2Builder
+(this.entityLinks[EntityLink(true, TYPECHILD_CONNECTION_ID)] as? ChildEntityType2Builder)
 }
 }
 set(value){
@@ -173,7 +172,7 @@ value.entityLinks[EntityLink(false, TYPECHILD_CONNECTION_ID)] = this
 _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
 }
 if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)){
-_diff.updateOneToOneChildOfParent(TYPECHILD_CONNECTION_ID, this, value)
+_diff.instrumentation.replaceChildren(TYPECHILD_CONNECTION_ID, this, listOfNotNull(value))
 }
 else{
 if (value is ModifiableWorkspaceEntityBase<*, *>){
@@ -203,7 +202,6 @@ modifiable.id = createEntityId()
 return modifiable
 }
 
-@OptIn(EntityStorageInstrumentationApi::class)
 override fun createEntity(snapshot: EntityStorageInstrumentation): EntityWithChildren{
 val entityId = createEntityId()
 return snapshot.initializeEntity(entityId){

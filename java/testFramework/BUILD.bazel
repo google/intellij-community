@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.java.testFramework` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "testFramework_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "testFramework",
   module_name = "intellij.java.testFramework",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":testFramework_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//java/openapi:java",
     "//java/testFramework/shared",
@@ -29,14 +24,17 @@ jvm_library(
     "//platform/util",
     "//libraries/junit4",
     "//platform/util/jdom",
+    "//platform/util:util-ui",
     "//platform/lang-api:lang",
     "//platform/backend/workspace",
     "//platform/lang-impl",
+    "//platform/problemsView/backend",
     "//java/compiler/impl",
     "//java/debugger/openapi:java-debugger",
     "//java/java-impl:impl",
     "//java/java-backend:backend",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//java/execution/impl",
     "//platform/editor-ui-ex:editor-ex",
     "//platform/testFramework",
@@ -48,8 +46,10 @@ jvm_library(
     "//libraries/stream",
     "//libraries/fastutil",
     "//platform/core-ui",
+    "//platform/core-impl",
     "//platform/code-style-impl:codeStyle-impl",
     "//platform/platform-util-io:ide-util-io",
+    "//platform/progress/shared:ide-progress",
     "//libraries/asm",
     "@lib//:org-codehaus-groovy-groovy",
     "//java/java-impl-refactorings:impl-refactorings",
@@ -59,14 +59,130 @@ jvm_library(
     "//platform/xdebugger-testFramework:debugger-testFramework",
     "//xml/xml-psi-api:psi",
     "//java/java-syntax:syntax",
+    "//xml/xml-parser:parser",
     "//platform/eel",
+    "//java/java-psi-api:psi",
     "//platform/execution",
     "//platform/testFramework/junit5",
     "//platform/testFramework/junit5/codeInsight",
     "//java/java-frontback-psi-impl:frontback-psi-impl",
+    "//java/java-frontback-psi-api:frontback-psi",
     "//platform/xdebugger-impl/shared",
     "//java/testFramework/backend",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//platform/util/concurrency",
   ],
+  exports = [
+    "//java/openapi:java",
+    "//java/testFramework/shared",
+    "//java/java-impl:impl",
+    "//java/java-backend:backend",
+  ],
+  runtime_deps = [
+    "//java/plugin",
+    "//platform/external-system-impl:externalSystem-impl",
+  ]
+)
+
+jvm_library(
+  name = "testFramework_test_lib",
+  testonly = True,
+  module_name = "intellij.java.testFramework",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True),
+  exports = [
+    "//java/openapi:java",
+    "//java/openapi:java_test_lib",
+    "//java/testFramework/shared",
+    "//java/testFramework/shared:shared_test_lib",
+    "//java/java-impl:impl",
+    "//java/java-impl:impl_test_lib",
+    "//java/java-backend:backend",
+    "//java/java-backend:backend_test_lib",
+  ],
+  runtime_deps = [
+    ":testFramework",
+    "//java/openapi:java_test_lib",
+    "//java/testFramework/shared:shared_test_lib",
+    "//platform/analysis-api:analysis_test_lib",
+    "//platform/code-style-api:codeStyle_test_lib",
+    "//platform/core-api:core_test_lib",
+    "//platform/editor-ui-api:editor-ui_test_lib",
+    "//platform/indexing-api:indexing_test_lib",
+    "//jps/model-api:model_test_lib",
+    "//platform/lang-core:lang-core_test_lib",
+    "//platform/projectModel-api:projectModel_test_lib",
+    "//platform/refactoring:refactoring_test_lib",
+    "//platform/structure-view-impl:structureView-impl_test_lib",
+    "//platform/util:util_test_lib",
+    "//libraries/junit4:junit4_test_lib",
+    "//platform/util/jdom:jdom_test_lib",
+    "//platform/util:util-ui_test_lib",
+    "//platform/lang-api:lang_test_lib",
+    "//platform/backend/workspace:workspace_test_lib",
+    "//platform/lang-impl:lang-impl_test_lib",
+    "//platform/problemsView/backend:backend_test_lib",
+    "//java/compiler/impl:impl_test_lib",
+    "//java/debugger/openapi:java-debugger_test_lib",
+    "//java/java-impl:impl_test_lib",
+    "//java/java-backend:backend_test_lib",
+    "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
+    "//java/execution/impl:impl_test_lib",
+    "//java/plugin:plugin_test_lib",
+    "//platform/editor-ui-ex:editor-ex_test_lib",
+    "//platform/testFramework:testFramework_test_lib",
+    "//platform/workspace/storage:storage_test_lib",
+    "//xml/relaxng",
+    "//xml/relaxng:relaxng_test_lib",
+    "//java/idea-ui:ui_test_lib",
+    "//java/debugger/impl:impl_test_lib",
+    "//java/execution/openapi:java-execution_test_lib",
+    "//platform/external-system-impl:externalSystem-impl_test_lib",
+    "//jps/jps-builders:build_test_lib",
+    "//libraries/stream:stream_test_lib",
+    "//libraries/fastutil:fastutil_test_lib",
+    "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl:core-impl_test_lib",
+    "//platform/code-style-impl:codeStyle-impl_test_lib",
+    "//platform/platform-util-io:ide-util-io_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
+    "//libraries/asm:asm_test_lib",
+    "//java/java-impl-refactorings:impl-refactorings_test_lib",
+    "//platform/xdebugger-impl:debugger-impl_test_lib",
+    "//platform/backend/observation:observation_test_lib",
+    "//java/debugger/shared:shared_test_lib",
+    "//platform/xdebugger-testFramework:debugger-testFramework_test_lib",
+    "//xml/xml-psi-api:psi_test_lib",
+    "//java/java-syntax:syntax_test_lib",
+    "//xml/xml-parser:parser_test_lib",
+    "//platform/eel:eel_test_lib",
+    "//java/java-psi-api:psi_test_lib",
+    "//platform/execution:execution_test_lib",
+    "//platform/testFramework/junit5:junit5_test_lib",
+    "//platform/testFramework/junit5/codeInsight:codeInsight_test_lib",
+    "//java/java-frontback-psi-impl:frontback-psi-impl_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
+    "//platform/xdebugger-impl/shared:shared_test_lib",
+    "//java/testFramework/backend:backend_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/util/concurrency:concurrency_test_lib",
+  ]
+)
+### auto-generated section `build intellij.java.testFramework` end
+
+### auto-generated section `iml intellij.java.testFramework` start
+exports_files([
+  "intellij.java.testFramework.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.java.testFramework` end
+
+### auto-generated section `build intellij.java.testFramework.tests` start
+jvm_library(
+  name = "testFramework-tests",
+  module_name = "intellij.java.testFramework.tests",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True),
   exports = [
     "//java/openapi:java",
     "//java/testFramework/shared",
@@ -82,10 +198,14 @@ jvm_library(
 )
 
 jvm_library(
-  name = "testFramework_test_lib",
+  name = "testFramework-tests_test_lib",
+  testonly = True,
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
-  associates = [":testFramework"],
+  associates = [
+    "//java/testFramework",
+    "//java/testFramework:testFramework_test_lib",
+  ],
   deps = [
     "//java/openapi:java",
     "//java/openapi:java_test_lib",
@@ -156,6 +276,8 @@ jvm_library(
     "//libraries/fastutil:fastutil_test_lib",
     "//platform/core-ui",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/code-style-impl:codeStyle-impl",
     "//platform/code-style-impl:codeStyle-impl_test_lib",
     "//platform/platform-util-io:ide-util-io",
@@ -186,10 +308,16 @@ jvm_library(
     "//platform/testFramework/junit5/codeInsight:codeInsight_test_lib",
     "//java/java-frontback-psi-impl:frontback-psi-impl",
     "//java/java-frontback-psi-impl:frontback-psi-impl_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
     "//platform/xdebugger-impl/shared",
     "//platform/xdebugger-impl/shared:shared_test_lib",
     "//java/testFramework/backend",
     "//java/testFramework/backend:backend_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/util/concurrency",
+    "//platform/util/concurrency:concurrency_test_lib",
   ],
   exports = [
     "//java/openapi:java",
@@ -206,19 +334,26 @@ jvm_library(
     "//java/java-backend:backend_test_lib",
   ],
   runtime_deps = [
+    ":testFramework-tests",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
     "//java/plugin:plugin_test_lib",
     "//platform/external-system-impl:externalSystem-impl_test_lib",
     "//platform/platform-util-io:ide-util-io_test_lib",
   ]
 )
-### auto-generated section `build intellij.java.testFramework` end
+### auto-generated section `build intellij.java.testFramework.tests` end
 
-### auto-generated section `test intellij.java.testFramework` start
+### auto-generated section `iml intellij.java.testFramework.tests` start
+exports_files([
+  "intellij.java.testFramework.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.java.testFramework.tests` end
+
+### auto-generated section `test intellij.java.testFramework.tests` start
 load("@community//build:tests-options.bzl", "jps_test")
 
 jps_test(
-  name = "testFramework_test",
-  runtime_deps = [":testFramework_test_lib"]
+  name = "testFramework-tests_test",
+  runtime_deps = [":testFramework-tests_test_lib"]
 )
-### auto-generated section `test intellij.java.testFramework` end
+### auto-generated section `test intellij.java.testFramework.tests` end

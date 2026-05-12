@@ -30,11 +30,6 @@ sealed interface EelExecApi {
   @get:ApiStatus.Experimental
   val descriptor: EelDescriptor
 
-  @Throws(ExecuteProcessException::class)
-  @ThrowsChecked(ExecuteProcessException::class)
-  @ApiStatus.Experimental
-  suspend fun spawnProcess(@GeneratedBuilder generatedBuilder: ExecuteProcessOptions): EelProcess
-
   /**
    * Executes the process, returning either an [EelProcess] or an error provided by the remote operating system.
    *
@@ -42,8 +37,16 @@ sealed interface EelExecApi {
    *
    * The method may throw a RuntimeException only in critical cases like connection loss or a bug.
    *
-   * See [executeProcessBuilder]
+   * All arguments and all paths should be valid for the remote machine. F.i., if the IDE runs on Windows, but IJent runs on Linux,
+   * [ExecuteProcessOptions.workingDirectory] is the path on the Linux host. There's no automatic path mapping in this interface.
+   *
+   * See [ExecuteProcessOptions]
    */
+  @Throws(ExecuteProcessException::class)
+  @ThrowsChecked(ExecuteProcessException::class)
+  @ApiStatus.Experimental
+  suspend fun spawnProcess(@GeneratedBuilder generatedBuilder: ExecuteProcessOptions): EelProcess
+
   @CheckReturnValue
   @Deprecated("Use spawnProcess instead")
   @ApiStatus.Internal
@@ -99,14 +102,10 @@ sealed interface EelExecApi {
     @get:ApiStatus.Experimental
     val workingDirectory: EelPath? get() = null
 
-    // TODO: Use EelPath as soon as it will be merged
-    //  We cannot do it currently until IJPL-163265 is implemented
     /**
-     * An **absolute** path to the executable.
-     * TODO Or do relative paths also work?
+     * Either an *absolute* path to the executable file or a binary name.
      *
-     * All argument, all paths, should be valid for the remote machine. F.i., if the IDE runs on Windows, but IJent runs on Linux,
-     * [ExecuteProcessOptions.workingDirectory] is the path on the Linux host. There's no automatic path mapping in this interface.
+     * When it's a binary name, the corresponginf executable is searched in the environment variable `PATH`.
      */
     @get:ApiStatus.Experimental
     val exe: String
@@ -340,6 +339,11 @@ sealed interface EelExecApi {
      * using a self-explaining prefix makes the command line more readable and easier to debug.
      */
     val filePrefix: String get() = ""
+
+    /**
+     * Create an entrypoint executable file with an exact name.
+     */
+    val exactName: String? get() = null
 
     val lifecycle: ExternalCliLifecycle get() = ExternalCliLifecycle.Default
 

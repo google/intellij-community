@@ -14,11 +14,11 @@ class MavenProfileWatcher(
 ) {
 
   fun subscribeOnProfileChanges(parentDisposable: Disposable) {
-    manager.addProjectsTreeListener(object : MavenProjectsTree.Listener {
+    manager.project.messageBus.connect(parentDisposable).subscribe(MavenProjectsTree.Listener.TOPIC, object : MavenProjectsTree.Listener {
       override fun profilesChanged() {
         projectTracker.markDirty(projectId)
         projectTracker.scheduleChangeProcessing()
       }
-    }, parentDisposable)
+    })
   }
 }

@@ -18,9 +18,7 @@ import org.jetbrains.plugins.gradle.tooling.util.ObjectCollector;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 import static org.jetbrains.plugins.gradle.tooling.serialization.ToolingStreamApiUtils.OBJECT_ID_FIELD;
 import static org.jetbrains.plugins.gradle.tooling.serialization.ToolingStreamApiUtils.assertNotNull;
@@ -28,7 +26,9 @@ import static org.jetbrains.plugins.gradle.tooling.serialization.ToolingStreamAp
 import static org.jetbrains.plugins.gradle.tooling.serialization.ToolingStreamApiUtils.readFile;
 import static org.jetbrains.plugins.gradle.tooling.serialization.ToolingStreamApiUtils.readFileSet;
 import static org.jetbrains.plugins.gradle.tooling.serialization.ToolingStreamApiUtils.readInt;
+import static org.jetbrains.plugins.gradle.tooling.serialization.ToolingStreamApiUtils.readList;
 import static org.jetbrains.plugins.gradle.tooling.serialization.ToolingStreamApiUtils.readString;
+import static org.jetbrains.plugins.gradle.tooling.serialization.ToolingStreamApiUtils.writeCollection;
 import static org.jetbrains.plugins.gradle.tooling.serialization.ToolingStreamApiUtils.writeFile;
 import static org.jetbrains.plugins.gradle.tooling.serialization.ToolingStreamApiUtils.writeString;
 import static org.jetbrains.plugins.gradle.tooling.serialization.ToolingStreamApiUtils.writeStrings;
@@ -83,13 +83,10 @@ public final class GradleBuildScriptClasspathSerializationService implements Ser
     });
   }
 
-  private static void writeClasspath(IonWriter writer, Set<? extends ClasspathEntryModel> classpath) throws IOException {
-    writer.setFieldName("classpath");
-    writer.stepIn(IonType.LIST);
-    for (ClasspathEntryModel entry : classpath) {
-      writeClasspathEntry(writer, entry);
-    }
-    writer.stepOut();
+  private static void writeClasspath(IonWriter writer, List<? extends ClasspathEntryModel> classpath) throws IOException {
+    writeCollection(writer, "classpath", classpath, entry ->
+      writeClasspathEntry(writer, entry)
+    );
   }
 
   private static void writeClasspathEntry(IonWriter writer, ClasspathEntryModel entry) throws IOException {
@@ -116,10 +113,7 @@ public final class GradleBuildScriptClasspathSerializationService implements Ser
           }
           classpathModel.setGradleVersion(context.gradleVersion);
           classpathModel.setGradleHomeDir(context.gradleHomeDir);
-          List<ClasspathEntryModel> classpathEntries = readClasspath(reader);
-          for (ClasspathEntryModel entry : classpathEntries) {
-            classpathModel.add(entry);
-          }
+          classpathModel.setClasspath(readClasspath(reader));
           return classpathModel;
         }
       });
@@ -128,15 +122,9 @@ public final class GradleBuildScriptClasspathSerializationService implements Ser
   }
 
   private static List<ClasspathEntryModel> readClasspath(IonReader reader) {
-    List<ClasspathEntryModel> list = new ArrayList<>();
-    reader.next();
-    reader.stepIn();
-    ClasspathEntryModel entry;
-    while ((entry = readClasspathEntry(reader)) != null) {
-      list.add(entry);
-    }
-    reader.stepOut();
-    return list;
+    return readList(reader, "classpath", () ->
+      readClasspathEntry(reader)
+    );
   }
 
   private static ClasspathEntryModel readClasspathEntry(IonReader reader) {

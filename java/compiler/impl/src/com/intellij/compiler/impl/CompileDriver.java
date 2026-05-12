@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.compiler.impl;
 
 import com.intellij.CommonBundle;
@@ -30,7 +30,6 @@ import com.intellij.openapi.compiler.CompileContext;
 import com.intellij.openapi.compiler.CompileScope;
 import com.intellij.openapi.compiler.CompileStatusNotification;
 import com.intellij.openapi.compiler.CompileTask;
-import com.intellij.openapi.compiler.CompilerFilter;
 import com.intellij.openapi.compiler.CompilerManager;
 import com.intellij.openapi.compiler.CompilerMessage;
 import com.intellij.openapi.compiler.CompilerMessageCategory;
@@ -62,6 +61,7 @@ import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.util.io.FileUtil;
+import com.intellij.openapi.util.io.NioFiles;
 import com.intellij.openapi.util.text.HtmlChunk;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
@@ -102,8 +102,8 @@ import org.jetbrains.jps.model.java.JavaSourceRootType;
 
 import javax.swing.SwingUtilities;
 import javax.swing.event.HyperlinkEvent;
-import java.io.File;
 import java.lang.ref.WeakReference;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -147,9 +147,8 @@ public final class CompileDriver {
     myProject = project;
   }
 
-  @SuppressWarnings({"deprecation", "unused"})
-  public void setCompilerFilter(@SuppressWarnings("unused") CompilerFilter compilerFilter) {
-  }
+  @SuppressWarnings({"unused", "removal", "UnnecessaryFullyQualifiedName"})
+  public void setCompilerFilter(com.intellij.openapi.compiler.CompilerFilter compilerFilter) { }
 
   public void rebuild(CompileStatusNotification callback, boolean cleanSystemData) {
     ProjectCompileScope scope = new ProjectCompileScope(myProject);
@@ -199,7 +198,7 @@ public final class CompileDriver {
           }
         }
       }
-      catch (ProcessCanceledException ignored) {
+      catch (@SuppressWarnings("IncorrectCancellationExceptionHandling") ProcessCanceledException ignored) {
         compileContext.putUserDataIfAbsent(COMPILE_SERVER_BUILD_STATUS, ExitStatus.CANCELLED);
       }
       catch (Throwable e) {
@@ -545,7 +544,6 @@ public final class CompileDriver {
       Tracer.Span compileWorkSpan = Tracer.start("compileWork");
       CompilerCacheManager compilerCacheManager = CompilerCacheManager.getInstance(myProject);
       final BuildManager buildManager = BuildManager.getInstance();
-      final Ref<TaskFutureAdapter<Void>> buildSystemDataCleanupTask = new Ref<>(null);
       try {
         buildManager.postponeBackgroundTasks();
         buildManager.cancelAutoMakeTasks(myProject);
@@ -567,9 +565,9 @@ public final class CompileDriver {
 
             if (canCleanBuildSystemData) {
               cancelPreload.waitFor();
-              File[] systemFiles = buildManager.getProjectSystemDirectory(myProject).listFiles();
-              if (systemFiles != null && systemFiles.length > 0) {
-                buildSystemDataCleanupTask.set(new TaskFutureAdapter<>(FileUtil.asyncDelete(Arrays.asList(systemFiles))));
+              for (Path path : NioFiles.list(buildManager.getProjectSystemDir(myProject))) {
+                //noinspection UseOptimizedEelFunctions
+                NioFiles.deleteRecursively(path);
               }
             }
             else {
@@ -612,7 +610,7 @@ public final class CompileDriver {
           COMPILE_SERVER_BUILD_STATUS.set(compileContext, ExitStatus.ERRORS);
         }
       }
-      catch (ProcessCanceledException ignored) {
+      catch (@SuppressWarnings("IncorrectCancellationExceptionHandling") ProcessCanceledException ignored) {
         compileContext.putUserDataIfAbsent(COMPILE_SERVER_BUILD_STATUS, ExitStatus.CANCELLED);
       }
       catch (Throwable e) {
@@ -636,11 +634,6 @@ public final class CompileDriver {
         );
         if (status == ExitStatus.SUCCESS) {
           BuildUsageCollector.logBuildCompleted(duration, isRebuild, false);
-        }
-
-        TaskFutureAdapter<Void> cleanupTask = buildSystemDataCleanupTask.get();
-        if (cleanupTask != null) {
-          cleanupTask.waitFor();
         }
       }
     };
@@ -772,7 +765,7 @@ public final class CompileDriver {
       try {
         task.execute(compileContext);
       }
-      catch (ProcessCanceledException ex) {
+      catch (@SuppressWarnings("IncorrectCancellationExceptionHandling") ProcessCanceledException ex) {
         // suppressed
       }
       finally {
@@ -855,7 +848,7 @@ public final class CompileDriver {
       }
       return runWithReadAccess(progress, () -> validateOutputs(modulesWithSources) && validateCyclicDependencies(scopeModules.first));
     }
-    catch (ProcessCanceledException e) {
+    catch (@SuppressWarnings("IncorrectCancellationExceptionHandling") ProcessCanceledException e) {
       return false;
     }
     catch (Throwable e) {

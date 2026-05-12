@@ -1,8 +1,13 @@
 <idea-plugin>
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
     <module name="intellij.devkit.core"/>
     <module name="intellij.json.backend"/>
+    <module name="intellij.xml.dom"/>
+    <module name="intellij.xml.psi"/>
+    <module name="intellij.xml.psi.impl"/>
   </dependencies>
+  <!-- endregion -->
 
   <resource-bundle>messages.DevKitThemesBundle</resource-bundle>
 

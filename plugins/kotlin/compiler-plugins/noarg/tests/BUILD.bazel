@@ -3,6 +3,7 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tests",
+  module_name = "kotlin.compiler-plugins.noarg.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -27,6 +28,7 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "kotlin.compiler-plugins.noarg.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -45,14 +47,16 @@ jvm_library(
     "//platform/projectModel-api:projectModel_test_lib",
     "//plugins/kotlin/plugin/k1",
     "//plugins/kotlin/plugin/k1:k1_test_lib",
+    "//java/java-psi-api:psi",
+    "//java/java-psi-api:psi_test_lib",
     "//plugins/kotlin/tests-common:common-tests",
     "//plugins/kotlin/tests-common:common-tests_test_lib",
     "//plugins/kotlin/base/plugin",
     "//plugins/kotlin/base/plugin:plugin_test_lib",
     "//plugins/kotlin/base/facet",
     "//plugins/kotlin/base/facet:facet_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//java/testFramework",
     "//java/testFramework:testFramework_test_lib",
     "//plugins/kotlin/core",
@@ -77,6 +81,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build kotlin.compiler-plugins.noarg.tests` end
+
+### auto-generated section `iml kotlin.compiler-plugins.noarg.tests` start
+exports_files([
+  "kotlin.compiler-plugins.noarg.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.compiler-plugins.noarg.tests` end
 
 ### auto-generated section `test kotlin.compiler-plugins.noarg.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

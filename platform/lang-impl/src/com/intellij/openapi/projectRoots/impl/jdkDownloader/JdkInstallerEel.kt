@@ -12,6 +12,7 @@ import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.provider.asEelPath
 import com.intellij.platform.eel.provider.asNioPath
 import com.intellij.platform.eel.provider.asNioPathOrNull
+import com.intellij.platform.eel.provider.utils.EelPathTransfer
 import com.intellij.platform.eel.provider.utils.EelPathUtils
 import org.jetbrains.annotations.ApiStatus.Internal
 import java.nio.file.Files
@@ -37,7 +38,7 @@ object JdkInstallerEel {
           .createTemporaryDirectory().prefix("download-jdk-").getOrThrow()
           .resolve(archiveName)
 
-        EelPathUtils.walkingTransfer(downloadFile, downloadFileEelCopy.asNioPath(), false, false)
+        EelPathTransfer.walkingTransfer(downloadFile, downloadFileEelCopy.asNioPath(), false, false)
 
         downloadFileEelCopy.parent
       }

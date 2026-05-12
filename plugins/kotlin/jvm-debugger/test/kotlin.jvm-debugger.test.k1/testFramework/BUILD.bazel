@@ -14,12 +14,14 @@ create_kotlinc_options(
 
 jvm_library(
   name = "testFramework",
+  module_name = "kotlin.jvm-debugger.test.k1.testFramework",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "testFramework_test_lib",
+  testonly = True,
   module_name = "kotlin.jvm-debugger.test.k1.testFramework",
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
@@ -53,6 +55,8 @@ jvm_library(
     "//platform/core-api:core_test_lib",
     "//platform/core-ui",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/execution",
     "//platform/execution:execution_test_lib",
     "//platform/external-system-api:externalSystem",
@@ -68,8 +72,8 @@ jvm_library(
     "//plugins/kotlin/base/fe10/analysis:analysis_test_lib",
     "//plugins/kotlin/base/scripting/scripting.k1",
     "//plugins/kotlin/base/scripting/scripting.k1:scripting.k1_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/compiler-plugins/kotlinx-serialization/common",
     "//plugins/kotlin/compiler-plugins/kotlinx-serialization/common:common_test_lib",
     "//plugins/kotlin/jvm-debugger/core-fe10",
@@ -80,6 +84,10 @@ jvm_library(
     "//plugins/kotlin/jvm-debugger/sequence:kotlin-jvm-debugger-sequence-k1_test_lib",
     "//plugins/kotlin/jvm-debugger/testFramework",
     "//plugins/kotlin/jvm-debugger/testFramework:testFramework_test_lib",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework_test_lib",
+    "//plugins/stream-debugger:java-debugger-streams-tests",
+    "//plugins/stream-debugger:java-debugger-streams-tests_test_lib",
   ],
   runtime_deps = [
     ":testFramework",
@@ -87,3 +95,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build kotlin.jvm-debugger.test.k1.testFramework` end
+
+### auto-generated section `iml kotlin.jvm-debugger.test.k1.testFramework` start
+exports_files([
+  "kotlin.jvm-debugger.test.k1.testFramework.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.jvm-debugger.test.k1.testFramework` end

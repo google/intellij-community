@@ -105,7 +105,13 @@ public final class CacheAvoidingVirtualFileWrapper extends VirtualFile implement
     if (child != null) {
       return new CacheAvoidingVirtualFileWrapper(child);
     }
-    return new TransientVirtualFileImpl(childName, getPath() + '/' + childName, fileSystem, this);
+    TransientVirtualFileImpl file = new TransientVirtualFileImpl(childName, getPath() + '/' + childName, fileSystem, this);
+    if (file.exists()) {
+      return file;
+    }
+    else {
+      return null;
+    }
   }
 
   @Override
@@ -118,8 +124,24 @@ public final class CacheAvoidingVirtualFileWrapper extends VirtualFile implement
 
   @Override
   public @NotNull VirtualFile findOrCreateChildData(Object requestor,
-                                                    @NotNull String name) throws IOException {
-    return findChild(name);
+                                                    @NotNull String childName) throws IOException {
+    NewVirtualFileSystem fileSystem = wrappedFile.getFileSystem();
+    NewVirtualFile child = wrappedFile.findChildIfCached(childName);
+    if (child != null) {
+      return new CacheAvoidingVirtualFileWrapper(child);
+    }
+    TransientVirtualFileImpl file = new TransientVirtualFileImpl(childName, getPath() + '/' + childName, fileSystem, this);
+    if (file.exists()) {
+      return file;
+    }
+    else {
+      fileSystem.createChildFile(requestor, this, childName);
+      VirtualFile newChild = findChild(childName);
+      if (newChild == null) {
+        throw new AssertionError("[" + file.getPath() + "] was just created, must be found and !null");
+      }
+      return newChild;
+    }
   }
 
   //<editor-fold desc="VirtualFile trivial delegates"> =====================================================================================

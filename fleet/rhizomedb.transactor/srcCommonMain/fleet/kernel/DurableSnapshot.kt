@@ -32,9 +32,9 @@ import com.jetbrains.rhizomedb.getOne
 import com.jetbrains.rhizomedb.impl.attributeSerializer
 import com.jetbrains.rhizomedb.impl.generateSeed
 import com.jetbrains.rhizomedb.mutate
+import fleet.multiplatform.shims.computeShim
 import fleet.reporting.shared.tracing.span
 import fleet.util.UID
-import fleet.util.computeShim
 import fleet.util.logging.logger
 import fleet.util.serialization.withSerializationCallback
 import kotlinx.serialization.ExperimentalSerializationApi

@@ -33,6 +33,7 @@
 
   <xi:include href="/META-INF/IdeCore.xml"/>
   <xi:include href="/META-INF/PlatformExtensionPoints.xml"/>
+  <xi:include href="/META-INF/MinimapExtensionPoints.xml"/>
   <xi:include href="/META-INF/Refactoring.xml"/>
   <xi:include href="/META-INF/LangExtensionPoints.xml"/>
 
@@ -133,5 +134,8 @@
 
     <registryKey key="ide.allow.folder.as.project" defaultValue="false"
                  description="Allow opening folder as project without modules" />
+    <projectSettings service="com.intellij.ide.bookmark.BookmarksManagerImpl"/>
+    <applicationSettings service="com.intellij.codeInspection.ex.ApplicationInspectionProfileManager"/>
+    <projectSettings service="com.intellij.ide.bookmarks.BookmarkManager"/>
   </extensions>
 </idea-plugin>

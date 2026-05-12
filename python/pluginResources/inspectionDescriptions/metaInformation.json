@@ -21,7 +21,7 @@
       "codeQualityCategory": "Reliability"
     },
     {
-      "id": "UnsatisfiedRequirementInspection",
+      "id": "RequirementInspection",
       "codeQualityCategory": "Reliability"
     },
     {
@@ -59,10 +59,6 @@
     {
       "id": "CythonUsageBeforeDeclarationInspection",
       "codeQualityCategory": "Sanity"
-    },
-    {
-      "id": "OutdatedRequirementInspection",
-      "codeQualityCategory": "Reliability"
     }
   ]
 }

@@ -27,14 +27,14 @@ Common semantics:
 Output shape:
 
 - JSON with `items` and optional `more`.
-- Each item is an object with `filePath` and optional `lineNumber`/`lineText`.
+- Each item is an object with `filePath` and optional `startLine`/`startColumn`/`endLine`/`endColumn`.
 - `search_file` returns only `filePath`.
-- `search_text` / `search_regex` return snippets (`lineNumber`, `lineText`) when available.
-- `search_symbol` returns file paths and snippets when available.
+- `search_text` / `search_regex` return match coordinates when available.
+- `search_symbol` returns file paths and coordinates when available.
 
-## Tool Exposure and Modes
+## Tool Exposure
 
-Search tools are exposed in both tool modes (`JETBRAINS_MCP_TOOL_MODE=codex` or `cc`) with the same names and parameters when ij-proxy provides the fallback shims.
+Search tools are exposed with a single proxy shape.
 
 You can force legacy search behavior by setting `JETBRAINS_MCP_PROXY_DISABLE_NEW_SEARCH` to any non-empty value except `0` or `false`.
 When enabled, ij-proxy will ignore upstream `search_*` tools and only use the legacy search APIs when present.

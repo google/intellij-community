@@ -94,7 +94,7 @@ final class NativeFileChooserDialogImpl implements FileChooserDialog, PathChoose
 
   @Override
   public VirtualFile @NotNull [] choose(@Nullable Project project, VirtualFile @NotNull ... toSelect) {
-    choose(toSelect.length > 0 ? toSelect[0] : null, __ -> { });
+    choose(toSelect.length > 0 ? toSelect[0] : null, _ -> { });
     FileChooserUsageCollector.log(this, myDescriptor, myChosenFiles);
     return myChosenFiles;
   }

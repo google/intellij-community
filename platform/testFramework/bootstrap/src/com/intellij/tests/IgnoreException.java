@@ -2,6 +2,7 @@
 package com.intellij.tests;
 
 import org.junit.AssumptionViolatedException;
+import org.opentest4j.TestAbortedException;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -14,6 +15,7 @@ public class IgnoreException extends Exception {
 
   public static boolean isIgnoringThrowable(Throwable throwable) {
     if (throwable instanceof AssumptionViolatedException) return true;
+    if (throwable instanceof TestAbortedException) return true;
     if (throwable instanceof IgnoreException) return true;
     if (throwable.getClass().getName().equals(MULTIPLE_FAILURES_ERROR)) {
       try {

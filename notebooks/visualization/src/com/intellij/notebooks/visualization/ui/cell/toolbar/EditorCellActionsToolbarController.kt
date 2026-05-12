@@ -13,7 +13,7 @@ import com.intellij.notebooks.visualization.ui.EditorCell
 import com.intellij.notebooks.visualization.ui.NotebookUiUtils.intersectsEvenIfEmpty
 import com.intellij.notebooks.visualization.ui.jupyterToolbars.JupyterCellActionsToolbar
 import com.intellij.notebooks.visualization.ui.notebookEditor
-import com.intellij.notebooks.visualization.ui.providers.bounds.JupyterBoundsChangeHandler
+import com.intellij.notebooks.visualization.ui.providers.bounds.JupyterBoundsChangeNotifier
 import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.application.EDT
@@ -21,26 +21,22 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.PlatformUtils
-import com.intellij.util.cancelOnDispose
 import com.intellij.util.ui.JBUI
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.intellij.lang.annotations.Language
 import java.awt.Point
 import java.awt.Rectangle
-import java.time.Duration
 import javax.swing.JComponent
 import javax.swing.SwingUtilities
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.time.toKotlinDuration
+import kotlin.time.Duration.Companion.milliseconds
 
 /** Position of the floating toolbar in cells top right corner. */
 internal class EditorCellActionsToolbarController(
@@ -59,15 +55,10 @@ internal class EditorCellActionsToolbarController(
     get() = cell.view?.controllers?.filterIsInstance<DataProviderComponent>()?.firstOrNull()?.retrieveDataProvider()
 
   init {
-    coroutineScope.launch {
-      @OptIn(FlowPreview::class) // For debounce.
-      JupyterBoundsChangeHandler.get(editor).eventFlow.debounce(Duration.ofMillis(200).toKotlinDuration()).collect {
-        val targetComponent = toolbar?.targetComponent ?: return@collect
-        withContext(Dispatchers.EDT) {
-          updateToolbarPosition(targetComponent)
-        }
-      }
-    }.cancelOnDispose(this)
+    JupyterBoundsChangeNotifier.get(editor).subscribe(this) {
+      val targetComponent = toolbar?.targetComponent ?: return@subscribe
+      updateToolbarPosition(targetComponent)
+    }
 
     editor.scrollingModel.addVisibleAreaListener {
       if (!NotebookSettings.getInstance().cellToolbarStickyVisible) return@addVisibleAreaListener
@@ -87,7 +78,11 @@ internal class EditorCellActionsToolbarController(
     editor.notebookEditor.cellAddToolbarShown.afterDistinctChange(this) {
       updateToolbarVisibility()
     }
-    updateToolbarVisibility()
+
+    //Prevent StackOverflow
+    coroutineScope.launch(Dispatchers.EDT) {
+      updateToolbarVisibility()
+    }
   }
 
   /**
@@ -100,6 +95,9 @@ internal class EditorCellActionsToolbarController(
 
   override fun checkAndRebuildInlays() {
     val component = targetComponent ?: return
+    toolbar?.apply {
+      background = editor.notebookAppearance.editorBackgroundColor()
+    }
     updateToolbarPosition(component)
   }
 
@@ -119,12 +117,14 @@ internal class EditorCellActionsToolbarController(
     val component = targetComponent ?: return
     val actionGroup = getActionGroup(cell.interval.type) ?: return
 
-    toolbar = JupyterCellActionsToolbar(actionGroup, component, actionsUpdatedCallback = { updateToolbarPosition(component) })
+    toolbar = JupyterCellActionsToolbar(actionGroup, component, actionsUpdatedCallback = { updateToolbarPosition(component) }).apply {
+      background = editor.notebookAppearance.editorBackgroundColor()
+    }
     showToolbarJob?.cancel()
 
     showToolbarJob = coroutineScope.launch {
       delay(SHOW_TOOLBAR_DELAY_MS)
-      withContext(Dispatchers.Main) {
+      withContext(Dispatchers.EDT) {
         updateToolbarPosition(component)
         editor.contentComponent.add(toolbar, 0)
       }
@@ -174,11 +174,11 @@ internal class EditorCellActionsToolbarController(
     .putClientProperty(ActionUtil.HIDE_DROPDOWN_ICON, true)
 
   private fun calculateToolbarBounds(panel: JComponent, toolbar: JComponent): Rectangle {
-    val toolbarHeight = toolbar.preferredSize.height
-    val toolbarWidth = toolbar.preferredSize.width
-
     val panelHeight = panel.height
     val panelWidth = panel.width
+
+    val toolbarHeight = toolbar.preferredSize.height
+    val toolbarWidth = min(toolbar.preferredSize.width, panelWidth)
 
     val delimiterSize = when (cell.interval.ordinal) {
       0 -> editor.notebookAppearance.aboveFirstCellDelimiterHeight
@@ -187,7 +187,7 @@ internal class EditorCellActionsToolbarController(
 
     val panelRoofHeight = panelHeight - delimiterSize
 
-    val xOffset = panelWidth - toolbarWidth - (panelWidth * RELATIVE_Y_OFFSET_RATIO).toInt()
+    val xOffset = max(0, panelWidth - toolbarWidth - (panelWidth * RELATIVE_Y_OFFSET_RATIO).toInt())
     val yOffset = panelHeight - panelRoofHeight - (toolbarHeight / 2)
 
     val panelLocationInEditor = SwingUtilities.convertPoint(panel, Point(0, 0), editor.contentComponent)
@@ -222,7 +222,7 @@ internal class EditorCellActionsToolbarController(
   }
 
   companion object {
-    private const val SHOW_TOOLBAR_DELAY_MS = 35L
+    private val SHOW_TOOLBAR_DELAY_MS = 35.milliseconds
 
     private const val RELATIVE_Y_OFFSET_RATIO = 0.05
 

@@ -1,14 +1,14 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.testFramework.syntax
 
-import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.platform.syntax.SyntaxElementType
 import com.intellij.platform.syntax.lexer.Lexer
 import com.intellij.testFramework.UsefulTestCase
 import com.intellij.testFramework.fixtures.IdeaTestExecutionPolicy
-import java.io.File
 import java.io.IOException
+import java.nio.file.Path
+import kotlin.io.path.readText
 
 abstract class LexerTestCase : UsefulTestCase() {
   protected abstract val dirPath: String
@@ -18,6 +18,11 @@ abstract class LexerTestCase : UsefulTestCase() {
 
   protected abstract fun createLexer(): Lexer
 
+  /**
+   * Tokenizes [text] with [lexer] and compares the result against [expected] (if provided)
+   * or a golden file derived from the test name and [expectedFileExtension].
+   * Also verifies correct lexer restart via [checkCorrectRestart].
+   */
   @JvmOverloads
   protected fun doTest(text: String, expected: String? = null, lexer: Lexer = createLexer()) {
     val result = printTokens(lexer, text, 0)
@@ -27,6 +32,9 @@ abstract class LexerTestCase : UsefulTestCase() {
     }
     else {
       assertSameLinesWithFile(getPathToTestDataFile(this.expectedFileExtension), result)
+    }
+    if (isCheckCorrectRestart()) {
+      checkCorrectRestart(text)
     }
   }
 
@@ -49,7 +57,7 @@ abstract class LexerTestCase : UsefulTestCase() {
   protected fun loadTestDataFile(fileExt: String): String {
     val fileName = getPathToTestDataFile(fileExt)
     try {
-      val fileText = FileUtil.loadFile(File(fileName))
+      val fileText = Path.of(fileName).readText()
       return StringUtil.convertLineSeparators(fileText.trim { it <= ' ' })
     }
     catch (e: IOException) {
@@ -76,5 +84,59 @@ abstract class LexerTestCase : UsefulTestCase() {
     return StringUtil.replace(sequence.subSequence(start, end).toString(), "\n", "\\n")
   }
 
+  /** Whether to check correct lexer restart with [checkCorrectRestart]. Default is true. */
+  protected open fun isCheckCorrectRestart() = true
+
+  /**
+   * Verifies that the lexer produces the same token sequence when restarted from any position
+   * where [Lexer.getState] returns zero.
+   * TODO support restartable lexers in Syntax Library
+   *
+   * For every such position the lexer is restarted via [Lexer.start] with the recorded offset and state,
+   * and the resulting tokens are compared against the tail of the initial full-text tokenization.
+   */
+  protected fun checkCorrectRestart(text: String) {
+    val mainLexer = createLexer()
+    val allTokens = tokenize(text, 0, 0, mainLexer)
+    val auxLexer = createLexer()
+    auxLexer.start(text)
+    var index = 0
+    while (auxLexer.getTokenType() != null) {
+      val state = auxLexer.getState()
+      if (state == 0) {
+        val tokenStart = auxLexer.getTokenStart()
+        val expectedTokens = allTokens.subList(index, allTokens.size)
+        val restartedTokens = tokenize(text, tokenStart, state, mainLexer)
+        assertEquals(
+          "Restarting impossible from offset $tokenStart `${auxLexer.getTokenText()}`\n" +
+          "All tokens <type, offset, lexer state>: $allTokens\n",
+          expectedTokens.joinToString("\n"),
+          restartedTokens.joinToString("\n")
+        )
+      }
+      index++
+      auxLexer.advance()
+    }
+  }
+
+  private fun tokenize(text: String, start: Int, state: Int, lexer: Lexer): List<TokenState> {
+    val allTokens = mutableListOf<TokenState>()
+    try {
+      lexer.start(text, start, text.length, state)
+    }
+    catch (t: Throwable) {
+      LOG.error("Restarting impossible from offset $start", t)
+      throw RuntimeException(t)
+    }
+    while (true) {
+      val tokenType = lexer.getTokenType() ?: break
+      allTokens.add(TokenState(tokenType, lexer.getTokenStart(), lexer.getState()))
+      lexer.advance()
+    }
+    return allTokens
+  }
+
   data class Token(val type: SyntaxElementType, val start: Int, val end: Int)
+
+  private data class TokenState(val type: SyntaxElementType, val offset: Int, val state: Int)
 }

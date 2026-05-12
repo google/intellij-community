@@ -8,6 +8,7 @@ import com.intellij.ide.actions.searcheverywhere.statistics.SearchFieldStatistic
 import com.intellij.ide.lightEdit.LightEdit;
 import com.intellij.ide.lightEdit.LightEditCompatible;
 import com.intellij.internal.statistic.utils.StartMoment;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.ActionPlaces;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.DataKey;
@@ -25,6 +26,7 @@ import com.intellij.ui.ScreenUtil;
 import com.intellij.ui.SearchTextField;
 import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.popup.AbstractPopup;
+import com.intellij.util.Alarm;
 import com.intellij.util.PlatformUtils;
 import com.intellij.util.SystemProperties;
 import com.intellij.util.containers.ContainerUtil;
@@ -94,7 +96,7 @@ public final class SearchEverywhereManagerImpl implements SearchEverywhereManage
 
     Project project = initEvent.getProject();
 
-    List<SearchEverywhereContributor<?>> contributors = createContributors(initEvent, project);
+    List<SearchEverywhereContributor<?>> contributors = createContributors(initEvent, project, false, true);
     SearchEverywhereContributorValidationRule.updateContributorsMap(contributors);
     mySearchEverywhereUI = createView(myProject, contributors, SearchFieldStatisticsCollector.getStartMoment(initEvent));
     contributors.forEach(c -> Disposer.register(mySearchEverywhereUI, c));
@@ -102,6 +104,12 @@ public final class SearchEverywhereManagerImpl implements SearchEverywhereManage
     // Handle SE on the Welcome Screen
     if (project == null && ALL_CONTRIBUTORS_GROUP_ID.equals(tabID)) mySearchEverywhereUI.switchToTabOrFirst(tabID);
     else mySearchEverywhereUI.switchToTab(tabID);
+
+    // Inform the ML service about start of search session (opening of SE window)
+    SearchEverywhereMlService mlService = SearchEverywhereMlService.getInstance();
+    if (mlService != null) {
+      mlService.onSessionStarted(myProject, tabID, mySearchEverywhereUI.getMixedListInfo());
+    }
 
     myHistoryIterator = myHistoryList.getIterator(tabID);
     //history could be suppressed by user for some reasons (creating promo video, conference demo etc.)
@@ -174,6 +182,32 @@ public final class SearchEverywhereManagerImpl implements SearchEverywhereManage
       myBalloon.setSize(prefSize);
     }
     calcPositionAndShow(initEvent, project, myBalloon);
+
+    if (Registry.is("search.everywhere.freeze.reproducer.enabled")) {
+      startWriteActions(myBalloon);
+    }
+  }
+
+  // Remove this function and scheduleWriteAction as soon as the ticket is fixed
+  // IJPL-240542 Search Everywhere freeze caused by VFS-refresh write-action contention (https://youtrack.jetbrains.com/issue/IJPL-240542)
+  private static void startWriteActions(Disposable disposable) {
+    if (disposable == null) {
+      throw new IllegalArgumentException("Disposable cannot be null");
+    }
+
+    Alarm alarm = new Alarm(Alarm.ThreadToUse.SWING_THREAD, disposable);
+    scheduleWriteAction(alarm);
+  }
+
+  private static void scheduleWriteAction(Alarm alarm) {
+    alarm.addRequest(() -> {
+      ApplicationManager.getApplication().runWriteAction(() -> {
+        // short write action
+      });
+      if (!alarm.isDisposed()) {
+        scheduleWriteAction(alarm);
+      }
+    }, 0);
   }
 
   @Override
@@ -187,7 +221,10 @@ public final class SearchEverywhereManagerImpl implements SearchEverywhereManage
   }
 
   @ApiStatus.Internal
-  public static List<SearchEverywhereContributor<?>> createContributors(@NotNull AnActionEvent initEvent, Project project) {
+  public static List<SearchEverywhereContributor<?>> createContributors(@NotNull AnActionEvent initEvent,
+                                                                        Project project,
+                                                                        boolean isSplitSearchEverywhere,
+                                                                        boolean shouldLinkFilesTabContributors) {
     SearchEverywhereMlContributorReplacement.saveInitEvent(initEvent);
     if (project == null) {
       ActionSearchEverywhereContributor.Factory factory = new ActionSearchEverywhereContributor.Factory();
@@ -196,13 +233,45 @@ public final class SearchEverywhereManagerImpl implements SearchEverywhereManage
 
     List<SearchEverywhereContributor<?>> res = new ArrayList<>();
     for (SearchEverywhereContributorFactory<?> factory : SearchEverywhereContributor.EP_NAME.getExtensionList()) {
-      if (factory.isAvailable(project)) {
+      if (factory.isAvailable(project, isSplitSearchEverywhere)) {
         SearchEverywhereContributor<?> contributor = factory.createContributor(initEvent);
         res.add(contributor);
       }
     }
 
+    if (shouldLinkFilesTabContributors) {
+      linkFilesContributors(res);
+    }
+
     return res;
+  }
+
+  @ApiStatus.Internal
+  public static void linkFilesContributors(List<SearchEverywhereContributor<?>> contributors) {
+    // Find the main FileSearchEverywhereContributor
+    FileSearchEverywhereContributor mainFilesContributor = null;
+    for (SearchEverywhereContributor<?> contributor : contributors) {
+      mainFilesContributor = FilesTabSEContributor.asMainFilesContributorOrNull(contributor);
+      if (mainFilesContributor != null) break;
+    }
+
+    if (mainFilesContributor == null) {
+      return; // No main contributor found (shouldn't happen in normal scenarios)
+    }
+
+    // Find all other FilesTabSEContributors (excluding the main one)
+    List<FilesTabSEContributor> otherFilesContributors = new ArrayList<>();
+    for (SearchEverywhereContributor<?> contributor : contributors) {
+      FilesTabSEContributor unwrapped = FilesTabSEContributor.unwrapFilesTabContributorIfPossible(contributor);
+      if (unwrapped != null && !FilesTabSEContributor.isMainFilesContributor(contributor)) {
+        otherFilesContributors.add(unwrapped);
+      }
+    }
+
+    // Link them
+    if (!otherFilesContributors.isEmpty()) {
+      mainFilesContributor.linkFilesTabContributors(otherFilesContributors);
+    }
   }
 
   private void calcPositionAndShow(@NotNull AnActionEvent initEvent,
@@ -346,10 +415,10 @@ public final class SearchEverywhereManagerImpl implements SearchEverywhereManage
       });
     });
 
-    DumbAwareAction.create(__ -> showHistoryItem(true))
+    DumbAwareAction.create(_ -> showHistoryItem(true))
       .registerCustomShortcutSet(SearchTextField.SHOW_HISTORY_SHORTCUT, view);
 
-    DumbAwareAction.create(__ -> showHistoryItem(false))
+    DumbAwareAction.create(_ -> showHistoryItem(false))
       .registerCustomShortcutSet(SearchTextField.ALT_SHOW_HISTORY_SHORTCUT, view);
 
     return view;

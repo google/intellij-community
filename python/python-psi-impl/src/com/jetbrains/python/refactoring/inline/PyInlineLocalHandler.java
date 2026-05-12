@@ -302,7 +302,7 @@ public final class PyInlineLocalHandler extends InlineActionHandler {
     for (final PsiElement ref : refsToInline) {
       final List<PsiElement> elems = new ArrayList<>();
       final List<Instruction> latestDefs =
-        PyDefUseUtil.getLatestDefs(containerBlock, local.getName(), ref, false, false, TypeEvalContext.codeInsightFallback(project));
+        PyDefUseUtil.getLatestDefs(containerBlock, local.getName(), ref, false, false, TypeEvalContext.codeInsightFallback(project)).defs();
       for (Instruction i : latestDefs) {
         elems.add(i.getElement());
       }
@@ -411,7 +411,7 @@ public final class PyInlineLocalHandler extends InlineActionHandler {
     if (expr != null) {
       try {
         final List<Instruction> candidates =
-          PyDefUseUtil.getLatestDefs(containerBlock, local.getName(), expr, true, true, TypeEvalContext.codeInsightFallback(project));
+          PyDefUseUtil.getLatestDefs(containerBlock, local.getName(), expr, true, true, TypeEvalContext.codeInsightFallback(project)).defs();
         if (candidates.size() == 1) {
           final PyStatement expression = getAssignmentByLeftPart((PyElement)candidates.get(0).getElement());
           return Pair.create(expression, false);

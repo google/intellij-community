@@ -5,6 +5,7 @@ package com.intellij.platform.impl.toolkit
 import java.awt.Component
 import java.awt.GraphicsEnvironment
 import java.awt.Point
+import java.awt.Rectangle
 import java.awt.Window
 import java.awt.event.MouseEvent
 import java.awt.peer.MouseInfoPeer
@@ -17,9 +18,16 @@ object IdeMouseInfoPeer: MouseInfoPeer {
 
   override fun fillPointWithCoords(point: Point): Int {
     point.location = lastMouseCoords
-    return GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices().indexOfFirst {
-      it.defaultConfiguration.bounds.contains(point)
-    }
+    val screenDevices = GraphicsEnvironment.getLocalGraphicsEnvironment().screenDevices
+    return screenDevices.indices.minByOrNull {
+      screenDevices[it].defaultConfiguration.bounds.squaredDistanceTo(point)
+    } ?: 0
+  }
+
+  private fun Rectangle.squaredDistanceTo(point: Point): Int {
+    val dx = point.x.coerceIn(bounds.x, bounds.x + bounds.width) - point.x
+    val dy = point.y.coerceIn(bounds.y, bounds.y + bounds.height) - point.y
+    return dx * dx + dy * dy
   }
 
   override fun isWindowUnderMouse(w: Window): Boolean {

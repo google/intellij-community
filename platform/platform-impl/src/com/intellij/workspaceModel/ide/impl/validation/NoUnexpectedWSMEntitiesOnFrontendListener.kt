@@ -36,7 +36,7 @@ internal class NoUnexpectedWSMEntitiesOnFrontendListener : WorkspaceModelChangeL
     }
 
     if (violations.isNotEmpty()) {
-      thisLogger().error("It is not correct to change the following WSM entities on frontend: ${violations}")
+      thisLogger().error("It is not correct to change the following WSM entities on frontend: {$violations}")
     }
   }
 }

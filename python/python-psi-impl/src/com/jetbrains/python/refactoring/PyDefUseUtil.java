@@ -23,6 +23,7 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.Ref;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiFile;
 import com.intellij.psi.util.QualifiedName;
 import com.jetbrains.python.codeInsight.controlflow.CallInstruction;
 import com.jetbrains.python.codeInsight.controlflow.ControlFlowCache;
@@ -37,6 +38,7 @@ import com.jetbrains.python.psi.PyElement;
 import com.jetbrains.python.psi.PyExpression;
 import com.jetbrains.python.psi.PyImplicitImportNameDefiner;
 import com.jetbrains.python.psi.PyImportedNameDefiner;
+import com.jetbrains.python.psi.PyQualifiedExpression;
 import com.jetbrains.python.psi.PyTargetExpression;
 import com.jetbrains.python.psi.PyTypedElement;
 import com.jetbrains.python.psi.impl.PyAugAssignmentStatementNavigator;
@@ -44,6 +46,7 @@ import com.jetbrains.python.psi.types.PyNarrowedType;
 import com.jetbrains.python.psi.types.TypeEvalContext;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -61,30 +64,35 @@ public final class PyDefUseUtil {
   private PyDefUseUtil() {
   }
 
+  // For very large control flows we keep using a lighter, project-cached context for the narrowing-detection lookup
+  // below to avoid blowing the stack when re-entering type inference from inside a deep CFG walk (PY-73958).
   private static final int MAX_CONTROL_FLOW_SIZE = 200;
 
-  public static @NotNull List<Instruction> getLatestDefs(@NotNull ScopeOwner block,
-                                                         @NotNull String varName,
-                                                         @NotNull PsiElement anchor,
-                                                         boolean acceptTypeAssertions,
-                                                         boolean acceptImplicitImports,
-                                                         @NotNull TypeEvalContext context) {
+  public record LatestDefsResult(@NotNull List<Instruction> defs, boolean foundPrefixCall) {
+    static  LatestDefsResult EMPTY = new LatestDefsResult(Collections.emptyList(), false);
+  }
+
+  public static @NotNull LatestDefsResult getLatestDefs(@NotNull ScopeOwner block,
+                                                        @NotNull String varName,
+                                                        @NotNull PsiElement anchor,
+                                                        boolean acceptTypeAssertions,
+                                                        boolean acceptImplicitImports,
+                                                        @NotNull TypeEvalContext context) {
     return getLatestDefs(ControlFlowCache.getControlFlow(block), block, varName, anchor, acceptTypeAssertions, acceptImplicitImports,
                          context);
   }
 
-
-  public static @NotNull List<Instruction> getLatestDefs(@NotNull PyControlFlow controlFlow,
-                                                         @NotNull ScopeOwner scopeOwner,
-                                                         @NotNull String varName,
-                                                         @NotNull PsiElement anchor,
-                                                         boolean acceptTypeAssertions,
-                                                         boolean acceptImplicitImports,
-                                                         @NotNull TypeEvalContext context) {
+  public static @NotNull LatestDefsResult getLatestDefs(@NotNull PyControlFlow controlFlow,
+                                                              @NotNull ScopeOwner scopeOwner,
+                                                              @NotNull String varName,
+                                                              @NotNull PsiElement anchor,
+                                                              boolean acceptTypeAssertions,
+                                                              boolean acceptImplicitImports,
+                                                              @NotNull TypeEvalContext context) {
     final Instruction[] instructions = controlFlow.getInstructions();
     int startNum = findStartInstructionId(anchor, controlFlow, scopeOwner);
     if (startNum < 0) {
-      return Collections.emptyList();
+      return LatestDefsResult.EMPTY;
     }
 
     QualifiedName varQname = QualifiedName.fromDottedString(varName);
@@ -92,6 +100,7 @@ public final class PyDefUseUtil {
     final Collection<Instruction> result = new LinkedHashSet<>();
     final HashMap<PyCallSiteExpression, ConditionalInstruction> pendingTypeGuard = new HashMap<>();
     final Ref<@NotNull Boolean> foundPrefixWrite = Ref.create(false);
+    final Ref<@NotNull Boolean> foundPrefixCall = Ref.create(false);
     iteratePrev(startNum, controlFlow,
                 instruction -> {
                   if (instruction instanceof PyWithContextExitInstruction withExit) {
@@ -105,22 +114,18 @@ public final class PyDefUseUtil {
                       result.add(typeGuardInstruction);
                       return ControlFlowUtil.Operation.CONTINUE;
                     }
-                    if (instruction.num() < startNum &&
+                    if (isNotBackEdge(instruction.num(), startNum) &&
                         context.getOrigin() == callInstruction.getElement().getContainingFile()) {
-                      var newContext = (MAX_CONTROL_FLOW_SIZE > instructions.length)
-                                       ? TypeEvalContext.codeAnalysis(context.getOrigin().getProject(), context.getOrigin())
-                                       : TypeEvalContext.codeInsightFallback(context.getOrigin().getProject());
-                      if (callInstruction.isNoReturnCall(newContext)) return ControlFlowUtil.Operation.CONTINUE;
+                      TypeEvalContext narrowingContext = chooseNarrowingContext(context, instructions.length);
+                      if (callInstruction.isNoReturnCall(narrowingContext)) return ControlFlowUtil.Operation.CONTINUE;
                     }
                   }
-                  if (instruction.num() < startNum
+                  if (isNotBackEdge(instruction.num(), startNum)
                       && acceptTypeAssertions && instruction instanceof ConditionalInstruction conditionalInstruction) {
                     if (conditionalInstruction.getCondition() instanceof PyTypedElement typedElement &&
                         context.getOrigin() == typedElement.getContainingFile()) {
-                      var newContext = (MAX_CONTROL_FLOW_SIZE > instructions.length)
-                                       ? TypeEvalContext.codeAnalysis(context.getOrigin().getProject(), context.getOrigin())
-                                       : TypeEvalContext.codeInsightFallback(context.getOrigin().getProject());
-                      if (newContext.getType(typedElement) instanceof PyNarrowedType narrowedType && narrowedType.isBound()) {
+                      TypeEvalContext narrowingContext = chooseNarrowingContext(context, instructions.length);
+                      if (narrowingContext.getType(typedElement) instanceof PyNarrowedType narrowedType && narrowedType.isBound()) {
                         String narrowedQname = narrowedType.getQname();
                         if (narrowedQname != null) {
                           if (isQualifiedBy(varQname, narrowedQname)) {
@@ -135,10 +140,16 @@ public final class PyDefUseUtil {
                       }
                     }
                   }
+                  // A call with prefix as receiver or argument (e.g. self.reset() or foo(self)) may mutate attributes, so soft-invalidate narrowing (PY-88265)
+                  if (instruction instanceof CallInstruction callInstr) {
+                    if (isCallOnPrefix(callInstr, varQname)) {
+                      foundPrefixCall.set(true);
+                    }
+                  }
                   if (instruction instanceof ReadWriteInstruction rwInstruction) {
                     final ReadWriteInstruction.ACCESS access = rwInstruction.getAccess();
                     if (access.isWriteAccess() ||
-                        acceptTypeAssertions && access.isAssertTypeAccess() && instruction.num() < startNum) {
+                        acceptTypeAssertions && access.isAssertTypeAccess() && isNotBackEdge(instruction.num(), startNum)) {
 
                       final String name = rwInstruction.getName();
 
@@ -162,9 +173,51 @@ public final class PyDefUseUtil {
                   return ControlFlowUtil.Operation.NEXT;
                 });
     if (foundPrefixWrite.get()) {
-      return Collections.emptyList();
+      return LatestDefsResult.EMPTY;
     }
-    return new ArrayList<>(result);
+    return new LatestDefsResult(new ArrayList<>(result), foundPrefixCall.get());
+  }
+
+  /**
+   * New analysis handles back edges separately.
+   *
+   * @see com.jetbrains.python.psi.impl.PyReferenceExpressionImpl
+   */
+  private static boolean isNotBackEdge(int instNum, int startNum) {
+    return instNum < startNum;
+  }
+
+  /**
+   * Reuse the caller's context for narrowing detection so the AssumptionContext set up by the
+   * fixpoint isn't dropped (PY-89245). Fall back to a lighter context for oversized CFGs to keep
+   * the stack-overflow guard from PY-73958.
+   */
+  private static @NotNull TypeEvalContext chooseNarrowingContext(@NotNull TypeEvalContext context, int controlFlowSize) {
+    if (controlFlowSize >= MAX_CONTROL_FLOW_SIZE) {
+      PsiFile origin = context.getOrigin();
+      if (origin != null) {
+        return TypeEvalContext.codeInsightFallback(origin.getProject());
+      }
+    }
+    return context;
+  }
+
+  private static boolean isCallOnPrefix(@NotNull CallInstruction callInstr, @NotNull QualifiedName varQname) {
+    PyExpression receiver = callInstr.getElement().getReceiver(null);
+    if (isPrefixExpression(receiver, varQname)) return true;
+    for (PyExpression arg : callInstr.getElement().getArguments()) {
+      if (isPrefixExpression(arg, varQname)) return true;
+    }
+    return false;
+  }
+
+  private static boolean isPrefixExpression(@Nullable PyExpression expr, @NotNull QualifiedName varQname) {
+    if (expr instanceof PyQualifiedExpression qualifiedExpr) {
+      QualifiedName exprQname = qualifiedExpr.asQualifiedName();
+      return exprQname != null && varQname.getComponentCount() > exprQname.getComponentCount()
+             && varQname.matchesPrefix(exprQname);
+    }
+    return false;
   }
 
   private static boolean isQualifiedBy(QualifiedName varQname, @NotNull String qualifier) {

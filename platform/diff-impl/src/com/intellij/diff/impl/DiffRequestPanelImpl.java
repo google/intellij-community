@@ -9,6 +9,8 @@ import com.intellij.diff.util.DiffUserDataKeysEx;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.Key;
+import com.intellij.openapi.util.UserDataHolder;
+import com.intellij.openapi.util.UserDataHolderBase;
 import com.intellij.util.concurrency.annotations.RequiresEdt;
 import com.intellij.util.ui.UIUtil;
 import org.jetbrains.annotations.NotNull;
@@ -26,7 +28,11 @@ public class DiffRequestPanelImpl implements DiffRequestPanel {
   private final @NotNull MyDiffRequestProcessor myProcessor;
 
   public DiffRequestPanelImpl(@Nullable Project project, @Nullable Window window) {
-    myProcessor = new MyDiffRequestProcessor(project, window);
+    this(project, window, new UserDataHolderBase());
+  }
+
+  public DiffRequestPanelImpl(@Nullable Project project, @Nullable Window window, UserDataHolder context) {
+    myProcessor = new MyDiffRequestProcessor(project, window, context);
     myProcessor.putContextUserData(DiffUserDataKeys.DO_NOT_CHANGE_WINDOW_TITLE, true);
 
     myPanel = new JPanel(new BorderLayout()) {
@@ -75,8 +81,8 @@ public class DiffRequestPanelImpl implements DiffRequestPanel {
     private @NotNull DiffRequest myRequest = NoDiffRequest.INSTANCE;
     private @Nullable Object myRequestIdentity = null;
 
-    MyDiffRequestProcessor(@Nullable Project project, @Nullable Window window) {
-      super(project);
+    MyDiffRequestProcessor(@Nullable Project project, @Nullable Window window, UserDataHolder context) {
+      super(project, context);
       myWindow = window;
     }
 

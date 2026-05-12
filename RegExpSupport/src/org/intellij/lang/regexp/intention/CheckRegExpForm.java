@@ -213,10 +213,7 @@ public final class CheckRegExpForm {
       public void focusGained(FocusEvent e) {
         final Editor editor = mySampleText.getEditor();
         if (editor == null) return;
-        final int offset = editor.getCaretModel().getOffset();
-        ApplicationManager.getApplication().invokeLater(() -> { // we use invokeLater here to wrap this computation into a write-intent lock
-          highlightSampleGroup(offset, regExpFile);
-        });
+        highlightSampleGroup(editor.getCaretModel().getOffset(), regExpFile);
       }
     });
 
@@ -279,7 +276,7 @@ public final class CheckRegExpForm {
               setMatches(regExpFile, null);
             }
             ApplicationManager.getApplication()
-              .invokeLater(() -> reportResult(result, regExpFile), ModalityState.any(), __ -> updater.isDisposed());
+              .invokeLater(() -> reportResult(result, regExpFile), ModalityState.any(), _ -> updater.isDisposed());
           }, 0);
         }
       }

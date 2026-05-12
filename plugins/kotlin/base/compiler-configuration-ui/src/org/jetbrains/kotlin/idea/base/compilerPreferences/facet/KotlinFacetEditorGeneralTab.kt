@@ -16,6 +16,7 @@ import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.ui.HoverHyperlinkLabel
+import com.intellij.ui.dsl.listCellRenderer.listCellRenderer
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.ThreeStateCheckBox
 import com.intellij.util.xmlb.annotations.Transient
@@ -56,13 +57,10 @@ import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
 import org.jetbrains.kotlin.platform.jvm.isJvm
 import org.jetbrains.kotlin.platform.oldFashionedDescription
 import java.awt.BorderLayout
-import java.awt.Component
 import javax.swing.AbstractButton
-import javax.swing.DefaultListCellRenderer
 import javax.swing.JComboBox
 import javax.swing.JComponent
 import javax.swing.JLabel
-import javax.swing.JList
 import javax.swing.JPanel
 import javax.swing.JTextField
 import javax.swing.border.EmptyBorder
@@ -204,24 +202,19 @@ class KotlinFacetEditorGeneralTab(
             targetPlatformLabel = JLabel() //JTextField()? targetPlatformLabel.isEditable = false
             targetPlatformSelectSingleCombobox =
                 ComboBox(targetPlatformWrappers.toTypedArray()).apply {
-                    setRenderer(object : DefaultListCellRenderer() {
-                        override fun getListCellRendererComponent(
-                            list: JList<*>?,
-                            value: Any?,
-                            index: Int,
-                            isSelected: Boolean,
-                            cellHasFocus: Boolean
-                        ): Component {
-                            return super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus).apply {
-                                val specificPlatform = (value as? TargetPlatformWrapper)?.targetPlatform?.componentPlatforms?.singleOrNull()
-                                text = specificPlatform?.oldFashionedDescription ?: KotlinBaseCompilerConfigurationUiBundle.message("facet.text.multiplatform")
+                    renderer = listCellRenderer {
+                        val specificPlatform = value?.targetPlatform?.componentPlatforms?.singleOrNull()
+                        text(
+                            specificPlatform?.oldFashionedDescription
+                                ?: KotlinBaseCompilerConfigurationUiBundle.message("facet.text.multiplatform")
+                        )
 
-                                if (specificPlatform is JdkPlatform && specificPlatform.targetVersion == JvmTarget.JVM_1_6) {
-                                    text += " " + KotlinBaseCompilerConfigurationUiBundle.message("deprecated.jvm.version")
-                                }
+                        if (specificPlatform is JdkPlatform && specificPlatform.targetVersion == JvmTarget.JVM_1_6) {
+                            text(KotlinBaseCompilerConfigurationUiBundle.message("deprecated.jvm.version")) {
+                                foreground = greyForeground
                             }
                         }
-                    })
+                    }
                 }
             targetPlatformSelectSingleCombobox.maximumRowCount =
                 targetPlatformsComboboxRowsCount(targetPlatformWrappers.size)

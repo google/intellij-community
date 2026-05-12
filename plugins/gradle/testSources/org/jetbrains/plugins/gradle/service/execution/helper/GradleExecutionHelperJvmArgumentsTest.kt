@@ -19,7 +19,7 @@ import com.intellij.util.net.NetUtils
 import org.assertj.core.api.Assertions
 import org.gradle.util.GradleVersion
 import org.jetbrains.plugins.gradle.testFramework.annotations.AllGradleVersionsSource
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatGradleIsAtLeast
+import org.jetbrains.plugins.gradle.tooling.annotation.TargetVersions
 import org.junit.jupiter.params.ParameterizedTest
 
 class GradleExecutionHelperJvmArgumentsTest : GradleExecutionHelperJvmArgumentsTestCase() {
@@ -74,14 +74,12 @@ class GradleExecutionHelperJvmArgumentsTest : GradleExecutionHelperJvmArgumentsT
 
   @ParameterizedTest
   @AllGradleVersionsSource
+  @TargetVersions(
+    "8.13+",
+    reason = "Gradle TAPI's VM options merger cannot recognise org.gradle.debug.* sub-properties in gradle.properties in <8.13. " +
+             "Gradle debugger port cannot be specified in gradle.properties in <7.4"
+  )
   fun `test Gradle JVM options resolution with debug agent in gradle properties and custom properties`(gradleVersion: GradleVersion) {
-    assumeThatGradleIsAtLeast(gradleVersion, "7.4") {
-      "Gradle debugger port cannot be specified in gradle.properties"
-    }
-    assumeThatGradleIsAtLeast(gradleVersion, "8.13") {
-      "Gradle TAPI's VM options merger cannot recognise org.gradle.debug.* sub-properties in gradle.properties"
-    }
-
     testEmptyProject(gradleVersion) {
 
       val port = NetUtils.findAvailableSocketPort()

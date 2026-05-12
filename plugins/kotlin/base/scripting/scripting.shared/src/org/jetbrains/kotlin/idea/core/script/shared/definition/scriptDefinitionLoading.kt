@@ -12,7 +12,7 @@ import com.intellij.openapi.util.io.toNioPathOrNull
 import com.intellij.util.ExceptionUtil
 import com.intellij.util.PathUtil
 import com.intellij.util.lang.UrlClassLoader
-import org.jetbrains.kotlin.idea.core.script.v1.logger
+import org.jetbrains.kotlin.idea.core.script.v1.kotlinScriptLogger
 import org.jetbrains.kotlin.idea.core.script.v1.scriptingErrorLog
 import org.jetbrains.kotlin.idea.core.script.v1.scriptingInfoLog
 import org.jetbrains.kotlin.idea.core.script.v1.scriptingWarnLog
@@ -141,7 +141,7 @@ private fun moveJarFromWslToHost(source: Path, targetFolderPathResolver: Lazy<Pa
     try {
         Files.copy(source, relocatedJar, StandardCopyOption.REPLACE_EXISTING)
     } catch (t: Throwable) {
-        logger.warn("Unable to copy a DSL-related jar from $source to $relocatedJar: ${ExceptionUtil.getMessage(t)}")
+        kotlinScriptLogger.warn("Unable to copy a DSL-related jar from $source to $relocatedJar: ${ExceptionUtil.getMessage(t)}")
         return source
     }
     return relocatedJar

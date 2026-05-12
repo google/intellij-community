@@ -1,23 +1,19 @@
 ### auto-generated section `build intellij.java.debugger` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "java-debugger_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "java-debugger",
   module_name = "intellij.java.debugger",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":java-debugger_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//java/execution/openapi:java-execution",
+    "//java/java-syntax:syntax",
     "//java/jsp-openapi:jsp",
     "//java/java-psi-api:psi",
-    "//resources-en:java-resources-en",
+    "//java/java-frontback-psi-api:frontback-psi",
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
@@ -30,6 +26,8 @@ jvm_library(
     "//xml/xml-psi-api:psi",
     "@lib//:kotlin-stdlib",
     "//platform/execution",
+    "//platform/ide-core",
+    "//platform/util/base",
   ],
   exports = ["//platform/xdebugger-api:debugger"],
   runtime_deps = ["//platform/backend"]
@@ -37,6 +35,7 @@ jvm_library(
 
 jvm_library(
   name = "java-debugger_test_lib",
+  testonly = True,
   module_name = "intellij.java.debugger",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -47,9 +46,10 @@ jvm_library(
   runtime_deps = [
     ":java-debugger",
     "//java/execution/openapi:java-execution_test_lib",
+    "//java/java-syntax:syntax_test_lib",
     "//java/jsp-openapi:jsp_test_lib",
     "//java/java-psi-api:psi_test_lib",
-    "//resources-en:java-resources-en_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
     "//platform/analysis-api:analysis_test_lib",
     "//platform/core-api:core_test_lib",
     "//platform/editor-ui-api:editor-ui_test_lib",
@@ -62,6 +62,14 @@ jvm_library(
     "//xml/xml-psi-api:psi_test_lib",
     "//platform/execution:execution_test_lib",
     "//platform/backend:backend_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
+    "//platform/util/base:base_test_lib",
   ]
 )
 ### auto-generated section `build intellij.java.debugger` end
+
+### auto-generated section `iml intellij.java.debugger` start
+exports_files([
+  "intellij.java.debugger.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.java.debugger` end

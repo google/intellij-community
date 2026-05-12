@@ -4,6 +4,7 @@ import com.intellij.codeInsight.daemon.impl.HintRenderer;
 import com.intellij.database.DataGridBundle;
 import com.intellij.database.datagrid.CoreGrid;
 import com.intellij.database.datagrid.DataGrid;
+import com.intellij.database.datagrid.GridCellRequest;
 import com.intellij.database.datagrid.GridColumn;
 import com.intellij.database.datagrid.GridHelper;
 import com.intellij.database.datagrid.GridRow;
@@ -72,15 +73,14 @@ public final class DefaultTextRendererFactory implements GridCellRendererFactory
   }
 
   @Override
-  public boolean supports(@NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
+  public boolean supports(@NotNull GridCellRequest<GridRow, GridColumn> request) {
     return true;
   }
 
   @Override
-  public @NotNull GridCellRenderer getOrCreateRenderer(@NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
-    Object value = myGrid.getDataModel(DATA_WITH_MUTATIONS).getValueAt(row, column);
-    String languageId = getLanguage(myGrid, row, column).getID();
-    return hasInlay(value) ? myRenderersWithInlay.get(languageId) : myRenderers.get(languageId);
+  public @NotNull GridCellRenderer getOrCreateRenderer(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    String languageId = getLanguage(request).getID();
+    return hasInlay(request.getValue()) ? myRenderersWithInlay.get(languageId) : myRenderers.get(languageId);
   }
 
   @Override
@@ -89,10 +89,10 @@ public final class DefaultTextRendererFactory implements GridCellRendererFactory
     myRenderersWithInlay.forEach((lang, renderer) -> renderer.reinitSettings());
   }
 
-  public static @NotNull Language getLanguage(@NotNull DataGrid grid, @NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> columnIdx) {
-    Language language = grid.getContentLanguage(columnIdx);
+  public static @NotNull Language getLanguage(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    Language language = request.getGrid() instanceof DataGrid g ? g.getContentLanguage(request.getColumnIdx()) : Language.ANY;
     if (language != Language.ANY) return language;
-    language = GridHelper.get(grid).getCellLanguage(grid, row, columnIdx);
+    language = GridHelper.get(request.getGrid()).getCellLanguage(request);
     return language == null ? PlainTextLanguage.INSTANCE : language;
   }
 
@@ -173,6 +173,13 @@ public final class DefaultTextRendererFactory implements GridCellRendererFactory
       }
     }
 
+    /**
+     * Returns the editor. Must be called after {@link #getComponent} which lazily creates it.
+     */
+    public @NotNull EditorEx getEditor() {
+      return myComponent.getEditor();
+    }
+
     public static @NotNull AbbreviatingRendererComponent createComponent(@NotNull Project project, @Nullable Language language) {
       return language == PlainTextLanguage.INSTANCE ?
              new AbbreviatingRendererComponent(project, language, false, true) :
@@ -180,7 +187,7 @@ public final class DefaultTextRendererFactory implements GridCellRendererFactory
     }
 
     @Override
-    public int getSuitability(@NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
+    public int getSuitability(@NotNull GridCellRequest<GridRow, GridColumn> request) {
       return SUITABILITY_MIN;
     }
 

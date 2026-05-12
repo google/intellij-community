@@ -38,6 +38,9 @@ internal object NodeIds {
   /** Module set XML file generation */
   @JvmField val MODULE_SET_XML = NodeId("moduleSetXml", NodeCategory.GENERATION)
 
+  /** Module-set plugin wrapper generation */
+  @JvmField val MODULE_SET_PLUGINS = NodeId("moduleSetPlugins", NodeCategory.GENERATION)
+
   /** Product module dependency generation (modules in module sets) */
   @JvmField val PRODUCT_MODULE_DEPS = NodeId("productModuleDeps", NodeCategory.GENERATION)
 
@@ -97,6 +100,12 @@ internal object NodeIds {
   /** Product module set validation */
   @JvmField val PRODUCT_MODULE_SET_VALIDATION = NodeId("productModuleSetValidation", NodeCategory.VALIDATION)
 
+  /** Pluginized module-set reference validation */
+  @JvmField val PLUGINIZED_MODULE_SET_REFERENCE_VALIDATION = NodeId("pluginizedModuleSetReferenceValidation", NodeCategory.VALIDATION)
+
+  /** Module set pluginization constraints validation */
+  @JvmField val MODULE_SET_PLUGINIZATION_VALIDATION = NodeId("moduleSetPluginizationValidation", NodeCategory.VALIDATION)
+
   /** Library module validation (auto-fixes .iml files) */
   @JvmField val LIBRARY_MODULE_VALIDATION = NodeId("libraryModuleValidation", NodeCategory.VALIDATION)
 
@@ -111,4 +120,7 @@ internal object NodeIds {
 
   /** Test library scope validation */
   @JvmField val TEST_LIBRARY_SCOPE_VALIDATION = NodeId("testLibraryScopeValidation", NodeCategory.VALIDATION)
+
+  /** Implicit embedded-module content-module inclusion validation */
+  @JvmField val IMPLICIT_EMBEDDED_CONTENT_MODULE_VALIDATION = NodeId("implicitEmbeddedContentModuleValidation", NodeCategory.VALIDATION)
 }

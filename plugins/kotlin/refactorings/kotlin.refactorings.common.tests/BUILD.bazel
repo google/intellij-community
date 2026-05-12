@@ -3,6 +3,7 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "kotlin-refactorings-common-tests",
+  module_name = "kotlin.refactorings.common.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -17,6 +18,7 @@ jvm_library(
 
 jvm_library(
   name = "kotlin-refactorings-common-tests_test_lib",
+  testonly = True,
   module_name = "kotlin.refactorings.common.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -27,15 +29,18 @@ jvm_library(
     "//platform/code-style-api:codeStyle_test_lib",
     "//platform/core-api:core",
     "//platform/core-api:core_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/editor-ui-api:editor-ui",
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//platform/indexing-api:indexing",
     "//platform/indexing-api:indexing_test_lib",
+    "//java/java-psi-api:psi",
+    "//java/java-psi-api:psi_test_lib",
     "//platform/refactoring",
     "//platform/refactoring:refactoring_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
-    "@lib//:kotlinc-kotlin-compiler-tests",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/tests-common:common-tests",
     "//plugins/kotlin/tests-common:common-tests_test_lib",
     "//plugins/kotlin/base/util",
@@ -61,6 +66,12 @@ jvm_library(
   runtime_deps = [":kotlin-refactorings-common-tests"]
 )
 ### auto-generated section `build kotlin.refactorings.common.tests` end
+
+### auto-generated section `iml kotlin.refactorings.common.tests` start
+exports_files([
+  "kotlin.refactorings.common.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.refactorings.common.tests` end
 
 ### auto-generated section `test kotlin.refactorings.common.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

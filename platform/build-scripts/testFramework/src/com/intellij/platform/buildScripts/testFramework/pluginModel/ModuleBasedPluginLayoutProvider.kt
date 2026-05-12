@@ -1,12 +1,10 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.buildScripts.testFramework.pluginModel
 
-import com.intellij.platform.distributionContent.testFramework.deserializeContentData
 import com.intellij.platform.runtime.product.ProductMode
 import com.intellij.platform.runtime.product.ProductModules
 import com.intellij.platform.runtime.product.serialization.ProductModulesSerialization
 import com.intellij.platform.runtime.product.serialization.ResourceFileResolver
-import com.intellij.platform.runtime.repository.RuntimeModuleDescriptor
 import com.intellij.platform.runtime.repository.RuntimeModuleId
 import com.intellij.platform.runtime.repository.RuntimeModuleLoadingRule
 import com.intellij.platform.runtime.repository.RuntimeModuleRepository
@@ -15,20 +13,20 @@ import org.jetbrains.jps.model.java.JpsJavaExtensionService
 import org.jetbrains.jps.model.module.JpsModule
 import java.io.InputStream
 import java.nio.file.Path
-import kotlin.io.path.exists
 import kotlin.io.path.inputStream
 import kotlin.io.path.pathString
-import kotlin.io.path.readText
 
 class ModuleBasedPluginLayoutProvider(
   private val project: JpsProject,
-  runtimeModuleRepository: RuntimeModuleRepository,
+  private val runtimeModuleRepository: RuntimeModuleRepository,
+  private val corePluginConfigurationModuleName: String,
   private val productRootModuleName: String,
   productMode: ProductMode,
   private val corePluginDescriptorPath: String,
 ) : PluginLayoutProvider {
   private val productModules: ProductModules
   private val mainModulesOfBundledPlugins: Set<String>
+  private val embeddedModulesInBundledPlugins: Map<String, List<String>>
 
   init {
     val productRootModule = requireNotNull(project.findModuleByName(productRootModuleName)) { "Cannot find module '$productRootModuleName'" }
@@ -37,7 +35,7 @@ class ModuleBasedPluginLayoutProvider(
     }
     val resourceFileResolver = object : ResourceFileResolver {
       override fun readResourceFile(moduleId: RuntimeModuleId, relativePath: String): InputStream? {
-        val module = project.findModuleByName(moduleId.stringId) ?: return null
+        val module = project.findModuleByName(moduleId.name) ?: return null
         return module.findProductionFile(relativePath)?.inputStream()
       }
     }
@@ -48,41 +46,40 @@ class ModuleBasedPluginLayoutProvider(
       runtimeModuleRepository,
       resourceFileResolver,
     )
-    mainModulesOfBundledPlugins = productModules.bundledPluginModuleGroups.mapTo(HashSet()) { it.mainModule.moduleId.stringId }
+    mainModulesOfBundledPlugins = productModules.bundledPluginDescriptorModules.mapTo(HashSet()) { it.name }
+    embeddedModulesInBundledPlugins = productModules.bundledPluginDescriptorModules.associateBy(
+      { it.name },
+      { pluginDescriptorModule ->
+        val header = runtimeModuleRepository.findBundledPluginHeader(pluginDescriptorModule) ?: return@associateBy emptyList()
+        header.includedModules
+          .filter { it.loadingRule == RuntimeModuleLoadingRule.EMBEDDED && it.moduleId.namespace != RuntimeModuleId.LEGACY_JPS_LIBRARY_NAMESPACE
+                    && it.moduleId.namespace != RuntimeModuleId.LEGACY_JPS_MODULE_TESTS_NAMESPACE }
+          .map { it.moduleId.name }
+      })
   }
 
   private fun JpsModule.findProductionFile(relativePath: String): Path? = JpsJavaExtensionService.getInstance().findSourceFileInProductionRoots(this, relativePath)
 
   override fun loadCorePluginLayout(): PluginLayoutDescription {
-    val rootEmbeddedModules = productModules.mainModuleGroup.includedModules
+    val corePluginHeader = runtimeModuleRepository.findBundledPluginHeader(RuntimeModuleId.legacyJpsModule(corePluginConfigurationModuleName))
+                           ?: error("Cannot find core plugin header for module '$corePluginConfigurationModuleName'")
+    val embeddedModules = corePluginHeader.includedModules
       .asSequence()
       .filter { it.loadingRule == RuntimeModuleLoadingRule.EMBEDDED }
-      .map { it.moduleDescriptor }
-    val embeddedModulesWithDependencies = LinkedHashSet<RuntimeModuleDescriptor>()
-    fun collectDependencies(descriptor: RuntimeModuleDescriptor, result: MutableSet<RuntimeModuleDescriptor>) {
-      if (result.add(descriptor)) {
-        descriptor.dependencies.forEach { collectDependencies(it, result) }
+      .map { it.moduleId }
+      .filterNot { it.namespace == RuntimeModuleId.LEGACY_JPS_LIBRARY_NAMESPACE }
+      .mapNotNull {
+        project.findModuleByName(it.name)
       }
-    }
-    for (descriptor in rootEmbeddedModules) {
-      collectDependencies(descriptor, embeddedModulesWithDependencies)
-    }
-    
-    val mainGroupModules = embeddedModulesWithDependencies
-      .asSequence()
-      .map { it.moduleId.stringId }
-      .filterNot { it.startsWith(RuntimeModuleId.LIB_NAME_PREFIX) }
-      .mapNotNull { 
-        project.findModuleByName(it)
-      }
-    val mainModule = requireNotNull(mainGroupModules.find { it.findProductionFile(corePluginDescriptorPath) != null }) {
+
+    val mainModule = requireNotNull(embeddedModules.find { it.findProductionFile(corePluginDescriptorPath) != null }) {
       "Cannot find '$corePluginDescriptorPath' in the main module group of '$productRootModuleName'"
     }
-    
+
     return PluginLayoutDescription(
       mainJpsModule = mainModule.name,
       pluginDescriptorPath = corePluginDescriptorPath,
-      jpsModulesInClasspath = mainGroupModules.mapTo(LinkedHashSet()) { it.name },
+      jpsModulesInClasspath = embeddedModules.mapTo(LinkedHashSet()) { it.name },
     )
   }
 
@@ -94,25 +91,12 @@ class ModuleBasedPluginLayoutProvider(
     if (mainModule.name !in mainModulesOfBundledPlugins) {
       return null
     }
-    
-    // Try to load plugin-content.yaml if it exists
-    val contentDataPath = mainModule.findProductionFile("plugin-content.yaml")
-    if (contentDataPath != null && contentDataPath.exists()) {
-      val contentData = deserializeContentData(contentDataPath.readText())
-      return toPluginLayoutDescription(
-        entries = contentData,
-        mainModuleName = mainModule.name,
-        pluginDescriptorPath = "META-INF/plugin.xml",
-        mainLibDir = "lib",
-        jarsToIgnore = emptySet()
-      )
-    }
-    
-    // Fallback: just the main module
+
+    val embeddedModules = embeddedModulesInBundledPlugins[mainModule.name]?.toSet() ?: emptySet()
     return PluginLayoutDescription(
       mainJpsModule = mainModule.name,
       pluginDescriptorPath = "META-INF/plugin.xml",
-      jpsModulesInClasspath = setOf(mainModule.name),
+      jpsModulesInClasspath = embeddedModules,
     )
   }
 

@@ -11,6 +11,9 @@ com.intellij.collaboration.api.ServerPath
 - a:toURI():java.net.URI
 f:com.intellij.collaboration.api.data.GraphQLRequestPagination
 - sf:Companion:com.intellij.collaboration.api.data.GraphQLRequestPagination$Companion
+- sf:DEFAULT_PAGE_SIZE:I
+- <init>(I):V
+- b:<init>(I,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - <init>(java.lang.String,I):V
 - b:<init>(java.lang.String,I,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - <init>(java.util.Date,I):V
@@ -119,7 +122,6 @@ f:com.intellij.collaboration.api.httpclient.HttpClientUtil
 - f:checkStatusCodeWithLogging(com.intellij.openapi.diagnostic.Logger,java.lang.String,I,java.io.InputStream):V
 - f:getUserAgentValue(java.lang.String):java.lang.String
 - f:inflateAndReadWithErrorHandlingAndLogging(com.intellij.openapi.diagnostic.Logger,java.net.http.HttpRequest,kotlin.jvm.functions.Function2):java.net.http.HttpResponse$BodyHandler
-- f:readSuccessResponseWithLogging(com.intellij.openapi.diagnostic.Logger,java.net.http.HttpRequest,java.net.http.HttpResponse$ResponseInfo,java.io.InputStream,kotlin.jvm.functions.Function1):java.lang.Object
 com.intellij.collaboration.api.httpclient.HttpRequestConfigurer
 - a:configure(java.net.http.HttpRequest$Builder):java.net.http.HttpRequest$Builder
 f:com.intellij.collaboration.api.httpclient.InflatedStreamReadingBodyHandler
@@ -137,8 +139,8 @@ f:com.intellij.collaboration.api.json.HttpJsonDeserializationException
 f:com.intellij.collaboration.api.json.JsonHttpApiHelperKt
 f:com.intellij.collaboration.api.page.ApiPageUtil
 - sf:INSTANCE:com.intellij.collaboration.api.page.ApiPageUtil
-- f:createGQLPagesFlow(Z,kotlin.jvm.functions.Function2):kotlinx.coroutines.flow.Flow
-- bs:createGQLPagesFlow$default(com.intellij.collaboration.api.page.ApiPageUtil,Z,kotlin.jvm.functions.Function2,I,java.lang.Object):kotlinx.coroutines.flow.Flow
+- f:createGQLPagesFlow(Z,com.intellij.collaboration.api.data.GraphQLRequestPagination,kotlin.jvm.functions.Function2):kotlinx.coroutines.flow.Flow
+- bs:createGQLPagesFlow$default(com.intellij.collaboration.api.page.ApiPageUtil,Z,com.intellij.collaboration.api.data.GraphQLRequestPagination,kotlin.jvm.functions.Function2,I,java.lang.Object):kotlinx.coroutines.flow.Flow
 - f:createPagesFlowByLinkHeader(java.net.URI,kotlin.jvm.functions.Function2):kotlinx.coroutines.flow.Flow
 f:com.intellij.collaboration.api.page.ApiPageUtilKt
 - sf:foldToList(kotlinx.coroutines.flow.Flow,kotlin.coroutines.Continuation):java.lang.Object

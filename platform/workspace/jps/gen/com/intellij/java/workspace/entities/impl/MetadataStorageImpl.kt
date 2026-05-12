@@ -1994,6 +1994,48 @@ internal object MetadataStorageImpl : MetadataStorageBase() {
 
     addMetadata(typeMetadata)
 
+    typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.jps.entities.CustomImlComponentEntity",
+                                  entityDataFqName = "com.intellij.platform.workspace.jps.entities.impl.CustomImlComponentEntityData",
+                                  supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"),
+                                  properties = listOf(OwnPropertyMetadata(isComputable = false,
+                                                                          isKey = false,
+                                                                          isOpen = false,
+                                                                          name = "entitySource",
+                                                                          valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false,
+                                                                                                                              typeMetadata = FinalClassMetadata.KnownClass(
+                                                                                                                                fqName = "com.intellij.platform.workspace.storage.EntitySource")),
+                                                                          withDefault = false),
+                                                      OwnPropertyMetadata(isComputable = false,
+                                                                          isKey = false,
+                                                                          isOpen = false,
+                                                                          name = "module",
+                                                                          valueType = ValueTypeMetadata.EntityReference(connectionType = ConnectionId.ConnectionType.ONE_TO_ONE,
+                                                                                                                        entityFqName = "com.intellij.platform.workspace.jps.entities.ModuleEntity",
+                                                                                                                        isChild = false,
+                                                                                                                        isNullable = false),
+                                                                          withDefault = false),
+                                                      OwnPropertyMetadata(isComputable = false,
+                                                                          isKey = false,
+                                                                          isOpen = false,
+                                                                          name = "components",
+                                                                          valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(
+                                                                            primitiveTypeStringNotNullable,
+                                                                            primitiveTypeStringNotNullable),
+                                                                                                                          primitive = primitiveTypeMapNotNullable),
+                                                                          withDefault = false)),
+                                  extProperties = listOf(ExtPropertyMetadata(isComputable = false,
+                                                                             isOpen = false,
+                                                                             name = "customImlComponent",
+                                                                             receiverFqn = "com.intellij.platform.workspace.jps.entities.ModuleEntity",
+                                                                             valueType = ValueTypeMetadata.EntityReference(connectionType = ConnectionId.ConnectionType.ONE_TO_ONE,
+                                                                                                                           entityFqName = "com.intellij.platform.workspace.jps.entities.CustomImlComponentEntity",
+                                                                                                                           isChild = true,
+                                                                                                                           isNullable = true),
+                                                                             withDefault = false)),
+                                  isAbstract = false)
+
+    addMetadata(typeMetadata)
+
     typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.jps.entities.CustomSourceRootPropertiesEntity",
                                   entityDataFqName = "com.intellij.platform.workspace.jps.entities.impl.CustomSourceRootPropertiesEntityData",
                                   supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"),
@@ -3565,6 +3607,7 @@ internal object MetadataStorageImpl : MetadataStorageBase() {
     addMetadataHash(typeFqn = "com.intellij.java.workspace.entities.ModuleTestOutputPackagingElementEntity", metadataHash = -190357913)
     addMetadataHash(typeFqn = "com.intellij.java.workspace.entities.PackagingElementEntity", metadataHash = -847487130)
     addMetadataHash(typeFqn = "com.intellij.platform.workspace.jps.entities.ContentRootEntity", metadataHash = 1173883867)
+    addMetadataHash(typeFqn = "com.intellij.platform.workspace.jps.entities.CustomImlComponentEntity", metadataHash = 51191557)
     addMetadataHash(typeFqn = "com.intellij.platform.workspace.jps.entities.CustomSourceRootPropertiesEntity", metadataHash = 1823618332)
     addMetadataHash(typeFqn = "com.intellij.platform.workspace.jps.entities.ExcludeUrlEntity", metadataHash = 2090027351)
     addMetadataHash(typeFqn = "com.intellij.platform.workspace.jps.entities.ExcludeUrlOrderEntity", metadataHash = -331091110)
@@ -3612,7 +3655,7 @@ internal object MetadataStorageImpl : MetadataStorageBase() {
     addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.SymbolicEntityId", metadataHash = -134684736)
     addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.EntitySource", metadataHash = -1659784075)
     addMetadataHash(typeFqn = "com.intellij.platform.workspace.jps.CustomModuleEntitySource", metadataHash = -768510244)
-    addMetadataHash(typeFqn = "com.intellij.platform.workspace.jps.GlobalStorageEntitySource", metadataHash = -1096189621)
+    addMetadataHash(typeFqn = "com.intellij.platform.workspace.jps.GlobalStorageEntitySource", metadataHash = 1706165233)
     addMetadataHash(typeFqn = "com.intellij.platform.workspace.jps.JpsGlobalFileEntitySource", metadataHash = -1975614804)
     addMetadataHash(typeFqn = "com.intellij.platform.workspace.jps.JpsFileEntitySource", metadataHash = -132164193)
     addMetadataHash(typeFqn = "com.intellij.platform.workspace.jps.JpsProjectFileEntitySource", metadataHash = 1697597780)

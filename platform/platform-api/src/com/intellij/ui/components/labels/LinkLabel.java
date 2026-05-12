@@ -103,7 +103,7 @@ public class LinkLabel<T> extends JLabel {
    */
   @Deprecated
   public static @NotNull LinkLabel<?> create(@Nullable @NlsContexts.LinkLabel String text, @Nullable Runnable action) {
-    return new LinkLabel<>(text, null, action == null ? null : (__, ___) -> action.run(), null, null);
+    return new LinkLabel<>(text, null, action == null ? null : (_, _) -> action.run(), null, null);
   }
 
   /**

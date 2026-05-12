@@ -5,6 +5,7 @@ import com.intellij.execution.process.ProcessOutputType;
 import com.intellij.openapi.util.Key;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.idea.maven.externalSystemIntegration.output.parsers.CompositeSpyOutputExtractor;
 import org.jetbrains.idea.maven.externalSystemIntegration.output.parsers.Maven3SpyOutputExtractor;
 import org.jetbrains.idea.maven.externalSystemIntegration.output.parsers.Maven4SpyOutputExtractor;
 import org.jetbrains.idea.maven.externalSystemIntegration.output.parsers.SpyOutputExtractor;
@@ -23,7 +24,6 @@ public class MavenSimpleConsoleEventsBuffer {
   public static class Builder {
     private final BiConsumer<String, Key<Object>> consumer;
     private boolean showSpyOutput;
-    private boolean loggingOutputStream;
     private boolean hideWindowsCmdMessage;
 
     public Builder(BiConsumer<String, Key<Object>> consumer) {
@@ -35,29 +35,23 @@ public class MavenSimpleConsoleEventsBuffer {
       return this;
     }
 
-    public Builder withLoggingOutputStream(boolean v) {
-      loggingOutputStream = v;
-      return this;
-    }
-
     public Builder withHidingCmdExitQuestion(boolean v) {
       hideWindowsCmdMessage = v;
       return this;
     }
 
     public MavenSimpleConsoleEventsBuffer build() {
-      return new MavenSimpleConsoleEventsBuffer(consumer, showSpyOutput, loggingOutputStream, hideWindowsCmdMessage);
+      return new MavenSimpleConsoleEventsBuffer(consumer, showSpyOutput, hideWindowsCmdMessage);
     }
   }
 
   private MavenSimpleConsoleEventsBuffer(BiConsumer<String, Key<Object>> consumer,
                                          boolean showSpyOutput,
-                                         boolean withLoggingOutputStream,
                                          boolean hideWindowsMessage) {
     myConsumer = consumer;
     myShowSpyOutput = showSpyOutput;
     myHideWindowsExitMessage = hideWindowsMessage;
-    myBuffer = new TypedBuffer(consumer, withLoggingOutputStream ? new Maven4SpyOutputExtractor() : new Maven3SpyOutputExtractor());
+    myBuffer = new TypedBuffer(consumer, new CompositeSpyOutputExtractor(new Maven4SpyOutputExtractor(), new Maven3SpyOutputExtractor()));
   }
 
   public void addText(@NotNull String text, @NotNull Key<Object> outputType) {

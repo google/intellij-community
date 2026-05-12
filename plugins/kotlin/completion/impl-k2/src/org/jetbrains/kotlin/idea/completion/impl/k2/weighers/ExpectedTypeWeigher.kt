@@ -6,9 +6,9 @@ import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementWeigher
 import com.intellij.openapi.util.Key
 import kotlinx.serialization.Serializable
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.components.DefaultTypeClassIds
-import org.jetbrains.kotlin.analysis.api.components.buildClassType
+import org.jetbrains.kotlin.analysis.api.components.KaStandardTypeClassIds
 import org.jetbrains.kotlin.analysis.api.components.expandedSymbol
 import org.jetbrains.kotlin.analysis.api.components.isMarkedNullable
 import org.jetbrains.kotlin.analysis.api.components.isNothingType
@@ -16,6 +16,7 @@ import org.jetbrains.kotlin.analysis.api.components.isNullable
 import org.jetbrains.kotlin.analysis.api.components.isSubClassOf
 import org.jetbrains.kotlin.analysis.api.components.isSubtypeOf
 import org.jetbrains.kotlin.analysis.api.components.isUnitType
+import org.jetbrains.kotlin.analysis.api.components.typeCreator
 import org.jetbrains.kotlin.analysis.api.components.upperBoundIfFlexible
 import org.jetbrains.kotlin.analysis.api.components.withNullability
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
@@ -55,11 +56,14 @@ internal object ExpectedTypeWeigher {
             } else MatchesExpectedType.NON_TYPABLE
             lookupElement.`object` is NamedArgumentLookupObject -> MatchesExpectedType.MATCHES
             lookupElement.`object` is KeywordLookupObject && expectedType != null -> {
+                @OptIn(KaExperimentalApi::class)
                 val actualType = when (lookupElement.lookupString) {
-                    KtTokens.NULL_KEYWORD.value -> buildClassType(DefaultTypeClassIds.NOTHING).withNullability(true)
+                    KtTokens.NULL_KEYWORD.value -> typeCreator.classType(KaStandardTypeClassIds.NOTHING) {
+                            isMarkedNullable = true
+                        }
 
                     KtTokens.TRUE_KEYWORD.value,
-                    KtTokens.FALSE_KEYWORD.value -> buildClassType(DefaultTypeClassIds.BOOLEAN)
+                    KtTokens.FALSE_KEYWORD.value -> typeCreator.classType(KaStandardTypeClassIds.BOOLEAN)
 
                     else -> null
                 } ?: return

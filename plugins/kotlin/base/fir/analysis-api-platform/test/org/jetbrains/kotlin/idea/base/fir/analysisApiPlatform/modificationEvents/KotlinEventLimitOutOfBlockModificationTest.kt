@@ -1,10 +1,16 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.base.fir.analysisApiPlatform.modificationEvents
 
+import com.intellij.codeInsight.multiverse.CodeInsightContext
+import com.intellij.codeInsight.multiverse.CodeInsightContextManager
+import com.intellij.codeInsight.multiverse.CodeInsightContextProvider
 import com.intellij.codeInsight.multiverse.ProjectModelContextBridge
-import com.intellij.codeInsight.multiverse.defaultContext
 import com.intellij.openapi.application.runUndoTransparentWriteAction
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.openapi.vfs.VirtualFile
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisFromWriteAction
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
@@ -48,6 +54,7 @@ class KotlinEventLimitOutOfBlockModificationTest : AbstractKotlinModificationEve
                 FileWithText("b.kt", "fun bar(): Int = 20"),
                 FileWithText("c.kt", "fun baz(): Int = 30"),
                 FileWithText("d.kt", "fun qux(): Int = 40"),
+                FileWithText("e.kt", "fun qax(): Int = 50"),
             )
         }
 
@@ -70,6 +77,7 @@ class KotlinEventLimitOutOfBlockModificationTest : AbstractKotlinModificationEve
         val fileB = moduleA.findSourceKtFile("b.kt")
         val fileC = moduleA.findSourceKtFile("c.kt")
         val fileD = moduleA.findSourceKtFile("d.kt")
+        val fileE = moduleA.findSourceKtFile("e.kt")
 
         fun deleteTypeReference(file: KtFile) {
             file.firstTopLevelFunction.typeReference!!.delete()
@@ -114,6 +122,14 @@ class KotlinEventLimitOutOfBlockModificationTest : AbstractKotlinModificationEve
             deleteTypeReference(fileD)
 
             moduleTracker.assertModifiedExactly(times = 2)
+            globalTracker.assertModifiedOnce()
+        }
+
+        // Ensure that event limits are reset in a new write action.
+        runUndoTransparentWriteAction {
+            deleteTypeReference(fileE)
+
+            moduleTracker.assertModifiedExactly(times = 3)
             globalTracker.assertModifiedOnce()
         }
     }
@@ -315,7 +331,14 @@ class KotlinEventLimitOutOfBlockModificationTest : AbstractKotlinModificationEve
         val moduleContextA = ProjectModelContextBridge.getInstance(project).getContext(moduleA)
             ?: error("Expected a module context to be available for module A.")
 
-        val defaultFileA = moduleA.findSourceKtFile("a.kt", defaultContext())
+        val mockContext = object : CodeInsightContext {}
+
+        CodeInsightContextManager.getInstance(project).registerTestOnlyCodeInsightContextProvider(object : CodeInsightContextProvider {
+            override fun getContexts(file: VirtualFile, project: Project): List<CodeInsightContext> = listOf(mockContext)
+            override fun invalidationRequestFlow(project: Project): Flow<Unit> = emptyFlow()
+        }, testRootDisposable)
+
+        val defaultFileA = moduleA.findSourceKtFile("a.kt", mockContext)
         val moduleFileA = moduleA.findSourceKtFile("a.kt", moduleContextA)
 
         Assert.assertNotEquals(

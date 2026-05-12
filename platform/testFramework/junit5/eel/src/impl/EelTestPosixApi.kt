@@ -11,7 +11,7 @@ import com.intellij.platform.eel.EelResult
 import com.intellij.platform.eel.EelTunnelsPosixApi
 import com.intellij.platform.eel.EelUserPosixInfo
 import com.intellij.platform.eel.fs.EelFileSystemApi
-import com.intellij.platform.eel.impl.fs.PosixNioBasedEelFileSystemApi
+import com.intellij.platform.eel.impl.local.PosixNioBasedEelFileSystemApi
 import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.provider.asEelPath
 import com.intellij.platform.eel.provider.utils.toEelArch

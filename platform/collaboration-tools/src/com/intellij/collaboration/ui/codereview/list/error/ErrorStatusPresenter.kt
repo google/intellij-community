@@ -2,6 +2,7 @@
 package com.intellij.collaboration.ui.codereview.list.error
 
 import com.intellij.openapi.util.NlsSafe
+import com.intellij.openapi.util.text.HtmlBuilder
 import org.jetbrains.annotations.Nls
 import javax.swing.Action
 
@@ -39,6 +40,21 @@ sealed interface ErrorStatusPresenter<T> {
       override fun getErrorDescription(error: T): String? =
         if (descriptionProvider != null) descriptionProvider.invoke(error)
         else error.localizedMessage
+    }
+
+    fun <T : Throwable> simpleHTML(
+      title: @Nls String,
+      descriptionProvider: ((T) -> @Nls String?)? = null,
+      actionProvider: (T) -> Action? = { null },
+    ): HTML<T> = object : HTML<T> {
+      override fun getErrorTitle(error: T): @Nls String = ""
+      override fun getErrorAction(error: T): Action? = actionProvider(error)
+      override fun getHTMLBody(error: T): String =
+        HtmlBuilder()
+          .append(title)
+          .br().br()
+          .appendRaw(descriptionProvider?.invoke(error) ?: error.localizedMessage)
+          .toString()
     }
   }
 }

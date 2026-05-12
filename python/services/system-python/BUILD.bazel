@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.python.community.services.systemPython` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "system-python_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "system-python",
   module_name = "intellij.python.community.services.systemPython",
   visibility = ["//visibility:public"],
   srcs = glob(["gen/**/*.kt", "gen/**/*.java", "src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":system-python_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//python/python-sdk:sdk",
@@ -36,6 +31,7 @@ jvm_library(
 
 jvm_library(
   name = "system-python_test_lib",
+  testonly = True,
   module_name = "intellij.python.community.services.systemPython",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -63,15 +59,16 @@ jvm_library(
 )
 ### auto-generated section `build intellij.python.community.services.systemPython` end
 
-### auto-generated section `build intellij.python.community.services.systemPython.tests` start
-resourcegroup(
-  name = "python-community-services-systemPython-tests_test_resources",
-  srcs = glob(["testResources/**/*"]),
-  strip_prefix = "testResources"
-)
+### auto-generated section `iml intellij.python.community.services.systemPython` start
+exports_files([
+  "intellij.python.community.services.systemPython.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.python.community.services.systemPython` end
 
+### auto-generated section `build intellij.python.community.services.systemPython.tests` start
 jvm_library(
   name = "python-community-services-systemPython-tests",
+  module_name = "intellij.python.community.services.systemPython.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   exports = ["//python/services/shared"]
@@ -79,14 +76,18 @@ jvm_library(
 
 jvm_library(
   name = "python-community-services-systemPython-tests_test_lib",
+  testonly = True,
   visibility = ["//visibility:public"],
   srcs = glob(["tests/**/*.kt", "tests/**/*.java", "tests/**/*.form"], allow_empty = True),
-  resources = [":python-community-services-systemPython-tests_test_resources"],
+  resources = glob(["testResources/**/*"]),
+  resource_strip_prefix = "testResources",
   associates = [
     "//python/services/system-python",
     "//python/services/system-python:system-python_test_lib",
   ],
   deps = [
+    "//libraries/assertj-core",
+    "//libraries/assertj-core:assertj-core_test_lib",
     "//platform/util/coroutines",
     "//platform/util/coroutines:coroutines_test_lib",
     "@lib//:kotlin-stdlib",
@@ -132,14 +133,26 @@ jvm_library(
     "//python/python-exec-service/execService.python:execService.python_test_lib",
     "//platform/testFramework/junit5/eel",
     "//platform/testFramework/junit5/eel:eel_test_lib",
+    "//platform/testFramework/junit5/eel:testFramework-junit5-eel-tests",
+    "//platform/testFramework/junit5/eel:testFramework-junit5-eel-tests_test_lib",
+    "//platform/ide-core",
   ],
   exports = [
     "//python/services/shared",
     "//python/services/shared:shared_test_lib",
   ],
-  runtime_deps = [":python-community-services-systemPython-tests"]
+  runtime_deps = [
+    ":python-community-services-systemPython-tests",
+    "//platform/ide-core:ide-core_test_lib",
+  ]
 )
 ### auto-generated section `build intellij.python.community.services.systemPython.tests` end
+
+### auto-generated section `iml intellij.python.community.services.systemPython.tests` start
+exports_files([
+  "intellij.python.community.services.systemPython.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.python.community.services.systemPython.tests` end
 
 ### auto-generated section `test intellij.python.community.services.systemPython.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

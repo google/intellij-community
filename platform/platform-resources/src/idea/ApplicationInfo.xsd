@@ -65,7 +65,7 @@
     <xs:attribute type="xs:string" name="edition">
       <xs:annotation>
         <xs:documentation>
-          Edition of the product if applicable (e.g. "Community Edition", "Professional Edition", etc.).
+          Edition of the product if applicable (e.g. "Educational Edition", etc.).
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
@@ -117,7 +117,7 @@
       <xs:annotation>
         <xs:documentation>
           Specifies the full build number in format '&lt;product code&gt;-__BUILD__'. &lt;product code&gt; is a unique product code
-          (e.g., IU for IntelliJ IDEA, IC for IntelliJ IDEA Community Edition), and __BUILD__ is a placeholder
+          (e.g., IU for IntelliJ IDEA, IC for IntelliJ IDEA Open Source), and __BUILD__ is a placeholder
           that will be replaced by the real build number (two or more numbers separated by dots) by the build scripts.
         </xs:documentation>
       </xs:annotation>

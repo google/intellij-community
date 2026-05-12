@@ -30,7 +30,8 @@ open class ToolWindowTabFile(
   editorTitle: String,
   icon: Icon?,
   val toolWindowId: String,
-  val component: JComponent
+  val component: JComponent,
+  val preferredFocusedComponent: JComponent,
 ) : LightVirtualFile(editorTitle, ToolWindowTabFileType(icon), ""), OptionallyIncluded {
 
   init {

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.syntax.parser
 
 import com.intellij.platform.syntax.SyntaxElementType
@@ -14,7 +14,6 @@ import org.jetbrains.annotations.NonNls
  *
  * @See SyntaxTreeBuilderFactory
  */
-@ApiStatus.Experimental
 @ApiStatus.NonExtendable
 interface SyntaxTreeBuilder {
   /**
@@ -118,6 +117,15 @@ interface SyntaxTreeBuilder {
     while (!eof() && this.currentOffset < offset) {
       advanceLexer()
     }
+  }
+
+  /**
+   * Advances the lexer to the end of the file.
+   *
+   * The default implementation does not bring any performance benefits over [.advanceLexer] method and should be overridden.
+   */
+  fun advanceToEOF() {
+    rawAdvanceLexer(Int.MAX_VALUE - rawTokenIndex())
   }
 
   /**

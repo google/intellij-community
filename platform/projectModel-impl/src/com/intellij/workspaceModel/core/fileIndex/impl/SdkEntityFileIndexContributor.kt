@@ -14,6 +14,13 @@ import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileKind
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileSetData
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileSetRegistrar
 import com.intellij.workspaceModel.ide.WsmSingletonEntityUtils
+import org.jetbrains.annotations.ApiStatus
+
+@ApiStatus.Internal
+fun EntityStorage.isProjectSdk(entity: SdkEntity): Boolean {
+  val setting = WsmSingletonEntityUtils.getSingleEntity(this, ProjectSettingsEntity::class.java)
+  return setting?.projectSdk == entity.symbolicId
+}
 
 class SdkEntityFileIndexContributor : WorkspaceFileIndexContributor<SdkEntity>, PlatformInternalWorkspaceFileIndexContributor {
 
@@ -24,7 +31,7 @@ class SdkEntityFileIndexContributor : WorkspaceFileIndexContributor<SdkEntity>, 
     val compiledRootsData: WorkspaceFileSetData
     val sourceRootFileSetData: WorkspaceFileSetData
 
-    if (isProjectSdk(entity, storage)) {
+    if (storage.isProjectSdk(entity)) {
       compiledRootsData = SdkRootFileSetData(entity.symbolicId)
       sourceRootFileSetData = SdkSourceRootFileSetData(entity.symbolicId)
     }
@@ -52,11 +59,6 @@ class SdkEntityFileIndexContributor : WorkspaceFileIndexContributor<SdkEntity>, 
     get() = listOf(
       DependencyDescription.OnReference(SdkId::class.java),
     )
-
-  private fun isProjectSdk(entity: SdkEntity, storage: EntityStorage): Boolean {
-    val setting = WsmSingletonEntityUtils.getSingleEntity(storage, ProjectSettingsEntity::class.java)
-    return setting?.projectSdk == entity.symbolicId
-  }
 
   internal open class SdkSourceRootFileSetData(
     sdkId: SdkId,

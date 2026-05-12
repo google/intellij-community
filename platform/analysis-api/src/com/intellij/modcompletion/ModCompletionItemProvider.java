@@ -2,12 +2,15 @@
 package com.intellij.modcompletion;
 
 import com.intellij.codeInsight.completion.BaseCompletionParameters;
+import com.intellij.codeInsight.completion.CompletionContributor;
+import com.intellij.codeInsight.completion.CompletionProcess;
 import com.intellij.codeInsight.completion.CompletionSorter;
 import com.intellij.codeInsight.completion.CompletionType;
 import com.intellij.codeInsight.completion.PrefixMatcher;
 import com.intellij.lang.Language;
 import com.intellij.lang.LanguageExtension;
 import com.intellij.lang.LanguageExtensionWithAny;
+import com.intellij.openapi.project.PossiblyDumbAware;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.psi.PsiElement;
@@ -22,7 +25,7 @@ import java.util.List;
  * A language-specific provider for {@link ModCompletionItem} completion options 
  */
 @NotNullByDefault
-public interface ModCompletionItemProvider {
+public interface ModCompletionItemProvider extends PossiblyDumbAware {
   LanguageExtension<ModCompletionItemProvider> EP_NAME = new LanguageExtensionWithAny<>("com.intellij.modcompletion.completionItemProvider");
 
   /**
@@ -34,11 +37,32 @@ public interface ModCompletionItemProvider {
   void provideItems(CompletionContext context, ModCompletionResult sink);
 
   /**
+   * @return true if provider is enabled in general. By default, this is controlled by a registry key 
+   * (see {@link #modCommandCompletionEnabled()}), given the experimental nature of {@link ModCompletionItemProvider}.
+   * One may override this method to return {@code true} unconditionally for contributors that are known to be stable.
+   */
+  default boolean isEnabled() {
+    return modCommandCompletionEnabled();
+  }
+
+  /**
    * @param context context to use
    * @return the completion sorter that should be used to sort the items provided by this provider
    */
   default CompletionSorter getSorter(CompletionContext context) {
     return CompletionSorter.defaultSorter(context, context.matcher());
+  }
+
+  /**
+   * @return the completion contributor class to attach this provider to;
+   * the completion items from this provider will be contributed right before the supplied contributor.
+   * This may help to retain the order in complex cases with different sorters when migration to {@link ModCompletionItemProvider} 
+   * is in progress and this provider was extracted from the specified anchor contributor, but the contributor still exists.
+   * Returns null if no anchor contributor is specified; in this case the provider will be executed before any classic contributors.
+   */
+  @ApiStatus.Internal
+  default @Nullable Class<? extends CompletionContributor> getAnchorContributor() {
+    return null;
   }
 
   /**
@@ -68,6 +92,7 @@ public interface ModCompletionItemProvider {
    * @param type completion type
    */
   record CompletionContext(
+    CompletionProcess process,
     PsiFile originalFile,
     int offset,
     @Nullable PsiElement original,
@@ -125,6 +150,11 @@ public interface ModCompletionItemProvider {
 
     public Project getProject() {
       return originalFile.getProject();
+    }
+
+    @Override
+    public CompletionProcess getProcess() {
+      return process;
     }
 
     @Override

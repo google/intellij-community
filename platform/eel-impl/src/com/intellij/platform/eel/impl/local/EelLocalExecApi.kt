@@ -24,8 +24,9 @@ import com.intellij.platform.eel.EelWindowsProcess
 import com.intellij.platform.eel.ExecuteProcessException
 import com.intellij.platform.eel.LocalEelExecApi
 import com.intellij.platform.eel.channels.EelDelicateApi
-import com.intellij.platform.eel.impl.bindProcessToScopeIfSet
-import com.intellij.platform.eel.impl.commandLineForDebug
+import com.intellij.platform.eel.impl.base.EelExecApiEnvironmentVariableCache
+import com.intellij.platform.eel.impl.base.bindProcessToScopeIfSet
+import com.intellij.platform.eel.impl.base.commandLineForDebug
 import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.provider.LocalEelDescriptor
 import com.intellij.platform.eel.provider.utils.awaitProcessResult
@@ -69,9 +70,9 @@ class EelLocalExecPosixApi(
   ): EelPosixProcess {
     val process = executeImpl(generatedBuilder)
     val r = if (process is PtyProcess)
-      LocalEelPosixProcess.create(process, process::setWinSize)
+      LocalEelPosixProcess.create(process, process::setWinSize, platform)
     else
-      LocalEelPosixProcess.create(process, null)
+      LocalEelPosixProcess.create(process, null, platform)
     generatedBuilder.bindProcessToScopeIfSet(r)
     return r
   }

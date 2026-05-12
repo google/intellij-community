@@ -1,7 +1,7 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.uiDesigner.propertyInspector.properties;
 
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.uiDesigner.FormEditingUtil;
 import com.intellij.uiDesigner.UIDesignerBundle;
 import com.intellij.uiDesigner.propertyInspector.InplaceContext;
@@ -72,7 +72,7 @@ public class ButtonGroupProperty extends Property<RadComponent, RadButtonGroup> 
     private RadComponent myComponent;
 
     MyPropertyEditor() {
-      myCbx.setRenderer(SimpleListCellRenderer.create(UIDesignerBundle.message("button.group.none"), value ->
+      myCbx.setRenderer(BuilderKt.textListCellRenderer(UIDesignerBundle.message("button.group.none"), value ->
         value == RadButtonGroup.NEW_GROUP ? UIDesignerBundle.message("button.group.new") : value.getName()));
       myCbx.addItemListener(new ItemListener() {
         @Override

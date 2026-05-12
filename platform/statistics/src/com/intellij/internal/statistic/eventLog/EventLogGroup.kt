@@ -44,6 +44,16 @@ open class EventLogGroup {
     groupData: List<Pair<EventField<*>, FeatureUsageData.() -> Unit>> = emptyList(),
   ) : this(id, version, recorder, groupData)
 
+  @Deprecated("Binary compatibility shim", level = DeprecationLevel.HIDDEN)
+  @Suppress("EventLogDescription", "unused")
+  constructor(
+    @EventIdName id: String,
+    version: Int,
+    recorder: String?,
+    p1: Int,
+    p2: kotlin.jvm.internal.DefaultConstructorMarker?
+  ) : this(id, version, recorder ?: FUS_RECORDER, emptyList())
+
   /**
    * Constructs an EventLogGroup.
    *
@@ -88,6 +98,7 @@ open class EventLogGroup {
   }
 
   @Deprecated("Descriptions are moved to a separate file; inline the usage")
+  @Suppress("DeprecatedCallableAddReplaceWith")
   fun registerEvent(@EventIdName eventId: String, @Suppress("unused") description: String): EventId = registerEvent(eventId)
 
   /**
@@ -98,20 +109,19 @@ open class EventLogGroup {
    * To implement a new collector:
    * - Record events according to a "fus-collectors.md" dev guide and register it in plugin.xml
    * - Implement custom validation rules if necessary (see [com.intellij.internal.statistic.eventLog.validator.IntellijSensitiveDataValidator])
-   * - If new group is implemented in a platform or a plugin built with IntelliJ Ultimate, YT issue will be created automatically
-   * - Otherwise, create a YT issue in FUS project with group data scheme and descriptions to register it on the statistics metadata server
+   * - If the new group is implemented in a platform or a plugin built with IntelliJ Ultimate, YT issue will be created automatically
+   * - Otherwise, create a YT issue in the FUS project with a group data scheme and descriptions to register it on the statistics metadata server
    *
-   * To test collector:
-   * - If a group is not registered on the server, add it to an events test scheme with "Add Group to Events Test Scheme" action.
+   * To test a collector:
+   * - If a group is not registered on the server, add it to an events test scheme with the "Add Group to Events Test Scheme" action.
    *   (com.intellij.internal.statistic.actions.scheme.AddGroupToTestSchemeAction)
    *
    * @see registerVarargEvent
    */
-  fun registerEvent(@EventIdName eventId: String): EventId {
-    return EventId(this, eventId).also { addToRegisteredEvents(it) }
-  }
+  fun registerEvent(@EventIdName eventId: String): EventId = EventId(this, eventId).also { addToRegisteredEvents(it) }
 
   @Deprecated("Descriptions are moved to a separate file; inline the usage")
+  @Suppress("DeprecatedCallableAddReplaceWith")
   fun <T1> registerEvent(
     @EventIdName eventId: String,
     eventField1: EventField<T1>,
@@ -136,11 +146,10 @@ open class EventLogGroup {
   fun <T1> registerEvent(
     @EventIdName eventId: String,
     eventField1: EventField<T1>,
-  ): EventId1<T1> {
-    return EventId1(this, eventId, eventField1).also { addToRegisteredEvents(it) }
-  }
+  ): EventId1<T1> = EventId1(this, eventId, eventField1).also { addToRegisteredEvents(it) }
 
   @Deprecated("Descriptions are moved to a separate file; inline the usage")
+  @Suppress("DeprecatedCallableAddReplaceWith")
   fun <T1, T2> registerEvent(
     @EventIdName eventId: String,
     eventField1: EventField<T1>,
@@ -158,11 +167,10 @@ open class EventLogGroup {
     @EventIdName eventId: String,
     eventField1: EventField<T1>,
     eventField2: EventField<T2>
-  ): EventId2<T1, T2> {
-    return EventId2(this, eventId, eventField1, eventField2).also { addToRegisteredEvents(it) }
-  }
+  ): EventId2<T1, T2> = EventId2(this, eventId, eventField1, eventField2).also { addToRegisteredEvents(it) }
 
   @Deprecated("Descriptions are moved to a separate file; inline the usage")
+  @Suppress("DeprecatedCallableAddReplaceWith")
   fun <T1, T2, T3> registerEvent(
     @EventIdName eventId: String,
     eventField1: EventField<T1>,
@@ -182,11 +190,10 @@ open class EventLogGroup {
     eventField1: EventField<T1>,
     eventField2: EventField<T2>,
     eventField3: EventField<T3>
-  ): EventId3<T1, T2, T3> {
-    return EventId3(this, eventId, eventField1, eventField2, eventField3).also { addToRegisteredEvents(it) }
-  }
+  ): EventId3<T1, T2, T3> = EventId3(this, eventId, eventField1, eventField2, eventField3).also { addToRegisteredEvents(it) }
 
   @Deprecated("Descriptions are moved to a separate file; inline the usage")
+  @Suppress("DeprecatedCallableAddReplaceWith")
   fun registerVarargEvent(@EventIdName eventId: String, @Suppress("unused") description: String, vararg fields: EventField<*>): VarargEventId =
     registerVarargEvent(eventId, *fields)
 

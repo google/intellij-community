@@ -8,8 +8,8 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vcs.ProjectLevelVcsManager;
 import com.intellij.openapi.vcs.VcsDirectoryMapping;
 import com.intellij.openapi.vcs.impl.ProjectLevelVcsManagerImpl;
-import com.intellij.openapi.vcs.impl.projectlevelman.FileWatchRequestsManager;
 import com.intellij.openapi.vcs.impl.projectlevelman.NewMappings;
+import com.intellij.openapi.vcs.impl.projectlevelman.VcsMappingsFileWatchesManager;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.testFramework.LightPlatformTestCase;
 import com.intellij.testFramework.RunAll;
@@ -37,7 +37,7 @@ public class VcsFileWatchRequestManagementTest extends LightPlatformTestCase {
     myNewMappings = new NewMappings(project, (ProjectLevelVcsManagerImpl)ProjectLevelVcsManager.getInstance(project), ((ComponentManagerEx)project).getCoroutineScope());
     Disposer.register(getTestRootDisposable(), myNewMappings);
     myMockLocalFileSystem = new MyMockLocalFileSystem();
-    myNewMappings.setFileWatchRequestsManager(new TestFileWatchRequestsManager(project, myNewMappings, myMockLocalFileSystem));
+    myNewMappings.setFileWatchRequestsManager(new TestVcsMappingsFileWatchesManager(project, myNewMappings, myMockLocalFileSystem));
     myNewMappings.activateActiveVcses();
   }
 
@@ -207,8 +207,10 @@ public class VcsFileWatchRequestManagementTest extends LightPlatformTestCase {
     }
   }
 
-  private static class TestFileWatchRequestsManager extends FileWatchRequestsManager {
-    TestFileWatchRequestsManager(@NotNull Project project, @NotNull NewMappings newMappings, @NotNull LocalFileSystem localFileSystem) {
+  private static class TestVcsMappingsFileWatchesManager extends VcsMappingsFileWatchesManager {
+    TestVcsMappingsFileWatchesManager(@NotNull Project project,
+                                      @NotNull NewMappings newMappings,
+                                      @NotNull LocalFileSystem localFileSystem) {
       super(project, newMappings, localFileSystem);
     }
 

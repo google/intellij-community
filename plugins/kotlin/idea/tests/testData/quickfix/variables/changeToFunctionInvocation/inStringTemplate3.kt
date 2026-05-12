@@ -1,4 +1,7 @@
 // "Change to function invocation" "true"
+// K2_ERROR: Function invocation 'bar(...)' expected.
+// K2_ERROR: No value passed for parameter 'i'.
+// K2_ERROR: No value passed for parameter 'j'.
 fun bar(i: Int, j: Int) {}
 
 fun test(){

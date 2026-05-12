@@ -91,8 +91,8 @@ fun KtSimpleNameExpression.canBeRedundantCompanionReference(): Boolean {
  *
  * For that, it is required to do resolve to ensure that the semantics of the code do not change.
  */
-context(_: KaSession)
 @ApiStatus.Internal
+context(_: KaSession)
 fun KtSimpleNameExpression.isRedundantCompanionReference(): Boolean {
     val parent = this.parent as? KtDotQualifiedExpression ?: return false
 

@@ -2,11 +2,7 @@
 package com.intellij.openapi.editor.impl.softwrap.mapping;
 
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.SoftWrap;
-import com.intellij.openapi.editor.event.DocumentEvent;
-import com.intellij.openapi.editor.ex.util.EditorUtil;
-import com.intellij.openapi.editor.impl.EditorImpl;
-import com.intellij.openapi.editor.impl.SoftWrapModelImpl;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -19,24 +15,11 @@ public final class IncrementalCacheUpdateEvent {
 
   private final int myLengthDiff;
 
-  /**
-   * Creates new {@code IncrementalCacheUpdateEvent} object on the basis on the given event object that describes
-   * document change that caused cache update.
-   * <p/>
-   * This constructor is assumed to be used <b>before</b> the document change.
-   *
-   * @param event   object that describes document change that caused cache update
-   */
-  IncrementalCacheUpdateEvent(@NotNull DocumentEvent event, @NotNull EditorImpl editor) {
-    this(event.getOffset(), event.getOffset() + event.getOldLength(), event.getOffset() + event.getNewLength(), editor);
-  }
-
-  /**
-   * Creates new {@code IncrementalCacheUpdateEvent} object for the event not changing document length
-   * (like expansion of folded region).
-   */
-  IncrementalCacheUpdateEvent(int startOffset, int endOffset, @NotNull EditorImpl editor) {
-    this(startOffset, endOffset, endOffset, editor);
+  @ApiStatus.Internal
+  public IncrementalCacheUpdateEvent(int startOffset, int mandatoryEndOffset, int lengthDiff) {
+    myStartOffset = startOffset;
+    myMandatoryEndOffset = mandatoryEndOffset;
+    myLengthDiff = lengthDiff;
   }
 
   /**
@@ -45,48 +28,9 @@ public final class IncrementalCacheUpdateEvent {
    *
    * @param document    target document to reparse
    */
-  IncrementalCacheUpdateEvent(@NotNull Document document) {
-    myStartOffset = 0;
-    myMandatoryEndOffset = document.getTextLength();
-    myLengthDiff = 0;
-  }
-
-  private IncrementalCacheUpdateEvent(int startOffset, int oldEndOffset, int newEndOffset, @NotNull EditorImpl editor) {
-    VisualLineInfo info = getVisualLineInfo(editor, startOffset, false);
-    if (info.startsWithSoftWrap) {
-      info = getVisualLineInfo(editor, info.startOffset, true);
-    }
-    myStartOffset = info.startOffset;
-    myMandatoryEndOffset = newEndOffset;
-    myLengthDiff = newEndOffset - oldEndOffset;
-  }
-
-
-  private static VisualLineInfo getVisualLineInfo(@NotNull EditorImpl editor, int offset, boolean beforeSoftWrap) {
-    Document document = editor.getUiDocument();
-    int textLength = document.getTextLength();
-    if (offset <= 0 || textLength == 0) return new VisualLineInfo(0, false);
-    offset = Math.min(offset, textLength);
-
-    int startOffset = EditorUtil.getNotFoldedLineStartOffset(editor, offset);
-
-    SoftWrapModelImpl softWrapModel = editor.getSoftWrapModel();
-    int wrapIndex = softWrapModel.getSoftWrapIndex(offset);
-    int prevSoftWrapIndex = wrapIndex < 0 ? - wrapIndex - 2 : wrapIndex - (beforeSoftWrap ? 1 : 0);
-    SoftWrap prevSoftWrap = prevSoftWrapIndex < 0 ? null : softWrapModel.getRegisteredSoftWraps().get(prevSoftWrapIndex);
-
-    int visualLineStartOffset = prevSoftWrap == null ? startOffset : Math.max(startOffset, prevSoftWrap.getStart());
-    return new VisualLineInfo(visualLineStartOffset, prevSoftWrap != null && prevSoftWrap.getStart() == visualLineStartOffset);
-  }
-
-  private static final class VisualLineInfo {
-    private final int startOffset;
-    private final boolean startsWithSoftWrap;
-
-    private VisualLineInfo(int startOffset, boolean wrap) {
-      this.startOffset = startOffset;
-      startsWithSoftWrap = wrap;
-    }
+  @ApiStatus.Internal
+  public static IncrementalCacheUpdateEvent forWholeDocument(@NotNull Document document) {
+    return new IncrementalCacheUpdateEvent(0, document.getTextLength(), 0);
   }
 
   /**
@@ -111,6 +55,10 @@ public final class IncrementalCacheUpdateEvent {
     return myActualEndOffset;
   }
 
+  /**
+   * Called by soft-wrapping internals after {@link SoftWrapParsingListener#onRegionReparseStart(IncrementalCacheUpdateEvent)}
+   * and before {@link SoftWrapParsingListener#onRegionReparseEnd(IncrementalCacheUpdateEvent)}.
+   */
   public void setActualEndOffset(int actualEndOffset) {
     myActualEndOffset = actualEndOffset;
   }

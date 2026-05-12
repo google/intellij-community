@@ -2,50 +2,42 @@
 package org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage
 
 import com.intellij.codeInsight.intention.IntentionAction
+import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
 import org.jetbrains.kotlin.idea.codeinsight.api.applicators.fixes.KotlinQuickFixFactory
 import org.jetbrains.kotlin.idea.codeinsight.api.applicators.fixes.KotlinQuickFixRegistrar
 import org.jetbrains.kotlin.idea.codeinsight.api.applicators.fixes.KotlinQuickFixesList
 import org.jetbrains.kotlin.idea.codeinsight.api.applicators.fixes.KtQuickFixesListBuilder
+import org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage.K2CreateFunctionFromUsageBuilder.generateCreateMethodActions
+import org.jetbrains.kotlin.psi.KtCallElement
 import org.jetbrains.kotlin.psi.KtCallExpression
+import org.jetbrains.kotlin.psi.KtConstructorDelegationCall
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtImportDirective
 import org.jetbrains.kotlin.psi.KtQualifiedExpression
+import org.jetbrains.kotlin.psi.KtSuperTypeCallEntry
 
 class K2CreateFromUsageQuickFixesRegistrar : KotlinQuickFixRegistrar() {
 
     private val createFunctionForArgumentTypeMismatch: KotlinQuickFixFactory.IntentionBased<KaFirDiagnostic.ArgumentTypeMismatch> =
         KotlinQuickFixFactory.IntentionBased { diagnostic: KaFirDiagnostic.ArgumentTypeMismatch ->
-            val psi = diagnostic.psi
-            val callExpression = PsiTreeUtil.getParentOfType(psi, KtCallExpression::class.java)
-            if (callExpression == null) {
-                listOf()
-            } else {
-                K2CreateFunctionFromUsageBuilder.buildRequestsAndActions(callExpression)
-            }
+            functionOrConstructorBuilder(diagnostic.psi)
         }
     private val createFunctionForTooManyArguments: KotlinQuickFixFactory.IntentionBased<KaFirDiagnostic.TooManyArguments> =
         KotlinQuickFixFactory.IntentionBased { diagnostic: KaFirDiagnostic.TooManyArguments ->
-            val psi = diagnostic.psi
-            val callExpression = PsiTreeUtil.getParentOfType(psi, KtCallExpression::class.java)
-            if (callExpression == null) {
-                listOf()
-            } else {
-                K2CreateFunctionFromUsageBuilder.buildRequestsAndActions(callExpression)
-            }
+            functionOrConstructorBuilder(diagnostic.psi)
         }
     private val createFunctionForNoValueForParameter: KotlinQuickFixFactory.IntentionBased<KaFirDiagnostic.NoValueForParameter> =
         KotlinQuickFixFactory.IntentionBased { diagnostic: KaFirDiagnostic.NoValueForParameter ->
-            val psi = diagnostic.psi
-            val expression = if (psi is KtQualifiedExpression) psi.selectorExpression else psi
-            val callExpression = PsiTreeUtil.getParentOfType(expression, KtCallExpression::class.java, false)
-            if (callExpression == null) {
-                listOf()
-            } else {
-                K2CreateFunctionFromUsageBuilder.buildRequestsAndActions(callExpression)
-            }
+            functionOrConstructorBuilder(diagnostic.psi)
         }
+
+    private val createFunctionForNoneApplicable: KotlinQuickFixFactory.IntentionBased<KaFirDiagnostic.NoneApplicable> =
+        KotlinQuickFixFactory.IntentionBased { diagnostic: KaFirDiagnostic.NoneApplicable ->
+            functionOrConstructorBuilder(diagnostic.psi)
+        }
+
     private val createVariableForExpressionExpectedPackageFound: KotlinQuickFixFactory.IntentionBased<KaFirDiagnostic.ExpressionExpectedPackageFound> =
         KotlinQuickFixFactory.IntentionBased { diagnostic: KaFirDiagnostic.ExpressionExpectedPackageFound ->
             listOfNotNull(K2CreateLocalVariableFromUsageBuilder.generateCreateLocalVariableAction(diagnostic.psi)) +
@@ -80,9 +72,27 @@ class K2CreateFromUsageQuickFixesRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(createFunctionForArgumentTypeMismatch)
         registerFactory(createFunctionForTooManyArguments)
         registerFactory(createFunctionForNoValueForParameter)
+        registerFactory(createFunctionForNoneApplicable)
         registerFactory(createVariableForExpressionExpectedPackageFound)
         registerFactory(createParameterForNamedParameterNotFound)
         registerFactory(createParameterForComponentFunctionMissing)
         registerFactory(createClassFromUsageForUnresolvedImport)
+    }
+}
+
+private fun functionOrConstructorBuilder(psi: PsiElement): List<IntentionAction> {
+    val expression = if (psi is KtQualifiedExpression) psi.selectorExpression else psi
+    val callElement = PsiTreeUtil.getParentOfType(expression, KtCallElement::class.java, false)
+    if (callElement == null) {
+        return if (psi is KtElement) generateCreateMethodActions(psi) else emptyList()
+    }
+    if (callElement is KtConstructorDelegationCall || callElement is KtSuperTypeCallEntry) {
+        return K2CreateSecondaryConstructorFromUsageBuilder.buildRequestsAndActions(callElement)
+    }
+    val callExpression = callElement as? KtCallExpression ?: return emptyList()
+    return if (K2CreateSecondaryConstructorFromUsageBuilder.findTargetClassForCallExpression(callExpression) != null) {
+        K2CreateSecondaryConstructorFromUsageBuilder.buildRequestsAndActions(callExpression)
+    } else {
+        K2CreateFunctionFromUsageBuilder.buildRequestsAndActions(callExpression)
     }
 }

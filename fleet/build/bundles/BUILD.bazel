@@ -1,6 +1,6 @@
 ### auto-generated section `build fleet.build.bundles` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_bundles",
@@ -14,22 +14,19 @@ create_kotlinc_options(
   x_lambdas = "class"
 )
 
-resourcegroup(
-  name = "bundles_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "bundles",
   module_name = "fleet.build.bundles",
   visibility = ["//visibility:public"],
   srcs = glob(["srcJvmMain/**/*.kt", "srcJvmMain/**/*.java", "srcJvmMain/**/*.form"], allow_empty = True),
-  resources = [":bundles_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_bundles",
   deps = [
     "@lib//:kotlin-stdlib",
     "//fleet/build/codecache",
+    "//fleet/build/platform",
+    "//fleet/build/scrambling",
     "//fleet/build/sign",
     "//fleet/codecache",
     "//fleet/build/fs",
@@ -43,6 +40,7 @@ jvm_library(
 
 jvm_library(
   name = "bundles_test_lib",
+  testonly = True,
   module_name = "fleet.build.bundles",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -50,6 +48,8 @@ jvm_library(
   runtime_deps = [
     ":bundles",
     "//fleet/build/codecache:codecache_test_lib",
+    "//fleet/build/platform:platform_test_lib",
+    "//fleet/build/scrambling:scrambling_test_lib",
     "//fleet/build/sign:sign_test_lib",
     "//fleet/codecache:codecache_test_lib",
     "//fleet/build/fs:fs_test_lib",
@@ -57,3 +57,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build fleet.build.bundles` end
+
+### auto-generated section `iml fleet.build.bundles` start
+exports_files([
+  "fleet.build.bundles.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml fleet.build.bundles` end

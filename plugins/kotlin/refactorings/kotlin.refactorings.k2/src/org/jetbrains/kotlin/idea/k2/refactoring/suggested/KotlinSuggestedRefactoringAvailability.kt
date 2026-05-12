@@ -98,7 +98,7 @@ class KotlinSuggestedRefactoringAvailability(refactoringSupport: SuggestedRefact
         )
     }
 
-    @OptIn(KaAllowAnalysisOnEdt::class, KaImplementationDetail::class, KaAllowAnalysisFromWriteAction::class)
+    @OptIn(KaAllowAnalysisOnEdt::class, KaAllowAnalysisFromWriteAction::class)
     override fun refineSignaturesWithResolve(state: SuggestedRefactoringState): SuggestedRefactoringState {
         val newDeclaration = state.declaration as? KtCallableDeclaration ?: return state
         val oldDeclaration = state.restoredDeclarationCopy() as? KtCallableDeclaration ?: return state
@@ -185,8 +185,8 @@ class KotlinSuggestedRefactoringAvailability(refactoringSupport: SuggestedRefact
         return oldTypeInCode to newTypeInCode
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun KaType.fqText() = render(position = Variance.INVARIANT)
 
     override fun detectAvailableRefactoring(state: SuggestedRefactoringState): SuggestedRefactoringData? {

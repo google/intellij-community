@@ -78,7 +78,7 @@ final class NamedReferenceProviders {
         final Map<String, List<XmlNamedReferenceProviderBean>> map = bean.caseSensitive ? caseSensitiveMap
                                                                                         : caseInsensitiveMap;
         for (String hostName : bean.getHostNames()) {
-          map.computeIfAbsent(hostName, __ -> new SmartList<>()).add(bean);
+          map.computeIfAbsent(hostName, _ -> new SmartList<>()).add(bean);
         }
       }
 

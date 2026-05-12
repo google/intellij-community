@@ -108,24 +108,10 @@ def test_tensor_with_dtype():
 
 # 5
 def test_define_format_function():
-    assert numpy_based_tables_helpers.__define_format_function(None) is None
-    assert numpy_based_tables_helpers.__define_format_function('null') is None
-    assert numpy_based_tables_helpers.__define_format_function('garbage') is None
-    assert numpy_based_tables_helpers.__define_format_function(1) is None
-
-    format_to_result = {
-        "%.2f": (1.1, "1.10"),
-        "%.12f": (1.1, "1.100000000000"),
-        "%.2e": (1.1, "1.10e+00"),
-        "%d": (1.1, "1"),
-        "%d garbage": (1.1, "1 garbage"),
-    }
-
-    for format_str, (float_value, expected_result) in format_to_result.items():
-        formatter = numpy_based_tables_helpers.__define_format_function(format_str)
-        assert formatter is not None
-        assert callable(formatter)
-        assert formatter(float_value) == expected_result
+    """
+    Is checked by [test_pydev_tensorflow_with_pandas.py::test_define_format_function]
+    """
+    pass
 
 
 # 6

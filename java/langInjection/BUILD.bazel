@@ -1,11 +1,5 @@
 ### auto-generated section `build intellij.java.langInjection` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_provided_library", "resourcegroup")
-
-resourcegroup(
-  name = "langInjection_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_provided_library")
 
 jvm_provided_library(
   name = "plugins_IntelliLang_backend_provided",
@@ -17,10 +11,13 @@ jvm_library(
   module_name = "intellij.java.langInjection",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":langInjection_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//java/openapi:java",
     "//java/java-indexing-api:indexing",
+    "//java/java-syntax:syntax",
+    "//java/java-psi-api:psi",
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
     "//platform/editor-ui-api:editor-ui",
@@ -31,11 +28,20 @@ jvm_library(
     "//platform/projectModel-api:projectModel",
     "//RegExpSupport:regexp",
     "//platform/platform-api:ide",
+    "//platform/ide-core",
     "//java/java-impl:impl",
     "//plugins/IntelliLang:langInjection",
     "//platform/core-ui",
+    "//platform/core-impl",
     "//platform/util/jdom",
+    "//platform/util:util-ui",
+    "//platform/util-ex",
     "//platform/forms_rt:java-guiForms-rt",
+    "//java/java-frontback-psi-api:frontback-psi",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//platform/util/concurrency",
+    "//platform/lang-api:lang",
+    "//uast/uast-common-ide:ide",
     ":plugins_IntelliLang_backend_provided",
   ],
   runtime_deps = [
@@ -46,6 +52,7 @@ jvm_library(
 
 jvm_library(
   name = "langInjection_test_lib",
+  testonly = True,
   module_name = "intellij.java.langInjection",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -53,6 +60,8 @@ jvm_library(
     ":langInjection",
     "//java/openapi:java_test_lib",
     "//java/java-indexing-api:indexing_test_lib",
+    "//java/java-syntax:syntax_test_lib",
+    "//java/java-psi-api:psi_test_lib",
     "//platform/analysis-api:analysis_test_lib",
     "//platform/core-api:core_test_lib",
     "//platform/editor-ui-api:editor-ui_test_lib",
@@ -63,15 +72,30 @@ jvm_library(
     "//platform/projectModel-api:projectModel_test_lib",
     "//RegExpSupport:regexp_test_lib",
     "//platform/platform-api:ide_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//java/java-impl:impl_test_lib",
     "//plugins/IntelliLang:langInjection_test_lib",
     "//java/langInjection/jps:jps_test_lib",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/util/jdom:jdom_test_lib",
+    "//platform/util:util-ui_test_lib",
+    "//platform/util-ex:util-ex_test_lib",
     "//plugins/IntelliLang/backend",
     "//plugins/IntelliLang/backend:backend_test_lib",
     "//platform/forms_rt:java-guiForms-rt_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
     "//platform/backend:backend_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/util/concurrency:concurrency_test_lib",
+    "//platform/lang-api:lang_test_lib",
+    "//uast/uast-common-ide:ide_test_lib",
   ]
 )
 ### auto-generated section `build intellij.java.langInjection` end
+
+### auto-generated section `iml intellij.java.langInjection` start
+exports_files([
+  "intellij.java.langInjection.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.java.langInjection` end

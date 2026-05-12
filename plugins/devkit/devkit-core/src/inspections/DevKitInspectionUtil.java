@@ -26,11 +26,11 @@ public final class DevKitInspectionUtil {
    * @see #isAllowedIncludingTestSources(PsiFile)
    */
   public static boolean isAllowed(@NotNull PsiFile file) {
-    return isAllowed(file, false, __ -> true);
+    return isAllowed(file, false, _ -> true);
   }
 
   public static boolean isAllowedIncludingTestSources(@NotNull PsiFile file) {
-    return isAllowed(file, true, ___ -> true);
+    return isAllowed(file, true, _ -> true);
   }
 
   public static boolean isClassAvailable(@NotNull ProblemsHolder holder, @NonNls String classFqn) {

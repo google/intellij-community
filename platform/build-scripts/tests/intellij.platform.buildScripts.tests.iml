@@ -15,8 +15,9 @@
     <orderEntry type="library" scope="TEST" name="opentelemetry-semconv" level="project" />
     <orderEntry type="module" module-name="intellij.platform.buildScripts.downloader" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.util" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.platform.bazel.runfiles" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.testFramework" scope="TEST" />
-    <orderEntry type="library" scope="TEST" name="assertJ" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.assertj.core" scope="TEST" />
     <orderEntry type="library" scope="TEST" name="JUnit5" level="project" />
     <orderEntry type="module" module-name="intellij.platform.testExtensions" scope="TEST" />
     <orderEntry type="module" module-name="intellij.idea.community.build.tasks" scope="TEST" />
@@ -27,6 +28,7 @@
     <orderEntry type="module" module-name="intellij.platform.util.zip" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.util.jdom" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.util.ex" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.platform.util.base" scope="TEST" />
     <orderEntry type="module" module-name="intellij.idea.community.build.zip" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.netty.buffer" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.hash4j" scope="TEST" />
@@ -40,5 +42,9 @@
     <orderEntry type="module" module-name="intellij.platform.images.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.regexp.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.debugger.impl.tests" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.tools.testsBootstrap" scope="TEST" />
+    <orderEntry type="library" scope="TEST" name="JUnit5Launcher" level="project" />
+    <orderEntry type="module" module-name="intellij.idea.community.build.tasks.tests" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.platform.buildScripts.productDsl.tests" scope="TEST" />
   </component>
 </module>

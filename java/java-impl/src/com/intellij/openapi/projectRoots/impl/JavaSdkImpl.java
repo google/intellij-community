@@ -61,6 +61,7 @@ import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.JBIterable;
 import com.intellij.util.containers.MostlySingularMultiMap;
+import com.intellij.util.io.zip.JBZipFile;
 import com.intellij.util.lang.JavaVersion;
 import org.intellij.lang.annotations.MagicConstant;
 import org.jdom.Element;
@@ -646,38 +647,86 @@ public final class JavaSdkImpl extends JavaSdk {
 
   @ApiStatus.Internal
   private static void addSources(@NotNull Path jdkHome, @NotNull SdkModificator sdkModificator) {
-    VirtualFile jdkSrc = findSources(jdkHome, "src");
-    if (jdkSrc != null) {
-      if (jdkSrc.findChild("java.base") != null) {
-        for (VirtualFile root : jdkSrc.getChildren()) {
-          if (root.isDirectory()) {
-            sdkModificator.addRoot(root, OrderRootType.SOURCES);
-          }
-        }
-      }
-      else {
-        sdkModificator.addRoot(jdkSrc, OrderRootType.SOURCES);
-      }
-    }
-
-    VirtualFile fxSrc = findSources(jdkHome, "javafx-src");
-    if (fxSrc != null) {
-      sdkModificator.addRoot(fxSrc, OrderRootType.SOURCES);
+    for (String url : findSources(jdkHome)) {
+      sdkModificator.addRoot(url, OrderRootType.SOURCES);
     }
   }
 
-  private static @Nullable VirtualFile findSources(@NotNull Path jdkHome, @NotNull String srcName) {
-    Path srcArc = jdkHome.resolve(srcName + ".jar");
-    if (!Files.exists(srcArc)) srcArc = jdkHome.resolve(srcName + ".zip");
-    if (!Files.exists(srcArc)) srcArc = jdkHome.resolve("lib").resolve(srcName + ".zip");
+  @ApiStatus.Internal
+  public static @NotNull List<String> findSources(@NotNull Path jdkHome) {
+    List<String> result = new ArrayList<>();
+
+    Path srcArc = jdkHome.resolve("src.jar");
+    if (!Files.exists(srcArc)) srcArc = jdkHome.resolve("src.zip");
+    if (!Files.exists(srcArc)) srcArc = jdkHome.resolve("lib").resolve("src.zip");
     if (Files.exists(srcArc)) {
-      VirtualFile srcRoot = findInJar(srcArc, "src");
-      if (srcRoot == null) srcRoot = findInJar(srcArc, "");
-      return srcRoot;
+      addArchiveSourceUrls(srcArc, true, result);
+    }
+    else {
+      Path srcDir = jdkHome.resolve("src");
+      if (Files.isDirectory(srcDir)) {
+        addDirectorySourceUrls(srcDir, result);
+      }
     }
 
-    Path srcDir = jdkHome.resolve("src");
-    return Files.isDirectory(srcDir) ? LocalFileSystem.getInstance().findFileByNioFile(srcDir) : null;
+    Path fxArc = jdkHome.resolve("javafx-src.jar");
+    if (!Files.exists(fxArc)) fxArc = jdkHome.resolve("javafx-src.zip");
+    if (!Files.exists(fxArc)) fxArc = jdkHome.resolve("lib").resolve("javafx-src.zip");
+    if (Files.exists(fxArc)) {
+      addArchiveSourceUrls(fxArc, false, result);
+    }
+
+    return result;
+  }
+
+  private static void addArchiveSourceUrls(@NotNull Path archive, boolean checkModular, @NotNull List<String> result) {
+    String jarBase = "jar://" + vfsPath(archive) + "!/";
+    try (JBZipFile zip = new JBZipFile(archive, true)) {
+      Set<String> noPrefix = new LinkedHashSet<>();   // top-level dirs at root
+      Set<String> srcPrefix = new LinkedHashSet<>();  // top-level dirs under "src/"
+      for (var entry : zip.getEntries()) {
+        String name = entry.getName();
+        int slash = name.indexOf('/');
+        if (slash > 0) noPrefix.add(name.substring(0, slash));
+        if (name.startsWith("src/") && name.length() > 4) {
+          int srcSlash = name.indexOf('/', 4);
+          if (srcSlash > 4) srcPrefix.add(name.substring(4, srcSlash));
+        }
+      }
+      boolean hasSrcPrefix = noPrefix.contains("src");
+      Set<String> topDirs = hasSrcPrefix ? srcPrefix : noPrefix;
+      String urlBase = jarBase + (hasSrcPrefix ? "src/" : "");
+      if (checkModular && topDirs.contains("java.base")) {
+        for (String dir : topDirs) {
+          result.add(urlBase + dir + "/");
+        }
+      }
+      else {
+        result.add(urlBase);
+      }
+    }
+    catch (IOException e) {
+      LOG.info(e);
+      result.add(jarBase);
+    }
+  }
+
+  private static void addDirectorySourceUrls(@NotNull Path srcDir, @NotNull List<String> result) {
+    if (Files.isDirectory(srcDir.resolve("java.base"))) {
+      try (DirectoryStream<Path> children = Files.newDirectoryStream(srcDir)) {
+        for (Path child : children) {
+          if (Files.isDirectory(child)) {
+            result.add(VfsUtil.getUrlForLibraryRoot(child));
+          }
+        }
+      }
+      catch (IOException e) {
+        LOG.info(e);
+      }
+    }
+    else {
+      result.add(VfsUtil.getUrlForLibraryRoot(srcDir));
+    }
   }
 
   private void addDocs(@NotNull Path jdkHome, @NotNull SdkModificator sdkModificator, @Nullable Sdk sdk) {

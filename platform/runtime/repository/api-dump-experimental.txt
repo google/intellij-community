@@ -31,7 +31,9 @@
 - s:values():com.intellij.platform.runtime.repository.RuntimeModuleLoadingRule[]
 *:com.intellij.platform.runtime.repository.RuntimeModuleRepository
 - s:create(java.nio.file.Path):com.intellij.platform.runtime.repository.RuntimeModuleRepository
+- a:findBundledPluginHeader(com.intellij.platform.runtime.repository.RuntimeModuleId):com.intellij.platform.runtime.repository.serialization.RawRuntimePluginHeader
 - a:getBootstrapClasspath(java.lang.String):java.util.List
+- a:getBundledPluginHeaders():java.util.List
 - a:getModule(com.intellij.platform.runtime.repository.RuntimeModuleId):com.intellij.platform.runtime.repository.RuntimeModuleDescriptor
 - a:getModuleResourcePaths(com.intellij.platform.runtime.repository.RuntimeModuleId):java.util.List
 - a:resolveModule(com.intellij.platform.runtime.repository.RuntimeModuleId):com.intellij.platform.runtime.repository.RuntimeModuleRepository$ResolveResult
@@ -46,9 +48,11 @@
 - s:valueOf(java.lang.String):com.intellij.platform.runtime.repository.RuntimeModuleVisibility
 - s:values():com.intellij.platform.runtime.repository.RuntimeModuleVisibility[]
 *f:com.intellij.platform.runtime.repository.serialization.RawIncludedRuntimeModule
+- equals(java.lang.Object):Z
 - getLoadingRule():com.intellij.platform.runtime.repository.RuntimeModuleLoadingRule
 - getModuleId():com.intellij.platform.runtime.repository.RuntimeModuleId
 - getRequiredIfAvailableId():com.intellij.platform.runtime.repository.RuntimeModuleId
+- hashCode():I
 - resolve(com.intellij.platform.runtime.repository.RuntimeModuleRepository):com.intellij.platform.runtime.repository.IncludedRuntimeModule
 *f:com.intellij.platform.runtime.repository.serialization.RawRuntimeModuleDescriptor
 - <init>(java.lang.String,java.util.List,java.util.List):V

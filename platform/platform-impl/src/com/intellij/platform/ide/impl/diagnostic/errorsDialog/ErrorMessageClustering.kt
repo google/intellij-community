@@ -42,10 +42,12 @@ internal class ErrorMessageClustering(private val coroutineScope: CoroutineScope
     return ErrorMessageCluster(messages, pluginId, plugin, submitter)
   }
 
-  private suspend fun createPluginInfo(pluginId: PluginId?): ProblematicPluginInfo? {
+  internal suspend fun createPluginInfo(pluginId: PluginId?): ProblematicPluginInfo? {
     if (pluginId == null) return null
+
     val localPlugin = PluginManagerCore.getPlugin(pluginId)
     if (localPlugin != null) return ProblematicPluginInfoBasedOnDescriptor(localPlugin)
+
     val uiModel = UiPluginManager.getInstance().getPlugin(pluginId) ?: return null
     return ProblematicPluginInfoBasedOnModel(uiModel)
   }
@@ -56,6 +58,10 @@ private class ProblematicPluginInfoBasedOnModel(val plugin: PluginUiModel) : Pro
     get() = plugin.pluginId
   override val isBundled: Boolean
     get() = plugin.isBundled
+  override val isImplementationDetail: Boolean
+    get() = plugin.isImplementationDetail
+  override val isEssential: Boolean
+    get() = plugin.isEssential
   override val allowsBundledUpdate: Boolean
     get() = plugin.allowBundledUpdate
   override val name: @NlsSafe String

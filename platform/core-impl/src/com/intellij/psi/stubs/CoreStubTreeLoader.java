@@ -49,11 +49,11 @@ public class CoreStubTreeLoader extends StubTreeLoader {
   }
 
   @Override
-  public void rebuildStubTree(VirtualFile virtualFile) {
+  public void rebuildStubTree(@NotNull VirtualFile virtualFile) {
   }
 
   @Override
-  public boolean canHaveStub(VirtualFile file) {
+  public boolean canHaveStub(@NotNull VirtualFile file) {
     FileType fileType = file.getFileType();
     if (fileType instanceof LanguageFileType) {
       Language l = ((LanguageFileType)fileType).getLanguage();

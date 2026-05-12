@@ -1,6 +1,7 @@
 ### auto-generated section `build fleet.rhizomedb.transactor` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@community//fleet/build:fleet.bzl", "fleet_plugin_services_resources")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_rhizomedb.transactor",
@@ -15,10 +16,24 @@ create_kotlinc_options(
   x_lambdas = "class"
 )
 
-resourcegroup(
-  name = "rhizomedb.transactor_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
+fleet_plugin_services_resources(
+  name = "rhizomedb.transactor_fleet_plugin_services_resources",
+  srcs = glob(["srcCommonMain/**/*.kt", "srcCommonMain/**/*.java", "srcCommonMain/**/*.form"], allow_empty = True),
+  deps = [
+    "@lib//:kotlin-stdlib",
+    "//fleet/rhizomedb",
+    "@lib//:kotlinx-serialization-core",
+    "@lib//:kotlinx-serialization-json",
+    "//fleet/util/core",
+    "//fleet/rpc",
+    "@lib//:kotlinx-coroutines-core",
+    "//fleet/reporting/api",
+    "//fleet/reporting/shared",
+    "//fleet/multiplatform.shims",
+    "//libraries/fastutil",
+    "//fleet/bifurcan",
+    "//fleet/fastutil",
+  ]
 )
 
 jvm_library(
@@ -26,7 +41,9 @@ jvm_library(
   module_name = "fleet.rhizomedb.transactor",
   visibility = ["//visibility:public"],
   srcs = glob(["srcCommonMain/**/*.kt", "srcCommonMain/**/*.java", "srcCommonMain/**/*.form"], allow_empty = True),
-  resources = [":rhizomedb.transactor_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
+  resource_jars = [":rhizomedb.transactor_fleet_plugin_services_resources"],
   kotlinc_opts = ":custom_rhizomedb.transactor",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -39,12 +56,11 @@ jvm_library(
     "//fleet/reporting/api",
     "//fleet/reporting/shared",
     "//fleet/multiplatform.shims",
-    "@lib//:fastutil-min",
+    "//libraries/fastutil",
     "//fleet/bifurcan",
     "//fleet/fastutil",
   ],
   exports = [
-    "//fleet/rhizomedb",
     "//fleet/util/core",
     "//fleet/rpc",
   ]
@@ -52,13 +68,12 @@ jvm_library(
 
 jvm_library(
   name = "rhizomedb.transactor_test_lib",
+  testonly = True,
   module_name = "fleet.rhizomedb.transactor",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   kotlinc_opts = ":custom_rhizomedb.transactor",
   exports = [
-    "//fleet/rhizomedb",
-    "//fleet/rhizomedb:rhizomedb_test_lib",
     "//fleet/util/core",
     "//fleet/util/core:core_test_lib",
     "//fleet/rpc",
@@ -72,8 +87,15 @@ jvm_library(
     "//fleet/reporting/api:api_test_lib",
     "//fleet/reporting/shared:shared_test_lib",
     "//fleet/multiplatform.shims:multiplatform.shims_test_lib",
+    "//libraries/fastutil:fastutil_test_lib",
     "//fleet/bifurcan:bifurcan_test_lib",
     "//fleet/fastutil:fastutil_test_lib",
   ]
 )
 ### auto-generated section `build fleet.rhizomedb.transactor` end
+
+### auto-generated section `iml fleet.rhizomedb.transactor` start
+exports_files([
+  "fleet.rhizomedb.transactor.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml fleet.rhizomedb.transactor` end

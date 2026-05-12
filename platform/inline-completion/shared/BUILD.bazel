@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.inline.completion` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "inline-completion_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "inline-completion",
   module_name = "intellij.platform.inline.completion",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":inline-completion_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:jetbrains-annotations",
@@ -21,7 +16,9 @@ jvm_library(
     "//platform/projectModel-api:projectModel",
     "//platform/util",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//platform/platform-impl/codeinsight-inline:ide-codeinsight-inline",
+    "//platform/util:util-ui",
     "//platform/editor-ui-api:editor-ui",
     "//platform/platform-impl:ide-impl",
     "//platform/lang-api:lang",
@@ -33,6 +30,7 @@ jvm_library(
 
 jvm_library(
   name = "inline-completion_test_lib",
+  testonly = True,
   module_name = "intellij.platform.inline.completion",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -43,7 +41,9 @@ jvm_library(
     "//platform/projectModel-api:projectModel_test_lib",
     "//platform/util:util_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/platform-impl/codeinsight-inline:ide-codeinsight-inline_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/lang-api:lang_test_lib",
@@ -53,3 +53,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.inline.completion` end
+
+### auto-generated section `iml intellij.platform.inline.completion` start
+exports_files([
+  "intellij.platform.inline.completion.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.inline.completion` end

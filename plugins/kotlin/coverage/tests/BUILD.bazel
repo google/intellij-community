@@ -3,12 +3,12 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tests",
+  module_name = "intellij.kotlin.coverage.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinc-kotlin-compiler-common",
-    "@lib//:kotlinc-kotlin-compiler-tests",
     "@lib//:junit4",
     "//plugins/kotlin/base/util",
     "//plugins/kotlin/frontend-independent",
@@ -25,6 +25,7 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.coverage.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -53,8 +54,8 @@ jvm_library(
     "//plugins/kotlin/jvm/shared:shared_test_lib",
     "//plugins/kotlin/coverage",
     "//plugins/kotlin/coverage:coverage_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/tests-common:common-tests",
     "//plugins/kotlin/tests-common:common-tests_test_lib",
     "//plugins/kotlin/test-framework",
@@ -63,6 +64,8 @@ jvm_library(
     "//platform/core-impl:core-impl_test_lib",
     "//plugins/coverage",
     "//plugins/coverage:coverage_test_lib",
+    "//plugins/coverage:java-coverage-tests",
+    "//plugins/coverage:java-coverage-tests_test_lib",
   ],
   runtime_deps = [
     ":tests",
@@ -71,6 +74,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.kotlin.coverage.tests` end
+
+### auto-generated section `iml intellij.kotlin.coverage.tests` start
+exports_files([
+  "intellij.kotlin.coverage.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.coverage.tests` end
 
 ### auto-generated section `test intellij.kotlin.coverage.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

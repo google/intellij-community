@@ -16,6 +16,7 @@ import com.intellij.openapi.editor.impl.FoldingKeys;
 import com.intellij.openapi.editor.impl.FoldingModelInternal;
 import com.intellij.openapi.editor.impl.SoftWrapModelImpl;
 import com.intellij.openapi.editor.impl.softwrap.SoftWrapDrawingType;
+import com.intellij.openapi.editor.impl.softwrap.SoftWrapEx;
 import com.intellij.util.DocumentUtil;
 import com.intellij.util.IntPair;
 import com.intellij.util.ObjectUtils;
@@ -64,7 +65,6 @@ final class EditorCoordinateMapper {
 
   int yToVisualLine(int y) {
     int lineHeight = myView.getLineHeight();
-    y = Math.max(0, y - myView.getInsets().top);
     if (y < lineHeight) return 0;
     int lineMin = 0;
     int yMin = 0;
@@ -359,7 +359,9 @@ final class EditorCoordinateMapper {
           if (fragment.getStartVisualColumn() == 0) {
             return new VisualPosition(visualLine, 0);
           }
-          int markerWidth = mySoftWrapModel.getMinDrawingWidthInPixels(SoftWrapDrawingType.AFTER_SOFT_WRAP);
+          SoftWrapEx lineStartSoftWrap = mySoftWrapModel.getSoftWrapEx(visualLineStartOffset);
+          int markerWidth = lineStartSoftWrap != null && lineStartSoftWrap.isPaintable() ?
+                            mySoftWrapModel.getMinDrawingWidthInPixels(SoftWrapDrawingType.AFTER_SOFT_WRAP) : 0;
           float indent = fragment.getStartX() - markerWidth;
           if (px <= indent) {
             break;
@@ -377,14 +379,17 @@ final class EditorCoordinateMapper {
         maxOffset = Math.max(maxOffset, fragment.getMaxOffset());
         logicalLine = fragment.getEndLogicalLine();
       }
-      if (mySoftWrapModel.getSoftWrap(maxOffset) != null) {
-        int markerWidth = mySoftWrapModel.getMinDrawingWidthInPixels(SoftWrapDrawingType.BEFORE_SOFT_WRAP_LINE_FEED);
-        if (px <= x + markerWidth) {
-          boolean after = px >= x + markerWidth / 2;
-          return new VisualPosition(visualLine, lastColumn + (after ? 1 : 0), !after);
+      SoftWrapEx lineEndSoftWrap = mySoftWrapModel.getSoftWrapEx(maxOffset);
+      if (lineEndSoftWrap != null) {
+        if (lineEndSoftWrap.isPaintable()) {
+          int markerWidth = mySoftWrapModel.getMinDrawingWidthInPixels(SoftWrapDrawingType.BEFORE_SOFT_WRAP_LINE_FEED);
+          if (px <= x + markerWidth) {
+            boolean after = px >= x + markerWidth / 2;
+            return new VisualPosition(visualLine, lastColumn + (after ? 1 : 0), !after);
+          }
+          px -= markerWidth;
+          lastColumn++;
         }
-        px -= markerWidth;
-        lastColumn++;
         logicalLine = -1;
       }
       else if (logicalLine == -1) {
@@ -442,7 +447,8 @@ final class EditorCoordinateMapper {
         maxOffset = Math.max(maxOffset, fragment.getMaxOffset());
         logicalLine = fragment.getEndLogicalLine();
       }
-      if (column > lastColumn && mySoftWrapModel.getSoftWrap(maxOffset) != null) {
+      SoftWrapEx lineEndSoftWrap = mySoftWrapModel.getSoftWrapEx(maxOffset);
+      if (column > lastColumn && lineEndSoftWrap != null && lineEndSoftWrap.isPaintable()) {
         column--;
         x += mySoftWrapModel.getMinDrawingWidthInPixels(SoftWrapDrawingType.BEFORE_SOFT_WRAP_LINE_FEED);
       }

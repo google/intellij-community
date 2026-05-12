@@ -3,6 +3,7 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "kotlin-gradle-multiplatform-tests",
+  module_name = "intellij.kotlin.gradle.multiplatform.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -18,11 +19,13 @@ jvm_library(
     "@lib//:kotlinc-kotlin-compiler-common",
     "@lib//:kotlin-tooling-core",
     "//plugins/kotlin/base/indices",
+    "//platform/util/jdom",
   ]
 )
 
 jvm_library(
   name = "kotlin-gradle-multiplatform-tests_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.gradle.multiplatform.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -37,6 +40,8 @@ jvm_library(
     "//platform/analysis-api:analysis_test_lib",
     "//platform/core-api:core",
     "//platform/core-api:core_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/editor-ui-api:editor-ui",
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//plugins/kotlin/base/util",
@@ -49,14 +54,16 @@ jvm_library(
     "//plugins/kotlin/base/facet:facet_test_lib",
     "//java/testFramework",
     "//java/testFramework:testFramework_test_lib",
+    "//java/java-psi-api:psi",
+    "//java/java-psi-api:psi_test_lib",
     "//plugins/kotlin/base/analysis",
     "//plugins/kotlin/base/analysis:analysis_test_lib",
     "//platform/external-system-impl:externalSystem-tests",
     "//platform/external-system-impl:externalSystem-tests_test_lib",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/tests-common:common-tests",
     "//plugins/kotlin/tests-common:common-tests_test_lib",
     "//plugins/kotlin/test-framework",
@@ -97,10 +104,22 @@ jvm_library(
     "//RegExpSupport:regexp-tests_test_lib",
     "//platform/xdebugger-impl:debugger-impl-tests",
     "//platform/xdebugger-impl:debugger-impl-tests_test_lib",
+    "//platform/util:util-ui",
+    "//platform/util:util-ui_test_lib",
+    "//platform/util-ex",
+    "//platform/util-ex:util-ex_test_lib",
+    "//platform/util/jdom",
+    "//platform/util/jdom:jdom_test_lib",
   ],
   runtime_deps = [":kotlin-gradle-multiplatform-tests"]
 )
 ### auto-generated section `build intellij.kotlin.gradle.multiplatform.tests` end
+
+### auto-generated section `iml intellij.kotlin.gradle.multiplatform.tests` start
+exports_files([
+  "intellij.kotlin.gradle.multiplatform.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.gradle.multiplatform.tests` end
 
 ### auto-generated section `test intellij.kotlin.gradle.multiplatform.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

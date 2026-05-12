@@ -35,6 +35,7 @@ jvm_library(
 
 jvm_library(
   name = "tree_test_lib",
+  testonly = True,
   module_name = "intellij.platform.syntax.tree",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -52,3 +53,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.syntax.tree` end
+
+### auto-generated section `iml intellij.platform.syntax.tree` start
+exports_files([
+  "intellij.platform.syntax.tree.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.syntax.tree` end

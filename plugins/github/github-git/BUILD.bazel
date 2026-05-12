@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.vcs.github.git` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "vcs-github-git_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "vcs-github-git",
   module_name = "intellij.vcs.github.git",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":vcs-github-git_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//libraries/kotlinx/coroutines/core",
@@ -27,6 +22,7 @@ jvm_library(
     "//platform/util/coroutines",
     "//platform/util/progress",
     "//platform/ide-core",
+    "//platform/progress/shared:ide-progress",
     "//platform/dvcs-impl:vcs-dvcs-impl",
     "//platform/core-ui",
     "//platform/vcs-api:vcs",
@@ -39,6 +35,7 @@ jvm_library(
 
 jvm_library(
   name = "vcs-github-git_test_lib",
+  testonly = True,
   module_name = "intellij.vcs.github.git",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -56,6 +53,7 @@ jvm_library(
     "//platform/util/coroutines:coroutines_test_lib",
     "//platform/util/progress:progress_test_lib",
     "//platform/ide-core:ide-core_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
     "//platform/dvcs-impl:vcs-dvcs-impl_test_lib",
     "//platform/core-ui:core-ui_test_lib",
     "//platform/vcs-api:vcs_test_lib",
@@ -66,3 +64,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.vcs.github.git` end
+
+### auto-generated section `iml intellij.vcs.github.git` start
+exports_files([
+  "intellij.vcs.github.git.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.vcs.github.git` end

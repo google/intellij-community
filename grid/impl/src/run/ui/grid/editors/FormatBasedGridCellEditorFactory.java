@@ -6,7 +6,10 @@ import com.intellij.codeInsight.completion.PrioritizedLookupElement;
 import com.intellij.codeInsight.lookup.AutoCompletionPolicy;
 import com.intellij.codeInsight.lookup.CharFilter;
 import com.intellij.codeInsight.lookup.LookupElementBuilder;
+import com.intellij.database.datagrid.CoreGrid;
 import com.intellij.database.datagrid.DataGrid;
+import com.intellij.database.datagrid.GridCellRequest;
+import com.intellij.database.datagrid.GridCellRequestKt;
 import com.intellij.database.datagrid.GridColumn;
 import com.intellij.database.datagrid.GridRow;
 import com.intellij.database.datagrid.GridUtil;
@@ -17,6 +20,7 @@ import com.intellij.database.run.ui.grid.editors.UnparsedValue.ParsingError;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.util.ObjectUtils;
 import com.intellij.util.textCompletion.TextCompletionProvider;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -28,7 +32,6 @@ import java.util.Objects;
 import java.util.function.BiFunction;
 
 import static com.intellij.database.datagrid.GridUtil.createFormatterConfig;
-import static com.intellij.database.run.ui.DataAccessType.DATA_WITH_MUTATIONS;
 
 public abstract class FormatBasedGridCellEditorFactory implements GridCellEditorFactory {
   private static final Logger LOG = Logger.getInstance(FormatBasedGridCellEditorFactory.class);
@@ -44,28 +47,24 @@ public abstract class FormatBasedGridCellEditorFactory implements GridCellEditor
   }
 
   @Override
-  public @NotNull GridCellEditor createEditor(@NotNull DataGrid grid,
-                                              @NotNull ModelIndex<GridRow> row,
-                                              @NotNull ModelIndex<GridColumn> column,
-                                              @Nullable Object object,
-                                              EventObject initiator) {
-    Project project = grid.getProject();
-    Formatter formatter = getFormat(grid, row, column);
-    TextCompletionProvider provider = GridUtil.createCompletionProvider(grid, row, column);
-    GridCellEditorHelper helper = GridCellEditorHelper.get(grid);
-    ReservedCellValue nullValue = helper.getDefaultNullValue(grid, column);
-    TextCompletionProvider resultProvider = new NullCompletionProvider(helper.isNullable(grid, column), provider);
-    ValueParser valueParser = getValueParser(grid, row, column);
-    ValueFormatter valueFormatter = getValueFormatter(grid, row, column, object);
-    return createEditorImpl(project, grid, formatter, nullValue, initiator, resultProvider, row, column, valueParser, valueFormatter);
+  public @NotNull GridCellEditor createEditor(@NotNull GridCellRequest<GridRow, GridColumn> request, EventObject initiator) {
+    Project project = request.getGrid().getProject();
+    Formatter formatter = getFormat(request);
+    TextCompletionProvider provider = GridUtil.createCompletionProvider(request);
+    GridCellEditorHelper helper = GridCellEditorHelper.get(request.getGrid());
+    ReservedCellValue nullValue = helper.getDefaultNullValue(request.getGrid(), request.getColumnIdx());
+    TextCompletionProvider resultProvider = new NullCompletionProvider(helper.isNullable(request.getGrid(), request.getColumnIdx()), provider);
+    ValueParser valueParser = getValueParser(request);
+    ValueFormatter valueFormatter = getValueFormatter(request);
+    return createEditorImpl(project, request, formatter, nullValue, initiator, resultProvider, valueParser, valueFormatter);
   }
 
-  private @NotNull Formatter getFormat(@NotNull DataGrid grid, @NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
-    Formatter baseFormatter = getFormatInner(grid, row, column);
-    return makeFormatterLenient(grid) ? new LenientFormatter(baseFormatter) : baseFormatter;
+  private @NotNull Formatter getFormat(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    Formatter baseFormatter = getFormatInner(request);
+    return makeFormatterLenient(request.getGrid()) ? new LenientFormatter(baseFormatter) : baseFormatter;
   }
 
-  protected abstract @NotNull Formatter getFormatInner(@NotNull DataGrid grid, @NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column);
+  protected abstract @NotNull Formatter getFormatInner(@NotNull GridCellRequest<GridRow, GridColumn> request);
 
   @Override
   public @NotNull IsEditableChecker getIsEditableChecker() {
@@ -73,18 +72,22 @@ public abstract class FormatBasedGridCellEditorFactory implements GridCellEditor
   }
 
   @Override
-  public @NotNull ValueParser getValueParser(@NotNull DataGrid grid,
-                                             @NotNull ModelIndex<GridRow> rowIdx,
-                                             @NotNull ModelIndex<GridColumn> columnIdx) {
+  public @NotNull ValueParser getValueParser(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    Object initialValue = request.getValue();
+    String initialText = getValueFormatter(request).format().text;
+    CoreGrid<GridRow, GridColumn> grid = request.getGrid();
+    ModelIndex<GridRow> rowIdx = request.getRowIdx();
+    ModelIndex<GridColumn> columnIdx = request.getColumnIdx();
     Object databaseValue = grid.getDataModel(DataAccessType.DATABASE_DATA).getValueAt(rowIdx, columnIdx);
-    String databaseValueText = getValueFormatter(grid, rowIdx, columnIdx, databaseValue).format().text;
-    Formatter format = getFormat(grid, rowIdx, columnIdx);
-    return getValueParser(format, grid, databaseValue, databaseValueText, columnIdx,
-                          (text, e) -> GridCellEditorHelper.get(grid).createUnparsedValue(text, e, grid, rowIdx, columnIdx));
+    String databaseValueText = getValueFormatter(GridCellRequestKt.overrideValue(request, databaseValue)).format().text;
+    Formatter format = getFormat(request);
+    ValueParser baseParser = getValueParser(format, grid, databaseValue, databaseValueText, columnIdx,
+                                            (text, e) -> GridCellEditorHelper.get(grid).createUnparsedValue(text, e, grid, rowIdx, columnIdx));
+    return (text, document) -> initialText.equals(text) ? ObjectUtils.notNull(initialValue, ReservedCellValue.NULL) : baseParser.parse(text, document);
   }
 
   protected static @NotNull ValueParser getValueParser(@NotNull Formatter format,
-                                                       @NotNull DataGrid grid,
+                                                       @NotNull CoreGrid<GridRow, GridColumn> grid,
                                                        @Nullable Object databaseValue,
                                                        @Nullable String databaseValueText,
                                                        @Nullable ModelIndex<GridColumn> columnIdx,
@@ -110,15 +113,14 @@ public abstract class FormatBasedGridCellEditorFactory implements GridCellEditor
   }
 
   @Override
-  public @NotNull ValueFormatter getValueFormatter(@NotNull DataGrid grid,
-                                                   @NotNull ModelIndex<GridRow> rowIdx,
-                                                   @NotNull ModelIndex<GridColumn> columnIdx,
-                                                   @Nullable Object value) {
-    Formatter format;
+  public @NotNull ValueFormatter getValueFormatter(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    DataGrid grid = (DataGrid)request.getGrid();
+    Object value = request.getValue();
+    ModelIndex<GridColumn> columnIdx = request.getColumnIdx();
     if (value instanceof UnparsedValue) {
       return new DefaultValueToText(grid, columnIdx, value);
     }
-    format = getFormat(grid, rowIdx, columnIdx);
+    Formatter format = getFormat(request);
     return () -> {
       try {
         return new ValueFormatterResult(value instanceof ReservedCellValue || value == null ? "" : format.format(value));
@@ -129,7 +131,7 @@ public abstract class FormatBasedGridCellEditorFactory implements GridCellEditor
                            " using format " + format + "\n";
           LOG.debug(message, iae);
         }
-        GridColumn column = grid.getDataModel(DATA_WITH_MUTATIONS).getColumn(columnIdx);
+        GridColumn column = request.getColumn();
         String text;
         if (column != null) {
           text = grid.getObjectFormatter().objectToString(value, column, createFormatterConfig(grid, columnIdx));
@@ -143,21 +145,19 @@ public abstract class FormatBasedGridCellEditorFactory implements GridCellEditor
     };
   }
 
-  protected boolean makeFormatterLenient(@NotNull DataGrid grid) {
+  protected boolean makeFormatterLenient(@NotNull CoreGrid<GridRow, GridColumn> grid) {
     return false;
   }
 
   protected @NotNull FormatBasedGridCellEditor createEditorImpl(@NotNull Project project,
-                                                                @NotNull DataGrid grid,
+                                                                @NotNull GridCellRequest<GridRow, GridColumn> request,
                                                                 @NotNull Formatter format,
                                                                 @Nullable ReservedCellValue nullValue,
                                                                 EventObject initiator,
                                                                 @Nullable TextCompletionProvider provider,
-                                                                @NotNull ModelIndex<GridRow> row,
-                                                                @NotNull ModelIndex<GridColumn> column,
                                                                 @NotNull ValueParser valueParser,
                                                                 @NotNull ValueFormatter valueFormatter) {
-    return new FormatBasedGridCellEditor(project, grid, format, column, row, nullValue, initiator, provider, valueParser, valueFormatter, myMultiline);
+    return new FormatBasedGridCellEditor(project, request, format, nullValue, initiator, provider, valueParser, valueFormatter, myMultiline);
   }
 
   private static class LenientFormatter extends Formatter.Wrapper {

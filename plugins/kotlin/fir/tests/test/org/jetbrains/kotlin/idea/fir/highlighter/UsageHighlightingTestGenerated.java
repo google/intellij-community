@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.fir.highlighter;
 
@@ -49,6 +49,21 @@ public class UsageHighlightingTestGenerated extends AbstractUsageHighlightingTes
     @TestMetadata("destructingDeclarationLambdaParams.kt")
     public void testDestructingDeclarationLambdaParams() throws Exception {
         runTest("../../idea/tests/testData/usageHighlighter/destructingDeclarationLambdaParams.kt");
+    }
+
+    @TestMetadata("destructuring.kt")
+    public void testDestructuring() throws Exception {
+        runTest("../../idea/tests/testData/usageHighlighter/destructuring.kt");
+    }
+
+    @TestMetadata("fullNameBasedDestructuringOnEntry.kt")
+    public void testFullNameBasedDestructuringOnEntry() throws Exception {
+        runTest("../../idea/tests/testData/usageHighlighter/fullNameBasedDestructuringOnEntry.kt");
+    }
+
+    @TestMetadata("fullNameBasedDestructuringOnInitializer.kt")
+    public void testFullNameBasedDestructuringOnInitializer() throws Exception {
+        runTest("../../idea/tests/testData/usageHighlighter/fullNameBasedDestructuringOnInitializer.kt");
     }
 
     @TestMetadata("functionNameIdentifier.kt")
@@ -131,8 +146,18 @@ public class UsageHighlightingTestGenerated extends AbstractUsageHighlightingTes
         runTest("../../idea/tests/testData/usageHighlighter/localVal.kt");
     }
 
+    @TestMetadata("positionBasedDestructuring.kt")
+    public void testPositionBasedDestructuring() throws Exception {
+        runTest("../../idea/tests/testData/usageHighlighter/positionBasedDestructuring.kt");
+    }
+
     @TestMetadata("primaryCtor.kt")
     public void testPrimaryCtor() throws Exception {
         runTest("../../idea/tests/testData/usageHighlighter/primaryCtor.kt");
+    }
+
+    @TestMetadata("shortNameBasedDestructuring.kt")
+    public void testShortNameBasedDestructuring() throws Exception {
+        runTest("../../idea/tests/testData/usageHighlighter/shortNameBasedDestructuring.kt");
     }
 }

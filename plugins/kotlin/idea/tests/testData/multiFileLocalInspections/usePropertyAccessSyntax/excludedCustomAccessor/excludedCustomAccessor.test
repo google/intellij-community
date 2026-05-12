@@ -1,5 +1,6 @@
 {
     "inspectionClass": "org.jetbrains.kotlin.idea.intentions.UsePropertyAccessSyntaxInspection",
+    "k2InspectionClass": "org.jetbrains.kotlin.idea.k2.codeinsight.inspections.UsePropertyAccessSyntaxInspection",
     "problem": "none",
     "mainFile": "CallAccessMethod.kt"
 }

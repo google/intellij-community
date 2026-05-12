@@ -2,11 +2,9 @@
 package com.intellij.agent.workbench.chat
 
 import com.intellij.agent.workbench.common.normalizeAgentWorkbenchPath
-import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.UiWithModelAccess
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
-import com.intellij.openapi.fileEditor.FileEditorManager
-import com.intellij.openapi.project.ProjectManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -21,13 +19,16 @@ internal class AgentChatTabsService {
     get() = service<AgentChatTabsStateService>()
 
   fun resolveFromPath(path: String): AgentChatTabResolution? {
+    if (stateService.hasVersionMismatch()) {
+      return null
+    }
     val tabKey = AgentChatTabKey.parsePath(path) ?: return null
     val snapshot = stateService.load(tabKey)
-    return if (snapshot != null) {
-      AgentChatTabResolution.Resolved(snapshot)
+    if (snapshot != null) {
+      return AgentChatTabResolution.Resolved(snapshot)
     }
     else {
-      AgentChatTabResolution.Unresolved(tabKey)
+      return AgentChatTabResolution.Unresolved(tabKey)
     }
   }
 
@@ -36,54 +37,38 @@ internal class AgentChatTabsService {
   }
 
   fun forget(tabKey: AgentChatTabKey): Boolean {
-    return stateService.delete(tabKey)
+    val deletedSnapshot = stateService.deleteAndGetSnapshot(tabKey)
+    if (deletedSnapshot != null) {
+      removeAgentChatSharedThreadPresentation(deletedSnapshot)
+    }
+    return deletedSnapshot != null
   }
 
   fun forget(tabKey: String): Boolean {
-    return stateService.delete(tabKey)
+    return AgentChatTabKey.parse(tabKey)?.let(::forget) ?: false
   }
 
   fun load(tabKey: String): AgentChatTabSnapshot? {
     return stateService.load(tabKey)
   }
 
-  suspend fun closeAndForgetByThread(projectPath: String, threadIdentity: String): AgentChatThreadCleanupResult {
+  suspend fun closeAndForgetByThread(
+    projectPath: String,
+    threadIdentity: String,
+    subAgentId: String? = null,
+  ): AgentChatThreadCleanupResult {
     val normalizedProjectPath = normalizeAgentWorkbenchPath(projectPath)
-    val closedTabs = withContext(Dispatchers.EDT) {
-      closeMatchingOpenTabs(normalizedProjectPath, threadIdentity)
+    val closedTabs = withContext(Dispatchers.UiWithModelAccess) {
+      // FileEditorManager.closeFile() can initiate write-intent, which is disallowed on strict Dispatchers.UI.
+      collectOpenAgentChatTabsSnapshot().closeMatchingOpenTabs(normalizedProjectPath, threadIdentity, subAgentId)
     }
     val deleteResult = withContext(Dispatchers.IO) {
-      stateService.deleteByThreadWithKeys(normalizedProjectPath, threadIdentity)
+      stateService.deleteByThreadWithKeys(normalizedProjectPath, threadIdentity, subAgentId)
     }
-    if (deleteResult.deletedKeys.isNotEmpty()) {
-      val fileSystem = agentChatVirtualFileSystem()
-      for (tabKey in deleteResult.deletedKeys) {
-        fileSystem.forgetFile(tabKey)
-      }
-    }
+    removeAgentChatSharedThreadPresentation(deleteResult.deletedTabs)
     return AgentChatThreadCleanupResult(
       closedTabs = closedTabs,
       deletedStates = deleteResult.deletedKeys.size,
     )
   }
-}
-
-private fun closeMatchingOpenTabs(projectPath: String, threadIdentity: String): Int {
-  var closedTabs = 0
-  for (project in ProjectManager.getInstance().openProjects) {
-    if (project.isDisposed) {
-      continue
-    }
-
-    val manager = runCatching { FileEditorManager.getInstance(project) }.getOrNull() ?: continue
-    val matchingFiles = manager.openFiles.filterIsInstance<AgentChatVirtualFile>().filter { chatFile ->
-      normalizeAgentWorkbenchPath(chatFile.projectPath) == projectPath &&
-      chatFile.threadIdentity == threadIdentity
-    }
-    for (chatFile in matchingFiles) {
-      manager.closeFile(chatFile)
-      closedTabs++
-    }
-  }
-  return closedTabs
 }

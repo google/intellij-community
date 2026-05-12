@@ -33,6 +33,11 @@
     <extensionPoint qualifiedName="com.intellij.customPropertyScopeProvider" interface="com.intellij.psi.impl.search.CustomPropertyScopeProvider" dynamic="true"/>
   </extensionPoints>
 
+  <applicationListeners>
+    <listener class="com.intellij.psi.impl.java.stubs.index.AutoModuleManifestChangeListener"
+              topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
+  </applicationListeners>
+
   <extensions defaultExtensionNs="com.intellij">
     <languageStubDefinition language="JAVA" implementationClass="com.intellij.psi.impl.java.stubs.JavaStubDefinition"/>
 
@@ -41,7 +46,10 @@
     <fileBasedIndex implementation="com.intellij.psi.impl.java.stubs.index.JavaAutoModuleNameIndex"/>
     <fileBasedIndex implementation="com.intellij.psi.impl.java.stubs.index.JavaSourceModuleNameIndex"/>
     <fileBasedIndex implementation="com.intellij.psi.impl.search.JavaNullMethodArgumentIndex"/>
+    <fileBasedIndex implementation="com.intellij.psi.impl.java.stubs.index.ExternalAnnotationsIndex"/>
     <fileBasedIndex implementation="com.intellij.psi.impl.java.JavaFunctionalExpressionIndex"/>
+    <workspaceModel.fileIndexContributor implementation="com.intellij.psi.impl.java.stubs.index.ExternalAnnotationsLibraryRootFileIndexContributor"/>
+    <workspaceModel.fileIndexContributor implementation="com.intellij.psi.impl.java.stubs.index.ExternalAnnotationsSdkRootFileIndexContributor"/>
     <stubIndex implementation="com.intellij.psi.impl.java.stubs.index.JavaModuleNameIndex"/>
     <stubIndex implementation="com.intellij.psi.impl.java.stubs.index.JavaMethodParameterTypesIndex"/>
     <stubIndex implementation="com.intellij.psi.impl.java.stubs.index.JavaSuperClassNameOccurenceIndex"/>
@@ -61,6 +69,9 @@
                     serviceImplementation="com.intellij.psi.impl.CompositeShortNamesCache"/>
     <projectService serviceInterface="com.intellij.openapi.roots.PackageIndex"
                     serviceImplementation="com.intellij.openapi.roots.impl.ProjectPackageIndexImpl"/>
+    <projectService serviceInterface="com.intellij.psi.impl.search.JavaFilesSearchScopeProvider"
+                    serviceImplementation="com.intellij.psi.impl.search.JavaFilesSearchScopeProviderImpl"
+                    open="true"/>
     <functionalExpressionSearch implementation="com.intellij.psi.impl.search.JavaFunctionalExpressionSearcher"/>
     <definitionsScopedSearch implementation="com.intellij.codeInsight.navigation.ClassImplementationsSearch"/>
     <definitionsScopedSearch implementation="com.intellij.codeInsight.navigation.MethodImplementationsSearch"/>
@@ -75,6 +86,7 @@
     <implicitClassSearch implementation="com.intellij.psi.impl.search.ImplicitClassesSearcher"/>
     <javaModuleSearch implementation="com.intellij.psi.impl.search.JavaModuleSearcher"/>
     <annotatedElementsSearch implementation="com.intellij.psi.impl.search.AnnotatedElementsSearcher"/>
+    <annotatedElementsSearch implementation="com.intellij.psi.impl.search.ExternalAnnotatedElementsSearcher"/>
     <allClassesSearch implementation="com.intellij.psi.impl.search.AllClassesSearchExecutor"/>
     <referencesSearch implementation="com.intellij.psi.impl.search.VariableInIncompleteCodeSearcher"/>
     <referencesSearch implementation="com.intellij.psi.impl.search.SimpleAccessorReferenceSearcher"/>

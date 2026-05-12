@@ -4,6 +4,7 @@ package com.intellij.platform.pluginSystem.testFramework
 import com.intellij.ide.plugins.DiscoveredPluginsList
 import com.intellij.ide.plugins.PluginDescriptorLoadingContext
 import com.intellij.ide.plugins.PluginInitializationContext
+import com.intellij.ide.plugins.PluginLoadingErrorReportingPolicy
 import com.intellij.ide.plugins.PluginMainDescriptor
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.ide.plugins.PluginManagerState
@@ -19,7 +20,6 @@ import com.intellij.platform.runtime.product.ProductMode
 import com.intellij.util.io.directoryStreamIfExists
 import com.intellij.util.lang.UrlClassLoader
 import java.nio.file.Path
-import java.util.Collections.emptySet
 
 class PluginSetTestBuilder private constructor(
   private val pluginDescriptorLoader: (loadingContext: PluginDescriptorLoadingContext) -> List<PluginMainDescriptor>,
@@ -81,20 +81,17 @@ class PluginSetTestBuilder private constructor(
     }
 
   fun buildInitContext(): PluginInitializationContext {
-    // copy just in case
-    val buildNumber = productBuildNumber
-    return PluginInitializationContext.buildForTest(
-      essentialPlugins = emptySet(),
-      disabledPlugins = disabledPluginIds.toSet(),
-      expiredPlugins = expiredPluginIds.toSet(),
-      brokenPluginVersions = brokenPlugins.mapValues { it.value.toSet() }.toMap(),
-      getProductBuildNumber = { buildNumber },
-      requirePlatformAliasDependencyForLegacyPlugins = false,
-      checkEssentialPlugins = false,
-      explicitPluginSubsetToLoad = explicitPluginSubsetToLoad,
-      disablePluginLoadingCompletely = false,
-      currentProductModeId = productMode.id,
-    )
+    return object : PseudoProductTestPluginInitContext() {
+      override val expiredPlugins: Set<PluginId> = this@PluginSetTestBuilder.expiredPluginIds
+      override val productBuildNumber: BuildNumber = this@PluginSetTestBuilder.productBuildNumber
+      override fun isPluginDisabled(id: PluginId): Boolean = id in disabledPluginIds
+      override fun isPluginBroken(id: PluginId, version: String?): Boolean {
+        brokenPlugins[id]?.let { return version in it }
+        return false
+      }
+      override val explicitPluginSubsetToLoad: Set<PluginId>? = this@PluginSetTestBuilder.explicitPluginSubsetToLoad
+      override val currentProductModeId: String = productMode.id
+    }
   }
 
   fun discoverPlugins(): Pair<PluginDescriptorLoadingContext, PluginsDiscoveryResult> {
@@ -104,9 +101,6 @@ class PluginSetTestBuilder private constructor(
   }
 
   fun buildState(): PluginManagerState {
-    //clear errors, which may be registered by other tests
-    PluginManagerCore.getAndClearPluginLoadingErrors()
-
     val initContext = buildInitContext()
     val loadingContext = PluginDescriptorLoadingContext(getBuildNumberForDefaultDescriptorVersion = { productBuildNumber })
     val pluginList = withInitContextForLoadingRuleDetermination(initContext) { // FIXME this should not exist
@@ -119,6 +113,7 @@ class PluginSetTestBuilder private constructor(
       discoveredPlugins = discoveredPlugins,
       coreLoader = customCoreLoader ?: UrlClassLoader.build().get(),
       parentActivity = null,
+      reportingPolicy = PluginLoadingErrorReportingPolicy.TEST,
     )
   }
 

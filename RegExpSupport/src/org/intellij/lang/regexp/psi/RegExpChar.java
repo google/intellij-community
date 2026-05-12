@@ -32,7 +32,7 @@ public interface RegExpChar extends RegExpAtom, RegExpClassElement {
         /** An octal encoded character value, e.g.: \0141 */
         OCT,
 
-        /** A unicode escape character, e.g.: \uFFFD */
+        /** A Unicode escape character, e.g.: \uFFFD */
         UNICODE,
 
         /** A named character, e.g.: \N{LATIN SMALL LETTER A} */
@@ -49,6 +49,6 @@ public interface RegExpChar extends RegExpAtom, RegExpClassElement {
     @NotNull
     Type getType();
 
-    /** Returns unescaped character code point value, -1 if escape sequence is invalid. */
+    /** Returns the character code point value, -1 if the escape sequence is invalid. */
     int getValue();
 }

@@ -1,19 +1,27 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.java.workspace.entities.impl
 
 import com.intellij.java.workspace.entities.ArtifactEntity
 import com.intellij.java.workspace.entities.ArtifactEntityBuilder
 import com.intellij.java.workspace.entities.ArtifactPropertiesEntity
-import com.intellij.platform.workspace.storage.*
+import com.intellij.platform.workspace.storage.ConnectionId
+import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
+import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
+import com.intellij.platform.workspace.storage.MutableEntityStorage
+import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
+import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.EntityLink
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
-import com.intellij.platform.workspace.storage.impl.extractOneToManyParent
-import com.intellij.platform.workspace.storage.impl.updateOneToManyParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
 @GeneratedCodeApiVersion(3)
@@ -30,7 +38,8 @@ internal class ArtifactPropertiesEntityImpl(private val dataSource: ArtifactProp
   }
 
   override val artifact: ArtifactEntity
-    get() = snapshot.extractOneToManyParent(ARTIFACT_CONNECTION_ID, this)!!
+    get() = snapshot.instrumentation.getParent(ARTIFACT_CONNECTION_ID, this) as? ArtifactEntity
+            ?: error("Parent artifact not found for ArtifactPropertiesEntity")
   override val providerType: String
     get() {
       readField("providerType")
@@ -84,7 +93,7 @@ internal class ArtifactPropertiesEntityImpl(private val dataSource: ArtifactProp
         error("Field WorkspaceEntity#entitySource should be initialized")
       }
       if (_diff != null) {
-        if (_diff.extractOneToManyParent<WorkspaceEntityBase>(ARTIFACT_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getParentBuilder(ARTIFACT_CONNECTION_ID, this) == null) {
           error("Field ArtifactPropertiesEntity#artifact should be initialized")
         }
       }
@@ -124,12 +133,13 @@ internal class ArtifactPropertiesEntityImpl(private val dataSource: ArtifactProp
       get() {
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(ARTIFACT_CONNECTION_ID, this) as? ArtifactEntityBuilder)
-          ?: (this.entityLinks[EntityLink(false, ARTIFACT_CONNECTION_ID)]!! as ArtifactEntityBuilder)
+          ?: (this.entityLinks[EntityLink(false, ARTIFACT_CONNECTION_ID)] as? ArtifactEntityBuilder)
+          ?: error("artifact is null for ArtifactPropertiesEntity")
         }
         else {
-          this.entityLinks[EntityLink(false, ARTIFACT_CONNECTION_ID)]!! as ArtifactEntityBuilder
+          (this.entityLinks[EntityLink(false, ARTIFACT_CONNECTION_ID)] as? ArtifactEntityBuilder)
+          ?: error("artifact is null for ArtifactPropertiesEntity")
         }
       }
       set(value) {
@@ -145,7 +155,7 @@ internal class ArtifactPropertiesEntityImpl(private val dataSource: ArtifactProp
           _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
         }
         if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)) {
-          _diff.updateOneToManyParentOfChild(ARTIFACT_CONNECTION_ID, this, value)
+          _diff.instrumentation.addChild(ARTIFACT_CONNECTION_ID, value, this)
         }
         else {
 // Setting backref of the list
@@ -193,7 +203,6 @@ internal class ArtifactPropertiesEntityData : WorkspaceEntityData<ArtifactProper
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): ArtifactPropertiesEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {

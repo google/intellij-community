@@ -9,6 +9,7 @@ import com.intellij.openapi.components.Storage
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.IdeaLogRecordFormatter
 import com.intellij.openapi.diagnostic.JulLogger
+import com.intellij.openapi.diagnostic.LogLevel
 import com.intellij.openapi.diagnostic.RollingFileHandler
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.extensions.ExtensionPointName
@@ -31,11 +32,6 @@ import java.util.logging.LogRecord
 class LogLevelConfigurationManager : SerializablePersistentStateComponent<LogLevelConfigurationManager.State>(State()) {
   companion object {
     private val LOG = logger<LogLevelConfigurationManager>()
-
-    internal const val LOG_DEBUG_CATEGORIES_SYSTEM_PROPERTY = "idea.log.debug.categories"
-    internal const val LOG_TRACE_CATEGORIES_SYSTEM_PROPERTY = "idea.log.trace.categories"
-    internal const val LOG_ALL_CATEGORIES_SYSTEM_PROPERTY = "idea.log.all.categories"
-    internal const val LOG_SEPARATE_FILE_CATEGORIES_SYSTEM_PROPERTY = "idea.log.separate.file.categories"
 
     @JvmStatic
     fun getInstance(): LogLevelConfigurationManager = service()
@@ -233,35 +229,18 @@ class LogLevelConfigurationManager : SerializablePersistentStateComponent<LogLev
 
   private fun collectStateFromSystemProperties(): State {
     val categories = mutableListOf<LogCategory>()
-    // add categories from system properties (e.g., for tests on CI server)
-    categories.addAll(fromString(System.getProperty(LOG_DEBUG_CATEGORIES_SYSTEM_PROPERTY), DebugLogLevel.DEBUG))
-    categories.addAll(fromString(System.getProperty(LOG_TRACE_CATEGORIES_SYSTEM_PROPERTY), DebugLogLevel.TRACE))
-    categories.addAll(fromString(System.getProperty(LOG_ALL_CATEGORIES_SYSTEM_PROPERTY), DebugLogLevel.ALL))
+    LoggerConfigFromSystemProperties.categoryToLevel.mapNotNullTo(categories) { (category, logLevel) ->
+      val debugLogLevel = when (logLevel) {
+        LogLevel.DEBUG -> DebugLogLevel.DEBUG
+        LogLevel.TRACE -> DebugLogLevel.TRACE
+        LogLevel.ALL -> DebugLogLevel.ALL
+        else -> null
+      }
+      debugLogLevel?.let { LogCategory(category, debugLogLevel) }
+    }
     return State(
       categories = categories,
-      categoriesWithSeparateFiles = separateFileFromString(System.getProperty(LOG_SEPARATE_FILE_CATEGORIES_SYSTEM_PROPERTY)),
+      categoriesWithSeparateFiles = LoggerConfigFromSystemProperties.separateLogFileCategories.toHashSet(),
     )
-  }
-
-  private fun fromString(text: String?, level: DebugLogLevel): List<LogCategory> {
-    val categories = splitCategories(text) ?: return emptyList<LogCategory>()
-    return categories.mapNotNull { if (it.isBlank()) null else LogCategory(it, level) }
-  }
-
-  private fun separateFileFromString(text: String?): Set<String> =
-    splitCategories(text)?.toHashSet()
-    ?: emptySet()
-
-  private fun splitCategories(text: String?): List<String>? {
-    if (text.isNullOrBlank()) {
-      return null
-    }
-
-    val byNewlines = text.lines()
-    val byCommas = text.split(',')
-    if (byCommas.size > 1 && byNewlines.size > 1) {
-      LOG.error("Mixed commas and newlines as category separators: $text")
-    }
-    return if (byCommas.size > byNewlines.size) byCommas else byNewlines
   }
 }

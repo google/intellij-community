@@ -8,6 +8,7 @@ package com.intellij.debugger.ui.breakpoints;
 
 import com.intellij.debugger.DebuggerManagerEx;
 import com.intellij.debugger.JavaDebuggerBundle;
+import com.intellij.debugger.JvmDebuggerUtils;
 import com.intellij.debugger.SourcePosition;
 import com.intellij.debugger.engine.ContextUtil;
 import com.intellij.debugger.engine.DebugProcessImpl;
@@ -74,8 +75,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import static com.intellij.debugger.engine.EvaluationUtilsKt.shouldInstrumentBreakpoint;
-
 public class LineBreakpoint<P extends JavaBreakpointProperties> extends BreakpointWithHighlighter<P> {
   private final boolean myIgnoreSameLineLocations;
   private volatile String myMethodName = null;
@@ -136,7 +135,7 @@ public class LineBreakpoint<P extends JavaBreakpointProperties> extends Breakpoi
       SourcePosition position = getSourcePosition();
       List<Location> locations = debugProcess.getPositionManager().locationsOfLine(classType, position);
 
-      if (myXBreakpoint instanceof XBreakpointBase<?, ?, ?> xBreakpointBase && shouldInstrumentBreakpoint(xBreakpointBase)) {
+      if (myXBreakpoint instanceof XBreakpointBase<?, ?, ?> && JvmDebuggerUtils.isBreakpointInstrumentationSwitchedOn()) {
         InstrumentationBreakpointState instrumentationBreakpointState = debugProcess.getRequestsManager().getInstrumentationInfo(this);
         if (instrumentationBreakpointState != null) {
           instrumentationBreakpointState.updateInstrumentationModeEnabled(debugProcess.getRequestsManager(), true);

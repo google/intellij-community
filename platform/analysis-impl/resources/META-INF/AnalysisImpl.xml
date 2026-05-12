@@ -3,7 +3,11 @@
 
   <extensionPoints>
     <extensionPoint name="severitiesProvider"
-                    interface="com.intellij.codeInsight.daemon.impl.SeveritiesProvider"/>
+                    interface="com.intellij.codeInsight.daemon.impl.SeveritiesProvider"
+                    dynamic="true"/>
+    <extensionPoint name="inspectionProblemAddedListener"
+                    interface="com.intellij.codeInspection.ui.InspectionProblemAddedListener"
+                    dynamic="true"/>
 
     <extensionPoint name="fileRankerMlService" interface="com.intellij.psi.search.FileRankerMlService" dynamic="true"/>
 
@@ -110,5 +114,10 @@
     <completion.frontendFriendlyTailType target="com.intellij.codeInsight.CharTailType"
                                          converter="com.intellij.codeInsight.completion.CharTailTypeConverter"
                                          descriptor="com.intellij.codeInsight.completion.FrontendFriendlyCharTailType"/>
+
+    <applicationSettings service="com.intellij.find.impl.FindSettingsImpl$FindRecents"/>
+    <applicationSettings service="com.intellij.find.impl.FindUsagesSettingsImpl"/>
+    <projectSettings service="com.intellij.packageDependencies.DependencyValidationManagerImpl"/>
+    <projectSettings service="com.intellij.profile.codeInspection.ProjectInspectionProfileManager"/>
   </extensions>
 </idea-plugin>

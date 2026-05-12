@@ -66,7 +66,7 @@ public final class TogglePresentationModeAction extends AnAction implements Dumb
     }
 
     Job callback = project == null ? CompletableDeferredKt.CompletableDeferred(Unit.INSTANCE) : tweakFrameFullScreen(project, inPresentation);
-    callback.invokeOnCompletion(__ -> {
+    callback.invokeOnCompletion(_ -> {
       SwingUtilities.invokeLater(() -> restoreToolWindows(project));
       return Unit.INSTANCE;
     });

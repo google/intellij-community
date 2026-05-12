@@ -20,6 +20,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiReference;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.DocumentUtil;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -39,6 +40,7 @@ public class TemplateBuilderImpl implements TemplateBuilder {
   private final Map<RangeMarker, Boolean> myAlwaysStopAtMap = new HashMap<>();
   private final Map<RangeMarker, Boolean> mySkipOnStartMap = new HashMap<>();
   private final Map<RangeMarker, String> myVariableNamesMap = new HashMap<>();
+  private final Map<RangeMarker, String> myDefaultValuesMap = new HashMap<>();
   private final Set<RangeMarker> myElements = new TreeSet<>(RangeMarker.BY_START_OFFSET);
 
   private RangeMarker myEndElement;
@@ -103,6 +105,20 @@ public class TemplateBuilderImpl implements TemplateBuilder {
     replaceElement(key, expression);
   }
 
+  /**
+   * Adds a variable segment reference at the given range without creating a new Variable definition.
+   * Use this for subsequent occurrences of a variable that was already defined via
+   * {@link #replaceElement(PsiElement, TextRange, String, Expression, boolean)}.
+   * The text at the range will be replaced by the variable's value during template expansion.
+   */
+  @ApiStatus.Experimental
+  public void addVariableOccurrence(@NotNull PsiElement element, @NotNull TextRange rangeInElement, @NotNull String varName) {
+    final TextRange elementTextRange = InjectedLanguageManager.getInstance(element.getProject()).injectedToHost(element, element.getTextRange());
+    final RangeMarker key = myDocument.createRangeMarker(rangeInElement.shiftRight(elementTextRange.getStartOffset()));
+    myVariableNamesMap.put(key, varName);
+    myElements.add(key);
+  }
+
   private void replaceElement(final RangeMarker key, final Expression expression) {
     myExpressions.put(key, expression);
     myElements.add(key);
@@ -131,6 +147,24 @@ public class TemplateBuilderImpl implements TemplateBuilder {
     myAlwaysStopAtMap.put(key, alwaysStopAt ? Boolean.TRUE : Boolean.FALSE);
     myVariableNamesMap.put(key, primaryVariableName);
     myVariableExpressions.put(key, otherVariableName);
+    myElements.add(key);
+  }
+
+  /**
+   * Same as {@link #replaceElement(PsiElement, TextRange, String, String, boolean)} but with an
+   * explicit default-value expression string. When {@code defaultValueString} is non-null,
+   * {@link #initTemplate} uses it as the variable's {@code defaultValueExpression}; otherwise
+   * the behaviour matches the 5-arg overload (expression doubles as its own default).
+   */
+  @ApiStatus.Experimental
+  public void replaceElement(PsiElement element, TextRange textRange, String primaryVariableName,
+                             String otherVariableName, @Nullable String defaultValueString, boolean alwaysStopAt) {
+    final TextRange elementTextRange = InjectedLanguageManager.getInstance(element.getProject()).injectedToHost(element, element.getTextRange());
+    final RangeMarker key = myDocument.createRangeMarker(textRange.shiftRight(elementTextRange.getStartOffset()));
+    myAlwaysStopAtMap.put(key, alwaysStopAt ? Boolean.TRUE : Boolean.FALSE);
+    myVariableNamesMap.put(key, primaryVariableName);
+    myVariableExpressions.put(key, otherVariableName);
+    if (defaultValueString != null) myDefaultValuesMap.put(key, defaultValueString);
     myElements.add(key);
   }
 
@@ -168,6 +202,22 @@ public class TemplateBuilderImpl implements TemplateBuilder {
   public void setEndVariableAfter(PsiElement element) {
     element = PsiTreeUtil.nextLeaf(element);
     setEndVariableBefore(element);
+  }
+
+  /**
+   * Sets the end variable at a precise document offset, creating a zero-length range marker.
+   * Unlike {@link #setEndVariableBefore(PsiElement)}, this method does not expand to a PSI element's range,
+   * preserving the exact caret position.
+   *
+   * @param offset the document offset where the caret should be placed after the template is finished
+   */
+  @ApiStatus.Experimental
+  public void setEndVariableAt(int offset) {
+    if (myEndElement != null) {
+      myElements.remove(myEndElement);
+    }
+    myEndElement = myDocument.createRangeMarker(offset, offset);
+    myElements.add(myEndElement);
   }
 
   /**
@@ -278,7 +328,8 @@ public class TemplateBuilderImpl implements TemplateBuilder {
         final String variableName = myVariableNamesMap.get(element) == null
                                     ? String.valueOf(expression.hashCode())
                                     : myVariableNamesMap.get(element);
-        template.addVariable(variableName, dependantVariable, dependantVariable, alwaysStopAt);
+        final String defaultValue = myDefaultValuesMap.getOrDefault(element, dependantVariable);
+        template.addVariable(variableName, dependantVariable, defaultValue, alwaysStopAt);
       }
     }
 

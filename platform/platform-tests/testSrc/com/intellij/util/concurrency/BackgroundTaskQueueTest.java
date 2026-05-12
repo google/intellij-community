@@ -269,7 +269,7 @@ public class BackgroundTaskQueueTest extends HeavyPlatformTestCase {
       }
     };
 
-    myThreadRunner.run(THREADS, __ -> {
+    myThreadRunner.run(THREADS, _ -> {
       for (int j = 0; j < RUNS_PER_THREAD; j++) {
         myQueue.run(task);
       }
@@ -372,7 +372,7 @@ public class BackgroundTaskQueueTest extends HeavyPlatformTestCase {
     };
 
     final AtomicInteger cntThreads = new AtomicInteger(THREADS);
-    myThreadRunner.run(THREADS, __ -> {
+    myThreadRunner.run(THREADS, _ -> {
       for (int j = 0; j < RUNS_PER_THREAD; j++) {
         sleepX(7);
         myQueue.run(task);

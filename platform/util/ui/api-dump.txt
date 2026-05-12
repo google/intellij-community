@@ -229,6 +229,10 @@ f:com.intellij.icons.AllIcons$Breakpoints
 - sf:MultipleBreakpointsDisabled:javax.swing.Icon
 - sf:MultipleBreakpointsMuted:javax.swing.Icon
 - <init>():V
+f:com.intellij.icons.AllIcons$Build
+- sf:CompletionCloud:javax.swing.Icon
+- sf:CompletionLocalCache:javax.swing.Icon
+- <init>():V
 f:com.intellij.icons.AllIcons$Chooser
 - sf:Bottom:javax.swing.Icon
 - sf:Left:javax.swing.Icon
@@ -923,6 +927,8 @@ f:com.intellij.icons.AllIcons$Nodes
 - sf:Library:javax.swing.Icon
 - sf:Locked:javax.swing.Icon
 - sf:LogFolder:javax.swing.Icon
+- sf:McpServer:javax.swing.Icon
+- sf:McpServerWidget:javax.swing.Icon
 - sf:Method:javax.swing.Icon
 - sf:MethodReference:javax.swing.Icon
 - sf:Mnemonic:javax.swing.Icon
@@ -1453,10 +1459,6 @@ f:com.intellij.openapi.ui.CheckBoxWithDescription
 - javax.swing.JPanel
 - <init>(javax.swing.JCheckBox,java.lang.String):V
 - f:getCheckBox():javax.swing.JCheckBox
-f:com.intellij.openapi.ui.DescriptionLabel
-- javax.swing.JLabel
-- <init>(java.lang.String):V
-- updateUI():V
 a:com.intellij.openapi.ui.Divider
 - javax.swing.JPanel
 - <init>(java.awt.LayoutManager):V
@@ -1855,6 +1857,8 @@ com.intellij.ui.Colors
 - sf:DARK_RED:java.awt.Color
 - sf:DISABLED_COLOR:java.awt.Color
 f:com.intellij.ui.ComponentUtil
+- s:convertPoint(java.awt.Component,java.awt.Point,java.awt.Component):java.awt.Point
+- s:convertRectangle(java.awt.Component,java.awt.Rectangle,java.awt.Component):java.awt.Rectangle
 - s:decorateWindowHeader(javax.swing.JRootPane):V
 - s:findComponentsOfType(javax.swing.JComponent,java.lang.Class):java.util.List
 - s:findParentByCondition(java.awt.Component,java.util.function.Predicate):java.awt.Component
@@ -2527,6 +2531,7 @@ c:com.intellij.ui.JBColor
 - sf:ORANGE:com.intellij.ui.JBColor
 - sf:PINK:com.intellij.ui.JBColor
 - sf:PanelBackground:java.awt.Color
+- sf:PanelForeground:java.awt.Color
 - sf:RED:com.intellij.ui.JBColor
 - sf:WHITE:com.intellij.ui.JBColor
 - sf:YELLOW:com.intellij.ui.JBColor
@@ -2639,6 +2644,7 @@ Fc:com.intellij.ui.RoundedLineBorder
 f:com.intellij.ui.ScreenUtil
 - sf:DISPOSE_TEMPORARY:java.lang.String
 - s:cropRectangleToFitTheScreen(java.awt.Rectangle):V
+- s:cropRectangleToFitTheScreen(java.awt.Rectangle,java.awt.Rectangle):V
 - s:findNearestPointOnBorder(java.awt.Rectangle,java.awt.Point):java.awt.Point
 - s:fitToScreen(java.awt.Rectangle):V
 - s:fitToScreenVertical(java.awt.Rectangle,I,I,Z):V
@@ -2721,6 +2727,8 @@ f:com.intellij.ui.SizedIcon
 - getIconHeight():I
 - getIconWidth():I
 - getMenuBarIcon(Z):javax.swing.Icon
+- getSizedHeight():I
+- getSizedWidth():I
 - paintIcon(java.awt.Component,java.awt.Graphics,I,I):V
 - replaceBy(com.intellij.ui.icons.IconReplacer):com.intellij.ui.SizedIcon
 - retrieveIcon():javax.swing.Icon
@@ -3225,7 +3233,6 @@ f:com.intellij.ui.paint.PaintUtil
 - s:getFractOffsetInRootPane(javax.swing.JComponent):java.awt.geom.Point2D
 - s:getParityMode(D,com.intellij.ui.scale.ScaleContext,com.intellij.ui.paint.PaintUtil$RoundingMode):com.intellij.ui.paint.PaintUtil$ParityMode
 - s:getParityMode(D,java.awt.Graphics2D):com.intellij.ui.paint.PaintUtil$ParityMode
-- s:getStringWidth(java.lang.String,java.awt.Graphics,java.awt.FontMetrics):I
 - s:insets2offset(java.awt.Insets):java.awt.geom.Point2D
 - s:isFractionalScale(java.awt.geom.AffineTransform):Z
 - s:negate(java.awt.geom.Point2D):java.awt.geom.Point2D
@@ -3547,6 +3554,7 @@ f:com.intellij.util.ui.AvatarUtils
 com.intellij.util.ui.CSSFontResolver
 - a:getFont(java.awt.Font,javax.swing.text.AttributeSet):java.awt.Font
 f:com.intellij.util.ui.CenteredIcon
+- com.intellij.ui.RetrievableIcon
 - javax.swing.Icon
 - <init>(javax.swing.Icon):V
 - <init>(javax.swing.Icon,I,I):V
@@ -3554,6 +3562,8 @@ f:com.intellij.util.ui.CenteredIcon
 - getIconHeight():I
 - getIconWidth():I
 - paintIcon(java.awt.Component,java.awt.Graphics,I,I):V
+- replaceBy(com.intellij.ui.icons.IconReplacer):javax.swing.Icon
+- retrieveIcon():javax.swing.Icon
 f:com.intellij.util.ui.Centerizer
 - javax.swing.JPanel
 - <init>(javax.swing.JComponent):V
@@ -3594,6 +3604,7 @@ f:com.intellij.util.ui.ColorPalette$Companion
 - f:select(java.lang.Object[],java.lang.String):java.lang.Object
 - bs:select$default(com.intellij.util.ui.ColorPalette$Companion,java.lang.Object[],java.lang.String,I,java.lang.Object):java.lang.Object
 a:com.intellij.util.ui.ColorizeProxyIcon
+- com.intellij.ui.RetrievableIcon
 - javax.swing.Icon
 - p:<init>(javax.swing.Icon):V
 - getBaseIcon():javax.swing.Icon
@@ -3605,6 +3616,8 @@ f:com.intellij.util.ui.ColorizeProxyIcon$Simple
 - com.intellij.util.ui.ColorizeProxyIcon
 - <init>(javax.swing.Icon,java.awt.Color):V
 - getColor():java.awt.Color
+- replaceBy(com.intellij.ui.icons.IconReplacer):javax.swing.Icon
+- retrieveIcon():javax.swing.Icon
 c:com.intellij.util.ui.ColorsIcon
 - com.intellij.util.ui.ColorIcon
 - <init>(I,java.awt.Color[]):V
@@ -3879,12 +3892,15 @@ f:com.intellij.util.ui.ImageUtil
 - s:toBufferedImage(java.awt.Image,Z):java.awt.image.BufferedImage
 - s:toBufferedImage(java.awt.Image,Z,Z):java.awt.image.BufferedImage
 f:com.intellij.util.ui.IndentedIcon
+- com.intellij.ui.RetrievableIcon
 - javax.swing.Icon
 - <init>(javax.swing.Icon,I):V
 - <init>(javax.swing.Icon,java.awt.Insets):V
 - getIconHeight():I
 - getIconWidth():I
 - paintIcon(java.awt.Component,java.awt.Graphics,I,I):V
+- replaceBy(com.intellij.ui.icons.IconReplacer):javax.swing.Icon
+- retrieveIcon():javax.swing.Icon
 com.intellij.util.ui.ItemRemovable
 - a:removeRow(I):V
 a:com.intellij.util.ui.JBCachingScalableIcon
@@ -4258,7 +4274,6 @@ f:com.intellij.util.ui.JBUI$CurrentTheme$DefaultTabs
 - s:inactiveColoredTabBackground():java.awt.Color
 - s:inactiveUnderlineColor():java.awt.Color
 - s:underlineColor():java.awt.Color
-- s:underlineHeight():I
 - s:underlinedTabBackground():java.awt.Color
 - s:underlinedTabForeground():java.awt.Color
 com.intellij.util.ui.JBUI$CurrentTheme$DragAndDrop
@@ -5160,11 +5175,6 @@ f:com.intellij.util.ui.TimerUtil
 - <init>():V
 - s:createNamedTimer(java.lang.String,I):javax.swing.Timer
 - s:createNamedTimer(java.lang.String,I,java.awt.event.ActionListener):javax.swing.Timer
-c:com.intellij.util.ui.TwoColorsIcon
-- com.intellij.util.ui.ColorsIcon
-- <init>(I,java.awt.Color,java.awt.Color):V
-- p:<init>(com.intellij.util.ui.TwoColorsIcon):V
-- copy():com.intellij.util.ui.TwoColorsIcon
 f:com.intellij.util.ui.UIUtil
 - sf:AQUA_SEPARATOR_BACKGROUND_COLOR:java.awt.Color
 - sf:BORDER_LINE:java.lang.String
@@ -5200,7 +5210,6 @@ f:com.intellij.util.ui.UIUtil
 - s:addUndoRedoActions(javax.swing.text.JTextComponent):V
 - s:appendColor(java.awt.Color,java.lang.StringBuilder):V
 - s:applyDeprecatedBackground(javax.swing.JComponent):V
-- s:applyRenderingHints(java.awt.Graphics):V
 - s:applyStyle(com.intellij.util.ui.UIUtil$ComponentStyle,java.awt.Component):V
 - s:assignMnemonic(java.lang.String,javax.swing.Action):V
 - s:canDisplayFocusedState(java.awt.Component):Z
@@ -5210,6 +5219,7 @@ f:com.intellij.util.ui.UIUtil
 - s:computeStringWidth(javax.swing.JComponent,java.lang.String):I
 - s:computeTextComponentMinimumSize(I,java.lang.String,java.awt.FontMetrics):I
 - s:computeTextComponentMinimumSize(I,java.lang.String,java.awt.FontMetrics,I):I
+- s:computeTextComponentMinimumSize(I,java.lang.String,java.awt.FontMetrics,I,I,java.lang.String):I
 - s:configureNumericFormattedTextField(javax.swing.JFormattedTextField):V
 - s:convertToLabel(javax.swing.JEditorPane):V
 - s:createImage(I,I,I):java.awt.image.BufferedImage
@@ -5563,11 +5573,14 @@ e:com.intellij.util.ui.UnixDesktopEnv
 - s:valueOf(java.lang.String):com.intellij.util.ui.UnixDesktopEnv
 - s:values():com.intellij.util.ui.UnixDesktopEnv[]
 f:com.intellij.util.ui.WatermarkIcon
+- com.intellij.ui.RetrievableIcon
 - javax.swing.Icon
 - <init>(javax.swing.Icon,F):V
 - getIconHeight():I
 - getIconWidth():I
 - paintIcon(java.awt.Component,java.awt.Graphics,I,I):V
+- replaceBy(com.intellij.ui.icons.IconReplacer):javax.swing.Icon
+- retrieveIcon():javax.swing.Icon
 a:com.intellij.util.ui.WavePainter
 - p:<init>():V
 - s:forColor(java.awt.Color):com.intellij.util.ui.WavePainter
@@ -5638,6 +5651,7 @@ f:com.intellij.util.ui.accessibility.AccessibleContextUtil
 - sf:combineAccessibleStrings(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String):java.lang.String
 - sf:getCombinedDescription(java.awt.Component,java.lang.String,java.awt.Component):java.lang.String
 - sf:getCombinedDescription(java.awt.Component,java.lang.String,java.awt.Component,java.lang.String,java.awt.Component):java.lang.String
+- sf:getCombinedDescription(java.lang.String,java.awt.Component[]):java.lang.String
 - sf:getCombinedName(java.awt.Component,java.lang.String,java.awt.Component):java.lang.String
 - sf:getCombinedName(java.awt.Component,java.lang.String,java.awt.Component,java.lang.String,java.awt.Component):java.lang.String
 - sf:getCombinedName(java.lang.String,java.awt.Component[]):java.lang.String

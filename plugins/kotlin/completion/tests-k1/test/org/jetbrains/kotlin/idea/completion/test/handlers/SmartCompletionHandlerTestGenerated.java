@@ -99,6 +99,40 @@ public abstract class SmartCompletionHandlerTestGenerated extends AbstractSmartC
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../testData/handlers/smart/SAM")
+    public static class SAM extends AbstractSmartCompletionHandlerTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K1;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("KotlinFunInterface.kt")
+        public void testKotlinFunInterface() throws Exception {
+            runTest("../testData/handlers/smart/SAM/KotlinFunInterface.kt");
+        }
+
+        @TestMetadata("KotlinFunInterfaceMultiParam.kt")
+        public void testKotlinFunInterfaceMultiParam() throws Exception {
+            runTest("../testData/handlers/smart/SAM/KotlinFunInterfaceMultiParam.kt");
+        }
+
+        @TestMetadata("SAMExpected1.kt")
+        public void testSAMExpected1() throws Exception {
+            runTest("../testData/handlers/smart/SAM/SAMExpected1.kt");
+        }
+
+        @TestMetadata("SAMExpected2.kt")
+        public void testSAMExpected2() throws Exception {
+            runTest("../testData/handlers/smart/SAM/SAMExpected2.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../testData/handlers/smart/suspendLambdaSignature")
     public static class SuspendLambdaSignature extends AbstractSmartCompletionHandlerTest {
         @java.lang.Override
@@ -119,6 +153,35 @@ public abstract class SmartCompletionHandlerTestGenerated extends AbstractSmartC
         @TestMetadata("Simple.kt")
         public void testSimple() throws Exception {
             runTest("../testData/handlers/smart/suspendLambdaSignature/Simple.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../testData/handlers/smart/throwables")
+    public static class Throwables extends AbstractSmartCompletionHandlerTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K1;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("ThrowableFromJava.kt")
+        public void testThrowableFromJava() throws Exception {
+            runTest("../testData/handlers/smart/throwables/ThrowableFromJava.kt");
+        }
+
+        @TestMetadata("ThrowableFromStdlib.kt")
+        public void testThrowableFromStdlib() throws Exception {
+            runTest("../testData/handlers/smart/throwables/ThrowableFromStdlib.kt");
+        }
+
+        @TestMetadata("ThrowableWithoutArguments.kt")
+        public void testThrowableWithoutArguments() throws Exception {
+            runTest("../testData/handlers/smart/throwables/ThrowableWithoutArguments.kt");
         }
     }
 
@@ -175,14 +238,84 @@ public abstract class SmartCompletionHandlerTestGenerated extends AbstractSmartC
             runTest("../testData/handlers/smart/AnonymousObject3.kt");
         }
 
+        @TestMetadata("AnonymousObjectAbstractMixed.kt")
+        public void testAnonymousObjectAbstractMixed() throws Exception {
+            runTest("../testData/handlers/smart/AnonymousObjectAbstractMixed.kt");
+        }
+
+        @TestMetadata("AnonymousObjectElvis.kt")
+        public void testAnonymousObjectElvis() throws Exception {
+            runTest("../testData/handlers/smart/AnonymousObjectElvis.kt");
+        }
+
+        @TestMetadata("AnonymousObjectGenericInterface.kt")
+        public void testAnonymousObjectGenericInterface() throws Exception {
+            runTest("../testData/handlers/smart/AnonymousObjectGenericInterface.kt");
+        }
+
+        @TestMetadata("AnonymousObjectIf.kt")
+        public void testAnonymousObjectIf() throws Exception {
+            runTest("../testData/handlers/smart/AnonymousObjectIf.kt");
+        }
+
         @TestMetadata("AnonymousObjectInsertsImport.kt")
         public void testAnonymousObjectInsertsImport() throws Exception {
             runTest("../testData/handlers/smart/AnonymousObjectInsertsImport.kt");
         }
 
+        @TestMetadata("AnonymousObjectInterfaceProperty.kt")
+        public void testAnonymousObjectInterfaceProperty() throws Exception {
+            runTest("../testData/handlers/smart/AnonymousObjectInterfaceProperty.kt");
+        }
+
+        @TestMetadata("AnonymousObjectInterfaceWithDefaults.kt")
+        public void testAnonymousObjectInterfaceWithDefaults() throws Exception {
+            runTest("../testData/handlers/smart/AnonymousObjectInterfaceWithDefaults.kt");
+        }
+
+        @TestMetadata("AnonymousObjectLambda.kt")
+        public void testAnonymousObjectLambda() throws Exception {
+            runTest("../testData/handlers/smart/AnonymousObjectLambda.kt");
+        }
+
+        @TestMetadata("AnonymousObjectLazyProperty.kt")
+        public void testAnonymousObjectLazyProperty() throws Exception {
+            runTest("../testData/handlers/smart/AnonymousObjectLazyProperty.kt");
+        }
+
+        @TestMetadata("AnonymousObjectMap.kt")
+        public void testAnonymousObjectMap() throws Exception {
+            runTest("../testData/handlers/smart/AnonymousObjectMap.kt");
+        }
+
+        @TestMetadata("AnonymousObjectMultipleInterfaces.kt")
+        public void testAnonymousObjectMultipleInterfaces() throws Exception {
+            runTest("../testData/handlers/smart/AnonymousObjectMultipleInterfaces.kt");
+        }
+
+        @TestMetadata("AnonymousObjectNullableType.kt")
+        public void testAnonymousObjectNullableType() throws Exception {
+            runTest("../testData/handlers/smart/AnonymousObjectNullableType.kt");
+        }
+
+        @TestMetadata("AnonymousObjectOpenClass.kt")
+        public void testAnonymousObjectOpenClass() throws Exception {
+            runTest("../testData/handlers/smart/AnonymousObjectOpenClass.kt");
+        }
+
         @TestMetadata("AnonymousObjectUninferredTypeArgs.kt")
         public void testAnonymousObjectUninferredTypeArgs() throws Exception {
             runTest("../testData/handlers/smart/AnonymousObjectUninferredTypeArgs.kt");
+        }
+
+        @TestMetadata("AnonymousObjectVarReassignment.kt")
+        public void testAnonymousObjectVarReassignment() throws Exception {
+            runTest("../testData/handlers/smart/AnonymousObjectVarReassignment.kt");
+        }
+
+        @TestMetadata("AnonymousObjectWhen.kt")
+        public void testAnonymousObjectWhen() throws Exception {
+            runTest("../testData/handlers/smart/AnonymousObjectWhen.kt");
         }
 
         @TestMetadata("ArrayClassLiteral.kt")
@@ -723,16 +856,6 @@ public abstract class SmartCompletionHandlerTestGenerated extends AbstractSmartC
         @TestMetadata("ReplaceArgument.kt")
         public void testReplaceArgument() throws Exception {
             runTest("../testData/handlers/smart/ReplaceArgument.kt");
-        }
-
-        @TestMetadata("SAMExpected1.kt")
-        public void testSAMExpected1() throws Exception {
-            runTest("../testData/handlers/smart/SAMExpected1.kt");
-        }
-
-        @TestMetadata("SAMExpected2.kt")
-        public void testSAMExpected2() throws Exception {
-            runTest("../testData/handlers/smart/SAMExpected2.kt");
         }
 
         @TestMetadata("SecondVararg.kt")

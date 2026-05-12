@@ -1,14 +1,9 @@
 ### auto-generated section `build intellij.devkit.kotlin.tests` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "kotlin-tests_test_resources",
-  srcs = glob(["testData/**/*"]),
-  strip_prefix = "testData"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "kotlin-tests",
+  module_name = "intellij.devkit.kotlin.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -20,9 +15,11 @@ jvm_library(
 
 jvm_library(
   name = "kotlin-tests_test_lib",
+  testonly = True,
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
-  resources = [":kotlin-tests_test_resources"],
+  resources = glob(["testData/**/*"]),
+  resource_strip_prefix = "testData",
   associates = [
     "//plugins/devkit/intellij.kotlin.devkit:kotlin-devkit",
     "//plugins/devkit/intellij.kotlin.devkit:kotlin-devkit_test_lib",
@@ -57,6 +54,8 @@ jvm_library(
     "//plugins/java-i18n:java-i18n_test_lib",
     "//java/openapi:java",
     "//java/openapi:java_test_lib",
+    "//java/java-psi-api:psi",
+    "//java/java-psi-api:psi_test_lib",
     "//plugins/devkit/intellij.devkit.themes:themes",
     "//plugins/devkit/intellij.devkit.themes:themes_test_lib",
     "//xml/dom-openapi:dom",
@@ -74,8 +73,8 @@ jvm_library(
     "//xml/xml-psi-api:psi_test_lib",
     "//xml/xml-analysis-api:analysis",
     "//xml/xml-analysis-api:analysis_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/test-framework",
     "//plugins/kotlin/test-framework:test-framework_test_lib",
     "//plugins/kotlin/base/plugin",
@@ -90,6 +89,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.devkit.kotlin.tests` end
+
+### auto-generated section `iml intellij.devkit.kotlin.tests` start
+exports_files([
+  "intellij.devkit.kotlin.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.devkit.kotlin.tests` end
 
 ### auto-generated section `test intellij.devkit.kotlin.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

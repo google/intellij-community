@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.remoteDev.util` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "remoteDev-util_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "remoteDev-util",
   module_name = "intellij.remoteDev.util",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "modelGenerated/**/*.kt", "modelGenerated/**/*.java"], allow_empty = True),
-  resources = [":remoteDev-util_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//libraries/rd/core",
@@ -20,13 +15,14 @@ jvm_library(
     "//platform/editor-ui-api:editor-ui",
     "//platform/projectModel-api:projectModel",
     "//platform/util",
+    "//platform/util:util-ui",
     "//platform/core-api:core",
     "//platform/platform-api:ide",
     "//platform/platform-util-io:ide-util-io",
     "//platform/util/concurrency",
     "//platform/analysis-api:analysis",
     "@lib//:jna",
-    "@lib//:download-pgp-verifier",
+    "//libraries/download-pgp-verifier",
     "//libraries/bouncy-castle-pgp",
     "//platform/platform-impl:ide-impl",
     "//libraries/miglayout-swing",
@@ -41,6 +37,7 @@ jvm_library(
     "//platform/core-ui",
     "//libraries/kotlin/reflect",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "@lib//:rd-gen",
     "@lib//:opentelemetry",
     "@lib//:opentelemetry-semconv",
@@ -50,6 +47,7 @@ jvm_library(
     "//platform/diagnostic",
     "//platform/bootstrap",
     "//platform/platform-impl/ui",
+    "//platform/progress/shared:ide-progress",
     "//platform/welcome-screen-impl:welcomeScreen-impl",
     "//platform/lang-core",
     "//platform/runtime/repository",
@@ -62,9 +60,86 @@ jvm_library(
 
 jvm_library(
   name = "remoteDev-util_test_lib",
+  testonly = True,
+  module_name = "intellij.remoteDev.util",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True),
+  runtime_deps = [
+    ":remoteDev-util",
+    "//libraries/rd/core:core_test_lib",
+    "//libraries/rd/framework:framework_test_lib",
+    "//platform/editor-ui-api:editor-ui_test_lib",
+    "//platform/projectModel-api:projectModel_test_lib",
+    "//platform/util:util_test_lib",
+    "//platform/util:util-ui_test_lib",
+    "//platform/core-api:core_test_lib",
+    "//platform/platform-api:ide_test_lib",
+    "//platform/platform-util-io:ide-util-io_test_lib",
+    "//platform/util/concurrency:concurrency_test_lib",
+    "//platform/analysis-api:analysis_test_lib",
+    "//libraries/download-pgp-verifier:download-pgp-verifier_test_lib",
+    "//libraries/bouncy-castle-pgp:bouncy-castle-pgp_test_lib",
+    "//platform/platform-impl:ide-impl_test_lib",
+    "//libraries/miglayout-swing:miglayout-swing_test_lib",
+    "//libraries/jackson3/jackson:libraries-jackson3_test_lib",
+    "//libraries/jackson3/databind:databind_test_lib",
+    "//platform/rd-platform-community:rd-community_test_lib",
+    "//platform/statistics:statistics_test_lib",
+    "//libraries/gson:gson_test_lib",
+    "//libraries/junit5",
+    "//libraries/junit5:junit5_test_lib",
+    "//platform/util/progress:progress_test_lib",
+    "//libraries/junit5-params",
+    "//libraries/junit5-params:junit5-params_test_lib",
+    "//platform/testFramework/junit5",
+    "//platform/testFramework/junit5:junit5_test_lib",
+    "//libraries/kotlinx/serialization/core:core_test_lib",
+    "//libraries/kotlinx/serialization/json:json_test_lib",
+    "//platform/core-ui:core-ui_test_lib",
+    "//libraries/kotlin/reflect:reflect_test_lib",
+    "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
+    "//platform/diagnostic/telemetry:telemetry_test_lib",
+    "//platform/diagnostic/telemetry.exporters:telemetry.exporters_test_lib",
+    "//platform/diagnostic/telemetry-impl:telemetry-impl_test_lib",
+    "//platform/diagnostic:diagnostic_test_lib",
+    "//platform/bootstrap:bootstrap_test_lib",
+    "//platform/platform-impl/ui:ui_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
+    "//platform/welcome-screen-impl:welcomeScreen-impl_test_lib",
+    "//platform/lang-core:lang-core_test_lib",
+    "//platform/runtime/repository:repository_test_lib",
+    "//platform/core-impl:core-impl_test_lib",
+    "//platform/runtime/product:product_test_lib",
+    "//platform/execution:execution_test_lib",
+    "//platform/util/coroutines:coroutines_test_lib",
+  ]
+)
+### auto-generated section `build intellij.remoteDev.util` end
+
+### auto-generated section `iml intellij.remoteDev.util` start
+exports_files([
+  "intellij.remoteDev.util.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.remoteDev.util` end
+
+### auto-generated section `build intellij.remoteDev.util.tests` start
+jvm_library(
+  name = "remoteDev-util-tests",
+  module_name = "intellij.remoteDev.util.tests",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
+)
+
+jvm_library(
+  name = "remoteDev-util-tests_test_lib",
+  testonly = True,
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
-  associates = [":remoteDev-util"],
+  associates = [
+    "//platform/remoteDev-util",
+    "//platform/remoteDev-util:remoteDev-util_test_lib",
+  ],
   deps = [
     "@lib//:kotlin-stdlib",
     "//libraries/rd/core",
@@ -87,7 +162,8 @@ jvm_library(
     "//platform/analysis-api:analysis",
     "//platform/analysis-api:analysis_test_lib",
     "@lib//:jna",
-    "@lib//:download-pgp-verifier",
+    "//libraries/download-pgp-verifier",
+    "//libraries/download-pgp-verifier:download-pgp-verifier_test_lib",
     "//libraries/bouncy-castle-pgp",
     "//libraries/bouncy-castle-pgp:bouncy-castle-pgp_test_lib",
     "//platform/platform-impl:ide-impl",
@@ -148,19 +224,26 @@ jvm_library(
     "//platform/util/coroutines:coroutines_test_lib",
   ],
   runtime_deps = [
+    ":remoteDev-util-tests",
     "//platform/platform-util-io:ide-util-io_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
     "//platform/platform-impl/ui:ui_test_lib",
   ]
 )
-### auto-generated section `build intellij.remoteDev.util` end
+### auto-generated section `build intellij.remoteDev.util.tests` end
 
-### auto-generated section `test intellij.remoteDev.util` start
+### auto-generated section `iml intellij.remoteDev.util.tests` start
+exports_files([
+  "intellij.remoteDev.util.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.remoteDev.util.tests` end
+
+### auto-generated section `test intellij.remoteDev.util.tests` start
 load("@community//build:tests-options.bzl", "jps_test")
 
 jps_test(
-  name = "remoteDev-util_test",
-  runtime_deps = [":remoteDev-util_test_lib"]
+  name = "remoteDev-util-tests_test",
+  runtime_deps = [":remoteDev-util-tests_test_lib"]
 )
-### auto-generated section `test intellij.remoteDev.util` end
+### auto-generated section `test intellij.remoteDev.util.tests` end

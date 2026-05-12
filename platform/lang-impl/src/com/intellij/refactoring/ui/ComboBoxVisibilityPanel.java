@@ -17,7 +17,7 @@ package com.intellij.refactoring.ui;
 
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.refactoring.RefactoringBundle;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.ui.DialogUtil;
 import com.intellij.util.ui.UpDownHandler;
 
@@ -69,7 +69,7 @@ public class ComboBoxVisibilityPanel<V> extends VisibilityPanelBase<V> {
   }
 
   protected ListCellRenderer<?> getRenderer() {
-    return SimpleListCellRenderer.<V>create("", myNamesMap::get);
+    return BuilderKt.textListCellRenderer("", myNamesMap::get);
   }
 
   public ComboBoxVisibilityPanel(@NlsContexts.Label String name, V[] options) {

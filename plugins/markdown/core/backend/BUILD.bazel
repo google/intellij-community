@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.markdown.backend` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "backend_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "backend",
   module_name = "intellij.markdown.backend",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":backend_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//plugins/markdown/core:markdown",
     "@lib//:kotlin-stdlib",
@@ -28,10 +23,10 @@ jvm_library(
     "//platform/analysis-api:analysis",
     "//platform/ide-core",
     "//platform/project/shared:project",
-    "//platform/remote-driver/test-sdk:driver-sdk",
     "//platform/lang-api:lang",
     "//platform/ide-core-impl",
     "//platform/platform-impl/rpc",
+    "//fleet/rhizomedb",
   ],
   exports = ["//plugins/markdown/core:markdown"],
   runtime_deps = ["//platform/backend"]
@@ -39,6 +34,7 @@ jvm_library(
 
 jvm_library(
   name = "backend_test_lib",
+  testonly = True,
   module_name = "intellij.markdown.backend",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -62,10 +58,16 @@ jvm_library(
     "//platform/analysis-api:analysis_test_lib",
     "//platform/ide-core:ide-core_test_lib",
     "//platform/project/shared:project_test_lib",
-    "//platform/remote-driver/test-sdk:driver-sdk_test_lib",
     "//platform/lang-api:lang_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
     "//platform/platform-impl/rpc:rpc_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.markdown.backend` end
+
+### auto-generated section `iml intellij.markdown.backend` start
+exports_files([
+  "intellij.markdown.backend.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.markdown.backend` end

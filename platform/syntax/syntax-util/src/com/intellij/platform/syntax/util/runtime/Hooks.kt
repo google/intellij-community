@@ -1,14 +1,10 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:ApiStatus.Experimental
-
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.syntax.util.runtime
 
 import com.intellij.platform.syntax.parser.SyntaxTreeBuilder
 import com.intellij.platform.syntax.parser.WhitespacesAndCommentsBinder
-import org.jetbrains.annotations.ApiStatus
 import kotlin.jvm.JvmField
 
-@ApiStatus.Experimental
 @JvmField
 val LEFT_BINDER: Hook<WhitespacesAndCommentsBinder> = object : Hook<WhitespacesAndCommentsBinder> {
   override fun run(
@@ -21,7 +17,6 @@ val LEFT_BINDER: Hook<WhitespacesAndCommentsBinder> = object : Hook<WhitespacesA
   }
 }
 
-@ApiStatus.Experimental
 @JvmField
 val RIGHT_BINDER: Hook<WhitespacesAndCommentsBinder> = object : Hook<WhitespacesAndCommentsBinder> {
   override fun run(
@@ -34,7 +29,6 @@ val RIGHT_BINDER: Hook<WhitespacesAndCommentsBinder> = object : Hook<Whitespaces
   }
 }
 
-@ApiStatus.Experimental
 @JvmField
 val WS_BINDERS: Hook<Array<WhitespacesAndCommentsBinder>> = object : Hook<Array<WhitespacesAndCommentsBinder>> {
   override fun run(

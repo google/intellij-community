@@ -72,8 +72,8 @@ class KotlinGenerateSecondaryConstructorAction : KotlinGenerateMemberActionBase<
 
     private fun shouldPreselect(element: PsiElement) = element is KtProperty && !element.isVar
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun chooseSuperConstructors(classSymbol: KaClassSymbol): List<ClassMember> {
         val superClassSymbol = getSuperClassSymbolNoAny(classSymbol) ?: return emptyList()
         val candidates = superClassSymbol.declaredMemberScope.constructors
@@ -91,7 +91,6 @@ class KotlinGenerateSecondaryConstructorAction : KotlinGenerateMemberActionBase<
         }
 
     context(_: KaSession)
-    @OptIn(KaExperimentalApi::class)
     private fun KtProperty.isPropertyNotInitialized(): Boolean {
         // TODO: when KT-63221 is fixed use `diagnostics(KaDiagnosticCheckerFilter.ONLY_COMMON_CHECKERS)` instead
         return containingKtFile.collectDiagnostics(KaDiagnosticCheckerFilter.ONLY_COMMON_CHECKERS)
@@ -185,8 +184,8 @@ class KotlinGenerateSecondaryConstructorAction : KotlinGenerateMemberActionBase<
         }
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun generateConstructor(
         klass: KtClass,
         propertiesToInitialize: List<KtProperty>,

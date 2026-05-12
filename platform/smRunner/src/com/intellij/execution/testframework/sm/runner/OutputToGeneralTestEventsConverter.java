@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.testframework.sm.runner;
 
 import com.intellij.execution.process.ColoredOutputTypeRegistry;
@@ -434,7 +434,8 @@ public class OutputToGeneralTestEventsConverter implements ProcessOutputConsumer
 
     @Override
     public void visitTestSuiteFinished(final @NotNull TestSuiteFinished suiteFinished) {
-      TestSuiteFinishedEvent finishedEvent = new TestSuiteFinishedEvent(suiteFinished);
+      String duration = suiteFinished.getAttributes().get(ATTR_KEY_TEST_DURATION);
+      TestSuiteFinishedEvent finishedEvent = new TestSuiteFinishedEvent(suiteFinished, duration);
       fireOnSuiteFinished(finishedEvent);
     }
 

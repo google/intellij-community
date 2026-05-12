@@ -21,6 +21,8 @@ public class LombokExtensionMethodsHighlightingTest extends LightDaemonAnalyzerT
   public void testExtensionMethodPlain() { doTest(); }
   public void testExtensionMethodSuppress() { doTest(); }
   public void testExtensionMethodVarargs() { doTest(); }
+  public void testExtensionMethodVarargsOverloaded() { doTest(); }
+  public void testExtensionMethodWrongArguments() { doTest(); }
 
   @NotNull
   @Override

@@ -1,7 +1,9 @@
 // Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package org.intellij.plugins.markdown.actions
 
+import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.testFramework.LightPlatformCodeInsightTestCase
+import com.intellij.testFramework.EditorTestUtil
 
 @Suppress("unused")
 class MarkdownStylingActionsConsistencyTest {
@@ -25,6 +27,17 @@ class MarkdownStylingActionsConsistencyTest {
       executeAction(actionId)
       checkResultByText(applied)
       executeAction(actionId)
+      checkResultByText(content)
+    }
+
+    fun `test disabled inside code span`() {
+      // language=Markdown
+      val content = """
+      Some `arbi<caret>trary` text
+      """.trimIndent()
+      configureFromFileText("some.md", content)
+      val action = ActionManager.getInstance().getAction(actionId)
+      assertFalse(EditorTestUtil.checkActionIsEnabled(editor, action))
       checkResultByText(content)
     }
 

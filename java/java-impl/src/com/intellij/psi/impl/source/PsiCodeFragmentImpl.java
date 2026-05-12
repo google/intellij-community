@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.impl.source;
 
 import com.intellij.ide.highlighter.JavaFileType;
@@ -20,6 +20,7 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiElementVisitor;
 import com.intellij.psi.PsiNameHelper;
+import com.intellij.psi.PsiPackage;
 import com.intellij.psi.PsiType;
 import com.intellij.psi.ResolveState;
 import com.intellij.psi.SingleRootFileViewProvider;
@@ -36,6 +37,7 @@ import com.intellij.psi.scope.util.PsiScopesUtil;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.tree.IElementType;
 import com.intellij.testFramework.LightVirtualFile;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -43,8 +45,10 @@ import org.jetbrains.annotations.Nullable;
 import java.util.LinkedHashMap;
 import java.util.StringTokenizer;
 
+@ApiStatus.Internal
 public class PsiCodeFragmentImpl extends PsiFileImpl implements JavaCodeFragment, IntentionFilterOwner {
   private final PsiElement myContext;
+  private final String myPackageName;
   private boolean myPhysical;
   private PsiType myThisType;
   private PsiType mySuperType;
@@ -66,6 +70,24 @@ public class PsiCodeFragmentImpl extends PsiFileImpl implements JavaCodeFragment
             new LightVirtualFile(name, FileTypeManager.getInstance().getFileTypeByFileName(name), text), isPhysical)
     );
     myContext = context;
+    myPackageName = context instanceof PsiPackage aPackage ? aPackage.getQualifiedName() : null;
+    ((SingleRootFileViewProvider)getViewProvider()).forceCachedPsi(this);
+    myPhysical = isPhysical;
+  }
+
+  PsiCodeFragmentImpl(Project project,
+                      IElementType contentElementType,
+                      boolean isPhysical,
+                      @NonNls String name,
+                      CharSequence text,
+                      @Nullable String packageName) {
+    super(TokenType.CODE_FRAGMENT,
+          contentElementType,
+          PsiManagerEx.getInstanceEx(project).getFileManager().createFileViewProvider(
+            new LightVirtualFile(name, FileTypeManager.getInstance().getFileTypeByFileName(name), text), isPhysical)
+    );
+    myPackageName = packageName;
+    myContext = null;
     ((SingleRootFileViewProvider)getViewProvider()).forceCachedPsi(this);
     myPhysical = isPhysical;
   }
@@ -82,10 +104,8 @@ public class PsiCodeFragmentImpl extends PsiFileImpl implements JavaCodeFragment
     clone.myOriginalFile = this;
     clone.myPseudoImports = new LinkedHashMap<>(myPseudoImports);
     FileManager fileManager = ((PsiManagerEx)getManager()).getFileManager();
-    SingleRootFileViewProvider cloneViewProvider = (SingleRootFileViewProvider)fileManager.createFileViewProvider(new LightVirtualFile(
-      getName(),
-      getLanguage(),
-      getText()), false);
+    SingleRootFileViewProvider cloneViewProvider = (SingleRootFileViewProvider)
+      fileManager.createFileViewProvider(new LightVirtualFile(getName(), getLanguage(), getText()), false);
     cloneViewProvider.forceCachedPsi(clone);
     clone.myViewProvider = cloneViewProvider;
     return clone;
@@ -125,8 +145,13 @@ public class PsiCodeFragmentImpl extends PsiFileImpl implements JavaCodeFragment
   }
 
   @Override
-  public void setSuperType(final PsiType superType) {
+  public void setSuperType(PsiType superType) {
     mySuperType = superType;
+  }
+
+  @Override
+  public @Nullable String getPackageName() {
+    return myPackageName;
   }
 
   @Override
@@ -161,8 +186,8 @@ public class PsiCodeFragmentImpl extends PsiFileImpl implements JavaCodeFragment
 
   @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
-    if (visitor instanceof JavaElementVisitor) {
-      ((JavaElementVisitor)visitor).visitCodeFragment(this);
+    if (visitor instanceof JavaElementVisitor v) {
+      v.visitCodeFragment(this);
     }
     else {
       visitor.visitFile(this);
@@ -250,10 +275,7 @@ public class PsiCodeFragmentImpl extends PsiFileImpl implements JavaCodeFragment
     private final String myQName;
     private final LinkedHashMap<String, String> myPseudoImports;
 
-    ImportClassUndoableAction(final String className,
-                                     final String qName,
-                                     final Document document,
-                                     final LinkedHashMap<String, String> pseudoImportsMap) {
+    ImportClassUndoableAction(String className, String qName, Document document, LinkedHashMap<String, String> pseudoImportsMap) {
       super(document);
       myClassName = className;
       myQName = qName;
@@ -277,7 +299,7 @@ public class PsiCodeFragmentImpl extends PsiFileImpl implements JavaCodeFragment
   }
 
   @Override
-  public void setIntentionActionsFilter(final @NotNull IntentionActionsFilter filter) {
+  public void setIntentionActionsFilter(@NotNull IntentionActionsFilter filter) {
     myIntentionActionsFilter = filter;
   }
 
@@ -303,7 +325,7 @@ public class PsiCodeFragmentImpl extends PsiFileImpl implements JavaCodeFragment
   }
 
   @Override
-  public void setExceptionHandler(final ExceptionHandler exceptionHandler) {
+  public void setExceptionHandler(ExceptionHandler exceptionHandler) {
     myExceptionHandler = exceptionHandler;
   }
 }

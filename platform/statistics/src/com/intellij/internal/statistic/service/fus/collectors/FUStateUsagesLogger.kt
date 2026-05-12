@@ -206,7 +206,7 @@ class FUStateUsagesLogger private constructor(coroutineScope: CoroutineScope) : 
 
   internal suspend fun logApplicationStates(onStartup: Boolean) {
     // state loggers may depend on Registry
-    RegistryManager.getInstanceAsync().awaitRegistryLoad()
+    RegistryManager.getInstanceAsync()
 
     logCollectorsMetrics(project = null,
                          getCollectors = { UsageCollectors.getApplicationCollectors(this@FUStateUsagesLogger, onStartup) },
@@ -241,7 +241,7 @@ class ProjectFUStateUsagesLogger(
 
   private suspend fun logProjectState() {
     // state loggers may depend on Registry
-    RegistryManager.getInstanceAsync().awaitRegistryLoad()
+    RegistryManager.getInstanceAsync()
 
     logCollectorsMetrics(project = project,
                          getCollectors = { UsageCollectors.getProjectCollectors(this@ProjectFUStateUsagesLogger) },

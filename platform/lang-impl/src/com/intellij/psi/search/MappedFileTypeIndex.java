@@ -71,7 +71,7 @@ public final class MappedFileTypeIndex extends FileTypeIndexImplBase {
     Int2ObjectMap<RandomAccessIntContainer> invertedIndex = new Int2ObjectOpenHashMap<>();
     forwardIndex.processEntries((inputId, data) -> {
       if (data != 0) {
-        invertedIndex.computeIfAbsent(data, __ -> createContainerForInvertedIndex()).add(inputId);
+        invertedIndex.computeIfAbsent(data, _ -> createContainerForInvertedIndex()).add(inputId);
       }
     });
     myDataController = new IndexDataController(invertedIndex, forwardIndex, id -> notifyInvertedIndexChangedForFileTypeId(id));
@@ -278,7 +278,7 @@ public final class MappedFileTypeIndex extends FileTypeIndexImplBase {
       }
       myForwardIndex.set(inputId, data);
       if (data != 0) {
-        myInvertedIndex.computeIfAbsent(data, __ -> createContainerForInvertedIndex()).add(inputId);
+        myInvertedIndex.computeIfAbsent(data, _ -> createContainerForInvertedIndex()).add(inputId);
       }
       //TODO RC: should we do the notification under the lock?
       triggerOnInvertedIndexChangeCallback(data, indexedData);

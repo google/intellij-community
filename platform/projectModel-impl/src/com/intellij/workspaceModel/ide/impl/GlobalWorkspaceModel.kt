@@ -53,6 +53,7 @@ import com.intellij.workspaceModel.ide.impl.legacyBridge.sdk.SdkBridgeImpl.Compa
 import com.intellij.workspaceModel.ide.impl.legacyBridge.sdk.SdkBridgeImpl.Companion.sdkMap
 import com.intellij.workspaceModel.ide.legacyBridge.GlobalEntityBridgeAndEventHandler
 import io.opentelemetry.api.metrics.Meter
+import kotlinx.coroutines.Job
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
 import org.jetbrains.annotations.TestOnly
@@ -86,6 +87,13 @@ class GlobalWorkspaceModels internal constructor() {
   }
 }
 
+/**
+ * Please use project-level [WorkspaceModel] directly instead.
+ * [SdkEntity] and global [LibraryEntity] are seamlessly synchronized between [GlobalWorkspaceModel] and [WorkspaceModel].
+ * For custom entities [GlobalWorkspaceModel] won't give you an advantage because you would still need to make sure that all the
+ * custom entities are present in the global WSM after application start because global WSM cache may be invalidated. On top of that, you
+ * would have to remember which WSM to use: the global WSM or project-level WSM.
+ */
 @OptIn(EntityStorageInstrumentationApi::class)
 @ApiStatus.Internal
 class GlobalWorkspaceModel internal constructor(
@@ -112,6 +120,7 @@ class GlobalWorkspaceModel internal constructor(
   private val globalEntitiesFilter = { entitySource: EntitySource -> entitySource is GlobalStorageEntitySource }
 
   val entityStorage: VersionedEntityStorageImpl
+  val jpsSyncJob: Job
   val currentSnapshot: ImmutableEntityStorage
     get() = entityStorage.current
 
@@ -163,7 +172,7 @@ class GlobalWorkspaceModel internal constructor(
       .loadInitialState(eelMachine, internalEnvironmentName, mutableEntityStorage, entityStorage, loadedFromCache)
     val changes = (mutableEntityStorage as MutableEntityStorageInstrumentation).collectChanges()
     entityStorage.replace(mutableEntityStorage.toSnapshot(), changes, mutableEntityStorage.collectSymbolicEntityIdsChanges(), {}, {})
-    callback.invoke()
+    jpsSyncJob = callback.invoke()
   }
 
   @OptIn(EntityStorageInstrumentationApi::class)
@@ -262,7 +271,7 @@ class GlobalWorkspaceModel internal constructor(
     // but the Project is not open therefore, it doesn't get closed, only disposed.
     Disposer.register(project) {
       if (initializingAndOpenProjects.remove(project)) {
-        LOG.info("Project ${project.name} is removed from the list of initializing and open projects. Project was disposed.")
+        LOG.info("Project ${project.name} is removed from the list of initializing and open projects. Project is being disposed.")
       }
     }
   }
@@ -322,6 +331,15 @@ class GlobalWorkspaceModel internal constructor(
       builder.replaceBySource(globalEntitiesFilter, entitiesCopyAtBuilder)
     }
     filteredProject = null
+  }
+
+  /**
+   * Consider using [com.intellij.platform.backend.workspace.impl.WorkspaceModelInternal.awaitSynchronizationWithJpsModel] if you want to
+   * use project-level WSM.
+   */
+  @ApiStatus.Internal
+  suspend fun awaitSynchronizationWithJpsModel() {
+    jpsSyncJob.join()
   }
 
   /**
@@ -491,7 +509,12 @@ class GlobalWorkspaceModelRegistry {
 
   fun getGlobalModels(): List<GlobalWorkspaceModel> {
     return if (Registry.`is`("ide.workspace.model.per.environment.model.separation", false)) {
-      environmentToModel.values.toList()
+      if (environmentToModel.containsKey(LocalEelMachine)) {
+        environmentToModel.values.toList()
+      }
+      else {
+        environmentToModel.values.toList() + getGlobalModel(LocalEelMachine)
+      }
     }
     else {
       listOf(getGlobalModel(LocalEelMachine))
@@ -501,6 +524,7 @@ class GlobalWorkspaceModelRegistry {
   @TestOnly
   fun dropCaches() {
     environmentToModel.clear()
+    JpsGlobalModelSynchronizer.getInstance().dropCaches()
   }
 
 }

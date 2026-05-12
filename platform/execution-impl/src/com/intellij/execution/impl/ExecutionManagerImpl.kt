@@ -1022,10 +1022,15 @@ fun RunnerAndConfigurationSettings.isOfSameType(runnerAndConfigurationSettings: 
     return this.filePathIfRunningCurrentFile == runnerAndConfigurationSettings.filePathIfRunningCurrentFile
   }
 
-  if (thisConfiguration is UserDataHolder) {
-    val originalRunProfile = DELEGATED_RUN_PROFILE_KEY[thisConfiguration] ?: return false
-    if (originalRunProfile === thatConfiguration) return true
-    if (thatConfiguration is UserDataHolder) return originalRunProfile === DELEGATED_RUN_PROFILE_KEY[thatConfiguration]
+  val thisOriginalRunProfile = if (thisConfiguration is UserDataHolder) DELEGATED_RUN_PROFILE_KEY[thisConfiguration] else null
+  val thatOriginalRunProfile = if (thatConfiguration is UserDataHolder) DELEGATED_RUN_PROFILE_KEY[thatConfiguration] else null
+
+  if (thisOriginalRunProfile != null &&
+      (thisOriginalRunProfile === thatConfiguration || thisOriginalRunProfile === thatOriginalRunProfile)) {
+    return true
+  }
+  if (thatOriginalRunProfile === thisConfiguration) {
+    return true
   }
   return false
 }
@@ -1090,10 +1095,12 @@ private fun userApprovesStopForSameTypeConfigurations(project: Project, configNa
       return UIBundle.message("dialog.options.do.not.show")
     }
   }
+
+  val escapedConfigName = StringUtil.escapeXmlEntities(configName)
   return Messages.showOkCancelDialog(
     project,
-    ExecutionBundle.message("rerun.singleton.confirmation.message", configName, instancesCount),
-    ExecutionBundle.message("process.is.running.dialog.title", configName),
+    ExecutionBundle.message("rerun.singleton.confirmation.message", escapedConfigName, instancesCount),
+    ExecutionBundle.message("process.is.running.dialog.title", escapedConfigName),
     ExecutionBundle.message("rerun.confirmation.button.text"),
     CommonBundle.getCancelButtonText(),
     Messages.getQuestionIcon(), option) == Messages.OK
@@ -1133,10 +1140,12 @@ private fun userApprovesStopForIncompatibleConfigurations(project: Project,
     names.append(if (name.isNullOrEmpty()) ExecutionBundle.message("run.configuration.no.name") else String.format("'%s'", name))
   }
 
+  val namesEscaped = StringUtil.escapeXmlEntities(names.toString())
+  val configNameEscaped = StringUtil.escapeXmlEntities(configName)
   return Messages.showOkCancelDialog(
     project,
     ExecutionBundle.message("stop.incompatible.confirmation.message",
-      configName, names.toString(), runningIncompatibleDescriptors.size),
+                            configNameEscaped, namesEscaped, runningIncompatibleDescriptors.size),
     ExecutionBundle.message("incompatible.configuration.is.running.dialog.title", runningIncompatibleDescriptors.size),
     ExecutionBundle.message("stop.incompatible.confirmation.button.text"),
     CommonBundle.getCancelButtonText(),

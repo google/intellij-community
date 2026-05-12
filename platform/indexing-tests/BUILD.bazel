@@ -3,6 +3,7 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "indexing-tests",
+  module_name = "intellij.platform.indexing.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -13,6 +14,7 @@ jvm_library(
 
 jvm_library(
   name = "indexing-tests_test_lib",
+  testonly = True,
   module_name = "intellij.platform.indexing.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
@@ -33,6 +35,12 @@ jvm_library(
   runtime_deps = [":indexing-tests"]
 )
 ### auto-generated section `build intellij.platform.indexing.tests` end
+
+### auto-generated section `iml intellij.platform.indexing.tests` start
+exports_files([
+  "intellij.platform.indexing.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.indexing.tests` end
 
 ### auto-generated section `test intellij.platform.indexing.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

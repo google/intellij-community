@@ -25,6 +25,7 @@ import org.jetbrains.kotlin.analysis.api.symbols.KaSyntheticJavaPropertySymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaValueParameterSymbol
 import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
 import org.jetbrains.kotlin.idea.codeinsight.utils.getCallExpressionSymbol
+import org.jetbrains.kotlin.idea.codeinsight.utils.isEnum
 import org.jetbrains.kotlin.idea.codeinsight.utils.resolveFunctionCall
 import org.jetbrains.kotlin.idea.debugger.core.breakpoints.isInlineOnly
 import org.jetbrains.kotlin.idea.debugger.core.isInlineClass
@@ -116,7 +117,6 @@ class SmartStepTargetVisitor(
         }
     }
 
-    @OptIn(KaExperimentalApi::class)
     private fun KaSession.recordProperty(expression: KtExpression, symbol: KaPropertySymbol): Boolean {
         if (expression !is KtNameReferenceExpression && expression !is KtCallableReferenceExpression) return false
         val targetType = expression.computeTargetType()
@@ -379,6 +379,7 @@ class SmartStepTargetVisitor(
             return
         }
 
+        if (isEnumEqualityCall(expression)) return
         val callLabel = calcLabel(symbol)
         val label = if (symbol.isInvoke() && highlightExpression is KtSimpleNameExpression) {
             "${highlightExpression.text}.$callLabel"
@@ -398,6 +399,21 @@ class SmartStepTargetVisitor(
                 CallableMemberInfo(symbol, ordinal, isEqualsNullCall = isEqualsNullCall)
             )
         )
+    }
+
+    private fun KaSession.isEnumEqualityCall(expression: KtExpression): Boolean {
+        if (expression !is KtBinaryExpression) return false
+        val operationToken = expression.operationToken
+        if (operationToken != KtTokens.EQEQ && operationToken != KtTokens.EXCLEQ) return false
+
+        val left = expression.left ?: return false
+        val right = expression.right ?: return false
+        return isEnumExpression(left) && isEnumExpression(right)
+    }
+
+    private fun KaSession.isEnumExpression(expression: KtExpression): Boolean {
+        val expressionType = expression.expressionType ?: return false
+        return expressionType.isEnum()
     }
 
     /**

@@ -7,6 +7,26 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" exported="" name="jsoup" level="project" />
+    <orderEntry type="module-library" exported="">
+      <library name="jsoup" type="repository">
+        <properties maven-id="org.jsoup:jsoup:1.22.1">
+          <verification>
+            <artifact url="file://$MAVEN_REPOSITORY$/org/jsoup/jsoup/1.22.1/jsoup-1.22.1.jar">
+              <sha256sum>cfd3298d8720cddfb0545109ccc6ea0ef39eff7e9c40a10ad95c93a65f01c916</sha256sum>
+            </artifact>
+          </verification>
+        </properties>
+        <ANNOTATIONS>
+          <root url="file://$MODULE_DIR$/../../lib/annotations/jsoup" />
+        </ANNOTATIONS>
+        <CLASSES>
+          <root url="jar://$MAVEN_REPOSITORY$/org/jsoup/jsoup/1.22.1/jsoup-1.22.1.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES>
+          <root url="jar://$MAVEN_REPOSITORY$/org/jsoup/jsoup/1.22.1/jsoup-1.22.1-sources.jar!/" />
+        </SOURCES>
+      </library>
+    </orderEntry>
   </component>
 </module>

@@ -58,9 +58,9 @@ data class FoldInitializerAndIfExpressionData(
     val couldBeVal: Boolean = false,
 )
 
-context(_: KaSession)
 @ApiStatus.Internal
 @OptIn(KaExperimentalApi::class)
+context(_: KaSession)
 fun prepareData(element: KtIfExpression, enforceNonNullableTypeIfPossible: Boolean = false): FoldInitializerAndIfExpressionData? {
     if (element.`else` != null) return null
 

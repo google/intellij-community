@@ -90,13 +90,19 @@ public abstract class XVariablesViewBase extends XDebugView {
   }
 
   protected void buildTreeAndRestoreState(final @NotNull XStackFrame stackFrame) {
+    buildTreeAndRestoreState(stackFrame, true);
+  }
+
+  protected void buildTreeAndRestoreState(final @NotNull XStackFrame stackFrame, @NotNull Boolean shouldClearInlays) {
     XSourcePosition position = stackFrame.getSourcePosition();
     XDebuggerTree tree = getTree();
     DebuggerUIUtilShared.freezePaintingToReduceFlickering(myTreePanel.getContentComponent());
     tree.setSourcePosition(position);
     createNewRootNode(stackFrame);
     XVariablesView.InlineVariablesInfo.set(getSessionProxy(tree), new XVariablesView.InlineVariablesInfo());
-    clearInlays(tree);
+    if (shouldClearInlays) {
+      clearInlays(tree);
+    }
     Object newEqualityObject = stackFrame.getEqualityObject();
     if (newEqualityObject != null) {
       XDebuggerTreeState state = myTreeStates.get(newEqualityObject);

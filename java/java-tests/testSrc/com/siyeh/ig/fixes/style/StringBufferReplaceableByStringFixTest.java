@@ -4,8 +4,8 @@ package com.siyeh.ig.fixes.style;
 import com.intellij.application.options.CodeStyle;
 import com.intellij.codeInspection.CommonQuickFixBundle;
 import com.intellij.lang.java.JavaLanguage;
+import com.intellij.pom.java.LanguageLevel;
 import com.intellij.psi.codeStyle.CommonCodeStyleSettings;
-import com.intellij.testFramework.IdeaTestUtil;
 import com.intellij.testFramework.builders.JavaModuleFixtureBuilder;
 import com.siyeh.ig.IGQuickFixesTestCase;
 import com.siyeh.ig.style.StringBufferReplaceableByStringInspection;
@@ -22,7 +22,7 @@ public class StringBufferReplaceableByStringFixTest extends IGQuickFixesTestCase
   @Override
   protected void tuneFixture(JavaModuleFixtureBuilder builder) throws Exception {
     super.tuneFixture(builder);
-    builder.addJdk(IdeaTestUtil.getMockJdk18Path().getPath());
+    builder.addJdkVersion(LanguageLevel.JDK_1_8);
   }
 
   private void doTestFor(String builderClassName) {

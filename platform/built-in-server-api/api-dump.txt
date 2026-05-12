@@ -32,7 +32,7 @@ f:org.jetbrains.ide.BuiltInServerBundle
 - s:getReloadOnSaveGotItTitle():java.lang.String
 - s:getReloadOnSavePreviewGotItContent():java.lang.String
 - s:getReloadOnSavePreviewGotItTitle():java.lang.String
-a:org.jetbrains.ide.BuiltInServerManager
+Fa:org.jetbrains.ide.BuiltInServerManager
 - sf:Companion:org.jetbrains.ide.BuiltInServerManager$Companion
 - <init>():V
 - a:addAuthToken(com.intellij.util.Url):com.intellij.util.Url

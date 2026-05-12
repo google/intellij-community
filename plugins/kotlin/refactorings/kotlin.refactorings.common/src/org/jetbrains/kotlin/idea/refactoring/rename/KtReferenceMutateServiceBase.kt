@@ -16,6 +16,7 @@ import org.jetbrains.kotlin.idea.references.AbstractKtReference
 import org.jetbrains.kotlin.idea.references.KDocReference
 import org.jetbrains.kotlin.idea.references.KtArrayAccessReference
 import org.jetbrains.kotlin.idea.references.KtDefaultAnnotationArgumentReference
+import org.jetbrains.kotlin.idea.references.KtDestructuringDeclarationReference
 import org.jetbrains.kotlin.idea.references.KtInvokeFunctionReference
 import org.jetbrains.kotlin.idea.references.KtReference
 import org.jetbrains.kotlin.idea.references.KtReferenceMutateService
@@ -184,6 +185,7 @@ abstract class KtReferenceMutateServiceBase : KtReferenceMutateService {
             is KtInvokeFunctionReference -> ktReference.renameTo(newElementName)
             is KtSimpleNameReference -> ktReference.renameTo(newElementName)
             is KtDefaultAnnotationArgumentReference -> ktReference.renameTo(newElementName)
+            is KtDestructuringDeclarationReference -> ktReference.renameTo(newElementName)
             else -> throw IncorrectOperationException()
         }
     }
@@ -216,6 +218,18 @@ abstract class KtReferenceMutateServiceBase : KtReferenceMutateService {
             return fullCallExpression.replace(arrayAccessExpression)
         }
         return renameImplicitConventionalCall(newElementName)
+    }
+
+    private fun KtDestructuringDeclarationReference.renameTo(newElementName: String): PsiElement {
+        val refToProperty = element.initializer?.reference
+        if (refToProperty is KtSimpleNameReference) {
+            return refToProperty.renameTo(newElementName)
+        }
+        val entryName = element.nameIdentifier
+        if (entryName != null) {
+            return entryName.replace(KtPsiFactory(element.project).createIdentifier(newElementName.quoteIfNeeded()))
+        }
+        throw IncorrectOperationException()
     }
 
     private fun KtSimpleNameReference.renameTo(newElementName: String): KtExpression {

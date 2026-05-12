@@ -427,21 +427,34 @@ public abstract class AbstractConstructorClassProcessor extends AbstractClassPro
       methodBuilder.withRelatedMember(param);
     }
 
+    PsiElementFactory factory = JavaPsiFacade.getElementFactory(psiClass.getProject());
     PsiSubstitutor substitutor = PsiSubstitutor.EMPTY;
     if (psiClass.hasTypeParameters()) {
       final PsiTypeParameter[] classTypeParameters = psiClass.getTypeParameters();
+      List<LightTypeParameterBuilder> methodTypeParameters = new ArrayList<>(classTypeParameters.length);
 
-      // need to create new type parameters
+      // Create method type parameters first so all class type parameters can be substituted in one pass.
       for (int index = 0; index < classTypeParameters.length; index++) {
         final PsiTypeParameter classTypeParameter = classTypeParameters[index];
-        final LightTypeParameterBuilder methodTypeParameter = createTypeParameter(methodBuilder, index, classTypeParameter);
+        final LightTypeParameterBuilder methodTypeParameter =
+          new LightTypeParameterBuilder(StringUtil.notNullize(classTypeParameter.getName()), methodBuilder, index);
         methodBuilder.withTypeParameter(methodTypeParameter);
+        methodTypeParameters.add(methodTypeParameter);
+        substitutor = substitutor.put(classTypeParameter, factory.createType(methodBuilder.getTypeParameters()[index]));
+      }
 
-        substitutor = substitutor.put(classTypeParameter, PsiSubstitutor.EMPTY.substitute(methodTypeParameter));
+      for (int index = 0; index < classTypeParameters.length; index++) {
+        PsiTypeParameter classTypeParameter = classTypeParameters[index];
+        final LightReferenceListBuilder methodExtendsList = methodTypeParameters.get(index).getExtendsList();
+        for (PsiClassType classReferencedType : classTypeParameter.getExtendsList().getReferencedTypes()) {
+          final PsiType substitutedType = substitutor.substitute(classReferencedType);
+          if (substitutedType instanceof PsiClassType psiClassSubstitutedType) {
+            methodExtendsList.addReference(psiClassSubstitutedType);
+          }
+        }
       }
     }
 
-    final PsiElementFactory factory = JavaPsiFacade.getElementFactory(psiClass.getProject());
     final PsiType returnType = factory.createType(psiClass, substitutor);
     methodBuilder.withMethodReturnType(returnType);
 
@@ -462,19 +475,6 @@ public abstract class AbstractConstructorClassProcessor extends AbstractClassPro
     LombokAddNullAnnotations.createRelevantNonNullAnnotation(psiClass, methodBuilder);
 
     return methodBuilder;
-  }
-
-  private static @NotNull LightTypeParameterBuilder createTypeParameter(LombokLightMethodBuilder method,
-                                                                        int index,
-                                                                        PsiTypeParameter psiClassTypeParameter) {
-    final String nameOfTypeParameter = StringUtil.notNullize(psiClassTypeParameter.getName());
-
-    final LightTypeParameterBuilder result = new LightTypeParameterBuilder(nameOfTypeParameter, method, index);
-    final LightReferenceListBuilder resultExtendsList = result.getExtendsList();
-    for (PsiClassType referencedType : psiClassTypeParameter.getExtendsList().getReferencedTypes()) {
-      resultExtendsList.addReference(referencedType);
-    }
-    return result;
   }
 
   private static @NotNull String createStaticCodeBlockText(@NotNull PsiType psiType,

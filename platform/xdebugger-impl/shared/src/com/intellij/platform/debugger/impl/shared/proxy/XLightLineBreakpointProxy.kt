@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.debugger.impl.shared.proxy
 
 import com.intellij.openapi.editor.markup.GutterIconRenderer
@@ -6,6 +6,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
+import com.intellij.xdebugger.breakpoints.XLineBreakpointVerticalPlacement
 import org.jetbrains.annotations.ApiStatus
 
 @ApiStatus.Internal
@@ -18,6 +19,7 @@ interface XLightLineBreakpointProxy {
 
   fun getFile(): VirtualFile?
   fun getLine(): Int
+  fun getPlacement(): XLineBreakpointVerticalPlacement
   fun getHighlightRange(): XLineBreakpointHighlighterRange
   suspend fun getHighlightRangeSuspend(): XLineBreakpointHighlighterRange = getHighlightRange()
 

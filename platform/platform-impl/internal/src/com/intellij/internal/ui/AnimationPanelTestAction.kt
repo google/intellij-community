@@ -16,7 +16,6 @@ import com.intellij.ui.ColorUtil
 import com.intellij.ui.ComponentUtil
 import com.intellij.ui.JBColor
 import com.intellij.ui.OnePixelSplitter
-import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.ActionLink
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
@@ -33,6 +32,7 @@ import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.toNullableProperty
+import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import com.intellij.ui.hover.HoverStateListener
 import com.intellij.util.Alarm
 import com.intellij.util.animation.Animation
@@ -520,8 +520,8 @@ internal class AnimationPanelTestAction : DumbAwareAction("Show Animation Panel"
           spinner(0..100, 5).bindIntValue(options::coerceMax)
         }
         row {
-          comboBox(JBAnimator.Type.entries, SimpleListCellRenderer.create { label, value, _ ->
-            label.text = value.toString().split("_").joinToString(" ") {
+          comboBox(JBAnimator.Type.entries, textListCellRenderer("") { value ->
+            value.toString().split("_").joinToString(" ") {
               it.lowercase(Locale.getDefault()).capitalize()
             }
           }).bindItem(options::type.toNullableProperty())

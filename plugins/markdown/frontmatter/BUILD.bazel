@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.markdown.frontmatter` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "frontmatter_resources",
-  srcs = glob(["src/main/resources/**/*"]),
-  strip_prefix = "src/main/resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "frontmatter",
   module_name = "intellij.markdown.frontmatter",
   visibility = ["//visibility:public"],
   srcs = glob(["src/main/kotlin/**/*.kt", "src/main/kotlin/**/*.java", "src/main/kotlin/**/*.form"], allow_empty = True),
-  resources = [":frontmatter_resources"],
+  resources = glob(["src/main/resources/**/*"]),
+  resource_strip_prefix = "src/main/resources",
   deps = [
     "//platform/core-api:core",
     "//platform/lang-impl",
@@ -27,6 +22,7 @@ jvm_library(
 
 jvm_library(
   name = "frontmatter_test_lib",
+  testonly = True,
   module_name = "intellij.markdown.frontmatter",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -42,3 +38,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.markdown.frontmatter` end
+
+### auto-generated section `iml intellij.markdown.frontmatter` start
+exports_files([
+  "intellij.markdown.frontmatter.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.markdown.frontmatter` end

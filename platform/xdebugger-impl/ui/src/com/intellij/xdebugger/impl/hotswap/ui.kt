@@ -5,7 +5,11 @@ import com.intellij.ide.HelpTooltip
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.project.Project
+import com.intellij.platform.debugger.impl.rpc.HotSwapVisibleStatus
+import com.intellij.util.ui.accessibility.AccessibleAnnouncerUtil
+import com.intellij.xdebugger.XDebuggerBundle
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.Nls
 import javax.swing.Icon
 
 @ApiStatus.Internal
@@ -27,6 +31,19 @@ interface HotSwapUiExtension {
   fun createTooltip(): HelpTooltip? = null
   val shouldAddHideButton: Boolean get() = true
   val shouldAddText: Boolean get() = true
+
+  @get:Nls
+  val hotSwapButtonAccessibleName: String? get() = XDebuggerBundle.message("xdebugger.hotswap.tooltip.apply")
+
+  @get:Nls
+  val toolbarAccessibleName: String? get() = XDebuggerBundle.message("xdebugger.hotswap.toolbar.accessible.name")
+
+  fun announceHotSwapStatus(project: Project, status: HotSwapVisibleStatus) {
+    if (status == HotSwapVisibleStatus.SUCCESS) {
+      AccessibleAnnouncerUtil.announce(null, XDebuggerBundle.message("xdebugger.hotswap.status.success.announcement"), true)
+    }
+  }
+
   fun moreAction(): AnAction? = null
   fun popupMenuActions(): DefaultActionGroup? = null
 

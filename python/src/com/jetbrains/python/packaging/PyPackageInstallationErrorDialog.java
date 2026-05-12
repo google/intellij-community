@@ -17,7 +17,7 @@ import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.uiDesigner.core.GridLayoutManager;
 import com.intellij.uiDesigner.core.Spacer;
 import com.jetbrains.python.packaging.ui.PyPackageManagementService;
-import com.jetbrains.python.run.PyVirtualEnvReaderKt;
+import com.jetbrains.python.run.ActivatableScriptExtKt;
 import com.jetbrains.python.sdk.impl.PySdkBundle;
 import kotlin.Pair;
 import org.jetbrains.annotations.NotNull;
@@ -203,7 +203,7 @@ public class PyPackageInstallationErrorDialog extends DialogWrapper {
 
     String activate = null;
     if (errorDescription.getSdk() != null) {
-      final Pair<String, String> activateScript = PyVirtualEnvReaderKt.findActivateScript(interpreterPath, null);
+      final Pair<String, String> activateScript = ActivatableScriptExtKt.findActivateScript(interpreterPath, null);
       if (activateScript != null) {
         final String activateScriptPath = activateScript.component1();
         final String condaEnvFolder = activateScript.component2();

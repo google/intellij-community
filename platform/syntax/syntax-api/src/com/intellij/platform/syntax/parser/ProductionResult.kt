@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:ApiStatus.Internal
 
 package com.intellij.platform.syntax.parser
@@ -11,7 +11,6 @@ import org.jetbrains.annotations.ApiStatus
 /**
  * Call this function after you're done with the parsing to obtain the result
  */
-@ApiStatus.Experimental
 fun prepareProduction(builder: SyntaxTreeBuilder): ProductionResult {
   return (builder as SyntaxTreeBuilderImpl).prepareProduction()
 }
@@ -19,7 +18,6 @@ fun prepareProduction(builder: SyntaxTreeBuilder): ProductionResult {
 /**
  * Raw result of parsing
  */
-@ApiStatus.Experimental
 @ApiStatus.NonExtendable
 interface ProductionResult {
   /**
@@ -48,7 +46,6 @@ interface ProductionResult {
 /**
  * List of markers defining the resulting syntax tree
  */
-@ApiStatus.Experimental
 @ApiStatus.NonExtendable
 interface ProductionMarkerList {
   /**

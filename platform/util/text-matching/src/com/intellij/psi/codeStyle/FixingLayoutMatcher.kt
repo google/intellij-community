@@ -3,6 +3,7 @@ package com.intellij.psi.codeStyle
 
 import com.intellij.util.text.matching.KeyboardLayoutConverter
 import com.intellij.util.text.matching.MatchingMode
+import org.jetbrains.annotations.ApiStatus
 import kotlin.jvm.JvmStatic
 
 /**
@@ -20,6 +21,7 @@ open class FixingLayoutMatcher(
 ) {
 
   @Deprecated("Use {@link #FixingLayoutMatcher(String, MatchingCaseSensitivity, String, KeyboardLayoutConverter)} instead")
+  @ApiStatus.ScheduledForRemoval
   constructor(pattern: String,
               options: NameUtil.MatchingCaseSensitivity,
               hardSeparators: String) : this(pattern, options.matchingMode(), hardSeparators, PlatformKeyboardLayoutConverter)

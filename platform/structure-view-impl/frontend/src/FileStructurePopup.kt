@@ -9,9 +9,9 @@ import com.intellij.ide.DefaultTreeExpander
 import com.intellij.ide.IdeBundle
 import com.intellij.ide.TreeExpander
 import com.intellij.ide.dnd.aware.DnDAwareTree
-import com.intellij.ide.structureView.newStructureView.StructurePopup
-import com.intellij.ide.structureView.newStructureView.StructurePopupTestExt
 import com.intellij.ide.structureView.newStructureView.TreeActionsOwner
+import com.intellij.platform.structureView.impl.StructurePopup
+import com.intellij.platform.structureView.impl.StructurePopupTestExt
 import com.intellij.ide.ui.UISettingsListener
 import com.intellij.ide.util.FileStructurePopupListener
 import com.intellij.ide.util.FileStructurePopupLoadingStateUpdater
@@ -142,7 +142,7 @@ import kotlin.time.Duration.Companion.nanoseconds
  */
 class FileStructurePopup(
   private val myProject: Project,
-  private val myFileEditor: FileEditor,
+  private val myFileEditor: FileEditor?,
   private val myModel: StructureUiModel,
 ) : Disposable, TreeActionsOwner, StructurePopup, StructurePopupTestExt {
   private var myPopup: JBPopup? = null
@@ -174,6 +174,8 @@ class FileStructurePopup(
   private var myCanClose = true
 
   init {
+    myProject.getMessageBus().syncPublisher<FileStructurePopupListener>(FileStructurePopupListener.TOPIC).stateChanged(true)
+
     //Stop code analyzer to speed up the EDT
     DaemonCodeAnalyzer.getInstance(myProject).disableUpdateByTimer(this)
     myTreeStructure = object : StructureViewTreeStructure(myProject, myModel) {
@@ -542,6 +544,7 @@ class FileStructurePopup(
       HierarchyListener { event ->
         if ((event.getChangeFlags() and HierarchyEvent.PARENT_CHANGED.toLong()) != 0L && event.getChanged() === chkPanel) {
           val topPanel = myCheckBoxesPanel.getParent()
+          topPanel.preferredSize = null
           val prefSize = topPanel.preferredSize
           if (singleRow) {
             prefSize.height = JBUI.CurrentTheme.Popup.toolbarHeight()
@@ -634,12 +637,11 @@ class FileStructurePopup(
     checkBox.setOpaque(false)
     UIUtil.applyStyle(UIUtil.ComponentStyle.SMALL, checkBox)
 
-    val selected = myModel.isActionEnabled(action)
+    val selected = myModel.isActionEnabled(action) != action.isReverted
     checkBox.setSelected(selected)
-    val isRevertedStructureFilter = action.isReverted
     checkBox.addActionListener {
       val state = checkBox.isSelected
-      myModel.setActionEnabled(action, isRevertedStructureFilter != state, myAutoClicked.contains(checkBox))
+      myModel.setActionEnabled(action, state, myAutoClicked.contains(checkBox))
       cs.launch(Dispatchers.UI) {
         rebuild(false)
         if (mySpeedSearch.isPopupActive) {

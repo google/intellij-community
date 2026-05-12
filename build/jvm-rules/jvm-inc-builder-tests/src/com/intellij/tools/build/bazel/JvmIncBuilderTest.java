@@ -70,4 +70,9 @@ public class JvmIncBuilderTest extends BazelIncBuildTest {
   public void testRebuildOnUntrackedInputChange() throws Exception {
     performTest("worker/rebuildOnUntrackedInputChange").assertSuccessful();
   }
+
+  @Test
+  public void testSrcJarInput() throws Exception {
+    performTest("worker/srcJarInput").assertFailure();
+  }
 }

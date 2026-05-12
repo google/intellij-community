@@ -12,6 +12,7 @@ jvm_library(
     "//platform/util-class-loader:util-classLoader",
     "//platform/util/base",
     "//platform/util",
+    "//platform/util/multiplatform",
     "//libraries/fastutil",
     "@lib//:kotlin-stdlib",
     "//libraries/kotlinx/coroutines/core",
@@ -22,6 +23,7 @@ jvm_library(
 
 jvm_library(
   name = "storages_test_lib",
+  testonly = True,
   module_name = "intellij.platform.util.io.storages",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -31,6 +33,7 @@ jvm_library(
     "//platform/util-class-loader:util-classLoader_test_lib",
     "//platform/util/base:base_test_lib",
     "//platform/util:util_test_lib",
+    "//platform/util/multiplatform:multiplatform_test_lib",
     "//libraries/fastutil:fastutil_test_lib",
     "//libraries/kotlinx/coroutines/core:core_test_lib",
     "@lib//:junit4",
@@ -39,3 +42,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.util.io.storages` end
+
+### auto-generated section `iml intellij.platform.util.io.storages` start
+exports_files([
+  "intellij.platform.util.io.storages.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.util.io.storages` end

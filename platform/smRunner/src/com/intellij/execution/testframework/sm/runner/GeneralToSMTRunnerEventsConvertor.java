@@ -1,4 +1,4 @@
-// Copyright 2000-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.testframework.sm.runner;
 
 import com.intellij.execution.testframework.sm.SMTestRunnerConnectionUtil;
@@ -227,9 +227,9 @@ public class GeneralToSMTRunnerEventsConvertor extends GeneralTestEventsProcesso
         if (!proxy.isFinal() || preferSuite && proxy.isSuite()) {
           String url = proxy.getLocationUrl();
           if (url != null) {
-            myCurrentChildren.computeIfAbsent(url, l -> new ArrayList<>()).add(proxy);
+            myCurrentChildren.computeIfAbsent(url, _ -> new ArrayList<>()).add(proxy);
           }
-          myCurrentChildren.computeIfAbsent(proxy.getName(), l -> new ArrayList<>()).add(proxy);
+          myCurrentChildren.computeIfAbsent(proxy.getName(), _ -> new ArrayList<>()).add(proxy);
         }
       }
     }
@@ -306,6 +306,8 @@ public class GeneralToSMTRunnerEventsConvertor extends GeneralTestEventsProcesso
     final String suiteName = suiteFinishedEvent.getName();
     final SMTestProxy mySuite = mySuitesStack.popSuite(suiteName);
     if (mySuite != null) {
+      final Long duration = suiteFinishedEvent.getDuration();
+      if (duration != null && duration >= 0) mySuite.setDuration(duration);
       mySuite.setFinished();
       myCurrentChildren.remove(suiteName);
       String locationUrl = mySuite.getLocationUrl();

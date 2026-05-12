@@ -65,6 +65,7 @@ import com.intellij.workspaceModel.ide.impl.GlobalWorkspaceModel
 import com.intellij.workspaceModel.ide.impl.GlobalWorkspaceModelRegistry
 import junit.framework.AssertionFailedError
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.runBlocking
 import org.jdom.Element
 import org.jetbrains.annotations.TestOnly
 import org.jetbrains.jps.model.serialization.JDomSerializationUtil
@@ -153,7 +154,7 @@ internal fun loadProject(configLocation: JpsProjectConfigLocation,
 }
 
 @TestOnly
-fun JpsProjectSerializersImpl.saveAllEntities(storage: EntityStorage, configLocation: JpsProjectConfigLocation) {
+suspend fun JpsProjectSerializersImpl.saveAllEntities(storage: EntityStorage, configLocation: JpsProjectConfigLocation) {
   val writer = JpsFileContentWriterImpl(configLocation)
   saveAllEntities(storage, writer)
   val modulePathMapping = this.moduleSerializers.keys.filterIsInstance<ExternalModuleImlFileEntitiesSerializer>()
@@ -162,7 +163,7 @@ fun JpsProjectSerializersImpl.saveAllEntities(storage: EntityStorage, configLoca
 }
 
 @TestOnly
-fun JpsProjectSerializersImpl.saveAffectedEntities(storage: EntityStorage, affectedEntitySources: Set<EntitySource>, configLocation: JpsProjectConfigLocation) {
+suspend fun JpsProjectSerializersImpl.saveAffectedEntities(storage: EntityStorage, affectedEntitySources: Set<EntitySource>, configLocation: JpsProjectConfigLocation) {
   val writer = JpsFileContentWriterImpl(configLocation)
   saveAffectedEntities(storage, affectedEntitySources, writer)
   val modulePathMapping = this.moduleSerializers.keys.filterIsInstance<ExternalModuleImlFileEntitiesSerializer>()
@@ -431,7 +432,7 @@ internal fun checkSaveProjectAfterChange(originalProjectFile: File,
     changedSources.addAll(builder.entitiesBySource { true }.mapTo(HashSet()) { it.entitySource })
   }
   val writer = JpsFileContentWriterImpl(projectData.configLocation)
-  projectData.serializers.saveEntities(builder.toSnapshot(), unloadedEntitiesBuilder.toSnapshot(), changedSources, writer)
+  runBlocking { projectData.serializers.saveEntities(builder.toSnapshot(), unloadedEntitiesBuilder.toSnapshot(), changedSources, writer) }
   val modulePathMapping = projectData.serializers.moduleSerializers.keys.filterIsInstance<ExternalModuleImlFileEntitiesSerializer>()
     .associate { it.fileUrl.url to it.modulePath.path }
   writer.writeFiles(modulePathMapping)

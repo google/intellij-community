@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.markdown` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "markdown_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "markdown",
   module_name = "intellij.markdown",
   visibility = ["//visibility:public"],
   srcs = glob(["gen/**/*.kt", "gen/**/*.java", "src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":markdown_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/code-style-api:codeStyle",
@@ -31,6 +26,7 @@ jvm_library(
     "//platform/observable",
     "//libraries/netty/codec-http:libraries-netty-codec-http",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//platform/projectModel-api:projectModel",
     "//platform/refactoring",
     "//platform/built-in-server:builtInServer-impl",
@@ -67,12 +63,15 @@ jvm_library(
     "//platform/platform-impl/rpc",
     "//platform/execution",
     "//platform/lang-api:lang",
+    "//fleet/rhizomedb",
+    "//platform/util:util-ui",
   ],
   exports = ["//platform/ui.jcef"]
 )
 
 jvm_library(
   name = "markdown_test_lib",
+  testonly = True,
   module_name = "intellij.markdown",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -99,6 +98,7 @@ jvm_library(
     "//platform/observable:observable_test_lib",
     "//libraries/netty/codec-http:libraries-netty-codec-http_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/projectModel-api:projectModel_test_lib",
     "//platform/refactoring:refactoring_test_lib",
     "//platform/built-in-server:builtInServer-impl_test_lib",
@@ -134,6 +134,14 @@ jvm_library(
     "//platform/platform-impl/rpc:rpc_test_lib",
     "//platform/execution:execution_test_lib",
     "//platform/lang-api:lang_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
+    "//platform/util:util-ui_test_lib",
   ]
 )
 ### auto-generated section `build intellij.markdown` end
+
+### auto-generated section `iml intellij.markdown` start
+exports_files([
+  "intellij.markdown.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.markdown` end

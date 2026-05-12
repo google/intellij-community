@@ -8,8 +8,8 @@ import org.jetbrains.plugins.gradle.codeInspection.GradleAvoidDependencyNamedArg
 import org.jetbrains.plugins.gradle.testFramework.GradleCodeInsightTestCase
 import org.jetbrains.plugins.gradle.testFramework.GradleTestFixtureBuilder
 import org.jetbrains.plugins.gradle.testFramework.annotations.AllGradleVersionsSource
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatGradleIsAtLeast
 import org.jetbrains.plugins.gradle.testFramework.util.withBuildFile
+import org.jetbrains.plugins.gradle.tooling.annotation.TargetVersions
 import org.junit.jupiter.params.ParameterizedTest
 
 class GradleAvoidDependencyNamedArgumentsNotationInspectionTest : GradleCodeInsightTestCase() {
@@ -974,8 +974,8 @@ class GradleAvoidDependencyNamedArgumentsNotationInspectionTest : GradleCodeInsi
 
   @ParameterizedTest
   @AllGradleVersionsSource
+  @TargetVersions("5.0+", reason = "Platform scope is supported since Gradle 5.0")
   fun testPlatformCall(gradleVersion: GradleVersion) {
-    assumeThatGradleIsAtLeast(gradleVersion, "5.0") { "Platform is supported since Gradle 5.0" }
     runTest(gradleVersion) {
       testHighlighting(
         """
@@ -1002,8 +1002,8 @@ class GradleAvoidDependencyNamedArgumentsNotationInspectionTest : GradleCodeInsi
 
   @ParameterizedTest
   @AllGradleVersionsSource
+  @TargetVersions("5.0+", reason = "EnforcedPlatform scope is supported since Gradle 5.0")
   fun testEnforcedPlatformCall(gradleVersion: GradleVersion) {
-    assumeThatGradleIsAtLeast(gradleVersion, "5.0") { "Enforced platform is supported since Gradle 5.0" }
     runTest(gradleVersion) {
       testHighlighting(
         """
@@ -1030,8 +1030,8 @@ class GradleAvoidDependencyNamedArgumentsNotationInspectionTest : GradleCodeInsi
 
   @ParameterizedTest
   @AllGradleVersionsSource
+  @TargetVersions("5.6+", reason = "TestFixtures scope is supported since Gradle 5.6")
   fun testTestFixturesCall(gradleVersion: GradleVersion) {
-    assumeThatGradleIsAtLeast(gradleVersion, "5.6") { "TestFixtures is supported since Gradle 5.6" }
     runTest(gradleVersion) {
       testHighlighting(
         """

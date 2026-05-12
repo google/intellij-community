@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.actionSystem.impl;
 
 import com.intellij.icons.AllIcons;
@@ -11,9 +11,9 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.KeyboardShortcut;
 import com.intellij.openapi.actionSystem.Presentation;
 import com.intellij.openapi.actionSystem.Shortcut;
-import com.intellij.openapi.actionSystem.ShortcutSet;
 import com.intellij.openapi.actionSystem.ex.ActionButtonLook;
 import com.intellij.openapi.actionSystem.ex.ActionUtil;
+import com.intellij.openapi.keymap.KeymapUtilKt;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.NlsActions;
 import com.intellij.openapi.util.SystemInfo;
@@ -30,6 +30,7 @@ import com.intellij.util.ui.StartupUiUtil;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.UIUtilities;
 import org.intellij.lang.annotations.MagicConstant;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -154,7 +155,6 @@ public class ActionButtonWithText extends ActionButton {
     Dimension basicSize = super.getPreferredSize();
 
     Icon icon = getIcon();
-    int position = horizontalTextPosition();
 
     FontMetrics fm = getFontMetrics(getFont());
     Rectangle viewRect = new Rectangle(0, 0, Short.MAX_VALUE, Short.MAX_VALUE);
@@ -164,10 +164,7 @@ public class ActionButtonWithText extends ActionButton {
 
     Rectangle iconR = new Rectangle();
     Rectangle textR = new Rectangle();
-    SwingUtilities.layoutCompoundLabel(this, fm, getText(), icon,
-                                       SwingConstants.CENTER, horizontalTextAlignment(),
-                                       SwingConstants.CENTER, position,
-                                       viewRect, iconR, textR, iconTextSpace());
+    layout(fm, getText(), icon, viewRect, iconR, textR);
     int x1 = Math.min(iconR.x, textR.x);
     int x2 = Math.max(iconR.x + iconR.width, textR.x + textR.width);
     int y1 = Math.min(iconR.y, textR.y);
@@ -184,6 +181,21 @@ public class ActionButtonWithText extends ActionButton {
     rv.width = Math.max(rv.width, basicSize.width);
     rv.height = Math.max(rv.height, basicSize.height);
     return rv;
+  }
+  
+  @ApiStatus.Internal
+  protected @NotNull @NlsActions.ActionText String layout(
+    @NotNull FontMetrics fm,
+    @NotNull @NlsActions.ActionText String fullText,
+    @Nullable Icon icon,
+    @NotNull Rectangle inViewRect,
+    @NotNull Rectangle outIconRect,
+    @NotNull Rectangle outTextRect
+  ) {
+    return SwingUtilities.layoutCompoundLabel(this, fm, fullText, icon,
+                                              SwingConstants.CENTER, horizontalTextAlignment(),
+                                              SwingConstants.CENTER, horizontalTextPosition(),
+                                              inViewRect, outIconRect, outTextRect, iconTextSpace());
   }
 
   @Override
@@ -222,10 +234,7 @@ public class ActionButtonWithText extends ActionButton {
 
     Rectangle iconRect = new Rectangle();
     Rectangle textRect = new Rectangle();
-    String text = SwingUtilities.layoutCompoundLabel(this, fm, getText(), icon,
-                                                     SwingConstants.CENTER, horizontalTextAlignment(),
-                                                     SwingConstants.CENTER, horizontalTextPosition(),
-                                                     viewRect, iconRect, textRect, iconTextSpace());
+    String text = layout(fm, getText(), icon, viewRect, iconRect, textRect);
     if (arrowIcon != null) {
       int alignment = horizontalTextAlignment();
       int dx = alignment == SwingConstants.CENTER ? arrowIcon.getIconWidth() / 2 - 2:
@@ -296,9 +305,7 @@ public class ActionButtonWithText extends ActionButton {
     if (mnemonicIndex != -1) {
       return mnemonicIndex;
     }
-    final ShortcutSet shortcutSet = myAction.getShortcutSet();
-    final Shortcut[] shortcuts = shortcutSet.getShortcuts();
-    for (Shortcut shortcut : shortcuts) {
+    for (Shortcut shortcut : KeymapUtilKt.getShortcutSetForDisplay(myAction).getShortcuts()) {
       if (!(shortcut instanceof KeyboardShortcut keyboardShortcut)) continue;
 
       if (keyboardShortcut.getSecondKeyStroke() == null) { // we are interested only in "mnemonic-like" shortcuts

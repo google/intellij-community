@@ -11,18 +11,22 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiRecursiveElementVisitor
 import com.intellij.psi.tree.IElementType
 import com.intellij.psi.tree.OuterLanguageElementType
-import com.intellij.psi.util.PsiUtilCore
 import com.intellij.psi.util.elementType
+import com.intellij.psi.util.siblings
 import org.intellij.plugins.markdown.lang.MarkdownElementTypes
 import org.intellij.plugins.markdown.lang.MarkdownTokenTypes
 import org.intellij.plugins.markdown.lang.psi.impl.MarkdownCodeFence
 import org.intellij.plugins.markdown.lang.psi.util.hasType
+import org.intellij.plugins.markdown.util.isFootnoteLabelText
+
+@Suppress("RegExpRedundantEscape")
+private val FOOTNOTE_REF_IN_TEXT = Regex("""\[\^[^\]\n\t ]+]""")
 
 internal class MarkdownHighlightingAnnotator : Annotator, DumbAware {
   private val syntaxHighlighter = MarkdownSyntaxHighlighter()
 
   override fun annotate(element: PsiElement, holder: AnnotationHolder) {
-    when (PsiUtilCore.getElementType(element)) {
+    when (element.elementType) {
       MarkdownTokenTypes.EMPH -> annotateBasedOnParent(element, holder) {
         when (it) {
           MarkdownElementTypes.EMPH -> MarkdownHighlighterColors.ITALIC_MARKER
@@ -49,7 +53,7 @@ internal class MarkdownHighlightingAnnotator : Annotator, DumbAware {
   }
 
   private fun annotateBasedOnParent(element: PsiElement, holder: AnnotationHolder, predicate: (IElementType) -> TextAttributesKey?) {
-    val parentType = element.parent?.let(PsiUtilCore::getElementType) ?: return
+    val parentType = element.parent?.elementType ?: return
     val attributes = predicate.invoke(parentType)
     if (attributes != null) {
       element.traverseAndCreateAnnotationsForContent(holder, attributes)
@@ -57,14 +61,97 @@ internal class MarkdownHighlightingAnnotator : Annotator, DumbAware {
   }
 
   private fun annotateWithHighlighter(element: PsiElement, holder: AnnotationHolder) {
+    val elementType = element.elementType
+    if (elementType == MarkdownTokenTypes.CODE_LINE) {
+      val codeBlock = element.parent
+      if (codeBlock != null && isFootnoteContinuationBlock(codeBlock)) {
+        element.traverseAndCreateAnnotationsForContent(holder, MarkdownHighlighterColors.FOOTNOTE_DEFINITION)
+        highlightFootnoteRefsInCodeLine(element, holder)
+        return
+      }
+    }
+    if (elementType == MarkdownTokenTypes.TEXT) {
+      val parent = element.parent
+      if (parent != null && parent.hasType(MarkdownElementTypes.PARAGRAPH) && isFootnoteDefinitionParagraph(parent)) {
+        element.traverseAndCreateAnnotationsForContent(holder, MarkdownHighlighterColors.FOOTNOTE_DEFINITION)
+        return
+      }
+    }
+    if (elementType == MarkdownElementTypes.LINK_DESTINATION) {
+      val linkDef = element.parent
+      if (linkDef != null && linkDef.hasType(MarkdownElementTypes.LINK_DEFINITION) && isFootnoteDefinitionLinkDef(linkDef)) {
+        element.traverseAndCreateAnnotationsForContent(holder, MarkdownHighlighterColors.FOOTNOTE_DEFINITION)
+        return
+      }
+    }
+    if (elementType == MarkdownElementTypes.LINK_TEXT) {
+      val parent = element.parent
+      if (parent != null && parent.hasType(MarkdownElementTypes.FULL_REFERENCE_LINK) && isConsecutiveFootnoteReferenceLink(parent)) {
+        // Apply LINK_LABEL color instead of LINK_TEXT (hyperlink) color, matching how SHORT_REFERENCE_LINK's LINK_LABEL is rendered
+        element.traverseAndCreateAnnotationsForContent(holder, MarkdownHighlighterColors.LINK_LABEL)
+        return
+      }
+    }
     if (element.hasType(MarkdownTokenTypes.CODE_FENCE_CONTENT) && (element.parent as? MarkdownCodeFence)?.fenceLanguage != null) {
       return
     }
-    val highlights = syntaxHighlighter.getTokenHighlights(PsiUtilCore.getElementType(element))
+    val highlights = syntaxHighlighter.getTokenHighlights(elementType)
     val parentAttributesKey = highlights.firstOrNull() ?: return
     if (parentAttributesKey != MarkdownHighlighterColors.TEXT) {
       element.traverseAndCreateAnnotationsForContent(holder, parentAttributesKey)
     }
+  }
+
+  private fun highlightFootnoteRefsInCodeLine(codeLine: PsiElement, holder: AnnotationHolder) {
+    val text = codeLine.text
+    val base = codeLine.textRange.startOffset
+    for (match in FOOTNOTE_REF_IN_TEXT.findAll(text)) {
+      val range = TextRange(base + match.range.first, base + match.range.last + 1)
+      holder.newSilentAnnotation(HighlightSeverity.INFORMATION)
+        .textAttributes(MarkdownHighlighterColors.LINK_LABEL)
+        .range(range)
+        .create()
+      holder.newSilentAnnotation(HighlightSeverity.INFORMATION)
+        .textAttributes(MarkdownHighlighterColors.BOLD)
+        .range(range)
+        .create()
+    }
+  }
+
+  private fun isFootnoteDefinitionParagraph(paragraph: PsiElement): Boolean {
+    val firstChild = paragraph.firstChild ?: return false
+    val linkLabel: PsiElement? = when (firstChild.elementType) {
+      MarkdownElementTypes.SHORT_REFERENCE_LINK -> firstChild.firstChild
+      MarkdownElementTypes.LINK_LABEL -> firstChild
+      else -> null
+    }
+    if (linkLabel == null || !linkLabel.hasType(MarkdownElementTypes.LINK_LABEL)) return false
+    return isFootnoteLabelText(linkLabel.text)
+  }
+
+  private fun isConsecutiveFootnoteReferenceLink(fullReferenceLink: PsiElement): Boolean {
+    val linkText = fullReferenceLink.children.firstOrNull { it.elementType == MarkdownElementTypes.LINK_TEXT }
+    val linkLabel = fullReferenceLink.children.firstOrNull { it.elementType == MarkdownElementTypes.LINK_LABEL }
+    return isFootnoteLabelText(linkText?.text.orEmpty()) && isFootnoteLabelText(linkLabel?.text.orEmpty())
+  }
+
+  private fun isFootnoteContinuationBlock(codeBlock: PsiElement): Boolean {
+    for (sibling in codeBlock.siblings(forward = false, withSelf = false)) {
+      when {
+        sibling.hasType(MarkdownElementTypes.PARAGRAPH) -> return isFootnoteDefinitionParagraph(sibling)
+        sibling.hasType(MarkdownElementTypes.LINK_DEFINITION) -> return isFootnoteDefinitionLinkDef(sibling)
+        sibling.hasType(MarkdownElementTypes.CODE_BLOCK) -> continue
+        sibling.firstChild == null -> continue  // skip leaf tokens (EOL, whitespace)
+        else -> return false
+      }
+    }
+    return false
+  }
+
+  private fun isFootnoteDefinitionLinkDef(linkDef: PsiElement): Boolean {
+    val linkLabel = linkDef.firstChild ?: return false
+    if (!linkLabel.hasType(MarkdownElementTypes.LINK_LABEL)) return false
+    return isFootnoteLabelText(linkLabel.text)
   }
 
   /**

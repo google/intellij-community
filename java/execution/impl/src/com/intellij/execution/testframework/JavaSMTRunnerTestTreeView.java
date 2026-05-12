@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.testframework;
 
 import com.intellij.execution.testframework.actions.TestFrameworkActions;
@@ -9,6 +9,7 @@ import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerTestTreeViewPr
 import com.intellij.execution.testframework.sm.runner.ui.SMTestRunnerResultsForm;
 import com.intellij.execution.testframework.sm.runner.ui.TestResultsViewer;
 import com.intellij.execution.testframework.sm.runner.ui.TestTreeRenderer;
+import com.intellij.execution.testframework.ui.AbstractTestTreeBuilderBase;
 import com.intellij.ide.nls.NlsMessages;
 import com.intellij.java.JavaBundle;
 import com.intellij.openapi.util.Key;
@@ -43,6 +44,10 @@ public class JavaSMTRunnerTestTreeView extends SMTRunnerTestTreeView implements 
                                                  @Override
                                                  public void onChanged(Boolean ignore) {
                                                    testFrameworkRunningModel.redrawStatusLabel();
+                                                   AbstractTestTreeBuilderBase<?> builder = testFrameworkRunningModel.getTreeBuilder();
+                                                   if (builder != null) {
+                                                     builder.setTestsComparator(testFrameworkRunningModel);
+                                                   }
                                                  }
                                                }
         , testFrameworkRunningModel, true);
@@ -57,9 +62,6 @@ public class JavaSMTRunnerTestTreeView extends SMTRunnerTestTreeView implements 
       @Override
       public @Nullable String getDurationText(@NotNull SMTestProxy testProxy,
                                               @NotNull TestConsoleProperties consoleProperties) {
-        if (testProxy.getDurationStrategy() != TestDurationStrategy.AUTOMATIC) {
-          return testProxy.getDurationString(consoleProperties);
-        }
         if (testProxy.isInProgress() && !testProxy.isSubjectToHide(consoleProperties)) {
           Long startedAt;
           if (testProxy.isSuite() && !JavaAwareTestConsoleProperties.USE_WALL_TIME.value(consoleProperties)) {
@@ -157,8 +159,7 @@ public class JavaSMTRunnerTestTreeView extends SMTRunnerTestTreeView implements 
 
   @Override
   public Long getCustomizedDuration(@NotNull SMTestProxy proxy) {
-    if (!proxy.isSuite() || proxy.getDurationStrategy() != TestDurationStrategy.AUTOMATIC ||
-        !JavaAwareTestConsoleProperties.USE_WALL_TIME.value(myTestConsoleProperties)) {
+    if (!proxy.isSuite() || !JavaAwareTestConsoleProperties.USE_WALL_TIME.value(myTestConsoleProperties)) {
       return proxy.getDuration();
     }
     Long startTime = proxy.getStartTimeMillis();

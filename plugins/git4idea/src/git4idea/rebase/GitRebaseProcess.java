@@ -599,7 +599,7 @@ public class GitRebaseProcess {
     try {
       String range = GitRebaseUtils.getCommitsRangeToRebase(baseBranch, rebasingBranch);
       List<? extends TimedVcsCommit> commits = GitHistoryUtils.collectTimedCommits(repository.getProject(), repository.getRoot(), range);
-      return exists(commits, commit -> GitProtectedBranchesKt.isCommitPublished(repository, commit.getId()));
+      return exists(commits, commit -> GitProtectedBranchesKt.isCommitPublishedBlocking(repository, commit.getId()));
     }
     catch (VcsException e) {
       LOG.error("Couldn't collect commits", e);

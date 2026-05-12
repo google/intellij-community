@@ -4,10 +4,7 @@ package org.jetbrains.kotlin.idea.k2.codeinsight.inspections.diagnosticBased
 
 import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.lang.injection.InjectedLanguageManager
-import com.intellij.modcommand.ModPsiUpdater
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
-import com.intellij.psi.createSmartPointer
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
 import org.jetbrains.kotlin.config.LanguageFeature
@@ -16,12 +13,11 @@ import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.inspections.KotlinKtDiagnosticBasedInspectionBase
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.inspections.KotlinModCommandQuickFix
 import org.jetbrains.kotlin.idea.codeinsight.utils.isExplicitTypeReferenceNeededForTypeInference
-import org.jetbrains.kotlin.idea.codeinsight.utils.renameToUnderscore
 import org.jetbrains.kotlin.idea.codeinsights.impl.base.applicators.ApplicabilityRanges
+import org.jetbrains.kotlin.idea.codeinsights.impl.base.quickFix.RemoveUnusedVariableFix
 import org.jetbrains.kotlin.idea.k2.codeinsight.intentions.branchedTransformations.isPure
 import org.jetbrains.kotlin.psi.KtCallableDeclaration
 import org.jetbrains.kotlin.psi.KtConstantExpression
-import org.jetbrains.kotlin.psi.KtDestructuringDeclarationEntry
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtLiteralStringTemplateEntry
@@ -115,50 +111,6 @@ internal class UnusedVariableInspection :
     override fun createQuickFix(
         element: KtNamedDeclaration,
         context: Context,
-    ): KotlinModCommandQuickFix<KtNamedDeclaration> {
-        val smartPointer = element.createSmartPointer()
-        return object : KotlinModCommandQuickFix<KtNamedDeclaration>() {
-
-            override fun getFamilyName(): String =
-                KotlinBundle.message("remove.variable")
-
-            override fun getName(): String = getName(smartPointer) { element ->
-                when (element) {
-                    is KtDestructuringDeclarationEntry -> {
-                        KotlinBundle.message("rename.to.underscore")
-                    }
-
-                    is KtProperty if context.couldBeAnExplicitlyIgnoredValue -> {
-                        KotlinBundle.message("rename.0.to.explicitly.ignore.return.value", element.name.toString())
-                    }
-
-                    else -> {
-                        if (context.isSimpleCase) {
-                            KotlinBundle.message("remove.variable.0", element.name.toString())
-                        } else {
-                            KotlinBundle.message("remove.variable.change.semantics", element.name.toString())
-                        }
-                    }
-                }
-            }
-
-            override fun applyFix(
-                project: Project,
-                element: KtNamedDeclaration,
-                updater: ModPsiUpdater,
-            ) {
-                when (element) {
-                    is KtDestructuringDeclarationEntry -> renameToUnderscore(element)
-                    is KtProperty -> {
-                        if (context.couldBeAnExplicitlyIgnoredValue) {
-                            renameToUnderscore(element)
-                        } else {
-                            // Always remove the entire statement for both simple and complex cases
-                            element.delete()
-                        }
-                    }
-                }
-            }
-        }
-    }
+    ): KotlinModCommandQuickFix<KtNamedDeclaration> =
+        RemoveUnusedVariableFix(element, context.isSimpleCase, context.couldBeAnExplicitlyIgnoredValue)
 }

@@ -116,7 +116,7 @@ public class VfsUtilPerformanceTest extends BareTestFixtureTestCase {
     Benchmark.newBenchmark("finding root",
                            () -> JobLauncher.getInstance().invokeConcurrentlyUnderProgress(
                                             Collections.nCopies(500, null), null,
-                                            __ -> {
+                                            _ -> {
                                               for (int i = 0; i < 100_000; i++) {
                                                 NewVirtualFile rootJar = managingFS.findRoot(path, fs);
                                                 assertNotNull(rootJar);

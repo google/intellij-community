@@ -66,7 +66,7 @@ public abstract class EditorActionHandler {
         hostEditor = editor;
       }
       final boolean[] result = new boolean[1];
-      final CaretTask check = (___, __) -> result[0] = true;
+      final CaretTask check = (_, _) -> result[0] = true;
       if (myRunForEachCaret) {
         hostEditor.getCaretModel().runForEachCaret(caret -> doIfEnabled(caret, dataContext, check), reverseCaretOrder());
       }

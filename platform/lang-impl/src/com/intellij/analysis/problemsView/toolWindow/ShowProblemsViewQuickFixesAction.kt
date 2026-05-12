@@ -8,25 +8,22 @@ import com.intellij.codeInsight.intention.impl.IntentionActionWithTextCaching
 import com.intellij.codeInsight.intention.impl.IntentionListStep
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.analysis.problemsView.toolWindow.splitApi.actions.ProblemsViewEditorUtils.positionCaret
+import com.intellij.analysis.problemsView.toolWindow.splitApi.actions.ProblemsViewEditorUtils.getEditor
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.PlatformCoreDataKeys.SELECTED_ITEM
 import com.intellij.openapi.actionSystem.impl.ActionButton
 import com.intellij.openapi.application.ApplicationManager.getApplication
 import com.intellij.openapi.application.ModalityState
-import com.intellij.openapi.editor.ClientEditorManager
 import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.wm.IdeFocusManager
-import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
 import com.intellij.ui.awt.AnchoredPoint
 import com.intellij.ui.awt.RelativePoint
-import com.intellij.util.ui.UIUtil
-import com.intellij.util.ui.UIUtil.isAncestor
 import java.awt.event.MouseEvent
 
 internal class ShowProblemsViewQuickFixesAction : AnAction() {
@@ -38,7 +35,7 @@ internal class ShowProblemsViewQuickFixesAction : AnAction() {
     val problem = node?.problem
     with(event.presentation) {
       val project = event.project
-      isVisible = getApplication().isInternal || project != null && ProblemsView.getSelectedPanel(project) is HighlightingPanel
+      isVisible = getApplication().isInternal || project != null && event.getData(ProblemsViewPanel.DATA_KEY) is HighlightingPanel
       isEnabled = isVisible && when (problem) {
         is HighlightingProblem -> isEnabled(event, problem)
         else -> false
@@ -53,29 +50,10 @@ internal class ShowProblemsViewQuickFixesAction : AnAction() {
     }
   }
 
-
-  private fun getEditor(psi: PsiFile, showEditor: Boolean): Editor? {
-    val file = psi.virtualFile ?: return null
-    val document = PsiDocumentManager.getInstance(psi.project).getDocument(psi) ?: return null
-    val editor = ClientEditorManager.getCurrentInstance().editors(document, psi.project).firstOrNull { !it.isViewer } ?: return null
-    if (!showEditor || UIUtil.isShowing(editor.component)) {
-      return editor
-    }
-
-    val manager = FileEditorManager.getInstance(psi.project) ?: return null
-    if (manager.allEditors.none { isAncestor(it.component, editor.component) }) {
-      return null
-    }
-
-    manager.openFile(file, false, true)
-    return if (UIUtil.isShowing(editor.component)) editor else null
-  }
-
   private fun show(event: AnActionEvent, popup: JBPopup) {
     val mouse = event.inputEvent as? MouseEvent ?: return popup.showInBestPositionFor(event.dataContext)
     val point = mouse.locationOnScreen
-    val project = event.project
-    val panel = project?.let{ProblemsView.getSelectedPanel(project)}
+    val panel = event.getData(ProblemsViewPanel.DATA_KEY)
     val button = mouse.source as? ActionButton
     if (panel == null || button == null) {
       popup.show(RelativePoint.fromScreen(point))
@@ -96,7 +74,7 @@ internal class ShowProblemsViewQuickFixesAction : AnAction() {
     val intentions = getCachedIntentions(event, problem, true) ?: return
     val editor: Editor = intentions.editor ?: return
 
-    if (intentions.offset >= 0) editor.caretModel.moveToOffset(intentions.offset.coerceAtMost(editor.document.textLength))
+    positionCaret(intentions.offset, editor)
     show(event, JBPopupFactory.getInstance().createListPopup(
       object : IntentionListStep(null, editor, intentions.file, intentions.file.project, intentions, IntentionSource.PROBLEMS_VIEW) {
         override fun chooseActionAndInvoke(cachedAction: IntentionActionWithTextCaching, psiFile: PsiFile, project: Project, editor: Editor?) {
@@ -116,10 +94,7 @@ internal class ShowProblemsViewQuickFixesAction : AnAction() {
 
   private fun getCachedIntentions(event: AnActionEvent, problem: HighlightingProblem, showEditor: Boolean): CachedIntentions? {
     val psi = event.getData(CommonDataKeys.PSI_FILE) ?: return null
-    val project = event.project ?: return null
-    val panel = ProblemsView.getSelectedPanel(project) ?: return null
-    if (!UIUtil.isShowing(panel)) return null
-    val editor = panel.preview ?: getEditor(psi, showEditor) ?: return null
+    val editor = event.getData(ProblemsViewPanel.PREVIEW_DATA_KEY) ?: getEditor(psi, showEditor) ?: return null
     val info = ShowIntentionsPass.IntentionsInfo()
     problem.info?.findRegisteredQuickFix { desc, _ ->
       info.intentionsToShow.add(desc)

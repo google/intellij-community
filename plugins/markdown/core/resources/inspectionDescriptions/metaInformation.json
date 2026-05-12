@@ -31,6 +31,10 @@
     {
       "id": "MarkdownUnresolvedFileReference",
       "codeQualityCategory": "Sanity"
+    },
+    {
+      "id": "MarkdownTablePipeInCodeSpan",
+      "codeQualityCategory": "Code Style"
     }
   ]
 }

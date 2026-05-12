@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.vcs.svn` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "vcs-svn_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "vcs-svn",
   module_name = "intellij.vcs.svn",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
-  resources = [":vcs-svn_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
@@ -27,6 +22,7 @@ jvm_library(
     "//platform/vcs-impl",
     "//platform/platform-impl:ide-impl",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//platform/analysis-impl",
     "//libraries/http-client",
     "//platform/diff-impl",
@@ -47,6 +43,7 @@ jvm_library(
     "//platform/external-process-auth-helper",
     "//platform/vcs-impl/shared",
     "//platform/core-impl",
+    "//platform/util:util-ui",
   ],
   runtime_deps = [
     "@lib//:jaxb-runtime",
@@ -56,6 +53,7 @@ jvm_library(
 
 jvm_library(
   name = "vcs-svn_test_lib",
+  testonly = True,
   module_name = "intellij.vcs.svn",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -74,6 +72,7 @@ jvm_library(
     "//platform/vcs-impl:vcs-impl_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/analysis-impl:analysis-impl_test_lib",
     "//libraries/http-client:http-client_test_lib",
     "//platform/diff-impl:diff-impl_test_lib",
@@ -93,13 +92,21 @@ jvm_library(
     "//platform/external-process-auth-helper:external-process-auth-helper_test_lib",
     "//platform/vcs-impl/shared:shared_test_lib",
     "//platform/core-impl:core-impl_test_lib",
+    "//platform/util:util-ui_test_lib",
   ]
 )
 ### auto-generated section `build intellij.vcs.svn` end
 
+### auto-generated section `iml intellij.vcs.svn` start
+exports_files([
+  "intellij.vcs.svn.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.vcs.svn` end
+
 ### auto-generated section `build intellij.vcs.svn.tests` start
 jvm_library(
   name = "vcs-svn-tests",
+  module_name = "intellij.vcs.svn.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -118,6 +125,7 @@ jvm_library(
 
 jvm_library(
   name = "vcs-svn-tests_test_lib",
+  testonly = True,
   module_name = "intellij.vcs.svn.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["testSource/**/*.kt", "testSource/**/*.java", "testSource/**/*.form"], allow_empty = True),
@@ -141,6 +149,7 @@ jvm_library(
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//platform/lang-api:lang",
     "//platform/lang-api:lang_test_lib",
     "//platform/core-impl",
@@ -160,15 +169,24 @@ jvm_library(
     "//platform/forms_rt:java-guiForms-rt_test_lib",
     "//platform/vcs-impl:vcs-impl-tests",
     "//platform/vcs-impl:vcs-impl-tests_test_lib",
+    "//platform/util/concurrency",
+    "//platform/util/concurrency:concurrency_test_lib",
   ],
   runtime_deps = [
     ":vcs-svn-tests",
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/platform-util-io:ide-util-io_test_lib",
   ]
 )
 ### auto-generated section `build intellij.vcs.svn.tests` end
+
+### auto-generated section `iml intellij.vcs.svn.tests` start
+exports_files([
+  "intellij.vcs.svn.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.vcs.svn.tests` end
 
 ### auto-generated section `test intellij.vcs.svn.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.junit;
 
 import com.intellij.junit4.JUnit4TestListener;
@@ -33,7 +33,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
   }
 
   @Test
-  public void test2Parameterized() throws Exception {
+  public void test2Parameterized() {
     final Description root = Description.createSuiteDescription("root");
     final ArrayList<Description> tests = new ArrayList<>();
     for (String className : new String[]{"a.TestA", "a.TestB"}) {
@@ -90,7 +90,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
   }
 
   @Test
-  public void testClassWithMethodsWithoutSendTreeBefore() throws Exception {
+  public void testClassWithMethodsWithoutSendTreeBefore() {
     Description root = Description.createSuiteDescription("ATest");
     List<Description> tests = new ArrayList<>();
     tests.add(Description.createTestDescription("ATest", "test1"));
@@ -117,11 +117,11 @@ public class JUnitTreeByDescriptionHierarchyTest {
       ##teamcity[testStarted name='ATest.test2' locationHint='java:test://ATest/test2']
       ##teamcity[testFinished name='ATest.test2']
       ##teamcity[testSuiteFinished name='ATest']
-      """, StringUtil.convertLineSeparators(buf.toString()));
+      """, prepare(buf.toString()));
   }
 
   @Test
-  public void testSameShortNames() throws Exception {
+  public void testSameShortNames() {
     final Description rootDescription = Description.createSuiteDescription("root");
     final ArrayList<Description> tests = new ArrayList<>();
     for (String className : new String[]{"a.MyTest", "b.MyTest"}) {
@@ -155,7 +155,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
   }
 
   @Test
-  public void testSingleParameterizedClass() throws Exception {
+  public void testSingleParameterizedClass() {
     final String className = "a.TestA";
     final Description aTestClassDescription = Description.createSuiteDescription(className);
     final ArrayList<Description> tests = new ArrayList<>();
@@ -187,7 +187,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
   }
 
   @Test
-  public void testParameterizedClassWithSameParameters() throws Exception {
+  public void testParameterizedClassWithSameParameters() {
     final String className = "a.TestA";
     final Description aTestClassDescription = Description.createSuiteDescription(className);
     final ArrayList<Description> tests = new ArrayList<>();
@@ -225,7 +225,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
   }
 
   @Test
-  public void testParameterizedClassWithParamsWithDots() throws Exception {
+  public void testParameterizedClassWithParamsWithDots() {
     final String className = "a.TestA";
     final Description aTestClassDescription = Description.createSuiteDescription(className);
     final ArrayList<Description> tests = new ArrayList<>();
@@ -263,7 +263,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
   }
 
   @Test
-  public void test2SuitesWithTheSameTest() throws Exception {
+  public void test2SuitesWithTheSameTest() {
     final Description root = Description.createSuiteDescription("root");
     final String className = "ATest";
     final String methodName = "test1";
@@ -313,12 +313,12 @@ public class JUnitTreeByDescriptionHierarchyTest {
              """);
   }
 
-  private static void doTest(Description root, List<Description> tests, String expectedTree, String expectedStart) throws Exception {
+  private static void doTest(Description root, List<Description> tests, String expectedTree, String expectedStart) {
     final StringBuffer buf = new StringBuffer();
     final JUnit4TestListener sender = createListener(buf);
     sender.sendTree(root);
 
-    Assert.assertEquals("output: " + buf, expectedTree, StringUtil.convertLineSeparators(buf.toString()));
+    Assert.assertEquals("output: " + buf, expectedTree, prepare(buf.toString()));
 
     buf.setLength(0);
 
@@ -329,11 +329,17 @@ public class JUnitTreeByDescriptionHierarchyTest {
     }
     sender.testRunFinished(new Result());
 
-    Assert.assertEquals("output: " + buf, expectedStart, StringUtil.convertLineSeparators(buf.toString()));
+    Assert.assertEquals("output: " + buf, expectedStart, prepare(buf.toString()));
+  }
+
+  private static String prepare(String messages) {
+    return StringUtil.convertLineSeparators(messages)
+      .replaceAll(" duration='\\d+'", "")
+      .replaceAll(" durationStrategy='\\w+'", "");
   }
 
   @Test
-  public void testSetupClassAssumptionFailure() throws Exception {
+  public void testSetupClassAssumptionFailure() {
     final Description root = Description.createSuiteDescription("root");
     final Description testA = Description.createSuiteDescription("TestA");
     root.addChild(testA);
@@ -358,7 +364,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
       ##teamcity[suiteTreeNode name='TestB.testNameB' locationHint='java:test://TestB/testNameB']
       ##teamcity[suiteTreeEnded name='TestB']
       ##teamcity[treeEnded]
-      """, StringUtil.convertLineSeparators(buf.toString()));
+      """, prepare(buf.toString()));
 
     buf.setLength(0);
 
@@ -381,11 +387,11 @@ public class JUnitTreeByDescriptionHierarchyTest {
       ##teamcity[testIgnored name='TestB.testNameB' error='true' message='' details='java.lang.Exception|n']
       ##teamcity[testFinished name='TestB.testNameB']
       ##teamcity[testSuiteFinished name='TestB']
-      """, StringUtil.convertLineSeparators(buf.toString()));
+      """, prepare(buf.toString()));
   }
 
   @Test
-  public void testSetupClassFailure() throws Exception {
+  public void testSetupClassFailure() {
     final Description root = Description.createSuiteDescription("root");
     final Description testA = Description.createSuiteDescription("TestA");
     root.addChild(testA);
@@ -402,7 +408,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
       ##teamcity[suiteTreeNode name='TestA.testName' locationHint='java:test://TestA/testName']
       ##teamcity[suiteTreeEnded name='TestA']
       ##teamcity[treeEnded]
-      """, StringUtil.convertLineSeparators(buf.toString()));
+      """, prepare(buf.toString()));
 
     buf.setLength(0);
 
@@ -422,7 +428,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
       ##teamcity[testIgnored name='TestA.testName']
       ##teamcity[testFinished name='TestA.testName']
       ##teamcity[testSuiteFinished name='TestA']
-      """, StringUtil.convertLineSeparators(buf.toString()));
+      """, prepare(buf.toString()));
   }
 
   @Test
@@ -441,7 +447,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
     final String startMessage = "##teamcity[enteredTheMatrix]\n" +
 
                                 "##teamcity[testFailed name='A.a' ";
-    Assert.assertEquals(startMessage, StringUtil.convertLineSeparators(output.toString()).substring(0, startMessage.length()));
+    Assert.assertEquals(startMessage, prepare(output.toString()).substring(0, startMessage.length()));
   }
 
   @Test
@@ -474,12 +480,12 @@ public class JUnitTreeByDescriptionHierarchyTest {
       ##teamcity[testFailed name='TestA.test1' error='true' message='' details='java.lang.Exception|n']
       ##teamcity[testFinished name='TestA.test1']
       ##teamcity[testSuiteFinished name='TestA']
-      """, StringUtil.convertLineSeparators(buf.toString()));
+      """, prepare(buf.toString()));
   
   }
 
   @Test
-  public void testParallelExecution() throws Exception {
+  public void testParallelExecution() {
     final Description root = Description.createSuiteDescription("root");
     Description testA = Description.createTestDescription("TestA", "test1");
     root.addChild(testA);
@@ -496,7 +502,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
       ##teamcity[suiteTreeNode name='TestA.test1' locationHint='java:test://TestA/test1']
       ##teamcity[suiteTreeNode name='TestB.test2' locationHint='java:test://TestB/test2']
       ##teamcity[treeEnded]
-      """, StringUtil.convertLineSeparators(buf.toString()));
+      """, prepare(buf.toString()));
 
     buf.setLength(0);
 
@@ -523,11 +529,11 @@ public class JUnitTreeByDescriptionHierarchyTest {
       ##teamcity[testStarted name='TestB.test2' locationHint='java:test://TestB/test2']
       ##teamcity[testFinished name='TestB.test2']
       ##teamcity[testSuiteFinished name='TestB']
-      """, StringUtil.convertLineSeparators(buf.toString()));
+      """, prepare(buf.toString()));
   }
 
   @Test
-  public void testTearDownClassFailure() throws Exception {
+  public void testTearDownClassFailure() {
     final Description root = Description.createSuiteDescription("root");
     final Description testA = Description.createSuiteDescription("TestA");
     root.addChild(testA);
@@ -544,7 +550,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
       ##teamcity[suiteTreeNode name='TestA.testName' locationHint='java:test://TestA/testName']
       ##teamcity[suiteTreeEnded name='TestA']
       ##teamcity[treeEnded]
-      """, StringUtil.convertLineSeparators(buf.toString()));
+      """, prepare(buf.toString()));
 
     buf.setLength(0);
 
@@ -565,11 +571,11 @@ public class JUnitTreeByDescriptionHierarchyTest {
       ##teamcity[testFailed name='Class Configuration' error='true' message='' details='java.lang.Exception|n']
       ##teamcity[testFinished name='Class Configuration']
       ##teamcity[testSuiteFinished name='TestA']
-      """, StringUtil.convertLineSeparators(buf.toString()));
+      """, prepare(buf.toString()));
   }
 
   @Test
-  public void testTearDownClassFailureSingleClass() throws Exception {
+  public void testTearDownClassFailureSingleClass() {
     final Description testA = Description.createSuiteDescription("TestA");
     final Description testName = Description.createTestDescription("TestA", "testName");
     testA.addChild(testName);
@@ -582,7 +588,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
       ##teamcity[enteredTheMatrix]
       ##teamcity[suiteTreeNode name='TestA.testName' locationHint='java:test://TestA/testName']
       ##teamcity[treeEnded]
-      """, StringUtil.convertLineSeparators(buf.toString()));
+      """, prepare(buf.toString()));
 
     buf.setLength(0);
 
@@ -601,11 +607,11 @@ public class JUnitTreeByDescriptionHierarchyTest {
       ##teamcity[testStarted name='Class Configuration' locationHint='java:suite://TestA' ]
       ##teamcity[testFailed name='Class Configuration' error='true' message='' details='java.lang.Exception|n']
       ##teamcity[testFinished name='Class Configuration']
-      """, StringUtil.convertLineSeparators(buf.toString()));
+      """, prepare(buf.toString()));
   }
 
   @Test
-  public void testSetupClassFailureForParameterizedClass() throws Exception {
+  public void testSetupClassFailureForParameterizedClass() {
     final Description root = Description.createSuiteDescription("root");
     final Description testA = Description.createSuiteDescription("TestA");
     root.addChild(testA);
@@ -626,7 +632,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
       ##teamcity[suiteTreeEnded name='param']
       ##teamcity[suiteTreeEnded name='TestA']
       ##teamcity[treeEnded]
-      """, StringUtil.convertLineSeparators(buf.toString()));
+      """, prepare(buf.toString()));
 
     buf.setLength(0);
 
@@ -645,7 +651,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
       ##teamcity[testFinished name='TestA.testName']
       ##teamcity[testSuiteFinished name='param']
       ##teamcity[testSuiteFinished name='TestA']
-      """, StringUtil.convertLineSeparators(buf.toString()));
+      """, prepare(buf.toString()));
     buf.setLength(0);
 
     //testStarted and testFinished are called by the framework
@@ -656,12 +662,12 @@ public class JUnitTreeByDescriptionHierarchyTest {
     Assert.assertEquals("output: " + buf, """
       ##teamcity[rootName name = 'root' location = 'java:suite://root']
       ##teamcity[testIgnored name='TestA.testName' error='true' message='' details='java.lang.Exception|n']
-      """, StringUtil.convertLineSeparators(buf.toString()));
+      """, prepare(buf.toString()));
 
   }
 
   @Test
-  public void testAssumptionFailures() throws Exception {
+  public void testAssumptionFailures() {
     Description root = Description.createSuiteDescription("root");
     for (int i = 0; i< 5; i++) {
       Description testClassDescription = Description.createSuiteDescription("Test" + i);
@@ -691,7 +697,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
       ##teamcity[suiteTreeNode name='Test4.testName' locationHint='java:test://Test4/testName']
       ##teamcity[suiteTreeEnded name='Test4']
       ##teamcity[treeEnded]
-      """, StringUtil.convertLineSeparators(buf.toString()));
+      """, prepare(buf.toString()));
 
     buf.setLength(0);
 
@@ -737,11 +743,11 @@ public class JUnitTreeByDescriptionHierarchyTest {
       ##teamcity[testStarted name='Test4.testName' locationHint='java:test://Test4/testName']
       ##teamcity[testFinished name='Test4.testName']
       ##teamcity[testSuiteFinished name='Test4']
-      """, StringUtil.convertLineSeparators(buf.toString()));
+      """, prepare(buf.toString()));
   }
 
   @Test
-  public void testSingleMethod() throws Exception {
+  public void testSingleMethod() {
     final Description rootDescription = Description.createTestDescription("TestA", "testName");
     doTest(rootDescription, Collections.singletonList(rootDescription),
            """
@@ -757,7 +763,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
   }
 
   @Test
-  public void testPackageWithoutDescriptionBefore() throws Exception {
+  public void testPackageWithoutDescriptionBefore() {
     final Description root = Description.createSuiteDescription("root");
     final ArrayList<Description> tests = new ArrayList<>();
     for (String className : new String[]{"a.TestA", "a.TestB"}) {
@@ -788,7 +794,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
       ##teamcity[testStarted name='TestB.testName' locationHint='java:test://a.TestB/testName']
       ##teamcity[testFinished name='TestB.testName']
       ##teamcity[testSuiteFinished name='TestB']
-      """, StringUtil.convertLineSeparators(buf.toString()));
+      """, prepare(buf.toString()));
   }
 
   private static JUnit4TestListener createListener(final StringBuffer buf) {
@@ -805,13 +811,13 @@ public class JUnitTreeByDescriptionHierarchyTest {
 
       @Override
       protected String getTrace(Failure failure) {
-        return StringUtil.convertLineSeparators(super.getTrace(failure));
+        return prepare(super.getTrace(failure));
       }
     };
   }
 
   @Test
-  public void testParameterizedTestsUpsideDown() throws Exception {
+  public void testParameterizedTestsUpsideDown() {
     final Description aTestClass = Description.createSuiteDescription("ATest");
     final ArrayList<Description> tests = new ArrayList<>();
     final Description testMethod = Description.createSuiteDescription("testName");
@@ -844,7 +850,7 @@ public class JUnitTreeByDescriptionHierarchyTest {
   }
 
   @Test
-  public void testSuiteAndParameterizedTestsInOnePackage() throws Exception {
+  public void testSuiteAndParameterizedTestsInOnePackage() {
     final Description root = Description.createSuiteDescription("root");
     final Description aTestClass = Description.createSuiteDescription("ATest");
     root.addChild(aTestClass);
@@ -909,15 +915,16 @@ public class JUnitTreeByDescriptionHierarchyTest {
     }
   }
 
+  @SuppressWarnings("SameParameterValue")
   private static void doTest(Description description, String expected) {
     final StringBuffer buf = new StringBuffer();
     createListener(buf).sendTree(description);
 
-    Assert.assertEquals("output: " + buf, expected, StringUtil.convertLineSeparators(buf.toString()));
+    Assert.assertEquals("output: " + buf, expected, prepare(buf.toString()));
   }
 
   @Test
-  public void testProcessEmptyTestCase() throws Exception {
+  public void testProcessEmptyTestCase() {
     final Description description = Description.createSuiteDescription("TestA");
     final Description emptyDescription = Description.createTestDescription(JUnit4TestListener.EMPTY_SUITE_NAME, JUnit4TestListener.EMPTY_SUITE_WARNING);
     description.addChild(emptyDescription);
@@ -938,7 +945,83 @@ public class JUnitTreeByDescriptionHierarchyTest {
   }
 
   @Test
-  public void test2ClassesWithNoDescription() throws Exception {
+  public void testFlatSuiteWithNamedInnerClassDollarInClassName() {
+    final Description root = Description.createSuiteDescription("a.OuterTest");
+    final List<Description> tests = new ArrayList<>();
+
+    final Description test1 = Description.createTestDescription("a.OuterTest$InnerA", "testFoo");
+    root.addChild(test1);
+    tests.add(test1);
+
+    final Description test2 = Description.createTestDescription("a.OuterTest$InnerB", "testBar");
+    root.addChild(test2);
+    tests.add(test2);
+
+    doTest(root, tests,
+           """
+             ##teamcity[enteredTheMatrix]
+             ##teamcity[suiteTreeNode name='InnerA.testFoo' locationHint='java:test://a.OuterTest$InnerA/testFoo']
+             ##teamcity[suiteTreeNode name='InnerB.testBar' locationHint='java:test://a.OuterTest$InnerB/testBar']
+             ##teamcity[treeEnded]
+             """,
+           """
+             ##teamcity[rootName name = 'OuterTest' comment = 'a' location = 'java:suite://a.OuterTest']
+             ##teamcity[testSuiteStarted name='InnerA' locationHint='java:suite://a.OuterTest$InnerA']
+             ##teamcity[testStarted name='InnerA.testFoo' locationHint='java:test://a.OuterTest$InnerA/testFoo']
+             ##teamcity[testFinished name='InnerA.testFoo']
+             ##teamcity[testSuiteFinished name='InnerA']
+             ##teamcity[testSuiteStarted name='InnerB' locationHint='java:suite://a.OuterTest$InnerB']
+             ##teamcity[testStarted name='InnerB.testBar' locationHint='java:test://a.OuterTest$InnerB/testBar']
+             ##teamcity[testFinished name='InnerB.testBar']
+             ##teamcity[testSuiteFinished name='InnerB']
+             """);
+  }
+
+  @Test
+  public void testAnonymousInnerClassDollarPreserved() {
+    final Description root = Description.createSuiteDescription("a.OuterTest");
+    final Description test = Description.createTestDescription("a.OuterTest$1", "testFoo");
+    root.addChild(test);
+
+    doTest(root, Collections.singletonList(test),
+           """
+             ##teamcity[enteredTheMatrix]
+             ##teamcity[suiteTreeNode name='OuterTest$1.testFoo' locationHint='java:test://a.OuterTest$1/testFoo']
+             ##teamcity[treeEnded]
+             """,
+           """
+             ##teamcity[rootName name = 'OuterTest' comment = 'a' location = 'java:suite://a.OuterTest']
+             ##teamcity[testSuiteStarted name='OuterTest$1' locationHint='java:suite://a.OuterTest$1']
+             ##teamcity[testStarted name='OuterTest$1.testFoo' locationHint='java:test://a.OuterTest$1/testFoo']
+             ##teamcity[testFinished name='OuterTest$1.testFoo']
+             ##teamcity[testSuiteFinished name='OuterTest$1']
+             """);
+  }
+
+  @Test
+  public void testNamedInnerClassInDisplayNameFallback() {
+    final Description root = Description.createSuiteDescription("a.OuterTest");
+    final Description test = Description.createSuiteDescription("a.OuterTest$InnerA");
+    root.addChild(test);
+
+    doTest(root, Collections.singletonList(test),
+           """
+             ##teamcity[enteredTheMatrix]
+             ##teamcity[suiteTreeStarted name='InnerA' locationHint='java:suite://a.OuterTest$InnerA']
+             ##teamcity[suiteTreeEnded name='InnerA']
+             ##teamcity[treeEnded]
+             """,
+           """
+             ##teamcity[rootName name = 'OuterTest' comment = 'a' location = 'java:suite://a.OuterTest']
+             ##teamcity[testSuiteStarted name='InnerA' locationHint='java:suite://a.OuterTest$InnerA']
+             ##teamcity[testStarted name='InnerA' locationHint='java:test://a.OuterTest$InnerA/InnerA']
+             ##teamcity[testFinished name='InnerA']
+             ##teamcity[testSuiteFinished name='InnerA']
+             """);
+  }
+
+  @Test
+  public void test2ClassesWithNoDescription() {
     final Description root = Description.createSuiteDescription(new TestClass(null).getName());
     final Description testA = Description.createSuiteDescription("TestA");
     root.addChild(testA);

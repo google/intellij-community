@@ -11,7 +11,3 @@ attr = 42
 
 # no functions
 # no classes
-# variables with complex values
-
-__weakref__ = None # (!) real value is ''
-

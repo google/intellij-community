@@ -49,7 +49,7 @@ fn link_cef() -> Result<()> {
     let cef_arch_string = match env::var("CARGO_CFG_TARGET_ARCH")?.as_str() {
         "x86_64" => "windows64",
         "aarch64" => "windowsarm64",
-        e => panic!("Unsupported arch: {}", e)
+        e => panic!("Unsupported arch: {e}")
     };
 
     let cef_download_root = PathBuf::from("./deps/cef");
@@ -118,7 +118,7 @@ fn verify_sha1_checksum(file: &Path, expected: &str) -> Result<()> {
     trace!("Written {file:?} to buffer to calculate digest");
 
     let digest = Sha1::digest(&buffer);
-    let actual = format!("{digest:x}");
+    let actual = digest.iter().map(|b| format!("{b:02x}")).collect::<String>();
 
     if actual != expected {
         bail!("Checksum mismatch. Expected: '{expected}', actual: '{actual}'");

@@ -4,9 +4,10 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.searchEverywhereMl.typos.isTypoFixingEnabled
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
-import java.util.regex.Pattern
 
 @Service(Service.Level.APP)
 internal class ActionsLanguageModel(val coroutineScope: CoroutineScope) {
@@ -22,26 +23,42 @@ internal class ActionsLanguageModel(val coroutineScope: CoroutineScope) {
     }
   }
 
+  val deferredSharedIndex: Deferred<ActionsTypoSharedIndex> = coroutineScope.async {
+    val corpus = CorpusBuilder.getInstance()?.buildCorpus() ?: emptySet()
+    ActionsTypoSharedIndex.create(corpus)
+  }
+
   val deferredDictionary: Deferred<LanguageModelDictionary> = coroutineScope.async {
-    val corpus = CorpusBuilder.getInstance()?.deferredCorpus?.await() ?: emptySet()
-    computeLanguageModelDictionary(corpus)
+    deferredSharedIndex.await().asDictionary()
   }
 
-  // Accept any word that is between 3 and 45 characters long
-  private val acceptableWordsPattern = Pattern.compile("^.{3,45}$")
-
-  private fun computeLanguageModelDictionary(corpus: Set<List<String>>): LanguageModelDictionary {
-    val cleanedSentences = corpus.map { sentence ->
-      sentence.filter { word -> acceptableWordsPattern.matcher(word).matches() }
-    }.filter { it.isNotEmpty() }
-
-    val validWords = cleanedSentences.flatten()
-
-    val dictionary = validWords.groupingBy { it }
-      .eachCount()
-      .let { SimpleLanguageModelDictionary(it) }
-
-    return dictionary
+  private val deferredPrefixMatcher: Deferred<ActionsTypoPrefixMatcher> = coroutineScope.async(start = CoroutineStart.LAZY) {
+    deferredSharedIndex.await().createPrefixMatcher()
   }
 
+  private val deferredNGramModels: Deferred<ActionsTypoNGramModels> = coroutineScope.async(start = CoroutineStart.LAZY) {
+    ActionsTypoNGramModels.create(deferredSharedIndex.await())
+  }
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  fun getReadyPrefixMatcherOrNull(): ActionsTypoPrefixMatcher? {
+    return deferredPrefixMatcher
+      .takeIf { it.isCompleted }
+      ?.getCompleted()
+  }
+
+  fun ensurePrefixMatcherBuilding() {
+    deferredPrefixMatcher.start()
+  }
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  fun getReadyNGramModelsOrNull(): ActionsTypoNGramModels? {
+    return deferredNGramModels
+      .takeIf { it.isCompleted }
+      ?.getCompleted()
+  }
+
+  fun ensureNGramModelsBuilding() {
+    deferredNGramModels.start()
+  }
 }

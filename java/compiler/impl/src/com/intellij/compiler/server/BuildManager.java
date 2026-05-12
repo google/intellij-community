@@ -94,6 +94,7 @@ import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.newvfs.BulkFileListener;
+import com.intellij.openapi.vfs.newvfs.ManagingFS;
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
 import com.intellij.platform.backend.workspace.GlobalWorkspaceModelCache;
 import com.intellij.platform.backend.workspace.WorkspaceModelCache;
@@ -339,8 +340,12 @@ public final class BuildManager implements Disposable {
       public void runTask() {
         if (shouldSaveDocuments()) {
           ApplicationManager.getApplication().invokeAndWait(
-            () -> ((FileDocumentManagerImpl)FileDocumentManager.getInstance()).saveAllDocuments(false)
+            () -> {
+              ((FileDocumentManagerImpl)FileDocumentManager.getInstance()).saveAllDocuments(false);
+            }
           );
+          //flush pending IO tasks, if any:
+          ManagingFS.getInstance().flushPendingUpdatesOrNotify();
         }
       }
 
@@ -1123,7 +1128,7 @@ public final class BuildManager implements Disposable {
 
   private @NotNull ProjectData getProjectData(@NotNull String projectPath) {
     synchronized (myProjectDataMap) {
-      return myProjectDataMap.computeIfAbsent(projectPath, __ -> {
+      return myProjectDataMap.computeIfAbsent(projectPath, _ -> {
         return new ProjectData(SequentialTaskExecutor.createSequentialApplicationPoolExecutor("BuildManager Pool"));
       });
     }

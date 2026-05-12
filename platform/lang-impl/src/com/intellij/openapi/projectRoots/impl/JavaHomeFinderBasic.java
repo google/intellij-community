@@ -23,6 +23,7 @@ import org.jetbrains.jps.model.java.JdkVersionDetector;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -164,6 +165,8 @@ public class JavaHomeFinderBasic {
           }
 
           dirsToCheck.addAll(listPossibleJdkInstallRootsFromHomes(parentFile));
+        }
+        catch (InvalidPathException ignored) {
         }
         catch (Exception e) {
           if (e instanceof ControlFlowException) throw e;

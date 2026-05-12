@@ -32,7 +32,7 @@ public class GrReferenceHighlighter extends TextEditorHighlightingPass {
   public void doCollectInformation(@NotNull ProgressIndicator progress) {
     if (!shouldHighlight(myGroovyBaseFile)) return;
     List<HighlightInfo> myInfos = new ArrayList<>();
-    myGroovyBaseFile.accept(new InaccessibleElementVisitor(myGroovyBaseFile, myProject, (__, info) -> myInfos.add(info)));
+    myGroovyBaseFile.accept(new InaccessibleElementVisitor(myGroovyBaseFile, myProject, (_, info) -> myInfos.add(info)));
     BackgroundUpdateHighlightersUtil.setHighlightersToEditor(myProject, myPsiFile, myDocument, 0, myGroovyBaseFile.getTextLength(), myInfos, getId());
   }
 

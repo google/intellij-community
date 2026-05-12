@@ -1,6 +1,6 @@
 ### auto-generated section `build intellij.platform.jewel.intUi.standalone.tests` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_jewel-intUi-standalone-tests",
@@ -14,14 +14,9 @@ create_kotlinc_options(
   x_explicit_api_mode = "strict"
 )
 
-resourcegroup(
-  name = "jewel-intUi-standalone-tests_test_resources",
-  srcs = glob(["src/test/resources/**/*"]),
-  strip_prefix = "src/test/resources"
-)
-
 jvm_library(
   name = "jewel-intUi-standalone-tests",
+  module_name = "intellij.platform.jewel.intUi.standalone.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -32,10 +27,12 @@ jvm_library(
 
 jvm_library(
   name = "jewel-intUi-standalone-tests_test_lib",
+  testonly = True,
   module_name = "intellij.platform.jewel.intUi.standalone.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["src/test/kotlin/**/*.kt", "src/test/kotlin/**/*.java", "src/test/kotlin/**/*.form"], allow_empty = True),
-  resources = [":jewel-intUi-standalone-tests_test_resources"],
+  resources = glob(["src/test/resources/**/*"]),
+  resource_strip_prefix = "src/test/resources",
   kotlinc_opts = ":custom_jewel-intUi-standalone-tests",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -47,6 +44,12 @@ jvm_library(
   runtime_deps = [":jewel-intUi-standalone-tests"]
 )
 ### auto-generated section `build intellij.platform.jewel.intUi.standalone.tests` end
+
+### auto-generated section `iml intellij.platform.jewel.intUi.standalone.tests` start
+exports_files([
+  "intellij.platform.jewel.intUi.standalone.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.jewel.intUi.standalone.tests` end
 
 ### auto-generated section `test intellij.platform.jewel.intUi.standalone.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

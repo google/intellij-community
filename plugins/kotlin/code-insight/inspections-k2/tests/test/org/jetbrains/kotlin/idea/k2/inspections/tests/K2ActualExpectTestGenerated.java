@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.k2.inspections.tests;
 
@@ -68,6 +68,11 @@ public class K2ActualExpectTestGenerated extends AbstractK2ActualExpectTest {
     @TestMetadata("missedActualObject.kt")
     public void testMissedActualObject() throws Exception {
         runTest("testData/multiplatform/actualExpect/missedActualObject.kt");
+    }
+
+    @TestMetadata("nestedTypeAliasExpect.kt")
+    public void testNestedTypeAliasExpect() throws Exception {
+        runTest("testData/multiplatform/actualExpect/nestedTypeAliasExpect.kt");
     }
 
     @TestMetadata("onlyListMissingLeaves.kt")

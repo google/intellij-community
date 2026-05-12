@@ -17,6 +17,12 @@ internal class ComposeVerboseStackTraceAction : DumbAwareToggleAction() {
 
   override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 
+  override fun update(e: AnActionEvent) {
+    super.update(e)
+
+    e.presentation.isVisible = isComposeToolingEnabled()
+  }
+
   override fun isSelected(e: AnActionEvent): Boolean = isEnabled
 
   override fun setSelected(e: AnActionEvent, state: Boolean) {

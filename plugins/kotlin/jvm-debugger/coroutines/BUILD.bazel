@@ -1,6 +1,6 @@
 ### auto-generated section `build intellij.kotlin.jvm.debugger.coroutines` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_coroutines",
@@ -11,18 +11,13 @@ create_kotlinc_options(
   x_context_parameters = True
 )
 
-resourcegroup(
-  name = "coroutines_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "coroutines",
   module_name = "intellij.kotlin.jvm.debugger.coroutines",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":coroutines_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_coroutines",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -54,27 +49,31 @@ jvm_library(
     "//platform/execution-impl",
     "//platform/external-system-impl:externalSystem-impl",
     "//platform/core-ui",
+    "//platform/core-impl",
     "//platform/platform-util-io:ide-util-io",
     "//platform/smRunner",
     "//platform/threadDumpParser",
     "//java/java-psi-api:psi",
     "//platform/platform-impl:ide-impl",
+    "//platform/ide-core",
     "//java/execution/impl",
     "//java/debugger/impl",
     "//plugins/kotlin/code-insight/utils",
     "//java/java-runtime:rt",
-    "//plugins/kotlin/base/frontend-agnostic",
     "//libraries/kotlinx/serialization/core",
     "//libraries/kotlinx/serialization/json",
     "//java/java-impl:impl",
     "//java/debugger/shared",
     "//platform/xdebugger-impl/rpc",
     "//platform/execution",
+    "//platform/statistics",
+    "//platform/util:util-ui",
   ]
 )
 
 jvm_library(
   name = "coroutines_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.jvm.debugger.coroutines",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -107,22 +106,31 @@ jvm_library(
     "//platform/execution-impl:execution-impl_test_lib",
     "//platform/external-system-impl:externalSystem-impl_test_lib",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/platform-util-io:ide-util-io_test_lib",
     "//platform/smRunner:smRunner_test_lib",
     "//platform/threadDumpParser:threadDumpParser_test_lib",
     "//java/java-psi-api:psi_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//java/execution/impl:impl_test_lib",
     "//java/debugger/impl:impl_test_lib",
     "//plugins/kotlin/code-insight/utils:utils_test_lib",
     "//java/java-runtime:rt_test_lib",
-    "//plugins/kotlin/base/frontend-agnostic:frontend-agnostic_test_lib",
     "//libraries/kotlinx/serialization/core:core_test_lib",
     "//libraries/kotlinx/serialization/json:json_test_lib",
     "//java/java-impl:impl_test_lib",
     "//java/debugger/shared:shared_test_lib",
     "//platform/xdebugger-impl/rpc:rpc_test_lib",
     "//platform/execution:execution_test_lib",
+    "//platform/statistics:statistics_test_lib",
+    "//platform/util:util-ui_test_lib",
   ]
 )
 ### auto-generated section `build intellij.kotlin.jvm.debugger.coroutines` end
+
+### auto-generated section `iml intellij.kotlin.jvm.debugger.coroutines` start
+exports_files([
+  "intellij.kotlin.jvm.debugger.coroutines.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.jvm.debugger.coroutines` end

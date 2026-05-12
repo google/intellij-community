@@ -3,6 +3,7 @@ package com.intellij.platform.workspace.storage.impl
 
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
+import com.intellij.concurrency.ThreadContextAwareReentrantLock
 import com.intellij.platform.diagnostic.telemetry.TelemetryManager
 import com.intellij.platform.diagnostic.telemetry.WorkspaceModel
 import com.intellij.platform.workspace.storage.CachedValue
@@ -214,6 +215,8 @@ public open class VersionedEntityStorageImpl(initialStorage: ImmutableEntityStor
       return snapshotCache.cache
     }
 
+  private val lock = ThreadContextAwareReentrantLock()
+
   override val current: ImmutableEntityStorage
     get() = currentPointer.storage
 
@@ -248,16 +251,15 @@ public open class VersionedEntityStorageImpl(initialStorage: ImmutableEntityStor
    * Unfortunately, we have to do it because we initialize bridges on the base of the changes.
    * We may calculate the change in this function as we won't need the changes for bridges initialization.
    */
-  @Synchronized
   public fun replace(
     newStorage: ImmutableEntityStorage,
     changes: Map<Class<*>, List<EntityChange<*>>>,
     symbolicEntityIdsChanges: Set<ReferenceChange<*>>,
     beforeChanged: (VersionedStorageChange) -> Unit,
     afterChanged: (VersionedStorageChange) -> Unit,
-  ) {
+  ): Unit = lock.withLock {
     val oldCopy = currentPointer
-    if (oldCopy.storage == newStorage) return
+    if (oldCopy.storage == newStorage) return@withLock
     val change = VersionedStorageChangeImpl(oldCopy.storage, newStorage, changes, symbolicEntityIdsChanges)
     try {
       (newStorage as? AbstractEntityStorage)?.isEventHandling = true

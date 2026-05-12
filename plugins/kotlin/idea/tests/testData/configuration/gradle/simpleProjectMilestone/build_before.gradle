@@ -1,14 +1,22 @@
-apply plugin: 'java'
+plugins {
+    id 'java'
+}
 
-sourceCompatibility = 1.5
-version = '1.0'
+group = 'org.example'
+version = '1.0-SNAPSHOT'
 
 repositories {
-  mavenCentral()
+    mavenCentral()
 }
 
 dependencies {
-  testCompile group: 'junit', name: 'junit', version: '4.11'
+    testImplementation platform('org.junit:junit-bom:6.0.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-// VERSION: 1.6.20-M1
+test {
+    useJUnitPlatform()
+}
+
+// VERSION: 2.3.20-M1

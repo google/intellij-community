@@ -1417,7 +1417,7 @@ public class DfaMemoryStateImpl implements DfaMemoryState {
     }
     for (DfaVariableValue value : vars) {
       DfType oldValue = getDfType(value);
-      doFlush(value, true);
+      doFlush(value, !qualifierStatusMap.myClosure);
       if (qualifierStatusMap.myFieldToFlush != null && qualifierStatusMap.myFieldToFlush.equals(value.getDescriptor())) {
         recordVariableType(value, oldValue.join(qualifierStatusMap.myFieldValue));
       }

@@ -8,6 +8,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.Nls
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @ApiStatus.Internal
@@ -23,6 +24,10 @@ data class CommandLineProcessorResult(val project: Project?, val future: Deferre
     get() = future.isCompleted && future.getCompleted().exitCode == 1
 
   fun showError() {
-    Messages.showErrorDialog(future.getCompleted().message, IdeBundle.message("dialog.title.cannot.execute.command"))
+    Messages.showErrorDialog(getErrorMessage(), IdeBundle.message("dialog.title.cannot.execute.command"))
+  }
+
+  fun getErrorMessage(): @Nls String? {
+    return future.getCompleted().message
   }
 }

@@ -80,7 +80,7 @@ class ModuleVcsDetector(private val project: Project, private val coroutineScope
         override fun run() = throw UnsupportedOperationException("Sync execution is not supported")
 
         override suspend fun execute() {
-          val contentRoots = project.serviceAsync<DefaultVcsRootPolicy>().defaultVcsRoots
+          val contentRoots = project.serviceAsync<DefaultVcsRootPolicy>().getDefaultVcsRoots()
           MAPPING_DETECTION_LOG.debug("ModuleVcsDetector.autoDetectDefaultRoots - contentRoots", contentRoots)
           val rootCheckers = if (props.getBoolean(INITIAL_DETECTION_KEY)) {
             VcsRootChecker.EXTENSION_POINT_NAME.extensionList.filter { it.shouldAlwaysRunInitialDetection() }

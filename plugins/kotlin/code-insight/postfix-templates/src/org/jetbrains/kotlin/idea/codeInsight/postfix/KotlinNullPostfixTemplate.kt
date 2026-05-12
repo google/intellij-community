@@ -15,4 +15,5 @@ internal class KotlinNullPostfixTemplate : StringBasedPostfixTemplate {
 
     override fun getTemplateString(element: PsiElement): String = "if (\$expr$ == null) {\n\$END$\n}"
     override fun getElementToRemove(expr: PsiElement): PsiElement = expr
+    override fun isApplicableForModCommand(): Boolean = true
 }

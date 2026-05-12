@@ -84,7 +84,7 @@ public final class BookmarkManager implements PersistentStateComponent<Element>,
   public BookmarkManager(@NotNull Project project) {
     myProject = project;
     MessageBusConnection connection = project.getMessageBus().connect();
-    connection.subscribe(EditorColorsManager.TOPIC, __ -> colorsChanged());
+    connection.subscribe(EditorColorsManager.TOPIC, _ -> colorsChanged());
     EditorEventMulticaster multicaster = EditorFactory.getInstance().getEventMulticaster();
     multicaster.addDocumentListener(new MyDocumentListener(), this);
 
@@ -436,7 +436,7 @@ public final class BookmarkManager implements PersistentStateComponent<Element>,
       if (file != null) {
         for (Bookmark bookmark : myBookmarks.get(file)) {
           if (bookmark.getLine() == -1) continue;
-          List<BookmarkInfo> list = myBeforeChangeData.computeIfAbsent(doc, __ -> new ArrayList<>());
+          List<BookmarkInfo> list = myBeforeChangeData.computeIfAbsent(doc, _ -> new ArrayList<>());
           list.add(new BookmarkInfo(bookmark,
                                     bookmark.getLine(),
                                     doc.getText(new TextRange(doc.getLineStartOffset(bookmark.getLine()),

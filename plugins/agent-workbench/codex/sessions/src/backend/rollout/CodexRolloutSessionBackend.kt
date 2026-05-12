@@ -9,72 +9,141 @@ package com.intellij.agent.workbench.codex.sessions.backend.rollout
 import com.intellij.agent.workbench.codex.common.normalizeRootPath
 import com.intellij.agent.workbench.codex.sessions.backend.CodexBackendThread
 import com.intellij.agent.workbench.codex.sessions.backend.CodexSessionBackend
+import com.intellij.agent.workbench.codex.sessions.backend.toAgentThreadActivity
+import com.intellij.agent.workbench.common.AgentThreadActivity
 import com.intellij.agent.workbench.codex.sessions.resolveProjectDirectoryFromPath
+import com.intellij.agent.workbench.json.filebacked.FileBackedSessionChangeSet
+import com.intellij.agent.workbench.json.filebacked.createFileBackedSessionChangeFlow
+import com.intellij.agent.workbench.sessions.core.providers.AgentSessionActivityHintPolicy
+import com.intellij.agent.workbench.sessions.core.providers.AgentSessionSourceUpdate
+import com.intellij.agent.workbench.sessions.core.providers.AgentSessionSourceUpdateEvent
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.nio.file.Path
 import kotlin.io.path.invariantSeparatorsPathString
+import kotlin.time.Duration.Companion.milliseconds
 
 private val LOG = logger<CodexRolloutSessionBackend>()
+private const val CODEX_ROLLOUT_TRAILING_REFRESH_DELAY_MS = 250L
 
 internal class CodexRolloutSessionBackend(
   private val codexHomeProvider: () -> Path = { Path.of(System.getProperty("user.home"), ".codex") },
-  rolloutChangeSource: (() -> Flow<CodexRolloutChangeSet>)? = null,
+  rolloutChangeSource: (() -> Flow<FileBackedSessionChangeSet>)? = null,
+  private val trailingRefreshDelayMs: Long = CODEX_ROLLOUT_TRAILING_REFRESH_DELAY_MS,
 ) : CodexSessionBackend {
   private val parser = CodexRolloutParser()
   private val threadIndex = CodexRolloutThreadIndex(codexHomeProvider = codexHomeProvider, parser = parser)
+  private val rolloutUpdates: Flow<AgentSessionSourceUpdateEvent> = createUpdatesFlow(
+    rolloutChangeSource?.invoke() ?: createWatcherUpdates()
+  ).conflate()
 
-  override val updates: Flow<Unit> = (rolloutChangeSource?.invoke() ?: createWatcherUpdates())
-    .map { changeSet ->
-      threadIndex.markDirty(changeSet)
+  internal val sessionUpdates: Flow<AgentSessionSourceUpdateEvent> = rolloutUpdates
+
+  override val updates: Flow<Unit> = rolloutUpdates.map {}
+
+  private fun createUpdatesFlow(sourceUpdates: Flow<FileBackedSessionChangeSet>): Flow<AgentSessionSourceUpdateEvent> {
+    return channelFlow {
+      var trailingRefreshJob: Job? = null
+      sourceUpdates.collect { changeSet ->
+        threadIndex.markDirty(changeSet)
+        send(resolveSessionUpdate(changeSet))
+
+        trailingRefreshJob?.cancel()
+        trailingRefreshJob = launch {
+          delay(trailingRefreshDelayMs.milliseconds)
+          send(resolveSessionUpdate(changeSet))
+        }
+      }
     }
-    .conflate()
+  }
 
-  private fun createWatcherUpdates(): Flow<CodexRolloutChangeSet> = callbackFlow {
-    LOG.debug { "Initializing Codex rollout updates watcher (codexHome=${codexHomeProvider()})" }
-    val watcher = runCatching {
+  private suspend fun resolveSessionUpdate(changeSet: FileBackedSessionChangeSet): AgentSessionSourceUpdateEvent {
+    return withContext(Dispatchers.IO) {
+      buildSessionUpdate(changeSet)
+    }
+  }
+
+  private fun buildSessionUpdate(changeSet: FileBackedSessionChangeSet): AgentSessionSourceUpdateEvent {
+    if (changeSet.requiresFullRescan || changeSet.changedPaths.isEmpty()) {
+      LOG.debug {
+        "Codex rollout update is unscoped (fullRescan=${changeSet.requiresFullRescan}, changedPaths=${changeSet.changedPaths.size})"
+      }
+      return UNSCOPED_ROLLOUT_SESSION_UPDATE
+    }
+
+    val rolloutPaths = changeSet.changedPaths.filter(::isRolloutPath)
+    if (rolloutPaths.isEmpty()) {
+      LOG.debug { "Codex rollout update is unscoped (no rollout paths in changedPaths=${changeSet.changedPaths.size})" }
+      return UNSCOPED_ROLLOUT_SESSION_UPDATE
+    }
+
+    val scopedPaths = LinkedHashSet<String>()
+    val threadIds = LinkedHashSet<String>()
+    val activityHintsByThreadId = LinkedHashMap<String, AgentThreadActivity>()
+    var failedParses = 0
+    for (path in rolloutPaths) {
+      val parsedThread = parser.parse(path)
+      if (parsedThread == null) {
+        failedParses++
+        continue
+      }
+      scopedPaths += parsedThread.normalizedCwd
+      threadIds += parsedThread.thread.thread.id
+      parsedThread.parentThreadId?.let(threadIds::add)
+      if (parsedThread.parentThreadId == null) {
+        activityHintsByThreadId[parsedThread.thread.thread.id] = parsedThread.thread.activity.toAgentThreadActivity()
+      }
+    }
+
+    if (failedParses > 0 || scopedPaths.isEmpty()) {
+      LOG.debug {
+        "Codex rollout update falls back to unscoped refresh " +
+        "(changedRolloutPaths=${rolloutPaths.size}, failedParses=$failedParses, scopedPaths=${scopedPaths.size})"
+      }
+      return UNSCOPED_ROLLOUT_SESSION_UPDATE
+    }
+
+    LOG.debug {
+      "Codex rollout update scoped (changedRolloutPaths=${rolloutPaths.size}, scopedPaths=${scopedPaths.size}, threadIds=${threadIds.size})"
+    }
+    return AgentSessionSourceUpdateEvent(
+      type = AgentSessionSourceUpdate.HINTS_CHANGED,
+      scopedPaths = scopedPaths,
+      threadIds = threadIds.takeIf { it.isNotEmpty() },
+      activityHintsByThreadId = activityHintsByThreadId,
+      activityHintPolicy = AgentSessionActivityHintPolicy.AUTHORITATIVE,
+    )
+  }
+
+  private fun createWatcherUpdates(): Flow<FileBackedSessionChangeSet> {
+    return createFileBackedSessionChangeFlow(
+      logger = LOG,
+      watcherName = "Codex rollout",
+      initContext = { "codexHome=${codexHomeProvider()}" },
+      emitInitialRefreshPing = true,
+    ) { scope, onChange ->
       CodexRolloutSessionsWatcher(
         codexHomeProvider = codexHomeProvider,
-        scope = this,
-      ) { changeSet ->
-        LOG.debug {
-          "Rollout watcher signaled change; emitting update (fullRescan=${changeSet.requiresFullRescan}, changedPaths=${changeSet.changedRolloutPaths.size})"
-        }
-        trySend(changeSet)
-      }
-    }.onFailure { t ->
-      LOG.warn("Failed to initialize Codex rollout watcher", t)
-    }.getOrNull()
-
-    if (watcher == null) {
-      LOG.debug { "Codex rollout updates watcher was not initialized; updates flow will stay idle" }
-      awaitClose { }
-      return@callbackFlow
-    }
-
-    val initialRefreshEmitted = trySend(CodexRolloutChangeSet()).isSuccess
-    LOG.debug {
-      "Codex rollout watcher initialized; initial refresh ping emitted=$initialRefreshEmitted"
-    }
-
-    awaitClose {
-      LOG.debug { "Closing Codex rollout updates watcher" }
-      watcher.close()
+        scope = scope,
+        onRolloutChange = onChange,
+      )
     }
   }
 
   override suspend fun listThreads(path: String, @Suppress("UNUSED_PARAMETER") openProject: Project?): List<CodexBackendThread> {
     return withContext(Dispatchers.IO) {
       val workingDirectory = resolveProjectDirectoryFromPath(path)
-        ?: return@withContext emptyList()
+                             ?: return@withContext emptyList()
       val cwdFilter = normalizeRootPath(workingDirectory.invariantSeparatorsPathString)
       threadIndex.collectByCwd(setOf(cwdFilter))[cwdFilter].orEmpty()
     }
@@ -99,4 +168,11 @@ private fun resolvePathFilters(paths: List<String>): List<Pair<String, String>> 
       path to normalizeRootPath(directory.invariantSeparatorsPathString)
     }
   }
+}
+
+private val UNSCOPED_ROLLOUT_SESSION_UPDATE = AgentSessionSourceUpdateEvent(type = AgentSessionSourceUpdate.HINTS_CHANGED)
+
+private fun isRolloutPath(path: Path): Boolean {
+  val fileName = path.fileName?.toString() ?: return false
+  return isRolloutFileName(fileName)
 }

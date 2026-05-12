@@ -237,7 +237,7 @@ public class ClassRenderer extends NodeRendererImpl {
       fieldsToShow, evaluationContext, parentDescriptor, nodeManager, nodeDescriptorFactory, objRef
     );
 
-    return CompletableFuture.allOf(futures).thenApply(__ -> StreamEx.of(futures).flatCollection(CompletableFuture::join).toList());
+    return CompletableFuture.allOf(futures).thenApply(_ -> StreamEx.of(futures).flatCollection(CompletableFuture::join).toList());
   }
 
   private CompletableFuture<List<DebuggerTreeNode>>[] createNodesChunked(List<Field> fields,

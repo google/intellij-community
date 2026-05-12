@@ -1,4 +1,5 @@
 // "Remove parameter 'x'" "false"
+// TOOL: org.jetbrains.kotlin.idea.k2.codeinsight.inspections.UnusedSymbolInspection
 // ACTION: Add 'block =' to argument
 // ACTION: Convert parameter to receiver
 // ACTION: Enable a trailing comma by default in the formatter

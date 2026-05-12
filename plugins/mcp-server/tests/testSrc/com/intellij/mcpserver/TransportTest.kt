@@ -1,8 +1,12 @@
 package com.intellij.mcpserver
 
 import com.intellij.mcpserver.annotations.McpDescription
+import com.intellij.mcpserver.annotations.McpToolHintValue.FALSE
+import com.intellij.mcpserver.annotations.McpToolHintValue.TRUE
+import com.intellij.mcpserver.annotations.McpToolHints
 import com.intellij.mcpserver.impl.McpServerService
 import com.intellij.mcpserver.impl.util.asTool
+import com.intellij.mcpserver.impl.util.projectPathParameterName
 import com.intellij.mcpserver.impl.util.network.McpServerConnectionAddressProvider
 import com.intellij.mcpserver.stdio.IJ_MCP_SERVER_PROJECT_PATH
 import com.intellij.openapi.project.Project
@@ -22,6 +26,7 @@ import io.modelcontextprotocol.kotlin.sdk.shared.AbstractTransport
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
@@ -32,66 +37,115 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.io.asSink
 import kotlinx.io.asSource
 import kotlinx.io.buffered
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 import java.util.concurrent.TimeUnit
-import kotlin.test.assertEquals
-import kotlin.test.fail
+import kotlin.time.Duration.Companion.milliseconds
 
 @TestApplication
 class TransportTest {
-
   companion object {
     val projectFixture = projectFixture(openAfterCreation = true)
     val project by projectFixture
+    val secondProjectFixture = projectFixture(openAfterCreation = true)
+    val secondProject by secondProjectFixture
 
     @JvmStatic
-    fun getTransports(): Array<TransportHolder> {
-      return arrayOf(
-        StdioTransportHolder(project),
-        SseTransportHolder(project),
-        HttpTransportHolder(project),
-      )
-    }
+    fun getTransports(): Array<TransportHolder> = arrayOf(
+      StdioTransportHolder(project),
+      SseTransportHolder(project),
+      HttpTransportHolder(project),
+    )
   }
 
   @ParameterizedTest
   @MethodSource("getTransports")
   fun list_tools(transport: TransportHolder) = transportTest(transport) { client ->
-    val listTools = client.listTools() ?: fail("No tools returned")
+    val listTools = client.listTools()
     assert(listTools.tools.isNotEmpty()) { "No tools returned" }
   }
 
   @ParameterizedTest
   @MethodSource("getTransports")
-  fun tool_call_has_project(transport: TransportHolder) = transportTest(transport) { client ->
-    delay(500)
+  fun list_tools_has_title(transport: TransportHolder) = transportTest(transport) { client ->
+    delay(500.milliseconds)
     Disposer.newDisposable().use { disposable ->
       application.extensionArea.getExtensionPoint(McpToolsProvider.EP).registerExtension(object : McpToolsProvider {
-        override fun getTools(): List<McpTool> {
-          return listOf(this@TransportTest::test_tool.asTool())
-        }
+        override fun getTools(): List<McpTool> = listOf(this@TransportTest::test_tool.asTool())
       }, disposable)
-      // tools change is being listened in a backgound coroutine, so we have to wait a bit
-      delay(500)
+      delay(500.milliseconds)
+
+      val tool = client.listTools().tools.single { it.name == "test_tool" }
+      assertEquals("Test title", tool.title)
+    }
+    delay(500.milliseconds)
+  }
+
+  @ParameterizedTest
+  @MethodSource("getTransports")
+  fun list_tools_has_annotations(transport: TransportHolder) = transportTest(transport) { client ->
+    delay(500.milliseconds)
+    Disposer.newDisposable().use { disposable ->
+      application.extensionArea.getExtensionPoint(McpToolsProvider.EP).registerExtension(object : McpToolsProvider {
+        override fun getTools(): List<McpTool> = listOf(this@TransportTest::test_tool.asTool())
+      }, disposable)
+      delay(500.milliseconds)
+
+      val tool = client.listTools().tools.single { it.name == "test_tool" }
+      assertThat(tool.annotations?.readOnlyHint).isTrue()
+      assertThat(tool.annotations?.openWorldHint).isFalse()
+    }
+    delay(500.milliseconds)
+  }
+
+  @ParameterizedTest
+  @MethodSource("getTransports")
+  fun tool_call_has_project(transport: TransportHolder) = transportTest(transport) { client ->
+    delay(500.milliseconds)
+    Disposer.newDisposable().use { disposable ->
+      application.extensionArea.getExtensionPoint(McpToolsProvider.EP).registerExtension(object : McpToolsProvider {
+        override fun getTools(): List<McpTool> = listOf(this@TransportTest::test_tool.asTool())
+      }, disposable)
+      // tools change is being listened in a background coroutine, so we have to wait a bit
+      delay(500.milliseconds)
       client.callTool("test_tool", emptyMap())
 
-      val actual = withTimeout(2000) { projectFromTool.await() }
-      assertEquals(project, actual)
+      val actual = withTimeout(2000.milliseconds) { projectFromTool.await() }
+      assertThat(actual).isEqualTo(project)
     }
     // the same to unregistration. Otherwise, tools change notification is being sent into a closed transport
-    delay(500) // delay for exit from use {}
+    delay(500.milliseconds) // delay for exit from use {}
+  }
+
+  @ParameterizedTest
+  @MethodSource("getTransports")
+  fun tool_call_prefers_project_path_argument_over_session_project(transport: TransportHolder) = transportTest(transport) { client ->
+    delay(500.milliseconds)
+    Disposer.newDisposable().use { disposable ->
+      application.extensionArea.getExtensionPoint(McpToolsProvider.EP).registerExtension(object : McpToolsProvider {
+        override fun getTools(): List<McpTool> = listOf(this@TransportTest::test_tool.asTool())
+      }, disposable)
+      delay(500.milliseconds)
+      client.callTool("test_tool", mapOf(projectPathParameterName to requireNotNull(secondProject.basePath)))
+
+      val actual = withTimeout(2000.milliseconds) { projectFromTool.await() }
+      assertThat(actual).isEqualTo(secondProject)
+    }
+    delay(500.milliseconds)
   }
 
   val projectFromTool = CompletableDeferred<Project?>()
 
-  @com.intellij.mcpserver.annotations.McpTool()
+  @com.intellij.mcpserver.annotations.McpTool(title = "Test title")
+  @McpToolHints(readOnlyHint = TRUE, openWorldHint = FALSE)
   @McpDescription("Test description")
   suspend fun test_tool() {
     projectFromTool.complete(currentCoroutineContext().projectOrNull)
   }
 
-  private fun transportTest(transportHolder: TransportHolder, action: suspend (Client) -> Unit) = runBlocking {
+  private fun transportTest(transportHolder: TransportHolder, action: suspend (Client) -> Unit) = runBlocking(Dispatchers.Default) {
     try {
       McpServerService.getInstance().start()
       val client = Client(Implementation(name = "test client", version = "1.0"))
@@ -99,7 +153,7 @@ class TransportTest {
         client.connect(transportHolder.transport)
       }
       catch (e: Exception) {
-        fail("Failed to connect to the server: ${e.message}. Additional diagnostics:\r\n${transportHolder.diagnostics}")
+        throw AssertionError("Failed to connect to the server: ${e.message}. Additional diagnostics:\r\n${transportHolder.diagnostics}")
       }
       action(client)
     }
@@ -116,7 +170,7 @@ abstract class TransportHolder {
 
   // do not make it AutoCloseable because Junit tries to close it automatically but we want to close it in test method manually
   open fun close() {
-    runBlocking {
+    runBlocking(Dispatchers.Default) {
       transport.close()
     }
   }
@@ -124,9 +178,8 @@ abstract class TransportHolder {
 
 @Suppress("RAW_SCOPE_CREATION")
 class StdioTransportHolder(project: Project) : TransportHolder() {
-
   private val scope = CoroutineScope(Job())
-  private val diag = StringBuilder()
+  private val diagnosticsCollector = StringBuilder()
 
   val process: Process by lazy {
     val mcpServerCommandLine = createStdioMcpServerCommandLine(McpServerService.getInstance().port, project.basePath)
@@ -134,7 +187,7 @@ class StdioTransportHolder(project: Project) : TransportHolder() {
     scope.launch {
       proc.errorStream.bufferedReader().use { reader ->
         reader.forEachLine {
-          diag.appendLine(it)
+          diagnosticsCollector.appendLine(it)
         }
       }
     }
@@ -146,23 +199,21 @@ class StdioTransportHolder(project: Project) : TransportHolder() {
   }
 
   override val diagnostics: String
-    get() = diag.toString()
+    get() = diagnosticsCollector.toString()
 
   override fun close() {
     super.close() //sseClientTransport.close()
     scope.cancel()
     if (!process.waitFor(10, TimeUnit.SECONDS)) process.destroyForcibly()
-    if (!process.waitFor(10, TimeUnit.SECONDS)) fail("Process is still alive")
+    if (!process.waitFor(10, TimeUnit.SECONDS)) throw AssertionError("Process is still alive")
   }
 
-  override fun toString(): String {
-    return "Stdio"
-  }
+  override fun toString(): String = "Stdio"
 }
 
 class SseTransportHolder(project: Project) : TransportHolder() {
   override val transport: AbstractTransport by lazy {
-    val addressProvider = McpServerConnectionAddressProvider.getInstanceOrNull() ?: fail("No address provider")
+    val addressProvider = McpServerConnectionAddressProvider.getInstanceOrNull() ?: throw AssertionError("No address provider")
     val transportUrl = addressProvider.serverSseUrl
     SseClientTransport(HttpClient {
       install(SSE)
@@ -171,14 +222,12 @@ class SseTransportHolder(project: Project) : TransportHolder() {
     }
   }
 
-  override fun toString(): String {
-    return "SSE"
-  }
+  override fun toString(): String = "SSE"
 }
 
 class HttpTransportHolder(project: Project) : TransportHolder() {
   override val transport: AbstractTransport by lazy {
-    val addressProvider = McpServerConnectionAddressProvider.getInstanceOrNull() ?: fail("No address provider")
+    val addressProvider = McpServerConnectionAddressProvider.getInstanceOrNull() ?: throw AssertionError("No address provider")
     val transportUrl = addressProvider.serverStreamUrl
     StreamableHttpClientTransport(HttpClient {
       install(SSE)
@@ -187,7 +236,5 @@ class HttpTransportHolder(project: Project) : TransportHolder() {
     }
   }
 
-  override fun toString(): String {
-    return "Http Stream"
-  }
+  override fun toString(): String = "Http Stream"
 }

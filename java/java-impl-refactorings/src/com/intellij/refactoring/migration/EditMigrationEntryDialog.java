@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.refactoring.migration;
 
 import com.intellij.java.refactoring.JavaRefactoringBundle;
@@ -11,11 +11,9 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.psi.JavaCodeFragment;
 import com.intellij.psi.JavaCodeFragmentFactory;
-import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.PsiNameHelper;
-import com.intellij.psi.PsiPackage;
 import com.intellij.ui.EditorTextField;
 import com.intellij.ui.LanguageTextField;
 import com.intellij.util.ui.JBUI;
@@ -95,9 +93,7 @@ public class EditMigrationEntryDialog extends DialogWrapper{
     final LanguageTextField.DocumentCreator documentCreator = new LanguageTextField.DocumentCreator() {
       @Override
       public Document createDocument(String value, @Nullable Language language, Project project) {
-        PsiPackage defaultPackage = JavaPsiFacade.getInstance(project).findPackage("");
-        final JavaCodeFragment fragment =
-          JavaCodeFragmentFactory.getInstance(project).createReferenceCodeFragment("", defaultPackage, true, true);
+        final JavaCodeFragment fragment = JavaCodeFragmentFactory.getInstance(project).createReferenceCodeFragmentInPackage("", "", true);
         return PsiDocumentManager.getInstance(project).getDocument(fragment);
       }
     };

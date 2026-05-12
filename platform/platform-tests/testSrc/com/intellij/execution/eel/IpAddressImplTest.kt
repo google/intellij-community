@@ -2,7 +2,7 @@
 package com.intellij.execution.eel
 
 import com.intellij.platform.eel.EelTunnelsApi
-import com.intellij.platform.eel.impl.asResolvedSocketAddress
+import com.intellij.platform.eel.impl.base.network.asResolvedSocketAddress
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource

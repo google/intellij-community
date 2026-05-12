@@ -13,7 +13,7 @@ import org.junit.runners.model.Statement
 class AndroidImportingTestRule : MethodRule {
 
     private companion object {
-        const val androidGradlePluginVersion = "8.2.2"
+        const val androidGradlePluginVersion = "8.5.2"
         val requiredGradleVersion: GradleVersion = GradleVersion.version("8.2")
     }
 

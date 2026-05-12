@@ -16,9 +16,11 @@ internal suspend fun <T> retryUntilVersionMatch(project: Project, document: Docu
   }
 }
 
-internal suspend fun durableWithStateReset(block: suspend CoroutineScope.() -> Unit, stateReset: () -> Unit) = try {
-  durable(body = block)
-}
-finally {
-  stateReset()
+internal suspend fun durableWithStateReset(block: suspend CoroutineScope.() -> Unit, stateReset: () -> Unit) = durable {
+  try {
+    block()
+  }
+  finally {
+    stateReset()
+  }
 }

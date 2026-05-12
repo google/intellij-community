@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.groovy.live.templates` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "groovy-live-templates_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "groovy-live-templates",
   module_name = "intellij.groovy.live.templates",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":groovy-live-templates_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:jetbrains-annotations",
     "@lib//:kotlin-stdlib",
@@ -23,11 +18,13 @@ jvm_library(
     "//platform/lang-impl",
     "//platform/util",
     "//platform/ide-core",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
   ]
 )
 
 jvm_library(
   name = "groovy-live-templates_test_lib",
+  testonly = True,
   module_name = "intellij.groovy.live.templates",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -39,6 +36,13 @@ jvm_library(
     "//platform/lang-impl:lang-impl_test_lib",
     "//platform/util:util_test_lib",
     "//platform/ide-core:ide-core_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
   ]
 )
 ### auto-generated section `build intellij.groovy.live.templates` end
+
+### auto-generated section `iml intellij.groovy.live.templates` start
+exports_files([
+  "intellij.groovy.live.templates.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.groovy.live.templates` end

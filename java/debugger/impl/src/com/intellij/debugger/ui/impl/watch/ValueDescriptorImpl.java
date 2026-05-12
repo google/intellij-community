@@ -499,7 +499,7 @@ public abstract class ValueDescriptorImpl extends NodeDescriptorImpl implements 
 
   @ApiStatus.Internal
   public Flow<@Nullable Renderer> getLastRendererFlow() {
-    return CoroutineUtilsKt.mapFlow(myRenderersChangedFlow, __ -> getLastRenderer());
+    return CoroutineUtilsKt.mapFlow(myRenderersChangedFlow, _ -> getLastRenderer());
   }
 
   public Renderer getLastRenderer() {
@@ -516,7 +516,7 @@ public abstract class ValueDescriptorImpl extends NodeDescriptorImpl implements 
 
   public CompletableFuture<NodeRenderer> getChildrenRenderer(DebugProcessImpl debugProcess) {
     if (OnDemandRenderer.isOnDemandForced(debugProcess)) {
-      return myInitFuture.thenApply(__ -> DebugProcessImpl.getDefaultRenderer(getValue()));
+      return myInitFuture.thenApply(_ -> DebugProcessImpl.getDefaultRenderer(getValue()));
     }
     return getRenderer(debugProcess);
   }
@@ -524,7 +524,7 @@ public abstract class ValueDescriptorImpl extends NodeDescriptorImpl implements 
   public CompletableFuture<NodeRenderer> getRenderer(DebugProcessImpl debugProcess) {
     DebuggerManagerThreadImpl.assertIsManagerThread();
     return myInitFuture
-      .thenCompose(__ -> DebuggerUtilsAsync.type(getValue()))
+      .thenCompose(_ -> DebuggerUtilsAsync.type(getValue()))
       .thenCompose(type -> getRenderer(type, debugProcess));
   }
 
@@ -574,7 +574,7 @@ public abstract class ValueDescriptorImpl extends NodeDescriptorImpl implements 
             try {
               return ReadAction.compute(() -> DebuggerTreeNodeExpression.substituteThis(
                 childrenRenderer.getChildValueExpression(new DebuggerTreeNodeMock(value), context),
-                ((PsiExpression)parentEvaluation), vDescriptor.getValue()
+                ((PsiExpression)parentEvaluation), vDescriptor.getValue(), vDescriptor.getDeclaredType()
               ));
             }
             catch (EvaluateException e) {
@@ -606,7 +606,7 @@ public abstract class ValueDescriptorImpl extends NodeDescriptorImpl implements 
           markName = e.getMarkName();
           promise = markers.markValue(value, new ValueMarkup(markName, new JBColor(0, 0), null));
         }
-        res = promise.then(__ -> ReadAction.nonBlocking(() -> JavaPsiFacade.getElementFactory(myProject)
+        res = promise.then(_ -> ReadAction.nonBlocking(() -> JavaPsiFacade.getElementFactory(myProject)
           .createExpressionFromText(markName + CodeFragmentFactoryContextWrapper.DEBUG_LABEL_SUFFIX,
                                     PositionUtil.getContextElement(context))).executeSynchronously());
       }
@@ -750,7 +750,7 @@ public abstract class ValueDescriptorImpl extends NodeDescriptorImpl implements 
 
   @ApiStatus.Internal
   public CompletableFuture<Boolean> canSetValueAsync() {
-    return myInitFuture.thenApply(__ -> isLvalue());
+    return myInitFuture.thenApply(_ -> isLvalue());
   }
 
   public XValueModifier getModifier(JavaValue value) {

@@ -334,12 +334,11 @@ public class FileTypeManagerImpl extends FileTypeManagerEx implements Persistent
     }
 
     @Override
-    public String toString() {
-      return fileType() +
-             " from '" +
-             (pluginDescriptor() == WILD_CARD ? "*" : PluginManagerCore.CORE_ID.equals(pluginDescriptor().getPluginId())
-                                                      ? "CORE" : pluginDescriptor()) +
-             "'";
+    public @NotNull String toString() {
+      return fileType() + " from '" +
+             (pluginDescriptor() == WILD_CARD ? "*" :
+              PluginManagerCore.CORE_ID.equals(pluginDescriptor().getPluginId()) ? "CORE" :
+              pluginDescriptor()) + "'";
     }
 
     // equals to all FileTypeWithDescriptor with this fileType
@@ -390,6 +389,7 @@ public class FileTypeManagerImpl extends FileTypeManagerEx implements Persistent
 
     PluginAdvertiserExtensionsStateService pluginAdvertiserExtensionsStateService =
       PluginAdvertiserExtensionsStateService.Companion.getInstance();
+    pluginAdvertiserExtensionsStateService.clearLocalPlugins(PluginManagerCore.CORE_ID);
     for (StandardFileType pair : standardFileTypes.values()) {
       if (schemeManager.findSchemeByName(pair.fileType.getName()) == null) {
         registerFileTypeWithoutNotification(pair.fileType,
@@ -476,7 +476,7 @@ public class FileTypeManagerImpl extends FileTypeManagerEx implements Persistent
 
   private void removeFromDuplicates(@NotNull FileType type, @NotNull PluginDescriptor pluginDescriptor) {
     fileTypesPerPlugin
-      .computeIfAbsent(pluginDescriptor, __ -> ConcurrentCollectionFactory.createConcurrentSet())
+      .computeIfAbsent(pluginDescriptor, _ -> ConcurrentCollectionFactory.createConcurrentSet())
       .removeIf(descriptor -> descriptor.fileType().equals(type));
   }
 
@@ -934,7 +934,8 @@ public class FileTypeManagerImpl extends FileTypeManagerEx implements Persistent
       }
     }
     else if (fileType == null || fileType == DetectedByContentFileType.INSTANCE) {
-      fileType = internalContinueToDetectFileTypeByFile(virtualFile, content, fileType);
+      // should run detectors for 'DetectedByContentFileType' type and if failed, return text
+      fileType = detectionService.getOrDetectFromContent(virtualFile, content, fileType);
     }
     FileType result = fileType == null ? UnknownFileType.INSTANCE : fileType;
     CachedFileTypes cached = CACHED;
@@ -944,21 +945,15 @@ public class FileTypeManagerImpl extends FileTypeManagerEx implements Persistent
     return result;
   }
 
-  // do not use
-  @ApiStatus.Internal
-  protected @NotNull FileType internalContinueToDetectFileTypeByFile(@NotNull VirtualFile file, byte @Nullable [] content, @Nullable FileType fileTypeByName) {
-    // should run detectors for 'DetectedByContentFileType' type and if failed, return text
-    return detectionService.getOrDetectFromContent(file, content, fileTypeByName);
-  }
-
   private FileType getTemporarilyFixedFileType(@NotNull VirtualFile file) {
     CachedFileTypes cached = CACHED;
-    return cached != null && file instanceof VirtualFileWithId vfid ? cached.fileTypes().get(vfid.getId()) : null;
+    return cached != null && file instanceof VirtualFileWithId vfId ? cached.fileTypes().get(vfId.getId()) : null;
   }
 
   // null means all conventional detect methods returned UnknownFileType.INSTANCE, have to detect from content
   @SuppressWarnings("DanglingJavadoc")
-  @Nullable FileType getByFile(@NotNull VirtualFile file) {
+  @Nullable
+  FileType getByFile(@NotNull VirtualFile file) {
     FileType temporarilyFixedFileType = getTemporarilyFixedFileType(file);
     if (temporarilyFixedFileType != null) return temporarilyFixedFileType;
 
@@ -1626,7 +1621,7 @@ public class FileTypeManagerImpl extends FileTypeManagerEx implements Persistent
   }
 
   private void checkFileTypeNamesUniqueness(@NotNull FileTypeWithDescriptor newDescriptor) {
-    fileTypesPerPlugin.computeIfAbsent(newDescriptor.pluginDescriptor(), __ -> ConcurrentHashMap.newKeySet()).add(newDescriptor);
+    fileTypesPerPlugin.computeIfAbsent(newDescriptor.pluginDescriptor(), _ -> ConcurrentHashMap.newKeySet()).add(newDescriptor);
     if (ApplicationManager.getApplication().isUnitTestMode()) {
       checkUnique();
     }

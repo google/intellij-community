@@ -104,42 +104,7 @@ public final class ParameterInfoController extends ParameterInfoControllerBase {
 
     registerSelf();
     setupListeners();
-
-    LookupListener lookupListener = new LookupListener() {
-      LookupImpl activeLookup = null;
-      final MergingUpdateQueue queue = new MergingUpdateQueue("Update parameter info position", 200, true, myComponent);
-
-      @Override
-      public void lookupShown(@NotNull LookupEvent event) {
-        activeLookup = (LookupImpl)event.getLookup();
-      }
-
-      @Override
-      public void lookupCanceled(@NotNull LookupEvent event) {
-        activeLookup = null;
-      }
-
-      @Override
-      public void uiRefreshed() {
-        queue.queue(new Update("PI update") {
-          @Override
-          public void run() {
-            if (activeLookup != null) {
-              WriteIntentReadAction.run(ParameterInfoController.this::updateComponent);
-            }
-          }
-        });
-      }
-    };
-
-
-    LookupManagerListener lookupManagerListener = (oldLookup, newLookup) -> {
-      if (newLookup != null && ClientId.isCurrentlyUnderLocalId()) {
-        newLookup.addLookupListener(lookupListener);
-      }
-    };
-
-    project.getMessageBus().connect(this).subscribe(LookupManagerListener.TOPIC, lookupManagerListener);
+    setupLookupListener(project);
 
     if (showHint) {
       showHint(requestFocus, mySingleParameterInfo);
@@ -147,6 +112,41 @@ public final class ParameterInfoController extends ParameterInfoControllerBase {
     else {
       updateComponent();
     }
+  }
+
+  /** Sets up a listener for lookup events to update parameter info position so that the popups do not overlap. */
+  private void setupLookupListener(Project project) {
+    final Boolean[] isLookupActive = {false};
+
+    LookupListener lookupListener = new LookupListener() {
+      final MergingUpdateQueue queue = new MergingUpdateQueue("Update parameter info position", 200, true, myComponent);
+
+      @Override
+      public void lookupShown(@NotNull LookupEvent event) {
+        isLookupActive[0] = true;
+      }
+
+      @Override
+      public void uiRefreshed() {
+        queue.queue(new Update("PI update") {
+          @Override
+          public void run() {
+            if (isLookupActive[0]) {
+              WriteIntentReadAction.run(ParameterInfoController.this::updateComponent);
+            }
+          }
+        });
+      }
+    };
+
+    LookupManagerListener lookupManagerListener = (oldLookup, newLookup) -> {
+      isLookupActive[0] = false;
+      if (newLookup != null && ClientId.isCurrentlyUnderLocalId()) {
+        newLookup.addLookupListener(lookupListener);
+      }
+    };
+
+    project.getMessageBus().connect(this).subscribe(LookupManagerListener.TOPIC, lookupManagerListener);
   }
 
   @Override

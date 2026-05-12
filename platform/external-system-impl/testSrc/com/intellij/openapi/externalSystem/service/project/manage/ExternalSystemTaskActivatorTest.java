@@ -15,7 +15,6 @@ import com.intellij.openapi.externalSystem.service.execution.AbstractExternalSys
 import com.intellij.openapi.externalSystem.service.project.ExternalSystemProjectResolver;
 import com.intellij.openapi.externalSystem.task.ExternalSystemTaskManager;
 import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil;
-import com.intellij.openapi.externalSystem.util.ExternalSystemOperationTestUtil;
 import com.intellij.openapi.externalSystem.util.ExternalSystemUtil;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleManager;
@@ -24,6 +23,7 @@ import com.intellij.openapi.util.KeyWithDefaultValue;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.registry.RegistryValue;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.platform.externalSystem.testFramework.ExternalSystemTestObservation;
 import com.intellij.platform.externalSystem.testFramework.TestExternalProjectSettings;
 import com.intellij.platform.externalSystem.testFramework.TestExternalSystemExecutionSettings;
 import com.intellij.platform.externalSystem.testFramework.TestExternalSystemManager;
@@ -64,7 +64,7 @@ public class ExternalSystemTaskActivatorTest extends HeavyPlatformTestCase {
     String projectPath = "/project/path";
     TestExternalProjectSettings projectSettings = new TestExternalProjectSettings();
     projectSettings.setExternalProjectPath(projectPath);
-    ExternalSystemOperationTestUtil.waitForProjectActivity(myProject, () ->
+    ExternalSystemTestObservation.waitForProjectActivity(myProject, () ->
       ExternalSystemUtil.linkExternalProject(projectSettings, new ImportSpecBuilder(myProject, TEST_EXTERNAL_SYSTEM_ID))
     );
   }

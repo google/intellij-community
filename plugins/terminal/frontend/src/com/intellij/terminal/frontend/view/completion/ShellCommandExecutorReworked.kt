@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.terminal.frontend.view.completion
 
+import com.intellij.terminal.completion.spec.ProcessExecutionResult
 import com.intellij.terminal.completion.spec.ShellCommandExecutor
 import com.intellij.terminal.completion.spec.ShellCommandResult
 import com.intellij.util.execution.ParametersListUtil
@@ -22,7 +23,10 @@ class ShellCommandExecutorReworked(
       workingDirectory = directory,
       env = emptyMap()
     )
-    return delegate.executeProcess(options)
+    return when (val result = delegate.executeProcess(options)) {
+      is ProcessExecutionResult.Finished -> ShellCommandResult.create(result.output, result.exitCode)
+      is ProcessExecutionResult.Failed -> emptyResult()
+    }
   }
 
   private fun emptyResult(): ShellCommandResult = ShellCommandResult.create("{}", 0)

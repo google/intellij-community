@@ -53,7 +53,6 @@ private fun List<KtClassOrObject>.toListOfNames() = map {
  *  - A sealed class is moved to a different package or module, but some of its children are not
  *  - An inheritor of a sealed class is moved to a different package or module, but its parent is not
  */
-@OptIn(KaExperimentalApi::class)
 internal fun checkSealedClassesConflict(
     declarationsToMove: Iterable<KtNamedDeclaration>,
     targetPackage: FqName,
@@ -104,6 +103,11 @@ internal fun checkSealedClassesConflict(
                 )
             )
         } else {
+            //if we move inheritors to the sealed class to fix existing issue
+            if (sealedSuperType.getKaModule(sealedSuperType.project, useSiteModule = null) == targetKaModule
+                && sealedSuperType.containingKtFile.packageFqName == targetPackage
+            ) continue
+
             // Some inheritors are being moved away from their sealed parent
             val movedInheritors = directInheritors.filter { it in movedClasses }
             val allHierarchyMembers = buildList {

@@ -81,12 +81,12 @@ public final class ProgressSuspender implements AutoCloseable {
   }
 
   public void executeNonSuspendableSection(@NotNull ProgressIndicator indicator, @NotNull Runnable runnable) {
-    myProgressesInNonSuspendableSections.compute(indicator, (__, number) -> (number == null ? 0 : number) + 1);
+    myProgressesInNonSuspendableSections.compute(indicator, (_, number) -> (number == null ? 0 : number) + 1);
     try {
       runnable.run();
     }
     finally {
-      myProgressesInNonSuspendableSections.compute(indicator, (__, number) -> number == null || number <= 1 ? null : number - 1);
+      myProgressesInNonSuspendableSections.compute(indicator, (_, number) -> number == null || number <= 1 ? null : number - 1);
     }
   }
 

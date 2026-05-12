@@ -7,6 +7,33 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" exported="" name="bouncy-castle-provider" level="project" />
+    <orderEntry type="module-library" exported="">
+      <library name="bouncy-castle-provider" type="repository">
+        <properties maven-id="org.bouncycastle:bcpkix-jdk18on:1.84">
+          <verification>
+            <artifact url="file://$MAVEN_REPOSITORY$/org/bouncycastle/bcpkix-jdk18on/1.84/bcpkix-jdk18on-1.84.jar">
+              <sha256sum>c87f16ed9e5ec61bc94151e9f3646ac44e50cd448121ce84367fa4b7ec7ec1bb</sha256sum>
+            </artifact>
+            <artifact url="file://$MAVEN_REPOSITORY$/org/bouncycastle/bcutil-jdk18on/1.84/bcutil-jdk18on-1.84.jar">
+              <sha256sum>b374e16963421fb9cfb01cc20d7ad8fd2f8b8188e3eef0ec0a8965e245f7619a</sha256sum>
+            </artifact>
+            <artifact url="file://$MAVEN_REPOSITORY$/org/bouncycastle/bcprov-jdk18on/1.84/bcprov-jdk18on-1.84.jar">
+              <sha256sum>64d6c5a6121fcd927152dd182cbed39afe0fda641a970d9bcc0c9cb1858b2731</sha256sum>
+            </artifact>
+          </verification>
+        </properties>
+        <CLASSES>
+          <root url="jar://$MAVEN_REPOSITORY$/org/bouncycastle/bcpkix-jdk18on/1.84/bcpkix-jdk18on-1.84.jar!/" />
+          <root url="jar://$MAVEN_REPOSITORY$/org/bouncycastle/bcutil-jdk18on/1.84/bcutil-jdk18on-1.84.jar!/" />
+          <root url="jar://$MAVEN_REPOSITORY$/org/bouncycastle/bcprov-jdk18on/1.84/bcprov-jdk18on-1.84.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES>
+          <root url="jar://$MAVEN_REPOSITORY$/org/bouncycastle/bcpkix-jdk18on/1.84/bcpkix-jdk18on-1.84-sources.jar!/" />
+          <root url="jar://$MAVEN_REPOSITORY$/org/bouncycastle/bcutil-jdk18on/1.84/bcutil-jdk18on-1.84-sources.jar!/" />
+          <root url="jar://$MAVEN_REPOSITORY$/org/bouncycastle/bcprov-jdk18on/1.84/bcprov-jdk18on-1.84-sources.jar!/" />
+        </SOURCES>
+      </library>
+    </orderEntry>
   </component>
 </module>

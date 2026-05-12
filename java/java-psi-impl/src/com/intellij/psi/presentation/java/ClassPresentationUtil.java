@@ -3,6 +3,7 @@ package com.intellij.psi.presentation.java;
 
 import com.intellij.core.JavaPsiBundle;
 import com.intellij.extapi.psi.StubBasedPsiElementBase;
+import com.intellij.openapi.util.NlsSafe;
 import com.intellij.psi.PsiAnonymousClass;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiClassOwner;
@@ -106,10 +107,42 @@ public final class ClassPresentationUtil {
   }
 
   public static @Nls @NotNull String getFunctionalExpressionPresentation(PsiFunctionalExpression functionalExpression, boolean qualified) {
-    final StubElement<?> stub = ((StubBasedPsiElementBase<?>)functionalExpression).getGreenStub();
-    final String lambdaText = stub instanceof FunctionalExpressionStub
-                              ? ((FunctionalExpressionStub<?>)stub).getPresentableText()
-                              : PsiExpressionTrimRenderer.render(functionalExpression);
+    final String lambdaText = getSimpleFunctionalExpressionPresentation(functionalExpression);
     return JavaPsiBundle.message("class.context.display", lambdaText, getContextName(functionalExpression, qualified, false));
+  }
+
+  /**
+   * Returns the name for the class.
+   * <p>
+   * Examples:
+   * <ul>
+   *   <li>Named class: {@code "MyClass"}</li>
+   *   <li>Anonymous class: {@code "Anonymous"}</li>
+   *   <li>Enum constant initializer: {@code "Enum constant 'CONST'"}</li>
+   * </ul>
+   */
+  public static @Nls @NotNull String getSimpleNameForClass(@NotNull PsiClass aClass) {
+    if (aClass instanceof PsiImplicitClass) {
+      return JavaPsiBundle.message("implicit.class.context.display");
+    }
+    if (aClass instanceof PsiAnonymousClass) {
+      if (aClass instanceof PsiEnumConstantInitializer) {
+        PsiEnumConstant enumConstant = ((PsiEnumConstantInitializer)aClass).getEnumConstant();
+        return JavaPsiBundle.message("enum.constant.display", enumConstant.getName());
+      }
+      return JavaPsiBundle.message("anonymous.class.display");
+    }
+    String name = aClass.getName();
+    return name != null ? name : "";
+  }
+
+  /**
+   * Returns just the lambda/method-reference text without containing context.
+   */
+  public static @NlsSafe @NotNull String getSimpleFunctionalExpressionPresentation(@NotNull PsiFunctionalExpression functionalExpression) {
+    final StubElement<?> stub = ((StubBasedPsiElementBase<?>)functionalExpression).getGreenStub();
+    return stub instanceof FunctionalExpressionStub
+           ? ((FunctionalExpressionStub<?>)stub).getPresentableText()
+           : PsiExpressionTrimRenderer.render(functionalExpression);
   }
 }

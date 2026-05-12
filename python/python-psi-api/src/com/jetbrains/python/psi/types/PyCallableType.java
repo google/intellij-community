@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.psi.types;
 
 import com.intellij.openapi.util.text.StringUtil;
@@ -24,6 +24,11 @@ public interface PyCallableType extends PyType {
     return true;
   }
 
+  @ApiStatus.Experimental
+  default @Nullable List<PyTypeParameterType> getTypeParameters(TypeEvalContext context) {
+    return null;
+  }
+
   /**
    * Returns the return type of a function independent of a call site.
    *
@@ -45,6 +50,17 @@ public interface PyCallableType extends PyType {
    */
   default @Nullable List<PyCallableParameter> getParameters(@NotNull TypeEvalContext context) {
     return null;
+  }
+
+  /**
+   * Returns the list of parameter types with keyword containers carrying {@code Unpack[TypedDict]}
+   * expanded into individual keyword parameters derived from the TypedDict fields.
+   *
+   * @see PyCallableParameterListType#getUnpackedParameters
+   */
+  @ApiStatus.Experimental
+  default @Nullable List<PyCallableParameter> getUnpackedParameters(@NotNull TypeEvalContext context) {
+    return getParameters(context);
   }
 
   /**

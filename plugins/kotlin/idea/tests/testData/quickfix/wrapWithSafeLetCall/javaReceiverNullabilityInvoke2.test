@@ -4,7 +4,7 @@
 package p;
 
 fun test(x: Foo) {
-    <caret>x.foo()()
+    x.fo<caret>o()()
 }
 
 // FILE: org/jspecify/nullness/Nullable.java
@@ -42,5 +42,5 @@ public class Foo {
 package p;
 
 fun test(x: Foo) {
-    <caret>x.foo()?.let { it() }
+    x.fo<caret>o()?.let { it() }
 }

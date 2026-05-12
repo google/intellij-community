@@ -67,6 +67,10 @@ internal object PreviewLAFThemeStyles {
       border-left: 2px solid ${scheme.linkActiveForegroundColor.webRgba(alpha = 0.4)};
     }
     
+    .footnotes {
+      border-top-color: $separatorColor;
+    }
+    
     blockquote, code, pre {
       background-color: ${scheme.fenceBackgroundColor.webRgba(scheme.fenceBackgroundColor.alpha / 255.0)};
     }

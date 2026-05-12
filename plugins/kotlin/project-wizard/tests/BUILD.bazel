@@ -3,15 +3,15 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tests",
+  module_name = "kotlin.project-wizard.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinc-kotlin-compiler-common",
-    "@lib//:kotlinc-kotlin-compiler-tests",
     "//libraries/kotlin/reflect",
     "//plugins/kotlin/plugin/k2",
-    "//plugins/kotlin/base/test",
+    "//plugins/kotlin/base/testFramework",
     "//plugins/kotlin/base/analysis",
     "//plugins/kotlin/frontend-independent",
     "//plugins/kotlin/code-insight/api",
@@ -29,6 +29,7 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "kotlin.project-wizard.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -47,6 +48,8 @@ jvm_library(
     "//platform/core-api:core_test_lib",
     "//platform/core-ui",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/editor-ui-api:editor-ui",
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//platform/external-system-impl:externalSystem-impl",
@@ -57,8 +60,8 @@ jvm_library(
     "//platform/lang-core:lang-core_test_lib",
     "//platform/projectModel-api:projectModel",
     "//platform/projectModel-api:projectModel_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/base/analysis",
     "//plugins/kotlin/base/analysis:analysis_test_lib",
     "//platform/external-system-impl:externalSystem-tests",
@@ -112,8 +115,8 @@ jvm_library(
     "//plugins/maven/testFramework:testFramework_test_lib",
     "//plugins/kotlin/project-wizard/maven",
     "//plugins/kotlin/project-wizard/maven:maven_test_lib",
-    "//plugins/maven-model",
-    "//plugins/maven-model:maven-model_test_lib",
+    "//plugins/maven/model",
+    "//plugins/maven/model:model_test_lib",
     "//plugins/maven",
     "//plugins/maven:maven_test_lib",
     "//plugins/maven/src/test:maven-tests",
@@ -143,17 +146,33 @@ jvm_library(
     "//platform/workspace/storage:storage_test_lib",
     "//platform/util/jdom",
     "//platform/util/jdom:jdom_test_lib",
+    "//platform/util:util-ui",
+    "//platform/util:util-ui_test_lib",
+    "//platform/ide-core",
     "//plugins/kotlin/base/statistics",
     "//plugins/kotlin/base/statistics:statistics_test_lib",
     "//plugins/kotlin/gradle/scripting/kotlin.gradle.scripting.k2:kotlin-gradle-scripting",
     "//plugins/kotlin/gradle/scripting/kotlin.gradle.scripting.k2:kotlin-gradle-scripting_test_lib",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework_test_lib",
+    "//java/java-syntax:syntax",
+    "//java/java-syntax:syntax_test_lib",
+    "//java/java-psi-api:psi",
+    "//java/java-psi-api:psi_test_lib",
   ],
   runtime_deps = [
     ":tests",
     "//plugins/kotlin/plugin/k2:k2_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
   ]
 )
 ### auto-generated section `build kotlin.project-wizard.tests` end
+
+### auto-generated section `iml kotlin.project-wizard.tests` start
+exports_files([
+  "kotlin.project-wizard.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.project-wizard.tests` end
 
 ### auto-generated section `test kotlin.project-wizard.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

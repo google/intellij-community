@@ -13,6 +13,7 @@ import com.intellij.xdebugger.frame.XFullValueEvaluator;
 import com.intellij.xdebugger.impl.XDebuggerManagerImpl;
 import com.sun.jdi.StringReference;
 import com.sun.jdi.Value;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -20,7 +21,8 @@ import org.jetbrains.annotations.Nullable;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 
-abstract class AbstractImageRenderer extends CompoundRendererProvider {
+@ApiStatus.Internal
+public abstract class AbstractImageRenderer extends CompoundRendererProvider {
   private static final Logger LOG = Logger.getInstance(AbstractImageRenderer.class);
 
   @Override
@@ -36,7 +38,9 @@ abstract class AbstractImageRenderer extends CompoundRendererProvider {
     return true;
   }
 
-  static byte @Nullable [] getImageBytes(EvaluationContextImpl evaluationContext, Value obj, String methodName) {
+  protected abstract byte @Nullable [] getImageBytes(@NotNull EvaluationContextImpl evaluationContext, Value obj);
+
+  static byte @Nullable [] getImageBytesFromHelper(EvaluationContextImpl evaluationContext, Value obj, String methodName) {
     try {
       EvaluationContextImpl copyContext = evaluationContext.createEvaluationContext(obj);
       StringReference bytes =
@@ -53,8 +57,7 @@ abstract class AbstractImageRenderer extends CompoundRendererProvider {
 
   protected XFullValueEvaluator createImagePopupEvaluator(@NotNull @Nls String message,
                                                           @NotNull EvaluationContextImpl evaluationContext,
-                                                          Value imageObj,
-                                                          String getBytesMethodName) {
+                                                          Value imageObj) {
     return new JavaValue.JavaFullValueEvaluator(message, evaluationContext) {
       {
         setShowValuePopup(false);
@@ -64,7 +67,7 @@ abstract class AbstractImageRenderer extends CompoundRendererProvider {
       public void evaluate(@NotNull XFullValueEvaluationCallback callback) {
         if (callback.isObsolete()) return;
 
-        var imageData = getImageBytes(getEvaluationContext(), imageObj, getBytesMethodName);
+        var imageData = getImageBytes(getEvaluationContext(), imageObj);
 
         ShowImagePopupUtil.showOnFrontend(getEvaluationContext().getProject(), imageData);
         callback.evaluated("");

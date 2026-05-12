@@ -40,7 +40,7 @@ public abstract class StacksHolderBase<E, ECollection extends Collection<E>>  {
     VirtualFile file = r.getFile();
 
     if (file.isInLocalFileSystem()) {
-      result = myDocumentStacks.computeIfAbsent(r, __ -> newCollection());
+      result = myDocumentStacks.computeIfAbsent(r, _ -> newCollection());
     }
     else {
       result = addWeaklyTrackedEmptyStack(file, myNonlocalVirtualFilesWithStacks);

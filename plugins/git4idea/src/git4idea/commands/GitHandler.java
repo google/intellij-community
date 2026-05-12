@@ -22,6 +22,7 @@ import com.intellij.openapi.vcs.VcsEnvCustomizer.VcsExecutableContext;
 import com.intellij.openapi.vcs.VcsException;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.newvfs.ManagingFS;
 import com.intellij.platform.diagnostic.telemetry.helpers.TraceUtil;
 import com.intellij.platform.vcs.impl.shared.telemetry.VcsScopeKt;
 import com.intellij.util.EnvironmentUtil;
@@ -462,7 +463,7 @@ public abstract class GitHandler {
     return String.format("git %s took %s ms. Command parameters: %n%s", myCommand, time, myCommandLine.getCommandLineString());
   }
 
-  private void start() {
+  private void start() throws IOException {
     if (myProject == null && !TrustedProjects.isProjectTrusted(Objects.requireNonNull(getWorkingDirectory()))) {
       throw new IllegalStateException("Shouldn't be possible to run a Git command in potentially untrusted project. " +
                                       "Pass Project to GitHandler constructor if applicable.");
@@ -476,6 +477,8 @@ public abstract class GitHandler {
       throw new IllegalStateException("The process has been already started");
     }
 
+    //Flush pending VFS writes, if any:
+    ManagingFS.getInstance().flushPendingUpdates();
     try {
       myStartTime = System.currentTimeMillis();
       String logDirectoryPath = getDirectoryPathForLogging();
@@ -587,7 +590,7 @@ public abstract class GitHandler {
    * @deprecated remove together with {@link GitHandlerUtil}
    */
   @Deprecated
-  void runInCurrentThread(@Nullable Runnable postStartAction) {
+  void runInCurrentThread(@Nullable Runnable postStartAction) throws IOException {
     try {
       start();
       if (isStarted()) {

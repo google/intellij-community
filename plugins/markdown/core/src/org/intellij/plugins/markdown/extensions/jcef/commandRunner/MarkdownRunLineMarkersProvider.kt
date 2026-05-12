@@ -42,7 +42,7 @@ internal class MarkdownRunLineMarkersProvider: RunLineMarkerContributor(), DumbA
       return null
     }
 
-    val dir = element.containingFile.virtualFile.parent?.path ?: return null
+    val dir = getMarkdownCommandWorkingDirectory(element.project, element.containingFile.virtualFile) ?: return null
     val text = getText(element)
     if (!matches(element.project, dir, true, text, allowRunConfigurations = inCodeSpan)) {
       return null
@@ -66,7 +66,7 @@ internal class MarkdownRunLineMarkersProvider: RunLineMarkerContributor(), DumbA
     val language = CodeFenceLanguageGuesser.guessLanguageForInjection(lang)
     val runner = MarkdownRunner.EP_NAME.extensionList.firstOrNull { it.isApplicable(language) } ?: return null
     val text = (element.parent as? MarkdownCodeFence)?.let(this::collectFenceText) ?: return null
-    val dir = element.containingFile.virtualFile.parent?.path ?: return null
+    val dir = getMarkdownCommandWorkingDirectory(element.project, element.containingFile.virtualFile) ?: return null
     val runAction = object : AnAction({ runner.title() }, AllIcons.RunConfigurations.TestState.Run_run) {
       override fun actionPerformed(event: AnActionEvent) {
         val project = event.getData(CommonDataKeys.PROJECT) ?: return

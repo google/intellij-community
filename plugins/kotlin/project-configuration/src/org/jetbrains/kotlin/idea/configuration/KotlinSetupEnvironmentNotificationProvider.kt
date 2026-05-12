@@ -93,7 +93,6 @@ class KotlinSetupEnvironmentNotificationProvider : EditorNotificationProvider {
         if (!configurationChecker.isSyncing &&
             isNotConfiguredNotificationRequired(module.toModuleGroup()) &&
             !module.hasKotlinPluginEnabled() &&
-            !isStdlibModule(module) &&
             getLibraryRootsWithIncompatibleAbi(module).isEmpty()
         ) {
             val configurators = getAbleToRunConfigurators(module).toList()

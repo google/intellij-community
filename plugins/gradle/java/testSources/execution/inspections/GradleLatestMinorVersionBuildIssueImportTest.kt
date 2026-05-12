@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.execution.inspections
 
 import org.jetbrains.plugins.gradle.execution.inspections.GradleLatestMinorVersionBuildIssueTaskExecutionTest.Companion.assertNewMinorGradleVersionNodeConsoleText
@@ -12,6 +12,7 @@ import org.junit.Test
 class GradleLatestMinorVersionBuildIssueImportTest : BuildViewMessagesImportingTestCase() {
 
   @Test
+  @TargetVersions("8.0.x")
   fun testImport() {
     enableGradleLatestMinorVersionInspection(myProject)
     createSettingsFile("")
@@ -31,7 +32,7 @@ class GradleLatestMinorVersionBuildIssueImportTest : BuildViewMessagesImportingT
   }
 
   @Test
-  @TargetVersions("8.0")
+  @TargetVersions("8.0.x")
   fun testImportDisabledInspection() {
     createSettingsFile("")
     importProject()

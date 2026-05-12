@@ -1,9 +1,10 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:Suppress("ReplaceGetOrSet", "ReplacePutWithAssignment")
+
 package com.intellij.openapi.util.registry
 
 import com.intellij.diagnostic.LoadingState
 import com.intellij.openapi.util.NlsSafe
-import kotlinx.coroutines.future.asDeferred
 import org.jdom.Element
 import org.jetbrains.annotations.ApiStatus.Experimental
 import org.jetbrains.annotations.ApiStatus.Internal
@@ -14,7 +15,6 @@ import java.lang.ref.Reference
 import java.lang.ref.SoftReference
 import java.util.MissingResourceException
 import java.util.Properties
-import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.function.Function
 
@@ -29,6 +29,16 @@ data class ValueWithSource(
  *
  * Plugins can provide their own registry keys using the `com.intellij.registryKey` extension point
  * (see `com.intellij.openapi.util.registry.RegistryKeyBean` for more details).
+ * 
+ * ## Registry Access Notes
+ * Any [Registry] access in the early IDE startup phase, before the IDE components are initialized ([LoadingState.COMPONENTS_LOADED]),
+ * might lead to reading an uninitialized value (**without** respect to the actual value stored by the user or the corresponding defaults).
+ * Such access is only allowed from the IDE features that only work after the component initialization, such as action system,
+ * tool windows, editor features. If you access the registry too early, the access will be permitted, but an error will be logged.
+ * 
+ * In any other cases, when you need to access the registry but aren't sure if the component initialization is complete, you should use the
+ * `com.intellij.openapi.util.registry.RegistryManager`: `RegistryManager.getInstance()` or `getInstanceAsync()` guarantees the correct
+ * initialization.
  */
 class Registry {
   private val userProperties = LinkedHashMap<String, ValueWithSource>()
@@ -40,15 +50,13 @@ class Registry {
     private set
 
   @Volatile
-  private var loadFuture = CompletableFuture<Void?>()  // cannot use `CompletableDeferred` - the coroutines lib may be not on the classpath
-
-  @Volatile
-  var valueChangeListener: RegistryValueListener = EMPTY_VALUE_LISTENER
+  internal var valueChangeListener: RegistryValueListener = EMPTY_VALUE_LISTENER
     private set
 
   companion object {
     private var bundledRegistry: Reference<Map<String, String>>? = null
 
+    @Internal
     const val REGISTRY_BUNDLE: String = "misc.registry"
 
     private val EMPTY_VALUE_LISTENER: RegistryValueListener = object : RegistryValueListener { }
@@ -147,6 +155,21 @@ class Registry {
     @JvmStatic
     fun stringValue(key: String): String = getInstance().resolveValue(key).asString()
 
+    @JvmStatic
+    fun stringValue(key: String, defaultValue: String): String {
+      if (!LoadingState.COMPONENTS_LOADED.isOccurred) {
+        LoadingState.COMPONENTS_REGISTERED.checkOccurred()
+        return defaultValue
+      }
+
+      try {
+        return registry.resolveValue(key).asString()
+      }
+      catch (_: MissingResourceException) {
+        return defaultValue
+      }
+    }
+
     @Throws(MissingResourceException::class)
     @JvmStatic
     fun getColor(key: String, defaultValue: Color?): Color? = getInstance().resolveValue(key).asColor(defaultValue)
@@ -202,7 +225,7 @@ class Registry {
           RegistryValueSource.MANAGER.name -> RegistryValueSource.MANAGER
           else -> RegistryValueSource.SYSTEM
         }
-        map[key] = ValueWithSource(value, source)
+        map.put(key, ValueWithSource(value, source))
       }
       return map
     }
@@ -249,12 +272,6 @@ class Registry {
     @JvmStatic
     fun markAsLoaded() {
       registry.isLoaded = true
-      registry.loadFuture.complete(null)
-    }
-
-    @Internal
-    suspend fun awaitLoad() {
-      registry.loadFuture.asDeferred().join()
     }
 
     @Internal
@@ -325,7 +342,7 @@ class Registry {
         for ((key, value) in map) {
           val registryValue = registry.resolveValue(key)
           if (value.value != registry.getBundleValueOrNull(registryValue.key)) {
-            userProperties[key] = value
+            userProperties.put(key, value)
             registryValue.resetCache()
           }
         }
@@ -337,36 +354,37 @@ class Registry {
       }
 
       registry.isLoaded = true
-      registry.loadFuture.complete(null)
       return userProperties
     }
   }
 
   // https://youtrack.jetbrains.com/issue/IJPL-158097/Investigate-allocation-performance-of-Registry.is
   private val valueProducer: Function<String, RegistryValue> = Function {
-    RegistryValue(registry = this, key = it, keyDescriptor = contributedKeys[it])
+    RegistryValue(registry = this, key = it, keyDescriptor = contributedKeys.get(it))
   }
 
   private fun resolveValue(key: String): RegistryValue = values.computeIfAbsent(key, valueProducer)
 
   @TestOnly
+  @Internal
   fun reset() {
     userProperties.clear()
     values.clear()
     isLoaded = false
-    loadFuture.cancel(false)
-    loadFuture = CompletableFuture()
   }
 
-  fun getBundleValueOrNull(key: String): @NlsSafe String? =
-    contributedKeys[key]?.defaultValue ?: loadFromBundledConfig()?.get(key)
+  @Internal
+  fun getBundleValueOrNull(key: String): @NlsSafe String? {
+    return contributedKeys.get(key)?.defaultValue ?: loadFromBundledConfig()?.get(key)
+  }
 
   @Throws(MissingResourceException::class)
-  internal fun getBundleValue(key: String, keyDescriptor: RegistryKeyDescriptor?): @NlsSafe String =
-    keyDescriptor?.defaultValue
-    ?: contributedKeys[key]?.defaultValue
-    ?: loadFromBundledConfig()?.get(key)
-    ?: throw MissingResourceException("Registry key $key is not defined", REGISTRY_BUNDLE, key)
+  internal fun getBundleValue(key: String, keyDescriptor: RegistryKeyDescriptor?): @NlsSafe String {
+    return keyDescriptor?.defaultValue
+           ?: contributedKeys[key]?.defaultValue
+           ?: loadFromBundledConfig()?.get(key)
+           ?: throw MissingResourceException("Registry key $key is not defined", REGISTRY_BUNDLE, key)
+  }
 
   @Internal
   fun getState(): Element {
@@ -409,14 +427,16 @@ class Registry {
         values.remove(key)
       }
       else {
-        registry.values[key]?.setValue(v)
+        registry.values.get(key)?.setValue(v)
       }
     }
   }
 
+  @get:Internal
   val isInDefaultState: Boolean
     get() = userProperties.isEmpty()
 
+  @get:Internal
   val isRestartNeeded: Boolean
     get() = isRestartNeeded(userProperties)
 }

@@ -1,35 +1,15 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build.impl
-
-import org.jetbrains.intellij.build.FrontendModuleFilter
 
 /**
  * Names of JAR files from `IDE_HOME/lib` directory.
- * These names are implementation detail and may be changed in the future; code outside the build scripts must not rely on them.
+ * These names are implementation details and may be changed in the future; code outside the build scripts must not rely on them.
  */
 object PlatformJarNames {
   /**
    * Used by default for modules and module-level libraries included in the platform part of the distribution.
    */
   internal const val APP_BACKEND_JAR: String = "app-backend.jar"
-
-  /**
-   * Used by default for modules and module-level libraries included in the platform part of the distribution, which are also used by 
-   * JetBrains Client.
-   */
-  internal const val APP_JAR: String = "app.jar"
-
-  /**
-   * Returns the name of the default JAR for a platform module.
-   */
-  internal fun getPlatformModuleJarName(moduleName: String, frontendModuleFilter: FrontendModuleFilter): String {
-    if (frontendModuleFilter.isBackendModule(moduleName)) {
-      return APP_BACKEND_JAR
-    }
-    else {
-      return APP_JAR
-    }
-  }
 
   /**
    * Used by default for project-level libraries included in the platform part of the distribution.

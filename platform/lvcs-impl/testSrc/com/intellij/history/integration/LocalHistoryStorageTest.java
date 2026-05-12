@@ -3,6 +3,7 @@ package com.intellij.history.integration;
 
 import com.intellij.history.core.LocalHistoryStorage;
 import com.intellij.openapi.application.WriteAction;
+import com.intellij.openapi.util.Clock;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
@@ -160,7 +161,7 @@ public class LocalHistoryStorageTest extends IntegrationTestCase {
   }
 
   private int createRecord(int size) throws IOException {
-    int r = myStorage.createNextRecord();
+    int r = myStorage.createNextRecord(Clock.getTime());
     try (AbstractStorage.StorageDataOutput s = myStorage.writeStream(r, true)) {
       for (int i = 0; i < size; i++) {
         s.writeInt(r);

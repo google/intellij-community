@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diagnostic.opentelemetry
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.project.Project
@@ -26,9 +27,11 @@ internal class LowMemoryToOTelReporter : ProjectActivity {
   }
 
   @Service(Service.Level.APP)
-  private class ReportingService : LowMemoryWatcherManager.Listener {
+  private class ReportingService : LowMemoryWatcherManager.Listener, Disposable {
     private val gcLoadGauge: DoubleGauge
     private val gcOverloaded: LongGauge
+
+    private val manager: LowMemoryWatcherManager
 
     init {
       val otelMeter = TelemetryManager.getMeter(PlatformMetrics)
@@ -36,7 +39,13 @@ internal class LowMemoryToOTelReporter : ProjectActivity {
       //RC: this boolean flag is logically better be an Attributes of the .gcLoad metric, but we don't support Attributes
       //    in our open-telemetry-metrics.csv/open-telemetry-metrics-plotter.html, so I introduce the dedicated metric instead:
       gcOverloaded = otelMeter.gaugeBuilder("LowMemory.gcOverloaded").ofLongs().build()
-      (AppExecutorUtil.getAppScheduledExecutorService() as AppScheduledExecutorService).lowMemoryWatcherManager.addListener(this)
+
+      manager = (AppExecutorUtil.getAppScheduledExecutorService() as AppScheduledExecutorService).lowMemoryWatcherManager
+      manager.addListener(this)
+    }
+
+    override fun dispose() {
+      manager.removeListener(this)
     }
 
     override fun memoryStatus(event: LowMemoryWatcherManager.LowMemoryEvent) {

@@ -3,7 +3,6 @@ package org.jetbrains.kotlin.idea.search.refIndex
 
 import com.intellij.pom.java.LanguageLevel
 import com.intellij.psi.PsiElement
-import com.intellij.testFramework.IdeaTestUtil
 import com.intellij.testFramework.builders.JavaModuleFixtureBuilder
 import org.jetbrains.kotlin.findUsages.AbstractFindUsagesTest
 import org.jetbrains.kotlin.findUsages.KotlinFindUsageConfigurator
@@ -18,7 +17,7 @@ abstract class AbstractFindUsagesWithCompilerReferenceIndexTest : KotlinCompiler
     override fun tuneFixture(moduleBuilder: JavaModuleFixtureBuilder<*>) {
         super.tuneFixture(moduleBuilder)
         moduleBuilder.setLanguageLevel(LanguageLevel.JDK_17)
-        moduleBuilder.addJdk(IdeaTestUtil.getMockJdk18Path().path)
+        moduleBuilder.addJdkVersion(LanguageLevel.JDK_1_8)
     }
 
     protected open val ignoreLog: Boolean get() = false

@@ -30,7 +30,7 @@ public class LightStubBuilder implements StubBuilder {
   public static final ThreadLocal<LighterAST> FORCED_AST = new ThreadLocal<>();
 
   @Override
-  public StubElement<?> buildStubTree(@NotNull PsiFile file) {
+  public @NotNull StubElement<?> buildStubTree(@NotNull PsiFile file) {
     LighterAST tree = FORCED_AST.get();
     if (tree == null) {
       FileType fileType = file.getFileType();

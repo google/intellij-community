@@ -1,4 +1,9 @@
-<idea-plugin package="org.jetbrains.kotlin.idea.codeInsight.inspections.shared">
+<idea-plugin package="org.jetbrains.kotlin.idea.codeInsight.inspections.shared" visibility="internal">
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+  <dependencies>
+    <module name="intellij.java.psi"/>
+  </dependencies>
+  <!-- endregion -->
   <extensions defaultExtensionNs="com.intellij">
 
     <codeInsight.blockingMethodChecker
@@ -553,7 +558,7 @@
     <localInspection implementationClass="org.jetbrains.kotlin.idea.codeInsight.inspections.shared.coroutines.SuspiciousImplicitCoroutineScopeReceiverAccessInspection"
                      groupPath="Kotlin"
                      groupBundle="messages.KotlinBundle" groupKey="group.names.coroutine"
-                     enabledByDefault="false"
+                     enabledByDefault="true"
                      level="WARNING"
                      language="kotlin"
                      key="inspection.suspicious.implicit.coroutine.scope.receiver.display.name" bundle="messages.KotlinBundle"/>

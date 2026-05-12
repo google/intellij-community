@@ -7,6 +7,7 @@ import com.intellij.util.text.matching.KeyboardLayoutConverter
 import com.intellij.util.text.matching.MatchedFragment
 import com.intellij.util.text.matching.MatchingMode
 import com.intellij.util.text.matching.deprecated
+import org.jetbrains.annotations.ApiStatus
 import kotlin.jvm.JvmStatic
 
 /**
@@ -20,6 +21,7 @@ class AllOccurrencesMatcher private constructor(
   keyboardLayoutConverter: KeyboardLayoutConverter,
 ) : MinusculeMatcher() {
   @Deprecated("Use {@link #AllOccurrencesMatcher(String, MatchingCaseSensitivity, String, KeyboardLayoutConverter)} instead")
+  @ApiStatus.ScheduledForRemoval
   constructor(pattern: String,
               options: NameUtil.MatchingCaseSensitivity,
               hardSeparators: String) : this(pattern, options.matchingMode(), hardSeparators, PlatformKeyboardLayoutConverter)
@@ -34,6 +36,7 @@ class AllOccurrencesMatcher private constructor(
   }
 
   @Deprecated("use matchingDegree(String, Boolean, List<MatchedFragment>)", replaceWith = ReplaceWith("matchingDegree(name, valueStartCaseMatch, fragments.map { MatchedFragment(it.startOffset, it.endOffset) })"))
+  @ApiStatus.ScheduledForRemoval
   override fun matchingDegree(name: String, valueStartCaseMatch: Boolean, fragments: FList<out TextRange>?): Int {
     return delegate.matchingDegree(name, valueStartCaseMatch, fragments)
   }
@@ -57,6 +60,7 @@ class AllOccurrencesMatcher private constructor(
   }
 
   @Deprecated("use match(String)", replaceWith = ReplaceWith("match(name)"))
+  @ApiStatus.ScheduledForRemoval
   override fun matchingFragments(name: String): FList<TextRange>? {
     return match(name)?.deprecated()
   }
@@ -74,6 +78,7 @@ class AllOccurrencesMatcher private constructor(
     }
 
     @Deprecated("Use {@link #create(String, MatchingCaseSensitivity, String)} instead")
+    @ApiStatus.ScheduledForRemoval
     @JvmStatic
     fun create(pattern: String, options: NameUtil.MatchingCaseSensitivity, hardSeparators: String): MinusculeMatcher {
       return AllOccurrencesMatcher(pattern, options.matchingMode(), hardSeparators, PlatformKeyboardLayoutConverter)

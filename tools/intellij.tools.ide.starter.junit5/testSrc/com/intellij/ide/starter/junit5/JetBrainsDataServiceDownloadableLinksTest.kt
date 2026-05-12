@@ -5,7 +5,7 @@ import com.intellij.ide.starter.community.ProductInfoRequestParameters
 import com.intellij.ide.starter.community.model.Download
 import com.intellij.ide.starter.community.model.OperatingSystem
 import com.intellij.ide.starter.community.model.ReleaseInfo
-import com.intellij.ide.starter.ide.IdeProductProvider
+import com.intellij.ide.starter.models.IdeInfoType
 import com.intellij.openapi.util.BuildNumber
 import com.intellij.tools.ide.util.common.logOutput
 import io.kotest.matchers.collections.shouldNotBeEmpty
@@ -41,7 +41,7 @@ class JetBrainsDataServiceDownloadableLinksTest {
   @Test
   fun `get latest releases of IntellijJ`() {
     val latestReleases = JetBrainsDataServiceClient
-                           .getReleases(ProductInfoRequestParameters(type = IdeProductProvider.IU.productCode, snapshot = "release"))
+                           .getReleases(ProductInfoRequestParameters(type = IdeInfoType.IDEA_ULTIMATE.productCode, snapshot = "release"))
                            .values
                            .firstOrNull() ?: listOf()
 

@@ -16,13 +16,12 @@
 
 package com.intellij.history.core.changes;
 
-import com.intellij.history.core.InMemoryLocalHistoryFacade;
 import com.intellij.history.core.LocalHistoryFacade;
 import com.intellij.history.core.LocalHistoryTestCase;
 import com.intellij.history.core.tree.RootEntry;
 
 public abstract class ChangeListTestCase extends LocalHistoryTestCase {
-  protected LocalHistoryFacade facade = new InMemoryLocalHistoryFacade();
+  protected LocalHistoryFacade facade = createInMemoryFacade();
   protected RootEntry r = new RootEntry();
 
 }

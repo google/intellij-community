@@ -20,7 +20,6 @@ import com.intellij.platform.searchEverywhere.SeLegacyItemPresentationProvider
 import com.intellij.platform.searchEverywhere.SeProviderId
 import com.intellij.platform.searchEverywhere.SeProviderIdUtils
 import com.intellij.platform.searchEverywhere.SeSession
-import com.intellij.platform.searchEverywhere.providers.SeProvidersHolder.Companion.initialize
 import com.intellij.platform.searchEverywhere.toProviderId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -100,10 +99,10 @@ class SeProvidersHolder(
 
         if (providerFactory is SeWrappedLegacyContributorItemsProviderFactory) {
           provider = legacyContributors[providerFactoryId]?.let {
-            providerFactory.getItemsProviderCatchingOrNull(project, it)
+            providerFactory.getItemsProviderCatchingOrNull(project, it, isAllTab = true)
           }
           separateTabProvider = separateTabLegacyContributors[providerFactoryId]?.let {
-            providerFactory.getItemsProviderCatchingOrNull(project, it)
+            providerFactory.getItemsProviderCatchingOrNull(project, it, isAllTab = false)
           }
         }
         else {
@@ -156,7 +155,7 @@ class SeProvidersHolder(
       separateTabContributors: MutableMap<SeProviderId, SearchEverywhereContributor<Any>>,
     ) {
       withContext(Dispatchers.EDT) {
-        SearchEverywhereManagerImpl.createContributors(initEvent, project)
+        SearchEverywhereManagerImpl.createContributors(initEvent, project, true, false)
       }.filterIsInstance<SearchEverywhereContributor<Any>>().forEach {
         allContributors[SeProviderId(it.searchProviderId)] = it
       }
@@ -182,8 +181,10 @@ suspend fun SeItemsProviderFactory.getItemsProviderCatchingOrNull(project: Proje
   computeCatchingOrNull { getItemsProvider(project, dataContext) }
 
 @ApiStatus.Internal
-suspend fun SeWrappedLegacyContributorItemsProviderFactory.getItemsProviderCatchingOrNull(project: Project?, legacyContributor: SearchEverywhereContributor<Any>): SeItemsProvider? =
-  computeCatchingOrNull { getItemsProvider(project, legacyContributor) }
+suspend fun SeWrappedLegacyContributorItemsProviderFactory.getItemsProviderCatchingOrNull(project: Project?,
+                                                                                         legacyContributor: SearchEverywhereContributor<Any>,
+                                                                                         isAllTab: Boolean): SeItemsProvider? =
+  computeCatchingOrNull { getItemsProvider(project, legacyContributor, isAllTab) }
 
 @ApiStatus.Internal
 suspend fun SeItemsProviderFactory.computeCatchingOrNull(block: suspend () -> SeItemsProvider?): SeItemsProvider? =

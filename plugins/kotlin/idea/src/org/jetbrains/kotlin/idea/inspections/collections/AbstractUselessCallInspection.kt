@@ -15,7 +15,7 @@ import org.jetbrains.kotlin.resolve.calls.util.getResolvedCall
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameOrNull
 
 @K1Deprecation
-abstract open class AbstractUselessCallInspection : AbstractKotlinInspection() {
+abstract class AbstractUselessCallInspection : AbstractKotlinInspection() {
 
     protected abstract val uselessFqNames: Map<String, Conversion>
 

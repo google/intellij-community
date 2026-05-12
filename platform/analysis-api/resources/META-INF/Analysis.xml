@@ -44,5 +44,6 @@
     <applicationService serviceInterface="com.intellij.lang.documentation.ClientDocumentationSettings"
                         serviceImplementation="com.intellij.lang.documentation.LocalDocumentationSettings"
                         client="local" />
+    <projectSettings service="com.intellij.psi.search.scope.packageSet.NamedScopeManager"/>
   </extensions>
 </idea-plugin>

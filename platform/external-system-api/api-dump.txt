@@ -71,6 +71,7 @@ f:com.intellij.openapi.externalSystem.autoimport.ExternalSystemProjectId
 - f:getSystemId():com.intellij.openapi.externalSystem.model.ProjectSystemId
 - hashCode():I
 com.intellij.openapi.externalSystem.autoimport.ExternalSystemProjectListener
+- java.util.EventListener
 - onProjectReloadFinish(com.intellij.openapi.externalSystem.autoimport.ExternalSystemRefreshStatus):V
 - onProjectReloadStart():V
 - onSettingsFilesListChange():V
@@ -88,7 +89,6 @@ f:com.intellij.openapi.externalSystem.autoimport.ExternalSystemProjectNotificati
 - f:getInstance(com.intellij.openapi.project.Project):com.intellij.openapi.externalSystem.autoimport.ExternalSystemProjectNotificationAware
 - f:isNotificationVisibleProperty(com.intellij.openapi.project.Project,com.intellij.openapi.externalSystem.model.ProjectSystemId):com.intellij.openapi.observable.properties.ObservableProperty
 - f:whenNotificationChanged(com.intellij.openapi.project.Project,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- f:whenNotificationChanged(com.intellij.openapi.project.Project,kotlin.jvm.functions.Function0):V
 com.intellij.openapi.externalSystem.autoimport.ExternalSystemProjectNotificationAware$Listener
 - onNotificationChanged(com.intellij.openapi.project.Project):V
 com.intellij.openapi.externalSystem.autoimport.ExternalSystemProjectReloadContext
@@ -1307,11 +1307,6 @@ com.intellij.openapi.externalSystem.settings.workspaceModel.ExternalProjectsBuil
 - a:getProjectsBuildClasspath():java.util.Map
 - a:setEntitySource(com.intellij.platform.workspace.storage.EntitySource):V
 - a:setProjectsBuildClasspath(java.util.Map):V
-f:com.intellij.openapi.externalSystem.settings.workspaceModel.ExternalProjectsBuildClasspathEntityModifications
-- sf:createExternalProjectsBuildClasspathEntity(java.util.Map,com.intellij.platform.workspace.storage.EntitySource):com.intellij.openapi.externalSystem.settings.workspaceModel.ExternalProjectsBuildClasspathEntityBuilder
-- sf:createExternalProjectsBuildClasspathEntity(java.util.Map,com.intellij.platform.workspace.storage.EntitySource,kotlin.jvm.functions.Function1):com.intellij.openapi.externalSystem.settings.workspaceModel.ExternalProjectsBuildClasspathEntityBuilder
-- bs:createExternalProjectsBuildClasspathEntity$default(java.util.Map,com.intellij.platform.workspace.storage.EntitySource,kotlin.jvm.functions.Function1,I,java.lang.Object):com.intellij.openapi.externalSystem.settings.workspaceModel.ExternalProjectsBuildClasspathEntityBuilder
-- sf:modifyExternalProjectsBuildClasspathEntity(com.intellij.platform.workspace.storage.MutableEntityStorage,com.intellij.openapi.externalSystem.settings.workspaceModel.ExternalProjectsBuildClasspathEntity,kotlin.jvm.functions.Function1):com.intellij.openapi.externalSystem.settings.workspaceModel.ExternalProjectsBuildClasspathEntity
 f:com.intellij.openapi.externalSystem.settings.workspaceModel.ExternalProjectsBuildClasspathEntitySource
 - com.intellij.platform.workspace.storage.EntitySource
 - sf:INSTANCE:com.intellij.openapi.externalSystem.settings.workspaceModel.ExternalProjectsBuildClasspathEntitySource
@@ -1364,9 +1359,7 @@ f:com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
 - s:executeOnEdt(com.intellij.openapi.util.Computable):java.lang.Object
 - s:executeOnEdt(Z,java.lang.Runnable):V
 - s:executeProjectChangeAction(com.intellij.openapi.components.ComponentManager,java.lang.Runnable):V
-- s:executeProjectChangeAction(com.intellij.openapi.externalSystem.util.DisposeAwareProjectChange):V
 - s:executeProjectChangeAction(Z,com.intellij.openapi.components.ComponentManager,java.lang.Runnable):V
-- s:executeProjectChangeAction(Z,com.intellij.openapi.externalSystem.util.DisposeAwareProjectChange):V
 - s:extractNameFromPath(java.lang.String):java.lang.String
 - s:find(com.intellij.openapi.externalSystem.model.DataNode,com.intellij.openapi.externalSystem.model.Key):com.intellij.openapi.externalSystem.model.DataNode
 - s:find(com.intellij.openapi.externalSystem.model.DataNode,com.intellij.openapi.externalSystem.model.Key,com.intellij.util.BooleanFunction):com.intellij.openapi.externalSystem.model.DataNode

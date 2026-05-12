@@ -3,6 +3,7 @@ package com.jetbrains.python;
 
 import com.intellij.codeInsight.CodeInsightSettings;
 import com.intellij.codeInsight.completion.impl.CamelHumpMatcher;
+import com.intellij.idea.TestFor;
 import com.jetbrains.python.fixtures.PyTestCase;
 import com.jetbrains.python.psi.LanguageLevel;
 
@@ -163,6 +164,12 @@ public class PythonKeywordCompletionTest extends PyTestCase {
       ),
       "as"
     );
+  }
+
+  @TestFor(issues = "PY-89189")
+  public void testNoAsInsideStringLiteral() {
+    assertDoesntContain(doTestByText("with patch(\"sample.<caret>\")"), "as");
+    assertDoesntContain(doTestByText("import foo\n\"bar <caret>\""), "as");
   }
 
   public void testElseInFor() {  // PY-6755

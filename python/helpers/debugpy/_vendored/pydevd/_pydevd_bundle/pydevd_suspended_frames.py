@@ -55,13 +55,24 @@ class _AbstractVariable(object):
         for key, val in safe_repr_custom_attrs.items():
             setattr(safe_repr, key, val)
 
-        type_name, _type_qualifier, _is_exception_on_eval, resolver, value = get_variable_details(
+        type_name, type_qualifier, _is_exception_on_eval, resolver, value = get_variable_details(
             self.value, to_string=safe_repr, context=context
         )
 
         is_raw_string = type_name in ("str", "bytes", "bytearray")
 
         attributes = []
+
+        if type_qualifier:
+            attributes.append(f"qualifiedType: {type_qualifier}.{type_name}")
+
+        try:
+            import inspect
+            src_file = inspect.getfile(self.value.__class__)
+            if src_file:
+                attributes.append(f"typeSourceFile: {src_file}")
+        except (TypeError, OSError):
+            pass
 
         if is_raw_string:
             attributes.append("rawString")

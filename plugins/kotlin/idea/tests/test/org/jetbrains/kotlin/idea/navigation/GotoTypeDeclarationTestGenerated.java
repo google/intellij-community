@@ -40,6 +40,31 @@ public class GotoTypeDeclarationTestGenerated extends AbstractGotoTypeDeclaratio
         runTest("testData/navigation/gotoTypeDeclaration/classInstance.test");
     }
 
+    @TestMetadata("enum.test")
+    public void testEnum() throws Exception {
+        runTest("testData/navigation/gotoTypeDeclaration/enum.test");
+    }
+
+    @TestMetadata("enum2.test")
+    public void testEnum2() throws Exception {
+        runTest("testData/navigation/gotoTypeDeclaration/enum2.test");
+    }
+
+    @TestMetadata("enum3.test")
+    public void testEnum3() throws Exception {
+        runTest("testData/navigation/gotoTypeDeclaration/enum3.test");
+    }
+
+    @TestMetadata("enum4.test")
+    public void testEnum4() throws Exception {
+        runTest("testData/navigation/gotoTypeDeclaration/enum4.test");
+    }
+
+    @TestMetadata("enumTypealias.test")
+    public void testEnumTypealias() throws Exception {
+        runTest("testData/navigation/gotoTypeDeclaration/enumTypealias.test");
+    }
+
     @TestMetadata("explicitParameterInLambda.test")
     public void testExplicitParameterInLambda() throws Exception {
         runTest("testData/navigation/gotoTypeDeclaration/explicitParameterInLambda.test");
@@ -73,6 +98,41 @@ public class GotoTypeDeclarationTestGenerated extends AbstractGotoTypeDeclaratio
     @TestMetadata("genericTypeInParameter.test")
     public void testGenericTypeInParameter() throws Exception {
         runTest("testData/navigation/gotoTypeDeclaration/genericTypeInParameter.test");
+    }
+
+    @TestMetadata("genericTypeParameter.test")
+    public void testGenericTypeParameter() throws Exception {
+        runTest("testData/navigation/gotoTypeDeclaration/genericTypeParameter.test");
+    }
+
+    @TestMetadata("genericTypeParameterBounded.test")
+    public void testGenericTypeParameterBounded() throws Exception {
+        runTest("testData/navigation/gotoTypeDeclaration/genericTypeParameterBounded.test");
+    }
+
+    @TestMetadata("genericTypeParameterCallSite.test")
+    public void testGenericTypeParameterCallSite() throws Exception {
+        runTest("testData/navigation/gotoTypeDeclaration/genericTypeParameterCallSite.test");
+    }
+
+    @TestMetadata("genericTypeParameterClassMember.test")
+    public void testGenericTypeParameterClassMember() throws Exception {
+        runTest("testData/navigation/gotoTypeDeclaration/genericTypeParameterClassMember.test");
+    }
+
+    @TestMetadata("genericTypeParameterLambdaIt.test")
+    public void testGenericTypeParameterLambdaIt() throws Exception {
+        runTest("testData/navigation/gotoTypeDeclaration/genericTypeParameterLambdaIt.test");
+    }
+
+    @TestMetadata("genericTypeParameterMultiple.test")
+    public void testGenericTypeParameterMultiple() throws Exception {
+        runTest("testData/navigation/gotoTypeDeclaration/genericTypeParameterMultiple.test");
+    }
+
+    @TestMetadata("genericTypeParameterReceiver.test")
+    public void testGenericTypeParameterReceiver() throws Exception {
+        runTest("testData/navigation/gotoTypeDeclaration/genericTypeParameterReceiver.test");
     }
 
     @TestMetadata("itExtensionLambda.test")

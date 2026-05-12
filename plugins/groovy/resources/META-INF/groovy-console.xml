@@ -4,6 +4,7 @@
     <scratch.rootType implementation="org.jetbrains.plugins.groovy.console.GroovyConsoleRootType"/>
     <resolveScopeProvider implementation="org.jetbrains.plugins.groovy.console.GroovyConsoleResolveScopeProvider"/>
     <editorNotificationProvider implementation="org.jetbrains.plugins.groovy.console.GroovyConsoleEditorDecorator"/>
+    <projectSettings service="org.jetbrains.plugins.groovy.console.GroovyConsoleStateService"/>
   </extensions>
 
   <actions>

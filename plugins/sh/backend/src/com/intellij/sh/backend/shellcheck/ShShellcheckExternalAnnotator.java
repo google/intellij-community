@@ -24,7 +24,7 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.platform.eel.provider.utils.EelPathUtils;
-import com.intellij.platform.eel.provider.utils.EelPathUtils.FileTransferAttributesStrategy;
+import com.intellij.platform.eel.provider.utils.EelPathTransfer.FileTransferAttributesStrategy;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.templateLanguages.OuterLanguageElement;

@@ -21,5 +21,6 @@
     <orderEntry type="module" module-name="intellij.python.community.execService.python" />
     <orderEntry type="module" module-name="intellij.platform.eel.provider" />
     <orderEntry type="module" module-name="intellij.python.common" />
+    <orderEntry type="module" module-name="intellij.platform.analysis" />
   </component>
 </module>

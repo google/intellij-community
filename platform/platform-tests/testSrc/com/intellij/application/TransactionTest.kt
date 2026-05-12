@@ -38,7 +38,7 @@ class TransactionTest : LightPlatformTestCase() {
 
   override fun runTestRunnable(testRunnable: ThrowableRunnable<Throwable>) {
     if (app != null) {
-      guard.assertWriteActionAllowed()
+      guard.assertWriteSafeEnvironment()
     }
 
     SwingUtilities.invokeLater(testRunnable::run)

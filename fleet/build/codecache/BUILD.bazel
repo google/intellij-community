@@ -1,6 +1,6 @@
 ### auto-generated section `build fleet.build.codecache` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_codecache",
@@ -14,18 +14,13 @@ create_kotlinc_options(
   x_lambdas = "class"
 )
 
-resourcegroup(
-  name = "codecache_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "codecache",
   module_name = "fleet.build.codecache",
   visibility = ["//visibility:public"],
   srcs = glob(["srcJvmMain/**/*.kt", "srcJvmMain/**/*.java", "srcJvmMain/**/*.form"], allow_empty = True),
-  resources = [":codecache_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_codecache",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -43,6 +38,7 @@ jvm_library(
 
 jvm_library(
   name = "codecache_test_lib",
+  testonly = True,
   module_name = "fleet.build.codecache",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -56,3 +52,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build fleet.build.codecache` end
+
+### auto-generated section `iml fleet.build.codecache` start
+exports_files([
+  "fleet.build.codecache.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml fleet.build.codecache` end

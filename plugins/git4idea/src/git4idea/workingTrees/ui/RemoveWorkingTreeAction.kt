@@ -93,7 +93,7 @@ internal class RemoveWorkingTreeAction : DumbAwareAction() {
       }
     }
     val commandResult = withBackgroundProgress(project, GitBundle.message("progress.title.deleting.worktree"), cancellable = true) {
-      service<Git>().deleteWorkingTree(project, tree)
+      service<Git>().deleteWorkingTree(repository, tree)
     }
     if (commandResult.success()) {
       repository.workingTreeHolder.scheduleReload()

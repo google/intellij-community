@@ -25,9 +25,6 @@ import com.intellij.codeInsight.template.macro.CompleteSmartMacro;
 import com.intellij.codeInsight.template.macro.MethodNameMacro;
 import com.intellij.codeInsight.template.macro.MethodReturnTypeMacro;
 import com.intellij.codeInsight.template.macro.VariableOfTypeMacro;
-import com.intellij.modcommand.ActionContext;
-import com.intellij.modcommand.ModCommand;
-import com.intellij.modcommand.ModCommandExecutor;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.impl.DocumentImpl;
 import com.intellij.pom.java.JavaFeature;
@@ -323,7 +320,7 @@ public class JavaLiveTemplateTest extends LiveTemplateTestCase {
     Set<TemplateContextType> contextTypeSet = TemplateManagerImpl
       .getApplicableContextTypes(TemplateActionContext.expanding(myFixture.getFile(), myFixture.getEditor()));
     List<Class<? extends TemplateContextType>> applicableContextTypesClasses = ContainerUtil.map(contextTypeSet, TemplateContextType::getClass);
-    List<Class<? extends JavaCodeContextType>> declarationTypes = Arrays.asList(JavaCodeContextType.Declaration.class, JavaCodeContextType.NormalClassDeclarationAfterShortMainMethod.class);
+    List<Class<? extends JavaCodeContextType>> declarationTypes = Arrays.asList(JavaCodeContextType.Declaration.class);
 
     assertEquals(declarationTypes, applicableContextTypesClasses);
   }
@@ -370,6 +367,8 @@ public class JavaLiveTemplateTest extends LiveTemplateTestCase {
       assertTrue(isApplicable("class Foo { <caret>xxx String[] foo(String[] bar) {} }", template));
       assertFalse(isApplicable("<caret>", template));
       assertFalse(isApplicable("int a = 1; <caret>", template));
+      assertFalse(isApplicable("class Foo { void test(<caret>xxx) {} }", template));
+      assertFalse(isApplicable("record Foo(<caret>xxx) {}", template));
     });
     IdeaTestUtil.withLevel(getModule(), LanguageLevel.JDK_1_8, () -> {
       assertFalse(isApplicable("class Foo { <caret>xxx }", template));
@@ -383,6 +382,8 @@ public class JavaLiveTemplateTest extends LiveTemplateTestCase {
       assertTrue(isApplicable("class Foo { <caret>xxx String[] foo(String[] bar) {} }", template));
       assertFalse(isApplicable("<caret>", template));
       assertFalse(isApplicable("int a = 1; <caret>", template));
+      assertFalse(isApplicable("class Foo { void test(<caret>xxx) {} }", template));
+      assertFalse(isApplicable("record Foo(<caret>xxx) {}", template));
     });
     IdeaTestUtil.withLevel(getModule(), JavaFeature.IMPLICIT_CLASSES.getStandardLevel(), () -> {
       assertFalse(isApplicable("class Foo { <caret>xxx }", template));
@@ -1003,108 +1004,15 @@ public class JavaLiveTemplateTest extends LiveTemplateTestCase {
     });
   }
 
-  public void testModCommandSout() {
-    TemplateImpl template = TemplateSettings.getInstance().getTemplate("sout", "Java");
-    configureByJavaText("Test.java", """
-      class X {
-          void test() {
-              <caret>
-          }
-      }
-      """);
-    runModCommand(template);
-    myFixture.checkResult("""
-                            class X {
-                                void test() {
-                                    System.out.println(<caret>);
-                                }
-                            }
-                            """);
-  }
-
-  public void testModCommandSoutm() {
-    TemplateImpl template = TemplateSettings.getInstance().getTemplate("soutm", "Java");
-    configureByJavaText("Test.java", """
-      class X {
-          void test() {
-              <caret>
-          }
-      }
-      """);
-    runModCommand(template);
-    myFixture.checkResult("""
-                            class X {
-                                void test() {
-                                    System.out.println("X.test");<caret>
-                                }
-                            }
-                            """);
-  }
-
-  public void testModCommandSoutp() {
-    TemplateImpl template = TemplateSettings.getInstance().getTemplate("soutp", "Java");
-    configureByJavaText("Test.java", """
-      class X {
-          void test(String[] arr, int[][] arr2, int p) {
-              <caret>
-          }
-      }
-      """);
-    runModCommand(template);
-    myFixture.checkResult("""
-      import java.util.Arrays;
-      
-      class X {
-          void test(String[] arr, int[][] arr2, int p) {
-              System.out.println("arr = " + Arrays.toString(arr) + ", arr2 = " + Arrays.deepToString(arr2) + ", p = " + p);
-          }
-      }
-      """);
-  }
-
-  public void testModCommandMain() {
-    TemplateImpl template = TemplateSettings.getInstance().getTemplate("main", "Java");
-    configureByJavaText("Test.java", """
-      class X {
-          <caret>
-      }
-      """);
-    runModCommand(template);
-    myFixture.checkResult("""
-                            class X {
-                                public static void main(String[] args) {
-                                    <caret>
-                                }
-                            }
-                            """);
-  }
-
-  public void testModCommandFori() {
-    TemplateImpl template = TemplateSettings.getInstance().getTemplate("fori", "Java");
-    configureByJavaText("Test.java", """
-      class X {
-          void test() {
-              <caret>
-          }
-      }
-      """);
-    runModCommand(template);
-    myFixture.checkResult("""
-                            class X {
-                                void test() {
-                                    for (int <selection>i<caret></selection> = 0; i < ; i++) {
-                                       \s
-                                    }
-                                }
-                            }
-                            """);
-  }
-
-  private void runModCommand(TemplateImpl template) {
-    ActionContext context = myFixture.getActionContext();
-    ModCommandExecutor.executeInteractively(
-      context, "ModCommand", myFixture.getEditor(),
-      () -> ModCommand.psiUpdate(context, (updater) -> TemplateManagerImpl.updateTemplate(template, updater)));
+  public void testSoutNotAvailableAfterDot() {
+    final TemplateImpl template =
+      TemplateSettings.getInstance().getTemplate("sout", "Java");
+      assertFalse(isApplicable("""
+                                 class A{
+                                  public static void main(){
+                                    .<caret>
+                                  }
+                                 }""", template));
   }
 
   @Override

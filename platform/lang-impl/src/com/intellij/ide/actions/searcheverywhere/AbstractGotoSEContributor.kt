@@ -29,6 +29,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.actionSystem.DataProvider
+import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
@@ -53,6 +54,7 @@ import com.intellij.util.indexing.FindSymbolParameters
 import it.unimi.dsi.fastutil.ints.IntArrayList
 import org.jetbrains.annotations.ApiStatus
 import java.util.EnumSet
+import java.util.function.BiConsumer
 import java.util.regex.Pattern
 import javax.swing.ListCellRenderer
 
@@ -71,7 +73,7 @@ internal val patternToDetectAnonymousClasses: Pattern = Pattern.compile("([.\\w]
 abstract class AbstractGotoSEContributor @ApiStatus.Internal protected constructor(
   event: AnActionEvent,
   @ApiStatus.Internal val contributorModules: List<SearchEverywhereContributorModule>?
-) : WeightedSearchEverywhereContributor<Any>, ScopeSupporting, SearchEverywhereExtendedInfoProvider {
+) : WeightedSearchEverywhereContributor<Any>, ScopeSupporting, SearchEverywhereExtendedInfoProvider, PossibleInternalCommandsContributor {
   @JvmField
   protected val myProject: Project = event.getRequiredData(CommonDataKeys.PROJECT)
   @JvmField
@@ -170,6 +172,15 @@ abstract class AbstractGotoSEContributor @ApiStatus.Internal protected construct
       }
       return current
     }
+
+    @ApiStatus.Internal
+    fun createScopes(project: Project, psiContext: SmartPsiElementPointer<PsiElement?>?): List<ScopeDescriptor> {
+      @Suppress("DEPRECATION")
+      return project.getService(ScopeService::class.java)
+        .createModel(EnumSet.of(ScopeOption.LIBRARIES, ScopeOption.EMPTY_SCOPES))
+        .getScopesImmediately(createContext(project, psiContext))
+        .scopeDescriptors
+    }
   }
 
   @ApiStatus.Internal
@@ -189,11 +200,7 @@ abstract class AbstractGotoSEContributor @ApiStatus.Internal protected construct
   }
 
   protected open fun createScopes(): List<ScopeDescriptor> {
-    @Suppress("DEPRECATION")
-    return myProject.getService(ScopeService::class.java)
-      .createModel(EnumSet.of(ScopeOption.LIBRARIES, ScopeOption.EMPTY_SCOPES))
-      .getScopesImmediately(createContext(myProject, myPsiContext))
-      .scopeDescriptors
+    return createScopes(myProject, myPsiContext)
   }
 
   override fun getSearchProviderId(): String = javaClass.simpleName
@@ -366,13 +373,22 @@ abstract class AbstractGotoSEContributor @ApiStatus.Internal protected construct
       fetchRunnable.run()
     }
     else {
-      // IJPL-176529
-      if (ModalityState.defaultModalityState() == ModalityState.nonModal()) {
+      try {
+        // IJPL-176529
+        if (ModalityState.defaultModalityState() == ModalityState.nonModal()) {
+          @Suppress("UsagesOfObsoleteApi", "DEPRECATION")
+          ProgressIndicatorUtils.yieldToPendingWriteActions()
+        }
         @Suppress("UsagesOfObsoleteApi", "DEPRECATION")
-        ProgressIndicatorUtils.yieldToPendingWriteActions()
+        ProgressIndicatorUtils.runInReadActionWithWriteActionPriority(fetchRunnable, progressIndicator)
       }
-      @Suppress("UsagesOfObsoleteApi", "DEPRECATION")
-      ProgressIndicatorUtils.runInReadActionWithWriteActionPriority(fetchRunnable, progressIndicator)
+      catch (_: IllegalStateException) {
+        // Happens when danced around with coroutineToIndicator calls
+        if (progressIndicator.isCanceled) {
+          LOG.warn("Got cancelled while trying to start a progress; rethrowing a CancelledException")
+          progressIndicator.checkCanceled()
+        }
+      }
     }
   }
 
@@ -466,15 +482,15 @@ abstract class AbstractGotoSEContributor @ApiStatus.Internal protected construct
     return true
   }
 
-  override fun getDataForItem(element: Any, dataId: String): Any? {
-    if (CommonDataKeys.PSI_ELEMENT.`is`(dataId)) {
+  override fun getDataProviders(): List<BiConsumer<Any, DataSink>> = super.getDataProviders() + BiConsumer { element, sink ->
+    sink.lazy(CommonDataKeys.PSI_ELEMENT) {
       when (element) {
-        is PsiElement -> return element
-        is DataProvider -> return element.getData(dataId)
-        is PsiElementNavigationItem -> return element.targetElement
+        is PsiElement -> element
+        is DataProvider -> element.getData(CommonDataKeys.PSI_ELEMENT.name) as? PsiElement
+        is PsiElementNavigationItem -> element.targetElement
+        else -> null
       }
     }
-    return null
   }
 
   override fun getItemDescription(element: Any): String? {
@@ -491,6 +507,16 @@ abstract class AbstractGotoSEContributor @ApiStatus.Internal protected construct
 
   @Suppress("OVERRIDE_DEPRECATION")
   override fun getElementPriority(element: Any, searchPattern: String): Int = 50
+
+  @ApiStatus.Internal
+  override fun shouldTreatAsACommandQuery(string: String): Boolean {
+    return contributorModules?.any { it.shouldTreatAsACommandQuery(string) != false } ?: false
+  }
+
+  @ApiStatus.Internal
+  override fun shouldTreatAsACommandQueryWithArg(string: String): Boolean {
+    return contributorModules?.any { it.shouldTreatAsACommandQueryWithArg(string) != false } ?: false
+  }
 }
 
 private class MyViewModel(private val myProject: Project, private val myModel: ChooseByNameModel) : ChooseByNameViewModel {

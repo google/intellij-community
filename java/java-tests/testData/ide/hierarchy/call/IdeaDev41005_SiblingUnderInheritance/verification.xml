@@ -1,4 +1,4 @@
-<node text="D.xyzzy()  ()" base="true">
-  <node text="A.main(String[])  ()">
+<node text="xyzzy() (D)" base="true">
+  <node text="main(String[]) (A)">
   </node>
 </node>

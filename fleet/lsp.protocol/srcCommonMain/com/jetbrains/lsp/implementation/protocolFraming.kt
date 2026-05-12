@@ -17,7 +17,7 @@ import kotlinx.serialization.json.JsonElement
 
 suspend fun withBaseProtocolFraming(
   connection: LspConnection,
-  exitSignal: CompletableDeferred<Unit>?,
+  exitSignal: CompletableDeferred<Unit>? = null,
   body: suspend CoroutineScope.(
     incoming: ReceiveChannel<JsonElement>,
     outgoing: SendChannel<JsonElement>,
@@ -104,7 +104,6 @@ private suspend fun ByteWriter.writeFrame(jsonElement: JsonElement): Boolean {
     // protocol requires string length in bytes
     val contentLengthInBytes = str.encodeToByteArrayUtf8().size
     append("Content-Length: $contentLengthInBytes\r\n")
-    append("Content-Type: application/json-rpc; charset=utf-8\r\n")
     append("\r\n")
     append(str)
   }

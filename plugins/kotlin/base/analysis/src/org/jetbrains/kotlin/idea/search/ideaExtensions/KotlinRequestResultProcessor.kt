@@ -10,6 +10,7 @@ import com.intellij.psi.ReferenceRange
 import com.intellij.psi.search.RequestResultProcessor
 import com.intellij.util.Processor
 import org.jetbrains.kotlin.asJava.unwrapped
+import org.jetbrains.kotlin.idea.base.psi.isNameBased
 import org.jetbrains.kotlin.idea.references.KtDestructuringDeclarationReference
 import org.jetbrains.kotlin.idea.search.KotlinSearchUsagesSupport.SearchUtils.isCallableOverrideUsage
 import org.jetbrains.kotlin.idea.search.KotlinSearchUsagesSupport.SearchUtils.isExtensionOfDeclarationClassUsage
@@ -17,6 +18,7 @@ import org.jetbrains.kotlin.idea.search.KotlinSearchUsagesSupport.SearchUtils.is
 import org.jetbrains.kotlin.idea.search.KotlinSearchUsagesSupport.SearchUtils.isUsageInContainingDeclaration
 import org.jetbrains.kotlin.idea.search.KotlinSearchUsagesSupport.SearchUtils.isUsageOfActual
 import org.jetbrains.kotlin.psi.KtDestructuringDeclaration
+import org.jetbrains.kotlin.psi.KtDestructuringDeclarationEntry
 import org.jetbrains.kotlin.psi.KtFunction
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
 
@@ -53,7 +55,14 @@ class KotlinRequestResultProcessor(
         if (isReferenceTo(element)) {
             return true
         }
-        if (resolve()?.unwrapped == element.originalElement) {
+        val unwrapped = resolve()?.unwrapped
+        if (unwrapped == element.originalElement) {
+            return true
+        }
+
+        if (unwrapped is KtDestructuringDeclarationEntry &&
+            unwrapped.initializer == null && unwrapped.isNameBased() &&
+            unwrapped.reference?.isReferenceTo(element) == true) {
             return true
         }
 

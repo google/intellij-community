@@ -7,12 +7,12 @@ import com.intellij.polySymbols.PolySymbolKind
 import com.intellij.polySymbols.PolySymbolModifier
 import com.intellij.polySymbols.completion.PolySymbolCodeCompletionItem
 import com.intellij.polySymbols.impl.canUnwrapSymbols
-import com.intellij.polySymbols.patterns.ComplexPatternOptions
 import com.intellij.polySymbols.patterns.PolySymbolPattern
 import com.intellij.polySymbols.patterns.impl.CompletionAutoPopupPattern
 import com.intellij.polySymbols.patterns.impl.CompletionParameters
 import com.intellij.polySymbols.patterns.impl.ComplexPattern
 import com.intellij.polySymbols.patterns.impl.ComplexPatternConfigProvider
+import com.intellij.polySymbols.patterns.impl.ComplexPatternOptions
 import com.intellij.polySymbols.patterns.impl.ListParameters
 import com.intellij.polySymbols.patterns.impl.MatchParameters
 import com.intellij.polySymbols.patterns.impl.RegExpPattern
@@ -128,7 +128,15 @@ private class WebTypesComplexPatternConfigProvider(
     val unique = pattern.unique != false
 
     val symbolsResolver = createSymbolsResolver(delegate)
-    return ComplexPatternOptions(delegate, apiStatus, isRequired, priority, repeats, unique, symbolsResolver)
+    return ComplexPatternOptions(
+      additionalScope = delegate?.queryScope ?: emptyList(),
+      apiStatus = apiStatus,
+      isRequired = isRequired,
+      priority = priority,
+      repeats = repeats,
+      unique = unique,
+      symbolsResolver = symbolsResolver,
+    )
   }
 
   private fun createSymbolsResolver(delegate: PolySymbol?) =

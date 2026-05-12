@@ -5,9 +5,13 @@ import com.intellij.python.pyproject.model.api.ModelRebuiltListener
 import com.intellij.util.messages.Topic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.VisibleForTesting
 
 @Topic.ProjectLevel
-internal val MODEL_REBUILD: Topic<ModelRebuiltListener> = Topic(ModelRebuiltListener::class.java, Topic.BroadcastDirection.NONE)
+@VisibleForTesting
+@get:ApiStatus.Internal
+val MODEL_REBUILD: Topic<ModelRebuiltListener> = Topic(ModelRebuiltListener::class.java, Topic.BroadcastDirection.NONE)
 
 
 /**

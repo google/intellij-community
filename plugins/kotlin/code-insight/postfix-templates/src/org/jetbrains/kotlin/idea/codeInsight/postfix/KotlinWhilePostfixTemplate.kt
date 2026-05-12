@@ -15,4 +15,5 @@ internal class KotlinWhilePostfixTemplate : StringBasedPostfixTemplate {
 
     override fun getTemplateString(element: PsiElement): String = "while(\$expr$) {\n\$END$\n}"
     override fun getElementToRemove(expr: PsiElement): PsiElement = expr
+    override fun isApplicableForModCommand(): Boolean = true
 }

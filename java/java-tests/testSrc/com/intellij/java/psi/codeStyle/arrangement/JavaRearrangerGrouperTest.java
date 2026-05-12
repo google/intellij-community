@@ -1,8 +1,9 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.java.psi.codeStyle.arrangement;
 
 import com.intellij.psi.codeStyle.arrangement.group.ArrangementGroupingRule;
 import com.intellij.psi.codeStyle.arrangement.std.StdArrangementTokens;
+import org.intellij.lang.annotations.Language;
 
 import java.util.List;
 
@@ -92,6 +93,7 @@ public class JavaRearrangerGrouperTest extends AbstractJavaRearrangerTest {
   }
 
   public void test_overridden_methods() {
+    //noinspection override,RedundantMethodOverride
     doTest("""
              class Base {
                void base1() {}
@@ -118,6 +120,7 @@ public class JavaRearrangerGrouperTest extends AbstractJavaRearrangerTest {
   }
 
   public void test_overridden_methods_with_class() {
+    //noinspection RedundantMethodOverride
     doTest("""
              class C {
                  public void overridden() {}
@@ -125,17 +128,17 @@ public class JavaRearrangerGrouperTest extends AbstractJavaRearrangerTest {
              }
 
              class A {
-                \s
+
                  static class X1 extends C {
                      @Override
                      public void overridden() {}
                      @Override
                      public void foo() {}
                  }
-                \s
+
                  static class X2 extends C {
                      static class X3 {}
-                    \s
+
                      @Override
                      public void overridden() {}
                  }
@@ -147,27 +150,27 @@ public class JavaRearrangerGrouperTest extends AbstractJavaRearrangerTest {
              }
 
              class A {
-                \s
+
                  static class X1 extends C {
                      @Override
                      public void overridden() {}
                      @Override
                      public void foo() {}
                  }
-                \s
+
                  static class X2 extends C {
                      @Override
                      public void overridden() {}
-                    \s
+
                      static class X3 {}
                  }
              }
-             """, List.of(rule(StdArrangementTokens.EntryType.METHOD),
-                          rule(StdArrangementTokens.EntryType.CLASS)),
+             """, List.of(rule(StdArrangementTokens.EntryType.METHOD), rule(StdArrangementTokens.EntryType.CLASS)),
            List.of(group(OVERRIDDEN_METHODS)));
   }
 
   public void do_not_test_overriden_and_utility_methods() {
+    //noinspection override
     doTest("""
              class Base {
                void base1() {}
@@ -198,8 +201,8 @@ public class JavaRearrangerGrouperTest extends AbstractJavaRearrangerTest {
   }
 
   public void test_that_calls_from_anonymous_class_create_a_dependency() {
+    //noinspection Convert2Lambda,override,TrivialFunctionalExpressionUsage
     doTest("""
-
              class Test {
                void test2() {}
                void test1() { test2(); }
@@ -211,7 +214,6 @@ public class JavaRearrangerGrouperTest extends AbstractJavaRearrangerTest {
                  }.run();
                }
              }""", """
-
              class Test {
                void root() {
                  new Runnable() {
@@ -229,7 +231,7 @@ public class JavaRearrangerGrouperTest extends AbstractJavaRearrangerTest {
   public void test_keep_dependent_methods_together_multiple_times_produce_same_result() {
     List<ArrangementGroupingRule> groups =
       List.of(group(DEPENDENT_METHODS, BREADTH_FIRST));
-    String before = """
+    @Language("JAVA") String before = """
       public class SuperClass {
 
           public void doSmth1() {
@@ -251,7 +253,7 @@ public class JavaRearrangerGrouperTest extends AbstractJavaRearrangerTest {
               this.doSmth4();
           }
       }""";
-    String after = """
+    @Language("JAVA") String after = """
       public class SuperClass {
 
           public void doSmth() {
@@ -275,7 +277,6 @@ public class JavaRearrangerGrouperTest extends AbstractJavaRearrangerTest {
 
   public void test_dependent_methods_DFS() {
     doTest("""
-
              public class Q {
 
                  void E() {
@@ -307,7 +308,6 @@ public class JavaRearrangerGrouperTest extends AbstractJavaRearrangerTest {
 
              }
              """, """
-
              public class Q {
 
                  void A() {
@@ -335,9 +335,76 @@ public class JavaRearrangerGrouperTest extends AbstractJavaRearrangerTest {
              """, List.of(), List.of(group(DEPENDENT_METHODS, DEPTH_FIRST)));
   }
 
+  public void test_dependent_methods_DFS2() {
+    // IDEA-149524
+    doTest("""
+             public class StepdownRule {
+                 private void nestedPrivateMethod() {}
+             
+                 private void secondPrivateMethod() {}
+             
+                 private void firstPrivateMethod() {
+                     nestedPrivateMethod();
+                 }
+             
+                 public void publicMethod() {
+                     firstPrivateMethod();
+                     secondPrivateMethod();
+                 }
+             }""",
+           """
+             public class StepdownRule {
+                 public void publicMethod() {
+                     firstPrivateMethod();
+                     secondPrivateMethod();
+                 }
+                 private void firstPrivateMethod() {
+                     nestedPrivateMethod();
+                 }
+                 private void nestedPrivateMethod() {}
+                 private void secondPrivateMethod() {}
+             }""", List.of(), List.of(group(DEPENDENT_METHODS, DEPTH_FIRST)));
+  }
+
+  public void test_dependent_methods_DFS3() {
+    // IDEA-166524
+    doTest("""
+             public class Sample {
+             
+                  public Sample() {
+                      firstLevel1();
+                      firstLevel2();
+                  }
+             
+                  private void firstLevel2() {
+                  }
+             
+                  private void firstLevel1() {
+                      secondLevel1();
+                  }
+             
+                  private void secondLevel1() {
+                  }
+              }""",
+           """
+             public class Sample {
+             
+                  public Sample() {
+                      firstLevel1();
+                      firstLevel2();
+                  }
+                  private void firstLevel1() {
+                      secondLevel1();
+                  }
+                  private void secondLevel1() {
+                  }
+                  private void firstLevel2() {
+                  }
+              }""", List.of(), List.of(group(DEPENDENT_METHODS, DEPTH_FIRST)));
+  }
+
   public void test_dependent_methods_BFS() {
     doTest("""
-
              public class Q {
 
                  void E() {
@@ -369,7 +436,6 @@ public class JavaRearrangerGrouperTest extends AbstractJavaRearrangerTest {
 
              }
              """, """
-
              public class Q {
 
                  void A() {
@@ -398,8 +464,8 @@ public class JavaRearrangerGrouperTest extends AbstractJavaRearrangerTest {
   }
 
   public void test_method_references_dependant_methods() {
+    //noinspection RedundantOperationOnEmptyContainer,MappingBeforeCount,ResultOfMethodCallIgnored,MethodMayBeStatic
     doTest("""
-
              import java.util.ArrayList;
 
              public class Test {
@@ -423,7 +489,6 @@ public class JavaRearrangerGrouperTest extends AbstractJavaRearrangerTest {
                  }
              }
              """, """
-
              import java.util.ArrayList;
 
              public class Test {

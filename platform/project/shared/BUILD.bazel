@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.project` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "project_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "project",
   module_name = "intellij.platform.project",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":project_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//libraries/kotlinx/serialization/core",
@@ -23,11 +18,13 @@ jvm_library(
     "//platform/util/coroutines",
     "//platform/core-api:core",
     "//platform/platform-impl/rpc",
+    "//fleet/rhizomedb",
   ]
 )
 
 jvm_library(
   name = "project_test_lib",
+  testonly = True,
   module_name = "intellij.platform.project",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -41,6 +38,13 @@ jvm_library(
     "//platform/util/coroutines:coroutines_test_lib",
     "//platform/core-api:core_test_lib",
     "//platform/platform-impl/rpc:rpc_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.project` end
+
+### auto-generated section `iml intellij.platform.project` start
+exports_files([
+  "intellij.platform.project.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.project` end

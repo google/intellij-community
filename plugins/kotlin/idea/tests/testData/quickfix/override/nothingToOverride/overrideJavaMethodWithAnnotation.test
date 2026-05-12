@@ -1,5 +1,5 @@
 // FILE: test.before.kt
-// "Change function signature to 'fun foo(a: String, b: String?, c: String?)'" "true"
+// "Change function signature to 'fun foo(a: String, b: String?, c: String)'" "true"
 // ERROR: 'foo' overrides nothing
 package foo
 
@@ -28,11 +28,11 @@ public @interface JavaAnnotation {
 }
 
 // FILE: test.after.kt
-// "Change function signature to 'fun foo(a: String, b: String?, c: String?)'" "true"
+// "Change function signature to 'fun foo(a: String, b: String?, c: String)'" "true"
 // ERROR: 'foo' overrides nothing
 package foo
 
 class KotlinClass : JavaClass() {
-    <caret>override fun foo(a: String, b: String?, @JavaAnnotation c: String?) {
+    <caret>override fun foo(a: String, b: String?, c: String) {
     }
 }

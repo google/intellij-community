@@ -13,7 +13,6 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import org.jetbrains.intellij.build.productLayout.LIB_MODULE_PREFIX
 import org.jetbrains.intellij.build.productLayout.config.SuppressionConfig
 import org.jetbrains.intellij.build.productLayout.dependency.PluginContentProvider
 import org.jetbrains.intellij.build.productLayout.deps.PluginDependencyPlan
@@ -61,15 +60,17 @@ internal object PluginDependencyPlanner : PipelineNode {
       val pluginContentCache = model.pluginContentCache
       val suppressionConfig = model.suppressionConfig
       val updateSuppressions = model.updateSuppressions
+      val allRealProductNames = embeddedCheckProductNames(model.discovery.products.map { it.name })
 
       // Process all real plugins in the graph (main target present).
       // DSL-defined plugins are generated from Kotlin specs and skipped here.
       val tasks = ArrayList<Deferred<PluginDependencyPlan?>>()
-      val pluginGraphDeps = collectPluginGraphDeps(graph, model.config.libraryModuleFilter)
+      val pluginGraphDeps = collectPluginGraphDeps(graph = graph, allRealProductNames = allRealProductNames)
       for (graphDeps in pluginGraphDeps) {
         if (graphDeps.isDslDefined) continue
         tasks.add(async {
           buildPluginDependencyPlan(
+            graph = graph,
             graphDeps = graphDeps,
             pluginContentCache = pluginContentCache,
             suppressionConfig = suppressionConfig,
@@ -97,7 +98,10 @@ internal data class PluginGraphDeps(
   @JvmField val duplicateDeclarationPluginIds: Set<PluginId>,
 )
 
-internal fun collectPluginGraphDeps(graph: PluginGraph, libraryModuleFilter: (String) -> Boolean): List<PluginGraphDeps> {
+internal fun collectPluginGraphDeps(
+  graph: PluginGraph,
+  allRealProductNames: Set<String>,
+): List<PluginGraphDeps> {
   val results = ArrayList<PluginGraphDeps>()
   graph.query {
     plugins { plugin ->
@@ -112,6 +116,7 @@ internal fun collectPluginGraphDeps(graph: PluginGraph, libraryModuleFilter: (St
       val legacyConfigFilePluginDeps = LinkedHashSet<PluginId>()
       val filteredModuleDeps = LinkedHashSet<ContentModuleName>()
       val duplicateDeclarations = LinkedHashSet<PluginId>()
+      val embeddedCheckProductNames = embeddedCheckProductsForPlugin(plugin.id, allRealProductNames)
 
       plugin.mainTarget { target ->
         hasMainTarget = true
@@ -119,16 +124,12 @@ internal fun collectPluginGraphDeps(graph: PluginGraph, libraryModuleFilter: (St
           if (!dep.isProduction()) return@dependsOn
           when (val classification = classifyTarget(dep.targetId)) {
             is DependencyClassification.ModuleDep -> {
-              if (classification.moduleName.value.startsWith(LIB_MODULE_PREFIX) && !libraryModuleFilter(classification.moduleName.value)) {
-                filteredModuleDeps.add(classification.moduleName)
-                return@dependsOn
-              }
               if (classification.moduleName in contentModules) {
                 filteredModuleDeps.add(classification.moduleName)
                 return@dependsOn
               }
-              val depModuleId = contentModule(classification.moduleName)?.id ?: -1
-              if (depModuleId >= 0 && shouldSkipEmbeddedPluginDependency(depModuleId)) {
+              val depModuleId = contentModule(classification.moduleName)
+              if (depModuleId != null && shouldSkipEmbeddedPluginDependency(depModuleId, embeddedCheckProductNames)) {
                 filteredModuleDeps.add(classification.moduleName)
                 return@dependsOn
               }
@@ -189,6 +190,7 @@ internal data class FilteredDependencies(
  * Also migrates legacy `<depends>` entries (v1 format) to `<plugin id="..."/>` (v2 format).
  */
 private suspend fun buildPluginDependencyPlan(
+  graph: PluginGraph,
   graphDeps: PluginGraphDeps,
   pluginContentCache: PluginContentProvider,
   suppressionConfig: SuppressionConfig,
@@ -210,36 +212,38 @@ private suspend fun buildPluginDependencyPlan(
 
   val existingXmlModuleDeps = info.moduleDependencies
   val existingXmlPluginDeps: Set<PluginId> = info.depsByFile.firstOrNull()?.pluginDependencies ?: emptySet()
+  val mainDependencyEntries = extractDependenciesEntries(info.pluginXmlContent)
+  val managedXmlModuleDeps = mainDependencyEntries?.managedModuleNames?.mapTo(HashSet(), ::ContentModuleName) ?: existingXmlModuleDeps
+  val managedXmlPluginDeps = mainDependencyEntries?.managedPluginIds?.mapTo(HashSet(), ::PluginId) ?: existingXmlPluginDeps
   val effectiveJpsPluginDependencies = graphDeps.jpsPluginDependencies - graphDeps.legacyConfigFilePluginDependencies
   val suppressedModules = suppressionConfig.getPluginSuppressedModules(pluginContentModuleName)
   val suppressedPlugins = suppressionConfig.getPluginSuppressedPlugins(pluginContentModuleName)
-  val effectiveSuppressedModules = if (updateSuppressions) {
-    val missingModulesInXml = graphDeps.jpsModuleDependencies.filterNotTo(LinkedHashSet()) { it in existingXmlModuleDeps }
-    val xmlOnlyModules = existingXmlModuleDeps.filterNotTo(LinkedHashSet()) { it in graphDeps.jpsModuleDependencies }
-    suppressedModules + missingModulesInXml + xmlOnlyModules
-  }
-  else {
-    suppressedModules
-  }
-  val effectiveSuppressedPlugins = if (updateSuppressions) {
-    val missingPluginsInXml = effectiveJpsPluginDependencies.filterNotTo(LinkedHashSet()) { it in existingXmlPluginDeps }
-    val xmlOnlyPlugins = existingXmlPluginDeps.filterNotTo(LinkedHashSet()) { it in effectiveJpsPluginDependencies }
-    suppressedPlugins + missingPluginsInXml + xmlOnlyPlugins
-  }
-  else {
-    suppressedPlugins
-  }
+  val moduleHandling = computeExistingDependencyHandling(
+    updateSuppressions = updateSuppressions,
+    existingXmlDeps = existingXmlModuleDeps,
+    jpsDeps = graphDeps.jpsModuleDependencies,
+    suppressedDeps = suppressedModules,
+    xmlOnlySuppressionCandidateDeps = managedXmlModuleDeps,
+  )
+  val pluginHandling = computeExistingDependencyHandling(
+    updateSuppressions = updateSuppressions,
+    existingXmlDeps = existingXmlPluginDeps,
+    jpsDeps = effectiveJpsPluginDependencies,
+    suppressedDeps = suppressedPlugins,
+    semanticallyPreservedExistingDeps = computeAliasPreservedPluginDeps(graph, existingXmlPluginDeps),
+    xmlOnlySuppressionCandidateDeps = managedXmlPluginDeps,
+  )
 
   val deps = filterPluginDependencies(
     graphDeps = graphDeps,
     pluginInfo = info,
     jpsPluginDependencies = effectiveJpsPluginDependencies,
-    suppressedModules = effectiveSuppressedModules,
-    suppressedPlugins = effectiveSuppressedPlugins,
+    suppressedModules = moduleHandling.effectiveSuppressedDeps,
+    suppressedPlugins = pluginHandling.effectiveSuppressedDeps,
   )
 
-  // Remove duplicate legacy <depends> only when modern deps are present or we are generating a <dependencies> section.
-  val hasDependenciesSection = extractDependenciesEntries(info.pluginXmlContent) != null
+  // Remove duplicate legacy <depends> only when modern deps are present, or we are generating a <dependencies> section.
+  val hasDependenciesSection = mainDependencyEntries != null
   val hasModernDepsInXIncludes = info.depsByFile.drop(1).any { it.pluginDependencies.isNotEmpty() || it.moduleDependencies.isNotEmpty() }
   val legacyPluginIds = info.legacyDepends.map { it.pluginId.value }.sorted()
   val autoPluginIds = deps.pluginDependencies.map { it.value }.sorted()
@@ -265,8 +269,8 @@ private suspend fun buildPluginDependencyPlan(
   val xiIncludePluginDeps = info.depsByFile.drop(1).flatMapTo(HashSet()) { it.pluginDependencies }
 
   // Compute deps to preserve during XML update
-  val preserveExistingModuleDeps = existingXmlModuleDeps.filterTo(LinkedHashSet()) { it in effectiveSuppressedModules }
-  val preserveExistingPluginDeps = existingXmlPluginDeps.filterTo(LinkedHashSet()) { it in effectiveSuppressedPlugins }
+  val preserveExistingModuleDeps = moduleHandling.preserveExistingDeps
+  val preserveExistingPluginDeps = pluginHandling.preserveExistingDeps
   val effectiveLegacyDepends = info.legacyDepends.filterNot { it.pluginId in legacyMigration.removedLegacyPluginIds }
 
   return PluginDependencyPlan(

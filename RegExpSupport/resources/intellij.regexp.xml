@@ -1,4 +1,24 @@
 <idea-plugin visibility="public">
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+  <dependencies>
+    <module name="intellij.libraries.fastutil"/>
+    <module name="intellij.libraries.kotlinx.collections.immutable"/>
+    <module name="intellij.platform.analysis"/>
+    <module name="intellij.platform.analysis.impl"/>
+    <module name="intellij.platform.core"/>
+    <module name="intellij.platform.core.impl"/>
+    <module name="intellij.platform.core.ui"/>
+    <module name="intellij.platform.editor.ui"/>
+    <module name="intellij.platform.ide.core"/>
+    <module name="intellij.platform.ide.impl"/>
+    <module name="intellij.platform.indexing"/>
+    <module name="intellij.platform.lang"/>
+    <module name="intellij.platform.lang.impl"/>
+    <module name="intellij.platform.projectModel.impl"/>
+    <module name="intellij.platform.util.ui"/>
+    <module name="intellij.xml.psi"/>
+  </dependencies>
+  <!-- endregion -->
   <module value="com.intellij.modules.regexp"/>
 
   <extensionPoints>
@@ -46,6 +66,14 @@
       <bundleName>messages.RegExpBundle</bundleName>
       <categoryKey>inspection.group.name.regexp</categoryKey>
     </intentionAction>
+    <intentionAction>
+      <language>RegExp</language>
+      <className>org.intellij.lang.regexp.intention.ExplainRegExpIntention</className>
+      <bundleName>messages.RegExpBundle</bundleName>
+      <categoryKey>inspection.group.name.regexp</categoryKey>
+    </intentionAction>
+    <registryKey key="explain.regexp.intention.enable.info.links" defaultValue="true"
+                 description="Enable links to https://www.regular-expressions.info/"/>
 
     <inspection.basicVisitor class="org.intellij.lang.regexp.psi.RegExpElementVisitor"/>
 

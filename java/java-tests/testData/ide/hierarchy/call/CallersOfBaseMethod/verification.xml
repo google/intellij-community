@@ -1,4 +1,4 @@
-<node text="BaseClass.method()  (p)" base="true">
-  <node text="SubClassA.otherMethod()  (p)"/>
-  <node text="SubClassB.otherMethod()  (p)"/>
+<node text="method() (p.BaseClass)" base="true">
+  <node text="otherMethod() (p.SubClassA)"/>
+  <node text="otherMethod() (p.SubClassB)"/>
 </node>

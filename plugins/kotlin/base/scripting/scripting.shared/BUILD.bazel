@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.kotlin.base.scripting.shared` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "scripting.shared_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "scripting.shared",
   module_name = "intellij.kotlin.base.scripting.shared",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":scripting.shared_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlinc-kotlin-compiler-common",
     "@lib//:kotlinc-kotlin-script-runtime",
@@ -21,6 +16,7 @@ jvm_library(
     "@lib//:kotlinc-kotlin-scripting-jvm",
     "@lib//:kotlinc-kotlin-scripting-compiler-impl",
     "//platform/core-api:core",
+    "//platform/core-impl",
     "@lib//:kotlin-stdlib",
     "//plugins/kotlin/base/facet",
     "//platform/util",
@@ -50,6 +46,7 @@ jvm_library(
 
 jvm_library(
   name = "scripting.shared_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.base.scripting.shared",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -57,6 +54,7 @@ jvm_library(
     ":scripting.shared",
     "//platform/projectModel-api:projectModel_test_lib",
     "//platform/core-api:core_test_lib",
+    "//platform/core-impl:core-impl_test_lib",
     "//plugins/kotlin/base/facet:facet_test_lib",
     "//platform/util:util_test_lib",
     "//platform/lang-impl:lang-impl_test_lib",
@@ -82,3 +80,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.kotlin.base.scripting.shared` end
+
+### auto-generated section `iml intellij.kotlin.base.scripting.shared` start
+exports_files([
+  "intellij.kotlin.base.scripting.shared.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.base.scripting.shared` end

@@ -13,8 +13,8 @@ import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileSystem;
+import com.intellij.openapi.vfs.impl.SymlinksCapableFileSystem;
 import com.intellij.openapi.vfs.impl.ZipHandlerBase;
-import com.intellij.openapi.vfs.impl.local.LocalFileSystemImpl;
 import com.intellij.openapi.vfs.newvfs.AttributeInputStream;
 import com.intellij.openapi.vfs.newvfs.AttributeOutputStream;
 import com.intellij.openapi.vfs.newvfs.ChildInfoImpl;
@@ -27,6 +27,7 @@ import com.intellij.openapi.vfs.newvfs.persistent.namecache.FileNameCache;
 import com.intellij.openapi.vfs.newvfs.persistent.namecache.MRUFileNameCache;
 import com.intellij.openapi.vfs.newvfs.persistent.namecache.SLRUFileNameCache;
 import com.intellij.openapi.vfs.newvfs.persistent.recovery.VFSInitializationResult;
+import com.intellij.platform.util.io.storages.appendonlylog.InvalidRecordIdException;
 import com.intellij.serviceContainer.AlreadyDisposedException;
 import com.intellij.util.BitUtil;
 import com.intellij.util.ExceptionUtil;
@@ -161,7 +162,7 @@ public final class FSRecordsImpl implements Closeable {
     ExceptionUtil.rethrow(error);
   };
 
-  public static final ErrorHandler ON_ERROR_RETHROW = (__, error) -> {
+  public static final ErrorHandler ON_ERROR_RETHROW = (_, error) -> {
     ExceptionUtil.rethrow(error);
   };
 
@@ -1097,9 +1098,9 @@ public final class FSRecordsImpl implements Closeable {
 
       CharSequence name = info.getName();
       VirtualFileSystem fs = parent.getFileSystem();
-      if (fs instanceof LocalFileSystemImpl) {
+      if (fs instanceof SymlinksCapableFileSystem scfs && scfs.isSymlinksSupported()) {
         String linkPath = parent.getPath() + '/' + name;
-        ((LocalFileSystemImpl)fs).symlinkUpdated(id, parent, name, linkPath, symlinkTarget);
+        scfs.symlinkUpdated(id, parent, name, linkPath, symlinkTarget);
       }
     }
   }
@@ -1544,41 +1545,49 @@ public final class FSRecordsImpl implements Closeable {
   @VisibleForTesting
   public @NotNull AttributeOutputStream writeAttribute(int fileId, @NotNull FileAttribute attribute) {
     StampedLock lock = fileRecordLock.lockFor(fileId);
-    long lockStamp = lock.writeLock();
-    try {
-      AttributeOutputStream stream = attributeAccessor.writeAttribute(fileId, attribute);
-      //AttributeOutputStream is byte[]-backed stream that commits the changes in .close() method
-      // Create a delegating stream: overwrite .close() and protect it with a write lock:
-      return new AttributeOutputStream(stream) {
-        @Override
-        public void writeEnumeratedString(String str) throws IOException {
-          stream.writeEnumeratedString(str);
-        }
 
-        @Override
-        public void close() throws IOException {
-          long lockStamp = lock.writeLock();
-          try {
-            super.close();
-          }
-          catch (FileTooBigException e) {
-            LOG.warn("Error storing " + attribute + " of file(" + fileId + ")", e);
-            //don't mark VFS as corrupted, error is due to data supplied from outside
-            throw e;
-          }
-          catch (Throwable t) {
-            LOG.warn("Error storing " + attribute + " of file(" + fileId + ")", t);
-            throw handleError(t);
-          }
-          finally {
-            lock.unlockWrite(lockStamp);
-          }
-        }
-      };
+    long lockStamp = lock.writeLock();
+    AttributeOutputStream stream;
+    try {
+      stream = attributeAccessor.writeAttribute(fileId, attribute);
     }
     finally {
       lock.unlockWrite(lockStamp);
     }
+
+    //AttributeOutputStream is byte[]-backed stream that commits the changes in .close() method
+    // Return a delegating stream: with overridden .close() protected with the write lock, and
+    // additional error-processing:
+    return new AttributeOutputStream(stream) {
+      @Override
+      public void writeEnumeratedString(String str) throws IOException {
+        stream.writeEnumeratedString(str);
+      }
+
+      @Override
+      public void close() throws IOException {
+        long lockStamp = lock.writeLock();
+        try {
+          super.close();
+        }
+        catch (FileTooBigException e) {
+          LOG.warn("Error storing " + attribute + " of file(#" + fileId + ", name: " + getName(fileId) + "): " +
+                   "attribute.size=" + getWrittenBytesCount() + " is too big", e);
+          //don't mark VFS as corrupted: this error is due to data supplied from outside (add few bits of diagnostic
+          // data)
+          throw new FileTooBigException("Error storing " + attribute + " of file(#" + fileId + ", name: " + getName(fileId) + "): " +
+                                        "attribute.size=" + getWrittenBytesCount() + " is too big", e);
+        }
+        catch (Throwable t) {
+          LOG.warn("Error storing " + attribute + " of file(#" + fileId + ", name: " + getName(fileId) + "): " +
+                   "attribute.size=" + getWrittenBytesCount(), t);
+          throw handleError(t);
+        }
+        finally {
+          lock.unlockWrite(lockStamp);
+        }
+      }
+    };
   }
 
   //'raw' (lambda + ByteBuffer instead of Input/OutputStream) attributes access: experimental
@@ -1627,8 +1636,13 @@ public final class FSRecordsImpl implements Closeable {
     try {
       return contentAccessor.readContent(fileId);
     }
+    catch (InvalidRecordIdException e) {
+      //MAYBE RC: should we call handleError() to mark VFS corrupted here?
+      throw new RuntimeException(e.getMessage() + " {" + connection.describeConsistencyStatus() + "}", e);
+    }
     catch (InterruptedIOException ie) {
-      //RC: goal is to just bypass handleError(), which likely marks VFS corrupted,
+      //TODO RC: do we still need these branch? Current VFSContentStorage impl never throws InterruptedIOException!
+      //RC: goal is to avoid handleError(): handleError() likely marks VFS corrupted,
       //    but thread interruption during _read_ doesn't corrupt anything
       throw new RuntimeException(ie);
     }
@@ -1636,6 +1650,8 @@ public final class FSRecordsImpl implements Closeable {
       throw oom;
     }
     catch (ZipException e) {
+      //TODO RC: do we still need these branch? Currently VFSContentStorage impl uses LZ4 instead of java.util.zip
+
       // we use zip to compress content
       String fileName = getName(fileId);
       long length = getLength(fileId);
@@ -1653,8 +1669,13 @@ public final class FSRecordsImpl implements Closeable {
     try {
       return contentAccessor.readContentByContentId(contentId);
     }
+    catch (InvalidRecordIdException e) {
+      //MAYBE RC: should we call handleError() to mark VFS corrupted here?
+      throw new RuntimeException(e.getMessage() + " {" + connection.describeConsistencyStatus() + "}", e);
+    }
     catch (InterruptedIOException ie) {
-      //RC: goal is to just not go into handleError(), which likely marks VFS corrupted,
+      //TODO RC: do we still need these branch? Current VFSContentStorage impl never throws InterruptedIOException!
+      //RC: goal is to avoid handleError(): handleError() likely marks VFS corrupted,
       //    but thread interruption during _read_ doesn't corrupt anything
       throw new RuntimeException(ie);
     }

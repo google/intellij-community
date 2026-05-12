@@ -48,5 +48,6 @@
 
     <registryKey key="git.enable.working.trees.feature" defaultValue="true" restartRequired="true"
                  description="Enables the 'Working Trees' feature, see https://youtrack.jetbrains.com/issue/IJPL-204771"/>
+    <projectSettings service="com.intellij.vcs.git.branch.popup.GitBranchesPopupTreeStateHolder"/>
   </extensions>
 </idea-plugin>

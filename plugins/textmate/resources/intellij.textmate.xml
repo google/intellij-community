@@ -46,5 +46,7 @@
     <!--<applicationSettings service="org.jetbrains.plugins.textmate.configuration.TextMateUserBundlesSettings"/>-->
     <!--<rdct.remoteSettingProvider-->
     <!--  implementation="org.jetbrains.plugins.textmate.configuration.TextMateUserBundlesSettingsRemoteInfoProvider"/>-->
+    <applicationSettings service="org.jetbrains.plugins.textmate.configuration.TextMateUserBundlesSettings"/>
+    <applicationSettings service="org.jetbrains.plugins.textmate.configuration.TextMateBuiltinBundlesSettings"/>
   </extensions>
 </idea-plugin>

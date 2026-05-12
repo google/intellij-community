@@ -1,6 +1,7 @@
 // HIGHLIGHT: GENERIC_ERROR_OR_WARNING
 fun foo(): Boolean {
-    return !someComplexCondition() // comment explaining the `false` case
+    return someComplexCondition() && someOtherCondition() // comment explaining the computed `true` case
 }
 
 fun someComplexCondition(): Boolean = true
+fun someOtherCondition(): Boolean = true

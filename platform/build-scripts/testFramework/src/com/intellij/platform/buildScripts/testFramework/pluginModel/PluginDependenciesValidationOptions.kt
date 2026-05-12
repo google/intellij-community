@@ -6,28 +6,51 @@ import com.intellij.openapi.extensions.PluginId
 /**
  * Options for [PluginDependenciesValidator].
  */
-class PluginDependenciesValidationOptions(
+data class PluginDependenciesValidationOptions(
   /**
-   * List of a module name and a name of a missing dependency in this module which shouldn't be reported by the validator.
-   * This can be used to temporarily suppress some errors while they are being fixed in plugins or while a false-positive is being fixed in the validator. 
+   * List of dependencies to temporarily ignore during validation.
+   * Each entry suppresses the check that [MissingCompileDep.toModule] is reachable from
+   * [MissingCompileDep.fromModule]'s classloader at runtime.
+   * Wildcards are supported: `*` matches any name; a trailing `*` matches any suffix.
+   *
+   * **This list is a temporary solution.** Every entry MUST reference a YouTrack issue via [MissingCompileDep.issueId].
+   * The team is working on auto-generating XML descriptor dependencies from `.iml` files; each item
+   * here represents tracked debt that must be resolved before that migration is complete.
    */
-  val missingDependenciesToIgnore: List<Pair<String, String>>,
+  val missingCompileDeps: List<MissingCompileDep> = emptyList(),
 
   /**
-   * Prefixes of plugin loading error messages which shouldn't be reported by the validator.
+   * Stub plugins to temporarily inject into the plugin set to satisfy runtime dependency declarations absent from the distribution.
+   *
+   * Use an empty list to satisfy a `<plugin id="…"/>` dependency.
+   * Use a non-empty list to also satisfy `<module name="…"/>` dependencies.
+   *
+   * **This list is a temporary solution.** Every entry MUST reference a YouTrack issue via [MissingRuntimeDep.issueId].
+   * Use this only when the real plugin is intentionally absent from the distribution and there is
+   * a tracked plan to either include it or remove the dependency.
    */
-  val pluginErrorPrefixesToIgnore: List<String>,
+  val missingRuntimeDeps: List<MissingRuntimeDep> = emptyList(),
 
   /**
    * Relative paths to XML files which are located in libraries and included in plugin descriptors via `<xi:include>`.
    */
-  val pathsIncludedFromLibrariesViaXiInclude: Set<String>,
+  val pathsIncludedFromLibrariesViaXiInclude: Set<String> = emptySet(),
 
   /**
    * Specifies the minimum number of modules which should be checked by the validator.
    * This is used to ensure that the validator won't stop checking many modules due to some mistake in the validation code.
    */
   val minimumNumberOfModulesToBeChecked: Int,
+
+  /**
+   * Set of pairs corresponding to dependencies used for compilation only, the validator will ignore such dependencies if they have 'provided' scope.
+   * The second element of a pair is the name of the target module.
+   * The first element of a pair is either the name of the module that has the dependency, or `*` if dependencies on the target module in all modules should be treated as compile-only.
+   *
+   * It's supposed that elements from the target module are either not referenced from class-files at all, or the source module is used outside the IDE process where these classes
+   * are present in the classpath.
+   */
+  val compileOnlyDependencies: List<Pair<String, String>> = compileOnlyDependenciesInCommunity,
 
   /**
    * Specifies variants of plugins enabled via a system property.
@@ -39,8 +62,9 @@ class PluginDependenciesValidationOptions(
   /**
    * Specifies plugin ids which should be excluded from the validation.
    */
-  val pluginsToIgnore: List<PluginId> = emptyList(),
-)
+  val pluginsToIgnore: Set<String> = emptySet(),
+
+  )
 
 /**
  * Defines a variant of a plugin with a custom value of system property used in `includeUnless`/`includeIf` directives.
@@ -49,4 +73,31 @@ class PluginVariantWithDynamicIncludes(
   val pluginId: PluginId,
   val systemPropertyKey: String,
   val systemPropertyValue: Boolean,
+)
+
+/**
+ * A suppressed missing compile-time dependency. Every instance MUST reference a YouTrack issue.
+ *
+ * @param fromModule the module that has the compile dependency (wildcards `*` supported).
+ * @param toModule the dependency module absent from the distribution (wildcards `*` supported).
+ * @param issueId the YouTrack issue tracking the root cause and the planned fix, e.g. `"IDEA-123456"`.
+ */
+data class MissingCompileDep(
+  val fromModule: String,
+  val toModule: String,
+  val issueId: String,
+)
+
+/**
+ * An injected stub plugin to satisfy a runtime dependency absent from the distribution.
+ * Every instance MUST reference a YouTrack issue.
+ *
+ * @param pluginId the plugin ID of the stub to inject.
+ * @param moduleIds content module IDs hosted by the stub; use an empty list to satisfy only `<plugin id="…"/>` deps.
+ * @param issueId the YouTrack issue tracking the root cause and the planned fix, e.g. `"IDEA-123456"`.
+ */
+data class MissingRuntimeDep(
+  val pluginId: String,
+  val moduleIds: List<String> = emptyList(),
+  val issueId: String,
 )

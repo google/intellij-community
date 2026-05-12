@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build
 
 import com.intellij.util.text.SemVer
@@ -129,6 +129,12 @@ internal object JewelMavenArtifacts {
         "org.jetbrains.compose.components" -> {
           add(dependency.withTransitiveDependencies(DependencyScope.COMPILE))
         }
+        "net.java.dev.jna" -> {
+          // Add it only to Jewel Standalone INT UI modules, as it's unnecessary for other modules
+          if (module.name == "intellij.platform.jewel.intUi.standalone") {
+            add(dependency.withTransitiveDependencies(DependencyScope.COMPILE))
+          }
+        }
 
         // else -> ignore the dependency, as it comes through transitively, usually from Compose.
 
@@ -185,7 +191,7 @@ internal object JewelMavenArtifacts {
 
   fun validate(context: BuildContext, mavenArtifacts: Collection<GeneratedMavenArtifacts>) {
     ALL_MODULES.asSequence()
-      .map(context::findRequiredModule)
+      .map { context.outputProvider.findRequiredModule(it) }
       .flatMap { it.modulesTree() }
       .distinct().forEach { module ->
         val artifact = mavenArtifacts.singleOrNull { (it) -> it.name == module.name }

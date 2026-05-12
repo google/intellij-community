@@ -1,9 +1,9 @@
 package com.intellij.grid.images.impl
 
 import com.intellij.database.datagrid.DataGrid
+import com.intellij.database.datagrid.GridCellRequest
 import com.intellij.database.datagrid.GridColumn
 import com.intellij.database.datagrid.GridRow
-import com.intellij.database.datagrid.ModelIndex
 import com.intellij.database.extractors.ImageInfo
 import com.intellij.database.run.ui.CellViewer
 import com.intellij.database.run.ui.CellViewerFactory
@@ -90,10 +90,9 @@ class ImageCellViewer(private val grid: DataGrid) : CellViewer, CheckedDisposabl
 }
 
 class ImageCellViewerFactory : CellViewerFactory {
-  override fun getSuitability(grid: DataGrid, row: ModelIndex<GridRow>, column: ModelIndex<GridColumn>): Suitability {
-    if (!row.isValid(grid) || !column.isValid(grid)) return Suitability.NONE
-    val value = grid.getDataModel(DataAccessType.DATA_WITH_MUTATIONS).getValueAt(row, column)
-    return if (value is ImageInfo) Suitability.MAX else Suitability.NONE
+  override fun getSuitability(request: GridCellRequest<GridRow, GridColumn>): Suitability {
+    if (!request.isValid()) return Suitability.NONE
+    return if (request.getValue() is ImageInfo) Suitability.MAX else Suitability.NONE
   }
 
   override fun createViewer(grid: DataGrid): CellViewer = ImageCellViewer(grid)

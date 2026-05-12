@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide;
 
 import com.intellij.application.options.CodeStyleAbstractConfigurable;
@@ -99,7 +99,6 @@ public final class JavaLanguageCodeStyleSettingsProvider extends LanguageCodeSty
       consumer.moveStandardOption("SPACE_AFTER_COMMA_IN_TYPE_ARGUMENTS", groupName);
       consumer.showCustomOption(JavaCodeStyleSettings.class, "SPACE_AFTER_CLOSING_ANGLE_BRACKET_IN_TYPE_ARGUMENT",
                                 JavaFrontbackBundle.message("code.style.settings.spacing.after.closing.angle.bracket"), groupName);
-
       groupName = getInstance().SPACES_IN_TYPE_PARAMETERS;
       consumer.showCustomOption(JavaCodeStyleSettings.class, "SPACE_BEFORE_OPENING_ANGLE_BRACKET_IN_TYPE_PARAMETER",
                                 ApplicationBundle.message("checkbox.spaces.before.opening.angle.bracket"), groupName);
@@ -109,6 +108,8 @@ public final class JavaLanguageCodeStyleSettingsProvider extends LanguageCodeSty
       groupName = getInstance().SPACES_OTHER;
       consumer.showCustomOption(JavaCodeStyleSettings.class, "SPACE_BEFORE_COLON_IN_FOREACH", JavaFrontbackBundle.message(
         "checkbox.spaces.before.colon.in.foreach"), groupName);
+      consumer.showCustomOption(JavaCodeStyleSettings.class, "STRIP_WHITESPACE_FROM_BLANK_LINES_IN_TEXT_BLOCKS", JavaFrontbackBundle.message(
+        "checkbox.strip.whitespace.from.blank.lines.in.text.blocks"), groupName);
       consumer.showCustomOption(JavaCodeStyleSettings.class, "SPACE_INSIDE_ONE_LINE_ENUM_BRACES", JavaFrontbackBundle.message(
         "checkbox.spaces.inside.one.line.enum"), groupName);
 

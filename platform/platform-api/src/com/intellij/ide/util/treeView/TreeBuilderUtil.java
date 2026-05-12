@@ -16,18 +16,34 @@ import java.util.List;
 public final class TreeBuilderUtil {
   private static final Logger LOG = Logger.getInstance(TreeBuilderUtil.class);
 
+  /**
+   * @see TreeBuilderUtil#_storePaths(JTree, DefaultMutableTreeNode, List, List, boolean, boolean)
+   */
   public static void storePaths(@NotNull JTree tree, @NotNull DefaultMutableTreeNode root, @NotNull List<Object> pathsToExpand, @NotNull List<Object> selectionPaths, boolean storeElementsOnly) {
+    storePaths(tree, root, pathsToExpand, selectionPaths, storeElementsOnly, true);
+  }
+
+  /**
+   * Saves paths that are currently expanded and selected in the tree.
+   * @param tree The JTree instance.
+   * @param root The root node of the tree.
+   * @param pathsToExpand List to store paths that are expanded.
+   * @param selectionPaths List to store paths that are selected.
+   * @param storeElementsOnly If true, only store the elements associated with the paths, otherwise store the paths themselves.
+   * @param expandLeaves If true, consider leaf nodes as expanded.
+   */
+  public static void storePaths(@NotNull JTree tree, @NotNull DefaultMutableTreeNode root, @NotNull List<Object> pathsToExpand, @NotNull List<Object> selectionPaths, boolean storeElementsOnly, boolean expandLeaves) {
     TreePath path = new TreePath(root.getPath());
     if (tree.isPathSelected(path)){
       selectionPaths.add(storeElementsOnly ? ((NodeDescriptor<?>)root.getUserObject()).getElement() : path);
     }
-    if (tree.isExpanded(path) || root.getChildCount() == 0){
+    if (tree.isExpanded(path) || (expandLeaves && root.getChildCount() == 0)){
       pathsToExpand.add(storeElementsOnly ? ((NodeDescriptor<?>)root.getUserObject()).getElement() : path);
-      _storePaths(tree, root, pathsToExpand, selectionPaths, storeElementsOnly);
+      _storePaths(tree, root, pathsToExpand, selectionPaths, storeElementsOnly, expandLeaves);
     }
   }
 
-  private static void _storePaths(@NotNull JTree tree, @NotNull DefaultMutableTreeNode root, @NotNull List<Object> pathsToExpand, @NotNull List<Object> selectionPaths, boolean storeElementsOnly) {
+  private static void _storePaths(@NotNull JTree tree, @NotNull DefaultMutableTreeNode root, @NotNull List<Object> pathsToExpand, @NotNull List<Object> selectionPaths, boolean storeElementsOnly, boolean expandLeaves) {
     List<TreeNode> childNodes = TreeUtil.listChildren(root);
     for (final Object childNode1 : childNodes) {
       DefaultMutableTreeNode childNode = (DefaultMutableTreeNode)childNode1;
@@ -40,11 +56,11 @@ public final class TreeBuilderUtil {
         }
         selectionPaths.add(storeElementsOnly ? ((NodeDescriptor<?>)userObject).getElement() : path);
       }
-      if (tree.isExpanded(path) || childNode.getChildCount() == 0) {
+      if (tree.isExpanded(path) || (expandLeaves && childNode.getChildCount() == 0)) {
         pathsToExpand.add(storeElementsOnly && userObject instanceof NodeDescriptor
                           ? ((NodeDescriptor<?>)userObject).getElement()
                           : path);
-        _storePaths(tree, childNode, pathsToExpand, selectionPaths, storeElementsOnly);
+        _storePaths(tree, childNode, pathsToExpand, selectionPaths, storeElementsOnly, expandLeaves);
       }
     }
   }

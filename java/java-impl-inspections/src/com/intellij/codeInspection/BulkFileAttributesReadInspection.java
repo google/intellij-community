@@ -195,7 +195,7 @@ public final class BulkFileAttributesReadInspection extends AbstractBaseJavaLoca
       if (!FILE_ATTR_CALL_MATCHER.test(call)) return;
       PsiVariable variable = getFileVariable(call);
       if (variable == null || !ControlFlowUtil.isEffectivelyFinal(variable, myScope)) return;
-      List<PsiMethodCallExpression> varCalls = myCalls.computeIfAbsent(variable, __ -> new SmartList<>());
+      List<PsiMethodCallExpression> varCalls = myCalls.computeIfAbsent(variable, _ -> new SmartList<>());
       varCalls.add(call);
     }
   }

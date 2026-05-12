@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.codeStyle.arrangement.engine;
 
 import com.intellij.application.options.CodeStyle;
@@ -12,7 +12,6 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.ex.DocumentEx;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.util.NlsContexts;
-import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiDocumentManager;
@@ -50,7 +49,6 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -233,48 +231,37 @@ public final class ArrangementEngine {
    * @return                   arranged list of the given rules
    */
   public static @NotNull <E extends ArrangementEntry> List<E> arrange(@NotNull Collection<? extends E> entries,
-                                                             @NotNull List<ArrangementSectionRule> sectionRules,
-                                                             @NotNull List<? extends ArrangementMatchRule> rulesByPriority,
-                                                             @Nullable Map<E, ArrangementSectionRule> entryToSection)
-  {
-    List<E> arranged = new ArrayList<>();
-    Set<E> unprocessed = new LinkedHashSet<>();
-    List<Pair<Set<ArrangementEntry>, E>> dependent = new ArrayList<>();
+                                                                      @NotNull List<ArrangementSectionRule> sectionRules,
+                                                                      @NotNull List<? extends ArrangementMatchRule> rulesByPriority,
+                                                                      @Nullable Map<E, ArrangementSectionRule> entryToSection) {
+    MultiMap<E, ArrangementEntry> dependent = MultiMap.createLinkedSet();
     for (E entry : entries) {
       List<? extends ArrangementEntry> dependencies = entry.getDependencies();
-      if (dependencies == null) {
-        unprocessed.add(entry);
-      }
-      else {
-        if (dependencies.size() == 1 && dependencies.get(0) == entry.getParent()) {
-          // Handle a situation when the entry is configured to be at the first parent's children.
-          arranged.add(entry);
-        }
-        else {
-          Set<ArrangementEntry> first = new HashSet<>(dependencies);
-          dependent.add(Pair.create(first, entry));
-        }
+      if (dependencies != null) {
+        dependent.putValues(entry, dependencies);
       }
     }
-
-    Set<E> matched = new HashSet<>();
 
     MultiMap<ArrangementMatchRule, E> elementsByRule = new MultiMap<>();
-    for (ArrangementMatchRule rule : rulesByPriority) {
-      matched.clear();
-      for (E entry : unprocessed) {
-        if (entry.canBeMatched() && rule.getMatcher().isMatched(entry)) {
-          elementsByRule.putValue(rule, entry);
-          matched.add(entry);
+    if (!rulesByPriority.isEmpty()) {
+      Set<E> matched = new HashSet<>();
+      for (ArrangementMatchRule rule : rulesByPriority) {
+        matched.clear();
+        for (E entry : entries) {
+          if (entry.canBeMatched() && rule.getMatcher().isMatched(entry)) {
+            elementsByRule.putValue(rule, entry);
+            matched.add(entry);
+          }
         }
+        entries.removeAll(matched);
+        if (entries.isEmpty()) break;
       }
-      unprocessed.removeAll(matched);
     }
 
+    List<E> arranged = new ArrayList<>();
     for (ArrangementSectionRule sectionRule : sectionRules) {
       for (ArrangementMatchRule rule : sectionRule.getMatchRules()) {
         final Collection<E> arrangedEntries = arrangeByRule(arranged, elementsByRule, rule);
-
         if (entryToSection != null && arrangedEntries != null) {
           for (E entry : arrangedEntries) {
             entryToSection.put(entry, sectionRule);
@@ -282,18 +269,56 @@ public final class ArrangementEngine {
         }
       }
     }
-    arranged.addAll(unprocessed);
+    arranged.addAll(entries);
+    removeForwardDependencies(arranged, dependent);
+    insertDependentsAfterDependencies(entryToSection, arranged, dependent);
 
+    return arranged;
+  }
+
+  private static <E extends ArrangementEntry> void removeForwardDependencies(List<E> arranged, MultiMap<E, ArrangementEntry> dependent) {
+    for (int i = 0; i < arranged.size(); i++) {
+      E entry = arranged.get(i);
+      Collection<? extends ArrangementEntry> dependencies = entry.getDependencies();
+      if (dependencies != null) {
+        if (entry.canBeGrouped()) {
+          arranged.remove(i); // reinsert later directly after dependencies
+          //noinspection AssignmentToForLoopParameter
+          i--;
+        }
+        else {
+          for (int j = 0; j < i; j++) {
+            // have we seen the dependencies in the arranged entries?
+            dependencies.remove(arranged.get(j));
+          }
+          if (!dependencies.isEmpty()) {
+            // dependencies not all seen yet, remove and reinsert later
+            arranged.remove(i);
+            //noinspection AssignmentToForLoopParameter
+            i--;
+          }
+          else {
+            // all dependencies seen
+            dependent.remove(entry);
+          }
+        }
+      }
+    }
+  }
+
+  private static <E extends ArrangementEntry> void insertDependentsAfterDependencies(@Nullable Map<E, ArrangementSectionRule> entryToSection,
+                                                                                     List<E> arranged,
+                                                                                     MultiMap<E, ArrangementEntry> dependent) {
     for (int i = 0; i < arranged.size() && !dependent.isEmpty(); i++) {
       E e = arranged.get(i);
       List<E> shouldBeAddedAfterCurrentElement = new ArrayList<>();
 
-      for (Iterator<Pair<Set<ArrangementEntry>, E>> iterator = dependent.iterator(); iterator.hasNext(); ) {
-        Pair<Set<ArrangementEntry>, E> pair = iterator.next();
-        pair.first.remove(e);
-        if (pair.first.isEmpty()) {
+      for (Iterator<Map.Entry<E, Collection<ArrangementEntry>>> iterator = dependent.entrySet().iterator(); iterator.hasNext(); ) {
+        Map.Entry<E, Collection<ArrangementEntry>> entry = iterator.next();
+        Collection<ArrangementEntry> deps = entry.getValue();
+        if (deps.remove(e) && deps.isEmpty()) {
           iterator.remove();
-          shouldBeAddedAfterCurrentElement.add(pair.second);
+          shouldBeAddedAfterCurrentElement.add(entry.getKey());
         }
       }
 
@@ -306,8 +331,6 @@ public final class ArrangementEngine {
       }
       arranged.addAll(i + 1, shouldBeAddedAfterCurrentElement);
     }
-
-    return arranged;
   }
 
   private static @Nullable <E extends ArrangementEntry> Collection<E> arrangeByRule(@NotNull List<? super E> arranged,

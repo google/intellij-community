@@ -30,7 +30,6 @@ inline fun <reified T : Any> T.thisLogger(): Logger = Logger.getInstance(T::clas
  * This function MUST be inline to properly get the calling class.
  */
 @Suppress("NOTHING_TO_INLINE")
-@Internal
 inline fun currentClassLogger(): Logger {
   val clazz = MethodHandles.lookup().lookupClass()
   return Logger.getInstance(clazz)
@@ -52,7 +51,6 @@ inline fun currentClassLogger(): Logger {
  * ```
  */
 @Suppress("NOTHING_TO_INLINE")
-@Internal
 inline fun fileLogger(): Logger {
   return currentClassLogger()
 }
@@ -77,7 +75,6 @@ inline fun Logger.traceThrowable(lazyThrowable: () -> Throwable) {
 }
 
 /** Consider using [Result.getOrHandleException] for more straight-forward API instead. */
-@Internal
 inline fun <T> Logger.runAndLogException(runnable: () -> T): T? {
   return runCatching {
     runnable()
@@ -92,7 +89,6 @@ inline fun <T> Logger.runAndLogException(runnable: () -> T): T? {
  * Consider using [Result.getOrHandleException] to have more control over how the exception is handled.
  * Especially consider passing a custom message to the logger, not just the exception.
  */
-@Internal
 fun <T> Result<T>.getOrLogException(logger: Logger): T? {
   return getOrHandleException {
     logger.error(it)
@@ -120,7 +116,6 @@ inline fun <T> Result<T>.getOrLogException(log: (Throwable) -> Unit): T? = getOr
  * If the result is a failure, and the exception is not a control flow exception,
  * then the given [handler] is called and `null` is returned.
  */
-@Internal
 inline fun <T> Result<T>.getOrHandleException(handler: (Throwable) -> Unit): T? {
   return onFailure { e ->
     rethrowControlFlowException(e)
@@ -139,7 +134,6 @@ inline fun <T> Result<T>.getOrHandleException(handler: (Throwable) -> Unit): T? 
  *
  * If [e] is null, then this function is a no-op.
  */
-@Internal
 fun rethrowControlFlowException(e: Throwable?) {
   if (e is CancellationException || e is ControlFlowException) {
     throw ExceptionUtilRt.addRethrownStackAsSuppressed(e)

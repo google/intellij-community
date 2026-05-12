@@ -12,6 +12,7 @@ jvm_library(
 
 jvm_library(
   name = "rt-java8_test_lib",
+  testonly = True,
   module_name = "intellij.platform.util.rt.java8",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -19,3 +20,9 @@ jvm_library(
   runtime_deps = [":rt-java8"]
 )
 ### auto-generated section `build intellij.platform.util.rt.java8` end
+
+### auto-generated section `iml intellij.platform.util.rt.java8` start
+exports_files([
+  "intellij.platform.util.rt.java8.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.util.rt.java8` end

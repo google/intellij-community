@@ -1,36 +1,34 @@
 ### auto-generated section `build intellij.lambda.sampleTestsWithFixtures` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_lambda-sampleTestsWithFixtures",
   x_context_parameters = True
 )
 
-resourcegroup(
-  name = "lambda-sampleTestsWithFixtures_test_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "lambda-sampleTestsWithFixtures",
+  module_name = "intellij.lambda.sampleTestsWithFixtures",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "lambda-sampleTestsWithFixtures_test_lib",
+  testonly = True,
   module_name = "intellij.lambda.sampleTestsWithFixtures",
   visibility = ["//visibility:public"],
   srcs = glob(["tests/**/*.kt", "tests/**/*.java", "tests/**/*.form"], allow_empty = True),
-  resources = [":lambda-sampleTestsWithFixtures_test_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_lambda-sampleTestsWithFixtures",
   deps = [
     "@lib//:kodein-di-jvm",
     "@lib//:kotlin-stdlib",
     "@lib//:kotlin-test",
-    "@lib//:assert_j",
+    "//libraries/assertj-core",
+    "//libraries/assertj-core:assertj-core_test_lib",
     "//libraries/rd/framework",
     "//libraries/rd/framework:framework_test_lib",
     "//libraries/rd/core",
@@ -75,6 +73,7 @@ jvm_library(
     "//plugins/performanceTesting/core:performanceTesting",
     "//plugins/performanceTesting/core:performanceTesting_test_lib",
     "//platform/platform-impl/codeinsight-inline:ide-codeinsight-inline",
+    "//platform/ide-core",
     "//platform/xdebugger-api:debugger",
     "//platform/xdebugger-api:debugger_test_lib",
     "//platform/xdebugger-impl:debugger-impl",
@@ -108,9 +107,16 @@ jvm_library(
     ":lambda-sampleTestsWithFixtures",
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/platform-impl/codeinsight-inline:ide-codeinsight-inline_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
   ]
 )
 ### auto-generated section `build intellij.lambda.sampleTestsWithFixtures` end
+
+### auto-generated section `iml intellij.lambda.sampleTestsWithFixtures` start
+exports_files([
+  "intellij.lambda.sampleTestsWithFixtures.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.lambda.sampleTestsWithFixtures` end
 
 ### auto-generated section `test intellij.lambda.sampleTestsWithFixtures` start
 load("@community//build:tests-options.bzl", "jps_test")

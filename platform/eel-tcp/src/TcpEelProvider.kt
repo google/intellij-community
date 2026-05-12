@@ -5,30 +5,19 @@ import com.intellij.execution.eel.MultiRoutingFileSystemUtils
 import com.intellij.platform.eel.EelDescriptor
 import com.intellij.platform.eel.EelMachine
 import com.intellij.platform.eel.annotations.MultiRoutingFileSystemPath
-import com.intellij.platform.eel.provider.EelProvider
+import com.intellij.platform.eel.provider.EelEnvironmentInitializer
+import com.intellij.platform.eel.provider.getEelDescriptor
 import com.intellij.platform.eel.provider.resolveEelMachine
 import java.nio.file.Path
-import kotlin.io.path.Path
-import kotlin.io.path.invariantSeparatorsPathString
 
-class TcpEelProvider : EelProvider {
+class TcpEelEnvironmentInitializer : EelEnvironmentInitializer {
   override suspend fun tryInitialize(path: @MultiRoutingFileSystemPath String): EelMachine? {
     if (!MultiRoutingFileSystemUtils.isMultiRoutingFsEnabled) {
       return null
     }
-    val descriptor = getEelDescriptor(Path(path)) ?: return null
+    val descriptor = Path.of(path).getEelDescriptor() as? TcpEelDescriptor ?: return null
     val tcpMachine = descriptor.resolveEelMachine() as? TcpEelMachine ?: return null
     tcpMachine.toEelApi(descriptor) // deploy ijent
     return tcpMachine
-  }
-
-  override fun getEelDescriptor(path: @MultiRoutingFileSystemPath Path): EelDescriptor? {
-    val sanitizedPath = path.invariantSeparatorsPathString
-    val (internalName, osFamily) = TcpEelPathParser.extractInternalMachineId(sanitizedPath) ?: return null
-    return TcpEelPathParser.toDescriptor(internalName, osFamily)
-  }
-
-  override fun getCustomRoots(eelDescriptor: EelDescriptor): Collection<@MultiRoutingFileSystemPath String>? {
-    return if (eelDescriptor is TcpEelDescriptor) listOf(eelDescriptor.rootPathString) else null
   }
 }

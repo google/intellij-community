@@ -118,7 +118,7 @@ final class PerFileElementTypeStubModificationTracker implements StubIndexImpl.F
 
   private void registerModificationFor(@NotNull IFileElementType fileElementType) {
     myModificationsInCurrentBatch.add(fileElementType);
-    myModCounts.compute(fileElementType, (__, value) -> {
+    myModCounts.compute(fileElementType, (_, value) -> {
       if (value == null) return 1L;
       return value + 1;
     });
@@ -142,7 +142,7 @@ final class PerFileElementTypeStubModificationTracker implements StubIndexImpl.F
   @Override
   public synchronized void endUpdatesBatch() {
     myModificationsInCurrentBatch.clear();
-    ReadAction.run(() -> {
+    ReadAction.runBlocking(() -> {
       if (disposeTrace.get() != null) {
         throw new IllegalStateException("Cannot end updates batch because the tracker is disposed! Disposal trace is in the cause", disposeTrace.get());
       }
@@ -246,7 +246,7 @@ final class PerFileElementTypeStubModificationTracker implements StubIndexImpl.F
         }
         final Stub stub = StubTreeBuilder.buildStubTree(fileContent);
         Map<Integer, SerializedStubTree> serializedStub = stub == null ? Collections.emptyMap() : stubIndexer.map(fileContent);
-        if (diffBuilder.differentiate(serializedStub, (__, ___, ____, _____) -> { }, true)) {
+        if (diffBuilder.differentiate(serializedStub, (_, _, _, _) -> { }, true)) {
           registerModificationFor(info.type);
         }
       }
@@ -310,7 +310,7 @@ final class PerFileElementTypeStubModificationTracker implements StubIndexImpl.F
   private @NotNull List<IFileElementType> determinePreviousFileElementType(int fileId, @NotNull StubUpdatingIndexStorage index) {
     String storedVersion = index.getStoredSubIndexerVersion(fileId);
     if (storedVersion == null) return Collections.emptyList();
-    return myFileElementTypesCache.compute(storedVersion, (__, value) -> {
+    return myFileElementTypesCache.compute(storedVersion, (_, value) -> {
       if (value != null) return value;
       List<IFileElementType> types = StubBuilderType.getStubFileElementTypeFromVersion(storedVersion);
       if (types.size() > 1) {

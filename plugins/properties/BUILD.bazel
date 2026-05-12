@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.properties.backend` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "properties-backend_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "properties-backend",
   module_name = "intellij.properties.backend",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":properties-backend_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
@@ -36,17 +31,25 @@ jvm_library(
     "//platform/refactoring",
     "//platform/code-style-impl:codeStyle-impl",
     "//platform/util/jdom",
+    "//platform/util:util-ui",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//platform/structuralsearch:structuralSearch",
     "//plugins/properties/properties-common:properties",
     "//platform/diff-impl",
     "//platform/forms_rt:java-guiForms-rt",
+    "//platform/structure-view-impl:structureView-impl",
+    "//libraries/fastutil",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//platform/util/concurrency",
+    "//jps/model-api:model",
   ],
   runtime_deps = ["//platform/backend"]
 )
 
 jvm_library(
   name = "properties-backend_test_lib",
+  testonly = True,
   module_name = "intellij.properties.backend",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -74,12 +77,25 @@ jvm_library(
     "//platform/refactoring:refactoring_test_lib",
     "//platform/code-style-impl:codeStyle-impl_test_lib",
     "//platform/util/jdom:jdom_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/structuralsearch:structuralSearch_test_lib",
     "//plugins/properties/properties-common:properties_test_lib",
     "//platform/backend:backend_test_lib",
     "//platform/diff-impl:diff-impl_test_lib",
     "//platform/forms_rt:java-guiForms-rt_test_lib",
+    "//platform/structure-view-impl:structureView-impl_test_lib",
+    "//libraries/fastutil:fastutil_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/util/concurrency:concurrency_test_lib",
+    "//jps/model-api:model_test_lib",
   ]
 )
 ### auto-generated section `build intellij.properties.backend` end
+
+### auto-generated section `iml intellij.properties.backend` start
+exports_files([
+  "intellij.properties.backend.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.properties.backend` end

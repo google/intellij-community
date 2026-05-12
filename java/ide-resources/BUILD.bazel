@@ -1,24 +1,27 @@
 ### auto-generated section `build intellij.java.ide.resources` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "ide-resources_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "ide-resources",
+  module_name = "intellij.java.ide.resources",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
-  resources = [":ide-resources_resources"]
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources"
 )
 
 jvm_library(
   name = "ide-resources_test_lib",
+  testonly = True,
   module_name = "intellij.java.ide.resources",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [":ide-resources"]
 )
 ### auto-generated section `build intellij.java.ide.resources` end
+
+### auto-generated section `iml intellij.java.ide.resources` start
+exports_files([
+  "intellij.java.ide.resources.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.java.ide.resources` end

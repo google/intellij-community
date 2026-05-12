@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.toml.json` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "json_resources",
-  srcs = glob(["src/main/resources/**/*"]),
-  strip_prefix = "src/main/resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "json",
   module_name = "intellij.toml.json",
   visibility = ["//visibility:public"],
   srcs = glob(["src/main/kotlin/**/*.kt", "src/main/kotlin/**/*.java", "src/main/kotlin/**/*.form"], allow_empty = True),
-  resources = [":json_resources"],
+  resources = glob(["src/main/resources/**/*"]),
+  resource_strip_prefix = "src/main/resources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/code-style-api:codeStyle",
@@ -25,6 +20,7 @@ jvm_library(
     "//plugins/toml/core",
     "@lib//:kotlin-stdlib",
     "//json/backend",
+    "//platform/util:util-ui",
     "//libraries/stream",
   ],
   exports = ["//json/backend"],
@@ -33,6 +29,7 @@ jvm_library(
 
 jvm_library(
   name = "json_test_lib",
+  testonly = True,
   module_name = "intellij.toml.json",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -53,7 +50,14 @@ jvm_library(
     "//plugins/toml/core:core_test_lib",
     "//json/backend:backend_test_lib",
     "//platform/backend:backend_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//libraries/stream:stream_test_lib",
   ]
 )
 ### auto-generated section `build intellij.toml.json` end
+
+### auto-generated section `iml intellij.toml.json` start
+exports_files([
+  "intellij.toml.json.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.toml.json` end

@@ -20,131 +20,195 @@ internal object MetadataStorageImpl : MetadataStorageBase() {
     var typeMetadata: StorageTypeMetadata
 
     typeMetadata = FinalClassMetadata.ObjectMetadata(fqName = "com.intellij.externalSystem.JavaBridgeCoordinateEntitySource",
-                                                     properties = listOf(
-                                                       OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false,
-                                                                           name = "virtualFileUrl",
-                                                                           valueType = ValueTypeMetadata.SimpleType.CustomType(
-                                                                             isNullable = true,
-                                                                             typeMetadata = FinalClassMetadata.KnownClass(
-                                                                               fqName = "com.intellij.platform.workspace.storage.url.VirtualFileUrl")),
-                                                                           withDefault = false)),
+                                                     properties = listOf(OwnPropertyMetadata(isComputable = false,
+                                                                                             isKey = false,
+                                                                                             isOpen = false,
+                                                                                             name = "virtualFileUrl",
+                                                                                             valueType = ValueTypeMetadata.SimpleType.CustomType(
+                                                                                               isNullable = true,
+                                                                                               typeMetadata = FinalClassMetadata.KnownClass(
+                                                                                                 fqName = "com.intellij.platform.workspace.storage.url.VirtualFileUrl")),
+                                                                                             withDefault = false)),
                                                      supertypes = listOf("com.intellij.platform.workspace.storage.EntitySource"))
 
     addMetadata(typeMetadata)
 
     typeMetadata = EntityMetadata(fqName = "com.intellij.java.impl.dependencySubstitution.LibraryMavenCoordinateEntity",
                                   entityDataFqName = "com.intellij.java.impl.dependencySubstitution.impl.LibraryMavenCoordinateEntityData",
-                                  supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(
-        OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource",
-                            valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false,
-                                                                                typeMetadata = FinalClassMetadata.KnownClass(
-                                                                                  fqName = "com.intellij.platform.workspace.storage.EntitySource")),
-                            withDefault = false),
-        OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "library",
-                            valueType = ValueTypeMetadata.EntityReference(connectionType = ConnectionId.ConnectionType.ONE_TO_ONE,
-                                                                          entityFqName = "com.intellij.platform.workspace.jps.entities.LibraryEntity",
-                                                                          isChild = false, isNullable = false), withDefault = false),
-        OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "coordinates",
-                            valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false,
-                                                                                typeMetadata = FinalClassMetadata.ClassMetadata(
-                                                                                  fqName = "com.intellij.java.library.MavenCoordinates",
-                                                                                  properties = listOf(
-                                                                                    OwnPropertyMetadata(isComputable = false, isKey = false,
-                                                                                                        isOpen = false, name = "artifactId",
-                                                                                                        valueType = primitiveTypeStringNotNullable,
-                                                                                                        withDefault = false),
-                                                                                    OwnPropertyMetadata(isComputable = false, isKey = false,
-                                                                                                        isOpen = false,
-                                                                                                        name = "baseVersion",
-                                                                                                        valueType = primitiveTypeStringNotNullable,
-                                                                                                        withDefault = false),
-                                                                                    OwnPropertyMetadata(isComputable = false, isKey = false,
-                                                                                                        isOpen = false, name = "classifier",
-                                                                                                        valueType = primitiveTypeStringNullable,
-                                                                                                        withDefault = false),
-                                                                                    OwnPropertyMetadata(isComputable = false, isKey = false,
-                                                                                                        isOpen = false, name = "groupId",
-                                                                                                        valueType = primitiveTypeStringNotNullable,
-                                                                                                        withDefault = false),
-                                                                                    OwnPropertyMetadata(isComputable = false, isKey = false,
-                                                                                                        isOpen = false, name = "packaging",
-                                                                                                        valueType = primitiveTypeStringNotNullable,
-                                                                                                        withDefault = false),
-                                                                                    OwnPropertyMetadata(isComputable = false, isKey = false,
-                                                                                                        isOpen = false, name = "version",
-                                                                                                        valueType = primitiveTypeStringNotNullable,
-                                                                                                        withDefault = false)),
-                                                                                  supertypes = listOf())), withDefault = false)),
-                                  extProperties = listOf(
-                                    ExtPropertyMetadata(isComputable = false, isOpen = false, name = "mavenCoordinates",
-                                                        receiverFqn = "com.intellij.platform.workspace.jps.entities.LibraryEntity",
-                                                        valueType = ValueTypeMetadata.EntityReference(
-                                                          connectionType = ConnectionId.ConnectionType.ONE_TO_ONE,
-                                                          entityFqName = "com.intellij.java.impl.dependencySubstitution.LibraryMavenCoordinateEntity",
-                                                          isChild = true, isNullable = true), withDefault = false)), isAbstract = false)
+                                  supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"),
+                                  properties = listOf(OwnPropertyMetadata(isComputable = false,
+                                                                          isKey = false,
+                                                                          isOpen = false,
+                                                                          name = "entitySource",
+                                                                          valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false,
+                                                                                                                              typeMetadata = FinalClassMetadata.KnownClass(
+                                                                                                                                fqName = "com.intellij.platform.workspace.storage.EntitySource")),
+                                                                          withDefault = false),
+                                                      OwnPropertyMetadata(isComputable = false,
+                                                                          isKey = false,
+                                                                          isOpen = false,
+                                                                          name = "library",
+                                                                          valueType = ValueTypeMetadata.EntityReference(connectionType = ConnectionId.ConnectionType.ONE_TO_ONE,
+                                                                                                                        entityFqName = "com.intellij.platform.workspace.jps.entities.LibraryEntity",
+                                                                                                                        isChild = false,
+                                                                                                                        isNullable = false),
+                                                                          withDefault = false),
+                                                      OwnPropertyMetadata(isComputable = false,
+                                                                          isKey = false,
+                                                                          isOpen = false,
+                                                                          name = "coordinates",
+                                                                          valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false,
+                                                                                                                              typeMetadata = FinalClassMetadata.ClassMetadata(
+                                                                                                                                fqName = "com.intellij.java.library.MavenCoordinates",
+                                                                                                                                properties = listOf(
+                                                                                                                                  OwnPropertyMetadata(
+                                                                                                                                    isComputable = false,
+                                                                                                                                    isKey = false,
+                                                                                                                                    isOpen = false,
+                                                                                                                                    name = "artifactId",
+                                                                                                                                    valueType = primitiveTypeStringNotNullable,
+                                                                                                                                    withDefault = false),
+                                                                                                                                  OwnPropertyMetadata(
+                                                                                                                                    isComputable = false,
+                                                                                                                                    isKey = false,
+                                                                                                                                    isOpen = false,
+                                                                                                                                    name = "baseVersion",
+                                                                                                                                    valueType = primitiveTypeStringNotNullable,
+                                                                                                                                    withDefault = false),
+                                                                                                                                  OwnPropertyMetadata(
+                                                                                                                                    isComputable = false,
+                                                                                                                                    isKey = false,
+                                                                                                                                    isOpen = false,
+                                                                                                                                    name = "classifier",
+                                                                                                                                    valueType = primitiveTypeStringNullable,
+                                                                                                                                    withDefault = false),
+                                                                                                                                  OwnPropertyMetadata(
+                                                                                                                                    isComputable = false,
+                                                                                                                                    isKey = false,
+                                                                                                                                    isOpen = false,
+                                                                                                                                    name = "groupId",
+                                                                                                                                    valueType = primitiveTypeStringNotNullable,
+                                                                                                                                    withDefault = false),
+                                                                                                                                  OwnPropertyMetadata(
+                                                                                                                                    isComputable = false,
+                                                                                                                                    isKey = false,
+                                                                                                                                    isOpen = false,
+                                                                                                                                    name = "packaging",
+                                                                                                                                    valueType = primitiveTypeStringNotNullable,
+                                                                                                                                    withDefault = false),
+                                                                                                                                  OwnPropertyMetadata(
+                                                                                                                                    isComputable = false,
+                                                                                                                                    isKey = false,
+                                                                                                                                    isOpen = false,
+                                                                                                                                    name = "version",
+                                                                                                                                    valueType = primitiveTypeStringNotNullable,
+                                                                                                                                    withDefault = false)),
+                                                                                                                                supertypes = listOf())),
+                                                                          withDefault = false)),
+                                  extProperties = listOf(ExtPropertyMetadata(isComputable = false,
+                                                                             isOpen = false,
+                                                                             name = "mavenCoordinates",
+                                                                             receiverFqn = "com.intellij.platform.workspace.jps.entities.LibraryEntity",
+                                                                             valueType = ValueTypeMetadata.EntityReference(connectionType = ConnectionId.ConnectionType.ONE_TO_ONE,
+                                                                                                                           entityFqName = "com.intellij.java.impl.dependencySubstitution.LibraryMavenCoordinateEntity",
+                                                                                                                           isChild = true,
+                                                                                                                           isNullable = true),
+                                                                             withDefault = false)),
+                                  isAbstract = false)
 
     addMetadata(typeMetadata)
 
     typeMetadata = EntityMetadata(fqName = "com.intellij.java.impl.dependencySubstitution.ModuleMavenCoordinateEntity",
                                   entityDataFqName = "com.intellij.java.impl.dependencySubstitution.impl.ModuleMavenCoordinateEntityData",
-                                  supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(
-        OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource",
-                            valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false,
-                                                                                typeMetadata = FinalClassMetadata.KnownClass(
-                                                                                  fqName = "com.intellij.platform.workspace.storage.EntitySource")),
-                            withDefault = false),
-        OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "module",
-                            valueType = ValueTypeMetadata.EntityReference(connectionType = ConnectionId.ConnectionType.ONE_TO_ONE,
-                                                                          entityFqName = "com.intellij.platform.workspace.jps.entities.ModuleEntity",
-                                                                          isChild = false, isNullable = false), withDefault = false),
-        OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "coordinates",
-                            valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false,
-                                                                                typeMetadata = FinalClassMetadata.ClassMetadata(
-                                                                                  fqName = "com.intellij.java.library.MavenCoordinates",
-                                                                                  properties = listOf(
-                                                                                    OwnPropertyMetadata(isComputable = false, isKey = false,
-                                                                                                        isOpen = false, name = "artifactId",
-                                                                                                        valueType = primitiveTypeStringNotNullable,
-                                                                                                        withDefault = false),
-                                                                                    OwnPropertyMetadata(isComputable = false, isKey = false,
-                                                                                                        isOpen = false,
-                                                                                                        name = "baseVersion",
-                                                                                                        valueType = primitiveTypeStringNotNullable,
-                                                                                                        withDefault = false),
-                                                                                    OwnPropertyMetadata(isComputable = false, isKey = false,
-                                                                                                        isOpen = false, name = "classifier",
-                                                                                                        valueType = primitiveTypeStringNullable,
-                                                                                                        withDefault = false),
-                                                                                    OwnPropertyMetadata(isComputable = false, isKey = false,
-                                                                                                        isOpen = false, name = "groupId",
-                                                                                                        valueType = primitiveTypeStringNotNullable,
-                                                                                                        withDefault = false),
-                                                                                    OwnPropertyMetadata(isComputable = false, isKey = false,
-                                                                                                        isOpen = false, name = "packaging",
-                                                                                                        valueType = primitiveTypeStringNotNullable,
-                                                                                                        withDefault = false),
-                                                                                    OwnPropertyMetadata(isComputable = false, isKey = false,
-                                                                                                        isOpen = false, name = "version",
-                                                                                                        valueType = primitiveTypeStringNotNullable,
-                                                                                                        withDefault = false)),
-                                                                                  supertypes = listOf())), withDefault = false)),
-                                  extProperties = listOf(
-                                    ExtPropertyMetadata(isComputable = false, isOpen = false, name = "mavenCoordinates",
-                                                        receiverFqn = "com.intellij.platform.workspace.jps.entities.ModuleEntity",
-                                                        valueType = ValueTypeMetadata.EntityReference(
-                                                          connectionType = ConnectionId.ConnectionType.ONE_TO_ONE,
-                                                          entityFqName = "com.intellij.java.impl.dependencySubstitution.ModuleMavenCoordinateEntity",
-                                                          isChild = true, isNullable = true), withDefault = false)), isAbstract = false)
+                                  supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"),
+                                  properties = listOf(OwnPropertyMetadata(isComputable = false,
+                                                                          isKey = false,
+                                                                          isOpen = false,
+                                                                          name = "entitySource",
+                                                                          valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false,
+                                                                                                                              typeMetadata = FinalClassMetadata.KnownClass(
+                                                                                                                                fqName = "com.intellij.platform.workspace.storage.EntitySource")),
+                                                                          withDefault = false),
+                                                      OwnPropertyMetadata(isComputable = false,
+                                                                          isKey = false,
+                                                                          isOpen = false,
+                                                                          name = "module",
+                                                                          valueType = ValueTypeMetadata.EntityReference(connectionType = ConnectionId.ConnectionType.ONE_TO_ONE,
+                                                                                                                        entityFqName = "com.intellij.platform.workspace.jps.entities.ModuleEntity",
+                                                                                                                        isChild = false,
+                                                                                                                        isNullable = false),
+                                                                          withDefault = false),
+                                                      OwnPropertyMetadata(isComputable = false,
+                                                                          isKey = false,
+                                                                          isOpen = false,
+                                                                          name = "coordinates",
+                                                                          valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false,
+                                                                                                                              typeMetadata = FinalClassMetadata.ClassMetadata(
+                                                                                                                                fqName = "com.intellij.java.library.MavenCoordinates",
+                                                                                                                                properties = listOf(
+                                                                                                                                  OwnPropertyMetadata(
+                                                                                                                                    isComputable = false,
+                                                                                                                                    isKey = false,
+                                                                                                                                    isOpen = false,
+                                                                                                                                    name = "artifactId",
+                                                                                                                                    valueType = primitiveTypeStringNotNullable,
+                                                                                                                                    withDefault = false),
+                                                                                                                                  OwnPropertyMetadata(
+                                                                                                                                    isComputable = false,
+                                                                                                                                    isKey = false,
+                                                                                                                                    isOpen = false,
+                                                                                                                                    name = "baseVersion",
+                                                                                                                                    valueType = primitiveTypeStringNotNullable,
+                                                                                                                                    withDefault = false),
+                                                                                                                                  OwnPropertyMetadata(
+                                                                                                                                    isComputable = false,
+                                                                                                                                    isKey = false,
+                                                                                                                                    isOpen = false,
+                                                                                                                                    name = "classifier",
+                                                                                                                                    valueType = primitiveTypeStringNullable,
+                                                                                                                                    withDefault = false),
+                                                                                                                                  OwnPropertyMetadata(
+                                                                                                                                    isComputable = false,
+                                                                                                                                    isKey = false,
+                                                                                                                                    isOpen = false,
+                                                                                                                                    name = "groupId",
+                                                                                                                                    valueType = primitiveTypeStringNotNullable,
+                                                                                                                                    withDefault = false),
+                                                                                                                                  OwnPropertyMetadata(
+                                                                                                                                    isComputable = false,
+                                                                                                                                    isKey = false,
+                                                                                                                                    isOpen = false,
+                                                                                                                                    name = "packaging",
+                                                                                                                                    valueType = primitiveTypeStringNotNullable,
+                                                                                                                                    withDefault = false),
+                                                                                                                                  OwnPropertyMetadata(
+                                                                                                                                    isComputable = false,
+                                                                                                                                    isKey = false,
+                                                                                                                                    isOpen = false,
+                                                                                                                                    name = "version",
+                                                                                                                                    valueType = primitiveTypeStringNotNullable,
+                                                                                                                                    withDefault = false)),
+                                                                                                                                supertypes = listOf())),
+                                                                          withDefault = false)),
+                                  extProperties = listOf(ExtPropertyMetadata(isComputable = false,
+                                                                             isOpen = false,
+                                                                             name = "mavenCoordinates",
+                                                                             receiverFqn = "com.intellij.platform.workspace.jps.entities.ModuleEntity",
+                                                                             valueType = ValueTypeMetadata.EntityReference(connectionType = ConnectionId.ConnectionType.ONE_TO_ONE,
+                                                                                                                           entityFqName = "com.intellij.java.impl.dependencySubstitution.ModuleMavenCoordinateEntity",
+                                                                                                                           isChild = true,
+                                                                                                                           isNullable = true),
+                                                                             withDefault = false)),
+                                  isAbstract = false)
 
     addMetadata(typeMetadata)
   }
 
   override fun initializeMetadataHash() {
-    addMetadataHash(typeFqn = "com.intellij.java.impl.dependencySubstitution.LibraryMavenCoordinateEntity", metadataHash = -1045210070)
-    addMetadataHash(typeFqn = "com.intellij.java.impl.dependencySubstitution.ModuleMavenCoordinateEntity", metadataHash = -1563495236)
-    addMetadataHash(typeFqn = "com.intellij.java.library.MavenCoordinates", metadataHash = -786961692)
+    addMetadataHash(typeFqn = "com.intellij.java.impl.dependencySubstitution.LibraryMavenCoordinateEntity", metadataHash = 330790206)
+    addMetadataHash(typeFqn = "com.intellij.java.impl.dependencySubstitution.ModuleMavenCoordinateEntity", metadataHash = -2145731156)
+    addMetadataHash(typeFqn = "com.intellij.java.library.MavenCoordinates", metadataHash = -1988359172)
     addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.EntitySource", metadataHash = -1889898909)
     addMetadataHash(typeFqn = "com.intellij.externalSystem.JavaBridgeCoordinateEntitySource", metadataHash = 1980250535)
   }
-
 }

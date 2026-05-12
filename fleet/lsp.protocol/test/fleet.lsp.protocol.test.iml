@@ -2,13 +2,13 @@
 <module type="JAVA_MODULE" version="4">
   <component name="FacetManager">
     <facet type="kotlin-language" name="Kotlin">
-      <configuration version="5" platform="JVM 21" allPlatforms="JVM [21]" useProjectSettings="false">
+      <configuration version="5" platform="JVM 25" allPlatforms="JVM [25]" useProjectSettings="false">
         <compilerSettings>
           <option name="additionalArguments" value="-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi -Xlambdas=class -Xconsistent-data-class-copy-visibility -opt-in=kotlinx.serialization.ExperimentalSerializationApi -Xcontext-parameters -Xjvm-default=all -XXLanguage:+AllowEagerSupertypeAccessibilityChecks -opt-in=kotlin.concurrent.atomics.ExperimentalAtomicApi -progressive" />
         </compilerSettings>
         <compilerArguments>
           <stringArguments>
-            <stringArg name="jvmTarget" arg="21" />
+            <stringArg name="jvmTarget" arg="25" />
             <stringArg name="apiVersion" arg="2.3" />
             <stringArg name="languageVersion" arg="2.3" />
           </stringArguments>
@@ -19,16 +19,15 @@
   <component name="NewModuleRootManager" inherit-compiler-output="true">
     <exclude-output />
     <content url="file://$MODULE_DIR$">
-      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/srcCommonTest" isTestSource="true" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="kotlin-stdlib" level="project" />
     <orderEntry type="library" name="kotlinx-coroutines-core" level="project" />
+    <orderEntry type="library" scope="TEST" name="kotlinx-coroutines-test" level="project" />
     <orderEntry type="library" name="kotlinx-io-core" level="project" />
-    <orderEntry type="module" module-name="fleet.ktor.client.cio" scope="TEST" />
     <orderEntry type="module" module-name="fleet.ktor.client.core" scope="TEST" />
-    <orderEntry type="module" module-name="fleet.ktor.network.tls" scope="TEST" />
     <orderEntry type="module" module-name="fleet.lsp.protocol" scope="TEST" />
     <orderEntry type="module" module-name="fleet.test.runtime" scope="TEST" />
   </component>

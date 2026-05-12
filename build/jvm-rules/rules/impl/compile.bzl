@@ -21,12 +21,11 @@ load(
     _KtCompilerPluginInfo = "KtCompilerPluginInfo",
     _KtPluginConfiguration = "KtPluginConfiguration",
 )
+load("@rules_kotlin//kotlin/internal:opts.bzl", "JavacOptions")
 load("//:rules/common-attrs.bzl", "add_dicts")
 load("//:rules/impl/associates.bzl", "get_associates")
 load("//:rules/impl/builder-args.bzl", "init_builder_args")
 load("//:rules/impl/compiler-plugins.bzl", "collect_compiler_plugins_for_export", "compiler_plugins_from", "exported_compiler_plugins_from")
-load("//:rules/impl/javac-options.bzl", "JavacOptions")
-load("//:rules/impl/kotlinc-options.bzl", "KotlincOptions")
 load("//:rules/resource.bzl", "ResourceGroupInfo")
 
 visibility("private")
@@ -41,6 +40,7 @@ def _partitioned_srcs(srcs):
     kt_srcs = []
     java_srcs = []
     form_srcs = []
+    src_jars = []
 
     for f in srcs:
         if f.path.endswith(".kt"):
@@ -49,13 +49,15 @@ def _partitioned_srcs(srcs):
             java_srcs.append(f)
         elif f.path.endswith(".form"):
             form_srcs.append(f)
+        elif f.path.endswith(".srcjar"):
+            src_jars.append(f)
 
     return struct(
         kt = kt_srcs,
         java = java_srcs,
         forms = form_srcs,
         all_srcs = kt_srcs + java_srcs + form_srcs,
-        src_jars = [],
+        src_jars = src_jars,
     )
 
 def _compute_transitive_jars(dep_infos, prune_transitive_deps):
@@ -90,6 +92,20 @@ def _jvm_deps(ctx, associated_targets, deps, runtime_deps):
         runtime_deps = [_java_info(d) for d in runtime_deps],
     )
 
+def _collect_resources(ctx):
+    """Collects resources from both direct resources and resource_jars attrs."""
+    result = []
+    if ctx.attr.resources:
+        res = struct(
+          files = ctx.files.resources,
+          strip_prefix = ctx.file.strip_prefix,
+          add_prefix = "",
+        )
+        result.append(res)
+    for r in ctx.attr.resource_jars:
+        result.append(r[ResourceGroupInfo])
+    return result
+
 def kt_jvm_produce_jar_actions(ctx, isTest = False):
     """Sets up a compile action for a jar.
 
@@ -121,7 +137,7 @@ def kt_jvm_produce_jar_actions(ctx, isTest = False):
         ctx = ctx,
         output_jar = output_jar,
         srcs = srcs,
-        resources = [r[ResourceGroupInfo] for r in ctx.attr.resources],
+        resources = _collect_resources(ctx),
         associates = associates,
         compile_deps = compile_deps,
         transitiveInputs = transitiveInputs,
@@ -190,12 +206,6 @@ def _run_jvm_builder(
 
     kotlin_cri_storage_file = None
 
-    kotlin_inc_threshold = ctx.attr._kotlin_inc_threshold[BuildSettingInfo].value
-    if kotlin_inc_threshold == -1:
-        kotlinc_options = ctx.attr.kotlinc_opts[KotlincOptions]
-        kotlin_inc_threshold = kotlinc_options.inc_threshold
-    java_inc_threshold = ctx.attr._java_inc_threshold[BuildSettingInfo].value
-
     args = init_builder_args(ctx, srcs, resources, associates, transitiveInputs, plugins = plugins, compile_deps = compile_deps)
     args.add("--out", output_jar)
 
@@ -216,10 +226,6 @@ def _run_jvm_builder(
     if javac_opts and javac_opts.no_proc:
         args.add("--no-proc")
 
-    isIncremental = (kotlin_inc_threshold != -1 and len(srcs.kt) >= kotlin_inc_threshold) or (java_inc_threshold != -1 and len(srcs.java) >= java_inc_threshold)
-    if not isIncremental:
-        args.add("--non-incremental")
-
     javaCount = len(srcs.java)
     args.add("--java-count", javaCount)
 
@@ -232,7 +238,7 @@ def _run_jvm_builder(
         env = {
             "MALLOC_ARENA_MAX": "2",
         },
-        inputs = depset(srcs.all_srcs + all_resources, transitive = transitiveInputs),
+        inputs = depset(srcs.all_srcs + srcs.src_jars + all_resources, transitive = transitiveInputs),
         outputs = outputs,
         tools = [ctx.file._jvm_builder_launcher, ctx.file._jvm_builder],
         executable = java_runtime.java_executable_exec_path,
@@ -248,7 +254,7 @@ def _run_jvm_builder(
             ctx.file._jvm_builder.path,
             args,
         ],
-        progress_message = "compile %%{label} (kt: %d, java: %d%s}" % (len(srcs.kt), javaCount, "" if isIncremental else ", non-incremental"),
+        progress_message = "compile %%{label} (kt: %d, java: %d)" % (len(srcs.kt), javaCount),
     )
 
     return struct(abi_jar = abi_jar, kotlin_cri_storage_file = kotlin_cri_storage_file)

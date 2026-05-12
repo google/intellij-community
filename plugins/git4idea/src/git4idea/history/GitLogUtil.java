@@ -163,6 +163,13 @@ public final class GitLogUtil {
     return new ArrayList<>(collectConsumer.getResult());
   }
 
+  public static @Nullable VcsCommitMetadata collectMetadataForCommit(@NotNull Project project,
+                                                                     @NotNull VirtualFile root,
+                                                                     @NotNull String commit)
+    throws VcsException {
+    return ContainerUtil.getOnlyItem(collectMetadata(project, root, Collections.singletonList(commit)));
+  }
+
   public static void collectMetadata(@NotNull Project project, @NotNull VirtualFile root,
                                      @NotNull List<String> hashes, @NotNull Consumer<? super VcsCommitMetadata> consumer)
     throws VcsException {
@@ -236,7 +243,7 @@ public final class GitLogUtil {
       handler.endOptions();
 
       Tracer tracer = TelemetryManager.getInstance().getTracer(VcsScope);
-      runWithSpanThrows(tracer.spanBuilder(Log.LoadingCommitMetadata.getName()).setAttribute("rootName", root.getName()), __ -> {
+      runWithSpanThrows(tracer.spanBuilder(Log.LoadingCommitMetadata.getName()).setAttribute("rootName", root.getName()), _ -> {
         GitLogOutputSplitter<GitLogRecord> handlerListener = new GitLogOutputSplitter<>(handler, parser, recordConsumer);
         Git.getInstance().runCommandWithoutCollectingOutput(handler).throwOnError();
         handlerListener.reportErrors();

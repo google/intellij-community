@@ -75,12 +75,7 @@
       "borderWidth": 6,
       "borderWidth.compact": 4,
       "borderColor": "ToolWindowBackground",
-      "inactiveAlpha": 0.55,
-      "inactiveAlphaInStatusBar": {
-        "os.mac": 0.2,
-        "os.windows": 0.2,
-        "os.linux": 0.15
-      }
+      "inactiveAlpha": 0.55
     },
 
     "MainWindow.background": "#3C3F41",
@@ -112,12 +107,14 @@
       "inactiveBackground": "BackgroundLight",
       "borderColor": "BorderTransparent",
       "Dropdown.transparentHoverBackground": "#FFFFFF12",
-      "Button.arc.compact": 8
+      "Button.arc.compact": 8,
+      "Icon.insets": "6,5,4,5"
     },
 
     "StatusBar": {
       "background": "BackgroundLight",
       "borderColor": "BorderTransparent",
+      "topBorderWidth": 0,
       "Breadcrumbs.foreground": "#9da0a8",
       "Widget.foreground": "#9da0a8",
       "Breadcrumbs.hoverBackground": "#FFFFFF18",
@@ -190,10 +187,10 @@
       "inactiveUnderlinedTabBackground": "#35393B",
       "hoverBackground": "#35393B",
 
-      "tabInsets": "-7,8,-7,8",
+      "tabInsets": "-6,8,-6,8",
       "tabInsets.compact": "-2,6,-2,4",
-      "verticalTabInsets": "-2,10,-2,10",
-      "verticalTabInsets.compact": "0,10,0,10",
+      "verticalTabInsets": "-6,8,-6,8",
+      "verticalTabInsets.compact": "-2,10,-2,10",
       "tabContentActionsRightInsets": "0,4,0,2"
     },
 
@@ -375,14 +372,14 @@
       "disabledBackground": "#3c3f41",
       "disabledForeground": "#777777",
       "nonEditableBackground": "#3c3f41",
-      "minimumSize.compact": "70,24",
+      "minimumSize.compact": "49,24",
       "padding.compact": "1,6,1,6",
       "UI": "com.intellij.ide.ui.laf.darcula.ui.DarculaComboBoxUI"
     },
 
     "TextField": {
       "background": "InputBackground",
-      "minimumSize.compact": "70,24"
+      "minimumSize.compact": "49,24"
     },
 
     "ComboBox": {
@@ -435,10 +432,51 @@
 
     "Bookmark.MnemonicAssigned.foreground": "#1e1f22",
 
+    "Profiler": {
+      "ChartSlider": {
+        "foreground": "Gray12",
+        "lineColor": "Gray5"
+      },
+      "CpuChart": {
+        "background": "Green3",
+        "borderColor": "Green6",
+        "inactiveBackground": "Green1",
+        "inactiveBorderColor": "Green3",
+        "pointBackground": "Green6",
+        "pointBorderColor": "Gray2"
+      },
+      "MemoryChart": {
+        "background": "Blue2",
+        "borderColor": "Blue8",
+        "inactiveBackground": "Blue1",
+        "inactiveBorderColor": "Blue3",
+        "pointBackground": "Blue5",
+        "pointBorderColor": "Gray2"
+      },
+      "Timer": {
+        "foreground": "Gray12",
+        "disabledForeground": "Gray7"
+      },
+      "LiveChart": {
+        "horizontalAxisColor": "Gray4"
+      }
+    },
+
     "LineProfiler": {
-      "HotLine.foreground": "#db5c5c",
-      "IgnoredLine.foreground": "#4e5157",
-      "Line.foreground": "#6f737a"
+      "Line": {
+        "labelBackground": "#FFFFFF17",
+        "foreground": "#9FA2A8",
+        "hoverBackground": "#FFFFFF29"
+      },
+      "HotLine": {
+        "labelBackground": "#402929",
+        "foreground": "#DB5C5C",
+        "hoverBackground": "#5E3838"
+      },
+      "IgnoredLine": {
+        "labelBackground": "#FFFFFF17",
+        "foreground": "#73767C"
+      }
     },
 
     "PresentationAssistant": {
@@ -881,17 +919,15 @@
   },
   "icons": {
     "ColorPalette": {
-      "Checkbox.Background.Default.Dark": "#363738",
-      "Checkbox.Border.Default.Dark": "#6B6B6B",
-      "Checkbox.Border.Selected.Dark": "#6B6B6B",
-      "Checkbox.Foreground.Selected.Dark": "#A7A7A7",
-      "Checkbox.Focus.Wide.Dark": "#366799",
-      "Checkbox.Focus.Thin.Default.Dark": "#466D94",
-      "Checkbox.Focus.Thin.Selected.Dark": "#466D94",
-      "Checkbox.Background.Disabled.Dark": "#43494A",
-      "Checkbox.Background.Selected.Dark": "#363738",
-      "Checkbox.Border.Disabled.Dark": "#545556",
-      "Checkbox.Foreground.Disabled.Dark": "#606060"
+      "Checkbox.Background.Default": "#363738",
+      "Checkbox.Border.Default": "#6B6B6B",
+      "Checkbox.Border.Selected": "#6B6B6B",
+      "Checkbox.Foreground.Selected": "#A7A7A7",
+      "Checkbox.Focus.Wide": "#366799",
+      "Checkbox.Background.Disabled": "#43494A",
+      "Checkbox.Background.Selected": "#363738",
+      "Checkbox.Border.Disabled": "#545556",
+      "Checkbox.Foreground.Disabled": "#606060"
     }
   }
 }

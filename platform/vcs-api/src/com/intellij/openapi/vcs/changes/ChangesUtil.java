@@ -261,7 +261,7 @@ public final class ChangesUtil {
       for (T item : items) {
         AbstractVcs vcs = separator.getVcsFor(item);
         if (vcs != null) {
-          changesByVcs.computeIfAbsent(vcs, __ -> new ArrayList<>()).add(item);
+          changesByVcs.computeIfAbsent(vcs, _ -> new ArrayList<>()).add(item);
         }
       }
     });

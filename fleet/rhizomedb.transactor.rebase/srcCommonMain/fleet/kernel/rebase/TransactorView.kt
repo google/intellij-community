@@ -37,6 +37,7 @@ import fleet.fastutil.ints.IntArrayList
 import fleet.fastutil.ints.IntList
 import fleet.fastutil.ints.contains
 import fleet.fastutil.ints.retainAll
+import fleet.kernel.DbSource
 import fleet.reporting.shared.tracing.spannedScope
 import fleet.util.async.view
 import fleet.util.openmap.MutableOpenMap
@@ -228,8 +229,8 @@ private fun <T> ChangeScope.withTransactorView(kernelViewEntity: TransactorViewE
       .cachedQueryWithParts(IntList.of(SchemaPart, fleet.kernel.CommonPart, fleet.kernel.SharedPart))
       .expandAndMutateWithParts(AllParts)
       .enforcingUniquenessConstraints(IntList.of(SchemaPart,
-          fleet.kernel.CommonPart,
-          fleet.kernel.SharedPart
+                                                 fleet.kernel.CommonPart,
+                                                 fleet.kernel.SharedPart
       ))
       .withDefaultPart(fleet.kernel.SharedPart)
       .executingEffects(::effectsContext)
@@ -289,23 +290,24 @@ private fun kernelViewMiddleware(kernelViewEntity: TransactorViewEntity2): fleet
     }
 
     context(cs: ChangeScope)
-    override fun initDb() { }
+    override fun initDb() {
+    }
   }
 
 suspend fun <T> withTransactorView(
-    hiddenPart: Part,
-    defaultPart: Part,
-    middleware: fleet.kernel.TransactorMiddleware = fleet.kernel.TransactorMiddleware.Identity,
-    body: suspend CoroutineScope.(fleet.kernel.Transactor) -> T,
+  hiddenPart: Part,
+  defaultPart: Part,
+  middleware: fleet.kernel.TransactorMiddleware = fleet.kernel.TransactorMiddleware.Identity,
+  body: suspend CoroutineScope.(fleet.kernel.Transactor) -> T,
 ): T =
   spannedScope("withKernelView $defaultPart") {
     val kernelViewEntity = fleet.kernel.change {
-        register(TransactorViewEntity2)
-        TransactorViewEntity2.new {
-            it[TransactorViewEntity2.DefaultPart] = defaultPart
-            it[TransactorViewEntity2.HiddenPart] = hiddenPart
-            it[TransactorViewEntity2.QueryCache] = QueryCache.empty()
-        }
+      register(TransactorViewEntity2)
+      TransactorViewEntity2.new {
+        it[TransactorViewEntity2.DefaultPart] = defaultPart
+        it[TransactorViewEntity2.HiddenPart] = hiddenPart
+        it[TransactorViewEntity2.QueryCache] = QueryCache.empty()
+      }
     }
 
     val kernel = fleet.kernel.transactor()
@@ -344,10 +346,10 @@ suspend fun <T> withTransactorView(
       override val meta: MutableOpenMap<fleet.kernel.Transactor> = MutableOpenMap.empty()
     }
     withContext(transactorView + fleet.kernel.DbSource.ContextElement(
-        fleet.kernel.FlowDbSource(
-            transactorView.dbState,
-            debugName = "kernelView $transactorView"
-        )
+      fleet.kernel.FlowDbSource(
+        transactorView.dbState,
+        debugName = "kernelView $transactorView"
+      )
     )) { body(transactorView) }
   }
 

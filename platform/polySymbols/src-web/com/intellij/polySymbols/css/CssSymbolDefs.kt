@@ -30,5 +30,4 @@ val CSS_PARTS: PolySymbolKind = PolySymbolKind[NAMESPACE_CSS, "parts"]
  * Name of boolean property used by `css/pseudo-elements` and `css/pseudo-classes` symbols
  * to specify whether they require arguments. Defaults to false.
  **/
-@JvmField
-val PROP_CSS_ARGUMENTS: PolySymbolProperty<Any> = PolySymbolProperty.Companion["arguments"]
+object CssArgumentProperty: PolySymbolProperty<Any>("arguments", Any::class.java)

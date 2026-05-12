@@ -12,7 +12,7 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.trace
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.util.Key
-import com.intellij.terminal.frontend.view.impl.TerminalEventsHandler
+import com.intellij.terminal.frontend.view.impl.TerminalKeyEventsHandler
 import com.intellij.terminal.frontend.view.impl.TimedKeyEvent
 import com.intellij.terminal.frontend.view.impl.handleKeyEvent
 import org.jetbrains.plugins.terminal.TerminalBundle
@@ -22,7 +22,7 @@ import javax.swing.JComponent
 /**
  * Processes shortcuts of disabled terminal actions.
  *
- * If [com.intellij.terminal.frontend.TerminalEventDispatcher] lets the action system to process a key event,
+ * If [com.intellij.terminal.frontend.view.impl.TerminalEventDispatcher] lets the action system to process a key event,
  * it's possible that all terminal actions associated with the corresponding shortcut are disabled.
  * However, it's possible that there are some other platform (non-terminal) actions that have the same shortcut.
  * Yet, if the action isn't on the terminal's "allowed list," we must not allow it to be performed,
@@ -32,7 +32,7 @@ import javax.swing.JComponent
  * It is also promoted, so it's considered before other platform actions.
  */
 internal class SendShortcutToTerminalAction(
-  private val handler: TerminalEventsHandler,
+  private val handler: TerminalKeyEventsHandler,
 ) : DumbAwareAction() {
 
   private var actions: List<AnAction> = emptyList()

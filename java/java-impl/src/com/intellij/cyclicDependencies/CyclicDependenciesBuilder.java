@@ -103,7 +103,7 @@ public class CyclicDependenciesBuilder{
           final Set<PsiFile> psiFiles = builder.getDependencies().get(psiJavaFile);
           if (psiFiles == null) return;
           for (PsiPackage pack : packs) {
-            Set<PsiPackage> pack2Packages = myPackageDependencies.computeIfAbsent(pack, __ -> new HashSet<>());
+            Set<PsiPackage> pack2Packages = myPackageDependencies.computeIfAbsent(pack, _ -> new HashSet<>());
             for (PsiFile psiFile : psiFiles) {
               if (!(psiFile instanceof PsiJavaFile) ||
                   !projectFileIndex.isInSourceContent(psiFile.getVirtualFile()) ||
@@ -204,7 +204,7 @@ public class CyclicDependenciesBuilder{
     }
     final HashMap<PsiPackage, Set<List<PsiPackage>>> result = new HashMap<>();
     for (PsiPackage psiPackage : packages) {
-      Set<List<PsiPackage>> paths2Pack = result.computeIfAbsent(psiPackage, __ -> new HashSet<>());
+      Set<List<PsiPackage>> paths2Pack = result.computeIfAbsent(psiPackage, _ -> new HashSet<>());
       paths2Pack.addAll(GraphAlgorithms.getInstance().findCycles(myGraph, psiPackage));
     }
     return result;

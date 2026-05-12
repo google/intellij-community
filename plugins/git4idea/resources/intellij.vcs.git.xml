@@ -695,12 +695,14 @@
                  description="Starts in-memory variants of interactive rebase operations in suitable scenarios, leading to better performance"/>
     <registryKey key="git.in.memory.interactive.rebase.debug.notify.errors" defaultValue="false"
                  description="Show notification when in-memory interactive rebase fails and fallbacks to the regular one"/>
-    <registryKey key="git.cherry.pick.use.git.sequencer" defaultValue="true"
+    <registryKey key="git.cherry.pick.use.git.sequencer" defaultValue="false"
                  description="If enabled, Git will use a sequencer to cherry-pick multiple commits as a range (e.g., 'git cherry-pick A^..C') instead of applying each commit individually."/>
     <registryKey key="git.commit.staged.saver.use.index.info" defaultValue="true"
                  description="Uses an optimized approach to save and restore the index during changelist commits, improving performance"/>
-    <registryKey key="git.amend.specific.commit" defaultValue="false"
+    <registryKey key="git.amend.specific.commit" defaultValue="true"
                  description="Adds a dropdown link with a commit selector in the commit tool window to amend a specific commit"/>
+    <registryKey key="git.use.pathspec.from.file" defaultValue="true"
+                 description="Use --pathspec-from-file to pass paths to git commands instead of chunking arguments on the command line."/>
     <search.projectOptionsTopHitProvider implementation="git4idea.config.GitOptionsTopHitProvider"/>
     <vcs name="Git" vcsClass="git4idea.GitVcs" displayName="Git" administrativeAreaName=".git"/>
     <checkoutProvider implementation="git4idea.checkout.GitCheckoutProvider" order="first"/>
@@ -715,9 +717,11 @@
     <vcsCheckinHandlerFactory implementation="git4idea.checkin.GitDetachedRootCheckinHandlerFactory"/>
     <vcsCheckinHandlerFactory implementation="git4idea.checkin.GitFileNameCheckinHandlerFactory"/>
     <vcsCheckinHandlerFactory implementation="git4idea.rebase.GitRebaseCheckinHandlerFactory"/>
+    <vcsCheckinHandlerFactory implementation="git4idea.cherrypick.GitCherryPickContinueCheckinHandlerFactory"/>
     <checkinHandlerFactory implementation="git4idea.checkin.GitSkipHooksCommitHandlerFactory" order="last"/>
     <unresolvedMergeCheckProvider implementation="git4idea.checkin.GitUnresolvedMergeCheckProvider"/>
     <logProvider implementation="git4idea.log.GitLogProvider"/>
+    <vcsLogRefreshActionListener implementation="git4idea.log.GitLogRefreshActionListener"/>
     <vcsLogCommitStatusProvider implementation="git4idea.log.GitCommitSignatureStatusProvider"/>
     <vcsLogFileHistoryHandler implementation="git4idea.history.GitLogHistoryHandler" order="last"/>
     <vcsChangesViewRefresher implementation="git4idea.changes.GitChangesViewRefresher"/>
@@ -958,6 +962,22 @@
 
     <vcs.commitSuccessNotificationActionProvider
       implementation="git4idea.rebase.log.GitCommitSuccessNotificationRewordProvider"/>
+    <projectSettings service="git4idea.config.GitMergeSettings"/>
+    <projectSettings service="git4idea.config.GitRebaseSettings"/>
+    <projectSettings service="git4idea.config.GitPullSettings"/>
+    <applicationSettings service="git4idea.config.SSHConnectionSettings"/>
+    <projectSettings service="git4idea.config.GitSharedSettings"/>
+    <applicationSettings service="git4idea.config.GitVcsApplicationSettings"/>
+    <applicationSettings service="git4idea.remote.GitRememberedInputs"/>
+    <applicationSettings service="git4idea.log.GitExternalLogTabsProperties"/>
+    <applicationSettings service="git4idea.index.ui.GitStageUiApplicationSettings"/>
+    <projectSettings service="git4idea.update.GitUpdateProjectInfoLogProperties"/>
+    <projectSettings service="git4idea.ui.branch.dashboard.BranchesTreeStateHolder"/>
+    <projectSettings service="git4idea.branch.GitCompareBranchesBottomLogProperties"/>
+    <projectSettings service="git4idea.branch.GitCompareBranchesTopLogProperties"/>
+    <projectSettings service="git4idea.rebase.interactive.GitRewordedCommitMessageProvider"/>
+    <projectSettings service="git4idea.search.GitSearchEverywhereFilterConfiguration"/>
+    <projectSettings service="git4idea.index.ui.GitStageUiProjectSettings"/>
   </extensions>
 
   <extensions defaultExtensionNs="Git4Idea">

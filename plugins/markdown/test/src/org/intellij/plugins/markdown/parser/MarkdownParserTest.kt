@@ -31,6 +31,8 @@ class MarkdownParserTest: MarkdownParsingTestCase("parser") {
 
   fun testCodeBlock() = doTest(true)
 
+  fun testCodeSpan() = doTest(true)
+
   fun testComment() = doTest(true)
 
   fun testComplex() = doTest(true)

@@ -22,7 +22,7 @@ class GitTrackedSearchScopeTest : GitSingleRepoTest() {
     createFileStructure(tracked = relativePaths, untracked = emptyList())
 
     getGitUntrackedSearchScope().assertScope(shouldContain = relativePaths)
-    GitFileUtils.deleteFilesFromCache(project, repo.root, relativePaths.map { repo.root.findFileByRelativePath(it) })
+    GitFileUtils.deleteFilesFromCache(project, repo.root, relativePaths.map { repo.root.findFileByRelativePath(it)!! })
     getGitUntrackedSearchScope().assertScope(shouldNotContain = relativePaths)
   }
 

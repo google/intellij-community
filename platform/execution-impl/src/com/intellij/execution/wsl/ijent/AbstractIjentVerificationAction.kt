@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("DialogTitleCapitalization", "HardCodedStringLiteral")
 
 package com.intellij.execution.wsl.ijent
@@ -22,10 +22,9 @@ import com.intellij.platform.ide.progress.ModalTaskOwner
 import com.intellij.platform.ide.progress.TaskCancellation
 import com.intellij.platform.ide.progress.withModalProgress
 import com.intellij.platform.ijent.IjentMissingBinary
-import com.intellij.platform.ijent.IjentPosixApi
+import com.intellij.platform.ijent.ParentOfIjentScopes
 import com.intellij.platform.ijent.community.impl.nio.IjentNioFileSystemProvider
 import com.intellij.platform.ijent.spi.IjentDeployingStrategy
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -63,47 +62,45 @@ abstract class AbstractIjentVerificationAction : DumbAwareAction() {
     GlobalScope.launch {
       LOG.runAndLogException {
         try {
+          val (title, deployingStrategy, descriptor) = deployingStrategy(ParentOfIjentScopes(this))
           withModalProgress(modalTaskOwner, e.presentation.text, TaskCancellation.cancellable()) {
-            coroutineScope {
-              val (title, deployingStrategy, descriptor) = deployingStrategy(this)
-              deployingStrategy.createIjentSession<IjentPosixApi>().getIjentInstance(descriptor).use { ijent ->
-                coroutineScope {
-                  launch {
-                    val info = ijent.ijentProcessInfo
-                    withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
-                      Messages.showInfoMessage(
-                        """
+            deployingStrategy.createIjentSession().getIjentInstance(descriptor).use { ijent ->
+              coroutineScope {
+                launch {
+                  val info = ijent.ijentProcessInfo
+                  withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+                    Messages.showInfoMessage(
+                      """
                         Architecture: ${info.architecture}
                         Remote PID:   ${info.remotePid}
                         Version:      ${info.version}
                         """.trimIndent(),
-                        title
-                      )
-                    }
+                      title
+                    )
                   }
+                }
 
-                  launch {
-                    val process = ijent.exec.spawnProcess("uname", "-a").eelIt()
-                    val stdout = ByteArrayOutputStream()
-                    copy(process.stdout, stdout.asEelChannel()) // TODO: process errors
-                    withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
-                      Messages.showInfoMessage(stdout.toString(), title)
-                    }
+                launch {
+                  val process = ijent.exec.spawnProcess("uname", "-a").eelIt()
+                  val stdout = ByteArrayOutputStream()
+                  copy(process.stdout, stdout.asEelChannel()) // TODO: process errors
+                  withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+                    Messages.showInfoMessage(stdout.toString(), title)
                   }
+                }
 
-                  launch(Dispatchers.IO) {
-                    val path = "/etc"
-                    val isDir =
-                      IjentNioFileSystemProvider.getInstance()
-                        .newFileSystem(
-                          URI("ijent://some-random-string"),
-                          IjentNioFileSystemProvider.newFileSystemMap(ijent.fs),
-                        ).use { nioFs ->
-                          nioFs.getPath(path).isDirectory()
-                        }
-                    withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
-                      Messages.showInfoMessage("$path is directory: $isDir", title)
-                    }
+                launch(Dispatchers.IO) {
+                  val path = "/etc"
+                  val isDir =
+                    IjentNioFileSystemProvider.getInstance()
+                      .newFileSystem(
+                        URI("ijent://some-random-string"),
+                        IjentNioFileSystemProvider.newFileSystemMap(ijent.fs),
+                      ).use { nioFs ->
+                        nioFs.getPath(path).isDirectory()
+                      }
+                  withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+                    Messages.showInfoMessage("$path is directory: $isDir", title)
                   }
                 }
               }
@@ -119,7 +116,7 @@ abstract class AbstractIjentVerificationAction : DumbAwareAction() {
     }
   }
 
-  protected abstract suspend fun deployingStrategy(ijentProcessScope: CoroutineScope): Triple<String, IjentDeployingStrategy, EelDescriptor>
+  protected abstract suspend fun deployingStrategy(ijentProcessScope: ParentOfIjentScopes): Triple<String, IjentDeployingStrategy, EelDescriptor>
 
   companion object {
     protected val LOG = logger<AbstractIjentVerificationAction>()

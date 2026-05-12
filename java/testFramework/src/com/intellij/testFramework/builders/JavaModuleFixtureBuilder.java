@@ -36,6 +36,9 @@ public interface JavaModuleFixtureBuilder<T extends ModuleFixture> extends Modul
   @NotNull
   JavaModuleFixtureBuilder addJdk(@NonNls @NotNull String jdkPath);
 
+  @NotNull
+  JavaModuleFixtureBuilder addJdkVersion(@NotNull LanguageLevel jdkVersion);
+
   void setMockJdkLevel(@NotNull MockJdkLevel level);
 
   final class MavenLib {

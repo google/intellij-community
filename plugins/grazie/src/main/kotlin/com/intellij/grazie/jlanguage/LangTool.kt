@@ -29,6 +29,8 @@ import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
 
+internal const val CACHE_SIZE: Long = 1024
+
 object LangTool : GrazieStateLifecycle {
   private val langs: MutableMap<Lang, MutableMap<TextStyleDomain, JLanguageTool>> = ConcurrentHashMap()
   private val rulesEnabledByDefault = ConcurrentHashMap<Lang, MutableMap<TextStyleDomain, Set<String>>>()
@@ -43,7 +45,7 @@ object LangTool : GrazieStateLifecycle {
       GrazieDynamic.loadClass(qualifiedName) ?: throw ClassNotFoundException(qualifiedName)
     }
 
-    Hunspell.setHunspellDictionaryFactory(::LuceneHunspellDictionary)
+    Hunspell.setHunspellStreamFactory { _, dic, aff -> LuceneHunspellDictionary(dic, aff) }
   }
 
   internal fun globalIdPrefix(lang: Lang): String = globalIdPrefix(lang.iso)
@@ -74,7 +76,7 @@ object LangTool : GrazieStateLifecycle {
   internal fun createTool(lang: Lang, state: GrazieConfig.State, domain: TextStyleDomain): JLanguageTool {
     val jLanguage = lang.jLanguage
     require(jLanguage != null) { "Trying to get LangTool for not available language" }
-    return JLanguageTool(jLanguage, null, ResultCache(10_000)).apply {
+    return JLanguageTool(jLanguage, null, ResultCache(2 * CACHE_SIZE)).apply {
       setCheckCancelledCallback { ProgressManager.checkCanceled(); false }
       addMatchFilter(UppercaseMatchFilter())
 
@@ -226,7 +228,7 @@ object LangTool : GrazieStateLifecycle {
 
   override fun update(prevState: GrazieConfig.State, newState: GrazieConfig.State) {
     if (
-      prevState.availableLanguages == newState.availableLanguages
+      prevState.enabledLanguages == newState.enabledLanguages
       && prevState.userDisabledRules == newState.userDisabledRules
       && prevState.userEnabledRules == newState.userEnabledRules
       && prevState.domainEnabledRules == newState.domainEnabledRules

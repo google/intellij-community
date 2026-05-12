@@ -6,6 +6,7 @@ import com.intellij.openapi.fileEditor.ex.IdeDocumentHistory
 import com.intellij.openapi.fileEditor.impl.EditorHistoryManager
 import com.intellij.openapi.fileEditor.impl.EditorTabPresentationUtil
 import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.io.FileUtil
@@ -24,6 +25,7 @@ import com.intellij.util.PlatformUtils
 import com.intellij.util.Processor
 import com.intellij.util.SystemProperties
 import com.intellij.util.concurrency.annotations.RequiresReadLock
+import com.intellij.util.indexing.ProcessorWithThrottledCancellationCheck
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.Path
@@ -118,14 +120,18 @@ private fun getRecentFiles(project: Project): List<VirtualFile> {
 
 private val IDENTICAL_NAMES_CACHE_KEY = Key.create<Boolean>("IDENTICAL_NAMES_CACHE_KEY")
 
+@RequiresReadLock
 private fun areThereFilesWithSameName(virtualFile: VirtualFile, project: Project): Boolean {
+  if (DumbService.getInstance(project).isDumb) return false
+
   val alreadyComputedValue = virtualFile.getUserData(IDENTICAL_NAMES_CACHE_KEY)
   if (alreadyComputedValue != null) return alreadyComputedValue
 
   val searchScope =
     if (PlatformUtils.isRider()) GlobalSearchScope.allScope(project) else GlobalSearchScope.projectScope(project)
   val processor = StopOnTwoIdenticalNamesProcessor(virtualFile.name)
-  FilenameIndex.processFilesByName(virtualFile.name, true, searchScope, processor)
+  val cancellationAwareProcessor = ProcessorWithThrottledCancellationCheck(processor)
+  FilenameIndex.processFilesByName(virtualFile.name, true, searchScope, cancellationAwareProcessor)
   val moreThanOneOccurrence = processor.areThereMoreThanOneFile()
   virtualFile.putUserData(IDENTICAL_NAMES_CACHE_KEY, moreThanOneOccurrence)
   return moreThanOneOccurrence
@@ -148,6 +154,7 @@ private class StopOnTwoIdenticalNamesProcessor(private val searchedName: String)
   }
 }
 
+@RequiresReadLock
 internal fun createRecentFileViewModel(virtualFile: VirtualFile, project: Project): BackendRecentFilePresentation {
   ProgressManager.checkCanceled()
   val parentPath = virtualFile.parent?.path?.toNioPathOrNull()

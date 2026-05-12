@@ -54,7 +54,6 @@ data class DiscoveredProduct(
  */
 private val CLASS_TO_FILE_NAME_OVERRIDES = mapOf(
   "com.jetbrains.rider.build.product.DotnetExternalProductProperties" to "ReSharperExternalProductProperties.kt",
-  "org.jetbrains.intellij.build.AndroidStudioWithMarketplaceProperties" to "UltimateAwareIdeaCommunityProperties.kt",
 )
 
 /**

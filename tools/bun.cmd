@@ -16,22 +16,21 @@ set -eu
 
 # bun configuration
 export TOOL_NAME="bun"
-export TOOL_VERSION="1.3.7"
+export TOOL_VERSION="1.3.11"
 
-# SHA-256 checksums for each platform (Bun v1.3.7)
-export TOOL_CHECKSUM_LINUX_X64="2bd2e0e0bdf09483be67a704607848ebe72c28420824e4ce772ce3da62c23d65"
-export TOOL_CHECKSUM_LINUX_ARM64="d5c7d651423c2bc5ae3f92d36837ffb2ddc6ee91849672500b7fe8e5a5159fbc"
-export TOOL_CHECKSUM_WINDOWS_X64="659af6415800976c40338d5e1b9c0a4d61c503b880656cb00b43865a3a99e3bf"
-# NOTE: Bun v1.3.7 does not ship a Windows ARM64 build; use x64 archive.
-export TOOL_CHECKSUM_WINDOWS_ARM64="659af6415800976c40338d5e1b9c0a4d61c503b880656cb00b43865a3a99e3bf"
-export TOOL_CHECKSUM_MACOS_X64="cdfe9c71cacbdd9a73f098c3b050671957a7414e1321dfedd9a410d7794dae51"
-export TOOL_CHECKSUM_MACOS_ARM64="16701e494998e4764d49af2fbe62d25ec59cf3c79ee696eba1def2cfe9049d64"
+# SHA-256 checksums for each platform (Bun v1.3.11)
+export TOOL_CHECKSUM_LINUX_X64="8611ba935af886f05a6f38740a15160326c15e5d5d07adef966130b4493607ed"
+export TOOL_CHECKSUM_LINUX_ARM64="d13944da12a53ecc74bf6a720bd1d04c4555c038dfe422365356a7be47691fdf"
+export TOOL_CHECKSUM_WINDOWS_X64="066f8694f8b7d8df592452746d18f01710d4053e93030922dbc6e8c34a8c4b9f"
+export TOOL_CHECKSUM_WINDOWS_ARM64="c7f661d7529ec3f2fdfc1eac39a760c65f526955bce06b74859c532cb4bf00d7"
+export TOOL_CHECKSUM_MACOS_X64="c4fe2b9247218b0295f24e895aaec8fee62e74452679a9026b67eacbd611a286"
+export TOOL_CHECKSUM_MACOS_ARM64="6f5a3467ed9caec4795bf78cd476507d9f870c7d57b86c945fcb338126772ffc"
 
 # Download URLs (GitHub releases)
 export TOOL_URL_LINUX_X64="https://github.com/oven-sh/bun/releases/download/bun-v${TOOL_VERSION}/bun-linux-x64.zip"
 export TOOL_URL_LINUX_ARM64="https://github.com/oven-sh/bun/releases/download/bun-v${TOOL_VERSION}/bun-linux-aarch64.zip"
 export TOOL_URL_WINDOWS_X64="https://github.com/oven-sh/bun/releases/download/bun-v${TOOL_VERSION}/bun-windows-x64.zip"
-export TOOL_URL_WINDOWS_ARM64="https://github.com/oven-sh/bun/releases/download/bun-v${TOOL_VERSION}/bun-windows-x64.zip"
+export TOOL_URL_WINDOWS_ARM64="https://github.com/oven-sh/bun/releases/download/bun-v${TOOL_VERSION}/bun-windows-aarch64.zip"
 export TOOL_URL_MACOS_X64="https://github.com/oven-sh/bun/releases/download/bun-v${TOOL_VERSION}/bun-darwin-x64.zip"
 export TOOL_URL_MACOS_ARM64="https://github.com/oven-sh/bun/releases/download/bun-v${TOOL_VERSION}/bun-darwin-aarch64.zip"
 
@@ -56,22 +55,21 @@ REM to verify all platform checksums before committing.
 
 REM bun configuration
 set "TOOL_NAME=bun"
-set "TOOL_VERSION=1.3.7"
+set "TOOL_VERSION=1.3.11"
 
-REM SHA-256 checksums for each platform (Bun v1.3.7)
-set "TOOL_CHECKSUM_LINUX_X64=2bd2e0e0bdf09483be67a704607848ebe72c28420824e4ce772ce3da62c23d65"
-set "TOOL_CHECKSUM_LINUX_ARM64=d5c7d651423c2bc5ae3f92d36837ffb2ddc6ee91849672500b7fe8e5a5159fbc"
-set "TOOL_CHECKSUM_WINDOWS_X64=659af6415800976c40338d5e1b9c0a4d61c503b880656cb00b43865a3a99e3bf"
-REM NOTE: Bun v1.3.7 does not ship a Windows ARM64 build; use x64 archive.
-set "TOOL_CHECKSUM_WINDOWS_ARM64=659af6415800976c40338d5e1b9c0a4d61c503b880656cb00b43865a3a99e3bf"
-set "TOOL_CHECKSUM_MACOS_X64=cdfe9c71cacbdd9a73f098c3b050671957a7414e1321dfedd9a410d7794dae51"
-set "TOOL_CHECKSUM_MACOS_ARM64=16701e494998e4764d49af2fbe62d25ec59cf3c79ee696eba1def2cfe9049d64"
+REM SHA-256 checksums for each platform (Bun v1.3.11)
+set "TOOL_CHECKSUM_LINUX_X64=8611ba935af886f05a6f38740a15160326c15e5d5d07adef966130b4493607ed"
+set "TOOL_CHECKSUM_LINUX_ARM64=d13944da12a53ecc74bf6a720bd1d04c4555c038dfe422365356a7be47691fdf"
+set "TOOL_CHECKSUM_WINDOWS_X64=066f8694f8b7d8df592452746d18f01710d4053e93030922dbc6e8c34a8c4b9f"
+set "TOOL_CHECKSUM_WINDOWS_ARM64=c7f661d7529ec3f2fdfc1eac39a760c65f526955bce06b74859c532cb4bf00d7"
+set "TOOL_CHECKSUM_MACOS_X64=c4fe2b9247218b0295f24e895aaec8fee62e74452679a9026b67eacbd611a286"
+set "TOOL_CHECKSUM_MACOS_ARM64=6f5a3467ed9caec4795bf78cd476507d9f870c7d57b86c945fcb338126772ffc"
 
 REM Download URLs (GitHub releases)
 set "TOOL_URL_LINUX_X64=https://github.com/oven-sh/bun/releases/download/bun-v%TOOL_VERSION%/bun-linux-x64.zip"
 set "TOOL_URL_LINUX_ARM64=https://github.com/oven-sh/bun/releases/download/bun-v%TOOL_VERSION%/bun-linux-aarch64.zip"
 set "TOOL_URL_WINDOWS_X64=https://github.com/oven-sh/bun/releases/download/bun-v%TOOL_VERSION%/bun-windows-x64.zip"
-set "TOOL_URL_WINDOWS_ARM64=https://github.com/oven-sh/bun/releases/download/bun-v%TOOL_VERSION%/bun-windows-x64.zip"
+set "TOOL_URL_WINDOWS_ARM64=https://github.com/oven-sh/bun/releases/download/bun-v%TOOL_VERSION%/bun-windows-aarch64.zip"
 set "TOOL_URL_MACOS_X64=https://github.com/oven-sh/bun/releases/download/bun-v%TOOL_VERSION%/bun-darwin-x64.zip"
 set "TOOL_URL_MACOS_ARM64=https://github.com/oven-sh/bun/releases/download/bun-v%TOOL_VERSION%/bun-darwin-aarch64.zip"
 

@@ -1,14 +1,9 @@
 ### auto-generated section `build intellij.xml.tests` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "tests_test_resources",
-  srcs = glob(["testResources/**/*"]),
-  strip_prefix = "testResources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tests",
+  module_name = "intellij.xml.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -26,10 +21,12 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "intellij.xml.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":tests_test_resources"],
+  resources = glob(["testResources/**/*"]),
+  resource_strip_prefix = "testResources",
   deps = [
     "@lib//:junit4",
     "//platform/analysis-api:analysis",
@@ -40,6 +37,8 @@ jvm_library(
     "//platform/core-api:core_test_lib",
     "//platform/lang-core",
     "//platform/lang-core:lang-core_test_lib",
+    "//platform/lang-api:lang",
+    "//platform/lang-api:lang_test_lib",
     "//platform/editor-ui-api:editor-ui",
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//platform/indexing-api:indexing",
@@ -64,10 +63,14 @@ jvm_library(
     "//java/idea-ui:ui_test_lib",
     "//java/java-impl:impl",
     "//java/java-impl:impl_test_lib",
+    "//java/java-psi-api:psi",
+    "//java/java-psi-api:psi_test_lib",
     "//platform/editor-ui-ex:editor-ex",
     "//platform/editor-ui-ex:editor-ex_test_lib",
     "//xml/xml-psi-api:psi",
     "//xml/xml-psi-api:psi_test_lib",
+    "//xml/xml-parser:parser",
+    "//xml/xml-parser:parser_test_lib",
     "//xml/testFramework",
     "//xml/testFramework:testFramework_test_lib",
     "//platform/testFramework",
@@ -81,11 +84,14 @@ jvm_library(
     "//platform/platform-tests:tests",
     "//platform/platform-tests:tests_test_lib",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "@lib//:xml-resolver",
     "//RegExpSupport:regexp",
     "//RegExpSupport:regexp_test_lib",
     "//platform/util/nanoxml",
     "//platform/util/nanoxml:nanoxml_test_lib",
+    "//platform/util:util-ui",
+    "//platform/util:util-ui_test_lib",
     "//plugins/IntelliLang:langInjection",
     "//plugins/IntelliLang:langInjection_test_lib",
     "//java/langInjection",
@@ -94,7 +100,10 @@ jvm_library(
     "//xml/xml-analysis-impl:analysis-impl_test_lib",
     "//platform/core-ui",
     "//platform/core-ui:core-ui_test_lib",
-    "@lib//:assert_j",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
+    "//libraries/assertj-core",
+    "//libraries/assertj-core:assertj-core_test_lib",
     "//libraries/guava",
     "//libraries/guava:guava_test_lib",
     "//libraries/jackson/jackson",
@@ -107,6 +116,8 @@ jvm_library(
     "//libraries/xerces:xerces_test_lib",
     "//platform/syntax/syntax-scripts:scripts",
     "//platform/syntax/syntax-scripts:scripts_test_lib",
+    "//platform/syntax/syntax-util:util",
+    "//platform/syntax/syntax-util:util_test_lib",
     "//xml/xml-syntax:syntax",
     "//xml/xml-syntax:syntax_test_lib",
     "//java/java-runtime:rt",
@@ -116,14 +127,27 @@ jvm_library(
     "//xml/xml-analysis-api:analysis_test_lib",
     "//xml/emmet",
     "//xml/emmet:emmet_test_lib",
+    "//libraries/fastutil",
+    "//libraries/fastutil:fastutil_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/util/concurrency",
+    "//platform/util/concurrency:concurrency_test_lib",
   ],
   runtime_deps = [
     ":tests",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//xml/langInjection:langInjection_test_lib",
   ]
 )
 ### auto-generated section `build intellij.xml.tests` end
+
+### auto-generated section `iml intellij.xml.tests` start
+exports_files([
+  "intellij.xml.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.xml.tests` end
 
 ### auto-generated section `test intellij.xml.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

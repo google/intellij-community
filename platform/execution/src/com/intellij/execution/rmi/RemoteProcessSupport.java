@@ -637,14 +637,13 @@ public abstract class RemoteProcessSupport<Target, EntryPoint, Parameters> {
       myFuture = AppExecutorUtil.getAppScheduledExecutorService().scheduleWithFixedDelay(() -> {
         beat();
       }, pulseTimeoutMillis, pulseTimeoutMillis, TimeUnit.MILLISECONDS);
-      //noinspection TestOnlyProblems
       Job contextJob = Cancellation.currentJob();
       if (contextJob != null) {
         // The spawned process is bound to the container that invoked it
         // Using Application as a default container is a bad guess, as it does not allow
         // proper disposal of the closing of the actual container
         // which may lead to project leaks, in this particular case.
-        contextJob.invokeOnCompletion((__) -> {
+        contextJob.invokeOnCompletion((_) -> {
           stopBeat();
           return null;
         });

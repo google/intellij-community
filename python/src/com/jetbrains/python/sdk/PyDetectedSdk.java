@@ -15,9 +15,11 @@
  */
 package com.jetbrains.python.sdk;
 
+import com.intellij.openapi.projectRoots.Sdk;
 import com.intellij.openapi.projectRoots.impl.ProjectJdkImpl;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * It is discouraged to use this class as it violates LSP.
@@ -32,5 +34,21 @@ public final class PyDetectedSdk extends ProjectJdkImpl {
   @Override
   public String getVersionString() {
     return "";
+  }
+
+  /**
+   * This method was designed to avoid instanceof checks and provide a more type-safe way to cast Sdk to PyDetectedSdk.
+   * @param sdk - Sdk to be casted
+   * @return PyDetectedSdk if sdk itself or delegate of PyRichSdk is instance of PyDetectedSdk, null otherwise
+   */
+  @ApiStatus.Obsolete
+  public static @Nullable PyDetectedSdk asPyDetectedSdk(Sdk sdk) {
+    if (sdk instanceof PyRichSdk) {
+      return asPyDetectedSdk(((PyRichSdk)sdk).getSdk());
+    }
+    if (sdk instanceof PyDetectedSdk) {
+      return (PyDetectedSdk)sdk;
+    }
+    return null;
   }
 }

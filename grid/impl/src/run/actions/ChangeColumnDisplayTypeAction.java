@@ -4,6 +4,8 @@ import com.intellij.database.DataGridBundle;
 import com.intellij.database.DatabaseDataKeys;
 import com.intellij.database.datagrid.CoreGrid;
 import com.intellij.database.datagrid.DataGrid;
+import com.intellij.database.datagrid.GridCellRequest;
+import com.intellij.database.datagrid.GridCellRequestKt;
 import com.intellij.database.datagrid.GridColumn;
 import com.intellij.database.datagrid.GridRow;
 import com.intellij.database.datagrid.ModelIndex;
@@ -24,8 +26,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
-
-import static com.intellij.database.run.ui.DataAccessType.DATA_WITH_MUTATIONS;
 
 public class ChangeColumnDisplayTypeAction extends ActionGroup implements DumbAware {
 
@@ -72,13 +72,14 @@ public class ChangeColumnDisplayTypeAction extends ActionGroup implements DumbAw
   }
 
   public static boolean isIntegerOrBigInt(@NotNull ModelIndex<GridColumn> columnIdx, @NotNull CoreGrid<GridRow, GridColumn> grid) {
-    int type = GridCellEditorHelper.get(grid).guessJdbcTypeForEditing(grid, null, columnIdx);
+    int type = GridCellEditorHelper.get(grid).guessJdbcTypeForEditing(GridCellRequestKt.requestColumn(grid, columnIdx));
     return ObjectFormatterUtil.isIntegerOrBigInt(type);
   }
 
   public static boolean isBinary(@NotNull ModelIndex<GridColumn> columnIdx, @NotNull CoreGrid<GridRow, GridColumn> grid) {
-    int type = GridCellEditorHelper.get(grid).guessJdbcTypeForEditing(grid, null, columnIdx);
-    GridColumn column = grid.getDataModel(DATA_WITH_MUTATIONS).getColumn(columnIdx);
+    GridCellRequest<GridRow, GridColumn> request = GridCellRequestKt.requestColumn(grid, columnIdx);
+    int type = GridCellEditorHelper.get(grid).guessJdbcTypeForEditing(request);
+    GridColumn column = request.getColumn();
     return ObjectFormatterUtil.isBinary(column, type);
   }
 

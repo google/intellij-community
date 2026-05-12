@@ -146,7 +146,7 @@ public abstract class AbstractTreeClassChooserDialog<T extends PsiNamedElement> 
   }
 
   private Filter<? super T> allFilter() {
-    return __ -> true;
+    return _ -> true;
   }
 
   @Override
@@ -207,7 +207,7 @@ public abstract class AbstractTreeClassChooserDialog<T extends PsiNamedElement> 
       }
     }.installOn(myTree);
 
-    myTree.addTreeSelectionListener(__ -> handleSelectionChanged());
+    myTree.addTreeSelectionListener(_ -> handleSelectionChanged());
 
     TreeUIHelper.getInstance().installTreeSpeedSearch(myTree);
 
@@ -272,7 +272,7 @@ public abstract class AbstractTreeClassChooserDialog<T extends PsiNamedElement> 
 
     myGotoByNamePanel.invoke(new MyCallback(), getModalityState(), false);
 
-    myTabbedPane.addChangeListener(__ -> handleSelectionChanged());
+    myTabbedPane.addChangeListener(_ -> handleSelectionChanged());
 
     return myTabbedPane.getComponent();
   }

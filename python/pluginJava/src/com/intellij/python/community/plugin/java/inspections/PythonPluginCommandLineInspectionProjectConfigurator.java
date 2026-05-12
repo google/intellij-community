@@ -97,8 +97,8 @@ final class PythonPluginCommandLineInspectionProjectConfigurator implements Comm
   }
 
   private static @Nullable Sdk configureSdk(@NotNull Sdk detectedSdk) {
-    final Sdk sdk = detectedSdk instanceof PyDetectedSdk
-                    ? PySdkExtKt.setup((PyDetectedSdk)detectedSdk, Arrays.asList(ProjectJdkTable.getInstance().getAllJdks()))
+    final Sdk sdk = PyDetectedSdk.asPyDetectedSdk(detectedSdk) != null
+                    ? PySdkExtKt.setup(detectedSdk, Arrays.asList(ProjectJdkTable.getInstance().getAllJdks()))
                     : detectedSdk;
 
     if (sdk != null) {

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.syntax.psi
 
 import com.intellij.lang.ASTNode
@@ -9,7 +9,10 @@ import com.intellij.platform.syntax.util.runtime.ParserUserState
 import com.intellij.psi.PsiElement
 import com.intellij.psi.tree.IFileElementType
 
-open class SyntaxGrammarKitFileElementType(language: Language) : IFileElementType(language) {
+class SyntaxGrammarKitFileElementType(
+  language: Language,
+  val stateFactory: (() -> ParserUserState?)? = null,
+) : IFileElementType(language) {
   override fun doParseContents(chameleon: ASTNode, psi: PsiElement): ASTNode? {
     val builderFactory = PsiSyntaxBuilderFactory.getInstance()
     val elementType = chameleon.getElementType()
@@ -28,7 +31,7 @@ open class SyntaxGrammarKitFileElementType(language: Language) : IFileElementTyp
     val parserRuntime = createSyntaxGeneratedParserRuntime(
       language = language,
       builder = syntaxBuilder.getSyntaxTreeBuilder(),
-      state = createExtendedParserUserState()
+      state = stateFactory?.invoke()
     )
 
     val root = registerParse(syntaxBuilder, language) {
@@ -37,6 +40,4 @@ open class SyntaxGrammarKitFileElementType(language: Language) : IFileElementTyp
     }
     return root.getFirstChildNode()
   }
-
-  open fun createExtendedParserUserState(): ParserUserState? = null
 }

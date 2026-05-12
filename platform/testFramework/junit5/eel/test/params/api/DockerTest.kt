@@ -2,6 +2,7 @@
 package com.intellij.platform.testFramework.junit5.eel.params.api
 
 import org.jetbrains.annotations.TestOnly
+import kotlin.reflect.KClass
 
 const val DEFAULT_EEL_TEST_DOCKER_IMAGE: String = "debian"
 
@@ -19,4 +20,19 @@ const val DEFAULT_EEL_TEST_DOCKER_IMAGE: String = "debian"
 @Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION)
 @TestApplicationWithEel
 @Repeatable
-annotation class DockerTest(val image: String = DEFAULT_EEL_TEST_DOCKER_IMAGE, val mandatory: Boolean = true, val setupCommands: Array<String> = [])
+annotation class DockerTest(
+  val image: String = DEFAULT_EEL_TEST_DOCKER_IMAGE,
+  val imageProvider: KClass<out DockerTestImageProvider> = DefaultEelDockerTestImageProvider::class,
+  val mandatory: Boolean = true,
+  val setupCommands: Array<String> = [],
+)
+
+interface DockerTestImageProvider {
+  val image: String
+  val furtherLines: List<String>
+}
+
+class DefaultEelDockerTestImageProvider : DockerTestImageProvider {
+  override val image: String = DEFAULT_EEL_TEST_DOCKER_IMAGE
+  override val furtherLines: List<String> = emptyList()
+}

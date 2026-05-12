@@ -353,14 +353,14 @@ public abstract class OrderEnumeratorBase extends OrderEnumerator implements Ord
 
   @Override
   public void forEach(final @NotNull Processor<? super OrderEntry> processor) {
-    forEach((entry, __) -> processor.process(entry));
+    forEach((entry, _) -> processor.process(entry));
   }
 
   protected abstract void forEach(@NotNull PairProcessor<? super OrderEntry, ? super List<? extends OrderEnumerationHandler>> processor);
 
   @Override
   public void forEachLibrary(final @NotNull Processor<? super Library> processor) {
-    forEach((entry, __) -> {
+    forEach((entry, _) -> {
       if (entry instanceof LibraryOrderEntry) {
         final Library library = ((LibraryOrderEntry)entry).getLibrary();
         if (library != null) {

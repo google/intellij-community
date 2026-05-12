@@ -1,6 +1,6 @@
 <html>
 <body>
-<p>Reports <code>if</code> statements which can be simplified to a single statement.</p>
+<p>Reports boolean <code>if</code> expressions and statements which can be simplified to a single expression.</p>
 <p><b>Example:</b></p>
 <pre><code>
   fun test(): Boolean {
@@ -16,6 +16,18 @@
   fun test(): Boolean {
       return foo()
   }
+</code></pre>
+<p>The inspection also simplifies branches where one branch is a boolean constant:</p>
+<pre><code>
+  val filterModified = if (condition) {
+      someBooleanExpression
+  } else {
+      false
+  }
+</code></pre>
+<p>After the quick-fix is applied:</p>
+<pre><code>
+  val filterModified = condition &amp;&amp; someBooleanExpression
 </code></pre>
 </body>
 </html>

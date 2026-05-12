@@ -7,11 +7,13 @@ import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.util.TextFieldCompletionProvider
 import com.jetbrains.python.debugger.PyDebugValue
+import com.jetbrains.python.debugger.PyDebuggerException
 import com.jetbrains.python.debugger.PyFrameAccessor
+import com.jetbrains.python.debugger.values.DataFrameDebugValue
 
 class PyDataViewerCompletionProvider(private val frameAccessor: PyFrameAccessor) : TextFieldCompletionProvider() {
   override fun addCompletionVariants(text: String, offset: Int, prefix: String, result: CompletionResultSet) {
-    val values = availableValues.sortedBy { obj: PyDebugValue -> obj.name }
+    val values = dataFrameValues.sortedBy { obj: PyDebugValue -> obj.name }
     for (i in values.indices) {
       val value = values[i]
       val element = LookupElementBuilder.create(value.name).withTypeText(value.type, true)
@@ -19,22 +21,17 @@ class PyDataViewerCompletionProvider(private val frameAccessor: PyFrameAccessor)
     }
   }
 
-  private val availableValues: List<PyDebugValue>
-    get() {
-      val values: MutableList<PyDebugValue> = ArrayList()
-      try {
-        val list = frameAccessor.loadFrame(null) ?: return values
-        for (i in 0 until list.size()) {
-          val value = list.getValue(i) as PyDebugValue
-          val type = value.type
-          if (DataViewStrategy.getStrategy(type) != null) {
-            values.add(value)
-          }
+  private val dataFrameValues: List<PyDebugValue>
+    get() = try {
+      val pythonVariables = frameAccessor.loadFrame(null) ?: return emptyList()
+      buildList {
+        for (i in 0 until pythonVariables.size()) {
+          val dataFrameValue = pythonVariables.getValue(i) as? DataFrameDebugValue ?: continue
+          add(dataFrameValue)
         }
       }
-      catch (e: Exception) {
-        thisLogger().error(e)
-      }
-      return values
+    } catch (e: PyDebuggerException) {
+      thisLogger().error("Error loading frame variables for completion provider: ${e.message}")
+      emptyList()
     }
 }

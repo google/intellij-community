@@ -4,7 +4,22 @@ package com.intellij.openapi.editor.impl;
 import com.intellij.openapi.editor.Inlay;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
+
 public class InlayModelTest extends AbstractEditorTest{
+
+  public void testInlineInlaysAtSameOffsetAreSortedByRelationToPrecedingText() {
+    initText("text");
+    Inlay<?> relatedToFollowingText = addInlay(1, false);
+    Inlay<?> relatedToPrecedingText = addInlay(1, true);
+
+    List<Inlay<?>> inlays = getEditor().getInlayModel().getInlineElementsInRange(1, 1);
+    assertEquals(2, inlays.size());
+    assertEquals(relatedToFollowingText, inlays.get(0));
+    assertFalse(inlays.get(0).isRelatedToPrecedingText());
+    assertEquals(relatedToPrecedingText, inlays.get(1));
+    assertTrue(inlays.get(1).isRelatedToPrecedingText());
+  }
 
   public void testWidestBlockInlayIsNullIfNoInlayExists() {
     initText("text");

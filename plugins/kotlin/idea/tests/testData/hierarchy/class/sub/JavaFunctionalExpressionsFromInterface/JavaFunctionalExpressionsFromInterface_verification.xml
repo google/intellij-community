@@ -1,8 +1,8 @@
 <node text="A ()" base="true">
   <node text="B ()">
     <node text="C ()"/>
-    <node text="() -> {...} in D"/>
+    <node text="() -> {...} (D)"/>
   </node>
-  <node text="() -> {...} in D"/>
-  <node text="() -> {...} in D"/>
+  <node text="() -> {...} (D)"/>
+  <node text="() -> {...} (D)"/>
 </node>

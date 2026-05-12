@@ -67,6 +67,7 @@ import static com.intellij.psi.impl.source.tree.JavaElementType.YIELD_STATEMENT;
  * See {@link com.intellij.java.syntax.parser.JavaParser}
  */
 @Deprecated
+@ApiStatus.ScheduledForRemoval
 public class StatementParser {
 
   private static final TokenSet YIELD_STMT_INDICATOR_TOKENS = TokenSet.create(
@@ -398,7 +399,9 @@ public class StatementParser {
       builder.advanceLexer();
     }
     builder.advanceLexer();
-    boolean isRecordPattern = builder.getTokenType() != JavaTokenType.SEMICOLON && builder.getTokenType() != JavaTokenType.DOT;
+    boolean isRecordPattern = builder.getTokenType() != JavaTokenType.SEMICOLON &&
+                              builder.getTokenType() != JavaTokenType.DOT &&
+                              builder.getTokenType() != JavaTokenType.COMMA;
     patternStart.rollbackTo();
     return isRecordPattern;
   }

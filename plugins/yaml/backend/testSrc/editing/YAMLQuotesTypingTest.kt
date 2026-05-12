@@ -80,6 +80,146 @@ class YAMLQuotesTypingTest : BasePlatformTestCase(){
     """.trimIndent())
   }
   
+  fun testOverTypeClosingQuoteInEmptyValue(){
+    myFixture.configureByText("test.yaml", """
+        myyaml:
+          root: "<caret>"
+
+    """.trimIndent())
+    myFixture.type("\"")
+    myFixture.checkResult("""
+        myyaml:
+          root: ""<caret>
+
+    """.trimIndent())
+  }
+
+  fun testOverTypeClosingSingleQuoteInEmptyValue(){
+    myFixture.configureByText("test.yaml", """
+        myyaml:
+          root: '<caret>'
+
+    """.trimIndent())
+    myFixture.type("'")
+    myFixture.checkResult("""
+        myyaml:
+          root: ''<caret>
+
+    """.trimIndent())
+  }
+
+  fun testOverTypeClosingQuoteInValue(){
+    myFixture.configureByText("test.yaml", """
+        myyaml:
+          root: "value<caret>"
+
+    """.trimIndent())
+    myFixture.type("\"")
+    myFixture.checkResult("""
+        myyaml:
+          root: "value"<caret>
+
+    """.trimIndent())
+  }
+
+  fun testOverTypeClosingSingleQuoteInValue(){
+    myFixture.configureByText("test.yaml", """
+        myyaml:
+          root: 'value<caret>'
+
+    """.trimIndent())
+    myFixture.type("'")
+    myFixture.checkResult("""
+        myyaml:
+          root: 'value'<caret>
+
+    """.trimIndent())
+  }
+
+  fun testLoneDoubleQuoteIsNotOverTyped(){
+    myFixture.configureByText("test.yaml", """
+        myyaml:
+          root: <caret>"
+
+    """.trimIndent())
+    myFixture.type("\"")
+    myFixture.checkResult("""
+        myyaml:
+          root: "<caret>"
+
+    """.trimIndent())
+  }
+
+  fun testLoneSingleQuoteIsNotOverTyped(){
+    myFixture.configureByText("test.yaml", """
+        myyaml:
+          root: <caret>'
+
+    """.trimIndent())
+    myFixture.type("'")
+    myFixture.checkResult("""
+        myyaml:
+          root: '<caret>'
+
+    """.trimIndent())
+  }
+
+  fun testOverTypeClosingQuoteInEmptyKey(){
+    myFixture.configureByText("test.yaml", """
+        myyaml:
+          "<caret>": value
+
+    """.trimIndent())
+    myFixture.type("\"")
+    myFixture.checkResult("""
+        myyaml:
+          ""<caret>: value
+
+    """.trimIndent())
+  }
+
+  fun testOverTypeClosingSingleQuoteInEmptyKey(){
+    myFixture.configureByText("test.yaml", """
+        myyaml:
+          '<caret>': value
+
+    """.trimIndent())
+    myFixture.type("'")
+    myFixture.checkResult("""
+        myyaml:
+          ''<caret>: value
+
+    """.trimIndent())
+  }
+
+  fun testOverTypeClosingQuoteInKey(){
+    myFixture.configureByText("test.yaml", """
+        myyaml:
+          "my key<caret>": value
+
+    """.trimIndent())
+    myFixture.type("\"")
+    myFixture.checkResult("""
+        myyaml:
+          "my key"<caret>: value
+
+    """.trimIndent())
+  }
+
+  fun testOverTypeClosingSingleQuoteInKey(){
+    myFixture.configureByText("test.yaml", """
+        myyaml:
+          'my key<caret>': value
+
+    """.trimIndent())
+    myFixture.type("'")
+    myFixture.checkResult("""
+        myyaml:
+          'my key'<caret>: value
+
+    """.trimIndent())
+  }
+
   fun testQuoteBeforeQuotes(){
     myFixture.configureByText("test.yaml", """
       bug:

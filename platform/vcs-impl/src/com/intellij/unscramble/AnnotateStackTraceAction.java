@@ -202,7 +202,7 @@ public final class AnnotateStackTraceAction extends DumbAwareAction {
             VirtualFile file = getHyperlinkVirtualFile(hyperlinks.findAllHyperlinksOnLine(line));
             if (file == null) continue;
 
-            files2lines.computeIfAbsent(file, __ -> new IntArrayList()).add(line);
+            files2lines.computeIfAbsent(file, _ -> new IntArrayList()).add(line);
           }
         });
 

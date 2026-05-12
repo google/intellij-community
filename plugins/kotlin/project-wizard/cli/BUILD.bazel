@@ -11,7 +11,6 @@ jvm_library(
     "//libraries/kotlin/reflect",
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
     "//libraries/snakeyaml",
-    "//plugins/kotlin/base/frontend-agnostic",
     "//plugins/kotlin/project-wizard/core",
   ],
   runtime_deps = [
@@ -22,6 +21,7 @@ jvm_library(
 
 jvm_library(
   name = "cli_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.projectWizard.cli",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -32,7 +32,6 @@ jvm_library(
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
     "@lib//:kotlinc-kotlin-compiler-tests",
     "//libraries/snakeyaml:snakeyaml_test_lib",
-    "//plugins/kotlin/base/frontend-agnostic:frontend-agnostic_test_lib",
     "//plugins/kotlin/project-wizard/core:core_test_lib",
     "//plugins/kotlin/tests-common:common-tests",
     "//plugins/kotlin/tests-common:common-tests_test_lib",
@@ -41,3 +40,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.kotlin.projectWizard.cli` end
+
+### auto-generated section `iml intellij.kotlin.projectWizard.cli` start
+exports_files([
+  "intellij.kotlin.projectWizard.cli.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.projectWizard.cli` end

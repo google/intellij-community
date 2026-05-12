@@ -138,7 +138,7 @@ public final class PyStatementEffectInspection extends PyInspection {
           if (rightExpression != null) {
             type = myTypeEvalContext.getType(rightExpression);
             if (type != null) {
-              String rmethod = "__r" + method.substring(2); // __add__ -> __radd__
+              String rmethod = "__r" + method.substring(2); // __add_ -> __radd__
               if (!type.isBuiltin() && type.resolveMember(rmethod, null, AccessDirection.READ, getResolveContext()) != null) {
                 return true;
               }

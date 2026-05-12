@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.workspace.jps.bridge.impl.serialization
 
+import com.intellij.platform.workspace.jps.serialization.CustomImlComponentNameContributor
 import com.intellij.platform.workspace.jps.serialization.SerializationContext
 import com.intellij.platform.workspace.jps.serialization.impl.CustomFacetRelatedEntitySerializer
 import com.intellij.platform.workspace.jps.serialization.impl.CustomModuleComponentSerializer
@@ -31,4 +32,7 @@ internal class SerializationContextImpl(
   
   override val customFacetRelatedEntitySerializers: List<CustomFacetRelatedEntitySerializer<*>>
     get() = listOf(DefaultFacetEntitySerializer()) //todo
+
+  override val customImpComponentNameContributors: List<CustomImlComponentNameContributor>
+    get() = emptyList() // todo
 }

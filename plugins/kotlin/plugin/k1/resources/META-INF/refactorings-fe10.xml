@@ -140,6 +140,7 @@
             description="Replace dialog with template for extract method refactoring"
             defaultValue="true"
             restartRequired="false"/>
+    <applicationSettings service="org.jetbrains.kotlin.idea.refactoring.KotlinRefactoringSettings"/>
   </extensions>
 
   <extensions defaultExtensionNs="org.jetbrains.kotlin">

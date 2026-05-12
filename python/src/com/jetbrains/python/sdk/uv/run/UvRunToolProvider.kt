@@ -9,14 +9,21 @@ import com.jetbrains.python.run.features.PyRunToolId
 import com.jetbrains.python.run.features.PyRunToolParameters
 import com.jetbrains.python.run.features.PyRunToolProvider
 import com.jetbrains.python.sdk.add.v2.FileSystem
+import com.jetbrains.python.sdk.uv.UvSdkAdditionalData
 import com.jetbrains.python.sdk.uv.getUvExecutionContext
 import com.jetbrains.python.sdk.uv.impl.getUvExecutable
 import com.jetbrains.python.sdk.uv.isUv
+import com.jetbrains.python.target.PyTargetAwareAdditionalData
 
 /**
  * PyRunToolProvider implementation that runs scripts/modules using `uv run`.
+ *
+ * Matches both local UV SDKs ([UvSdkAdditionalData]) and remote ones
+ * ([PyTargetAwareAdditionalData] wrapping `UvSdkFlavorData`).
  */
 internal class UvRunToolProvider : PyRunToolProvider {
+
+  override fun isAvailable(sdk: Sdk): Boolean = sdk.isUv
 
   override suspend fun getRunToolParameters(sdk: Sdk): PyRunToolParameters {
     val env = mutableMapOf<String, String>()
@@ -28,7 +35,7 @@ internal class UvRunToolProvider : PyRunToolProvider {
       env += "VIRTUAL_ENV" to it
       env += "UV_PROJECT_ENVIRONMENT" to it
     }
-    return PyRunToolParameters(requireNotNull(uvExecutable) { "Unable to find uv executable." }, listOf("run"), env, dropOldExe = true)
+    return PyRunToolParameters(requireNotNull(uvExecutable) { "Unable to find uv executable." }, listOf("run"), env)
   }
 
   override val runToolData: PyRunToolData = PyRunToolData(
@@ -38,6 +45,4 @@ internal class UvRunToolProvider : PyRunToolProvider {
   )
 
   override val initialToolState: Boolean = true
-
-  override fun isAvailable(sdk: Sdk): Boolean = sdk.isUv
 }

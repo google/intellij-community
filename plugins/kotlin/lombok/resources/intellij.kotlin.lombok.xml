@@ -1,0 +1,20 @@
+<idea-plugin package="org.jetbrains.kotlin.idea.lombok">
+  <dependencies>
+    <module name="intellij.java.impl"/>
+    <module name="intellij.java.psi"/>
+  </dependencies>
+
+  <resource-bundle>messages.LombokKotlinBundle</resource-bundle>
+
+  <extensions defaultExtensionNs="com.intellij">
+    <localInspection language="kotlin" implementationClass="org.jetbrains.kotlin.idea.lombok.inspections.LombokKotlinCompilerPluginInspection"
+                     shortName="LombokKotlinCompilerPlugin"
+                     key="lombok.kotlin.no.kotlin.lombok.compiler.plugin.inspection.problem.display.name"
+                     groupBundle="messages.KotlinBundle" groupKey="group.names.kotlin" groupPath="Lombok"
+                     level="WARNING" enabledByDefault="true"/>
+  </extensions>
+
+  <extensions defaultExtensionNs="org.jetbrains.kotlin">
+<!--    <projectPostConfigurator implementation="com.intellij.jpa.kotlin.configuration.KotlinJpaCompilerPluginProjectConfigurator"/>-->
+  </extensions>
+</idea-plugin>

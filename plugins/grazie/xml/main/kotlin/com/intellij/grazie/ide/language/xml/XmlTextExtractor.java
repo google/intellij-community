@@ -63,7 +63,7 @@ public class XmlTextExtractor extends TextExtractor {
   }
 
   protected Function<XmlTag, TagKind> tagClassifier(@NotNull PsiElement context) {
-    return __ -> TagKind.Unknown;
+    return _ -> TagKind.Unknown;
   }
 
   protected boolean shouldMaskEscapeSymbols() {

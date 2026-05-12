@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.core.nio.fs;
 
 import org.jetbrains.annotations.NotNull;
@@ -23,7 +23,7 @@ class CorePosixFilteringFileSystem extends DelegatingFileSystem<CorePosixFilteri
   }
 
   @Override
-  protected @NotNull FileSystem getDelegate(@NotNull String root) {
+  public @NotNull FileSystem getDelegate(@NotNull String root) {
     return myDelegate;
   }
 

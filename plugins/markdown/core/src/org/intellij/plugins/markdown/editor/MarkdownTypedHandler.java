@@ -5,13 +5,29 @@ import com.intellij.codeInsight.AutoPopupController;
 import com.intellij.codeInsight.editorActions.TypedHandlerDelegate;
 import com.intellij.openapi.editor.Caret;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.EditorModificationUtil;
+import com.intellij.openapi.editor.highlighter.HighlighterIterator;
+import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
+import org.intellij.plugins.markdown.lang.MarkdownTokenTypes;
 import org.intellij.plugins.markdown.lang.psi.impl.MarkdownFile;
 import org.jetbrains.annotations.NotNull;
 
 public final class MarkdownTypedHandler extends TypedHandlerDelegate {
+  @Override
+  public @NotNull Result beforeCharTyped(char c, @NotNull Project project, @NotNull Editor editor, @NotNull PsiFile file, @NotNull FileType fileType) {
+    if (c != ']' || !(file instanceof MarkdownFile)) return Result.CONTINUE;
+    int offset = editor.getCaretModel().getOffset();
+    HighlighterIterator iterator = editor.getHighlighter().createIterator(offset);
+    if (!iterator.atEnd() && iterator.getTokenType() == MarkdownTokenTypes.CHECK_BOX && iterator.getEnd() - 1 == offset) {
+      EditorModificationUtil.moveCaretRelatively(editor, 1);
+      return Result.STOP;
+    }
+    return Result.CONTINUE;
+  }
+
   @Override
   public @NotNull Result checkAutoPopup(char charTyped, @NotNull Project project, @NotNull Editor editor, @NotNull PsiFile file) {
     if (!(file instanceof MarkdownFile)) return Result.CONTINUE;

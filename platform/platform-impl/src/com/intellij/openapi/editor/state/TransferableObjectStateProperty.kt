@@ -9,7 +9,8 @@ class TransferableObjectStateProperty<T>(val type: KType,
                                          initialValue: T,
                                          defaultValueCalculator: SyncDefaultValueCalculator<T>,
                                          customOutValueModifier: CustomOutValueModifier<T>?,
-                                         val customPropertySerializer: CustomPropertySerializer<T>?)
+                                         val customPropertySerializer: CustomPropertySerializer<T>?,
+                                         val alwaysTransfer: Boolean = false)
   : ObjectStateProperty<T>(initialValue, defaultValueCalculator, customOutValueModifier), TransferableProperty<T> {
   override fun encodeToString(): String {
     return if (customPropertySerializer != null) customPropertySerializer.encodeToString(value)

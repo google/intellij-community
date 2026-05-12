@@ -1,24 +1,27 @@
 ### auto-generated section `build intellij.color.scheme.rails_casts` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "color-scheme-rails_casts_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "color-scheme-rails_casts",
+  module_name = "intellij.color.scheme.rails_casts",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
-  resources = [":color-scheme-rails_casts_resources"]
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources"
 )
 
 jvm_library(
   name = "color-scheme-rails_casts_test_lib",
+  testonly = True,
   module_name = "intellij.color.scheme.rails_casts",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [":color-scheme-rails_casts"]
 )
 ### auto-generated section `build intellij.color.scheme.rails_casts` end
+
+### auto-generated section `iml intellij.color.scheme.rails_casts` start
+exports_files([
+  "intellij.color.scheme.rails_casts.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.color.scheme.rails_casts` end

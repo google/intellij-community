@@ -3,14 +3,13 @@ package com.intellij.grazie.rule
 import ai.grazie.rules.tree.StubbedSentence
 import ai.grazie.rules.tree.Tree
 import com.intellij.grazie.cloud.DependencyParser
-import com.intellij.grazie.rule.ParsedSentence.Companion.findSentenceASAP
-import com.intellij.grazie.rule.ParsedSentence.Companion.findSentenceInFile
 import com.intellij.grazie.rule.ParsedSentence.Companion.getSentences
 import com.intellij.grazie.rule.SentenceBatcher.AsyncBatchParser
 import com.intellij.grazie.text.TextChecker.ProofreadingContext
 import com.intellij.grazie.text.TextContent
 import com.intellij.grazie.text.TextExtractor
 import com.intellij.grazie.utils.HighlightingUtil
+import com.intellij.grazie.utils.HighlightingUtil.checkedDomains
 import com.intellij.grazie.utils.NaturalTextDetector
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.util.TextRange
@@ -91,12 +90,24 @@ class ParsedSentence private constructor(
     }
 
     @JvmStatic
-    fun getAllCheckedSentences(viewProvider: FileViewProvider): Map<TextContent, List<ParsedSentence>> {
-      val contents = HighlightingUtil.getCheckedFileTexts(viewProvider).filterNot { HighlightingUtil.isTooLargeText(listOf(it)) }
-      if (contents.isEmpty()) return emptyMap()
+    @Suppress("unused")
+    fun getAllCheckedSentences(viewProvider: FileViewProvider): SequencedMap<TextContent, List<ParsedSentence>> {
+      val contents = HighlightingUtil.getCheckedFileTexts(viewProvider).filterNot { HighlightingUtil.isTooLargeText(it) }
+      if (contents.isEmpty()) return LinkedHashMap()
 
       return runBlockingCancellable {
-        contents.associateWith { getSentencesAsync(it) }
+        contents.associateWith { getSentencesAsync(it) } as SequencedMap<TextContent, List<ParsedSentence>>
+      }
+    }
+
+    @JvmStatic
+    fun getAllCheckedSentences(texts: List<TextContent>): SequencedMap<TextContent, List<ParsedSentence>> {
+      val checkedDomains = checkedDomains()
+      val contents = texts.filter { it.domain in checkedDomains && !HighlightingUtil.isTooLargeText(it) }
+      if (contents.isEmpty()) return LinkedHashMap()
+
+      return runBlockingCancellable {
+        contents.associateWith { getSentencesAsync(it) } as SequencedMap<TextContent, List<ParsedSentence>>
       }
     }
 
@@ -104,6 +115,7 @@ class ParsedSentence private constructor(
       return getSentences(content, content.commonParent.textRange, minimal = false)
     }
 
+    @Suppress("unused")
     suspend fun getSentencesAsync(context: ProofreadingContext): List<ParsedSentence> {
       if (HighlightingUtil.isTooLargeText(listOf(context.text))) return emptyList()
       val parser = DependencyParser.getParser(context, false) ?: return emptyList()

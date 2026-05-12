@@ -27,6 +27,7 @@ import javax.swing.Action;
 import javax.swing.ButtonGroup;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
+import java.awt.AWTEvent;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.GridLayout;
@@ -147,6 +148,7 @@ public final class PluginConflictDialog extends DialogWrapper {
         @Override
         public void mouseClicked(MouseEvent e) {
           radioButton.setSelected(true);
+          radioButton.requestFocus();
         }
       });
     }
@@ -227,6 +229,10 @@ public final class PluginConflictDialog extends DialogWrapper {
   protected void createDefaultActions() {
     super.createDefaultActions();
     myOKAction = new DisableAction();
+  }
+
+  @Override
+  public void doCancelAction(AWTEvent source) {
   }
 
   @Override

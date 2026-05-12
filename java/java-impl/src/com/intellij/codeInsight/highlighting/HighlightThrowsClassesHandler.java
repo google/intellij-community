@@ -37,7 +37,7 @@ class HighlightThrowsClassesHandler extends HighlightExceptionsHandler {
                                 @NotNull PsiClassType type,
                                 @NotNull PsiElement block,
                                 @NotNull PsiElement resolved) {
-    super(editor, file, target, new PsiClassType[]{type}, block, null, __->true);
+    super(editor, file, target, new PsiClassType[]{type}, block, null, _->true);
     myResolved = resolved;
   }
 

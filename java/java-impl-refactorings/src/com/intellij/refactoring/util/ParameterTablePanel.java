@@ -15,9 +15,9 @@ import com.intellij.psi.PsiVariable;
 import com.intellij.refactoring.ui.TypeSelector;
 import com.intellij.refactoring.ui.TypeSelectorManager;
 import com.intellij.refactoring.ui.TypeSelectorManagerImpl;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBComboBoxLabel;
 import com.intellij.ui.components.editors.JBComboBoxTableCellEditorComponent;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.ui.AbstractTableCellEditor;
 import com.intellij.util.ui.ColumnInfo;
 import org.jetbrains.annotations.NotNull;
@@ -66,7 +66,7 @@ public abstract class ParameterTablePanel extends AbstractParameterTablePanel<Va
     myTypeRendererCombo = new ComboBox<>(getVariableData());
     myTypeRendererCombo.setOpaque(true);
     myTypeRendererCombo.setBorder(null);
-    myTypeRendererCombo.setRenderer(SimpleListCellRenderer.create("", value -> value.type.getPresentableText()));
+    myTypeRendererCombo.setRenderer(BuilderKt.textListCellRenderer("", value -> value.type.getPresentableText()));
 
 
     final TableColumn typeColumn = myTable.getColumnModel().getColumn(1);

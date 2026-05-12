@@ -5,6 +5,8 @@ import com.intellij.util.lang.ImmutableZipFile
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.intellij.build.io.ZipEntryProcessorResult
 import org.jetbrains.intellij.build.io.readZipFile
+import org.jetbrains.jps.model.JpsElementType
+import org.jetbrains.jps.model.ex.JpsElementBase
 import org.jetbrains.jps.model.java.JavaResourceRootType
 import org.jetbrains.jps.model.java.JavaSourceRootType
 import org.jetbrains.jps.model.java.JpsJavaExtensionService
@@ -40,7 +42,7 @@ suspend fun findUnprocessedDescriptorContent(module: JpsModule, path: String, ou
   }
 }
 
-private val rootTypeOrder = arrayOf(JavaResourceRootType.RESOURCE, JavaSourceRootType.SOURCE, JavaResourceRootType.TEST_RESOURCE, JavaSourceRootType.TEST_SOURCE)
+private val rootTypeOrder = arrayOf<JpsElementType<out JpsElementBase<*>>>(JavaResourceRootType.RESOURCE, JavaSourceRootType.SOURCE, JavaResourceRootType.TEST_RESOURCE, JavaSourceRootType.TEST_SOURCE)
 
 fun findFileInModuleSources(module: JpsModule, relativePath: String, onlyProductionSources: Boolean = false): Path? {
   for (type in rootTypeOrder) {

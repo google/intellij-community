@@ -21,12 +21,11 @@ import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.util.NlsActions;
 import com.intellij.openapi.util.NlsContexts.TabTitle;
 import com.intellij.openapi.util.TextRange;
-import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import com.intellij.rt.coverage.data.LineCoverage;
 import com.intellij.rt.coverage.data.LineData;
 import com.intellij.util.Function;
 import org.jetbrains.annotations.ApiStatus;
@@ -34,6 +33,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -158,13 +158,28 @@ public abstract class CoverageEngine {
    * E.g., all *.class files for java source file with several classes
    *
    * @return files
+   * @deprecated Use {@link #getCorrespondingOutputPaths(PsiFile, Module, CoverageSuitesBundle)} instead.
    */
+  @SuppressWarnings({"IO_FILE_USAGE", "unused"})
+  @Deprecated
   @ApiStatus.Internal
   public @NotNull Set<File> getCorrespondingOutputFiles(final @NotNull PsiFile srcFile,
                                                         final @Nullable Module module,
                                                         final @NotNull CoverageSuitesBundle suite) {
+    throw new UnsupportedOperationException("Use getCorrespondingOutputPaths instead");
+  }
+
+  /**
+   * E.g., all *.class files for java source file with several classes
+   *
+   * @return paths
+   */
+  @ApiStatus.Internal
+  public @NotNull Set<Path> getCorrespondingOutputPaths(final @NotNull PsiFile srcFile,
+                                                        final @Nullable Module module,
+                                                        final @NotNull CoverageSuitesBundle suite) {
     final VirtualFile virtualFile = srcFile.getVirtualFile();
-    return virtualFile == null ? Collections.emptySet() : Collections.singleton(VfsUtilCore.virtualToIoFile(virtualFile));
+    return virtualFile == null ? Collections.emptySet() : Collections.singleton(virtualFile.toNioPath());
   }
 
   /**
@@ -181,11 +196,22 @@ public abstract class CoverageEngine {
   /**
    * Qualified name same as in coverage raw project data
    * E.g., java class qualified name by *.class file of some Java class in corresponding source file
+   *
+   * @deprecated Use {@link #getQualifiedName(Path, PsiFile)} instead.
    */
+  @SuppressWarnings("IO_FILE_USAGE")
+  @Deprecated
   @ApiStatus.Internal
   protected @Nullable String getQualifiedName(final @NotNull File outputFile,
                                               final @NotNull PsiFile sourceFile) {
     return null;
+  }
+
+  @SuppressWarnings("IO_FILE_USAGE")
+  @ApiStatus.Internal
+  protected @Nullable String getQualifiedName(final @NotNull Path outputFile,
+                                              final @NotNull PsiFile sourceFile) {
+    return getQualifiedName(outputFile.toFile(), sourceFile);
   }
 
   /**
@@ -200,7 +226,11 @@ public abstract class CoverageEngine {
   /**
    * Decide to include a file or not in a coverage report if coverage data isn't available for the file.
    * E.g., file wasn't touched by coverage util
+   *
+   * @deprecated Use {@link #includeUntouchedFileInCoverage(String, Path, PsiFile, CoverageSuitesBundle)} instead.
    */
+  @SuppressWarnings("IO_FILE_USAGE")
+  @Deprecated
   @ApiStatus.Internal
   public boolean includeUntouchedFileInCoverage(final @NotNull String qualifiedName,
                                                 final @NotNull File outputFile,
@@ -209,15 +239,34 @@ public abstract class CoverageEngine {
     return false;
   }
 
+  @SuppressWarnings("IO_FILE_USAGE")
+  @ApiStatus.Internal
+  public boolean includeUntouchedFileInCoverage(final @NotNull String qualifiedName,
+                                                final @NotNull Path outputFile,
+                                                final @NotNull PsiFile sourceFile,
+                                                final @NotNull CoverageSuitesBundle suite) {
+    return includeUntouchedFileInCoverage(qualifiedName, outputFile.toFile(), sourceFile, suite);
+  }
+
   /**
    * Collect code lines if untouched file should be included in coverage information. These lines will be marked as uncovered.
    *
    * @return List (probably empty) of code lines or null if all lines should be marked as uncovered
+   * @deprecated Use {@link #collectSrcLinesForUntouchedFile(Path, CoverageSuitesBundle)} instead.
    */
+  @SuppressWarnings("IO_FILE_USAGE")
+  @Deprecated
   @ApiStatus.Internal
   public @Nullable List<Integer> collectSrcLinesForUntouchedFile(final @NotNull File classFile,
                                                                  final @NotNull CoverageSuitesBundle suite) {
     return null;
+  }
+
+  @SuppressWarnings("IO_FILE_USAGE")
+  @ApiStatus.Internal
+  public @Nullable List<Integer> collectSrcLinesForUntouchedFile(final @NotNull Path classFile,
+                                                                 final @NotNull CoverageSuitesBundle suite) {
+    return collectSrcLinesForUntouchedFile(classFile.toFile(), suite);
   }
 
   /**
@@ -281,7 +330,7 @@ public abstract class CoverageEngine {
       if (file != null) {
         final String path = file.getCanonicalPath();
         if (path != null) {
-          settings.OUTPUT_DIRECTORY = FileUtil.toSystemDependentName(path) + File.separator + "htmlReport";
+          settings.OUTPUT_DIRECTORY = Path.of(path, "htmlReport").toString();
         }
       }
     }
@@ -349,14 +398,14 @@ public abstract class CoverageEngine {
   public boolean isInLibraryClasses(final Project project, final VirtualFile file) {
     final ProjectFileIndex projectFileIndex = ProjectRootManager.getInstance(project).getFileIndex();
 
-    return ReadAction.compute(() -> projectFileIndex.isInLibraryClasses(file) && !projectFileIndex.isInSource(file));
+    return ReadAction.computeBlocking(() -> projectFileIndex.isInLibraryClasses(file) && !projectFileIndex.isInSource(file));
   }
 
   @ApiStatus.Internal
   protected boolean isInLibrarySource(Project project, VirtualFile file) {
     final ProjectFileIndex projectFileIndex = ProjectRootManager.getInstance(project).getFileIndex();
 
-    return ReadAction.compute(() -> projectFileIndex.isInLibrarySource(file));
+    return ReadAction.computeBlocking(() -> projectFileIndex.isInLibrarySource(file));
   }
 
   @ApiStatus.Internal
@@ -468,5 +517,14 @@ public abstract class CoverageEngine {
     if (stackTrace.length < 2) return false;
     StackTraceElement element = stackTrace[1];
     return element.getClassName().equals(CoverageEngine.class.getName()) && element.getMethodName().equals("createCoverageSuite");
+  }
+
+  @ApiStatus.Internal
+  public static @NotNull String getLineCoverageStatus(LineData lineData) {
+    return switch (lineData.getStatus()) {
+      case LineCoverage.PARTIAL -> CoverageBundle.message("coverage.next.change.partial.covered");
+      case LineCoverage.FULL -> CoverageBundle.message("coverage.next.change.fully.covered");
+      default -> CoverageBundle.message("coverage.next.change.uncovered");
+    };
   }
 }

@@ -21,6 +21,7 @@ import com.intellij.util.xmlb.annotations.Property;
 import com.intellij.util.xmlb.annotations.Tag;
 import com.intellij.util.xmlb.annotations.Transient;
 import com.intellij.util.xmlb.annotations.XCollection;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -205,6 +206,19 @@ public class ConfigurableEP<T extends UnnamedConfigurable> implements PluginAwar
    */
   @Attribute("groupId")
   public String groupId;
+
+  /**
+   * Indicates whether the corresponding configurable component is searchable in Search Everywhere.
+   * When set to {@code true}, the configurable will be included in the search
+   * results when users perform a search in the "Find in Actions" feature, allowing
+   * easier discovery of the component. If set to {@code false}, the configurable
+   * will be excluded from such search results.
+   * The default value is {@code true}.
+   * See also {@link SearchableConfigurable#isSearchableInActions}.
+   */
+  @Attribute("searchableInActions")
+  @ApiStatus.Experimental
+  public boolean searchableInActions = true;
 
   /**
    * This attribute specifies the weight of a configurable component within a group or a parent configurable component.

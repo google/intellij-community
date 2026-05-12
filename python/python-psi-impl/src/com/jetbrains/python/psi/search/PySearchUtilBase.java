@@ -1,25 +1,18 @@
 package com.jetbrains.python.psi.search;
 
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.projectRoots.Sdk;
-import com.intellij.openapi.roots.OrderRootType;
 import com.intellij.openapi.roots.ProjectRootManager;
-import com.intellij.openapi.util.SystemInfo;
-import com.intellij.openapi.util.io.FileUtil;
-import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.ProjectScope;
-import com.intellij.util.containers.ContainerUtil;
-import com.jetbrains.python.PyNames;
+import com.jetbrains.python.sdk.PyRichSdkKt;
+import com.jetbrains.python.sdk.PyRichSdkExtKt;
 import com.jetbrains.python.sdk.legacy.PythonSdkUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
 import java.util.Objects;
 
 public class PySearchUtilBase {
@@ -71,58 +64,6 @@ public class PySearchUtilBase {
   }
 
   public static @Nullable VirtualFile findLibDir(@NotNull Sdk sdk) {
-    return findLibDir(ReadAction.compute(() -> sdk.getRootProvider().getFiles(OrderRootType.CLASSES)));
-  }
-
-  public static VirtualFile findVirtualEnvLibDir(@NotNull Sdk sdk) {
-    VirtualFile[] classVFiles = ReadAction.compute(() -> sdk.getRootProvider().getFiles(OrderRootType.CLASSES));
-    String homePath = sdk.getHomePath();
-    if (homePath != null) {
-      File root = PythonSdkUtil.getVirtualEnvRoot(homePath);
-      if (root != null) {
-        File libRoot = new File(root, "lib");
-        File[] versionRoots = libRoot.listFiles();
-        if (versionRoots != null && !SystemInfo.isWindows) {
-          final File versionRoot = ContainerUtil.find(versionRoots, file -> file.isDirectory() && file.getName().startsWith("python"));
-          if (versionRoot != null) {
-            libRoot = versionRoot;
-          }
-        }
-        // Empty in case of a temporary empty SDK created to install package management
-        if (classVFiles.length == 0) {
-          return LocalFileSystem.getInstance().findFileByIoFile(libRoot);
-        }
-
-        final String libRootPath = libRoot.getPath();
-        for (VirtualFile file : classVFiles) {
-          if (FileUtil.pathsEqual(file.getPath(), libRootPath)) {
-            return file;
-          }
-          // venv module doesn't add virtualenv's lib/pythonX.Y directory itself in sys.path
-          final VirtualFile parent = file.getParent();
-          if (PyNames.SITE_PACKAGES.equals(file.getName()) && FileUtil.pathsEqual(parent.getPath(), libRootPath)) {
-            return parent;
-          }
-        }
-      }
-    }
-    return null;
-  }
-
-  private static @Nullable VirtualFile findLibDir(VirtualFile[] files) {
-    for (VirtualFile file : files) {
-      if (!file.isValid()) {
-        continue;
-      }
-      if ((file.findChild("__future__.py") != null || file.findChild("__future__.pyc") != null) &&
-          file.findChild("xml") != null && file.findChild("email") != null) {
-        return file;
-      }
-      // Mock SDK does not have aforementioned modules
-      if (ApplicationManager.getApplication().isUnitTestMode() && file.getName().equals("Lib")) {
-        return file;
-      }
-    }
-    return null;
+    return PyRichSdkExtKt.stdlibLibDirectory(PyRichSdkKt.pyRichSdk(sdk, false));
   }
 }

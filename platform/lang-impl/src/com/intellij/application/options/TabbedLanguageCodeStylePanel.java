@@ -170,7 +170,7 @@ public abstract class TabbedLanguageCodeStylePanel extends CodeStyleAbstractPane
       myPanel = new JPanel();
       myPanel.setLayout(new BorderLayout());
       myTabbedPane = new TabbedPaneWrapper(this);
-      myTabbedPane.addChangeListener(__ -> {
+      myTabbedPane.addChangeListener(_ -> {
         if (myListener != null) {
           String title = myTabbedPane.getSelectedTitle();
           if (title != null) {
@@ -385,7 +385,7 @@ public abstract class TabbedLanguageCodeStylePanel extends CodeStyleAbstractPane
       if (!lang.equals(getDefaultLanguage())) {
         final String langName = LanguageCodeStyleSettingsProvider.getLanguageName(lang);
         JMenuItem langItem = new JBMenuItem(langName);
-        langItem.addActionListener(__ -> applyLanguageSettings(lang));
+        langItem.addActionListener(_ -> applyLanguageSettings(lang));
         parentMenu.add(langItem);
       }
     }
@@ -395,7 +395,7 @@ public abstract class TabbedLanguageCodeStylePanel extends CodeStyleAbstractPane
     for (final PredefinedCodeStyle predefinedCodeStyle : myPredefinedCodeStyles) {
       JMenuItem predefinedItem = new JBMenuItem(predefinedCodeStyle.getName());
       parentMenu.add(predefinedItem);
-      predefinedItem.addActionListener(__ -> applyPredefinedStyle(predefinedCodeStyle.getName()));
+      predefinedItem.addActionListener(_ -> applyPredefinedStyle(predefinedCodeStyle.getName()));
     }
   }
 

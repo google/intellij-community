@@ -40,6 +40,7 @@ import org.jetbrains.kotlin.psi.psiUtil.getCallNameExpression
 
 private val IMPLICIT_TO_STRING_METHOD_NAMES: Set<String> = setOf("append", "print", "println")
 private val TO_STRING_CALLABLE_ID = CallableId(StandardClassIds.Any, Name.identifier("toString"))
+private val CHAR_ARRAY_CLASS_ID: ClassId = StandardClassIds.primitiveArrayTypeByElementType.getValue(StandardClassIds.Char)
 
 // This also handles Kotlin typealiases to Java underlying types
 private val IMPLICIT_TO_STRING_CALLABLE_IDS: Set<CallableId> = setOf(
@@ -134,6 +135,7 @@ internal class KotlinArrayToStringInspection : KotlinApplicableInspectionBase<Kt
                 if (arguments.size != 1) return null
                 val argType = arguments[0].getArgumentExpression()?.expressionType ?: return null
                 if (!argType.isArrayOrPrimitiveArray) return null
+                if (argType.isClassType(CHAR_ARRAY_CLASS_ID)) return null
 
                 Context(argType.isNestedArray, isImplicitConversion = true)
             }

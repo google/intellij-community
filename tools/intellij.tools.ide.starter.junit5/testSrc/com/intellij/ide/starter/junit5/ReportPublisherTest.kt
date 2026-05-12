@@ -9,6 +9,7 @@ import com.intellij.ide.starter.path.IDEDataPaths
 import com.intellij.ide.starter.report.publisher.ReportPublisher
 import com.intellij.ide.starter.runner.IDERunContext
 import com.intellij.tools.ide.performanceTesting.commands.CommandChain
+import examples.data.IdeaCommunityCases
 import examples.data.TestCases
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.BeforeEach
@@ -54,7 +55,7 @@ class ReportPublisherTest {
     ideTestContext = IDETestContext(
       ideDataPaths,
       installedIDE,
-      TestCases.IC.GradleJitPackSimple,
+      IdeaCommunityCases.GradleJitPackSimple,
       "Test method",
       null,
       publishers = listOf(publisherSpy),

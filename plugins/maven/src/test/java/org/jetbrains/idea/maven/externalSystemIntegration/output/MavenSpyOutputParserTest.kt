@@ -240,4 +240,33 @@ class MavenSpyOutputParserTest : MavenBuildToolLogTestUtils() {
           .runAndFormatToString())
     }
   }
+
+  fun `test parse maven4 log pom success`() = runBlocking {
+    failOnWarns {
+      assertSameLines("org.example:mvn4-repro-386099:pom:1.0-SNAPSHOT\n" +
+                      " org.example:module:jar:1.0-SNAPSHOT\n" +
+                      "  kapt\n" +
+                      "  resources\n" +
+                      "  compile\n" +
+                      "  compile",
+                      testCase(*fromFile("org/jetbrains/maven/buildlogs/build-compile-maven4.log"))
+                        .withSkippedOutput()
+                        .runAndFormatToString())
+    }
+  }
+
+  fun `test parse maven4 log pom error`() = runBlocking {
+    failOnWarns {
+      assertSameLines("error:Maven Run\n" +
+                      " org.example:mvn4-repro-386099:pom:1.0-SNAPSHOT\n" +
+                      " org.example:module:jar:1.0-SNAPSHOT\n" +
+                      "  kapt\n" +
+                      "  resources\n" +
+                      "  compile\n" +
+                      "  compile",
+                      testCase(*fromFile("org/jetbrains/maven/buildlogs/build-compile-maven4-error.log"))
+                        .withSkippedOutput()
+                        .runAndFormatToString())
+    }
+  }
 }

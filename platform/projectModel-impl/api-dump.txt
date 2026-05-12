@@ -113,24 +113,26 @@ c:com.intellij.openapi.components.PathMacroManager
 - <init>(com.intellij.openapi.application.PathMacros):V
 - collapsePath(java.lang.String,Z):java.lang.String
 - collapsePaths(org.jdom.Element,Z):V
-- s:collapsePaths(org.jdom.Element,Z,com.intellij.application.options.ReplacePathToMacroMap):V
+- sf:collapsePaths(org.jdom.Element,Z,com.intellij.application.options.ReplacePathToMacroMap):V
 - p:computeReplacePathMap():com.intellij.application.options.ReplacePathToMacroMap
 - expandPath(java.lang.String):java.lang.String
 - expandPaths(org.jdom.Element):V
 - getExpandMacroMap():com.intellij.openapi.components.ExpandMacroToPathMap
-- s:getInstance(com.intellij.openapi.components.ComponentManager):com.intellij.openapi.components.PathMacroManager
-- s:getInstance(com.intellij.openapi.module.Module):com.intellij.openapi.components.PathMacroManager
-- getMacroFilter():com.intellij.openapi.application.PathMacroFilter
+- sf:getInstance(com.intellij.openapi.components.ComponentManager):com.intellij.openapi.components.PathMacroManager
+- sf:getInstance(com.intellij.openapi.module.Module):com.intellij.openapi.components.PathMacroManager
+- f:getMacroFilter():com.intellij.openapi.application.PathMacroFilter
 - f:getReplacePathMap():com.intellij.application.options.ReplacePathToMacroMap
-- ps:pathsEqual(java.lang.String,java.lang.String):Z
+- psf:pathsEqual(java.lang.String,java.lang.String):Z
 com.intellij.openapi.components.PathMacroSubstitutor
 - collapsePath(java.lang.String):java.lang.String
 - a:collapsePath(java.lang.String,Z):java.lang.String
+- collapsePathNonNull(java.lang.String):java.lang.String
 - collapsePaths(org.jdom.Element):V
 - a:collapsePaths(org.jdom.Element,Z):V
 - collapsePathsRecursively(java.lang.String):java.lang.String
 - collapsePathsRecursively(org.jdom.Element):V
 - a:expandPath(java.lang.String):java.lang.String
+- expandPathNonNull(java.lang.String):java.lang.String
 - a:expandPaths(org.jdom.Element):V
 f:com.intellij.openapi.components.impl.ModulePathMacroManager
 - com.intellij.openapi.components.PathMacroManager
@@ -138,11 +140,10 @@ f:com.intellij.openapi.components.impl.ModulePathMacroManager
 - computeReplacePathMap():com.intellij.application.options.ReplacePathToMacroMap
 - s:createInstance(java.util.function.Supplier,java.util.function.Supplier):com.intellij.openapi.components.impl.ModulePathMacroManager
 - getExpandMacroMap():com.intellij.openapi.components.ExpandMacroToPathMap
-c:com.intellij.openapi.components.impl.ProjectPathMacroManager
+f:com.intellij.openapi.components.impl.ProjectPathMacroManager
 - com.intellij.openapi.components.PathMacroManager
 - <init>(com.intellij.openapi.project.Project):V
-- p:computeReplacePathMap():com.intellij.application.options.ReplacePathToMacroMap
-- s:createInstance(java.util.function.Supplier,java.util.function.Supplier,java.util.function.Supplier):com.intellij.openapi.components.impl.ProjectPathMacroManager
+- sf:createInstance(kotlin.jvm.functions.Function0,kotlin.jvm.functions.Function0,kotlin.jvm.functions.Function0):com.intellij.openapi.components.impl.ProjectPathMacroManager
 - getExpandMacroMap():com.intellij.openapi.components.ExpandMacroToPathMap
 com.intellij.openapi.components.impl.stores.IProjectStore
 - sf:COMPONENT_STORE_LOADING_ENABLED:com.intellij.openapi.util.Key
@@ -199,7 +200,6 @@ Fa:com.intellij.openapi.options.SchemeManager
 - a:isMetadataEditable(java.lang.Object):Z
 - a:loadSchemes():java.util.Collection
 - a:reload():V
-- reload(kotlin.jvm.functions.Function1):V
 - a:removeScheme(java.lang.Object):Z
 - a:removeScheme(java.lang.String):java.lang.Object
 - a:save():V
@@ -297,6 +297,7 @@ a:com.intellij.openapi.projectRoots.impl.SdkAdditionalDataBase
 c:com.intellij.openapi.roots.AnnotationOrderRootType
 - com.intellij.openapi.roots.PersistentOrderRootType
 - sf:ANNOTATIONS_ID:java.lang.String
+- sf:SDK_ROOT_NAME:java.lang.String
 - s:getFiles(com.intellij.openapi.roots.OrderEntry):com.intellij.openapi.vfs.VirtualFile[]
 - s:getInstance():com.intellij.openapi.roots.OrderRootType
 - skipWriteIfEmpty():Z

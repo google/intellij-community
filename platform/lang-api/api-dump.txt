@@ -300,6 +300,8 @@ com.intellij.codeInsight.hints.declarative.PresentationTreeBuilder
 - a:list(kotlin.jvm.functions.Function1):V
 - a:text(java.lang.String,com.intellij.codeInsight.hints.declarative.InlayActionData):V
 - bs:text$default(com.intellij.codeInsight.hints.declarative.PresentationTreeBuilder,java.lang.String,com.intellij.codeInsight.hints.declarative.InlayActionData,I,java.lang.Object):V
+f:com.intellij.codeInsight.hints.declarative.PsiPointerInlayActionNavigationHandler
+- handleClick(com.intellij.openapi.editor.event.EditorMouseEvent,com.intellij.codeInsight.hints.declarative.InlayActionPayload):V
 com.intellij.codeInsight.hints.declarative.SharedBypassCollector
 - com.intellij.codeInsight.hints.declarative.InlayHintsCollector
 - a:collectFromElement(com.intellij.psi.PsiElement,com.intellij.codeInsight.hints.declarative.InlayTreeSink):V
@@ -517,6 +519,7 @@ com.intellij.ide.actions.searcheverywhere.SearchEverywhereContributor
 - getActions(java.lang.Runnable):java.util.List
 - getAdvertisement():java.lang.String
 - getDataForItem(java.lang.Object,java.lang.String):java.lang.Object
+- getDataProviders():java.util.List
 - getElementPriority(java.lang.Object,java.lang.String):I
 - a:getElementsRenderer():javax.swing.ListCellRenderer
 - getFullGroupName():java.lang.String
@@ -916,17 +919,9 @@ com.intellij.psi.codeStyle.CodeStyleConfigurable
 - a:apply(com.intellij.psi.codeStyle.CodeStyleSettings):V
 - a:reset(com.intellij.psi.codeStyle.CodeStyleSettings):V
 com.intellij.psi.codeStyle.CodeStyleSettingsCustomizable
-- sf:BLANK_LINES:java.lang.String
-- sf:BLANK_LINES_KEEP:java.lang.String
-- sf:BRACE_OPTIONS:java.lang.String[]
 - sf:BRACE_PLACEMENT_VALUES:I[]
 - sf:BRACE_VALUES:I[]
-- sf:SPACES_BEFORE_LEFT_BRACE:java.lang.String
-- sf:SPACES_BEFORE_PARENTHESES:java.lang.String
-- sf:SPACES_OTHER:java.lang.String
-- sf:SPACES_WITHIN:java.lang.String
 - sf:WRAP_ON_TYPING_VALUES:I[]
-- sf:WRAP_OPTIONS:java.lang.String[]
 - sf:WRAP_VALUES:I[]
 - sf:WRAP_VALUES_FOR_SINGLETON:I[]
 - moveStandardOption(java.lang.String,java.lang.String):V
@@ -945,6 +940,8 @@ com.intellij.psi.codeStyle.FileTypeIndentOptionsProvider
 - a:getFileType():com.intellij.openapi.fileTypes.FileType
 - a:getPreviewText():java.lang.String
 - a:prepareForReformat(com.intellij.psi.PsiFile):V
+a:com.intellij.psi.codeStyle.LanguageCodeStyleSettingsProvider
+- com.intellij.psi.codeStyle.LanguageCodeStyleProvider
 com.intellij.psi.codeStyle.extractor.differ.Differ
 - sf:UGLY_FORMATTING:I
 - a:getDifference(com.intellij.psi.codeStyle.extractor.values.ValuesExtractionResult):I
@@ -1085,5 +1082,3 @@ com.intellij.testIntegration.TestFinder
 - a:isTest(com.intellij.psi.PsiElement):Z
 com.intellij.util.ActionRunner$InterruptibleRunnable
 - a:run():V
-com.intellij.util.ActionRunner$InterruptibleRunnableWithResult
-- a:run():java.lang.Object

@@ -122,7 +122,7 @@ public abstract class ModuleAwareProjectConfigurable<T extends UnnamedConfigurab
         return configurable;
       }));
     }
-    moduleList.addListSelectionListener(__ -> showModuleConfigurable(layout, cardPanel, moduleList.getSelectedValue()));
+    moduleList.addListSelectionListener(_ -> showModuleConfigurable(layout, cardPanel, moduleList.getSelectedValue()));
 
     if (moduleList.getItemsCount() > 0) {
       moduleList.setSelectedIndex(0);

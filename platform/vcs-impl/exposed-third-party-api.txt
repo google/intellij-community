@@ -1,3 +1,2 @@
 com/google/gson/Gson
 kotlin/jvm/internal/DefaultConstructorMarker
-kotlin/reflect/KMutableProperty0

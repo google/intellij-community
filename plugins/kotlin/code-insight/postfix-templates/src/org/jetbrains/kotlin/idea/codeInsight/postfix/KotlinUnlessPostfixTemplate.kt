@@ -19,4 +19,5 @@ internal class KotlinUnlessPostfixTemplate : StringBasedPostfixTemplate {
     }
 
     override fun getElementToRemove(expr: PsiElement): PsiElement = expr
+    override fun isApplicableForModCommand(): Boolean = true
 }

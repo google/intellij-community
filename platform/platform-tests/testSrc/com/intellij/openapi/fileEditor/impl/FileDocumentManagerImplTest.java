@@ -3,6 +3,7 @@ package com.intellij.openapi.fileEditor.impl;
 
 import com.intellij.ide.actionsOnSave.impl.ActionsOnSaveManager;
 import com.intellij.mock.MockVirtualFile;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.command.WriteCommandAction;
@@ -13,6 +14,7 @@ import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.editor.ex.DocumentEx;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileDocumentManagerListener;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.ThrowableComputable;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.io.IoTestUtil;
@@ -413,6 +415,49 @@ public class FileDocumentManagerImplTest extends HeavyPlatformTestCase {
 
     assertEquals("old test", document.getText());
     assertEquals(oldDocumentStamp, document.getModificationStamp());
+  }
+
+  public void testConflictsSolverOverrideIsBoundToDisposable() {
+    assertTrue(myDocumentManager.isConflictsSolverEnabled());
+
+    Disposable firstOverride = Disposer.newDisposable();
+    Disposable secondOverride = Disposer.newDisposable();
+    try {
+      myDocumentManager.overrideConflictsSolverEnabled(false, firstOverride);
+      assertFalse(myDocumentManager.isConflictsSolverEnabled());
+
+      myDocumentManager.overrideConflictsSolverEnabled(true, secondOverride);
+      assertTrue(myDocumentManager.isConflictsSolverEnabled());
+
+      Disposer.dispose(secondOverride);
+      assertFalse(myDocumentManager.isConflictsSolverEnabled());
+    }
+    finally {
+      Disposer.dispose(firstOverride);
+      Disposer.dispose(secondOverride);
+    }
+
+    assertTrue(myDocumentManager.isConflictsSolverEnabled());
+  }
+
+  public void testDisposingOlderConflictsSolverOverrideDoesNotAffectNewerOverride() {
+    assertTrue(myDocumentManager.isConflictsSolverEnabled());
+
+    Disposable firstOverride = Disposer.newDisposable();
+    Disposable secondOverride = Disposer.newDisposable();
+    try {
+      myDocumentManager.overrideConflictsSolverEnabled(false, firstOverride);
+      myDocumentManager.overrideConflictsSolverEnabled(true, secondOverride);
+
+      Disposer.dispose(firstOverride);
+      assertTrue(myDocumentManager.isConflictsSolverEnabled());
+    }
+    finally {
+      Disposer.dispose(firstOverride);
+      Disposer.dispose(secondOverride);
+    }
+
+    assertTrue(myDocumentManager.isConflictsSolverEnabled());
   }
 
   public void testSaveDocument_DoNotSaveIfModStampEqualsToFile() throws Exception {

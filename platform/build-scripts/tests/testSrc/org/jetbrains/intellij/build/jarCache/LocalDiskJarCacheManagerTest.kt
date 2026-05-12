@@ -10,8 +10,11 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
+import org.jetbrains.intellij.build.DirSource
 import org.jetbrains.intellij.build.InMemoryContentSource
 import org.jetbrains.intellij.build.Source
+import org.jetbrains.intellij.build.ZipSource
+import org.jetbrains.intellij.build.getProductionClassesOutputDirectory
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.ByteBuffer
@@ -19,10 +22,14 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.FileTime
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
+
+private const val TEST_MODULE_NAME = "intellij.test.module"
 
 internal class LocalDiskJarCacheManagerTest {
   @TempDir
@@ -237,7 +244,7 @@ internal class LocalDiskJarCacheManagerTest {
       val cacheDir = tempDir.resolve("cache")
       val manager = LocalDiskJarCacheManager(
         cacheDir = cacheDir,
-        productionClassOutDir = tempDir.resolve("classes/production"),
+        classesOutputDirectory = tempDir.resolve("classes"),
         maxAccessTimeAge = 30.days,
       )
       val produceCalls = AtomicInteger()
@@ -261,6 +268,136 @@ internal class LocalDiskJarCacheManagerTest {
 
       assertThat(secondResult).isEqualTo(firstResult)
       assertThat(produceCalls.get()).isEqualTo(1)
+    }
+  }
+
+  @Test
+  fun `dir source cache key includes filter cache key`() {
+    runBlocking {
+      val cacheDir = tempDir.resolve("cache")
+      val manager = createManager(cacheDir = cacheDir, maxAccessTimeAge = 30.days)
+      val produceCalls = AtomicInteger()
+      val builder = TestSourceBuilder(produceCalls = produceCalls, useCacheAsTargetFile = true)
+
+      val moduleOutput = createModuleOutputDir()
+      val firstSources = listOf(dirSource(moduleOutput, "a/**"))
+      val secondSources = listOf(dirSource(moduleOutput, "b/**"))
+
+      manager.computeIfAbsent(
+        sources = firstSources,
+        targetFile = tempDir.resolve("out/first.jar"),
+        nativeFiles = null,
+        span = Span.getInvalid(),
+        producer = builder,
+      )
+      manager.computeIfAbsent(
+        sources = secondSources,
+        targetFile = tempDir.resolve("out2/first.jar"),
+        nativeFiles = null,
+        span = Span.getInvalid(),
+        producer = builder,
+      )
+
+      assertThat(produceCalls.get()).isEqualTo(2)
+      assertThat(listEntryPaths(cacheDir)).hasSize(2)
+    }
+  }
+
+  @Test
+  fun `dir source cache key reuses cache for same filter cache key`() {
+    runBlocking {
+      val cacheDir = tempDir.resolve("cache")
+      val manager = createManager(cacheDir = cacheDir, maxAccessTimeAge = 30.days)
+      val produceCalls = AtomicInteger()
+      val builder = TestSourceBuilder(produceCalls = produceCalls, useCacheAsTargetFile = true)
+
+      val moduleOutput = createModuleOutputDir()
+      val firstSources = listOf(dirSource(moduleOutput, "a/**"))
+      val secondSources = listOf(dirSource(moduleOutput, "a/**"))
+
+      val firstResult = manager.computeIfAbsent(
+        sources = firstSources,
+        targetFile = tempDir.resolve("out/first.jar"),
+        nativeFiles = null,
+        span = Span.getInvalid(),
+        producer = builder,
+      )
+      val secondResult = manager.computeIfAbsent(
+        sources = secondSources,
+        targetFile = tempDir.resolve("out2/first.jar"),
+        nativeFiles = null,
+        span = Span.getInvalid(),
+        producer = builder,
+      )
+
+      assertThat(secondResult).isEqualTo(firstResult)
+      assertThat(produceCalls.get()).isEqualTo(1)
+      assertThat(listEntryPaths(cacheDir)).hasSize(1)
+    }
+  }
+
+  @Test
+  fun `zip source cache key includes filter cache key`() {
+    runBlocking {
+      val cacheDir = tempDir.resolve("cache")
+      val manager = createManager(cacheDir = cacheDir, maxAccessTimeAge = 30.days)
+      val produceCalls = AtomicInteger()
+      val builder = TestSourceBuilder(produceCalls = produceCalls, useCacheAsTargetFile = true)
+
+      val moduleOutput = createModuleOutputJar()
+      val firstSources = listOf(zipSource(moduleOutput, "a/**"))
+      val secondSources = listOf(zipSource(moduleOutput, "b/**"))
+
+      manager.computeIfAbsent(
+        sources = firstSources,
+        targetFile = tempDir.resolve("out/first.jar"),
+        nativeFiles = null,
+        span = Span.getInvalid(),
+        producer = builder,
+      )
+      manager.computeIfAbsent(
+        sources = secondSources,
+        targetFile = tempDir.resolve("out2/first.jar"),
+        nativeFiles = null,
+        span = Span.getInvalid(),
+        producer = builder,
+      )
+
+      assertThat(produceCalls.get()).isEqualTo(2)
+      assertThat(listEntryPaths(cacheDir)).hasSize(2)
+    }
+  }
+
+  @Test
+  fun `zip source cache key reuses cache for same filter cache key`() {
+    runBlocking {
+      val cacheDir = tempDir.resolve("cache")
+      val manager = createManager(cacheDir = cacheDir, maxAccessTimeAge = 30.days)
+      val produceCalls = AtomicInteger()
+      val builder = TestSourceBuilder(produceCalls = produceCalls, useCacheAsTargetFile = true)
+
+      val moduleOutput = createModuleOutputJar()
+      val firstSources = listOf(zipSource(moduleOutput, "a/**"))
+      val secondSources = listOf(zipSource(moduleOutput, "a/**"))
+
+      val firstResult = manager.computeIfAbsent(
+        sources = firstSources,
+        targetFile = tempDir.resolve("out/first.jar"),
+        nativeFiles = null,
+        span = Span.getInvalid(),
+        producer = builder,
+      )
+      val secondResult = manager.computeIfAbsent(
+        sources = secondSources,
+        targetFile = tempDir.resolve("out2/first.jar"),
+        nativeFiles = null,
+        span = Span.getInvalid(),
+        producer = builder,
+      )
+
+      assertThat(secondResult).isEqualTo(firstResult)
+      assertThat(produceCalls.get()).isEqualTo(1)
+      assertThat(listEntryPaths(cacheDir)).hasSize(1)
     }
   }
 
@@ -761,7 +898,7 @@ internal class LocalDiskJarCacheManagerTest {
     val legacyPurgeMarkerFile = missingCacheDir.resolve(".legacy-format-purged.0")
 
     val result = runCatching {
-      invokePurgeLegacyCacheIfRequired(
+      purgeLegacyCacheIfRequired(
         cacheDir = missingCacheDir,
         versionedCacheDir = missingCacheDir.resolve("v0"),
         legacyPurgeMarkerFile = legacyPurgeMarkerFile,
@@ -901,7 +1038,7 @@ internal class LocalDiskJarCacheManagerTest {
   ): LocalDiskJarCacheManager {
     return LocalDiskJarCacheManager(
       cacheDir = cacheDir,
-      productionClassOutDir = tempDir.resolve("classes/production"),
+      classesOutputDirectory = tempDir.resolve("classes"),
       maxAccessTimeAge = maxAccessTimeAge,
       metadataTouchInterval = metadataTouchInterval,
     )
@@ -909,6 +1046,37 @@ internal class LocalDiskJarCacheManagerTest {
 
   private fun createSources(): List<Source> {
     return listOf(InMemoryContentSource("a.txt", "hello".encodeToByteArray()))
+  }
+
+  private fun createModuleOutputDir(): Path {
+    val moduleOutput = getProductionClassesOutputDirectory(tempDir.resolve("classes")).resolve(TEST_MODULE_NAME)
+    Files.createDirectories(moduleOutput)
+    Files.writeString(moduleOutput.resolve("A.class"), "class")
+    return moduleOutput
+  }
+
+  private fun createModuleOutputJar(): Path {
+    val file = tempDir.resolve("module-output.jar")
+    ZipOutputStream(Files.newOutputStream(file)).use { zip ->
+      zip.putNextEntry(ZipEntry("A.class"))
+      zip.write("class".encodeToByteArray())
+      zip.closeEntry()
+    }
+    return file
+  }
+
+  private fun dirSource(moduleOutput: Path, vararg filterCacheKey: String): DirSource {
+    return DirSource(dir = moduleOutput, moduleName = TEST_MODULE_NAME, filterCacheKey = filterCacheKey.toList())
+  }
+
+  private fun zipSource(moduleOutput: Path, vararg filterCacheKey: String): ZipSource {
+    return ZipSource(
+      file = moduleOutput,
+      distributionFileEntryProducer = null,
+      filter = { true },
+      moduleName = TEST_MODULE_NAME,
+      filterCacheKey = filterCacheKey.toList(),
+    )
   }
 
   private data class TestEntryPaths(
@@ -972,16 +1140,6 @@ internal class LocalDiskJarCacheManagerTest {
       return null
     }
     return entryStem.substring(0, separatorIndex)
-  }
-
-  private fun invokePurgeLegacyCacheIfRequired(cacheDir: Path, versionedCacheDir: Path, legacyPurgeMarkerFile: Path) {
-    val method = Class.forName("org.jetbrains.intellij.build.jarCache.LocalDiskJarCacheMaintenanceKt").getDeclaredMethod(
-      "purgeLegacyCacheIfRequired",
-      Path::class.java,
-      Path::class.java,
-      Path::class.java,
-    )
-    method.invoke(null, cacheDir, versionedCacheDir, legacyPurgeMarkerFile)
   }
 
   private fun findVersionDir(cacheDir: Path): Path {

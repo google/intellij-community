@@ -5,9 +5,9 @@
   reason: <- intellij.featuresTrainer
 - name: lib/assertj.jar
   library: assertJ
+  module: intellij.libraries.assertj.core
   files:
   - name: $MAVEN_REPOSITORY$/org/assertj/assertj-core/4/assertj-core-4.jar
-  reason: <- intellij.featuresTrainer
 - name: lib/featuresTrainer.jar
   modules:
   - name: intellij.featuresTrainer

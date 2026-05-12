@@ -3,9 +3,12 @@
 package com.intellij.ide.todo;
 
 import com.intellij.ide.highlighter.HighlighterFactory;
+import com.intellij.ide.todo.nodes.LeafTodoItemNode;
 import com.intellij.ide.todo.nodes.TodoFileNode;
 import com.intellij.ide.todo.nodes.TodoItemNode;
+import com.intellij.ide.todo.nodes.TodoRemoteItemNode;
 import com.intellij.ide.todo.nodes.TodoTreeHelper;
+import com.intellij.ide.todo.rpc.TodoResult;
 import com.intellij.ide.util.treeView.AbstractTreeNode;
 import com.intellij.ide.util.treeView.NodeDescriptor;
 import com.intellij.openapi.Disposable;
@@ -37,7 +40,9 @@ import com.intellij.psi.util.PsiUtilCore;
 import com.intellij.testFramework.LightVirtualFile;
 import com.intellij.ui.components.JBLoadingPanel;
 import com.intellij.ui.tree.StructureTreeModel;
+import com.intellij.ui.tree.TreeVisitor;
 import com.intellij.usageView.UsageTreeColorsScheme;
+import com.intellij.util.ObjectUtils;
 import com.intellij.util.SmartList;
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
 import com.intellij.util.concurrency.annotations.RequiresEdt;
@@ -91,6 +96,8 @@ public abstract class TodoTreeBuilder implements Disposable {
 
   //used from EDT and from StructureTreeModel invoker thread
   protected final Map<VirtualFile, EditorHighlighter> myFile2Highlighter = ContainerUtil.createConcurrentSoftValueMap();
+
+  private final Map<VirtualFile, List<TodoResult>> remoteTodosCache = new ConcurrentHashMap<>();
 
   private final @NotNull JTree myTree;
   /**
@@ -387,6 +394,7 @@ public abstract class TodoTreeBuilder implements Disposable {
     myFileTree.clear();
     myDirtyFileSet.clear();
     myFile2Highlighter.clear();
+    remoteTodosCache.clear();
   }
 
   protected final boolean hasDirtyFiles() {
@@ -412,19 +420,35 @@ public abstract class TodoTreeBuilder implements Disposable {
     TodoTreeStructure treeStructure = getTodoTreeStructure();
     // First we need to update "dirty" file set.
     for (VirtualFile file : myDirtyFileSet) {
-      PsiFile psiFile = file.isValid() ? PsiManager.getInstance(myProject).findFile(file) : null;
-      if (psiFile == null || !treeStructure.accept(psiFile)) {
-        if (myFileTree.contains(file)) {
+      if (shouldUseSplitTodo()) {
+        List<TodoResult> todoItems = getCachedRemoteTodos(file);
+        if (todoItems.isEmpty()) {
+          if (myFileTree.contains(file)) {
+            myFileTree.removeFile(file);
+            myFile2Highlighter.remove(file);
+          }
+        }
+        else {
           myFileTree.removeFile(file);
-          myFile2Highlighter.remove(file);
+          myFileTree.add(file);
         }
       }
-      else { // file is valid and contains T.O.D.O items
-        myFileTree.removeFile(file);
-        myFileTree.add(file); // file can be moved. remove/add calls move it to another place
-        EditorHighlighter highlighter = myFile2Highlighter.get(file);
-        if (highlighter != null) { // update highlighter text
-          highlighter.setText(PsiDocumentManager.getInstance(myProject).getDocument(psiFile).getCharsSequence());
+      else {
+        PsiFile psiFile = file.isValid() ? PsiManager.getInstance(myProject).findFile(file) : null;
+        if (psiFile == null || !treeStructure.accept(psiFile)) {
+          if (myFileTree.contains(file)) {
+            myFileTree.removeFile(file);
+            myFile2Highlighter.remove(file);
+          }
+          clearRemoteTodosCache(file);
+        }
+        else { // file is valid and contains T.O.D.O items
+          myFileTree.removeFile(file);
+          myFileTree.add(file); // file can be moved. remove/add calls move it to another place
+          EditorHighlighter highlighter = myFile2Highlighter.get(file);
+          if (highlighter != null) { // update highlighter text
+            highlighter.setText(PsiDocumentManager.getInstance(myProject).getDocument(psiFile).getCharsSequence());
+          }
         }
       }
     }
@@ -436,13 +460,28 @@ public abstract class TodoTreeBuilder implements Disposable {
     return getTodoTreeStructure().isAutoExpandNode(descriptor);
   }
 
+  @ApiStatus.Internal
+  public @NotNull List<TodoResult> getCachedRemoteTodos(@NotNull VirtualFile file) {
+    return remoteTodosCache.getOrDefault(file, Collections.emptyList());
+  }
+
+  @ApiStatus.Internal
+  public void cacheRemoteTodos(@NotNull VirtualFile file, @NotNull List<TodoResult> todos) {
+    remoteTodosCache.put(file, todos);
+  }
+
+  @ApiStatus.Internal
+  public void clearRemoteTodosCache(@NotNull VirtualFile file) {
+    remoteTodosCache.remove(file);
+  }
+
   /**
    * @return first {@code SmartTodoItemPointer} that is the children (in depth) of the specified {@code element}.
    * If {@code element} itself is a {@code TodoItem} then the method returns the {@code element}.
    */
-  public TodoItemNode getFirstPointerForElement(@Nullable Object element) {
-    if (element instanceof TodoItemNode) {
-      return (TodoItemNode)element;
+  public @Nullable LeafTodoItemNode getFirstLeafForElement(@Nullable Object element) {
+    if (element instanceof LeafTodoItemNode) {
+      return (LeafTodoItemNode)element;
     }
     else if (!(element instanceof AbstractTreeNode)) {
       return null;
@@ -453,11 +492,11 @@ public abstract class TodoTreeBuilder implements Disposable {
         return null;
       }
       Object firstChild = children[0];
-      if (firstChild instanceof TodoItemNode) {
-        return (TodoItemNode)firstChild;
+      if (firstChild instanceof LeafTodoItemNode) {
+        return (LeafTodoItemNode)firstChild;
       }
       else {
-        return getFirstPointerForElement(firstChild);
+        return getFirstLeafForElement(firstChild);
       }
     }
   }
@@ -466,9 +505,12 @@ public abstract class TodoTreeBuilder implements Disposable {
    * @return last {@code SmartTodoItemPointer} that is the children (in depth) of the specified {@code element}.
    * If {@code element} itself is a {@code TodoItem} then the method returns the {@code element}.
    */
-  public TodoItemNode getLastPointerForElement(Object element) {
-    if (element instanceof TodoItemNode) {
-      return (TodoItemNode)element;
+  public @Nullable LeafTodoItemNode getLastLeafForElement(@Nullable Object element) {
+    if (element instanceof LeafTodoItemNode) {
+      return (LeafTodoItemNode)element;
+    }
+    else if (!(element instanceof AbstractTreeNode)) {
+      return null;
     }
     else {
       Object[] children = getTodoTreeStructure().getChildElements(element);
@@ -476,11 +518,11 @@ public abstract class TodoTreeBuilder implements Disposable {
         return null;
       }
       Object firstChild = children[children.length - 1];
-      if (firstChild instanceof TodoItemNode) {
-        return (TodoItemNode)firstChild;
+      if (firstChild instanceof LeafTodoItemNode) {
+        return (LeafTodoItemNode)firstChild;
       }
       else {
-        return getLastPointerForElement(firstChild);
+        return getLastLeafForElement(firstChild);
       }
     }
   }
@@ -504,7 +546,7 @@ public abstract class TodoTreeBuilder implements Disposable {
   }
 
   public void select(Object obj) {
-    TodoNodeVisitor visitor = getVisitorFor(obj);
+    TreeVisitor visitor = getVisitorFor(obj);
 
     if (visitor == null) {
       TreeUtil.promiseSelectFirst(myTree);
@@ -518,16 +560,16 @@ public abstract class TodoTreeBuilder implements Disposable {
   }
 
   @ApiStatus.Internal
-  protected static @Nullable TodoNodeVisitor getVisitorFor(@NotNull Object obj) {
-    if (obj instanceof TodoItemNode) {
-      SmartTodoItemPointer value = ((TodoItemNode)obj).getValue();
+  protected static @Nullable TreeVisitor getVisitorFor(@NotNull Object obj) {
+    if (obj instanceof TodoItemNode localLeaf) {
+      SmartTodoItemPointer value = localLeaf.getValue();
       if (value != null) {
-        return new TodoNodeVisitor(value::getTodoItem,
-                                   value.getTodoItem().getFile().getVirtualFile());
+        return new TodoNodeVisitor(() -> value.getTodoItem(), value.getTodoItem().getFile().getVirtualFile());
       }
-      else {
-        return null;
-      }
+    }
+    if (obj instanceof TodoRemoteItemNode remoteLeaf) {
+      VirtualFile file = remoteLeaf.getVirtualFile();
+      return new TodoNodeVisitor(() -> remoteLeaf, file);
     }
     else {
       Object o = obj instanceof AbstractTreeNode ? ((AbstractTreeNode<?>)obj).getValue() : null;
@@ -590,16 +632,16 @@ public abstract class TodoTreeBuilder implements Disposable {
    * @return next {@code TodoItem} for the passed {@code pointer}. Returns {@code null}
    * if the {@code pointer} is the last t.o.d.o item in the tree.
    */
-  public TodoItemNode getNextPointer(TodoItemNode pointer) {
-    Object sibling = getNextSibling(pointer);
+  public @Nullable LeafTodoItemNode getNextLeaf(LeafTodoItemNode leaf) {
+    Object sibling = getNextSibling(leaf);
     if (sibling == null) {
       return null;
     }
-    if (sibling instanceof TodoItemNode) {
-      return (TodoItemNode)sibling;
+    if (sibling instanceof LeafTodoItemNode) {
+      return (LeafTodoItemNode)sibling;
     }
     else {
-      return getFirstPointerForElement(sibling);
+      return getFirstLeafForElement(sibling);
     }
   }
 
@@ -636,16 +678,16 @@ public abstract class TodoTreeBuilder implements Disposable {
    * @return next {@code SmartTodoItemPointer} for the passed {@code pointer}. Returns {@code null}
    * if the {@code pointer} is the last t.o.d.o item in the tree.
    */
-  public TodoItemNode getPreviousPointer(TodoItemNode pointer) {
-    Object sibling = getPreviousSibling(pointer);
+  public @Nullable LeafTodoItemNode getPreviousLeaf(LeafTodoItemNode leaf) {
+    Object sibling = getPreviousSibling(leaf);
     if (sibling == null) {
       return null;
     }
-    if (sibling instanceof TodoItemNode) {
-      return (TodoItemNode)sibling;
+    if (sibling instanceof LeafTodoItemNode) {
+      return (LeafTodoItemNode)sibling;
     }
     else {
-      return getLastPointerForElement(sibling);
+      return getLastLeafForElement(sibling);
     }
   }
 

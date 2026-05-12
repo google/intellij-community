@@ -33,7 +33,7 @@ public abstract class PerformanceCommand extends AbstractCommand {
     return PREFIX + getName();
   }
 
-  protected Boolean isWarmupMode() {
+  public Boolean isWarmupMode() {
     return extractCommandArgument(getPrefix()).contains("WARMUP");
   }
 

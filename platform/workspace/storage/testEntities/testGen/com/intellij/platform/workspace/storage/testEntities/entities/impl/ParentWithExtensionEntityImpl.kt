@@ -1,13 +1,15 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.storage.testEntities.entities.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
 import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
-import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
@@ -21,14 +23,12 @@ import com.intellij.platform.workspace.storage.testEntities.entities.ParentWithE
 @GeneratedCodeApiVersion(3)
 @GeneratedCodeImplVersion(7)
 @OptIn(WorkspaceEntityInternalApi::class)
-internal class ParentWithExtensionEntityImpl(private val dataSource: ParentWithExtensionEntityData) : ParentWithExtensionEntity, WorkspaceEntityBase(
-  dataSource) {
+internal class ParentWithExtensionEntityImpl(private val dataSource: ParentWithExtensionEntityData) : ParentWithExtensionEntity,
+                                                                                                      WorkspaceEntityBase(dataSource) {
 
   private companion object {
 
-
-    private val connections = listOf<ConnectionId>(
-    )
+    private val connections = listOf<ConnectionId>()
 
   }
 
@@ -49,8 +49,8 @@ internal class ParentWithExtensionEntityImpl(private val dataSource: ParentWithE
   }
 
 
-  internal class Builder(result: ParentWithExtensionEntityData?) : ModifiableWorkspaceEntityBase<ParentWithExtensionEntity, ParentWithExtensionEntityData>(
-    result), ParentWithExtensionEntityBuilder {
+  internal class Builder(result: ParentWithExtensionEntityData?) :
+    ModifiableWorkspaceEntityBase<ParentWithExtensionEntity, ParentWithExtensionEntityData>(result), ParentWithExtensionEntityBuilder {
     internal constructor() : this(ParentWithExtensionEntityData())
 
     override fun applyToBuilder(builder: MutableEntityStorage) {
@@ -63,15 +63,13 @@ internal class ParentWithExtensionEntityImpl(private val dataSource: ParentWithE
           error("Entity ParentWithExtensionEntity is already created in a different builder")
         }
       }
-
       this.diff = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
-      // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
-      // Builder may switch to snapshot at any moment and lock entity data to modification
+// After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
+// Builder may switch to snapshot at any moment and lock entity data to modification
       this.currentEntityData = null
-
-      // Process linked entities that are connected without a builder
+// Process linked entities that are connected without a builder
       processLinkedEntities(builder)
       checkInitialization() // TODO uncomment and check failed tests
     }
@@ -107,7 +105,6 @@ internal class ParentWithExtensionEntityImpl(private val dataSource: ParentWithE
         changedProperty.add("entitySource")
 
       }
-
     override var data: String
       get() = getEntityData().data
       set(value) {
@@ -118,6 +115,7 @@ internal class ParentWithExtensionEntityImpl(private val dataSource: ParentWithE
 
     override fun getEntityClass(): Class<ParentWithExtensionEntity> = ParentWithExtensionEntity::class.java
   }
+
 }
 
 @OptIn(WorkspaceEntityInternalApi::class)
@@ -133,7 +131,6 @@ internal class ParentWithExtensionEntityData : WorkspaceEntityData<ParentWithExt
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): ParentWithExtensionEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {
@@ -145,8 +142,7 @@ internal class ParentWithExtensionEntityData : WorkspaceEntityData<ParentWithExt
   }
 
   override fun getMetadata(): EntityMetadata {
-    return MetadataStorageImpl.getMetadataByTypeFqn(
-      "com.intellij.platform.workspace.storage.testEntities.entities.ParentWithExtensionEntity") as EntityMetadata
+    return MetadataStorageImpl.getMetadataByTypeFqn("com.intellij.platform.workspace.storage.testEntities.entities.ParentWithExtensionEntity") as EntityMetadata
   }
 
   override fun getEntityInterface(): Class<out WorkspaceEntity> {
@@ -154,8 +150,7 @@ internal class ParentWithExtensionEntityData : WorkspaceEntityData<ParentWithExt
   }
 
   override fun createDetachedEntity(parents: List<WorkspaceEntityBuilder<*>>): WorkspaceEntityBuilder<*> {
-    return ParentWithExtensionEntity(data, entitySource) {
-    }
+    return ParentWithExtensionEntity(data, entitySource)
   }
 
   override fun getRequiredParents(): List<Class<out WorkspaceEntity>> {
@@ -166,9 +161,7 @@ internal class ParentWithExtensionEntityData : WorkspaceEntityData<ParentWithExt
   override fun equals(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as ParentWithExtensionEntityData
-
     if (this.entitySource != other.entitySource) return false
     if (this.data != other.data) return false
     return true
@@ -177,9 +170,7 @@ internal class ParentWithExtensionEntityData : WorkspaceEntityData<ParentWithExt
   override fun equalsIgnoringEntitySource(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as ParentWithExtensionEntityData
-
     if (this.data != other.data) return false
     return true
   }

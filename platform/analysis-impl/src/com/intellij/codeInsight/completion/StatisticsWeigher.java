@@ -118,7 +118,7 @@ public final class StatisticsWeigher extends CompletionWeigher {
       for (String s : byName.keySet()) {
         List<LookupElement> group = (List<LookupElement>)byName.get(s);
         group.sort(Comparator.comparing(this::getScalarWeight).reversed());
-        map.computeIfAbsent(getMaxWeight(group), __ -> new ArrayList<>()).addAll(group);
+        map.computeIfAbsent(getMaxWeight(group), _ -> new ArrayList<>()).addAll(group);
       }
       return map;
     }

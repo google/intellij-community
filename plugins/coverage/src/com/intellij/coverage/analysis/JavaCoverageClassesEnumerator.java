@@ -10,20 +10,24 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.OrderEnumerator;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.containers.Stack;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.zip.ZipFile;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
+@ApiStatus.Internal
 public abstract class JavaCoverageClassesEnumerator {
   private static final OutputRootProcessor DIRECTORY_OUTPUT_ROOT_PROCESSOR = new DirectoryOutputRootProcessor();
   private static final OutputRootProcessor ARCHIVE_OUTPUT_ROOT_PROCESSOR = new ArchiveOutputRootProcessor();
@@ -43,7 +47,7 @@ public abstract class JavaCoverageClassesEnumerator {
   /**
    * Visit classes with the same top level name.
    */
-  protected void visitClassFiles(String topLevelClassName, List<File> files, String packageVMName) { }
+  protected void visitClassFiles(String topLevelClassName, List<Path> files, String packageVMName) { }
 
   public void visitSuite() {
     Map<ModuleRequest, List<RequestRoot>> roots = AnalyseKt.collectOutputRoots(mySuite, myProject);
@@ -62,7 +66,7 @@ public abstract class JavaCoverageClassesEnumerator {
     Map<RootRequestKey, RootRequestData> requests = new LinkedHashMap<>();
     for (RequestRoot request : roots) {
       RootRequestKey key = new RootRequestKey(request.getRoot(), request.getPackagePathInRoot());
-      requests.computeIfAbsent(key, __ -> new RootRequestData()).addRequest(request.getSimpleName());
+      requests.computeIfAbsent(key, _ -> new RootRequestData()).addRequest(request.getSimpleName());
     }
     for (Map.Entry<RootRequestKey, RootRequestData> entry : requests.entrySet()) {
       RootRequestKey key = entry.getKey();
@@ -78,10 +82,10 @@ public abstract class JavaCoverageClassesEnumerator {
   }
 
   /**
-   * @deprecated {@link #visitRoot(File, String, RootRequestData, String)} should be used instead.
+   * @deprecated {@link #visitRoot(Path, String, RootRequestData, String)} should be used instead.
    */
   @Deprecated
-  protected void visitRoot(File packageOutputRoot,
+  protected void visitRoot(Path packageOutputRoot,
                            String rootPackageVMName,
                            @Nullable String requestedSimpleName,
                            @NotNull String packagePathInRoot) {
@@ -96,15 +100,15 @@ public abstract class JavaCoverageClassesEnumerator {
     }
   }
 
-  private void visitRoot(File packageOutputRoot,
+  private void visitRoot(Path packageOutputRoot,
                          String rootPackageVMName,
                          RootRequestData requestData,
                          @NotNull String packagePathInRoot) {
     OutputRootProcessor processor = getProcessor(packageOutputRoot);
     if (processor == null) return;
     Set<String> requestedTopLevelNames = toRequestedTopLevelNames(rootPackageVMName, requestData.getRequestedSimpleNames());
-    Map<TopLevelClassKey, List<File>> topLevelClasses = new HashMap<>();
-    OutputRootContext context = new OutputRootContext(packageOutputRoot, rootPackageVMName, packagePathInRoot, requestedTopLevelNames);
+    Map<TopLevelClassKey, List<Path>> topLevelClasses = new HashMap<>();
+    OutputRootContext context = new OutputRootContext(packageOutputRoot, rootPackageVMName, packagePathInRoot, requestedTopLevelNames == null);
     processor.collectClasses(context, (packageVMName, simpleName, classFile) ->
       collectTopLevelClass(topLevelClasses, packageVMName, simpleName, classFile, requestedTopLevelNames));
     visitCollectedClasses(topLevelClasses);
@@ -120,29 +124,66 @@ public abstract class JavaCoverageClassesEnumerator {
     return requestedTopLevelNames;
   }
 
-  private static @Nullable OutputRootProcessor getProcessor(@NotNull File outputRoot) {
-    if (outputRoot.isDirectory()) return DIRECTORY_OUTPUT_ROOT_PROCESSOR;
-    if (outputRoot.isFile()) return ARCHIVE_OUTPUT_ROOT_PROCESSOR;
+  private static @Nullable OutputRootProcessor getProcessor(@NotNull Path outputRoot) {
+    if (Files.isDirectory(outputRoot)) return DIRECTORY_OUTPUT_ROOT_PROCESSOR;
+    if (Files.isRegularFile(outputRoot)) return ARCHIVE_OUTPUT_ROOT_PROCESSOR;
     return null;
   }
 
-  private void visitCollectedClasses(Map<TopLevelClassKey, List<File>> topLevelClasses) {
-    for (Map.Entry<TopLevelClassKey, List<File>> entry : topLevelClasses.entrySet()) {
+  /**
+   * Collects class files generated from the requested top-level classes in the given package.
+   * Supports both directory output roots and archive output roots, such as jars. Returned paths for archive entries use
+   * the {@code /path/to/archive.jar!/entry/name.class} form.
+   * <p>
+   * The {@code topLevelClassNames} set contains simple source-level class names. A class file is included when its simple
+   * name is equal to one of these names or starts with {@code <top-level-name>$}, which covers nested, inner, local, and
+   * anonymous classes generated for that top-level class.
+   */
+  public static @NotNull List<Path> collectClassFiles(@NotNull Path outputRoot,
+                                                      @NotNull String packageVMName,
+                                                      @NotNull Set<String> topLevelClassNames) {
+    if (topLevelClassNames.isEmpty()) return List.of();
+    OutputRootProcessor processor = getProcessor(outputRoot);
+    if (processor == null) return List.of();
+
+    List<Path> classFiles = new ArrayList<>();
+    OutputRootContext context = new OutputRootContext(outputRoot, packageVMName, packageVMName, false);
+    processor.collectClasses(context, (classPackageVMName, simpleName, classFile) -> {
+      if (!classPackageVMName.equals(packageVMName)) return;
+      if (isGeneratedFromTopLevelClass(simpleName, topLevelClassNames)) {
+        classFiles.add(classFile);
+      }
+    });
+    return classFiles;
+  }
+
+  private static boolean isGeneratedFromTopLevelClass(@NotNull String simpleName, @NotNull Set<String> topLevelClassNames) {
+    for (String topLevelClassName : topLevelClassNames) {
+      if (simpleName.equals(topLevelClassName) ||
+          simpleName.startsWith(topLevelClassName) && simpleName.charAt(topLevelClassName.length()) == '$') {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private void visitCollectedClasses(Map<TopLevelClassKey, List<Path>> topLevelClasses) {
+    for (Map.Entry<TopLevelClassKey, List<Path>> entry : topLevelClasses.entrySet()) {
       TopLevelClassKey key = entry.getKey();
       visitClassFiles(key.topLevelClassName, entry.getValue(), key.packageVMName);
     }
   }
 
-  private static void collectTopLevelClass(Map<TopLevelClassKey, List<File>> topLevelClasses,
+  private static void collectTopLevelClass(Map<TopLevelClassKey, List<Path>> topLevelClasses,
                                            String packageVMName,
                                            String simpleName,
-                                           File classFile,
+                                           Path classFile,
                                            @Nullable Set<String> requestedTopLevelNames) {
     String classFqVMName = AnalysisUtils.buildVMName(packageVMName, simpleName);
     String topLevelClassSrcFQName = AnalysisUtils.getSourceToplevelFQName(classFqVMName);
     if (requestedTopLevelNames != null && !requestedTopLevelNames.contains(topLevelClassSrcFQName)) return;
     TopLevelClassKey key = new TopLevelClassKey(topLevelClassSrcFQName, packageVMName);
-    topLevelClasses.computeIfAbsent(key, __ -> new ArrayList<>()).add(classFile);
+    topLevelClasses.computeIfAbsent(key, _ -> new ArrayList<>()).add(classFile);
   }
 
   private void updateProgress() {
@@ -153,22 +194,19 @@ public abstract class JavaCoverageClassesEnumerator {
     progressIndicator.setFraction(myCurrentRootsCount / (double)myRootsCount);
   }
 
-  private record PackageData(String packageVMName, File[] children) {
+  private record PackageData(String packageVMName, List<Path> children) {
   }
 
-  private record RootRequestKey(File root, String packagePathInRoot) {
+  private record RootRequestKey(Path root, String packagePathInRoot) {
   }
 
   private record TopLevelClassKey(String topLevelClassName, String packageVMName) {
   }
 
-  private record OutputRootContext(File outputRoot,
+  private record OutputRootContext(Path outputRoot,
                                    String rootPackageVMName,
                                    @NotNull String packagePathInRoot,
-                                   @Nullable Set<String> requestedTopLevelNames) {
-    private boolean includeSubpackages() {
-      return requestedTopLevelNames == null;
-    }
+                                   boolean includeSubpackages) {
   }
 
   private interface OutputRootProcessor {
@@ -176,30 +214,37 @@ public abstract class JavaCoverageClassesEnumerator {
   }
 
   private interface ClassFileConsumer {
-    void accept(String packageVMName, String simpleName, File classFile);
+    void accept(String packageVMName, String simpleName, Path classFile);
   }
 
   private static final class DirectoryOutputRootProcessor implements OutputRootProcessor {
     @Override
     public void collectClasses(@NotNull OutputRootContext context, @NotNull ClassFileConsumer collector) {
-      File packageRoot = PackageAnnotator.findRelativeFile(context.packagePathInRoot(), context.outputRoot());
-      if (!packageRoot.exists()) return;
-      Stack<PackageData> stack = new Stack<>(new PackageData(context.rootPackageVMName(), packageRoot.listFiles()));
+      Path packageRoot = PackageAnnotator.findRelativePath(context.packagePathInRoot(), context.outputRoot());
+      if (!Files.exists(packageRoot)) return;
+      Stack<PackageData> stack = new Stack<>(new PackageData(context.rootPackageVMName(), listChildren(packageRoot)));
       while (!stack.isEmpty()) {
         ProgressIndicatorProvider.checkCanceled();
         PackageData packageData = stack.pop();
         String packageVMName = packageData.packageVMName;
-        File[] children = packageData.children;
-        if (children == null) continue;
-        for (File child : children) {
+        for (Path child : packageData.children) {
           if (AnalysisUtils.isClassFile(child)) {
             collector.accept(packageVMName, AnalysisUtils.getClassName(child), child);
           }
-          else if (context.includeSubpackages() && child.isDirectory()) {
-            String childPackageVMName = AnalysisUtils.buildVMName(packageVMName, child.getName());
-            stack.push(new PackageData(childPackageVMName, child.listFiles()));
+          else if (context.includeSubpackages() && Files.isDirectory(child)) {
+            String childPackageVMName = AnalysisUtils.buildVMName(packageVMName, child.getFileName().toString());
+            stack.push(new PackageData(childPackageVMName, listChildren(child)));
           }
         }
+      }
+    }
+
+    private static @NotNull List<Path> listChildren(@NotNull Path packageRoot) {
+      try (var children = Files.list(packageRoot)) {
+        return children.toList();
+      }
+      catch (IOException ignored) {
+        return List.of();
       }
     }
   }
@@ -209,11 +254,10 @@ public abstract class JavaCoverageClassesEnumerator {
     public void collectClasses(@NotNull OutputRootContext context, @NotNull ClassFileConsumer collector) {
       String packagePathInRoot = context.packagePathInRoot();
       String prefix = packagePathInRoot.isEmpty() ? "" : packagePathInRoot + "/";
-      try (ZipFile zipFile = new ZipFile(context.outputRoot())) {
-        var entries = zipFile.entries();
-        while (entries.hasMoreElements()) {
+      try (ZipInputStream zipInputStream = new ZipInputStream(Files.newInputStream(context.outputRoot()))) {
+        ZipEntry entry;
+        while ((entry = zipInputStream.getNextEntry()) != null) {
           ProgressIndicatorProvider.checkCanceled();
-          var entry = entries.nextElement();
           if (entry.isDirectory()) continue;
           String entryName = entry.getName();
           if (!entryName.endsWith(".class")) continue;
@@ -227,7 +271,7 @@ public abstract class JavaCoverageClassesEnumerator {
                                  AnalysisUtils.buildVMName(context.rootPackageVMName(), relativePath.substring(0, slashIndex));
           int simpleNameStart = slashIndex + 1;
           String simpleName = relativePath.substring(simpleNameStart, relativePath.length() - ".class".length());
-          File classFile = new File(context.outputRoot().getPath() + "!/" + entryName);
+          Path classFile = AnalysisUtils.toArchiveEntryPath(context.outputRoot(), entryName);
           collector.accept(packageVMName, simpleName, classFile);
         }
       }

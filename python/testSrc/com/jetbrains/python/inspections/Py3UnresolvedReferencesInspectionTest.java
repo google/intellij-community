@@ -15,6 +15,7 @@
  */
 package com.jetbrains.python.inspections;
 
+import com.intellij.idea.TestFor;
 import com.intellij.lang.FileASTNode;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
@@ -543,7 +544,7 @@ public class Py3UnresolvedReferencesInspectionTest extends PyInspectionTestCase 
                    
                    def f(e: Literal[1, 2]):
                        a: tuple | None = None
-                       _ = e <weak_warning descr="Member 'None' of 'tuple | None' does not have attribute '__contains__'">in</weak_warning> a
+                       _ = e <weak_warning descr="Member 'None' of 'tuple[Any, ...] | None' does not have attribute '__contains__'">in</weak_warning> a
                    """);
   }
 
@@ -600,5 +601,46 @@ public class Py3UnresolvedReferencesInspectionTest extends PyInspectionTestCase 
                    
                    val: MyId | None = None
                    """);
+  }
+
+  // PY-89245
+  public void testFlakyLoop() {
+    doTestByText("""
+                   class ListNode:
+                       def __init__(self, val=0, next=None):
+                           self.val = val
+                           self.next = next
+                   
+                   
+                   def find_by_value(node: ListNode | None, val: int) -> ListNode | None:
+                       while node is not None and node.val != val:
+                           node = node.next
+                       return node
+                   """);
+  }
+
+  // PY-40883
+  public void testStrictClassAttributes() {
+    doTest();
+  }
+
+  // PY-40883
+  public void testStrictClassAttributesOff() {
+    final PyUnresolvedReferencesInspection inspection = new PyUnresolvedReferencesInspection();
+    inspection.strictClassAttributes = false;
+    myFixture.enableInspections(inspection);
+    myFixture.configureByFile(getTestCaseDirectory() + getTestName(true) + ".py");
+    myFixture.checkHighlighting(isWarning(), isInfo(), isWeakWarning());
+  }
+
+  @TestFor(issues="PY-82245")
+  public void testStringInAnnotated() {
+    doTestByText(
+      """
+        from typing import Annotated
+        
+        type A = Annotated[str, print(end="foo")]
+        """
+    );
   }
 }

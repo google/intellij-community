@@ -456,7 +456,7 @@ public class ApplicationImplTest extends LightPlatformTestCase {
           // check that defaultModalityState() carries write-safe context now
           ApplicationManager.getApplication().invokeAndWait(() -> {
             ApplicationManager.getApplication().assertWriteIntentLockAcquired();
-            ((TransactionGuardImpl)TransactionGuard.getInstance()).assertWriteActionAllowed();
+            ((TransactionGuardImpl)TransactionGuard.getInstance()).assertWriteSafeEnvironment();
           });
         }, "Title", true, getProject());
         assertTrue(result);

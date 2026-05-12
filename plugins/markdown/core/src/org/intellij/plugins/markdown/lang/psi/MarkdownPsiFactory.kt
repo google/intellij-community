@@ -8,6 +8,7 @@ import org.intellij.plugins.markdown.lang.MarkdownTokenTypeSets
 import org.intellij.plugins.markdown.lang.psi.impl.MarkdownBlockQuote
 import org.intellij.plugins.markdown.lang.psi.impl.MarkdownCodeBlock
 import org.intellij.plugins.markdown.lang.psi.impl.MarkdownCodeFence
+import org.intellij.plugins.markdown.lang.psi.impl.MarkdownCodeSpan
 import org.intellij.plugins.markdown.lang.psi.impl.MarkdownComment
 import org.intellij.plugins.markdown.lang.psi.impl.MarkdownFrontMatterHeader
 import org.intellij.plugins.markdown.lang.psi.impl.MarkdownHeader
@@ -49,6 +50,7 @@ object MarkdownPsiFactory {
       MarkdownElementTypes.TABLE_CELL -> MarkdownTableCell(node)
       MarkdownElementTypes.AUTOLINK -> MarkdownWrappedAutoLink(node)
       MarkdownElementTypes.LINK_COMMENT -> MarkdownComment(node)
+      MarkdownElementTypes.CODE_SPAN -> MarkdownCodeSpan(node)
       else -> when {
         elementType in MarkdownTokenTypeSets.HEADER_CONTENT -> MarkdownHeaderContent(node)
         MarkdownTokenTypeSets.HEADERS.contains(elementType) -> MarkdownHeader(node)

@@ -17,6 +17,8 @@ import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassifierSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaConstructorSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaNamedClassSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaSamConstructorSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaTypeParameterSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
 import org.jetbrains.kotlin.analysis.api.types.KaType
@@ -35,9 +37,8 @@ import org.jetbrains.kotlin.name.Name
 @ApiStatus.Internal
 object KotlinFirLookupElementFactory {
     context(_: KaSession)
-    @OptIn(KaExperimentalApi::class)
     fun createConstructorCallLookupElement(
-        containingSymbol: KaNamedClassSymbol,
+        containingSymbol: KaClassLikeSymbol,
         visibleConstructorSymbols: List<KaConstructorSymbol>,
         inputTypeArgumentsAreRequired: Boolean,
         importingStrategy: ImportStrategy = ImportStrategy.DoNothing,
@@ -66,8 +67,8 @@ object KotlinFirLookupElementFactory {
         is KaTypeParameterSymbol -> TypeParameterLookupElementFactory.createLookup(symbol)
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     fun createLookupElement(
         symbol: KaNamedSymbol,
         importStrategyDetector: ImportStrategyDetector,
@@ -123,6 +124,25 @@ object KotlinFirLookupElementFactory {
             typeArguments = typeArguments,
             importingStrategy = importingStrategy,
             aliasName = aliasName
+        )
+    }
+
+    context(_: KaSession)
+    internal fun createSamObjectLookupElement(
+        samInterfaceSymbol: KaNamedClassSymbol,
+        samFunction: KaNamedFunctionSymbol,
+        samConstructorSymbol: KaSamConstructorSymbol,
+        inputTypeArgumentsAreRequired: Boolean,
+        importingStrategy: ImportStrategy,
+        aliasName: Name?,
+    ): LookupElementBuilder {
+        return ClassLookupElementFactory.createSamObjectLookupElement(
+            samInterfaceSymbol = samInterfaceSymbol,
+            samFunction = samFunction,
+            samConstructorSymbol = samConstructorSymbol,
+            inputTypeArgumentsAreRequired = inputTypeArgumentsAreRequired,
+            importingStrategy = importingStrategy,
+            aliasName = aliasName,
         )
     }
 

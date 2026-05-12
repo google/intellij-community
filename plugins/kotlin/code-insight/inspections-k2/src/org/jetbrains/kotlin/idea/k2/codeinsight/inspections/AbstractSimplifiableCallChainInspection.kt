@@ -164,8 +164,8 @@ internal abstract class AbstractSimplifiableCallChainInspection :
         return parentPostfixExpression.operationToken != KtTokens.EXCLEXCL
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun isMapNotNullOnPrimitiveArrayConversion(conversion: CallChainConversion, firstCall: KaCallInfo): Boolean {
         if (conversion.replacementName != CallChainConversions.MAP_NOT_NULL) return false
         val extensionReceiverType = firstCall.successfulFunctionCallOrNull()?.partiallyAppliedSymbol?.extensionReceiver?.type
@@ -174,7 +174,6 @@ internal abstract class AbstractSimplifiableCallChainInspection :
     }
 
     context(_: KaSession)
-    @OptIn(KaExperimentalApi::class)
     private fun isAppliedOnMapReceiver(firstCall: KaCallInfo): Boolean {
         return firstCall.successfulFunctionCallOrNull()?.isCalledOnMapExtensionReceiver == true
     }
@@ -242,8 +241,8 @@ internal abstract class AbstractSimplifiableCallChainInspection :
     private fun KaCallInfo.isCalling(fqName: FqName): Boolean =
         successfulFunctionCallOrNull()?.partiallyAppliedSymbol?.symbol?.getFqNameIfPackageOrNonLocal() == fqName
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun KaCallableSignature<*>.isFunctionalTypeOfAnyKind(): Boolean =
         returnType.functionTypeKind != null
 

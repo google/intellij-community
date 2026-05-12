@@ -5,10 +5,10 @@ import com.intellij.openapi.externalSystem.autolink.ExternalSystemUnlinkedProjec
 import com.intellij.openapi.externalSystem.autolink.UnlinkedProjectStartupActivity
 import com.intellij.openapi.externalSystem.model.ProjectSystemId
 import com.intellij.openapi.externalSystem.testFramework.fixtures.MultiProjectTestFixture
-import com.intellij.openapi.externalSystem.util.awaitOpenProjectActivity
-import com.intellij.openapi.externalSystem.util.awaitProjectActivity
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.io.toCanonicalPath
+import com.intellij.platform.externalSystem.testFramework.ExternalSystemTestObservation.awaitOpenProjectActivity
+import com.intellij.platform.externalSystem.testFramework.ExternalSystemTestObservation.awaitProjectActivity
 import com.intellij.testFramework.openProjectAsync
 import org.junit.jupiter.api.Assertions
 import java.nio.file.Path

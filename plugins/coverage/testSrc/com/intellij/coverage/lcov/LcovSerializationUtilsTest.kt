@@ -15,9 +15,9 @@ class LcovSerializationUtilsTest {
 
   @Test
   fun lcovLoadedCorrectly() {
-    val lcov = LcovSerializationUtils.readLCOV(listOf(
-      File("$DATA_PATH/testData/lcov/coverage.info"),
-      File("$DATA_PATH/testData/lcov/coverage2.info")))
+    val lcov = LcovSerializationUtils.readLCOVFromPaths(listOf(
+      File("$DATA_PATH/testData/lcov/coverage.info").toPath(),
+      File("$DATA_PATH/testData/lcov/coverage2.info").toPath()))
     val lcovLines = lcov.info.values.joinToString("\n")
     assertEqualsToFile("LCOV report read incorrectly", File("$DATA_PATH/testData/lcov/line-hints.expected"), lcovLines)
     val projectData = LcovSerializationUtils.convertToProjectData(lcov, Function.identity())

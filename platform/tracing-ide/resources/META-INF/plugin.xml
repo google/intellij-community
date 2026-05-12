@@ -19,6 +19,7 @@
     <notificationGroup displayType="BALLOON" id="BuildTracing" bundle="messages.TracingBundle" key="build.tracing.group"/>
     <applicationService serviceImplementation="com.intellij.tracing.ide.TracingPersistentStateComponent"/>
     <buildProcess.parametersProvider implementation="com.intellij.tracing.ide.TracingBuildProcessParameterProvider"/>
+    <applicationSettings service="com.intellij.tracing.ide.TracingPersistentStateComponent"/>
   </extensions>
 
   <projectListeners>

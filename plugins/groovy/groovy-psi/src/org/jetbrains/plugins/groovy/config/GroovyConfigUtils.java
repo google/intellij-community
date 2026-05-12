@@ -177,7 +177,7 @@ public final class GroovyConfigUtils extends AbstractConfigUtils {
         try {
           yield Integer.parseInt(part);
         }
-        catch (NumberFormatException __) {
+        catch (NumberFormatException _) {
           yield -4;
         }
       }

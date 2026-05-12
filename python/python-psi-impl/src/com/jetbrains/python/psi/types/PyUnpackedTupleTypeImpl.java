@@ -3,6 +3,8 @@ package com.jetbrains.python.psi.types;
 
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiElement;
+import com.intellij.util.containers.ContainerUtil;
+import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -11,6 +13,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
+
+import static com.jetbrains.python.psi.PyUtil.as;
 
 public final class PyUnpackedTupleTypeImpl implements PyUnpackedTupleType {
   public static final PyUnpackedTupleType UNSPECIFIED = new PyUnpackedTupleTypeImpl(Collections.singletonList(null), true);
@@ -75,6 +79,34 @@ public final class PyUnpackedTupleTypeImpl implements PyUnpackedTupleType {
   }
 
   @Override
+  public @NotNull List<PyCallableParameter> asCallableParameters() {
+    if (isUnbound()) return List.of();
+
+    List<PyType> elementTypes = getElementTypes();
+    if (elementTypes.isEmpty() || ContainerUtil.exists(elementTypes, type -> type instanceof PyTypeVarTupleType)) {
+      return List.of();
+    }
+
+    int variadicIdx = (int)StreamEx.of(elementTypes)
+      .indexOf(type -> type instanceof PyUnpackedTupleType unpackedTupleType && unpackedTupleType.isUnbound())
+      .orElse(-1);
+
+    List<PyCallableParameter> result = new ArrayList<>();
+
+    for (int i = 0; i < elementTypes.size(); i++) {
+      if (i == variadicIdx) {
+        PyUnpackedTupleType variadic = as(elementTypes.get(i), PyUnpackedTupleType.class);
+        assert variadic != null;
+        result.add(PyCallableParameterImpl.positionalContainerNonPsi(null, variadic.getElementTypes().getFirst()));
+      }
+      else {
+        result.add(PyCallableParameterImpl.nonPsi("__p" + i, elementTypes.get(i)));
+      }
+    }
+    return result;
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
@@ -103,9 +135,6 @@ public final class PyUnpackedTupleTypeImpl implements PyUnpackedTupleType {
 
   @Override
   public <T> T acceptTypeVisitor(@NotNull PyTypeVisitor<T> visitor) {
-    if (visitor instanceof PyTypeVisitorExt<T> visitorExt) {
-      return visitorExt.visitPyUnpackedTupleType(this);
-    }
-    return visitor.visitPyType(this);
+    return visitor.visitPyUnpackedTupleType(this);
   }
 }

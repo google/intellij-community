@@ -5,7 +5,6 @@ package org.jetbrains.kotlin.idea.hierarchy.overrides
 import com.intellij.icons.AllIcons
 import com.intellij.ide.IdeBundle
 import com.intellij.ide.hierarchy.HierarchyNodeDescriptor
-import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.roots.ui.util.CompositeAppearance
 import com.intellij.openapi.util.Comparing
 import com.intellij.openapi.util.Iconable
@@ -32,7 +31,6 @@ import org.jetbrains.kotlin.psi.KtNamedDeclaration
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.descriptorUtil.parents
 import org.jetbrains.kotlin.util.findCallableMemberBySignature
-import java.awt.Font
 import javax.swing.Icon
 
 @K1Deprecation
@@ -127,10 +125,7 @@ class KotlinOverrideHierarchyNodeDescriptor(
         val oldText = myHighlightedText
 
         myHighlightedText = CompositeAppearance()
-        var classNameAttributes: TextAttributes? = null
-        if (myColor != null) {
-            classNameAttributes = TextAttributes(myColor, null, null, null, Font.PLAIN)
-        }
+        val classNameAttributes = textAttributesFor(classPsi)
 
         with(myHighlightedText.ending) {
             @NlsSafe val classDescriptorAsString = classDescriptor.name.asString()
@@ -146,7 +141,7 @@ class KotlinOverrideHierarchyNodeDescriptor(
 
                     is PackageFragmentDescriptor -> {
                         @NlsSafe val parentDescriptorAsString = parentDescriptor.fqName.asString()
-                        addText("  ($parentDescriptorAsString)", getPackageNameAttributes())
+                        addText(" ($parentDescriptorAsString)", getPackageNameAttributes())
                         return@forEach
                     }
                 }

@@ -2,6 +2,7 @@
 package com.intellij.java.terminal.completion
 
 import com.intellij.java.terminal.JavaShellCommandUtils
+import com.intellij.terminal.completion.spec.ProcessExecutionResult
 import com.intellij.terminal.completion.spec.ShellCommandResult
 import com.intellij.testFramework.UsefulTestCase
 import kotlinx.coroutines.runBlocking
@@ -25,8 +26,8 @@ internal class JavacShellCommandSpecsProviderTest(engine: TerminalEngine) : JdkC
   fun `default options are present`() = runBlocking {
     val fixture = ShellCompletionTestFixture.builder(project)
       .mockProcessesExecutor(object : ShellDataGeneratorProcessExecutor {
-        override suspend fun executeProcess(options: ShellDataGeneratorProcessOptions): ShellCommandResult {
-          return ShellCommandResult.create("", exitCode = 1)
+        override suspend fun executeProcess(options: ShellDataGeneratorProcessOptions): ProcessExecutionResult {
+          return ProcessExecutionResult.Finished("", exitCode = 1)
         }
       })
       .mockShellCommandResults { _ ->
@@ -70,5 +71,3 @@ internal class JavacShellCommandSpecsProviderTest(engine: TerminalEngine) : JdkC
     assertTrue(completion.all { it.prefixReplacementIndex == argument.length })
   }
 }
-
-

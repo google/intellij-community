@@ -15,19 +15,20 @@
  */
 package org.jetbrains.plugins.gradle.model;
 
-import org.gradle.tooling.model.DomainObjectSet;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * @author Vladislav.Soroka
  */
 public interface GradleBuildScriptClasspathModel extends Serializable {
 
-  DomainObjectSet<? extends ClasspathEntryModel> getClasspath();
+  @NotNull
+  List<? extends ClasspathEntryModel> getClasspath();
 
   @Nullable
   File getGradleHomeDir();

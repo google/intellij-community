@@ -1,27 +1,24 @@
 ### auto-generated section `build intellij.space.java.jps` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "java-jps_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "java-jps",
   module_name = "intellij.space.java.jps",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":java-jps_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = "@community//:k11",
   deps = [
     "//platform/util",
     "//jps/jps-builders:build",
+    "//platform/util/base",
   ]
 )
 
 jvm_library(
   name = "java-jps_test_lib",
+  testonly = True,
   module_name = "intellij.space.java.jps",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -30,6 +27,13 @@ jvm_library(
     ":java-jps",
     "//platform/util:util_test_lib",
     "//jps/jps-builders:build_test_lib",
+    "//platform/util/base:base_test_lib",
   ]
 )
 ### auto-generated section `build intellij.space.java.jps` end
+
+### auto-generated section `iml intellij.space.java.jps` start
+exports_files([
+  "intellij.space.java.jps.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.space.java.jps` end

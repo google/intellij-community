@@ -5,6 +5,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.platform.eel.EelDescriptor
+import com.intellij.platform.eel.annotations.NativePath
 import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.pathSeparator
 import com.intellij.platform.eel.provider.LocalEelDescriptor
@@ -16,7 +17,7 @@ internal class MutableShellExecOptionsImpl(
   private var _execCommand: ShellExecCommand,
   override val workingDirectory: EelPath,
   private val mutableEnvs: MutableMap<String, String>,
-  shellIntegration: ShellIntegration?,
+  private val shellIntegration: ShellIntegration?,
   private val requester: Class<out ShellExecOptionsCustomizer>,
 ) : MutableShellExecOptions {
 
@@ -63,7 +64,7 @@ internal class MutableShellExecOptionsImpl(
       LOG.debug { "$requester: appendEntryToPathLikeEnv('$envName', '$entry') failed, skipping" }
       return
     }
-    mutableEnvs[envName] = translator.joinEntries(envs[envName].orEmpty(), remotePath)
+    mutableEnvs[envName] = joinWithPathLikeEnv(remotePath, envName, false)
     LOG.debug { "$requester: appendEntryToPathLikeEnv('$envName', '$remotePath')" }
   }
 
@@ -72,14 +73,26 @@ internal class MutableShellExecOptionsImpl(
       LOG.debug { "$requester: prependEntryToPathLikeEnv('$envName', '$entry') failed, skipping" }
       return
     }
-    var value = translator.joinEntries(remotePath, envs[envName].orEmpty())
-    if (value.startsWith(INTELLIJ_FORCE_PREPEND_PREFIX) && !value.endsWith(eelDescriptor.osFamily.pathSeparator)) {
+    val envName = if (shellIntegration != null) envName.ensureStartsWith(INTELLIJ_FORCE_PREPEND_PREFIX) else envName
+    mutableEnvs[envName] = joinWithPathLikeEnv(remotePath, envName, true)
+    LOG.debug { "$requester: prependEntryToPathLikeEnv('$envName', '$remotePath')" }
+  }
+
+  private fun joinWithPathLikeEnv(remotePath: @NativePath String, envName: String, prepend: Boolean): String {
+    var value = if (prepend) {
+      translator.joinEntries(remotePath, envs[envName].orEmpty())
+    }
+    else {
+      translator.joinEntries(envs[envName].orEmpty(), remotePath)
+    }
+    if (envName.startsWith(INTELLIJ_FORCE_PREPEND_PREFIX)) {
+      // Ensure a force-prepend env var value ends with a path separator.
+      // A trailing path separator is required to simplify further shell integration code:
       // For every `_INTELLIJ_FORCE_PREPEND_FOO=BAR`, we run `export FOO=BAR$FOO`.
       // Therefore, `BAR` should end with the path separator.
-      value += eelDescriptor.osFamily.pathSeparator
+      value = value.ensureEndsWith(eelDescriptor.osFamily.pathSeparator)
     }
-    mutableEnvs[envName] = value
-    LOG.debug { "$requester: prependEntryToPathLikeEnv('$envName', '$remotePath')" }
+    return value
   }
 
   override val shellIntegrationConfigurer: ShellIntegrationConfigurer? = shellIntegration?.let {
@@ -99,7 +112,7 @@ internal class MutableShellExecOptionsImpl(
 
   override val envs: Map<String, String> = Collections.unmodifiableMap(mutableEnvs)
 
-  private fun translatePathToRemote(path: Path): String? {
+  private fun translatePathToRemote(path: Path): @NativePath String? {
     if (!path.isAbsolute) {
       LOG.debug { "$requester: Relative path '$path' will be added as-is" }
       return path.toString()
@@ -112,6 +125,9 @@ internal class MutableShellExecOptionsImpl(
 
   override fun toString() = ShellExecOptionsImpl.stringify(_execCommand, workingDirectory, envs)
 }
+
+private fun String.ensureStartsWith(prefix: String): String = if (this.startsWith(prefix)) this else prefix + this
+private fun String.ensureEndsWith(suffix: String): String = if (this.endsWith(suffix)) this else this + suffix
 
 private const val PATH: String = "PATH"
 private const val INTELLIJ_FORCE_PREPEND_PREFIX: String = "_INTELLIJ_FORCE_PREPEND_"

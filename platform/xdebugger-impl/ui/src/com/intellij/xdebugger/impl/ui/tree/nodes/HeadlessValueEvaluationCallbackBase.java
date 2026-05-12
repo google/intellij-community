@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger.impl.ui.tree.nodes;
 
 import com.intellij.notification.NotificationType;
@@ -36,7 +36,7 @@ public class HeadlessValueEvaluationCallbackBase implements XFullValueEvaluator.
   }
 
   @Override
-  public void evaluated(@NotNull String fullValue, @Nullable Font font) {
+  public void evaluated(@NotNull String fullValue) {
     evaluationComplete(fullValue);
   }
 

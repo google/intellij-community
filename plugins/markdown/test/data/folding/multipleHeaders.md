@@ -57,7 +57,7 @@ You need to install Maya 2017 as well as Visual Studio 2017 first. After that, s
 
 - MEL example
 
-<fold text='code fence: ```mel
+<fold text='```mel
 
 //create a Sim...
 
@@ -80,7 +80,7 @@ createNode "Simage_MxBezier3scalar" -n "SMB3_1"
 
 - MEL example
 
-<fold text='code fence: ```mel
+<fold text='```mel
 
 //select a geo...
 
@@ -108,7 +108,7 @@ deformer -type "Simage_PushDeformer"
 
 - MEL example
 
-<fold text='code fence: ```mel
+<fold text='```mel
 
 //select a geo...
 
@@ -131,7 +131,7 @@ deformer -type "Simage_NoiseDeformer"
 
 - MEL example
 
-<fold text='code fence: ```mel
+<fold text='```mel
 
 //select a geo...
 

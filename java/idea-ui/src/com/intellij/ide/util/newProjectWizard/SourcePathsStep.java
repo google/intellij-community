@@ -202,8 +202,8 @@ public class SourcePathsStep extends AbstractStepWithProgress<List<JavaModuleSou
     panel.add(unmarkAllButton, new GridBagConstraints(1, GridBagConstraints.RELATIVE, 1, 1, 1.0, 0.0, GridBagConstraints.NORTHWEST, GridBagConstraints.NONE,
                                                       JBUI.insets(0, 0, 8, 10), 0, 0));
 
-    markAllButton.addActionListener(__ -> mySourcePathsChooser.setAllElementsMarked(true));
-    unmarkAllButton.addActionListener(__ -> mySourcePathsChooser.setAllElementsMarked(false));
+    markAllButton.addActionListener(_ -> mySourcePathsChooser.setAllElementsMarked(true));
+    unmarkAllButton.addActionListener(_ -> mySourcePathsChooser.setAllElementsMarked(false));
 
     return panel;
   }

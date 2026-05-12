@@ -146,7 +146,6 @@ com.intellij.codeInsight.daemon.impl.HighlightInfo$Builder
 - a:fileLevelAnnotation():com.intellij.codeInsight.daemon.impl.HighlightInfo$Builder
 - a:group(I):com.intellij.codeInsight.daemon.impl.HighlightInfo$Builder
 - a:gutterIconRenderer(com.intellij.openapi.editor.markup.GutterIconRenderer):com.intellij.codeInsight.daemon.impl.HighlightInfo$Builder
-- a:inspectionToolId(java.lang.String):com.intellij.codeInsight.daemon.impl.HighlightInfo$Builder
 - a:navigationShift(I):com.intellij.codeInsight.daemon.impl.HighlightInfo$Builder
 - a:needsUpdateOnTyping(Z):com.intellij.codeInsight.daemon.impl.HighlightInfo$Builder
 - a:problemGroup(com.intellij.lang.annotation.ProblemGroup):com.intellij.codeInsight.daemon.impl.HighlightInfo$Builder
@@ -271,6 +270,8 @@ com.intellij.codeInsight.template.impl.TemplateOptionalProcessor
 com.intellij.codeInsight.template.impl.TemplatePreprocessor
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
 - a:preprocessTemplate(com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile,I,java.lang.String,java.lang.String):V
+c:com.intellij.codeInspection.AddToInspectionOptionListFix
+- availableInBatchMode():Z
 com.intellij.codeInspection.AggregateResultsInspection
 a:com.intellij.codeInspection.InspectionManagerBase
 - createProblemDescriptor(com.intellij.psi.PsiElement,com.intellij.openapi.util.TextRange,java.lang.String,com.intellij.codeInspection.ProblemHighlightType,java.lang.String,Z,com.intellij.codeInspection.LocalQuickFix[]):com.intellij.codeInspection.ProblemDescriptor
@@ -303,6 +304,8 @@ com.intellij.codeInspection.InspectionToolResultExporter
 c:com.intellij.codeInspection.ProblemDescriptorBase
 - <init>(com.intellij.psi.PsiElement,com.intellij.psi.PsiElement,java.lang.String,com.intellij.codeInspection.LocalQuickFix[],com.intellij.codeInspection.ProblemHighlightType,Z,com.intellij.openapi.util.TextRange,Z,Z,java.lang.String):V
 - getTooltipTemplate():java.lang.String
+c:com.intellij.codeInspection.UpdateInspectionOptionFix
+- availableInBatchMode():Z
 com.intellij.codeInspection.dataFlow.interpreter.DataFlowInterpreter
 - a:cancel():V
 - a:createClosureState(com.intellij.psi.PsiElement,com.intellij.codeInspection.dataFlow.memory.DfaMemoryState):V
@@ -502,6 +505,7 @@ com.intellij.psi.impl.source.tree.injected.InjectedFileViewProvider
 - s:same(com.intellij.psi.impl.source.tree.injected.Place,com.intellij.psi.impl.source.tree.injected.Place):Z
 - setShreds(com.intellij.psi.impl.source.tree.injected.Place):Z
 com.intellij.psi.impl.source.tree.injected.InjectionBackgroundSuppressor
+- sf:SUPPRESS_INJECTION_BACKGROUND:com.intellij.openapi.util.Key
 com.intellij.psi.search.SearchScopeProvider
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
 - getDisplayName():java.lang.String

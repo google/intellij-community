@@ -25,7 +25,6 @@ import com.jetbrains.python.psi.LanguageLevel;
 import com.jetbrains.python.psi.PyCallExpression;
 import com.jetbrains.python.psi.PyExpression;
 import com.jetbrains.python.psi.PyFile;
-import com.jetbrains.python.sdk.SdksKt;
 import com.jetbrains.python.sdk.legacy.PythonSdkUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -34,6 +33,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
+import static com.jetbrains.python.inspections.ModuleAssocToolKt.setAssociationToModuleAsync;
 
 public class PyPackageUtilTest extends PyTestCase {
 
@@ -44,7 +45,7 @@ public class PyPackageUtilTest extends PyTestCase {
     myFixture.copyDirectoryToProject("packaging/PyPackageUtil/" + getTestName(false), "");
     Module module = myFixture.getModule();
     Sdk sdk = PythonSdkUtil.findPythonSdk(module);
-    SdksKt.setAssociationToModuleAsync(sdk, module);
+    setAssociationToModuleAsync(sdk, module);
   }
 
   public void testAbsentSetupPyReading() {

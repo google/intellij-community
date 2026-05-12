@@ -1,17 +1,13 @@
 ### auto-generated section `build intellij.libraries.maven.resolver.provider` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "maven-resolver-provider_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "maven-resolver-provider",
+  module_name = "intellij.libraries.maven.resolver.provider",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
-  resources = [":maven-resolver-provider_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   exports = ["@lib//:maven-resolver-provider"],
   runtime_deps = [
     "@lib//:maven-resolver-provider",
@@ -21,6 +17,7 @@ jvm_library(
 
 jvm_library(
   name = "maven-resolver-provider_test_lib",
+  testonly = True,
   module_name = "intellij.libraries.maven.resolver.provider",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -32,3 +29,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.libraries.maven.resolver.provider` end
+
+### auto-generated section `iml intellij.libraries.maven.resolver.provider` start
+exports_files([
+  "intellij.libraries.maven.resolver.provider.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.libraries.maven.resolver.provider` end

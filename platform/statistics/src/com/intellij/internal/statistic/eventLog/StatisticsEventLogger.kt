@@ -181,7 +181,6 @@ abstract class StatisticsEventLoggerProvider(
       alternativeRecorderId = if (useDefaultRecorderId) "FUS" else null,
     )
     val writer = StatisticsEventLogFileWriter(
-      recorderId = recorderId,
       loggerProvider = this,
       maxFileSizeInBytes = maxFileSizeInBytes,
       isEap = isEap,

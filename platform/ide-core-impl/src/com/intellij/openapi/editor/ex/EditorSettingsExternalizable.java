@@ -37,14 +37,11 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * @see EditorSettingsRefactoringOptionsProvider
+ */
 @State(name = "EditorSettings", storages = @Storage("editor.xml"), category = SettingsCategory.CODE, perClient = true)
 public class EditorSettingsExternalizable implements PersistentStateComponent<EditorSettingsExternalizable.OptionSet> {
-
-  /**
-   * @deprecated Use {@link PropNames#PROP_ENABLE_RENDERED_DOC} instead
-   */
-  @Deprecated(forRemoval = true)
-  public static final @NonNls String PROP_DOC_COMMENT_RENDERING = PropNames.PROP_ENABLE_RENDERED_DOC;
 
   public static final UINumericRange BLINKING_RANGE = new UINumericRange(500, 10, 1500);
   public static final UINumericRange TOOLTIPS_DELAY_RANGE = new UINumericRange(500, 1, 5000);
@@ -95,7 +92,7 @@ public class EditorSettingsExternalizable implements PersistentStateComponent<Ed
 
     public boolean IS_BLOCK_CURSOR = false;
     public boolean IS_FULL_LINE_HEIGHT_CURSOR = false;
-    @ApiStatus.Experimental public boolean IS_ANIMATED_CARET = false;
+    @ApiStatus.Experimental public boolean IS_SMOOTH_CARET_MOVEMENT = false;
     @ApiStatus.Experimental public @NotNull EditorSettings.CaretEasing CARET_EASING = EditorSettings.CaretEasing.NINJA;
     public boolean IS_HIGHLIGHT_SELECTION_OCCURRENCES = true;
     public boolean IS_WHITESPACES_SHOWN = false;
@@ -519,7 +516,7 @@ public class EditorSettingsExternalizable implements PersistentStateComponent<Ed
     boolean oldValue = myOptions.ENABLE_RENDERED_DOC;
     myOptions.ENABLE_RENDERED_DOC = value;
     if (oldValue != value) {
-      myPropertyChangeSupport.firePropertyChange(PROP_DOC_COMMENT_RENDERING, oldValue, value);
+      myPropertyChangeSupport.firePropertyChange(PropNames.PROP_ENABLE_RENDERED_DOC, oldValue, value);
     }
   }
 
@@ -546,15 +543,15 @@ public class EditorSettingsExternalizable implements PersistentStateComponent<Ed
   }
 
   @ApiStatus.Experimental
-  public boolean isAnimatedCaret() {
-    return myOptions.IS_ANIMATED_CARET;
+  public boolean isSmoothCaretMovement() {
+    return myOptions.IS_SMOOTH_CARET_MOVEMENT;
   }
 
   @ApiStatus.Experimental
-  public void setAnimatedCaret(boolean val) {
-    boolean old = myOptions.IS_ANIMATED_CARET;
+  public void setSmoothCaretMovement(boolean val) {
+    boolean old = myOptions.IS_SMOOTH_CARET_MOVEMENT;
     if (old == val) return;
-    myOptions.IS_ANIMATED_CARET = val;
+    myOptions.IS_SMOOTH_CARET_MOVEMENT = val;
     myPropertyChangeSupport.firePropertyChange(PropNames.PROP_IS_ANIMATED_CARET, old, val);
   }
 
@@ -1200,7 +1197,7 @@ public class EditorSettingsExternalizable implements PersistentStateComponent<Ed
     public static final @NonNls String PROP_SMART_HOME = "smartHome";
     public static final @NonNls String PROP_IS_BLOCK_CURSOR = "isBlockCursor";
     public static final @NonNls String PROP_IS_FULL_LINE_HEIGHT_CURSOR = "isFullLineHeightCursor";
-    @ApiStatus.Experimental public static final @NonNls String PROP_IS_ANIMATED_CARET = "isAnimatedCaret";
+    @ApiStatus.Experimental public static final @NonNls String PROP_IS_ANIMATED_CARET = "isSmoothCaretMovement";
     @ApiStatus.Experimental public static final @NonNls String PROP_CARET_EASING = "caretEasing";
     public static final @NonNls String PROP_IS_HIGHLIGHT_SELECTION_OCCURRENCES = "isHighlightSelectionOccurrences";
     public static final @NonNls String PROP_IS_WHITESPACES_SHOWN = "isWhitespacesShown";

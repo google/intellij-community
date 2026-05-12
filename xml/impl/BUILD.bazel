@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.xml.impl` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "impl_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "impl",
   module_name = "intellij.xml.impl",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":impl_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/code-style-api:codeStyle",
@@ -40,6 +35,7 @@ jvm_library(
     "//xml/xml-structure-view-impl:structureView-impl",
     "//platform/xdebugger-api:debugger",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//platform/diff-api:diff",
     "//platform/util/diff",
     "//platform/built-in-server-api:builtInServer",
@@ -50,6 +46,7 @@ jvm_library(
     "//platform/polySymbols",
     "//platform/code-style-impl:codeStyle-impl",
     "//platform/platform-util-io-impl:ide-util-io-impl",
+    "//platform/platform-util-io:ide-util-io",
     "//platform/util/xmlDom",
     "//platform/util/jdom",
     "//libraries/aalto-xml",
@@ -58,6 +55,9 @@ jvm_library(
     "//xml/xml-syntax:syntax",
     "//xml/xml-analysis-api:analysis",
     "//platform/forms_rt:java-guiForms-rt",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//platform/util/concurrency",
+    "//platform/util:util-ui",
   ],
   exports = [
     "//xml/xml-psi-impl:psi-impl",
@@ -70,6 +70,7 @@ jvm_library(
 
 jvm_library(
   name = "impl_test_lib",
+  testonly = True,
   module_name = "intellij.xml.impl",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -111,6 +112,7 @@ jvm_library(
     "//xml/xml-structure-view-impl:structureView-impl_test_lib",
     "//platform/xdebugger-api:debugger_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/diff-api:diff_test_lib",
     "//platform/util/diff:diff_test_lib",
     "//platform/built-in-server-api:builtInServer_test_lib",
@@ -121,6 +123,7 @@ jvm_library(
     "//platform/polySymbols:polySymbols_test_lib",
     "//platform/code-style-impl:codeStyle-impl_test_lib",
     "//platform/platform-util-io-impl:ide-util-io-impl_test_lib",
+    "//platform/platform-util-io:ide-util-io_test_lib",
     "//platform/util/xmlDom:xmlDom_test_lib",
     "//platform/util/jdom:jdom_test_lib",
     "//libraries/aalto-xml:aalto-xml_test_lib",
@@ -130,6 +133,15 @@ jvm_library(
     "//xml/xml-syntax:syntax_test_lib",
     "//xml/xml-analysis-api:analysis_test_lib",
     "//platform/forms_rt:java-guiForms-rt_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/util/concurrency:concurrency_test_lib",
+    "//platform/util:util-ui_test_lib",
   ]
 )
 ### auto-generated section `build intellij.xml.impl` end
+
+### auto-generated section `iml intellij.xml.impl` start
+exports_files([
+  "intellij.xml.impl.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.xml.impl` end

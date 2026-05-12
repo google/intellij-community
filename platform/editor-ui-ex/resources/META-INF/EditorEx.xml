@@ -6,5 +6,7 @@
                         serviceImplementation="com.intellij.openapi.editor.colors.impl.EditorFontCacheImpl"/>
     <applicationService serviceInterface="com.intellij.openapi.editor.highlighter.EditorHighlighterFactory"
                         serviceImplementation="com.intellij.openapi.editor.highlighter.EditorHighlighterFactoryImpl"/>
+    <applicationSettings service="com.intellij.openapi.editor.colors.impl.AppConsoleFontOptions"/>
+    <applicationSettings service="com.intellij.openapi.editor.colors.impl.AppEditorFontOptions"/>
   </extensions>
 </idea-plugin>

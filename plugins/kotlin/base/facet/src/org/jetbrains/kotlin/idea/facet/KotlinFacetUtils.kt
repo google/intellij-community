@@ -18,12 +18,14 @@ import org.jetbrains.kotlin.cli.common.arguments.CommonCompilerArguments
 import org.jetbrains.kotlin.cli.common.arguments.K2JSCompilerArguments
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
 import org.jetbrains.kotlin.cli.common.arguments.K2NativeCompilerArguments
+import org.jetbrains.kotlin.cli.common.arguments.KotlinWasmCompilerArguments
 import org.jetbrains.kotlin.cli.common.arguments.ManualLanguageFeatureSetting
 import org.jetbrains.kotlin.cli.common.arguments.copyBeanTo
 import org.jetbrains.kotlin.cli.common.arguments.copyCommonCompilerArguments
 import org.jetbrains.kotlin.cli.common.arguments.copyFieldsSatisfying
 import org.jetbrains.kotlin.cli.common.arguments.copyK2JSCompilerArguments
 import org.jetbrains.kotlin.cli.common.arguments.copyK2JVMCompilerArguments
+import org.jetbrains.kotlin.cli.common.arguments.copyKotlinWasmCompilerArguments
 import org.jetbrains.kotlin.cli.common.arguments.parseCommandLineArguments
 import org.jetbrains.kotlin.compilerRunner.toArgumentStrings
 import org.jetbrains.kotlin.config.CompilerSettings
@@ -73,13 +75,10 @@ fun IKotlinFacetSettings.initializeIfNeeded(
 
         compilerArguments = targetPlatform.createArguments {
             if (argumentsForPlatform != null) {
-                when {
-                    argumentsForPlatform is K2JVMCompilerArguments &&
-                            this is K2JVMCompilerArguments -> copyK2JVMCompilerArguments(argumentsForPlatform, this)
-
-                    argumentsForPlatform is K2JSCompilerArguments &&
-                            this is K2JSCompilerArguments -> copyK2JSCompilerArguments(argumentsForPlatform, this)
-
+                when (argumentsForPlatform) {
+                    is K2JVMCompilerArguments if this is K2JVMCompilerArguments -> copyK2JVMCompilerArguments(argumentsForPlatform, this)
+                    is K2JSCompilerArguments if this is K2JSCompilerArguments -> copyK2JSCompilerArguments(argumentsForPlatform, this)
+                    is KotlinWasmCompilerArguments if this is KotlinWasmCompilerArguments -> copyKotlinWasmCompilerArguments(argumentsForPlatform, this)
                     else -> error("Unsupported copy arguments combination: ${argumentsForPlatform.javaClass.name} and ${javaClass.name}")
                 }
             }
@@ -190,7 +189,7 @@ fun applyCompilerArgumentsToFacetSettings(
             if (arguments.javaClass == this.javaClass) {
                 copyBeanTo(arguments, this) { property, value -> value != property.get(emptyArgs) }
             }
-            this.pluginOptions = joinPluginOptions(oldPluginOptions, arguments.pluginOptions)
+            this.pluginOptions = joinPluginOptions(oldPluginOptions, arguments.pluginOptions) ?: emptyArray()
 
             this.convertPathsToSystemIndependent()
 

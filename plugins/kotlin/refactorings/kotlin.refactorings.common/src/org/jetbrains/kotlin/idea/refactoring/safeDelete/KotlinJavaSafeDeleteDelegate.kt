@@ -3,7 +3,9 @@ package org.jetbrains.kotlin.idea.refactoring.safeDelete
 
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiNamedElement
+import com.intellij.psi.PsiParameter
 import com.intellij.psi.PsiReference
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.isAncestor
@@ -11,7 +13,12 @@ import com.intellij.refactoring.safeDelete.JavaSafeDeleteDelegate
 import com.intellij.refactoring.safeDelete.usageInfo.SafeDeleteCustomUsageInfo
 import com.intellij.refactoring.safeDelete.usageInfo.SafeDeleteReferenceSimpleDeleteUsageInfo
 import com.intellij.usageView.UsageInfo
+import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.resolution.successfulFunctionCallOrNull
+import org.jetbrains.kotlin.analysis.api.symbols.KaFunctionSymbol
 import org.jetbrains.kotlin.asJava.unwrapped
+import org.jetbrains.kotlin.idea.refactoring.parentLabeledExpression
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtCallElement
 import org.jetbrains.kotlin.psi.KtCallExpression
@@ -54,35 +61,46 @@ class KotlinJavaSafeDeleteDelegate : JavaSafeDeleteDelegate {
         val isReferenceOrConstructorCalleeExpression = calleeExpression is KtReferenceExpression || calleeExpression is KtConstructorCalleeExpression
         if (!(isReferenceOrConstructorCalleeExpression && calleeExpression.isAncestor(element))) return
 
-        val args = callExpression.valueArgumentList?.arguments ?: return
+        analyze(callExpression) {
+            createParameterUsagesFromResolvedCall(callExpression, usages, parameter, parameterIndex)
+        }
+    }
 
-        val namedArguments = args.filter { arg -> arg is KtValueArgument && arg.getArgumentName()?.text == parameter.name }
-        if (namedArguments.isNotEmpty()) {
-            usages.add(SafeDeleteValueArgumentListUsageInfo(parameter, namedArguments.first()))
+    private fun KaSession.createParameterUsagesFromResolvedCall(
+        callExpression: KtCallElement,
+        usages: MutableList<in UsageInfo>,
+        parameter: PsiNamedElement,
+        parameterIndex: Int,
+    ) {
+        val unwrapped = parameter.unwrapped
+        val targetParameter = when (unwrapped) {
+            is KtParameter -> unwrapped.symbol
+            is PsiParameter -> {
+                val method = unwrapped.declarationScope as? PsiMethod
+                (method?.callableSymbol as? KaFunctionSymbol)?.valueParameters?.getOrNull(parameterIndex)
+            }
+            else -> null
+        } ?: return
+
+        val resolvedCall = callExpression.resolveToCall()?.successfulFunctionCallOrNull() ?: return
+
+        val valueArguments = callExpression.valueArguments.filterIsInstance<KtValueArgument>().filter { argument ->
+            val argumentExpression = argument.getArgumentExpression()
+            argumentExpression != null && resolvedCall.valueArgumentMapping[argumentExpression]?.symbol == targetParameter
+        }
+
+        if (valueArguments.isNotEmpty()) {
+            usages.add(SafeDeleteValueArgumentListUsageInfo(parameter, *valueArguments.toTypedArray()))
             return
         }
 
-        val argCount = args.size
-        if (parameterIndex < argCount) {
-            if ((parameter as? KtParameter)?.isVarArg == true) {
-                for (idx in paramIdx..argCount - 1) {
-                    usages.add(SafeDeleteValueArgumentListUsageInfo(parameter, args[idx]))
-                }
-            } else {
-                val argument = args[parameterIndex]
-                if (argument.getArgumentName()?.text != null) {
-                    //parameter name check already failed above
-                    return
-                }
+        val lambdaArgument = callExpression.lambdaArguments.firstOrNull() ?: return
+        val argumentExpression = lambdaArgument.getArgumentExpression() ?: return
+        val mappedParameter = resolvedCall.valueArgumentMapping[argumentExpression]
+            ?: argumentExpression.parentLabeledExpression()?.let(resolvedCall.valueArgumentMapping::get)
 
-                usages.add(SafeDeleteValueArgumentListUsageInfo(parameter, argument))
-            }
-        } else {
-            val lambdaArgs = callExpression.lambdaArguments
-            val lambdaIndex = parameterIndex - argCount
-            if (lambdaIndex < lambdaArgs.size) {
-                usages.add(SafeDeleteReferenceSimpleDeleteUsageInfo(lambdaArgs[lambdaIndex], parameter, true))
-            }
+        if (mappedParameter?.symbol == targetParameter) {
+            usages.add(SafeDeleteReferenceSimpleDeleteUsageInfo(lambdaArgument, parameter, true))
         }
     }
 

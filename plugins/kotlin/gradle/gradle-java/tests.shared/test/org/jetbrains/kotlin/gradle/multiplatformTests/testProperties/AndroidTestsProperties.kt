@@ -9,8 +9,8 @@ object AndroidGradlePluginVersionTestsProperty : KotlinTestsResolvableProperty<A
 
     enum class Value(override val versionAlias: String, override val version: String) : ValueFromEnvironment {
         MinSupported("MIN", "7.4.2"),
-        LatestStable("STABLE", "8.3.1"),
-        Beta("BETA", "8.5.0-beta01"),
+        LatestStable("STABLE", "8.5.2"),
+        Beta("BETA", "8.5.2"),
         Alpha("ALPHA", "8.6.0-alpha03");
     }
 

@@ -87,7 +87,7 @@ public abstract class Instruction {
 
   /**
    * A helper method to create the resulting states for linear instruction 
-   * @param runner runner that interprets current IR
+   * @param interpreter interpreter for current IR
    * @param memState resulting memory state
    * @return an array of a single instruction state that refers to the next instruction and the supplied memory state
    */
@@ -97,7 +97,7 @@ public abstract class Instruction {
 
   /**
    * A helper method to create the resulting state pointing to the next instruction 
-   * @param runner runner that interprets current IR
+   * @param interpreter interpreter for current IR
    * @param memState resulting memory state
    * @return an instruction state that refers to the next instruction and the supplied memory state
    */

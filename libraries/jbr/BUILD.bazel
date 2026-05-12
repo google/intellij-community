@@ -1,23 +1,20 @@
 ### auto-generated section `build intellij.libraries.jbr` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "jbr_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "jbr",
+  module_name = "intellij.libraries.jbr",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
-  resources = [":jbr_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   exports = ["@lib//:jbr-api"],
   runtime_deps = ["@lib//:jbr-api"]
 )
 
 jvm_library(
   name = "jbr_test_lib",
+  testonly = True,
   module_name = "intellij.libraries.jbr",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -26,3 +23,9 @@ jvm_library(
   runtime_deps = [":jbr"]
 )
 ### auto-generated section `build intellij.libraries.jbr` end
+
+### auto-generated section `iml intellij.libraries.jbr` start
+exports_files([
+  "intellij.libraries.jbr.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.libraries.jbr` end

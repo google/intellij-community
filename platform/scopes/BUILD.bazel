@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.scopes` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "scopes_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "scopes",
   module_name = "intellij.platform.scopes",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":scopes_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/util",
@@ -28,11 +23,13 @@ jvm_library(
     "//platform/kernel/shared:kernel",
     "//platform/util/coroutines",
     "//platform/util/concurrency",
+    "//fleet/rhizomedb",
   ]
 )
 
 jvm_library(
   name = "scopes_test_lib",
+  testonly = True,
   module_name = "intellij.platform.scopes",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -51,6 +48,13 @@ jvm_library(
     "//platform/kernel/shared:kernel_test_lib",
     "//platform/util/coroutines:coroutines_test_lib",
     "//platform/util/concurrency:concurrency_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.scopes` end
+
+### auto-generated section `iml intellij.platform.scopes` start
+exports_files([
+  "intellij.platform.scopes.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.scopes` end

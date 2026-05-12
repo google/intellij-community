@@ -5,6 +5,7 @@ import com.intellij.diagnostic.PluginException
 import com.intellij.execution.configuration.EnvironmentVariablesData
 import com.intellij.execution.wsl.WslPath
 import com.intellij.ide.trustedProjects.TrustedProjects
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
@@ -17,6 +18,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.io.NioFiles
+import com.intellij.openapi.util.io.toCanonicalPath
 import com.intellij.openapi.util.text.Strings
 import com.intellij.platform.eel.EelApi
 import com.intellij.platform.eel.EelDescriptor
@@ -30,18 +32,21 @@ import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.path.EelPathException
 import com.intellij.platform.eel.provider.LocalEelDescriptor
 import com.intellij.platform.eel.provider.getEelDescriptor
+import com.intellij.platform.eel.provider.getRemoteProjectBaseNioPath
 import com.intellij.platform.eel.provider.toEelApi
 import com.intellij.util.PathUtil
 import com.intellij.util.text.nullize
 import com.intellij.util.xmlb.annotations.Property
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.plugins.terminal.settings.TerminalLocalOptions
+import org.jetbrains.plugins.terminal.settings.impl.TerminalProjectOptionsMigration
 import org.jetbrains.plugins.terminal.startup.ShellExecOptionsCustomizer
 import java.nio.file.Files
 import kotlin.reflect.KMutableProperty0
 import kotlin.reflect.KProperty
 
 @Service(Service.Level.PROJECT)
-@State(name = "TerminalProjectNonSharedOptionsProvider", storages = [(Storage(StoragePathMacros.WORKSPACE_FILE))])
+@State(name = TerminalProjectOptionsProvider.COMPONENT_NAME, storages = [(Storage(StoragePathMacros.WORKSPACE_FILE))])
 class TerminalProjectOptionsProvider(val project: Project) : PersistentStateComponent<TerminalProjectOptionsProvider.State> {
 
   private val state = State()
@@ -54,6 +59,17 @@ class TerminalProjectOptionsProvider(val project: Project) : PersistentStateComp
     state.startingDirectory = newState.startingDirectory
     state.shellPath = newState.shellPath
     state.envDataOptions = newState.envDataOptions
+
+    val backendState = TerminalProjectOptionsMigration.getInstance(project).getBackendStateOnce()
+    if (backendState != null) {
+      state.startingDirectory = backendState.startingDirectory
+      state.shellPath = backendState.shellPath
+      state.envDataOptions = backendState.envDataOptions
+    }
+  }
+
+  override fun noStateLoaded() {
+    loadState(State())
   }
 
   fun getEnvData(): EnvironmentVariablesData {
@@ -107,7 +123,16 @@ class TerminalProjectOptionsProvider(val project: Project) : PersistentStateComp
     }
 
   private fun getDefaultWorkingDirectory(): String? {
-    return project.guessProjectDir()?.canonicalPath
+    return if (ApplicationManager.getApplication().isUnitTestMode) {
+      // Use just `guessProjectDir` in unit tests because in this case it is "temp:///src"
+      // and `EelPath.parse` call in `getRemoteProjectBaseNioPath` will fail for this path on Windows.
+      project.guessProjectDir()?.canonicalPath
+    }
+    else {
+      // Can't just use `guessProjectDir` because in RD case it would return a path to the fake thin client project.
+      // While we need a true "MultiRoutingFileSystem" path that points to the remote project path.
+      project.getRemoteProjectBaseNioPath()?.toCanonicalPath()
+    }
   }
 
   var shellPath: String
@@ -122,7 +147,9 @@ class TerminalProjectOptionsProvider(val project: Project) : PersistentStateComp
       }
     }
 
-  internal var shellPathWithoutDefault: String?
+  @get:ApiStatus.Internal
+  @set:ApiStatus.Internal
+  var shellPathWithoutDefault: String?
     get() {
       val workingDirectory = startingDirectory
       val shellPath = when {
@@ -217,6 +244,8 @@ class TerminalProjectOptionsProvider(val project: Project) : PersistentStateComp
 
   companion object {
     private val LOG = Logger.getInstance(TerminalProjectOptionsProvider::class.java)
+
+    internal const val COMPONENT_NAME: String = "TerminalProjectNonSharedOptionsProvider"
 
     @JvmStatic
     fun getInstance(project: Project): TerminalProjectOptionsProvider {

@@ -1,13 +1,14 @@
 <idea-plugin visibility="public">
   <resource-bundle>messages.GitLabBundle</resource-bundle>
 
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
-    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
     <plugin id="Git4Idea"/>
     <module name="intellij.platform.collaborationTools"/>
     <module name="intellij.platform.vcs.log"/>
-    <!-- endregion -->
+    <module name="intellij.vcs.git.shared"/>
   </dependencies>
+  <!-- endregion -->
 
   <extensionPoints>
     <extensionPoint qualifiedName="intellij.vcs.gitlab.titleGenerator"
@@ -63,6 +64,10 @@
     <customPasteProvider id="CommentFileLinkPasteProvider"
                          implementation="org.jetbrains.plugins.gitlab.ui.comment.CommitFilePasteProvider"/>
 
+    <completion.contributor language="any"
+                            implementationClass="org.jetbrains.plugins.gitlab.ui.GitlabMarkdownCompletionContributor"/>
+    <typedHandler implementation="org.jetbrains.plugins.gitlab.ui.GitlabMarkdownTypedHandler"/>
+
     <registryKey key="vcs.gitlab.connect.silently"
                  description="Connect to GitLab repository without an explicit user action"
                  defaultValue="true"/>
@@ -78,6 +83,12 @@
 
     <registryKey defaultValue="true" description="Enable file uploading action for review notes"
                  key="gitlab.merge.requests.file.upload.enabled"/>
+    <applicationSettings service="org.jetbrains.plugins.gitlab.authentication.accounts.GitLabPersistentAccounts"/>
+    <projectSettings service="org.jetbrains.plugins.gitlab.mergerequest.ui.filters.GitLabMergeRequestsPersistentFiltersHistory"/>
+    <projectSettings service="org.jetbrains.plugins.gitlab.mergerequest.GitLabMergeRequestsPreferences"/>
+    <projectSettings service="org.jetbrains.plugins.gitlab.mergerequest.ui.details.model.GitLabPersistentMergeRequestChangesViewedState"/>
+    <projectSettings service="org.jetbrains.plugins.gitlab.authentication.accounts.GitLabProjectDefaultAccountHolder"/>
+    <applicationSettings service="org.jetbrains.plugins.gitlab.GitLabSettings"/>
   </extensions>
 
   <extensions defaultExtensionNs="com.intellij.statistics">

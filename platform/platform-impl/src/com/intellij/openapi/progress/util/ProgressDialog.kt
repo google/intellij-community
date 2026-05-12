@@ -1,14 +1,12 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:OptIn(FlowPreview::class)
-
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.progress.util
 
 import com.intellij.concurrency.ContextAwareRunnable
 import com.intellij.ide.ui.laf.darcula.ui.DarculaProgressBarUI
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.UI
 import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
@@ -31,12 +29,13 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.jetbrains.annotations.ApiStatus.Internal
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import java.awt.Component
 import java.awt.Window
 import java.awt.event.ActionListener
 import java.awt.event.KeyEvent
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JComponent
 import javax.swing.JOptionPane
 import javax.swing.JPanel
@@ -44,8 +43,11 @@ import javax.swing.JRootPane
 import javax.swing.KeyStroke
 import javax.swing.SwingUtilities
 import javax.swing.border.Border
+import kotlin.time.Duration.Companion.milliseconds
 
-@Internal
+@Suppress("SplitModeApiUsage")
+@ApiStatus.Internal
+@OptIn(FlowPreview::class)
 class ProgressDialog(
   private val progressWindow: ProgressWindow,
   private val shouldShowBackground: Boolean,
@@ -53,10 +55,9 @@ class ProgressDialog(
   private val parentWindow: Window?,
 ) : Disposable {
   companion object {
-    internal const val UPDATE_INTERVAL: Int = 50 // msec. 20 frames per second.
+    internal const val UPDATE_INTERVAL: Long = 50 // ms, 20 FPS
   }
 
-  private var lastTimeDrawn: Long = -1
   private val updateRequests = MutableSharedFlow<Unit>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
   private val cancelButtonEnabledRequests = MutableSharedFlow<Boolean>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
   private var wasShown = false
@@ -66,7 +67,7 @@ class ProgressDialog(
 
   private val repaintRunnable = Runnable(::doRepaint)
 
-  private var repaintedFlag = true // guarded by this
+  private val repainting = AtomicBoolean(false)
   private var popup: DialogWrapper? = null
 
   @Suppress("SSBasedInspection")
@@ -107,29 +108,20 @@ class ProgressDialog(
     }
 
     coroutineScope.launch {
+      val anyModalityContext = Dispatchers.UI + ModalityState.any().asContextElement()
       updateRequests
-        .throttle(500)
+        .throttle(UPDATE_INTERVAL)
         .collectLatest {
-          withContext(Dispatchers.EDT + progressWindow.modalityState.asContextElement()) {
-            if (!repaintedFlag) {
-              return@withContext
-            }
-
-            if (System.currentTimeMillis() > lastTimeDrawn + UPDATE_INTERVAL) {
-              repaintedFlag = false
-              doRepaint()
-            }
-            else {
-              scheduleUpdate()
-            }
+          withContext(anyModalityContext) {
+            doRepaint()
           }
         }
     }
 
     coroutineScope.launch {
-      val anyModalityContext = Dispatchers.EDT + ModalityState.any().asContextElement()
+      val anyModalityContext = Dispatchers.UI + ModalityState.any().asContextElement()
       cancelButtonEnabledRequests
-        .debounce(500)
+        .debounce(UPDATE_INTERVAL.milliseconds)
         .collectLatest { isEnabled ->
           withContext(anyModalityContext) {
             ui.cancelButton.isEnabled = isEnabled
@@ -139,6 +131,7 @@ class ProgressDialog(
   }
 
   private fun doRepaint() {
+    if (repainting.getAndSet(true)) return
     ui.updateTitle(progressWindow.title)
     ui.updateProgress(
       text = progressWindow.text,
@@ -152,10 +145,7 @@ class ProgressDialog(
         progressBarUI.updateIndeterminateAnimationIndex(startMillis)
       }
     }
-    lastTimeDrawn = System.currentTimeMillis()
-    synchronized(this@ProgressDialog) {
-      repaintedFlag = true
-    }
+    repainting.set(false)
   }
 
   override fun dispose() {
@@ -275,7 +265,7 @@ class ProgressDialog(
     }
     // GTW-1384 - If the parent window is JOptionPane.getRootFrame() then invoke DialogWrapper(Component) instead of DialogWrapper(Project)
     // because otherwise the ToolbarUtil.setTransparentTitleBar(...) is invoked.
-    // AFAIU: It should only affect progresses that are shown without any parent window (like the Gateway started from IDE)
+    // AFAIU: It should only affect progress dialogs that are shown without any parent window (like the Gateway started from IDE).
     if (window.isShowing || window == JOptionPane.getRootFrame()) {
       return MyDialogWrapper(window)
     }
@@ -302,7 +292,7 @@ class ProgressDialog(
         try {
           GlassPaneDialogWrapperPeer(this, parent)
         }
-        catch (e: GlasspanePeerUnavailableException) {
+        catch (_: GlasspanePeerUnavailableException) {
           super.createPeer(parent, canBeParent)
         }
       }
@@ -316,14 +306,12 @@ class ProgressDialog(
         try {
           GlassPaneDialogWrapperPeer(this)
         }
-        catch (e: GlasspanePeerUnavailableException) {
-          super.createPeer(WindowManager.getInstance().suggestParentWindow(progressWindow.myProject), canBeParent,
-                           applicationModalIfPossible)
+        catch (_: GlasspanePeerUnavailableException) {
+          super.createPeer(WindowManager.getInstance().suggestParentWindow(progressWindow.myProject), canBeParent, applicationModalIfPossible)
         }
       }
       else {
-        super.createPeer(WindowManager.getInstance().suggestParentWindow(progressWindow.myProject), canBeParent,
-                         applicationModalIfPossible)
+        super.createPeer(WindowManager.getInstance().suggestParentWindow(progressWindow.myProject), canBeParent, applicationModalIfPossible)
       }
     }
 
@@ -333,7 +321,7 @@ class ProgressDialog(
       return try {
         GlassPaneDialogWrapperPeer(project, this)
       }
-      catch (e: GlasspanePeerUnavailableException) {
+      catch (_: GlasspanePeerUnavailableException) {
         super.createPeer(project, canBeParent)
       }
     }

@@ -24,7 +24,7 @@ interface ShellExecOptionsCustomizer {
    */
   @RequiresBackgroundThread(generateAssertion = false)
   @RequiresReadLockAbsence(generateAssertion = false)
-  fun customizeExecOptions(project: Project, shellExecOptions: MutableShellExecOptions) {}
+  fun customizeExecOptions(project: Project, shellExecOptions: MutableShellExecOptions)
 
   /**
    * Customizes the default start working directory for the given project.

@@ -73,6 +73,3 @@ suspend fun DialogWrapper.waitClosed() {
     isDisposed
   }
 }
-
-val openedDialogWrappers: List<DialogWrapper>
-  get() = Window.getWindows().mapNotNull { DialogWrapper.findInstance(it) }

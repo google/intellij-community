@@ -158,7 +158,7 @@ public final class TestIntegrationUtils {
           if (member.hasModifierProperty(PsiModifier.PRIVATE)) return false;
 
           String name = method.getName();
-          List<PsiMethod> methods = methodsByName.computeIfAbsent(name, __ -> new ArrayList<>());
+          List<PsiMethod> methods = methodsByName.computeIfAbsent(name, _ -> new ArrayList<>());
           for (PsiMethod psiMethod : methods) {
             // rely on the order of collected classes: from descendant to ancestors
             if (PsiSuperMethodUtil.isSuperMethod(psiMethod, method)) {

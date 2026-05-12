@@ -38,7 +38,7 @@ final class UnknownInvalidSdkFixDownload extends UnknownSdkFixActionDownloadBase
     return new UnknownSdkDownloadTask(
       mySdk,
       myFix,
-      __ -> mySdk.mySdk
+      _ -> mySdk.mySdk
     );
   }
 

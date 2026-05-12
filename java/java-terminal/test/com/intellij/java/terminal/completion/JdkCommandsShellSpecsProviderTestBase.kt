@@ -7,6 +7,7 @@ import com.intellij.execution.vmOptions.VMOptionKind
 import com.intellij.execution.vmOptions.VMOptionVariant
 import com.intellij.execution.vmOptions.VMOptionsService
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.terminal.completion.spec.ProcessExecutionResult
 import com.intellij.terminal.completion.spec.ShellCommandResult
 import com.intellij.terminal.completion.spec.ShellCompletionSuggestion
 import com.intellij.terminal.completion.spec.ShellFileInfo
@@ -26,14 +27,14 @@ internal abstract class JdkCommandsShellSpecsProviderTestBase(private val engine
     val fixture = ShellCompletionTestFixture.builder(project)
       .setIsReworkedTerminal(engine == TerminalEngine.REWORKED)
       .mockProcessesExecutor(object : ShellDataGeneratorProcessExecutor {
-        override suspend fun executeProcess(options: ShellDataGeneratorProcessOptions): ShellCommandResult {
+        override suspend fun executeProcess(options: ShellDataGeneratorProcessOptions): ProcessExecutionResult {
           if (options.executable == "java" && options.args == listOf("-XshowSettings:properties", "-version")) {
-            return ShellCommandResult.create("java.home = /jre/home\njava.version = $javaVersion", exitCode = 0)
+            return ProcessExecutionResult.Finished("java.home = /jre/home\njava.version = $javaVersion", exitCode = 0)
           }
           else if (options.executable == "__jetbrains_intellij_get_directory_files") {
-            return ShellCommandResult.create("file1.jar\nfile2.jar\ndir1/", exitCode = 0)
+            return ProcessExecutionResult.Finished("file1.jar\nfile2.jar\ndir1/", exitCode = 0)
           }
-          return ShellCommandResult.create("", exitCode = 1)
+          return ProcessExecutionResult.Finished("", exitCode = 1)
         }
       })
       .mockShellCommandResults { command ->

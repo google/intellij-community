@@ -4,10 +4,12 @@ package com.intellij.openapi.vfs.newvfs.impl;
 import com.intellij.concurrency.ConcurrentCollectionFactory;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.Application;
-import com.intellij.openapi.application.ApplicationListener;
+import com.intellij.openapi.application.WriteActionListener;
+import com.intellij.openapi.application.ex.ApplicationEx;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.InvalidVirtualFileAccessException;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.newvfs.persistent.FSRecords;
 import com.intellij.openapi.vfs.newvfs.persistent.FSRecordsImpl;
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFS;
@@ -28,9 +30,6 @@ import com.intellij.util.containers.IntObjectMap;
 import com.intellij.util.keyFMap.KeyFMap;
 import io.opentelemetry.api.metrics.BatchCallback;
 import io.opentelemetry.api.metrics.Meter;
-import io.opentelemetry.api.metrics.ObservableDoubleMeasurement;
-import io.opentelemetry.api.metrics.ObservableLongMeasurement;
-import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import org.jetbrains.annotations.ApiStatus;
@@ -50,7 +49,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntFunction;
@@ -59,7 +57,7 @@ import java.util.function.IntUnaryOperator;
 import static com.intellij.util.SystemProperties.getBooleanProperty;
 
 /**
- * Main part of VFS in-memory cache: flags, user data and children are all stored here.
+ * The main part of VFS in-memory cache: flags, user data and children are all stored here.
  * {@link VirtualFileSystemEntry} and {@link VirtualDirectoryImpl} objects mainly just store fileId, so they could be
  * seen as 'pointers' into this cache.
  * <p>
@@ -83,12 +81,14 @@ import static com.intellij.util.SystemProperties.getBooleanProperty;
  * <li> After that the file is live, an object representing it can be retrieved any time from its parent. File system roots are
  * kept on hard references in {@link PersistentFS} </li>
  *
- * <li> If a file is deleted (invalidated), then its data is not needed anymore, and should be removed. But this can only happen
- * after all the listener has been notified about the file deletion and have had their chance to look at the data the last time.
- * See {@link #killInvalidatedFiles()} </li>
- *
- * <li> The file with removed data is marked as "dead" (see {@link #deadMarker}), any access to it will throw {@link InvalidVirtualFileAccessException}
- * Dead ids won't be reused in the same session of the IDE. </li>
+ * <li> If a file is deleted (={@link #invalidateFile(int)}), some of it's data could still be used by async listeners doing
+ * some cleanup work -- so we can't clean all the file's data right away, and it is hard to tell the moment the cleanup becomes
+ * possible. But we could clean _some_ pieces, like children for directories, because {@link VirtualFile#isValid()} explicitly
+ * mentions that children are _not_ safe to access for invalid files. Other pieces, like UserData, is still accessible for as
+ * long, as needed.
+ * If {@link #USE_SOFT_REFERENCES} is enabled, than excess data could be collected by GC eventually, but only at {@link Segment}
+ * granularity, see the apt comments.
+ * </li>
  * </ol>
  */
 @ApiStatus.Internal
@@ -100,11 +100,11 @@ public final class VfsData implements Closeable {
    * growing too large. <p/>
    * If false (legacy option) -- {@link #segments} map is strong-reference based, i.e., entries are never evicted, and the
    * map only grows. <p/>
-   * (This option may look like a regular cause of memory issues -- but practice proves otherwise: it was the only option
-   * for years, and caused the memory issues only occasionally. The reason for that is that overall files number in VFS is
-   * limited in most use-cases, and only a fraction of all VFS files is really accessed in a single IDE session. Thus, VFS
+   * ('false' option may look like a recipe for memory issues -- but practice proves otherwise: it was the only option
+   * for years, and caused the memory issues only occasionally. The reason for that is that the overall files number in VFS
+   * is limited in most use-cases, and only a fraction of all VFS files is really accessed in a single IDE session. Thus, VFS
    * cache size without an eviction is still typically in the range 20-50Mbs for the intellij project -- which is tolerable.
-   * I.e., this option definitely _could_ be used in practice)
+   * I.e., 'false' option definitely _could_ be used in practice)
    */
   private static final boolean USE_SOFT_REFERENCES = getBooleanProperty("platform.vfs.cache.use-soft-references", true);
 
@@ -117,14 +117,15 @@ public final class VfsData implements Closeable {
 
   /**
    * Mark 'invalidated' (=deleted) files in {@link Segment#objectFieldsArray}.
-   * Also used as a lock to protect {@link #queueOfFileIdsToBeInvalidated}
+   * Also used as a lock to protect {@link #fileIdsQueueForCleanup}
    */
-  private final Object deadMarker = ObjectUtils.sentinel("dead file");
+  private final Object invalidatedQueueLock = ObjectUtils.sentinel("dead file");
 
-  //TODO RC: FSRecords was quite optimized recently, probably caching is not needed anymore?
-  //         1. indexingFlag/nameId caching was already removed
-  //         2. (flag+modCount) field: this is additional data, partially-independent from persistent VFS data
-  //         3. .children: in many cases children could be accessed directly from FSRecords, without need to cache them
+  //TODO RC: FSRecords was quite optimized recently, maybe use it _instead_ of cache sometimes?
+  //         0. indexingFlag/nameId caching was already removed, FSRecords used instead
+  //         1. (flag+modCount) field: this is additional data, partially independent from persistent VFS data => can't be skipped
+  //         2. .invalidatedFileIds -- FSRecords.isDeleted() could be used instead? See comments
+  //         2. DirectoryData.children: in many cases children could be accessed directly from FSRecords, without need to cache them?
 
   /**
    * Map[segmentIndex -> Segment]
@@ -141,25 +142,30 @@ public final class VfsData implements Closeable {
 
   /**
    * Set of deleted file ids. Never cleaned during a session (deleted fileId could be re-used, but it could be done only on
-   * a session start, see {@link FSRecordsImpl}).
-   * File ids are added to this set immediately on file deletion, while _also_ added to the {@link #queueOfFileIdsToBeInvalidated},
-   * to be later (after-WA) used to replace the file's data {@link Segment#objectFieldsArray} with {@link #deadMarker}.
-   * MAYBE RC: maybe steal a bit for it in {@link Segment#intFieldsArray}? 16M->8M modCounts seems to be not very critical.
-   *           Or FSRecords.isDeleted could be used -- it would be even better, since it reduces data duplication: now
-   *           we have 'persistent file record marked deleted' and 'in-memory file record marked as invalid', but they could
-   *           be merged into one.
+   * a new session start, see {@link FSRecordsImpl}).
+   * File ids are added to this set immediately on file deletion, while _also_ added to the {@link #fileIdsQueueForCleanup},
+   * to be later (after-WA) removed from {@link #changedParents}.
+   * BEWARE: FSRecords.isDeleted flags are _not_ copied here -- instead, 'deleted' records from FSRecords are not loaded in cache
+   * at all, so we never need appropriate bits to be set in invalidatedFileIds.
+   * MAYBE RC: maybe steal a bit for it in {@link Segment#intFieldsArray}, e.g. from modCount -- 16M->8M modCounts seems
+   *           to be not very critical. Or FSRecords.isDeleted could be used -- it would be even better, since it reduces data
+   *           duplication: now we have 'persistent file record marked deleted' and 'in-memory file record marked as invalid',
+   *           but they could be merged into one.
    */
   private final ConcurrentBitSet invalidatedFileIds = ConcurrentBitSet.create();
 
   /**
-   * Records (fileIds) to be invalidated: removed from {@link #changedParents} and set 'dead' in {@link Segment#objectFieldsArray}).
-   * As soon, as apt slots are processed, this queue is cleared.
-   * Guarded by {@link #deadMarker}
+   * Invalidated records (fileIds) for some delayed cleanup.
+   * Currently, the cleanup == remove from {@link #changedParents}.
+   * As soon as cleanup is executed, this queue is cleared.
    */
-  private IntSet queueOfFileIdsToBeInvalidated = new IntOpenHashSet();
+  //@Guarded by {@link #invalidatedQueueLock}
+  private IntSet fileIdsQueueForCleanup = new IntOpenHashSet();
 
   /**
-   * If file/directory is moved (==parent is changed), then the change is added to this map, as (originalParentId -> newParent).
+   * If the file/directory is moved (==parent is changed), then the change is added to this map, as (originalParentId -> newParent).
+   * This is needed because it could be >1 VirtualFile instances representing the same file, and all those instances need to know
+   * somehow the parent has changed -- so they all check this collection on .getParent()
    *
    * @see Segment#replacement
    * @see VirtualFileSystemEntry#updateSegmentAndParent(Segment)
@@ -169,18 +175,19 @@ public final class VfsData implements Closeable {
 
   private final Disposable writeActionListenerDisposer = Disposer.newDisposable();
 
-  // ====================== monitoring ======================================================================================= //
+  // ====================== monitoring: ====================================================================================== //
 
-  /** # of {@link Segment} instances created, since the start */
+  /** # of {@link Segment} instances created, over the lifespan of VfsData */
   private final AtomicInteger segmentsCreated = new AtomicInteger();
 
-  /** # of {@link DirectoryData}/{@link VirtualDirectoryImpl} objects created, since the start */
+  /** # of {@link DirectoryData}/{@link VirtualDirectoryImpl} objects created, over the lifespan of VfsData */
   private final AtomicInteger directoriesCreated = new AtomicInteger();
 
-  /** # of {@link VirtualFileImpl} objects created, since the start */
+  /** # of {@link VirtualFileImpl} objects created, over the lifespan of VfsData */
   private final AtomicInteger filesCreated = new AtomicInteger();
 
   private final BatchCallback otelHandle;
+
 
   public VfsData(@NotNull Application app,
                  @NotNull PersistentFSImpl pfs) {
@@ -189,15 +196,10 @@ public final class VfsData implements Closeable {
 
     LOG.info("Use SoftReference in VFS cache: " + USE_SOFT_REFERENCES);
 
-    //TODO RC: replace with ((ApplicationEx)app).addWriteActionListener(new WriteActionListener()) ?
-    app.addApplicationListener(new ApplicationListener() {
+    ((ApplicationEx)app).addWriteActionListener(new WriteActionListener() {
       @Override
-      public void writeActionFinished(@NotNull Object action) {
-        // after top-level write action is finished, all the deletion listeners should have processed the deleted files
-        // and their data is considered safe to remove. From this point on accessing a removed file will result in an exception.
-        if (!app.isWriteAccessAllowed()) {
-          killInvalidatedFiles();
-        }
+      public void writeActionFinished(@NotNull Class<?> action) {
+        cleanupInvalidatedFileRecords();
       }
     }, writeActionListenerDisposer);
 
@@ -206,10 +208,10 @@ public final class VfsData implements Closeable {
 
   private BatchCallback setupOTelMonitoring() {
     Meter vfsMeter = TelemetryManager.getInstance().getMeter(PlatformScopesKt.VFS);
-    ObservableDoubleMeasurement cacheSegmentsCount = vfsMeter.gaugeBuilder("VFS.cache.segments").buildObserver();
-    ObservableLongMeasurement cacheSegmentsCreated = vfsMeter.counterBuilder("VFS.cache.segmentsCreated").buildObserver();
-    ObservableLongMeasurement cacheDirectoriesCreated = vfsMeter.counterBuilder("VFS.cache.directoriesCreated").buildObserver();
-    ObservableLongMeasurement cacheFilesCreated = vfsMeter.counterBuilder("VFS.cache.filesCreated").buildObserver();
+    var cacheSegmentsCount = vfsMeter.gaugeBuilder("VFS.cache.segments").ofLongs().buildObserver();
+    var cacheSegmentsCreated = vfsMeter.counterBuilder("VFS.cache.segmentsCreated").buildObserver();
+    var cacheDirectoriesCreated = vfsMeter.counterBuilder("VFS.cache.directoriesCreated").buildObserver();
+    var cacheFilesCreated = vfsMeter.counterBuilder("VFS.cache.filesCreated").buildObserver();
     return vfsMeter.batchCallback(
       () -> {
         cacheSegmentsCount.record(segments.size());
@@ -224,44 +226,44 @@ public final class VfsData implements Closeable {
 
   @Override
   public void close() {
-    otelHandle.close();
     Disposer.dispose(writeActionListenerDisposer);
+    otelHandle.close();
   }
 
   @NotNull PersistentFSImpl owningPersistentFS() {
     return owningPersistentFS;
   }
 
-  private void killInvalidatedFiles() {
-    synchronized (deadMarker) {
-      if (!queueOfFileIdsToBeInvalidated.isEmpty()) {
-        for (IntIterator iterator = queueOfFileIdsToBeInvalidated.iterator(); iterator.hasNext(); ) {
-          int id = iterator.nextInt();
-          Segment segment = Objects.requireNonNull(segmentForFileId(id, /*create: */false));
-          segment.killFileData(id, deadMarker);
-          changedParents.remove(id);
-        }
-        queueOfFileIdsToBeInvalidated = new IntOpenHashSet();
+  private void cleanupInvalidatedFileRecords() {
+    synchronized (invalidatedQueueLock) {
+      if (!fileIdsQueueForCleanup.isEmpty()) {
+        fileIdsQueueForCleanup.forEach(fileId -> {
+          Segment segment = segmentForFileId(fileId, /*create: */ false);
+          if (segment != null) {//could be GCed already
+            segment.cleanFileData(fileId);
+          }
+
+          changedParents.remove(fileId);
+        });
+        fileIdsQueueForCleanup = new IntOpenHashSet();
       }
     }
   }
 
   /**
    * @return a {@link VirtualFileSystemEntry} wrapper for the file data in the cache ({@link #segments}).
-   * If there is no data in {@link #segments} cache for given id yet -- returns null.
-   * If the file with given id was 'just deleted' (i.e. in the current WA) -- returns the wrapper what is {@code !isValid()},
-   * but if the file was deleted in already finished WA -- throws {@link InvalidVirtualFileAccessException}
+   * If there is no data in {@link #segments} cache for given id yet, or the file was deleted -- returns null.
    */
   @Nullable VirtualFileSystemEntry cachedFileById(int id, @NotNull VirtualDirectoryImpl parent) {
+    if (!isFileValid(id)) {
+      return null;
+    }
+
     Segment segment = segmentForFileId(id, /*create: */ false);
     if (segment == null) return null;
 
     Object entryData = segment.fileDataById(id);
     if (entryData == null) return null;
-
-    if (entryData == deadMarker) {
-      throw reportDeadFileAccess(new VirtualFileImpl(id, segment, parent));
-    }
 
     if (entryData instanceof DirectoryData directoryData) {
       VirtualDirectoryImpl directory = directoryData.directory;
@@ -282,16 +284,20 @@ public final class VfsData implements Closeable {
     return new VirtualFileImpl(id, segment, parent);
   }
 
+  /**
+   * @return a {@link VirtualDirectoryImpl} wrapper for the file data in the cache ({@link #segments}).
+   * If there is no data in {@link #segments} cache for given id yet, or the directory was deleted -- returns null.
+   */
   public @Nullable VirtualDirectoryImpl cachedDir(int id) {
+    if (!isFileValid(id)) {
+      return null;
+    }
+
     Segment segment = segmentForFileId(id, /*create: */ false);
     if (segment == null) return null;
 
     Object entryData = segment.fileDataById(id);
     if (entryData == null) return null;
-
-    if (entryData == deadMarker) {
-      return null;
-    }
 
     if (entryData instanceof DirectoryData directoryData) {
       VirtualDirectoryImpl dir = directoryData.directory;
@@ -319,10 +325,6 @@ public final class VfsData implements Closeable {
       }
     }
     return cachedDirs;
-  }
-
-  private static @NotNull InvalidVirtualFileAccessException reportDeadFileAccess(@NotNull VirtualFileSystemEntry file) {
-    return new InvalidVirtualFileAccessException("Accessing dead virtual file: " + file.getUrl());
   }
 
   @Contract("_,true->!null")
@@ -354,8 +356,8 @@ public final class VfsData implements Closeable {
 
   void invalidateFile(int id) {
     invalidatedFileIds.set(id);
-    synchronized (deadMarker) {
-      queueOfFileIdsToBeInvalidated.add(id);
+    synchronized (invalidatedQueueLock) {
+      fileIdsQueueForCleanup.add(id);
     }
   }
 
@@ -450,7 +452,7 @@ public final class VfsData implements Closeable {
       owningVfsData.segmentsCreated.incrementAndGet();
     }
 
-    @NotNull VfsData owningVfsData(){
+    @NotNull VfsData owningVfsData() {
       return owningVfsData;
     }
 
@@ -468,7 +470,7 @@ public final class VfsData implements Closeable {
     @NotNull KeyFMap getUserMap(@NotNull VirtualFileSystemEntry file, int id) {
       Object o = fileDataById(id);
       if (!(o instanceof KeyFMap)) {
-        throw reportDeadFileAccess(file);
+        return KeyFMap.EMPTY_MAP;
       }
       return (KeyFMap)o;
     }
@@ -588,14 +590,34 @@ public final class VfsData implements Closeable {
       }
     }
 
-    Object fileDataById(int fileId){
+    Object fileDataById(int fileId) {
       int offset = objectOffsetInSegment(fileId);
       return OBJECT_FIELDS_HANDLE.getVolatile(objectFieldsArray, offset);
     }
 
-    void killFileData(int fileId, Object deadMarker) {
-      OBJECT_FIELDS_HANDLE.setVolatile(objectFieldsArray, objectOffsetInSegment(fileId), deadMarker);
-      //skip cleaning .intFieldsArray since dead marker means slot is _not reusable_ in this session
+    void cleanFileData(int fileId) {
+      //Ideally, we should replace the value with null or some placeholder value -- to release any garbage attached to the file's
+      // userData for GC to collect.
+      // But it turns out that already removed (invalidated) files could be still used for quite some time after their deletion,
+      // and even after apt WA is finished. E.g. async/background listeners are often doing things like that.
+      // Those uses often rely on some flags/keys in file.userData -- so file.userData is better to be preserved even after the
+      // file is deleted -- and for unknown timespan.
+      // And, unfortunately, the contract of file.isValid() doesn't prohibit that kind of use-after-delete: it is stated that
+      // getUserData/putUserData _could_ still be used on invalid files. It doesn't directly state that userData is _preserved_
+      // after the file is deleted, but it could be read this way -- so the file.userData use-after-delete is not an error.
+      //
+      // Hence, we're forced to keep the slot of the removed file intact -- until, maybe, the whole Segment is released at some
+      // point, and GC collects it:
+      Object value = OBJECT_FIELDS_HANDLE.getVolatile(objectFieldsArray, objectOffsetInSegment(fileId));
+      if (value instanceof DirectoryData directoryData) {
+        ChildrenIds children = directoryData.children;
+        if (children.size() > 0) {
+          //Children of a deleted directory _must_ be themselves deleted, too, even before the directory is deleted,
+          // see PersistentFSImpl.invalidateSubtree()/invalidateNode()
+          LOG.error("[#" + fileId + "].children is !empty (" + children + ") while the file is deleted!");
+        }
+      }
+      //cleaning .intFieldsArray is not important, since deleted slots/files are not reusable in this session
     }
 
     @Override

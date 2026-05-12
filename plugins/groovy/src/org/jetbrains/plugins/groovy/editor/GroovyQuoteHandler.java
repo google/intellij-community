@@ -15,7 +15,7 @@ import org.jetbrains.plugins.groovy.lang.psi.GroovyTokenSets;
 public final class GroovyQuoteHandler implements MultiCharQuoteHandler {
 
   @Override
-  public boolean isClosingQuote(HighlighterIterator iterator, int offset) {
+  public boolean isClosingQuote(@NotNull HighlighterIterator iterator, int offset) {
     final IElementType tokenType = iterator.getTokenType();
 
     if (tokenType == GroovyTokenTypes.mGSTRING_END) return true;
@@ -34,7 +34,7 @@ public final class GroovyQuoteHandler implements MultiCharQuoteHandler {
   }
 
   @Override
-  public boolean isOpeningQuote(HighlighterIterator iterator, int offset) {
+  public boolean isOpeningQuote(@NotNull HighlighterIterator iterator, int offset) {
     final IElementType tokenType = iterator.getTokenType();
 
     if (tokenType == GroovyTokenTypes.mGSTRING_BEGIN || tokenType == GroovyTokenTypes.mREGEX_BEGIN) return true;
@@ -46,7 +46,7 @@ public final class GroovyQuoteHandler implements MultiCharQuoteHandler {
   }
 
   @Override
-  public boolean hasNonClosedLiteral(Editor editor, HighlighterIterator iterator, int offset) {
+  public boolean hasNonClosedLiteral(@NotNull Editor editor, @NotNull HighlighterIterator iterator, int offset) {
     final IElementType tokenType = iterator.getTokenType();
     if (GroovyTokenSets.STRING_LITERALS.contains(tokenType) ||
         tokenType == GroovyTokenTypes.mGSTRING_BEGIN ||
@@ -65,7 +65,7 @@ public final class GroovyQuoteHandler implements MultiCharQuoteHandler {
   }
 
   @Override
-  public boolean isInsideLiteral(HighlighterIterator iterator) {
+  public boolean isInsideLiteral(@NotNull HighlighterIterator iterator) {
     return GroovyTokenSets.STRING_LITERALS.contains(iterator.getTokenType());
   }
 

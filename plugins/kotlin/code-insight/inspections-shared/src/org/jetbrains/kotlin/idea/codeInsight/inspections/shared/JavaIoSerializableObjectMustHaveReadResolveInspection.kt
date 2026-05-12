@@ -9,6 +9,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementVisitor
 import com.intellij.psi.impl.source.tree.LeafPsiElement
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.scopes.KaScope
 import org.jetbrains.kotlin.analysis.api.symbols.KaFunctionSymbol
@@ -61,8 +62,9 @@ private class ImplementReadResolveQuickFix : PsiUpdateModCommandQuickFix() {
     }
 }
 
+@OptIn(KaExperimentalApi::class)
 private fun KtObjectDeclaration.doesImplementSerializable(): Boolean = analyze(this) {
-    buildClassType(symbol).isSubtypeOf(JAVA_IO_SERIALIZABLE_CLASS_ID)
+    typeCreator.classType(symbol).isSubtypeOf(JAVA_IO_SERIALIZABLE_CLASS_ID)
 }
 
 private fun KtObjectDeclaration.doesImplementReadResolve(): Boolean = analyze(this) {

@@ -1,7 +1,8 @@
 // HIGHLIGHT: GENERIC_ERROR_OR_WARNING
 fun foo(): Boolean {
-    <caret>if (someComplexCondition()) return false
-    return true // comment explaining the `true` case
+    <caret>if (someComplexCondition()) return true
+    return someOtherCondition() // comment explaining the fallback case
 }
 
 fun someComplexCondition(): Boolean = true
+fun someOtherCondition(): Boolean = true

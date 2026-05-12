@@ -31,7 +31,7 @@ import org.jetbrains.annotations.ApiStatus
 @ApiStatus.Experimental
 fun DataContext.rpcId(): DataContextId {
   val context = this
-  val serializedContext = serializeToRpc(context)
+  val serializedContext = serializeToRpc(context, true)
 
   return DataContextId(serializedContext, context)
 }
@@ -60,12 +60,29 @@ fun DataContext.rpcId(): DataContextId {
  *         Note that even a non-null result may not contain all expected DataContext elements.
  */
 @ApiStatus.Experimental
-fun DataContextId.dataContext(): DataContext? {
+fun DataContextId.dataContext(): DataContext? = dataContextWithDiagnostics().dataContext
+
+@ApiStatus.Internal
+data class DataContextDeserializationResult(
+  val dataContext: DataContext?,
+  val hasSerializedValue: Boolean = false,
+  val serializerClassName: String? = null,
+  val failure: Throwable? = null,
+)
+
+@ApiStatus.Internal
+fun DataContextId.dataContextWithDiagnostics(): DataContextDeserializationResult {
   if (localContext != null) {
-    return localContext
+    return DataContextDeserializationResult(localContext)
   }
 
-  return deserializeFromRpc<DataContext>(serializedValue)
+  val rpcResult = deserializeFromRpcWithDiagnostics(serializedValue, DataContext::class)
+  return DataContextDeserializationResult(
+    dataContext = rpcResult.value,
+    hasSerializedValue = serializedValue != null,
+    serializerClassName = rpcResult.serializerClassName,
+    failure = rpcResult.failure,
+  )
 }
 
 @ApiStatus.Experimental

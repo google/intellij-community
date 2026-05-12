@@ -3,17 +3,14 @@ package com.intellij.find.impl
 
 import com.intellij.find.FindSettings
 import com.intellij.ide.ApplicationInitializedListener
-import com.intellij.ide.rpc.performRpcWithRetries
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
-import com.intellij.openapi.diagnostic.logger
 import com.intellij.util.ArrayUtil
+import fleet.rpc.client.durable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-
-private val LOG = logger<LangFindSettingsImpl>()
 
 internal class LangFindSettingsImpl: FindSettingsImpl(), Disposable {
   private var languageExtensionsLoadingJob: Job? = null
@@ -25,7 +22,7 @@ internal class LangFindSettingsImpl: FindSettingsImpl(), Disposable {
   }
 
   private suspend fun loadExtensions() {
-    val extensions = LOG.performRpcWithRetries {
+    val extensions = durable {
       IdeLanguageCustomizationApi.getInstance().getPrimaryIdeLanguagesExtensions().toMutableSet()
     }
     if (extensions.contains("java")) {

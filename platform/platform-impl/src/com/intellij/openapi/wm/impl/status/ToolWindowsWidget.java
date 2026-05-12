@@ -91,7 +91,7 @@ final class ToolWindowsWidget implements CustomStatusBarWidget, Disposable, UISe
     }, parent);
 
     ApplicationManager.getApplication().getMessageBus().connect(this).subscribe(UISettingsListener.TOPIC, this);
-    FocusUtil.addFocusOwnerListener(this, __ -> {
+    FocusUtil.addFocusOwnerListener(this, _ -> {
       updateIcon();
     });
     myAlarm = new Alarm(parent);

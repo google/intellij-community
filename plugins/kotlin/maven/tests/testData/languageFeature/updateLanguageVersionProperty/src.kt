@@ -1,1 +1,3 @@
-val x get() = 1
+fun test() {
+    <caret>$$""
+}

@@ -152,7 +152,7 @@ public final class InspectionsConfigTreeTable extends TreeTable {
     getTableHeader().setReorderingAllowed(false);
     getTableHeader().setResizingAllowed(false);
 
-    registerKeyboardAction(__ -> {
+    registerKeyboardAction(_ -> {
       model.swapInspectionEnableState();
     }, KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, 0), JComponent.WHEN_FOCUSED);
 

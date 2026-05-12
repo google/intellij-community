@@ -1,7 +1,8 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.testframework.sm.runner.events;
 
 import jetbrains.buildServer.messages.serviceMessages.ServiceMessage;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -68,4 +69,25 @@ public abstract class TreeNodeEvent {
     return message.getAttributes().get(key);
   }
 
+  protected static long parseDuration(@Nullable String duration) {
+    if (isNumber(duration)) {
+      try {
+        return Long.parseLong(duration.trim());
+      }
+      catch (NumberFormatException ignored) {
+      }
+    }
+    return -1;
+  }
+
+  @Contract("null -> false")
+  private static boolean isNumber(@Nullable String s) {
+    if (s == null) return false;
+    for (int i = 0; i < s.length(); i++) {
+      if (!Character.isDigit(s.charAt(i))) {
+        return false;
+      }
+    }
+    return true;
+  }
 }

@@ -220,17 +220,15 @@ class NonBlockingFlushQueue(private val threadingSupport: ThreadingSupport) {
           require(currentWriteIntentLockMode == WriteIntentLockMode.UI_ONLY) {
             "Write action finished, but FlushQueue is unexpectedly allowed to run all runnables"
           }
-          synchronized(lockObject) {
-            uiQueue.pollFirst() // we remove WriteActionFinished from the queue and allow processing of further UI runnables.
-          }
           if (threadingSupport.isWriteActionPending() || threadingSupport.isWriteActionInProgress()) {
-            // if we failed to move the queue to the ALL mode, we need to unblock the processing of pending UI runnables.
-            uiQueue.enqueue(WriteActionFinished(timeCounter.getAndIncrement()))
             threadingSupport.runWhenWriteActionIsCompleted {
               requestFlush()
             }
             return null
           } else {
+            synchronized(lockObject) {
+              uiQueue.pollFirst() // now we remove WriteActionFinished from the queue
+            }
             currentWriteIntentLockMode = WriteIntentLockMode.ALL
           }
         }
@@ -363,7 +361,8 @@ class NonBlockingFlushQueue(private val threadingSupport: ThreadingSupport) {
     } catch (_: ProcessCanceledException) {
       // ignored
     } catch (e: Throwable) {
-      if (ApplicationManager.getApplication().isUnitTestMode()) {
+      val app = ApplicationManager.getApplication()
+      if (app == null || app.isUnitTestMode()) {
         ExceptionUtil.rethrow(e)
       }
       if (!Logger.shouldRethrow(e)) {

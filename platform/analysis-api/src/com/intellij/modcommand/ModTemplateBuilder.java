@@ -6,7 +6,9 @@ import com.intellij.codeInsight.template.impl.ConstantNode;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Function;
 
@@ -65,6 +67,37 @@ public interface ModTemplateBuilder {
    */
   @NotNull ModTemplateBuilder field(@NotNull PsiElement element, @NotNull String varName, @NotNull String dependantVariableName, 
                                     boolean alwaysStopAt);
+
+  /**
+   * Add a new dependent variable field covering {@code rangeInElement} of {@code element}.
+   * Useful when the mirrored value lives inside a PSI element.
+   *
+   * @param element element whose range contains the mirrored region
+   * @param rangeInElement range of the element to treat as the field range
+   * @param varName variable name
+   * @param dependantVariableName dependant variable name
+   * @param alwaysStopAt whether to always stop at this field
+   * @return this builder
+   */
+  @ApiStatus.Experimental
+  @NotNull ModTemplateBuilder field(@NotNull PsiElement element, @NotNull TextRange rangeInElement,
+                                    @NotNull String varName, @NotNull String dependantVariableName,
+                                    boolean alwaysStopAt);
+
+  /**
+   * Same as {@link #field(PsiElement, TextRange, String, String, boolean)} with alwaysStopAt=false, but with an explicit
+   * default-value expression string used when the main expression evaluates to {@code null} or
+   * empty. Useful for macro-call dependencies like {@code rightSideType()} whose XML template
+   * carries a separate literal fallback (e.g. {@code "java.util.Iterator"}).
+   *
+   * @param defaultValue default-value expression string (quoted string literals are treated as
+   *                     constants by the macro parser); {@code null} means reuse
+   *                     {@code dependantVariableName} as the default.
+   */
+  @ApiStatus.Experimental
+  @NotNull ModTemplateBuilder field(@NotNull PsiElement element, @NotNull TextRange rangeInElement,
+                                    @NotNull String varName, @NotNull String dependantVariableName,
+                                    @Nullable String defaultValue);
 
   /**
    * Add a finish position to the template. The caret will be moved to a given position after the template is finished

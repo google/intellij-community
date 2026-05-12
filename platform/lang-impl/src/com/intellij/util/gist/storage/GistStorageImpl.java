@@ -112,7 +112,7 @@ public final class GistStorageImpl extends GistStorage {
     @SuppressWarnings("unchecked")
     GistImpl<Data> gist = (GistImpl<Data>)knownGists.computeIfAbsent(
       id,
-      __ -> new GistImpl<>(id, version, externalizer)
+      _ -> new GistImpl<>(id, version, externalizer)
     );
 
     if (gist.version() != version) {

@@ -2,6 +2,7 @@
 package com.intellij.openapi.editor;
 
 import com.intellij.codeInsight.hint.HintManager;
+import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.textarea.TextComponentEditor;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
@@ -10,6 +11,8 @@ import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.Producer;
+import com.intellij.util.SlowOperations;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -30,7 +33,7 @@ public final class EditorModificationUtil extends EditorModificationUtilEx {
 
 
   public static void deleteSelectedTextForAllCarets(@NotNull Editor editor) {
-    editor.getCaretModel().runForEachCaret(__ -> deleteSelectedText(editor));
+    editor.getCaretModel().runForEachCaret(_ -> deleteSelectedText(editor));
   }
 
   public static void zeroWidthBlockSelectionAtCaretColumn(@NotNull Editor editor, int startLine, int endLine) {
@@ -83,7 +86,7 @@ public final class EditorModificationUtil extends EditorModificationUtilEx {
    */
   public static void typeInStringAtCaretHonorMultipleCarets(@NotNull Editor editor, @NotNull String str, boolean toProcessOverwriteMode, int caretShift)
     throws ReadOnlyFragmentModificationException {
-    editor.getCaretModel().runForEachCaret(__ -> insertStringAtCaretNoScrolling(editor, str, toProcessOverwriteMode, true, caretShift));
+    editor.getCaretModel().runForEachCaret(_ -> insertStringAtCaretNoScrolling(editor, str, toProcessOverwriteMode, true, caretShift));
     editor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
   }
 
@@ -98,7 +101,7 @@ public final class EditorModificationUtil extends EditorModificationUtilEx {
 
   public static @NotNull List<CaretState> calcBlockSelectionState(@NotNull Editor editor,
                                                                   @NotNull LogicalPosition blockStart, @NotNull LogicalPosition blockEnd) {
-    Document document = editor.getUiDocument();
+    Document document = editor.getElfDocument();
     int startLine = Math.max(Math.min(blockStart.line, document.getLineCount() - 1), 0);
     int endLine = Math.max(Math.min(blockEnd.line, document.getLineCount() - 1), 0);
     int step = endLine < startLine ? -1 : 1;
@@ -135,6 +138,25 @@ public final class EditorModificationUtil extends EditorModificationUtilEx {
     FileDocumentManager.WriteAccessStatus writeAccess =
       FileDocumentManager.getInstance().requestWritingStatus(editor.getDocument(), editor.getProject());
     if (!writeAccess.hasWriteAccess()) {
+      HintManager.getInstance().showInformationHint(editor, writeAccess.getReadOnlyMessage(), writeAccess.getHyperlinkListener());
+      return false;
+    }
+    return true;
+  }
+
+  @ApiStatus.Internal
+  public static boolean requestWriting(@NotNull Editor editor, char charTyped, @NotNull DataContext dataContext) {
+    FileDocumentManager.WriteAccessStatus writeAccess =
+      FileDocumentManager.getInstance().requestWritingStatus(editor.getDocument(), editor.getProject());
+    if (!writeAccess.hasWriteAccess()) {
+      for (NonWriteAccessTypedHandler nonWritable : NonWriteAccessTypedHandler.EP_NAME.getExtensionList()) {
+        if (nonWritable.isApplicable(editor, charTyped, dataContext)) {
+          try (var ignored = SlowOperations.startSection(SlowOperations.ACTION_PERFORM)) {
+            nonWritable.handle(editor, charTyped, dataContext);
+          }
+          return false;
+        }
+      }
       HintManager.getInstance().showInformationHint(editor, writeAccess.getReadOnlyMessage(), writeAccess.getHyperlinkListener());
       return false;
     }

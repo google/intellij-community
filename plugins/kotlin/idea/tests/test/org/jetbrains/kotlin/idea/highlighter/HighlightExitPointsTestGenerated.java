@@ -40,6 +40,11 @@ public class HighlightExitPointsTestGenerated extends AbstractCustomHighlightUsa
         runTest("testData/exitPoints/anonymousFunction2.kt");
     }
 
+    @TestMetadata("buildListForeignReceiver.kt")
+    public void testBuildListForeignReceiver() throws Exception {
+        runTest("testData/exitPoints/buildListForeignReceiver.kt");
+    }
+
     @TestMetadata("buildListNested.kt")
     public void testBuildListNested() throws Exception {
         runTest("testData/exitPoints/buildListNested.kt");
@@ -73,6 +78,11 @@ public class HighlightExitPointsTestGenerated extends AbstractCustomHighlightUsa
     @TestMetadata("buildSetSimple.kt")
     public void testBuildSetSimple() throws Exception {
         runTest("testData/exitPoints/buildSetSimple.kt");
+    }
+
+    @TestMetadata("buildStringForeignReceiver.kt")
+    public void testBuildStringForeignReceiver() throws Exception {
+        runTest("testData/exitPoints/buildStringForeignReceiver.kt");
     }
 
     @TestMetadata("buildStringNested.kt")
@@ -350,6 +360,11 @@ public class HighlightExitPointsTestGenerated extends AbstractCustomHighlightUsa
         runTest("testData/exitPoints/notReturnedLabeledExpression.kt");
     }
 
+    @TestMetadata("receiverResolution.kt")
+    public void testReceiverResolution() throws Exception {
+        runTest("testData/exitPoints/receiverResolution.kt");
+    }
+
     @TestMetadata("returnIfStatement.kt")
     public void testReturnIfStatement() throws Exception {
         runTest("testData/exitPoints/returnIfStatement.kt");
@@ -363,6 +378,11 @@ public class HighlightExitPointsTestGenerated extends AbstractCustomHighlightUsa
     @TestMetadata("returnWhenStatement.kt")
     public void testReturnWhenStatement() throws Exception {
         runTest("testData/exitPoints/returnWhenStatement.kt");
+    }
+
+    @TestMetadata("sequenceForeignReceiver.kt")
+    public void testSequenceForeignReceiver() throws Exception {
+        runTest("testData/exitPoints/sequenceForeignReceiver.kt");
     }
 
     @TestMetadata("sequenceInLambda.kt")

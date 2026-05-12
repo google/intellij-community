@@ -3,14 +3,16 @@ package org.jetbrains.kotlin.gradle.scripting.k2.inspections
 
 import com.intellij.gradle.java.properties.codeInspection.GradleRedundantKotlinStdLibInspection
 import org.gradle.util.GradleVersion
-import org.jetbrains.kotlin.gradle.scripting.k2.K2GradleCodeInsightTestCase
+import org.jetbrains.kotlin.gradle.K2GradleCodeInsightTestCase
 import org.jetbrains.plugins.gradle.frameworkSupport.GradleDsl
 import org.jetbrains.plugins.gradle.testFramework.GradleTestFixtureBuilder
 import org.jetbrains.plugins.gradle.testFramework.annotations.AllGradleVersionsSource
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatKotlinDslScriptsModelImportIsSupported
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatVersionCatalogsAreSupported
+import org.jetbrains.plugins.gradle.testFramework.util.KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS
+import org.jetbrains.plugins.gradle.testFramework.util.VERSION_CATALOGS_SUPPORTED_VERSIONS
+import org.jetbrains.plugins.gradle.testFramework.util.assertThatKotlinDslScriptsModelImportIsSupported
 import org.jetbrains.plugins.gradle.testFramework.util.withBuildFile
 import org.jetbrains.plugins.gradle.testFramework.util.withSettingsFile
+import org.jetbrains.plugins.gradle.tooling.annotation.TargetVersions
 import org.junit.jupiter.params.ParameterizedTest
 
 class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
@@ -20,7 +22,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
         projectFixture: GradleTestFixtureBuilder,
         test: () -> Unit
     ) {
-        assumeThatKotlinDslScriptsModelImportIsSupported(gradleVersion)
+        assertThatKotlinDslScriptsModelImportIsSupported(gradleVersion)
         test(gradleVersion, projectFixture) {
             codeInsightFixture.enableInspections(GradleRedundantKotlinStdLibInspection::class.java)
             test()
@@ -29,6 +31,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testSameVersion(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -44,6 +47,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testDifferentVersion(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -59,6 +63,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testKotlinMethod(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -74,6 +79,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testKotlinMethodNoVersion(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -89,6 +95,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testKotlinMethodDifferentVersion(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -104,6 +111,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testDependencyNoVersion(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -119,6 +127,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testDependencyNamedArguments(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -134,6 +143,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testDependencyNamedArgumentsNoVersion(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -149,6 +159,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testDependencyPositionalArguments(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -164,6 +175,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testDifferentConfiguration(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -179,6 +191,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testCustomConfigurationString(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -195,6 +208,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testCustomConfiguration(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -212,6 +226,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
     // should not warn as the overriding kotlin-stdlib dependency is a bit different
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testDependencyWithExtraArgumentsInClosure(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -230,6 +245,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
     // should not warn as the overriding kotlin-stdlib dependency is a bit different
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testDependencyWithExtraArgumentsInMap(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -245,6 +261,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testDisabledDefaultStdLib(gradleVersion: GradleVersion) {
         runTest(gradleVersion, DISABLED_DEFAULT_STDLIB_FIXTURE) {
             testHighlighting(
@@ -260,6 +277,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testSingeStringFalsePositive(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -275,6 +293,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testKotlinMethodFalsePositive(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -290,6 +309,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testNamedArgumentsFalsePositive(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -305,6 +325,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testFalsePositives(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -323,6 +344,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testCompileOnly(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -338,6 +360,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testCompileOnlyCustomSourceSet(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -356,8 +379,8 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(VERSION_CATALOGS_SUPPORTED_VERSIONS)
     fun testDependencyFromVersionCatalog(gradleVersion: GradleVersion) {
-        assumeThatVersionCatalogsAreSupported(gradleVersion)
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_AND_VERSION_CATALOGS_FIXTURE) {
             testHighlighting(
                 """
@@ -372,8 +395,8 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(VERSION_CATALOGS_SUPPORTED_VERSIONS)
     fun testDependencyFromVersionCatalogNoVersion(gradleVersion: GradleVersion) {
-        assumeThatVersionCatalogsAreSupported(gradleVersion)
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_AND_VERSION_CATALOGS_FIXTURE) {
             testHighlighting(
                 """
@@ -388,8 +411,8 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(VERSION_CATALOGS_SUPPORTED_VERSIONS)
     fun testDependencyFromVersionCatalogModuleAndVersion(gradleVersion: GradleVersion) {
-        assumeThatVersionCatalogsAreSupported(gradleVersion)
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_AND_VERSION_CATALOGS_FIXTURE) {
             testHighlighting(
                 """
@@ -404,8 +427,8 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(VERSION_CATALOGS_SUPPORTED_VERSIONS)
     fun testDependencyFromVersionCatalogModuleAndVersionReference(gradleVersion: GradleVersion) {
-        assumeThatVersionCatalogsAreSupported(gradleVersion)
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_AND_VERSION_CATALOGS_FIXTURE) {
             testHighlighting(
                 """
@@ -420,8 +443,8 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(VERSION_CATALOGS_SUPPORTED_VERSIONS)
     fun testDependencyFromVersionCatalogFull(gradleVersion: GradleVersion) {
-        assumeThatVersionCatalogsAreSupported(gradleVersion)
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_AND_VERSION_CATALOGS_FIXTURE) {
             testHighlighting(
                 """
@@ -436,8 +459,8 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(VERSION_CATALOGS_SUPPORTED_VERSIONS)
     fun testDependencyFromVersionCatalogFullVersionReference(gradleVersion: GradleVersion) {
-        assumeThatVersionCatalogsAreSupported(gradleVersion)
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_AND_VERSION_CATALOGS_FIXTURE) {
             testHighlighting(
                 """
@@ -452,8 +475,8 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(VERSION_CATALOGS_SUPPORTED_VERSIONS)
     fun testDependencyFromVersionCatalogMultilineString(gradleVersion: GradleVersion) {
-        assumeThatVersionCatalogsAreSupported(gradleVersion)
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_AND_VERSION_CATALOGS_FIXTURE) {
             testHighlighting(
                 """
@@ -468,8 +491,8 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(VERSION_CATALOGS_SUPPORTED_VERSIONS)
     fun testCustomConfigurationVersionCatalog(gradleVersion: GradleVersion) {
-        assumeThatVersionCatalogsAreSupported(gradleVersion)
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_AND_VERSION_CATALOGS_FIXTURE) {
             testHighlighting(
                 """
@@ -487,6 +510,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testNoPlugin(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -501,6 +525,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testDifferentPlugin(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -516,6 +541,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testPluginIdNoVersion(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -531,6 +557,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testPluginFromKotlinMethod(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -546,6 +573,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testPluginFromKotlinMethodBinary(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -561,6 +589,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testPluginFromKotlinMethodNotApplied(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -576,6 +605,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testPluginFromKotlinMethodNotAppliedBinary(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -591,6 +621,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testPluginFromKotlinMethodNotAppliedDotBinary(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -606,8 +637,8 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(VERSION_CATALOGS_SUPPORTED_VERSIONS)
     fun testPluginFromVersionCatalog(gradleVersion: GradleVersion) {
-        assumeThatVersionCatalogsAreSupported(gradleVersion)
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_AND_VERSION_CATALOGS_FIXTURE) {
             testHighlighting(
                 """
@@ -622,8 +653,8 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(VERSION_CATALOGS_SUPPORTED_VERSIONS)
     fun testPluginFromVersionCatalogFull(gradleVersion: GradleVersion) {
-        assumeThatVersionCatalogsAreSupported(gradleVersion)
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_AND_VERSION_CATALOGS_FIXTURE) {
             testHighlighting(
                 """
@@ -638,8 +669,8 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(VERSION_CATALOGS_SUPPORTED_VERSIONS)
     fun testPluginFromVersionCatalogFullWithVersionReference(gradleVersion: GradleVersion) {
-        assumeThatVersionCatalogsAreSupported(gradleVersion)
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_AND_VERSION_CATALOGS_FIXTURE) {
             testHighlighting(
                 """
@@ -654,6 +685,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testPluginIdNotApplied(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -671,6 +703,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testPluginIdApplied(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -688,6 +721,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testPluginIdMethodBinary(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -703,6 +737,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testPluginIdMethodNotAppliedBinary(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -718,6 +753,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testPluginIdMethodNotAppliedDotBinary(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -733,8 +769,8 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(VERSION_CATALOGS_SUPPORTED_VERSIONS)
     fun testPluginFromVersionCatalogNotApplied(gradleVersion: GradleVersion) {
-        assumeThatVersionCatalogsAreSupported(gradleVersion)
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_AND_VERSION_CATALOGS_FIXTURE) {
             testHighlighting(
                 """
@@ -751,8 +787,8 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(VERSION_CATALOGS_SUPPORTED_VERSIONS)
     fun testPluginFromVersionCatalogNotAppliedBinary(gradleVersion: GradleVersion) {
-        assumeThatVersionCatalogsAreSupported(gradleVersion)
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_AND_VERSION_CATALOGS_FIXTURE) {
             testHighlighting(
                 """
@@ -771,6 +807,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testSameVal(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -787,6 +824,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testDifferentVal(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -803,6 +841,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testSameGroupVal(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -819,6 +858,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testDifferentGroupVal(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -835,6 +875,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testSameNameVal(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -851,6 +892,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testDifferentNameVal(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -867,6 +909,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testSameVersionVal(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -883,6 +926,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testDifferentVersionVal(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -899,6 +943,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testSameGroupValNamedArguments(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -915,6 +960,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testDifferentGroupValNamedArguments(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -931,6 +977,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testSameNameValNamedArguments(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -947,6 +994,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testDifferentNameValNamedArguments(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -963,6 +1011,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testSameVersionValNamedArguments(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -979,6 +1028,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testDifferentVersionValNamedArguments(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -995,6 +1045,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testKotlinMethodSameNameVal(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -1011,6 +1062,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testKotlinMethodSameVersionVal(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -1027,6 +1079,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testKotlinMethodDifferentVersionVal(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -1043,6 +1096,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
     fun testQuickFixRemove(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testIntention(
@@ -1063,39 +1117,6 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
     }
 
     companion object {
-        private val WITH_CUSTOM_CONFIGURATIONS_AND_VERSION_CATALOGS_FIXTURE =
-            GradleTestFixtureBuilder.create("with-custom-configurations-and-version-catalogs") { gradleVersion ->
-                withSettingsFile(gradleVersion, gradleDsl = GradleDsl.KOTLIN) {
-                    setProjectName("with-custom-configurations-and-version-catalogs")
-                }
-                withBuildFile(gradleVersion, gradleDsl = GradleDsl.KOTLIN) {
-                    withKotlinJvmPlugin()
-                    withPrefix { code("val customConf by configurations.creating {}") }
-                    withPrefix { code("val customSourceSet by sourceSets.creating {}") }
-                }
-                withFile(
-                    "gradle/libs.versions.toml", /* language=TOML */ """
-                    [versions]
-                    kotlin = "2.2.0"
-                    [plugins]
-                    kotlinJvm = "org.jetbrains.kotlin.jvm:2.2.0"
-                    kotlinJvmFull = { id = "org.jetbrains.kotlin.jvm", version = "2.2.0" }
-                    kotlinJvmFullRef = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
-                    [libraries]
-                    kotlin-std-lib-simple = "org.jetbrains.kotlin:kotlin-stdlib:2.2.0"
-                    kotlin-std-lib-noVersion.module = "org.jetbrains.kotlin:kotlin-stdlib"
-                    kotlin-std-lib-moduleVersion = { module = "org.jetbrains.kotlin:kotlin-stdlib", version = "2.2.0" }
-                    kotlin-std-lib-moduleVersionRef = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
-                    kotlin-std-lib-groupNameVersion = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version = "2.2.0" }
-                    kotlin-std-lib-groupNameVersionRef = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }
-                    kotlin-std-lib-multiline = ""${'"'}org.jetbrains.kotlin
-                    :kotlin-stdlib
-                    :2.2.0
-                    ""${'"'}
-                    """.trimIndent()
-                )
-            }
-
         private val DISABLED_DEFAULT_STDLIB_FIXTURE =
             GradleTestFixtureBuilder.create("disabled-default-stdlib") { gradleVersion ->
                 withSettingsFile(gradleVersion, gradleDsl = GradleDsl.KOTLIN) {

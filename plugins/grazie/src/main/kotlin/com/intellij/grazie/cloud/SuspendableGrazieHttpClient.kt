@@ -35,6 +35,7 @@ internal class GrazieHttpClientManager : Disposable {
       val proxy = if (proxyConfig.USE_HTTP_PROXY) Proxy(Proxy.Type.HTTP, InetSocketAddress(proxyConfig.PROXY_HOST, proxyConfig.PROXY_PORT)) else null
       var last = lastClient
       if (last == null || last.first != proxy) {
+        last?.second?.close()
         thisLogger().debug("Using proxy $proxy")
         last = Pair(proxy, createKtorClient(proxy))
         lastClient = last
@@ -90,5 +91,7 @@ internal class GrazieHttpClientManager : Disposable {
   }
 
   override fun dispose() {
+    lastClient?.second?.close()
+    lastClient = null
   }
 }

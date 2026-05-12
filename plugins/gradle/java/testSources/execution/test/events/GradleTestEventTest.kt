@@ -1,10 +1,10 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.execution.test.events
 
 import org.gradle.util.GradleVersion
 import org.jetbrains.plugins.gradle.testFramework.GradleTestExecutionTestCase
 import org.jetbrains.plugins.gradle.testFramework.annotations.AllGradleVersionsSource
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatGradleIsAtLeast
+import org.jetbrains.plugins.gradle.tooling.annotation.TargetVersions
 import org.junit.jupiter.params.ParameterizedTest
 
 class GradleTestEventTest : GradleTestExecutionTestCase() {
@@ -166,8 +166,8 @@ class GradleTestEventTest : GradleTestExecutionTestCase() {
 
   @ParameterizedTest
   @AllGradleVersionsSource
+  @TargetVersions("7.0+")
   fun `test parametrized test count`(gradleVersion: GradleVersion) {
-    assumeThatGradleIsAtLeast(gradleVersion,"7.0")
     testJunitPlatformProject(gradleVersion) {
       writeText("src/test/java/org/example/TestCase.java", """
       | import org.junit.jupiter.params.ParameterizedTest;

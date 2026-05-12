@@ -55,6 +55,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.use
 import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleLoadingRuleValue
+import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleVisibilityValue
 import com.intellij.platform.pluginSystem.testFramework.PluginSetTestBuilder
 import com.intellij.platform.testFramework.loadDescriptorInTest
 import com.intellij.platform.testFramework.loadExtensionWithText
@@ -416,7 +417,7 @@ class DynamicPluginsTest {
             name = "plugin.xml",
             text = """<idea-plugin package="foo">
                      |  <id>foo</id>
-                     |  <content>
+                     |  <content namespace="test_ns">
                      |    <module name="foo.bar"/>
                      |  </content>
                      |</idea-plugin>""".trimIndent(),
@@ -439,7 +440,7 @@ class DynamicPluginsTest {
             name = "plugin.xml",
             text = """<idea-plugin> <!-- no package prefix -->
                      |  <id>bar</id>
-                     |  <content>
+                     |  <content namespace="test_ns">
                      |    <module name="bar.foo"/>
                      |  </content>
                      |</idea-plugin>""".trimIndent(),
@@ -599,7 +600,7 @@ class DynamicPluginsTest {
       packagePrefix = "foo"
       dependsIntellijModulesLang()
       extensionPoints = """<extensionPoint qualifiedName="foo.barExtension" beanClass="com.intellij.util.KeyedLazyInstanceEP" dynamic="true"/>"""
-      content {
+      content(namespace = "test_ns") {
         module("intellij.foo.bar") {
           packagePrefix = "foo.bar"
           extensions("""<barExtension key="foo" implementationClass="y"/>""", "foo")
@@ -635,9 +636,10 @@ class DynamicPluginsTest {
     val bar = plugin("com.intellij.bar") {
       packagePrefix = "com.intellij.bar"
       dependsIntellijModulesLang()
-      content {
+      content(namespace = "test_ns") {
         module("intellij.bar.foo") {
           packagePrefix = "com.intellij.bar.foo"
+          moduleVisibility = ModuleVisibilityValue.PUBLIC
           dependencies { plugin(foo.id!!) }
         }
       }
@@ -645,13 +647,13 @@ class DynamicPluginsTest {
     val baz = plugin("com.intellij.baz") {
       packagePrefix = "com.intellij.baz"
       dependsIntellijModulesLang()
-      content {
+      content(namespace = "test_ns") {
         module("intellij.baz.foo") {
           packagePrefix = "com.intellij.baz.foo"
           dependencies {
             plugin(foo.id!!)
             plugin(bar.id!!)
-            module("intellij.bar.foo")
+            module("intellij.bar.foo", namespace = "test_ns")
           }
         }
       }
@@ -678,59 +680,56 @@ class DynamicPluginsTest {
   @Test
   @TestFor(issues = ["IDEA-287123"])
   fun testModulesConfiguration() {
-    val foo = plugin("com.intellij.foo") {
-      packagePrefix = "com.intellij.foo"
+    val foo = plugin("foo") {
+      packagePrefix = "foo"
     }
-    val bar = plugin("com.intellij.bar") {
-      packagePrefix = "com.intellij.bar"
-      content {
-        module("intellij.bar.foo") {
-          packagePrefix = "com.intellij.bar.foo"
+    val bar = plugin("bar") {
+      packagePrefix = "bar"
+      content(namespace = "test_ns") {
+        module("bar.foo") {
+          packagePrefix = "bar.foo"
+          moduleVisibility = ModuleVisibilityValue.PUBLIC
           dependencies { plugin(foo.id!!) }
-          extensions("""<multiHostInjector implementation="com.intellij.bar.foo.InjectorImpl"/>""")
+          extensions("""<multiHostInjector implementation="bar.foo.InjectorImpl"/>""")
         }
       }
     }
-    val baz = plugin("com.intellij.baz") {
-      packagePrefix = "com.intellij.baz"
+    val baz = plugin("baz") {
+      packagePrefix = "baz"
       dependsIntellijModulesLang()
-      content {
-        module("intellij.baz.bar") {
-          packagePrefix = "com.intellij.baz.bar"
+      content(namespace = "test_ns") {
+        module("baz.bar") {
+          packagePrefix = "baz.bar"
           dependencies { plugin(bar.id!!) }
         }
-        module("intellij.baz.bar.foo") {
-          packagePrefix = "com.intellij.baz.bar.foo"
+        module("baz.bar.foo") {
+          packagePrefix = "baz.bar.foo"
           dependencies {
             plugin(foo.id!!)
-            module("intellij.bar.foo")
-            module("intellij.baz.bar")
+            module("bar.foo", namespace = "test_ns")
+            module("baz.bar")
           }
-          extensions("""<multiHostInjector implementation="com.intellij.baz.bar.foo.InjectorImpl"/>""")
+          extensions("""<multiHostInjector implementation="baz.bar.foo.InjectorImpl"/>""")
         }
       }
     }
 
     fun assertForModules(assertion: (String) -> Unit) {
       listOf(
-        "intellij.bar.foo",
-        "intellij.baz.bar",
-        "intellij.baz.bar.foo",
+        "bar.foo",
+        "baz.bar",
+        "baz.bar.foo",
       ).forEach(assertion)
     }
 
     val ep = MultiHostInjector.MULTIHOST_INJECTOR_EP_NAME.getPoint(projectRule.project) as ExtensionPointImpl<MultiHostInjector>
     val coreInjectorsCount = ep.size()
 
-    loadPluginWithText(
-      pluginSpec = baz,
-    ).use {
+    loadPluginWithText(pluginSpec = baz).use {
       assertForModules(::assertModuleIsNotLoaded)
       assertThat(ep.size()).isEqualTo(coreInjectorsCount)
 
-      loadPluginWithText(
-        pluginSpec = foo,
-      ).use {
+      loadPluginWithText(pluginSpec = foo).use {
         assertForModules(::assertModuleIsNotLoaded)
         assertThat(ep.size()).isEqualTo(coreInjectorsCount)
 
@@ -1196,8 +1195,7 @@ class DynamicPluginsTest {
     plugin("bar") {}.buildDir(barPluginPath)
     plugin("foo") {
       implementationDetail = true
-      namespace = "foo"
-      content {
+      content(namespace = "test_ns") {
         module("foo.a") {
           dependencies {
             plugin("bar")
@@ -1264,16 +1262,17 @@ class DynamicPluginsTest {
   fun `IJPL-218420 dependent modules loading order is correct`() {
     val ai = plugin("ai") {}
     val completion = plugin("completion") {
-      content {
+      content(namespace = "jetbrains") {
         module("completion.ai") {
           dependencies {
             plugin("ai")
           }
+          moduleVisibility = ModuleVisibilityValue.PUBLIC
         }
       }
     }
     val scala = plugin("scala") {
-      content {
+      content(namespace = "jetbrains") {
         module("scala.ai.completion") {
           dependencies {
             plugin("ai")

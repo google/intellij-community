@@ -310,7 +310,7 @@ public final class WatchRootsManager {
       String watchRoot = prepareWatchRoot(root);
       if (watchRoot == null) continue;
 
-      List<WatchRequest> requests = roots.computeIfAbsent(watchRoot, __ -> new SmartList<>());
+      List<WatchRequest> requests = roots.computeIfAbsent(watchRoot, _ -> new SmartList<>());
       boolean foundSameRequest = false;
       if (!requestsToRemove.isEmpty()) {
         for (WatchRequest currentRequest : requests) {
@@ -403,7 +403,7 @@ public final class WatchRootsManager {
   private void addWatchSymlinkRequest(WatchSymlinkRequest request) {
     String watchRoot = request.getRootPath();
     Map<String, List<WatchRequest>> roots = request.isToWatchRecursively() ? myRecursiveWatchRoots : myFlatWatchRoots;
-    List<WatchRequest> requests = roots.computeIfAbsent(watchRoot, __ -> new SmartList<>());
+    List<WatchRequest> requests = roots.computeIfAbsent(watchRoot, _ -> new SmartList<>());
     requests.add(request);
     if (requests.size() == 1 && !WatchRootsUtil.isCoveredRecursively(myOptimizedRecursiveWatchRoots, watchRoot)) {
       if (request.isToWatchRecursively()) {

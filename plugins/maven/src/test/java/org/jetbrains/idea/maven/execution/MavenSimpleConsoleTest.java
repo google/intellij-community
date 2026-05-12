@@ -220,7 +220,6 @@ public class MavenSimpleConsoleTest extends UsefulTestCase {
     StringBuilder actual = new StringBuilder();
     MavenSimpleConsoleEventsBuffer buffer =
       new MavenSimpleConsoleEventsBuffer.Builder((l, k) -> actual.append(l))
-        .withLoggingOutputStream(maven4)
         .withSpyOutput(showSpyOutput)
         .build();
     for (String s : text) {

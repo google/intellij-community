@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.impl.source.tree;
 
 import com.intellij.java.syntax.element.JavaSyntaxTokenType;
@@ -345,11 +345,11 @@ public interface JavaElementType {
     @Override
     public int getErrorsCount(final CharSequence seq, Language fileLanguage, final Project project) {
       Lexer lexer = new JavaLexer(LanguageLevel.HIGHEST);
-      boolean hasProperBraceBalance = SyntaxBuilderUtil.hasProperBraceBalance(
+      boolean isBalanced = SyntaxBuilderUtil.isBalancedBlock(
         seq, lexer, JavaSyntaxTokenType.LBRACE, JavaSyntaxTokenType.RBRACE,
         () -> ProgressManager.checkCanceled()
       );
-      return hasProperBraceBalance ? NO_ERRORS : FATAL_ERROR;
+      return isBalanced ? NO_ERRORS : FATAL_ERROR;
     }
 
     @Override

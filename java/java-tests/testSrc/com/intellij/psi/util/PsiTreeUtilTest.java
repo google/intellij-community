@@ -44,7 +44,7 @@ public class PsiTreeUtilTest extends LightJavaCodeInsightTestCase {
   private void doTraversalTest(boolean childrenFirst) {
     configureFromFileText("C.java", "class C { int answer = 42; }");
     StringBuilder result = new StringBuilder();
-    Iterator<PsiElement> descendants = PsiTreeUtilKt.descendants(getFile(), childrenFirst, __ -> true).iterator();
+    Iterator<PsiElement> descendants = PsiTreeUtilKt.descendants(getFile(), childrenFirst, _ -> true).iterator();
     while (descendants.hasNext()) {
       PsiElement next = descendants.next();
       result.append(next.getTextRange()).append(" ").append(next.getNode().getElementType()).append("\n");

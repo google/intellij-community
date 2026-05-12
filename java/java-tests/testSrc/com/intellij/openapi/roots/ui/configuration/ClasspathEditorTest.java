@@ -32,30 +32,36 @@ public class ClasspathEditorTest extends LightPlatformTestCase {
     WriteAction.runAndWait(mod::commit);
 
     final ModifiableRootModel uiRootModel = ModuleRootManager.getInstance(module).getModifiableModel();
-    disposeOnTearDown(() -> uiRootModel.dispose());
+    ClasspathEditor e = null;
+    try {
+      ModulesConfigurator modulesConfigurator = ProjectStructureConfigurable.getInstance(project).getContext().getModulesConfigurator();
+      e = new ClasspathEditor(new ModuleConfigurationStateImpl(project, modulesConfigurator) {
+        @Override
+        public ModifiableRootModel getModifiableRootModel() {
+          return uiRootModel;
+        }
 
-    ModulesConfigurator modulesConfigurator = ProjectStructureConfigurable.getInstance(project).getContext().getModulesConfigurator();
-    ClasspathEditor e = new ClasspathEditor(new ModuleConfigurationStateImpl(project, modulesConfigurator) {
-      @Override
-      public ModifiableRootModel getModifiableRootModel() {
-        return uiRootModel;
+        @Override
+        public ModuleRootModel getCurrentRootModel() {
+          return uiRootModel;
+        }
+      });
+
+      e.reset();
+      JComponent component = e.createComponent();
+
+      JdkComboBox box = findJdkComboBoxComponent(component);
+      assertThat(box).isNotNull();
+      assertThat(box.getSelectedJdk()).isNull();
+      //this is the behaviour from 2019.3. The code does not support the situation, where no SDK is specified
+      assertThat(box.getSelectedItem()).isInstanceOf(JdkComboBox.ProjectJdkComboBoxItem.class);
+    }
+    finally {
+      if (e != null) {
+        e.disposeUIResources();
       }
-
-      @Override
-      public ModuleRootModel getCurrentRootModel() {
-        return uiRootModel;
-      }
-    });
-
-    e.reset();
-    JComponent component = e.createComponent();
-    disposeOnTearDown(() -> e.disposeUIResources());
-
-    JdkComboBox box = findJdkComboBoxComponent(component);
-    assertThat(box).isNotNull();
-    assertThat(box.getSelectedJdk()).isNull();
-    //this is the behaviour from 2019.3. The code does not support the situation, where no SDK is specified
-    assertThat(box.getSelectedItem()).isInstanceOf(JdkComboBox.ProjectJdkComboBoxItem.class);
+      uiRootModel.dispose();
+    }
   }
 
   @Nullable

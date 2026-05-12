@@ -87,6 +87,10 @@ public abstract class LocalHistoryTestCase extends Assert {
     });
   }
 
+  protected static LocalHistoryFacade createInMemoryFacade() {
+    return new LocalHistoryFacade(new ChangeListImpl(new InMemoryChangeListStorage()));
+  }
+
   public CreateFileChange createFile(RootEntry root, String path) {
     return createFile(root, path, null);
   }

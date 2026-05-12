@@ -1,7 +1,16 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.impl
 
-import com.intellij.platform.workspace.storage.*
+import com.intellij.platform.workspace.storage.ConnectionId
+import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
+import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
+import com.intellij.platform.workspace.storage.MutableEntityStorage
+import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
+import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
@@ -17,14 +26,12 @@ import com.intellij.platform.workspace.storage.testEntities.entities.cacheVersio
 @GeneratedCodeApiVersion(3)
 @GeneratedCodeImplVersion(7)
 @OptIn(WorkspaceEntityInternalApi::class)
-internal class ChangedComputablePropsOrderEntityImpl(private val dataSource: ChangedComputablePropsOrderEntityData) : ChangedComputablePropsOrderEntity, WorkspaceEntityBase(
-  dataSource) {
+internal class ChangedComputablePropsOrderEntityImpl(private val dataSource: ChangedComputablePropsOrderEntityData) :
+  ChangedComputablePropsOrderEntity, WorkspaceEntityBase(dataSource) {
 
   private companion object {
 
-
-    private val connections = listOf<ConnectionId>(
-    )
+    private val connections = listOf<ConnectionId>()
 
   }
 
@@ -40,7 +47,6 @@ internal class ChangedComputablePropsOrderEntityImpl(private val dataSource: Cha
       readField("names")
       return dataSource.names
     }
-
   override val value: Int
     get() {
       readField("value")
@@ -58,8 +64,9 @@ internal class ChangedComputablePropsOrderEntityImpl(private val dataSource: Cha
   }
 
 
-  internal class Builder(result: ChangedComputablePropsOrderEntityData?) : ModifiableWorkspaceEntityBase<ChangedComputablePropsOrderEntity, ChangedComputablePropsOrderEntityData>(
-    result), ChangedComputablePropsOrderEntityBuilder {
+  internal class Builder(result: ChangedComputablePropsOrderEntityData?) :
+    ModifiableWorkspaceEntityBase<ChangedComputablePropsOrderEntity, ChangedComputablePropsOrderEntityData>(result),
+    ChangedComputablePropsOrderEntityBuilder {
     internal constructor() : this(ChangedComputablePropsOrderEntityData())
 
     override fun applyToBuilder(builder: MutableEntityStorage) {
@@ -72,15 +79,13 @@ internal class ChangedComputablePropsOrderEntityImpl(private val dataSource: Cha
           error("Entity ChangedComputablePropsOrderEntity is already created in a different builder")
         }
       }
-
       this.diff = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
-      // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
-      // Builder may switch to snapshot at any moment and lock entity data to modification
+// After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
+// Builder may switch to snapshot at any moment and lock entity data to modification
       this.currentEntityData = null
-
-      // Process linked entities that are connected without a builder
+// Process linked entities that are connected without a builder
       processLinkedEntities(builder)
       checkInitialization() // TODO uncomment and check failed tests
     }
@@ -125,7 +130,6 @@ internal class ChangedComputablePropsOrderEntityImpl(private val dataSource: Cha
         changedProperty.add("entitySource")
 
       }
-
     override var someKey: Int
       get() = getEntityData().someKey
       set(value) {
@@ -133,7 +137,6 @@ internal class ChangedComputablePropsOrderEntityImpl(private val dataSource: Cha
         getEntityData(true).someKey = value
         changedProperty.add("someKey")
       }
-
     private val namesUpdater: (value: List<String>) -> Unit = { value ->
 
       changedProperty.add("names")
@@ -155,7 +158,6 @@ internal class ChangedComputablePropsOrderEntityImpl(private val dataSource: Cha
         getEntityData(true).names = value
         namesUpdater.invoke(value)
       }
-
     override var value: Int
       get() = getEntityData().value
       set(value) {
@@ -166,6 +168,7 @@ internal class ChangedComputablePropsOrderEntityImpl(private val dataSource: Cha
 
     override fun getEntityClass(): Class<ChangedComputablePropsOrderEntity> = ChangedComputablePropsOrderEntity::class.java
   }
+
 }
 
 @OptIn(WorkspaceEntityInternalApi::class)
@@ -185,7 +188,6 @@ internal class ChangedComputablePropsOrderEntityData : WorkspaceEntityData<Chang
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): ChangedComputablePropsOrderEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {
@@ -197,8 +199,7 @@ internal class ChangedComputablePropsOrderEntityData : WorkspaceEntityData<Chang
   }
 
   override fun getMetadata(): EntityMetadata {
-    return MetadataStorageImpl.getMetadataByTypeFqn(
-      "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedComputablePropsOrderEntity") as EntityMetadata
+    return MetadataStorageImpl.getMetadataByTypeFqn("com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedComputablePropsOrderEntity") as EntityMetadata
   }
 
   override fun clone(): ChangedComputablePropsOrderEntityData {
@@ -213,8 +214,7 @@ internal class ChangedComputablePropsOrderEntityData : WorkspaceEntityData<Chang
   }
 
   override fun createDetachedEntity(parents: List<WorkspaceEntityBuilder<*>>): WorkspaceEntityBuilder<*> {
-    return ChangedComputablePropsOrderEntity(someKey, names, value, entitySource) {
-    }
+    return ChangedComputablePropsOrderEntity(someKey, names, value, entitySource)
   }
 
   override fun getRequiredParents(): List<Class<out WorkspaceEntity>> {
@@ -225,9 +225,7 @@ internal class ChangedComputablePropsOrderEntityData : WorkspaceEntityData<Chang
   override fun equals(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as ChangedComputablePropsOrderEntityData
-
     if (this.entitySource != other.entitySource) return false
     if (this.someKey != other.someKey) return false
     if (this.names != other.names) return false
@@ -238,9 +236,7 @@ internal class ChangedComputablePropsOrderEntityData : WorkspaceEntityData<Chang
   override fun equalsIgnoringEntitySource(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as ChangedComputablePropsOrderEntityData
-
     if (this.someKey != other.someKey) return false
     if (this.names != other.names) return false
     if (this.value != other.value) return false

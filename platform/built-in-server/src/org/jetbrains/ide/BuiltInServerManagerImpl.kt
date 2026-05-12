@@ -43,7 +43,7 @@ private const val PROPERTY_DISABLED = "idea.builtin.server.disabled"
 
 private val LOG = logger<BuiltInServerManager>()
 
-class BuiltInServerManagerImpl(private val coroutineScope: CoroutineScope) : BuiltInServerManager() {
+internal class BuiltInServerManagerImpl(private val coroutineScope: CoroutineScope) : BuiltInServerManager() {
   private var serverStartFuture: Job? = null
   private var server: BuiltInServer? = null
   private var portOverride: Int? = null
@@ -128,7 +128,7 @@ class BuiltInServerManagerImpl(private val coroutineScope: CoroutineScope) : Bui
     }
 
     // extensions may use registry to enable/disable URL handlers
-    RegistryManager.getInstanceAsync().awaitRegistryLoad()
+    RegistryManager.getInstanceAsync()
 
     try {
       server = BuiltInServer.start(firstPort = getDefaultPort(), portsCount = PORTS_COUNT, tryAnyPort = true)

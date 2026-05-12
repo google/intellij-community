@@ -91,6 +91,7 @@ import com.jetbrains.python.psi.stubs.PropertyStubStorage;
 import com.jetbrains.python.psi.stubs.PyClassStub;
 import com.jetbrains.python.psi.stubs.PyFunctionStub;
 import com.jetbrains.python.psi.stubs.PyTargetExpressionStub;
+import com.jetbrains.python.psi.types.PyAnyType;
 import com.jetbrains.python.psi.types.PyCallableParameter;
 import com.jetbrains.python.psi.types.PyClassLikeType;
 import com.jetbrains.python.psi.types.PyClassType;
@@ -148,7 +149,7 @@ public class PyClassImpl extends PyBaseElementImpl<PyClassStub> implements PyCla
   @Override
   public PyType getType(@NotNull TypeEvalContext context, @NotNull TypeEvalContext.Key key) {
     if (PyTypingTypeProvider.ANY.equals(getQualifiedName())) {
-      return null;
+      return PyAnyType.getAny();
     }
     return new PyClassTypeImpl(this, true);
   }
@@ -1524,12 +1525,12 @@ public class PyClassImpl extends PyBaseElementImpl<PyClassStub> implements PyCla
   private @NotNull List<PyClassLikeType> doGetSuperClassTypes(@NotNull TypeEvalContext context) {
     final List<PyClassLikeType> result = new ArrayList<>();
 
-    // In some cases stub may not provide all information, so we use stubs only if AST access id disabled
-    if (!context.maySwitchToAST(this)) {
-      fillSuperClassesNoSwitchToAst(context, getStub(), result);
+    // In some cases stub may not provide all information, so we use stubs only if AST access is disabled
+    if (context.maySwitchToAST(this)) {
+      fillSuperClassesSwitchingToAst(context, result);
     }
     else {
-      fillSuperClassesSwitchingToAst(context, result);
+      fillSuperClassesNoSwitchToAst(context, getStub(), result);
     }
 
     PyPsiUtils.assertValid(this);

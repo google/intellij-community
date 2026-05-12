@@ -7,9 +7,11 @@ import com.intellij.ide.starter.models.TestCase
 import com.intellij.ide.starter.models.VMOptions
 import com.intellij.ide.starter.path.IDEDataPaths
 import com.intellij.ide.starter.profiler.ProfilerType
+import com.intellij.ide.starter.project.NoProject
 import com.intellij.ide.starter.project.ProjectInfoSpec
 import com.intellij.ide.starter.report.publisher.ReportPublisher
 import com.intellij.openapi.util.SystemInfo
+import com.intellij.tools.ide.performanceTesting.commands.SdkObject
 import com.intellij.util.PlatformUtils
 import org.kodein.di.direct
 import org.kodein.di.instance
@@ -48,6 +50,22 @@ class IDERemDevTestContext private constructor(
   preserveSystemDir = preserveSystemDir,
 ) {
 
+  override fun copy(ide: InstalledIde?, resolvedProjectHome: Path?, sdk: SdkObject?): IDETestContext {
+    require(sdk == null || testCase.projectInfo != NoProject) { "project must be specified to setup project SDK" }
+    return IDERemDevTestContext(
+      paths,
+      ide ?: this.ide,
+      testCase.copy(sdk = sdk),
+      testName,
+      resolvedProjectHome ?: _resolvedProjectHome,
+      profilerType,
+      publishers,
+      isReportPublishingEnabled,
+      preserveSystemDir,
+      frontendIDEContext
+    )
+  }
+
   override fun setProfiler(profilerType: ProfilerType): IDETestContext {
     frontendIDEContext.setProfiler(profilerType)
     return super.setProfiler(profilerType)
@@ -61,6 +79,26 @@ class IDERemDevTestContext private constructor(
   override fun wipeWorkspaceState(): IDETestContext = apply {
     frontendIDEContext.wipeWorkspaceState()
     super.wipeWorkspaceState()
+  }
+
+  /**
+   * Adds the specified [domains] to the list of trusted domains using frontend IDE context.
+   * This is useful to avoid the "Remote host wants to open the following URL" confirmation dialog.
+   */
+  fun setupTrustedDomains(domains: List<String>): IDERemDevTestContext {
+    val domainsXml = domains.joinToString("\n") {
+      "<option value=\"$it\" />"
+    }
+    frontendIDEContext.writeConfigFile("options/trusted-domains.xml", """
+      <application>
+        <component name="trustedDomains">
+          <option name="trustedDomains">
+            $domainsXml
+          </option>
+        </component>
+      </application>
+    """)
+    return this
   }
 
   companion object {
@@ -116,4 +154,3 @@ fun IDERemDevTestContext.setFrontendEventLogsMetadataCustomPath(path: Path = pat
   }
   return this
 }
-

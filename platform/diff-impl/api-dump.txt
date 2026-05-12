@@ -132,7 +132,8 @@ c:com.intellij.diff.actions.impl.OpenInEditorAction
 - sf:openEditor(com.intellij.openapi.project.Project,com.intellij.pom.Navigatable[],java.lang.Runnable):Z
 - sf:openEditor(com.intellij.pom.Navigatable,java.lang.Runnable):Z
 - sf:openEditor(com.intellij.pom.Navigatable[],java.lang.Runnable):Z
-- promote(java.util.List,com.intellij.openapi.actionSystem.DataContext):java.util.List
+- f:promote(java.util.List,com.intellij.openapi.actionSystem.DataContext):java.util.List
+- f:suppress(java.util.List,com.intellij.openapi.actionSystem.DataContext):java.util.List
 - update(com.intellij.openapi.actionSystem.AnActionEvent):V
 f:com.intellij.diff.actions.impl.OpenInEditorAction$Companion
 - f:openEditor(com.intellij.openapi.project.Project,com.intellij.pom.Navigatable,java.lang.Runnable):Z
@@ -144,6 +145,7 @@ f:com.intellij.diff.actions.impl.SetEditorSettingsAction
 - actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
 - f:applyDefaults():V
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
+- f:setDiffActions(java.util.List):V
 - f:setSyncScrollSupport(com.intellij.diff.tools.util.SyncScrollSupport$Support):V
 - update(com.intellij.openapi.actionSystem.AnActionEvent):V
 c:com.intellij.diff.actions.impl.SetEditorSettingsActionGroup
@@ -151,10 +153,12 @@ c:com.intellij.diff.actions.impl.SetEditorSettingsActionGroup
 - com.intellij.openapi.project.DumbAware
 - pf:myActions:com.intellij.openapi.actionSystem.AnAction[]
 - applyDefaults():V
+- p:createAppearanceGroup():com.intellij.openapi.actionSystem.DefaultActionGroup
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
 - getChildren(com.intellij.openapi.actionSystem.AnActionEvent):com.intellij.openapi.actionSystem.AnAction[]
 - installGutterPopup():V
 - ps:replaceOrAppend(java.util.List,java.lang.Object,java.lang.Object):V
+- setDiffActions(java.util.List):V
 - setSyncScrollSupport(com.intellij.diff.tools.util.SyncScrollSupport$Support):V
 - update(com.intellij.openapi.actionSystem.AnActionEvent):V
 a:com.intellij.diff.chains.AsyncDiffRequestChain
@@ -387,6 +391,7 @@ com.intellij.diff.impl.DiffEditorViewerListener
 c:com.intellij.diff.impl.DiffRequestPanelImpl
 - com.intellij.diff.DiffRequestPanel
 - <init>(com.intellij.openapi.project.Project,java.awt.Window):V
+- <init>(com.intellij.openapi.project.Project,java.awt.Window,com.intellij.openapi.util.UserDataHolder):V
 - dispose():V
 - getComponent():javax.swing.JComponent
 - getPreferredFocusedComponent():javax.swing.JComponent
@@ -535,6 +540,11 @@ f:com.intellij.diff.impl.DiffSettingsHolder$State
 c:com.intellij.diff.impl.DiffWindow
 - <init>(com.intellij.openapi.project.Project,com.intellij.diff.chains.DiffRequestChain,com.intellij.diff.DiffDialogHints):V
 - p:createProcessor():com.intellij.diff.impl.DiffRequestProcessor
+f:com.intellij.diff.impl.FileAssignmentTracker
+- com.intellij.diff.impl.AssignmentTracker
+- <init>(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile[]):V
+- onEachAssignment():V
+- onLastUnassignment():V
 com.intellij.diff.lang.DiffIgnoredRangeProvider
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
 - a:accepts(com.intellij.openapi.project.Project,com.intellij.diff.contents.DiffContent):Z
@@ -1096,7 +1106,6 @@ pc:com.intellij.diff.tools.simple.ThreesideTextDiffViewerEx$MyFoldingModel
 - com.intellij.diff.tools.util.FoldingModelSupport
 - <init>(com.intellij.openapi.project.Project,com.intellij.openapi.editor.ex.EditorEx[],com.intellij.diff.tools.util.side.ThreesideContentPanel,com.intellij.openapi.Disposable):V
 - createState(java.util.List,com.intellij.diff.tools.util.FoldingModelSupport$Settings):com.intellij.diff.tools.util.FoldingModelSupport$Data
-- createState(java.util.List,java.util.List,com.intellij.diff.tools.util.FoldingModelSupport$Settings):com.intellij.diff.tools.util.FoldingModelSupport$Data
 - paintOnDivider(java.awt.Graphics2D,java.awt.Component,com.intellij.diff.util.Side):V
 - p:repaintSeparators():V
 pc:com.intellij.diff.tools.simple.ThreesideTextDiffViewerEx$MyPrevNextDifferenceIterable
@@ -1412,10 +1421,11 @@ f:com.intellij.diff.tools.util.base.TextDiffSettingsHolder
 f:com.intellij.diff.tools.util.base.TextDiffSettingsHolder$Companion
 f:com.intellij.diff.tools.util.base.TextDiffSettingsHolder$PlaceSettings
 - <init>():V
-- <init>(com.intellij.diff.tools.util.base.HighlightPolicy,com.intellij.diff.tools.util.base.IgnorePolicy,Z,Z,Z,Z,com.intellij.diff.tools.util.base.HighlightingLevel,Z,com.intellij.diff.tools.util.breadcrumbs.BreadcrumbsPlacement,Z):V
-- b:<init>(com.intellij.diff.tools.util.base.HighlightPolicy,com.intellij.diff.tools.util.base.IgnorePolicy,Z,Z,Z,Z,com.intellij.diff.tools.util.base.HighlightingLevel,Z,com.intellij.diff.tools.util.breadcrumbs.BreadcrumbsPlacement,Z,I,kotlin.jvm.internal.DefaultConstructorMarker):V
+- <init>(com.intellij.diff.tools.util.base.HighlightPolicy,com.intellij.diff.tools.util.base.IgnorePolicy,Z,Z,Z,Z,com.intellij.diff.tools.util.base.HighlightingLevel,Z,com.intellij.diff.tools.util.breadcrumbs.BreadcrumbsPlacement,Z,I):V
+- b:<init>(com.intellij.diff.tools.util.base.HighlightPolicy,com.intellij.diff.tools.util.base.IgnorePolicy,Z,Z,Z,Z,com.intellij.diff.tools.util.base.HighlightingLevel,Z,com.intellij.diff.tools.util.breadcrumbs.BreadcrumbsPlacement,Z,I,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - f:component1():com.intellij.diff.tools.util.base.HighlightPolicy
 - f:component10():Z
+- f:component11():I
 - f:component2():com.intellij.diff.tools.util.base.IgnorePolicy
 - f:component3():Z
 - f:component4():Z
@@ -1424,10 +1434,11 @@ f:com.intellij.diff.tools.util.base.TextDiffSettingsHolder$PlaceSettings
 - f:component7():com.intellij.diff.tools.util.base.HighlightingLevel
 - f:component8():Z
 - f:component9():com.intellij.diff.tools.util.breadcrumbs.BreadcrumbsPlacement
-- f:copy(com.intellij.diff.tools.util.base.HighlightPolicy,com.intellij.diff.tools.util.base.IgnorePolicy,Z,Z,Z,Z,com.intellij.diff.tools.util.base.HighlightingLevel,Z,com.intellij.diff.tools.util.breadcrumbs.BreadcrumbsPlacement,Z):com.intellij.diff.tools.util.base.TextDiffSettingsHolder$PlaceSettings
-- bs:copy$default(com.intellij.diff.tools.util.base.TextDiffSettingsHolder$PlaceSettings,com.intellij.diff.tools.util.base.HighlightPolicy,com.intellij.diff.tools.util.base.IgnorePolicy,Z,Z,Z,Z,com.intellij.diff.tools.util.base.HighlightingLevel,Z,com.intellij.diff.tools.util.breadcrumbs.BreadcrumbsPlacement,Z,I,java.lang.Object):com.intellij.diff.tools.util.base.TextDiffSettingsHolder$PlaceSettings
+- f:copy(com.intellij.diff.tools.util.base.HighlightPolicy,com.intellij.diff.tools.util.base.IgnorePolicy,Z,Z,Z,Z,com.intellij.diff.tools.util.base.HighlightingLevel,Z,com.intellij.diff.tools.util.breadcrumbs.BreadcrumbsPlacement,Z,I):com.intellij.diff.tools.util.base.TextDiffSettingsHolder$PlaceSettings
+- bs:copy$default(com.intellij.diff.tools.util.base.TextDiffSettingsHolder$PlaceSettings,com.intellij.diff.tools.util.base.HighlightPolicy,com.intellij.diff.tools.util.base.IgnorePolicy,Z,Z,Z,Z,com.intellij.diff.tools.util.base.HighlightingLevel,Z,com.intellij.diff.tools.util.breadcrumbs.BreadcrumbsPlacement,Z,I,I,java.lang.Object):com.intellij.diff.tools.util.base.TextDiffSettingsHolder$PlaceSettings
 - equals(java.lang.Object):Z
 - f:getBREADCRUMBS_PLACEMENT():com.intellij.diff.tools.util.breadcrumbs.BreadcrumbsPlacement
+- f:getCONTEXT_RANGE():I
 - f:getENABLE_SYNC_SCROLL():Z
 - f:getEXPAND_BY_DEFAULT():Z
 - f:getEventDispatcher():com.intellij.util.EventDispatcher
@@ -1441,6 +1452,7 @@ f:com.intellij.diff.tools.util.base.TextDiffSettingsHolder$PlaceSettings
 - f:getUSE_SOFT_WRAPS():Z
 - hashCode():I
 - f:setBREADCRUMBS_PLACEMENT(com.intellij.diff.tools.util.breadcrumbs.BreadcrumbsPlacement):V
+- f:setCONTEXT_RANGE(I):V
 - f:setENABLE_SYNC_SCROLL(Z):V
 - f:setEXPAND_BY_DEFAULT(Z):V
 - f:setHIGHLIGHTING_LEVEL(com.intellij.diff.tools.util.base.HighlightingLevel):V
@@ -1453,24 +1465,21 @@ f:com.intellij.diff.tools.util.base.TextDiffSettingsHolder$PlaceSettings
 - f:setUSE_SOFT_WRAPS(Z):V
 f:com.intellij.diff.tools.util.base.TextDiffSettingsHolder$SharedSettings
 - <init>():V
-- <init>(I,Z,Z,Z,Z):V
-- b:<init>(I,Z,Z,Z,Z,I,kotlin.jvm.internal.DefaultConstructorMarker):V
-- f:component1():I
+- <init>(Z,Z,Z,Z):V
+- b:<init>(Z,Z,Z,Z,I,kotlin.jvm.internal.DefaultConstructorMarker):V
+- f:component1():Z
 - f:component2():Z
 - f:component3():Z
 - f:component4():Z
-- f:component5():Z
-- f:copy(I,Z,Z,Z,Z):com.intellij.diff.tools.util.base.TextDiffSettingsHolder$SharedSettings
-- bs:copy$default(com.intellij.diff.tools.util.base.TextDiffSettingsHolder$SharedSettings,I,Z,Z,Z,Z,I,java.lang.Object):com.intellij.diff.tools.util.base.TextDiffSettingsHolder$SharedSettings
+- f:copy(Z,Z,Z,Z):com.intellij.diff.tools.util.base.TextDiffSettingsHolder$SharedSettings
+- bs:copy$default(com.intellij.diff.tools.util.base.TextDiffSettingsHolder$SharedSettings,Z,Z,Z,Z,I,java.lang.Object):com.intellij.diff.tools.util.base.TextDiffSettingsHolder$SharedSettings
 - equals(java.lang.Object):Z
-- f:getCONTEXT_RANGE():I
 - f:getENABLE_ALIGNING_CHANGES_MODE():Z
 - f:getEventDispatcher():com.intellij.util.EventDispatcher
 - f:getMERGE_AUTO_APPLY_NON_CONFLICTED_CHANGES():Z
 - f:getMERGE_AUTO_RESOLVE_IMPORT_CONFLICTS():Z
 - f:getMERGE_LST_GUTTER_MARKERS():Z
 - hashCode():I
-- f:setCONTEXT_RANGE(I):V
 - f:setENABLE_ALIGNING_CHANGES_MODE(Z):V
 - f:setMERGE_AUTO_APPLY_NON_CONFLICTED_CHANGES(Z):V
 - f:setMERGE_AUTO_RESOLVE_IMPORT_CONFLICTS(Z):V
@@ -1561,7 +1570,7 @@ a:com.intellij.diff.tools.util.side.OnesideDiffViewer
 a:com.intellij.diff.tools.util.side.OnesideTextDiffViewer
 - com.intellij.diff.tools.util.side.OnesideDiffViewer
 - com.intellij.diff.EditorDiffViewer
-- pf:myEditorSettingsAction:com.intellij.diff.actions.impl.SetEditorSettingsAction
+- pf:myEditorSettingsAction:com.intellij.diff.actions.impl.SetEditorSettingsActionGroup
 - <init>(com.intellij.diff.DiffContext,com.intellij.diff.requests.ContentDiffRequest):V
 - s:canShowRequest(com.intellij.diff.DiffContext,com.intellij.diff.requests.DiffRequest):Z
 - p:createEditorPopupActions():java.util.List
@@ -1598,7 +1607,7 @@ c:com.intellij.diff.tools.util.side.ThreesideContentPanel$Holders
 a:com.intellij.diff.tools.util.side.ThreesideTextDiffViewer
 - com.intellij.diff.EditorDiffViewer
 - com.intellij.diff.tools.util.base.DiffViewerBase
-- pf:myEditorSettingsAction:com.intellij.diff.actions.impl.SetEditorSettingsAction
+- pf:myEditorSettingsAction:com.intellij.diff.actions.impl.SetEditorSettingsActionGroup
 - p:mySyncScrollSupport:com.intellij.diff.tools.util.SyncScrollSupport$ThreesideSyncScrollSupport
 - <init>(com.intellij.diff.DiffContext,com.intellij.diff.requests.ContentDiffRequest):V
 - s:canShowRequest(com.intellij.diff.DiffContext,com.intellij.diff.requests.DiffRequest):Z
@@ -1661,7 +1670,7 @@ a:com.intellij.diff.tools.util.side.TwosideDiffViewer
 a:com.intellij.diff.tools.util.side.TwosideTextDiffViewer
 - com.intellij.diff.tools.util.side.TwosideDiffViewer
 - com.intellij.diff.EditorDiffViewer
-- pf:myEditorSettingsAction:com.intellij.diff.actions.impl.SetEditorSettingsAction
+- pf:myEditorSettingsAction:com.intellij.diff.actions.impl.SetEditorSettingsActionGroup
 - <init>(com.intellij.diff.DiffContext,com.intellij.diff.requests.ContentDiffRequest):V
 - s:canShowRequest(com.intellij.diff.DiffContext,com.intellij.diff.requests.DiffRequest):Z
 - p:createEditorHolders(com.intellij.diff.tools.holders.EditorHolderFactory):java.util.List
@@ -1859,6 +1868,7 @@ com.intellij.diff.util.DiffPlaces
 - sf:DEFAULT:java.lang.String
 - sf:DIR_DIFF:java.lang.String
 - sf:EXTERNAL:java.lang.String
+- sf:INTENTION_PREVIEW:java.lang.String
 - sf:MERGE:java.lang.String
 - sf:SHELVE_VIEW:java.lang.String
 - sf:TESTS_FAILED_ASSERTIONS:java.lang.String
@@ -1937,6 +1947,7 @@ f:com.intellij.diff.util.DiffUtil
 - s:createCustomNotifications(com.intellij.diff.FrameDiffTool$DiffViewer,com.intellij.openapi.util.UserDataHolder,com.intellij.openapi.util.UserDataHolder):java.util.List
 - s:createEditor(com.intellij.openapi.editor.Document,com.intellij.openapi.project.Project,Z):com.intellij.openapi.editor.ex.EditorEx
 - s:createEditor(com.intellij.openapi.editor.Document,com.intellij.openapi.project.Project,Z,Z):com.intellij.openapi.editor.ex.EditorEx
+- s:createEditor(com.intellij.openapi.editor.Document,com.intellij.openapi.project.Project,Z,Z,java.awt.Cursor,java.lang.Integer):com.intellij.openapi.editor.ex.EditorEx
 - s:createEditorHighlighter(com.intellij.openapi.project.Project,com.intellij.diff.contents.DocumentContent):com.intellij.openapi.editor.highlighter.EditorHighlighter
 - s:createEmptyEditorHighlighter():com.intellij.openapi.editor.highlighter.EditorHighlighter
 - s:createMessagePanel(java.lang.String):javax.swing.JPanel

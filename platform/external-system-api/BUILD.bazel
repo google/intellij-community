@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.externalSystem` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "externalSystem_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "externalSystem",
   module_name = "intellij.platform.externalSystem",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
-  resources = [":externalSystem_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
@@ -32,18 +27,21 @@ jvm_library(
     "//platform/util:util-ui",
     "//platform/util/concurrency",
     "//platform/platform-util-io:ide-util-io",
+    "//platform/ide-core",
     "//platform/external-system-api/dependency-updater",
     "//platform/core-ui",
     "//platform/backend/observation",
     "//platform/workspace/storage",
     "//platform/backend/workspace",
     "//platform/execution",
+    "//libraries/fastutil",
   ],
   exports = ["//platform/external-system-rt:externalSystem-rt"]
 )
 
 jvm_library(
   name = "externalSystem_test_lib",
+  testonly = True,
   module_name = "intellij.platform.externalSystem",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -70,12 +68,20 @@ jvm_library(
     "//platform/util:util-ui_test_lib",
     "//platform/util/concurrency:concurrency_test_lib",
     "//platform/platform-util-io:ide-util-io_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/external-system-api/dependency-updater:dependency-updater_test_lib",
     "//platform/core-ui:core-ui_test_lib",
     "//platform/backend/observation:observation_test_lib",
     "//platform/workspace/storage:storage_test_lib",
     "//platform/backend/workspace:workspace_test_lib",
     "//platform/execution:execution_test_lib",
+    "//libraries/fastutil:fastutil_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.externalSystem` end
+
+### auto-generated section `iml intellij.platform.externalSystem` start
+exports_files([
+  "intellij.platform.externalSystem.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.externalSystem` end

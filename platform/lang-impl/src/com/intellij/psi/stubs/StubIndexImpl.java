@@ -6,6 +6,7 @@ import com.intellij.openapi.application.AppUIExecutor;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.diagnostic.ThrottledLogger;
 import com.intellij.openapi.extensions.ExtensionPointListener;
 import com.intellij.openapi.extensions.PluginDescriptor;
 import com.intellij.openapi.progress.ProgressManager;
@@ -60,6 +61,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @ApiStatus.Internal
 public final class StubIndexImpl extends StubIndexEx {
   static final Logger LOG = Logger.getInstance(StubIndexImpl.class);
+  static final ThrottledLogger THROTTLED_LOG = new ThrottledLogger(LOG, 1000);
 
   public enum PerFileElementTypeStubChangeTrackingSource {
     Disabled,
@@ -439,7 +441,12 @@ public final class StubIndexImpl extends StubIndexEx {
   public @NotNull ModificationTracker getPerFileElementTypeModificationTracker(@NotNull IFileElementType fileElementType) {
     return () -> {
       if (PER_FILE_ELEMENT_TYPE_STUB_CHANGE_TRACKING_SOURCE == PerFileElementTypeStubChangeTrackingSource.ChangedFilesCollector) {
-        ReadAction.run(() -> {
+        if (StubTreeBuilder.isBuildingStub()) {
+          THROTTLED_LOG.error(
+            "Stub building must not rely on data from indexes because it introduces circular dependency indexes -> stub building -> resolve -> indexes. " +
+                    "File element type: "+ fileElementType);
+        }
+        ReadAction.runBlocking(() -> {
           if (FileBasedIndex.getInstance() instanceof FileBasedIndexImpl index) {
             index.getChangedFilesCollector().processFilesToUpdateInReadAction();
           }

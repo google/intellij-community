@@ -9,6 +9,9 @@
     <extensionPoint name="workspaceModel.customFacetRelatedEntitySerializer"
                     interface="com.intellij.platform.workspace.jps.serialization.impl.CustomFacetRelatedEntitySerializer"
                     dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.workspaceModel.customImlComponentNameContributor"
+                    interface="com.intellij.platform.workspace.jps.serialization.CustomImlComponentNameContributor"
+                    dynamic="true"/>
   </extensionPoints>
   <extensions defaultExtensionNs="com.intellij">
     <registryKey key="ide.new.project.model.index.case.sensitivity" defaultValue="false" restartRequired="true"

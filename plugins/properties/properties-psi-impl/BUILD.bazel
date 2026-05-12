@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.properties.backend.psi` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "backend-psi_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "backend-psi",
   module_name = "intellij.properties.backend.psi",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":backend-psi_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/code-style-api:codeStyle",
     "//platform/core-api:core",
@@ -28,6 +23,7 @@ jvm_library(
     "//platform/platform-impl:ide-impl",
     "//platform/indexing-impl",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//platform/analysis-impl",
     "//platform/lang-impl",
     "//platform/util/nanoxml",
@@ -37,6 +33,10 @@ jvm_library(
     "//plugins/properties/properties-common:properties",
     "//xml/xml-psi-impl:psi-impl",
     "//platform/lang-api:lang",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//platform/util/concurrency",
+    "//jps/model-api:model",
+    "//platform/util:util-ui",
   ],
   exports = [
     "//plugins/properties/properties-psi-api:psi",
@@ -47,6 +47,7 @@ jvm_library(
 
 jvm_library(
   name = "backend-psi_test_lib",
+  testonly = True,
   module_name = "intellij.properties.backend.psi",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -72,6 +73,7 @@ jvm_library(
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/indexing-impl:indexing-impl_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/analysis-impl:analysis-impl_test_lib",
     "//platform/lang-impl:lang-impl_test_lib",
     "//platform/util/nanoxml:nanoxml_test_lib",
@@ -82,6 +84,16 @@ jvm_library(
     "//platform/backend:backend_test_lib",
     "//xml/xml-psi-impl:psi-impl_test_lib",
     "//platform/lang-api:lang_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/util/concurrency:concurrency_test_lib",
+    "//jps/model-api:model_test_lib",
+    "//platform/util:util-ui_test_lib",
   ]
 )
 ### auto-generated section `build intellij.properties.backend.psi` end
+
+### auto-generated section `iml intellij.properties.backend.psi` start
+exports_files([
+  "intellij.properties.backend.psi.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.properties.backend.psi` end

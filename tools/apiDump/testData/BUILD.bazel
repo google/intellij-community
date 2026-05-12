@@ -14,9 +14,16 @@ jvm_library(
 
 jvm_library(
   name = "testData_test_lib",
+  testonly = True,
   module_name = "intellij.tools.apiDump.testData",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [":testData"]
 )
 ### auto-generated section `build intellij.tools.apiDump.testData` end
+
+### auto-generated section `iml intellij.tools.apiDump.testData` start
+exports_files([
+  "intellij.tools.apiDump.testData.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.tools.apiDump.testData` end

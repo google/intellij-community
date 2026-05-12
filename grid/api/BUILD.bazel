@@ -1,33 +1,37 @@
 ### auto-generated section `build intellij.grid` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "grid_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "grid",
   module_name = "intellij.grid",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":grid_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/util",
+    "//platform/util/base",
     "//platform/core-api:core",
   ]
 )
 
 jvm_library(
   name = "grid_test_lib",
+  testonly = True,
   module_name = "intellij.grid",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
     ":grid",
     "//platform/util:util_test_lib",
+    "//platform/util/base:base_test_lib",
     "//platform/core-api:core_test_lib",
   ]
 )
 ### auto-generated section `build intellij.grid` end
+
+### auto-generated section `iml intellij.grid` start
+exports_files([
+  "intellij.grid.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.grid` end

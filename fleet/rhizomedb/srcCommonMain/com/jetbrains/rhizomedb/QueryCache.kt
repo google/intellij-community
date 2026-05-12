@@ -3,7 +3,7 @@ package com.jetbrains.rhizomedb
 
 import fleet.fastutil.longs.LongArrayList
 import fleet.fastutil.longs.toArray
-import fleet.util.computeShim
+import fleet.multiplatform.shims.computeShim
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.PersistentSet
 import kotlinx.collections.immutable.persistentHashMapOf

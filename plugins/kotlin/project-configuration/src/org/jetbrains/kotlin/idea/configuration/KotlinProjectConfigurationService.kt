@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.VisibleForTesting
 import org.jetbrains.kotlin.idea.projectConfiguration.KotlinProjectConfigurationBundle
 import org.jetbrains.kotlin.idea.statistics.KotlinProjectSetupFUSCollector
 import org.jetbrains.kotlin.idea.util.isKotlinFileType
@@ -216,27 +217,13 @@ class KotlinProjectConfigurationService(private val project: Project, val corout
         checkingAndPerformingAutoConfig = true
         // Removes the notification showing for a split second
         refreshEditorNotifications()
-        coroutineScope.launch(Dispatchers.Default) {
+        val job = coroutineScope.launch(Dispatchers.Default) {
             var configured = false
             try {
-                val autoConfigurator = readAction {
-                    KotlinProjectConfigurator.EP_NAME.extensionList
-                        .firstOrNull { it.canRunAutoConfig() && it.isApplicable(module) }
-                } ?: return@launch
-
-                val autoConfigSettings = withBackgroundProgress(
-                    project = module.project,
-                    title = KotlinProjectConfigurationBundle.message("auto.configure.kotlin.check")
-                ) {
-                    val settings = autoConfigurator.calculateAutoConfigSettings(module)
-                    KotlinProjectSetupFUSCollector.logCheckAutoConfigStatus(module.project, settings != null)
-                    settings
+                configured = autoConfigure(module)
+                if (configured) {
+                    notificationCooldownEnd = System.currentTimeMillis() + 2000
                 }
-
-                if (autoConfigSettings == null) return@launch
-                autoConfigurator.runAutoConfig(autoConfigSettings)
-                configured = true
-                notificationCooldownEnd = System.currentTimeMillis() + 2000
             } finally {
                 checkingAndPerformingAutoConfig = false
                 if (!configured) {
@@ -246,5 +233,29 @@ class KotlinProjectConfigurationService(private val project: Project, val corout
                 }
             }
         }
+        jobReference?.set(job)
     }
+
+    @ApiStatus.Internal
+    suspend fun autoConfigure(module: Module): Boolean {
+        val autoConfigurator = readAction {
+            KotlinProjectConfigurator.EP_NAME.extensionList
+                .firstOrNull { it.canRunAutoConfig() && it.isApplicable(module) }
+        } ?: return false
+
+        val autoConfigSettings = withBackgroundProgress(
+            project = module.project,
+            title = KotlinProjectConfigurationBundle.message("auto.configure.kotlin.check")
+        ) {
+            val settings = autoConfigurator.calculateAutoConfigSettings(module)
+            KotlinProjectSetupFUSCollector.logCheckAutoConfigStatus(module.project, settings != null)
+            settings
+        } ?: return false
+
+        autoConfigurator.runAutoConfig(autoConfigSettings)
+        return true
+    }
+
+    @VisibleForTesting
+    var jobReference: AtomicReference<Job>? = null
 }

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build
 
 import kotlinx.collections.immutable.PersistentList
@@ -17,7 +17,6 @@ import java.nio.file.Path
 
 val MAVEN_ARTIFACTS_ADDITIONAL_MODULES: PersistentList<String> = persistentListOf(
   "intellij.tools.jps.build.standalone",
-  "intellij.devkit.runtimeModuleRepository.jps",
   "intellij.devkit.jps",
   "intellij.idea.community.build.tasks",
   "intellij.platform.debugger.testFramework",
@@ -118,7 +117,6 @@ open class IdeaCommunityProperties(private val communityHomeDir: Path) : JetBrai
 
   override fun getProductContentDescriptor(): ProductModulesContentSpec = productModules {
     include(intellijCommunityBaseFragment(platformPrefix))
-    include(communityExtensionsFragment())
   }
 
   override suspend fun copyAdditionalFiles(targetDir: Path, context: BuildContext) {
@@ -139,7 +137,7 @@ open class IdeaCommunityProperties(private val communityHomeDir: Path) : JetBrai
 
   override fun createWindowsCustomizer(projectHome: Path): WindowsDistributionCustomizer = communityWindowsCustomizer(communityHomeDir)
 
-  override fun createLinuxCustomizer(projectHome: String): LinuxDistributionCustomizer = communityLinuxCustomizer(communityHomeDir)
+  override fun createLinuxCustomizer(projectHome: Path): LinuxDistributionCustomizer = communityLinuxCustomizer(communityHomeDir)
 
   override fun createMacCustomizer(projectHome: Path): MacDistributionCustomizer = communityMacCustomizer(communityHomeDir)
 
@@ -197,13 +195,10 @@ fun intellijCommunityBaseFragment(platformPrefix: String? = null): ProductModule
 
   if (platformPrefix != "AndroidStudio") {
     alias("com.intellij.platform.ide.provisioner")
-    alias("com.intellij.modules.jcef")
   }
 
   include(CommunityProductFragments.javaIdeBaseFragment())
   deprecatedInclude("intellij.idea.community.customization", "META-INF/tips-intellij-idea-community.xml")
-
-  moduleSet(CommunityModuleSets.debuggerStreams())
 
   module("intellij.platform.coverage")
   module("intellij.platform.coverage.agent")
@@ -224,12 +219,4 @@ fun intellijCommunityBaseFragment(platformPrefix: String? = null): ProductModule
   moduleSet(CommunityModuleSets.rdCommon())
 
   deprecatedInclude("intellij.idea.community.customization", "META-INF/community-customization.xml")
-}
-
-/**
- * Community extensions fragment for Ultimate builds.
- * This fragment is composable - subclasses can choose to include or exclude it.
- */
-fun communityExtensionsFragment(): ProductModulesContentSpec = productModules {
-  deprecatedInclude("intellij.platform.extended.community.impl", "META-INF/community-extensions.xml", ultimateOnly = true)
 }

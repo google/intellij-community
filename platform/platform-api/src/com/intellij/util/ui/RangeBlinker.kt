@@ -22,17 +22,22 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
 import org.jetbrains.annotations.ApiStatus.Internal
+import kotlin.time.Duration.Companion.milliseconds
 
 @Service(Service.Level.APP)
 private class RangeBlinkerService(val coroutineScope: CoroutineScope)
 
+/**
+ * Makes it possible to blink [Segment]-s of the editor, to show a diff for instance.
+ * If [parentDisposable] is `null`, please make sure that this [Disposable] is registered.
+ */
 @Internal
 class RangeBlinker(
   private val editor: Editor,
   private val attributes: TextAttributes,
   private var timeToLive: Int,
   parentDisposable: Disposable?,
-) {
+): Disposable {
   private val lifetime = timeToLive
   private val markers = ArrayList<Segment>()
   private var show = true
@@ -44,8 +49,13 @@ class RangeBlinker(
 
   init {
     if (parentDisposable != null) {
-      Disposer.register(parentDisposable) { scope.cancel() }
+      Disposer.register(parentDisposable, this)
     }
+  }
+
+  override fun dispose() {
+    stopBlinking()
+    scope.cancel()
   }
 
   fun resetMarkers(markers: List<Segment>, resetTime: Boolean = false) {
@@ -72,6 +82,7 @@ class RangeBlinker(
   private fun doBlinkTick() {
     val project = editor.project
     if (ApplicationManager.getApplication().isDisposed || editor.isDisposed || project != null && project.isDisposed) {
+      stopBlinking()
       return
     }
 
@@ -108,8 +119,8 @@ class RangeBlinker(
       blinkingJob = scope.launch {
         doBlinkTick()
         triggerFlow
-          .debounce(400)
-          .sample(400)
+          .debounce(400.milliseconds)
+          .sample(400.milliseconds)
           .collect { doBlinkTick() }
       }
     }

@@ -69,6 +69,12 @@ interface XBreakpointProxy : Comparable<XBreakpointProxy> {
   fun setConditionEnabled(enabled: Boolean)
   fun setConditionExpression(condition: XExpression?)
 
+  /**
+   * Returns true if this breakpoint has an additional custom condition.
+   * See [com.intellij.xdebugger.breakpoints.XBreakpointType.hasCustomCondition].
+   */
+  fun hasCustomCondition(): Boolean
+
 
   @NlsSafe
   fun getGeneralDescription(): String

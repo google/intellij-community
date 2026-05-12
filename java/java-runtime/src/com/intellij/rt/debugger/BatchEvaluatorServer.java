@@ -28,7 +28,7 @@ public final class BatchEvaluatorServer {
         }
       }
       catch (Throwable e) {
-        res = e.getClass().getName();
+        res = e.toString();
         error = true;
       }
 

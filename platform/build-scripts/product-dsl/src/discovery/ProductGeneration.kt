@@ -11,6 +11,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import org.jetbrains.intellij.build.ModuleOutputProvider
 import org.jetbrains.intellij.build.productLayout.ProductModulesContentSpec
+import org.jetbrains.intellij.build.productLayout.debug
 import org.jetbrains.intellij.build.productLayout.generateProductXml
 import org.jetbrains.intellij.build.productLayout.model.error.FileDiff
 import org.jetbrains.intellij.build.productLayout.model.error.ValidationError
@@ -91,16 +92,6 @@ data class ModuleSetGenerationConfig(
   @JvmField val pluginAllowedMissingDependencies: Map<ContentModuleName, Set<ContentModuleName>> = emptyMap(),
 
   /**
-   * Filter to control which library modules should replace library references in .iml files.
-   * When a library is exported by a library module (e.g., Guava exported by intellij.libraries.guava),
-   * this filter determines whether the library reference should be replaced with a module reference.
-   *
-   * The filter receives the library module name (e.g., "intellij.libraries.guava").
-   * @return true if the library should be replaced with a module dependency, false to keep the library reference
-   */
-  @JvmField val libraryModuleFilter: (libraryModuleName: String) -> Boolean = { true },
-
-  /**
    * Map from project library name to the library module that exports it.
    * Built from JPS library modules (e.g., intellij.libraries.*) and used to map project
    * library dependencies to module targets.
@@ -169,9 +160,6 @@ internal suspend fun generateAllProductXmlFiles(
 
   val allProducts = discoveredProducts + testProducts
 
-  // Detect if this is an Ultimate build by checking if community directory is a subdirectory
-  val isUltimateBuild = Files.exists(projectRoot.resolve("community"))
-
   val productResults = coroutineScope {
     allProducts.map { discovered ->
       async {
@@ -181,10 +169,12 @@ internal suspend fun generateAllProductXmlFiles(
 
         val pluginXmlPath = projectRoot.resolve(pluginXmlRelativePath)
 
-        // Extract ProductProperties class name (works with both ProductProperties and null)
+        // Extract ProductProperties class name for the source comment.
+        // Use the declaring class of `getProductContentDescriptor` method.
         val productPropertiesClass = when (val props = discovered.properties) {
           null -> "test-product"
-          else -> props.javaClass.name
+          else -> (props.javaClass.methods.firstOrNull { it.name == "getProductContentDescriptor" }?.declaringClass
+                   ?: props.javaClass).name
         }
 
         generateProductXml(
@@ -194,7 +184,6 @@ internal suspend fun generateAllProductXmlFiles(
           outputProvider = outputProvider,
           productPropertiesClass = productPropertiesClass,
           projectRoot = projectRoot,
-          isUltimateBuild = isUltimateBuild,
           strategy = strategy,
         )
       }
@@ -233,5 +222,10 @@ suspend fun generateAllModuleSetsWithProducts(
   commitChanges: Boolean = true,
   updateSuppressions: Boolean = false,
 ): GenerationResult {
+  val validationFilterValue = config.validationFilter?.sorted()?.joinToString(separator = ",") ?: "<all>"
+  debug("missingDeps") {
+    "generateAllModuleSetsWithProducts outputProvider=${config.outputProvider::class.java.name} " +
+    "commitChanges=$commitChanges updateSuppressions=$updateSuppressions validationFilter=$validationFilterValue"
+  }
   return GenerationPipeline.default().execute(config = config, commitChanges = commitChanges, updateSuppressions = updateSuppressions, validationFilter = config.validationFilter)
 }

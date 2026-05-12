@@ -170,34 +170,6 @@ f:com.intellij.execution.process.ProcessWaitFor
 - setTerminationCallback(com.intellij.util.Consumer):V
 - waitFor():V
 - waitFor(J,java.util.concurrent.TimeUnit):Z
-f:com.intellij.execution.process.UnixProcessManager
-- sf:SIGABRT:I
-- sf:SIGALRM:I
-- sf:SIGHUP:I
-- sf:SIGINT:I
-- sf:SIGKILL:I
-- sf:SIGQUIT:I
-- sf:SIGTERM:I
-- s:getCurrentProcessId():I
-- s:getPSCmd(Z):java.lang.String[]
-- s:getPSCmd(Z,Z):java.lang.String[]
-- s:getPortableSignalNumber(java.lang.String):I
-- s:getProcessId(java.lang.Process):I
-- s:getSignalNumber(java.lang.String):I
-- s:processCommandOutput(java.lang.String[],com.intellij.util.Processor,Z,Z):V
-- s:processPSOutput(java.lang.String[],com.intellij.util.Processor):V
-- s:sendSigIntToProcessTree(java.lang.Process):Z
-- s:sendSigKillToProcessTree(java.lang.Process):Z
-- s:sendSignal(I,I):I
-- s:sendSignal(I,java.lang.String):I
-- s:sendSignalToProcessTree(I,I):Z
-- s:sendSignalToProcessTree(I,I,I):Z
-- s:sendSignalToProcessTree(java.lang.Process,I):Z
-f:com.intellij.execution.process.WinProcessManager
-- s:getCurrentProcessId():I
-- s:getProcessId(java.lang.Process):I
-- s:kill(I,Z):Z
-- s:kill(java.lang.Process,Z):Z
 f:com.intellij.jna.JnaLoader
 - <init>():V
 - s:isLoaded():Z
@@ -508,7 +480,6 @@ f:com.intellij.openapi.util.JDOMExternalizer
 - s:readMap(org.jdom.Element,java.util.Map,java.lang.String,java.lang.String):V
 - s:readString(org.jdom.Element,java.lang.String):java.lang.String
 - s:saveStringsList(org.jdom.Element,java.lang.String,java.lang.String,java.lang.String[]):V
-- s:write(org.jdom.Element,java.lang.String,I):V
 - s:write(org.jdom.Element,java.lang.String,java.lang.String):V
 - s:write(org.jdom.Element,java.lang.String,Z):V
 - s:writeMap(org.jdom.Element,java.util.Map,java.lang.String,java.lang.String):V
@@ -797,7 +768,6 @@ f:com.intellij.openapi.util.SystemInfo
 - s:getWinBuildNumber():java.lang.Long
 - s:hasXdgMime():Z
 - s:hasXdgOpen():Z
-- s:isJavaVersionAtLeast(java.lang.String):Z
 - s:isOsVersionAtLeast(java.lang.String):Z
 f:com.intellij.openapi.util.TimeoutCachedValue
 - java.util.function.Supplier
@@ -933,7 +903,6 @@ f:com.intellij.openapi.util.io.FileAttributes
 - isSymLink():Z
 - isWritable():Z
 - withCaseSensitivity(com.intellij.openapi.util.io.FileAttributes$CaseSensitivity):com.intellij.openapi.util.io.FileAttributes
-- withTimeStamp(J):com.intellij.openapi.util.io.FileAttributes
 e:com.intellij.openapi.util.io.FileAttributes$CaseSensitivity
 - java.lang.Enum
 - sf:INSENSITIVE:com.intellij.openapi.util.io.FileAttributes$CaseSensitivity
@@ -971,7 +940,6 @@ Fc:com.intellij.openapi.util.io.FileUtil
 - s:asyncDelete(java.io.File):java.util.concurrent.Future
 - s:asyncDelete(java.util.Collection):java.util.concurrent.Future
 - s:canExecute(java.io.File):Z
-- s:canWrite(java.lang.String):Z
 - s:collectMatchedFiles(java.io.File,java.util.regex.Pattern,java.util.List):V
 - s:compareFiles(java.io.File,java.io.File):I
 - s:comparePaths(java.lang.String,java.lang.String):I
@@ -1066,7 +1034,6 @@ Fc:com.intellij.openapi.util.io.FileUtil
 - s:loadFileText(java.io.File):C[]
 - s:loadFileText(java.io.File,java.lang.String):C[]
 - s:loadFileText(java.io.File,java.nio.charset.Charset):C[]
-- s:loadFirstAndClose(java.io.InputStream,I):B[]
 - s:loadLines(java.io.BufferedReader):java.util.List
 - s:loadLines(java.io.File):java.util.List
 - s:loadLines(java.io.File,java.lang.String):java.util.List
@@ -1140,39 +1107,6 @@ f:com.intellij.openapi.util.io.StreamUtil
 - s:readText(java.io.Reader):java.lang.String
 - s:readTextAndConvertSeparators(java.io.Reader):C[]
 - s:readTextFrom(java.io.Reader):java.lang.String
-f:com.intellij.openapi.util.registry.Registry
-- sf:Companion:com.intellij.openapi.util.registry.Registry$Companion
-- sf:REGISTRY_BUNDLE:java.lang.String
-- <init>():V
-- sf:doubleValue(java.lang.String):D
-- sf:doubleValue(java.lang.String,D):D
-- sf:get(java.lang.String):com.intellij.openapi.util.registry.RegistryValue
-- f:getBundleValueOrNull(java.lang.String):java.lang.String
-- sf:getColor(java.lang.String,java.awt.Color):java.awt.Color
-- sf:getInstance():com.intellij.openapi.util.registry.Registry
-- f:getValueChangeListener():com.intellij.openapi.util.registry.RegistryValueListener
-- sf:intValue(java.lang.String):I
-- sf:intValue(java.lang.String,I):I
-- sf:intValue(java.lang.String,I,I,I):I
-- sf:is(java.lang.String):Z
-- sf:is(java.lang.String,Z):Z
-- f:isInDefaultState():Z
-- f:isLoaded():Z
-- f:isRestartNeeded():Z
-- f:reset():V
-- sf:stringValue(java.lang.String):java.lang.String
-f:com.intellij.openapi.util.registry.Registry$Companion
-- f:doubleValue(java.lang.String):D
-- f:doubleValue(java.lang.String,D):D
-- f:get(java.lang.String):com.intellij.openapi.util.registry.RegistryValue
-- f:getColor(java.lang.String,java.awt.Color):java.awt.Color
-- f:getInstance():com.intellij.openapi.util.registry.Registry
-- f:intValue(java.lang.String):I
-- f:intValue(java.lang.String,I):I
-- f:intValue(java.lang.String,I,I,I):I
-- f:is(java.lang.String):Z
-- f:is(java.lang.String,Z):Z
-- f:stringValue(java.lang.String):java.lang.String
 c:com.intellij.openapi.util.registry.RegistryValue
 - f:addListener(com.intellij.openapi.util.registry.RegistryValueListener,com.intellij.openapi.Disposable):V
 - f:addListener(com.intellij.openapi.util.registry.RegistryValueListener,kotlinx.coroutines.CoroutineScope):V
@@ -1500,7 +1434,6 @@ Fc:com.intellij.openapi.util.text.StringUtil
 - s:replace(java.lang.String,java.lang.String,java.lang.String):java.lang.String
 - s:replace(java.lang.String,java.lang.String,java.lang.String,Z):java.lang.String
 - s:replace(java.lang.String,java.util.List,java.util.List):java.lang.String
-- s:replaceChar(java.lang.String,C,C):java.lang.String
 - s:replaceIgnoreCase(java.lang.String,java.lang.String,java.lang.String):java.lang.String
 - s:replaceSubSequence(java.lang.CharSequence,I,I,java.lang.CharSequence):com.intellij.util.text.MergingCharSequence
 - s:replaceSubstring(java.lang.String,com.intellij.openapi.util.TextRange,java.lang.String):java.lang.String
@@ -3964,7 +3897,6 @@ e:com.intellij.util.io.Decompressor$EscapingSymlinkPolicy
 - s:values():com.intellij.util.io.Decompressor$EscapingSymlinkPolicy[]
 f:com.intellij.util.io.Decompressor$Tar
 - com.intellij.util.io.Decompressor
-- <init>(java.io.File):V
 - <init>(java.io.InputStream):V
 - <init>(java.nio.file.Path):V
 f:com.intellij.util.io.Decompressor$Zip

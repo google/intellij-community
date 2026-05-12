@@ -37,6 +37,7 @@ import com.intellij.openapi.util.Weighted;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiFile;
 import com.intellij.ui.border.NamedBorder;
+import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.panels.HorizontalLayout;
 import com.intellij.ui.components.panels.NonOpaquePanel;
 import com.intellij.ui.components.panels.Wrapper;
@@ -87,12 +88,19 @@ import static com.intellij.ui.border.NamedBorderKt.withName;
 public class EditorNotificationPanel extends JPanel implements IntentionActionProvider, Weighted {
 
   private static final Supplier<EditorColorsScheme> GLOBAL_SCHEME_SUPPLIER = () -> EditorColorsManager.getInstance().getGlobalScheme();
-  private static final Consumer<Class<?>> VOID_CONSUMER = __ -> {
+  private static final Consumer<Class<?>> VOID_CONSUMER = _ -> {
   };
   private static final String BORDER_WITHOUT_STATUS = "borderWithoutStatus";
   private static final String BORDER_WITH_STATUS = "borderWithStatus";
 
-  protected final JLabel myLabel = new JLabel();
+  protected final JBLabel myTextLabel = new JBLabel();
+
+  /**
+   * @deprecated use {@link #myTextLabel} instead
+   */
+  @Deprecated(forRemoval = true)
+  protected final JLabel myLabel = myTextLabel;
+
   protected final JLabel myGearLabel = new JLabel();
   protected final JPanel myLinksPanel = new NonOpaquePanel(new HorizontalLayout(16));
 
@@ -169,7 +177,7 @@ public class EditorNotificationPanel extends JPanel implements IntentionActionPr
     putClientProperty(FileEditorManager.SEPARATOR_COLOR, JBUI.CurrentTheme.Editor.BORDER_COLOR);
 
     JPanel panel = new NonOpaquePanel(new BorderLayout());
-    panel.add(BorderLayout.CENTER, myLabel);
+    panel.add(BorderLayout.CENTER, myTextLabel);
     panel.add(BorderLayout.EAST, myLinksPanel);
     panel.setMinimumSize(new Dimension(0, 0));
 
@@ -186,7 +194,8 @@ public class EditorNotificationPanel extends JPanel implements IntentionActionPr
     setBorder(borderWithoutStatus());
     setOpaque(true);
 
-    myLabel.setForeground(mySchemeSupplier.get().getDefaultForeground());
+    myTextLabel.setForeground(mySchemeSupplier.get().getDefaultForeground());
+    myTextLabel.setCopyable(true);
     putClientProperty(DslComponentProperty.VISUAL_PADDINGS, UnscaledGaps.EMPTY);
   }
 
@@ -216,11 +225,11 @@ public class EditorNotificationPanel extends JPanel implements IntentionActionPr
     }
 
     var icon = status.getIcon();
-    myLabel.setIconTextGap(JBUI.scale(8));
-    myLabel.setIcon(new Icon() {
+    myTextLabel.setIconTextGap(JBUI.scale(8));
+    myTextLabel.setIcon(new Icon() {
       @Override
       public void paintIcon(Component component, Graphics graphics, int x, int y) {
-        if (!StringUtil.isEmpty(myLabel.getText())) {
+        if (!StringUtil.isEmpty(myTextLabel.getText())) {
           icon.paintIcon(component, graphics, x, y);
         }
       }
@@ -235,8 +244,8 @@ public class EditorNotificationPanel extends JPanel implements IntentionActionPr
         return icon.getIconHeight();
       }
     });
-    myLabel.setForeground(JBUI.CurrentTheme.Banner.FOREGROUND);
-    myLabel.setBorder(JBUI.Borders.emptyRight(20));
+    myTextLabel.setForeground(JBUI.CurrentTheme.Banner.FOREGROUND);
+    myTextLabel.setBorder(JBUI.Borders.emptyRight(20));
 
     setBorder(borderWithStatus());
 
@@ -355,7 +364,7 @@ public class EditorNotificationPanel extends JPanel implements IntentionActionPr
   }
 
   public void setText(@NotNull @Label String text) {
-    myLabel.setText(text);
+    myTextLabel.setText(text);
   }
   
   public @Nullable HyperlinkLabel findLabelByName(@NotNull @Label String text) {
@@ -370,21 +379,21 @@ public class EditorNotificationPanel extends JPanel implements IntentionActionPr
   }
 
   public EditorNotificationPanel text(@NotNull @Label String text) {
-    myLabel.setText(text);
+    myTextLabel.setText(text);
     return this;
   }
 
   public @NotNull @Label String getText() {
-    return myLabel.getText();
+    return myTextLabel.getText();
   }
 
   public EditorNotificationPanel icon(@NotNull Icon icon) {
-    myLabel.setIcon(icon);
+    myTextLabel.setIcon(icon);
     return this;
   }
 
   public EditorNotificationPanel noIcon() {
-    myLabel.setIcon(null);
+    myTextLabel.setIcon(null);
     return this;
   }
 
@@ -472,7 +481,7 @@ public class EditorNotificationPanel extends JPanel implements IntentionActionPr
   }
 
   public void clear() {
-    myLabel.setText("");
+    myTextLabel.setText("");
     myLinksPanel.removeAll();
   }
 
@@ -653,7 +662,7 @@ public class EditorNotificationPanel extends JPanel implements IntentionActionPr
       if (!myOptions.isEmpty()) {
         return myOptions.get(0).getText();
       }
-      String text = myLabel.getText();
+      String text = myTextLabel.getText();
       return StringUtil.isEmpty(text) ? EditorBundle.message("editor.notification.default.action.name")
                                       : StringUtil.shortenTextWithEllipsis(text, 50, 0);
     }

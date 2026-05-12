@@ -19,6 +19,7 @@ jvm_library(
 
 jvm_library(
   name = "starter_test_lib",
+  testonly = True,
   module_name = "intellij.platform.starter",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -33,3 +34,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.starter` end
+
+### auto-generated section `iml intellij.platform.starter` start
+exports_files([
+  "intellij.platform.starter.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.starter` end

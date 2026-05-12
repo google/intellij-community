@@ -306,7 +306,7 @@ final class RecentLocationsRenderer extends EditorTextFieldCellRenderer.SimpleWi
         }
       })
       .expireWith(this)
-      .finishOnUiThread(ModalityState.stateForComponent(this), __ -> {
+      .finishOnUiThread(ModalityState.stateForComponent(this), _ -> {
         component.repaint();
       })
       .submit(AppExecutorUtil.getAppExecutorService());

@@ -3,7 +3,6 @@ package com.intellij.platform.ide.newUiOnboarding.steps
 
 import com.intellij.execution.RunManager
 import com.intellij.execution.ui.RedesignedRunConfigurationSelector
-import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.actionSystem.impl.ActionButtonWithText
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.UiComponentsSearchUtil
@@ -46,9 +45,7 @@ open class RunWidgetStep : NewUiOnboardingStep {
     val anyRunConfigAvailable = RunManager.getInstance(project).allConfigurationsList.isNotEmpty()
     val ideHelpLink = NewUiOnboardingUtil.getHelpLink(ideHelpTopic)
     val builder = GotItComponentBuilder {
-      val linkText = link(NewUiOnboardingBundle.message("run.widget.step.link")) {
-        BrowserUtil.browse(URL(ideHelpLink))
-      }
+      val linkText = browserLink(NewUiOnboardingBundle.message("run.widget.step.link"), URL(ideHelpLink))
       if (anyRunConfigAvailable) {
         NewUiOnboardingBundle.message("run.widget.step.text.config.exist", linkText)
       }

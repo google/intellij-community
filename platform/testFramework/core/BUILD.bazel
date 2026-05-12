@@ -1,11 +1,5 @@
 ### auto-generated section `build intellij.platform.testFramework.core` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_provided_library", "resourcegroup")
-
-resourcegroup(
-  name = "core_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_provided_library")
 
 jvm_provided_library(
   name = "libraries_junit4_provided",
@@ -17,10 +11,14 @@ jvm_library(
   module_name = "intellij.platform.testFramework.core",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":core_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/util",
+    "//platform/bazel-runfiles",
     "//platform/util-class-loader:util-classLoader",
+    "//platform/util/base/multiplatform",
+    "//platform/util/base",
     "//platform/boot",
     "//platform/testFramework/bootstrap:tools-testsBootstrap",
     "@lib//:opentest4j",
@@ -34,19 +32,24 @@ jvm_library(
     "//libraries/http-client",
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
     "//platform/testFramework/teamCity",
+    "//.ownership/runtime-resolver:codeowners-runtime-resolver",
     ":libraries_junit4_provided",
   ]
 )
 
 jvm_library(
   name = "core_test_lib",
+  testonly = True,
   module_name = "intellij.platform.testFramework.core",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
     ":core",
     "//platform/util:util_test_lib",
+    "//platform/bazel-runfiles:bazel-runfiles_test_lib",
     "//platform/util-class-loader:util-classLoader_test_lib",
+    "//platform/util/base/multiplatform:multiplatform_test_lib",
+    "//platform/util/base:base_test_lib",
     "//platform/boot:boot_test_lib",
     "//platform/testFramework/bootstrap:tools-testsBootstrap_test_lib",
     "//libraries/junit4",
@@ -60,6 +63,13 @@ jvm_library(
     "//libraries/http-client:http-client_test_lib",
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
     "//platform/testFramework/teamCity:teamCity_test_lib",
+    "//.ownership/runtime-resolver:codeowners-runtime-resolver_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.testFramework.core` end
+
+### auto-generated section `iml intellij.platform.testFramework.core` start
+exports_files([
+  "intellij.platform.testFramework.core.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.testFramework.core` end

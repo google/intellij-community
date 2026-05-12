@@ -1,9 +1,10 @@
 package com.intellij.database.run.ui.grid.editors;
 
 import com.intellij.database.datagrid.CoreGrid;
+import com.intellij.database.datagrid.GridCellRequest;
+import com.intellij.database.datagrid.GridCellRequestKt;
 import com.intellij.database.datagrid.GridColumn;
 import com.intellij.database.datagrid.GridDataHookUp;
-import com.intellij.database.datagrid.GridModel;
 import com.intellij.database.datagrid.GridRow;
 import com.intellij.database.datagrid.ModelIndex;
 import com.intellij.database.extractors.FormatterCreator;
@@ -79,7 +80,7 @@ public class GridCellEditorHelperImpl implements GridCellEditorHelper {
   }
 
   protected @Nullable Formatter getDateFormat(@NotNull CoreGrid<GridRow, GridColumn> grid, @NotNull ModelIndex<GridColumn> columnIdx) {
-    int jdbcType = guessJdbcTypeForEditing(grid, null, columnIdx);
+    int jdbcType = guessJdbcTypeForEditing(GridCellRequestKt.requestColumn(grid, columnIdx));
     FormatterCreator creator = FormatterCreator.get(grid);
     FormatsCache cache = FormatsCache.get(grid);
     GridColumn column = grid.getDataModel(DataAccessType.DATA_WITH_MUTATIONS).getColumn(columnIdx);
@@ -89,12 +90,9 @@ public class GridCellEditorHelperImpl implements GridCellEditorHelper {
   }
 
   @Override
-  public int guessJdbcTypeForEditing(@NotNull CoreGrid<GridRow, GridColumn> grid,
-                                     @Nullable ModelIndex<GridRow> row,
-                                     @NotNull ModelIndex<GridColumn> column) {
-    if (row != null && !row.isValid(grid) || !column.isValid(grid)) return Types.OTHER;
-    GridModel<GridRow, GridColumn> model = grid.getDataModel(DataAccessType.DATA_WITH_MUTATIONS);
-    GridColumn c = model.getColumn(column);
+  public int guessJdbcTypeForEditing(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    if (!request.isValid()) return Types.OTHER;
+    GridColumn c = request.getColumn();
     return c == null ? Types.OTHER : c.getType();
   }
 

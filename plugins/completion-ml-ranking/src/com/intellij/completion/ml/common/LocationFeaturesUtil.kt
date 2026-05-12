@@ -1,7 +1,7 @@
 // Copyright 2000-2022 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.completion.ml.common
 
-import com.intellij.codeInsight.completion.CompletionParameters
+import com.intellij.codeInsight.completion.BaseCompletionParameters
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.psi.PsiElement
@@ -35,7 +35,7 @@ object LocationFeaturesUtil {
     return indentLevel
   }
 
-  fun linesDiff(completionParameters: CompletionParameters, completionElement: PsiElement?): Int? {
+  fun linesDiff(completionParameters: BaseCompletionParameters, completionElement: PsiElement?): Int? {
     if (completionElement == null) {
       return null
     }
@@ -56,8 +56,9 @@ object LocationFeaturesUtil {
       if (elementOffset == null || elementOffset < 0) {
         return null
       }
-      val completionLine = completionParameters.editor.caretModel.primaryCaret.logicalPosition.line
-      val elementLine = completionParameters.editor.document.getLineNumber(elementOffset)
+      val document = completionParameters.originalFile.fileDocument
+      val completionLine = document.getLineNumber(completionParameters.offset)
+      val elementLine = document.getLineNumber(elementOffset)
       return completionLine - elementLine
     } catch (e: ProcessCanceledException) {
       throw e

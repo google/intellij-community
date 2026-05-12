@@ -72,7 +72,7 @@ abstract class CoverageIntegrationBaseTest : JavaModuleTestCase() {
   protected suspend fun awaitGutterAnnotations(): Any? = CoverageDataAnnotationsManager.getInstance(myProject).allRequestsCompletion.await()
 
   private fun createCoverageFileProvider(coverageDataPath: String) =
-    DefaultCoverageFileProvider(File(coverageDataPath))
+    DefaultCoverageFileProvider(Path.of(coverageDataPath))
 
   private fun loadCoverageSuite(
     coverageEngineClass: Class<out CoverageEngine>, coverageRunnerClass: Class<out CoverageRunner>,

@@ -31,7 +31,6 @@ import org.jetbrains.idea.maven.utils.MavenUtil;
 
 import java.nio.file.Path;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,7 +70,7 @@ public final class MavenShortcutsManager implements Disposable {
     MyProjectsTreeListener listener = new MyProjectsTreeListener();
     MavenProjectsManager mavenProjectManager = MavenProjectsManager.getInstance(project);
     mavenProjectManager.addManagerListener(listener, this);
-    mavenProjectManager.addProjectsTreeListener(listener, this);
+    project.getMessageBus().connect(this).subscribe(MavenProjectsTree.Listener.TOPIC, listener);
 
     MessageBusConnection busConnection = ApplicationManager.getApplication().getMessageBus().connect(this);
     busConnection.subscribe(KeymapManagerListener.TOPIC, new KeymapManagerListener() {
@@ -172,13 +171,13 @@ public final class MavenShortcutsManager implements Disposable {
     }
 
     @Override
-    public void projectResolved(@NotNull Pair<MavenProject, MavenProjectChanges> projectWithChanges) {
-      scheduleKeymapUpdate(Collections.singletonList(projectWithChanges.first), true);
+    public void projectsResolved(@NotNull List<MavenProject> projects) {
+      scheduleKeymapUpdate(projects, true);
     }
 
     @Override
-    public void pluginsResolved(@NotNull MavenProject project) {
-      scheduleKeymapUpdate(Collections.singletonList(project), true);
+    public void pluginsResolved(@NotNull List<MavenProject> projects) {
+      scheduleKeymapUpdate(projects, true);
     }
 
     private void scheduleKeymapUpdate(List<MavenProject> mavenProjects, boolean forUpdate) {

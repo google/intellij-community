@@ -1,10 +1,10 @@
 package com.intellij.database.run.ui.grid.editors;
 
 import com.intellij.database.datagrid.DataGrid;
+import com.intellij.database.datagrid.GridCellRequest;
 import com.intellij.database.datagrid.GridColumn;
 import com.intellij.database.datagrid.GridRow;
 import com.intellij.database.datagrid.GridUtil;
-import com.intellij.database.datagrid.ModelIndex;
 import com.intellij.database.extractors.BinaryDisplayType;
 import com.intellij.database.extractors.TextInfo;
 import com.intellij.database.run.actions.ChangeCellEditorFileEncodingAction;
@@ -28,33 +28,28 @@ import static com.intellij.database.extractors.DatabaseObjectFormatterConfig.isT
 
 public class DefaultBlobEditorFactory implements GridCellEditorFactory {
   @Override
-  public int getSuitability(@NotNull DataGrid grid, @NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
-    return switch (GridCellEditorHelper.get(grid).guessJdbcTypeForEditing(grid, row, column)) {
+  public int getSuitability(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    return switch (GridCellEditorHelper.get(request.getGrid()).guessJdbcTypeForEditing(request)) {
       case Types.BINARY, Types.BLOB, Types.LONGVARBINARY, Types.VARBINARY -> SUITABILITY_MIN;
       default -> SUITABILITY_UNSUITABLE;
     };
   }
 
   @Override
-  public @NotNull ValueFormatter getValueFormatter(@NotNull DataGrid grid,
-                                                   @NotNull ModelIndex<GridRow> rowIdx,
-                                                   @NotNull ModelIndex<GridColumn> columnIdx,
-                                                   @Nullable Object value) {
-    return new DefaultValueToText(grid, columnIdx, value);
+  public @NotNull ValueFormatter getValueFormatter(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    return new DefaultValueToText((DataGrid)request.getGrid(), request.getColumnIdx(), request.getValue());
   }
 
   @Override
   public @NotNull IsEditableChecker getIsEditableChecker() {
     return (value, grid, column) -> {
       TextInfo textInfo = ObjectUtils.tryCast(value, TextInfo.class);
-      return value == null || textInfo != null && isTypeAllowed(createFormatterConfig(grid, column), BinaryDisplayType.TEXT);
+      return value == null || textInfo != null && isTypeAllowed(createFormatterConfig((DataGrid)grid, column), BinaryDisplayType.TEXT);
     };
   }
 
   @Override
-  public @NotNull ValueParser getValueParser(@NotNull DataGrid grid,
-                                             @NotNull ModelIndex<GridRow> rowIdx,
-                                             @NotNull ModelIndex<GridColumn> columnIdx) {
+  public @NotNull ValueParser getValueParser(@NotNull GridCellRequest<GridRow, GridColumn> request) {
     return (text, document) -> {
       VirtualFile file = document == null ? null : FileDocumentManager.getInstance().getFile(document);
       Charset charset = file == null ? StandardCharsets.UTF_8 : file.getCharset();
@@ -65,26 +60,20 @@ public class DefaultBlobEditorFactory implements GridCellEditorFactory {
   }
 
   @Override
-  public @NotNull GridCellEditor createEditor(@NotNull DataGrid grid,
-                                              @NotNull ModelIndex<GridRow> row,
-                                              @NotNull ModelIndex<GridColumn> column,
-                                              @Nullable Object object,
+  public @NotNull GridCellEditor createEditor(@NotNull GridCellRequest<GridRow, GridColumn> request,
                                               EventObject initiator) {
-    return new BlobTextCellEditor(grid, row, column, object, initiator, getIsEditableChecker(), getValueParser(grid, row, column), getValueFormatter(grid, row, column, object));
+    return new BlobTextCellEditor(request, initiator, getIsEditableChecker(), getValueParser(request), getValueFormatter(request));
   }
 
   private static class BlobTextCellEditor extends GridTextCellEditorBase implements LoadFileAction.LoadFileActionHandler {
     private final ValueParser myValueParser;
 
-    BlobTextCellEditor(@NotNull DataGrid grid,
-                       @NotNull ModelIndex<GridRow> row,
-                       @NotNull ModelIndex<GridColumn> column,
-                       @Nullable Object value,
+    BlobTextCellEditor(@NotNull GridCellRequest<GridRow, GridColumn> request,
                        EventObject initiator,
                        @NotNull IsEditableChecker editableChecker,
                        @NotNull ValueParser valueParser,
                        @NotNull ValueFormatter valueFormatter) {
-      super(grid, row, column, value, initiator, editableChecker, valueFormatter);
+      super(request, initiator, editableChecker, valueFormatter);
       myValueParser = valueParser;
     }
 
@@ -106,7 +95,7 @@ public class DefaultBlobEditorFactory implements GridCellEditorFactory {
     @Override
     public void fileChosen(@NotNull VirtualFile file) {
       myValue = GridUtil.blobFromFile(file);
-      myGrid.stopEditing();
+      getGrid().stopEditing();
     }
 
     private VirtualFile getVirtualFile() {

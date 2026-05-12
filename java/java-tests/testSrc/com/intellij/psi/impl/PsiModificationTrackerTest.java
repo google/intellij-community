@@ -39,9 +39,9 @@ import com.intellij.psi.util.PsiUtilCore;
 import com.intellij.testFramework.FixtureRuleKt;
 import com.intellij.testFramework.IdeaTestUtil;
 import com.intellij.testFramework.IndexingTestUtil;
-import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.PsiTestUtil;
 import com.intellij.testFramework.SkipSlowTestLocally;
+import com.intellij.testFramework.common.TestApplicationKt;
 import com.intellij.util.Processor;
 import com.intellij.util.containers.JBIterable;
 import com.intellij.util.io.PathKt;
@@ -223,7 +223,7 @@ public class PsiModificationTrackerTest extends JavaCodeInsightTestCase {
     assertNull(PsiDocumentManager.getInstance(getProject()).getCachedPsiFile(document));
 
     WriteCommandAction.runWriteCommandAction(getProject(), () -> document.insertString(0, "class Foo {}"));
-    PlatformTestUtil.waitForAllDocumentsCommitted(100, TimeUnit.SECONDS);
+    TestApplicationKt.waitForAllDocumentsCommitted(100, TimeUnit.SECONDS);
 
     assertFalse(count1 == getJavaTracker().getModificationCount());
     assertTrue(PsiDocumentManager.getInstance(getProject()).isCommitted(document));
@@ -247,7 +247,7 @@ public class PsiModificationTrackerTest extends JavaCodeInsightTestCase {
     assertFalse(count1 == count0);
 
     WriteCommandAction.runWriteCommandAction(getProject(), () -> document.deleteString(0, document.getTextLength()));
-    PlatformTestUtil.waitForAllDocumentsCommitted(100, TimeUnit.SECONDS);
+    TestApplicationKt.waitForAllDocumentsCommitted(100, TimeUnit.SECONDS);
     gcPsi(file);
 
     assertFalse(count1 == getJavaTracker().getModificationCount());

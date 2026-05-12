@@ -15,11 +15,6 @@ internal class MavenKotlinNewProjectWizardTest : MavenKotlinNewProjectWizardTest
         get() = "testData/mavenNewProjectWizard"
     override val testRoot: File? = TestMetadataUtil.getTestRoot(MavenKotlinNewProjectWizardTest::class.java)
 
-    override fun setUp() {
-        super.setUp()
-        overrideKotlinPluginVersion("2.3.10")
-    }
-
     @Test
-    fun testSimpleProjectKotlin_2_3_10() = runNewProjectTestCase()
+    fun testSimpleProjectKotlin() = runNewProjectTestCase()
 }

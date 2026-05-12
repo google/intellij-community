@@ -96,7 +96,7 @@ public final class PluginsAdvertiserDialog extends DialogWrapper {
       showAndGet();
     }
     else {
-      doInstallPlugins(__ -> true, modalityState != null ? modalityState : ModalityState.nonModal());
+      doInstallPlugins(_ -> true, modalityState != null ? modalityState : ModalityState.nonModal());
     }
   }
 

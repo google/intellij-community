@@ -2,7 +2,6 @@
 package org.jetbrains.plugins.github.pullrequest.comment.ui
 
 import com.intellij.collaboration.async.combineState
-import com.intellij.collaboration.async.combineStateIn
 import com.intellij.collaboration.async.launchNowIn
 import com.intellij.collaboration.async.stateInNow
 import com.intellij.collaboration.ui.html.AsyncHtmlImageLoader
@@ -20,6 +19,7 @@ import com.intellij.openapi.diff.impl.patch.PatchLine
 import com.intellij.openapi.diff.impl.patch.PatchReader
 import com.intellij.openapi.diff.impl.patch.TextFilePatch
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.NlsSafe
 import com.intellij.platform.ide.progress.withBackgroundProgress
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.platform.util.progress.indeterminateStep
@@ -30,16 +30,21 @@ import git4idea.repo.GitRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
 import org.jetbrains.plugins.github.api.GithubServerPath
 import org.jetbrains.plugins.github.i18n.GithubBundle
 import org.jetbrains.plugins.github.pullrequest.comment.GHMarkdownToHtmlConverter
 import org.jetbrains.plugins.github.pullrequest.comment.GHSuggestedChange
 import org.jetbrains.plugins.github.pullrequest.comment.GHSuggestedChangeApplier
+import org.jetbrains.plugins.github.pullrequest.comment.convertToHtml
 import org.jetbrains.plugins.github.pullrequest.data.GHPRDataContext
 import org.jetbrains.plugins.github.pullrequest.data.provider.GHPRDataProvider
 import org.jetbrains.plugins.github.pullrequest.data.provider.detailsComputationFlow
@@ -71,10 +76,9 @@ class GHPRReviewCommentBodyViewModel internal constructor(
 
   private val threadData = MutableStateFlow<ThreadData?>(null)
   private val canResolvedThread = MutableStateFlow(false)
-  val body: StateFlow<String>
+  private val body = MutableStateFlow("")
 
   init {
-    body = MutableStateFlow("")
     reviewData.threadsComputationFlow.mapNotNull { it.getOrNull() }.onEach { threads ->
       val thread = threads.find { it.id == threadId }
       threadData.value = thread?.let {
@@ -104,27 +108,31 @@ class GHPRReviewCommentBodyViewModel internal constructor(
     }.launchNowIn(cs)
   }
 
-  val blocks: StateFlow<List<GHPRCommentBodyBlock>> = combineStateIn(cs, threadData, body) { thread, body ->
-    if (thread == null) return@combineStateIn emptyList()
+  // is used for a resolved comment in a collapsed mode, in other cases blocks rendering should be used
+  val bodyHtml: StateFlow<@NlsSafe String> = body.map { it.convertToHtml(project, server) }
+    .flowOn(Dispatchers.Default).stateIn(cs, SharingStarted.Eagerly, "")
+
+  val blocks: StateFlow<List<GHPRCommentBodyBlock>> = combine(threadData, body) { thread, body ->
+    if (thread == null) return@combine emptyList()
     val markdownConverter = GHMarkdownToHtmlConverter(project)
     val suggestions = body.getSuggestions()
     if (suggestions.isEmpty()) {
-      val html = markdownConverter.convertMarkdown(body)
-      return@combineStateIn listOf(GHPRCommentBodyBlock.HTML(html))
+      val html = markdownConverter.convertMarkdown(body, server)
+      return@combine listOf(GHPRCommentBodyBlock.HTML(html))
     }
     else {
       val patchReader = PatchReader(PatchHunkUtil.createPatchFromHunk("_", thread.diffHunk))
       val hunk = patchReader.readTextPatches().firstOrNull()?.hunks?.firstOrNull() ?: run {
         LOG.warn("Empty diff hunk for thread $thread")
-        val html = markdownConverter.convertMarkdown(body)
-        return@combineStateIn listOf(GHPRCommentBodyBlock.HTML(html))
+        val html = markdownConverter.convertMarkdown(body, server)
+        return@combine listOf(GHPRCommentBodyBlock.HTML(html))
       }
       val code = hunk.lines
         .filter { it.type != PatchLine.Type.REMOVE }
         .takeLast(thread.codeLinesCount)
         .joinToString(separator = "\n") { it.text }
 
-      val htmlBody = markdownConverter.convertMarkdownWithSuggestedChange(body, thread.filePath, code)
+      val htmlBody = markdownConverter.convertMarkdownWithSuggestedChange(body, thread.filePath, code, server)
       val content = htmlBody.removePrefix("<body>").removeSuffix("</body>")
       val blocks = GHPRReviewCommentBodyComponentFactory.collectCommentBlocks(content)
       var suggestionIdx = 0
@@ -148,7 +156,7 @@ class GHPRReviewCommentBodyViewModel internal constructor(
         }
       }
     }
-  }
+  }.flowOn(Dispatchers.Default).stateIn(cs, SharingStarted.Eagerly, emptyList())
 
   private val loadedDetailsState = detailsData.detailsComputationFlow
     .filter { !it.isInProgress }.map { it.getOrNull() }

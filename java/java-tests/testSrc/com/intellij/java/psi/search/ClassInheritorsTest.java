@@ -61,7 +61,7 @@ public class ClassInheritorsTest extends JavaCodeInsightFixtureTestCase {
       StandardProgressIndicatorBase progress = new StandardProgressIndicatorBase();
       JobScheduler.getScheduler().schedule(progress::cancel, delayToCancel, TimeUnit.MILLISECONDS);
       try {
-        Collections.nCopies(Runtime.getRuntime().availableProcessors(), "").stream().parallel().forEach(__ -> {
+        Collections.nCopies(Runtime.getRuntime().availableProcessors(), "").stream().parallel().forEach(_ -> {
           Collection<PsiClass> inheritors = Collections.synchronizedSet(new HashSet<>());
           ProgressManager.getInstance().executeProcessUnderProgress(()-> {
             boolean success = ClassInheritorsSearch.search(class0).forEach(new CommonProcessors.CollectProcessor<>(inheritors));

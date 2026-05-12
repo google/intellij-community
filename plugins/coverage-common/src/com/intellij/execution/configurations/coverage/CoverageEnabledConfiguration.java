@@ -21,6 +21,8 @@ import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Date;
 
@@ -246,7 +248,12 @@ public abstract class CoverageEnabledConfiguration implements JDOMExternalizable
     }
 
     Path coverageRootPath = Path.of(PathManager.getSystemPath(), "coverage");
-    coverageRootPath.toFile().mkdirs();
+    try {
+      Files.createDirectories(coverageRootPath);
+    }
+    catch (IOException e) {
+      throw new RuntimeException(e);
+    }
 
     String projectName = FileUtil.sanitizeFileName(myConfiguration.getProject().getName());
     String configName = FileUtil.sanitizeFileName(myConfiguration.getName());

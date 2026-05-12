@@ -46,4 +46,13 @@ public class CastPostfixTemplateTest extends PostfixTemplateTestCase {
   public void testTernary() {
     doTest();
   }
+  
+  public void testCapturedWildcard() { doTest(); }
+
+  public static class ModCastPostfixTemplateTest extends CastPostfixTemplateTest {
+    @Override
+    protected boolean useModCommandTemplates() {
+      return true;
+    }
+  }
 }

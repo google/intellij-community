@@ -2,7 +2,7 @@
 
 import {ok} from 'node:assert/strict'
 import {describe, it} from 'bun:test'
-import {BLOCKED_TOOL_NAMES, getProxyToolNames, getReplacedToolNames, TOOL_MODES} from '../proxy-tools/registry'
+import {BLOCKED_TOOL_NAMES, getProxyToolNames, getReplacedToolNames} from '../proxy-tools/registry'
 import {buildUpstreamTool, debug, defaultUpstreamTools, SUITE_TIMEOUT_MS, withProxy} from '../test-utils'
 
 function assertContainsAll(names, expected) {
@@ -17,15 +17,9 @@ function assertExcludesAll(names, excluded) {
   }
 }
 
-function getOtherModeOnlyNames(mode) {
-  const otherMode = mode === TOOL_MODES.CC ? TOOL_MODES.CODEX : TOOL_MODES.CC
-  const current = getProxyToolNames(mode)
-  const other = getProxyToolNames(otherMode)
-  return new Set([...other].filter((name) => !current.has(name)))
-}
-
 describe('ij MCP proxy tool list', {timeout: SUITE_TIMEOUT_MS}, () => {
   const defaultHasSearchSymbol = defaultUpstreamTools.some((tool) => tool.name === 'search_symbol')
+  const readOnlyAnnotations = {readOnlyHint: true, openWorldHint: false}
   const upstreamToolsWithLegacySearch = [
     buildUpstreamTool('search_in_files_by_text', {project_path: {type: 'string'}}, ['project_path']),
     buildUpstreamTool('search_in_files_by_regex', {project_path: {type: 'string'}}, ['project_path']),
@@ -36,7 +30,28 @@ describe('ij MCP proxy tool list', {timeout: SUITE_TIMEOUT_MS}, () => {
     buildUpstreamTool('search_text', {query: {type: 'string'}, project_path: {type: 'string'}}, ['query', 'project_path'])
   ]
   const upstreamToolsWithReadFile = [
-    buildUpstreamTool('read_file', {path: {type: 'string'}}, ['path'])
+    buildUpstreamTool('read_file', {
+      file_path: {type: 'string'},
+      offset: {type: 'number'},
+      limit: {type: 'number'}
+    }, ['file_path'], readOnlyAnnotations)
+  ]
+  const upstreamToolsWithApplyPatch = [
+    buildUpstreamTool('apply_patch', {patch: {type: 'string'}}, ['patch'])
+  ]
+  const upstreamToolsWithLegacyLint = [
+    buildUpstreamTool('get_file_problems', {
+      filePath: {type: 'string'},
+      errorsOnly: {type: 'boolean'},
+      timeout: {type: 'number'}
+    }, ['filePath'])
+  ]
+  const upstreamToolsWithLintFiles = [
+    buildUpstreamTool('lint_files', {
+      file_paths: {type: 'array', items: {type: 'string'}},
+      min_severity: {type: 'string'},
+      timeout: {type: 'number'}
+    }, ['file_paths'])
   ]
 
   it('exposes proxy tools and hides replaced/blocked upstream tools', async () => {
@@ -46,12 +61,11 @@ describe('ij MCP proxy tool list', {timeout: SUITE_TIMEOUT_MS}, () => {
       debug('test: tools/list response received')
       const names = listResponse.result.tools.map((tool) => tool.name)
 
-      const expected = new Set(getProxyToolNames(TOOL_MODES.CODEX))
+      const expected = new Set(getProxyToolNames())
       if (!defaultHasSearchSymbol) {
         expected.delete('search_symbol')
       }
       assertContainsAll(names, expected)
-      assertExcludesAll(names, getOtherModeOnlyNames(TOOL_MODES.CODEX))
       assertExcludesAll(names, BLOCKED_TOOL_NAMES)
       assertExcludesAll(names, getReplacedToolNames())
       ok(!names.includes('grep_files'))
@@ -67,6 +81,20 @@ describe('ij MCP proxy tool list', {timeout: SUITE_TIMEOUT_MS}, () => {
       ok(names.includes('search_text'))
       ok(names.includes('search_regex'))
       ok(names.includes('search_file'))
+    })
+  })
+
+  it('exposes read-only annotations for proxy shims', async () => {
+    await withProxy({}, async ({proxyClient}) => {
+      const listResponse = await proxyClient.send('tools/list')
+      const expectedReadOnlyTools = ['read_file', 'search_text', 'search_regex', 'search_file', 'lint_files', 'list_dir']
+
+      for (const name of expectedReadOnlyTools) {
+        const tool = listResponse.result.tools.find((candidate) => candidate.name === name)
+        ok(tool)
+        ok(tool.annotations?.readOnlyHint === true, `Expected readOnlyHint for ${name}`)
+        ok(tool.annotations?.openWorldHint === false, `Expected openWorldHint for ${name}`)
+      }
     })
   })
 
@@ -95,8 +123,43 @@ describe('ij MCP proxy tool list', {timeout: SUITE_TIMEOUT_MS}, () => {
       const readTool = listResponse.result.tools.find((tool) => tool.name === 'read_file')
       ok(readTool)
       const properties = readTool.inputSchema?.properties ?? {}
-      ok('path' in properties)
-      ok(!('file_path' in properties))
+      ok('file_path' in properties)
+      ok('offset' in properties)
+      ok('limit' in properties)
+      ok(readTool.annotations?.readOnlyHint === true)
+      ok(readTool.annotations?.openWorldHint === false)
+    })
+  })
+
+  it('passes through upstream apply_patch schema when apply_patch is available', async () => {
+    await withProxy({tools: upstreamToolsWithApplyPatch}, async ({proxyClient}) => {
+      const listResponse = await proxyClient.send('tools/list')
+      const applyPatchTool = listResponse.result.tools.find((tool) => tool.name === 'apply_patch')
+      ok(applyPatchTool)
+      const properties = applyPatchTool.inputSchema?.properties ?? {}
+      ok('patch' in properties)
+      ok(!('input' in properties))
+    })
+  })
+
+  it('exposes lint_files and hides get_file_problems for legacy upstreams', async () => {
+    await withProxy({tools: upstreamToolsWithLegacyLint}, async ({proxyClient}) => {
+      const listResponse = await proxyClient.send('tools/list')
+      const names = listResponse.result.tools.map((tool) => tool.name)
+
+      ok(names.includes('lint_files'))
+      ok(!names.includes('get_file_problems'))
+    })
+  })
+
+  it('passes through upstream lint_files schema when lint_files is available', async () => {
+    await withProxy({tools: upstreamToolsWithLintFiles}, async ({proxyClient}) => {
+      const listResponse = await proxyClient.send('tools/list')
+      const lintTool = listResponse.result.tools.find((tool) => tool.name === 'lint_files')
+      ok(lintTool)
+      const properties = lintTool.inputSchema?.properties ?? {}
+      ok('file_paths' in properties)
+      ok(!('filePath' in properties))
     })
   })
 
@@ -106,28 +169,12 @@ describe('ij MCP proxy tool list', {timeout: SUITE_TIMEOUT_MS}, () => {
       const names = listResponse.result.tools.map((tool) => tool.name)
 
       ok(names.includes('read_file'))
+      ok(names.includes('list_dir'))
       ok(names.includes('apply_patch'))
     })
   })
 
-  it('uses cc tool list when tool mode is cc', async () => {
-    await withProxy({proxyEnv: {JETBRAINS_MCP_TOOL_MODE: 'cc'}}, async ({proxyClient}) => {
-      const listResponse = await proxyClient.send('tools/list')
-      const names = listResponse.result.tools.map((tool) => tool.name)
-
-      const expected = new Set(getProxyToolNames(TOOL_MODES.CC))
-      if (!defaultHasSearchSymbol) {
-        expected.delete('search_symbol')
-      }
-      assertContainsAll(names, expected)
-      assertExcludesAll(names, getOtherModeOnlyNames(TOOL_MODES.CC))
-      assertExcludesAll(names, BLOCKED_TOOL_NAMES)
-      assertExcludesAll(names, getReplacedToolNames())
-      ok(!names.includes('grep_files'))
-    })
-  })
-
-  it('rejects direct create_new_file calls in codex mode', async () => {
+  it('rejects direct create_new_file calls', async () => {
     await withProxy({}, async ({proxyClient}) => {
       const response = await proxyClient.send('tools/call', {
         name: 'create_new_file',
@@ -140,16 +187,16 @@ describe('ij MCP proxy tool list', {timeout: SUITE_TIMEOUT_MS}, () => {
     })
   })
 
-  it('rejects direct create_new_file calls in cc mode', async () => {
-    await withProxy({proxyEnv: {JETBRAINS_MCP_TOOL_MODE: 'cc'}}, async ({proxyClient}) => {
+  it('rejects direct get_file_problems calls', async () => {
+    await withProxy({}, async ({proxyClient}) => {
       const response = await proxyClient.send('tools/call', {
-        name: 'create_new_file',
-        arguments: {pathInProject: 'example.txt', text: 'hello', overwrite: true}
+        name: 'get_file_problems',
+        arguments: {filePath: 'src/Main.kt'}
       })
 
       ok(response.result?.isError)
       const message = response.result?.content?.[0]?.text ?? ''
-      ok(message.includes('write'))
+      ok(message.includes("Tool 'get_file_problems' is not exposed by ij-proxy"))
     })
   })
 })

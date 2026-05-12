@@ -1,4 +1,4 @@
-// Copyright 2000-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.util;
 
 import com.intellij.psi.JavaPsiFacade;
@@ -31,6 +31,17 @@ public class PsiLiteralUtilTest extends LightPlatformCodeInsightTestCase {
 
     // all sequences except new line should stay as is
     assertEquals("\\t\n", PsiLiteralUtil.escapeTextBlockCharacters("\\t\\n"));
+
+    // trailing space before a real LF is escaped with \s (the new parseSpaces branch)
+    assertEquals("foo\\s\nbar", PsiLiteralUtil.escapeTextBlockCharacters("foo \nbar"));
+    assertEquals("foo\\s\nbar\\s", PsiLiteralUtil.escapeTextBlockCharacters("foo \nbar "));
+    assertEquals("foo\\s\n", PsiLiteralUtil.escapeTextBlockCharacters("foo \n"));
+    assertEquals("foo \\s", PsiLiteralUtil.escapeTextBlockCharacters("foo  "));
+    // multiple spaces before real LF: all but last are kept, last replaced by \s
+    assertEquals("foo  \\s\nbar", PsiLiteralUtil.escapeTextBlockCharacters("foo   \nbar"));
+    // space at the very start of content followed by real LF
+    assertEquals("\\s\nbar", PsiLiteralUtil.escapeTextBlockCharacters(" \nbar"));
+    assertEquals(" foo\n bar\\s", PsiLiteralUtil.escapeTextBlockCharacters(" foo\n bar "));
   }
 
   public void testEscapeBackSlashesInTextBlock() {

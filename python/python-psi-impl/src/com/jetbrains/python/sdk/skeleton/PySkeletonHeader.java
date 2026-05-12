@@ -5,11 +5,12 @@ import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
-import java.io.FileReader;
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.LineNumberReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -39,8 +40,9 @@ public class PySkeletonHeader {
     return myVersion;
   }
 
-  public static @Nullable PySkeletonHeader readSkeletonHeader(@NotNull File file) {
-    try (LineNumberReader reader = new LineNumberReader(new FileReader(file, StandardCharsets.UTF_8))) {
+  public static @Nullable PySkeletonHeader readSkeletonHeader(@NotNull Path file) {
+    try (BufferedReader buffered = Files.newBufferedReader(file, StandardCharsets.UTF_8);
+         LineNumberReader reader = new LineNumberReader(buffered)) {
       String line = null;
       // Read 3 lines, skip first 2: encoding, module name
       for (int i = 0; i < 3; i++) {

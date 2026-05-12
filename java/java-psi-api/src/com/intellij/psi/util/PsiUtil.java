@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.util;
 
 import com.intellij.codeInsight.AnnotationUtil;
@@ -1284,6 +1284,7 @@ public final class PsiUtil extends PsiUtilCore {
    * @return true if the feature is available in the PsiFile, the supplied element belongs to
    */
   public static boolean isAvailable(@NotNull JavaFeature feature, @NotNull PsiElement element) {
+    if (JavaFeature.isAssumed(feature)) return true;
     if (!feature.isSufficient(getLanguageLevel(element))) return false;
     if (!feature.canBeCustomized()) return true;
     PsiFile file = element.getContainingFile();
@@ -1606,10 +1607,11 @@ public final class PsiUtil extends PsiUtilCore {
     }
 
     if (containingFile instanceof JavaCodeFragment) {
-      PsiElement context = containingFile.getContext();
-      if (context instanceof PsiPackage) {
-        return StringUtil.isEmpty(((PsiPackage)context).getName());
+      JavaCodeFragment fragment = (JavaCodeFragment)containingFile;
+      if ("".equals(fragment.getPackageName())) {
+        return true;
       }
+      PsiElement context = containingFile.getContext();
       if (context != null && context != containingFile) {
         return isFromDefaultPackage(context);
       }

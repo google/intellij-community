@@ -37,11 +37,11 @@ export function normalizeItems(
     const normalizedPath = normalizeProjectRelativePath(projectPath, rawPath)
     if (!normalizedPath) continue
     const normalizedItem: SearchItem = {filePath: normalizedPath}
-    if (includeDetails && typeof item.lineNumber === 'number') {
-      normalizedItem.lineNumber = item.lineNumber
-      if (typeof item.lineText === 'string') {
-        normalizedItem.lineText = item.lineText
-      }
+    if (includeDetails && typeof item.startLine === 'number') {
+      normalizedItem.startLine = item.startLine
+      if (typeof item.startColumn === 'number') normalizedItem.startColumn = item.startColumn
+      if (typeof item.endLine === 'number') normalizedItem.endLine = item.endLine
+      if (typeof item.endColumn === 'number') normalizedItem.endColumn = item.endColumn
     }
     const key = JSON.stringify(normalizedItem)
     if (seen.has(key)) continue
@@ -66,10 +66,7 @@ export function normalizeItemsFromEntries(
     if (!normalizedPath) continue
     const item: SearchItem = {filePath: normalizedPath}
     if (includeDetails && typeof entry.lineNumber === 'number') {
-      item.lineNumber = entry.lineNumber
-      if (typeof entry.lineText === 'string') {
-        item.lineText = entry.lineText
-      }
+      item.startLine = entry.lineNumber
     }
     const key = JSON.stringify(item)
     if (seen.has(key)) continue

@@ -14,6 +14,7 @@ public interface DiffPlaces {
   @NonNls String SHELVE_VIEW = "ShelveView";
   @NonNls String COMMIT_DIALOG = "CommitDialog";
   @NonNls String TESTS_FAILED_ASSERTIONS = "TestsFiledAssertions";
+  @NonNls String INTENTION_PREVIEW = "IntentionPreview";
   @NonNls String MERGE = "Merge";
   @NonNls String DIR_DIFF = "DirDiff";
   @NonNls String EXTERNAL = "External";

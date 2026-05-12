@@ -16,6 +16,7 @@ jvm_library(
 
 jvm_library(
   name = "cucumber-jvmFormatter4_test_lib",
+  testonly = True,
   module_name = "intellij.cucumber.jvmFormatter4",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -28,3 +29,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.cucumber.jvmFormatter4` end
+
+### auto-generated section `iml intellij.cucumber.jvmFormatter4` start
+exports_files([
+  "intellij.cucumber.jvmFormatter4.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.cucumber.jvmFormatter4` end

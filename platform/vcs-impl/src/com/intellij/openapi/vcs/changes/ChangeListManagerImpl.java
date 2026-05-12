@@ -10,6 +10,7 @@ import com.intellij.openapi.application.AccessToken;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.ex.ApplicationManagerEx;
 import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
@@ -77,6 +78,7 @@ import com.intellij.util.containers.MultiMap;
 import com.intellij.util.messages.MessageBusConnection;
 import com.intellij.util.messages.Topic;
 import com.intellij.util.ui.UIUtil;
+import com.intellij.util.ui.VcsConfirmationUtil;
 import com.intellij.vcs.commit.ChangeListCommitState;
 import com.intellij.vcs.commit.CommitModeManager;
 import com.intellij.vcs.commit.LocalChangesCommitter;
@@ -121,6 +123,8 @@ import static java.util.stream.Collectors.toSet;
 @State(name = "ChangeListManager", storages = @Storage(StoragePathMacros.WORKSPACE_FILE))
 public final class ChangeListManagerImpl extends ChangeListManagerEx implements PersistentStateComponent<Element>, Disposable {
   private static final Logger LOG = Logger.getInstance(ChangeListManagerImpl.class);
+  private static final String DEADLOCK_ADVICE =
+    "A lock may not be taken while com.intellij.openapi.vcs.changes.ChangeListManagerImpl.myDataLock is held, as this might lead to a deadlock";
 
   @Topic.ProjectLevel
   public static final Topic<LocalChangeListsLoadedListener> LISTS_LOADED =
@@ -331,26 +335,32 @@ public final class ChangeListManagerImpl extends ChangeListManagerEx implements 
                             : StringUtil.join(lists, list -> StringUtil.first(list.getName(), 30, true), BR);
     String question = VcsBundle.message("changes.empty.changelists.no.longer.active", lists.size(), changeListName);
 
+    VcsShowConfirmationOption option = new VcsShowConfirmationOption() {
+      @Override
+      public Value getValue() {
+        return config.REMOVE_EMPTY_INACTIVE_CHANGELISTS;
+      }
 
-    VcsConfirmationDialog dialog =
-      new VcsConfirmationDialog(project, VcsBundle.message("dialog.title.remove.empty.changelist"), VcsBundle.message("button.remove"),
-                                CommonBundle.getCancelButtonText(), new VcsShowConfirmationOption() {
-        @Override
-        public Value getValue() {
-          return config.REMOVE_EMPTY_INACTIVE_CHANGELISTS;
-        }
+      @Override
+      public void setValue(Value value) {
+        config.REMOVE_EMPTY_INACTIVE_CHANGELISTS = value;
+      }
 
-        @Override
-        public void setValue(Value value) {
-          config.REMOVE_EMPTY_INACTIVE_CHANGELISTS = value;
-        }
+      @Override
+      public boolean isPersistent() {
+        return true;
+      }
+    };
 
-        @Override
-        public boolean isPersistent() {
-          return true;
-        }
-      }, XmlStringUtil.wrapInHtml(question), VcsBundle.message("checkbox.remember.my.choice"));
-    return dialog.showAndGet();
+    return VcsConfirmationUtil.requestConfirmation(
+      option,
+      project,
+      XmlStringUtil.wrapInHtml(question),
+      VcsBundle.message("dialog.title.remove.empty.changelist"),
+      Messages.getQuestionIcon(),
+      VcsBundle.message("button.remove"),
+      CommonBundle.getCancelButtonText()
+    );
   }
 
   @Override
@@ -1473,11 +1483,11 @@ public final class ChangeListManagerImpl extends ChangeListManagerEx implements 
   @Override
   public @Nullable String getSwitchedBranch(@NotNull VirtualFile file) {
     if (!file.isInLocalFileSystem()) return null;
-    return ReadAction.compute(() -> {
-      synchronized (myDataLock) {
+    synchronized (myDataLock) {
+      return ApplicationManagerEx.getApplicationEx().withLocksProhibited(DEADLOCK_ADVICE, () -> {
         return myComposite.getSwitchedFileHolder().getBranchForFile(file);
-      }
-    });
+      });
+    }
   }
 
   @TestOnly

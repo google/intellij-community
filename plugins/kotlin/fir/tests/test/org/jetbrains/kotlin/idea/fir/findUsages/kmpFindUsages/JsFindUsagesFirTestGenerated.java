@@ -182,9 +182,29 @@ public abstract class JsFindUsagesFirTestGenerated extends AbstractFindUsagesFir
                 runTest("../../idea/tests/testData/findUsages/kotlin/conventions/components/memberComponentFun.0.kt");
             }
 
+            @TestMetadata("nameBasedDestructuringFull.0.kt")
+            public void testNameBasedDestructuringFull() throws Exception {
+                runTest("../../idea/tests/testData/findUsages/kotlin/conventions/components/nameBasedDestructuringFull.0.kt");
+            }
+
+            @TestMetadata("nameBasedDestructuringShort.0.kt")
+            public void testNameBasedDestructuringShort() throws Exception {
+                runTest("../../idea/tests/testData/findUsages/kotlin/conventions/components/nameBasedDestructuringShort.0.kt");
+            }
+
             @TestMetadata("operators.0.kt")
             public void testOperators() throws Exception {
                 runTest("../../idea/tests/testData/findUsages/kotlin/conventions/components/operators.0.kt");
+            }
+
+            @TestMetadata("positionBasedDestructuring.0.kt")
+            public void testPositionBasedDestructuring() throws Exception {
+                runTest("../../idea/tests/testData/findUsages/kotlin/conventions/components/positionBasedDestructuring.0.kt");
+            }
+
+            @TestMetadata("positionBasedDestructuringNew.0.kt")
+            public void testPositionBasedDestructuringNew() throws Exception {
+                runTest("../../idea/tests/testData/findUsages/kotlin/conventions/components/positionBasedDestructuringNew.0.kt");
             }
 
             @TestMetadata("propertyDelegate.0.kt")

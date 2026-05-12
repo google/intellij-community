@@ -33,7 +33,6 @@ import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.impl.text.TextEditorImpl;
 import com.intellij.openapi.fileTypes.BinaryFileTypeDecompilers;
-import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeRegistry;
 import com.intellij.openapi.fileTypes.UnknownFileType;
 import com.intellij.openapi.progress.ProgressIndicator;
@@ -56,7 +55,6 @@ import com.intellij.openapi.vfs.AsyncFileListener;
 import com.intellij.openapi.vfs.ReadonlyStatusHandler;
 import com.intellij.openapi.vfs.SafeWriteRequestor;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.openapi.vfs.VirtualFileSystem;
 import com.intellij.openapi.vfs.VirtualFileWithId;
 import com.intellij.openapi.vfs.newvfs.NewVirtualFileSystem;
 import com.intellij.openapi.vfs.newvfs.events.VFileContentChangeEvent;
@@ -65,6 +63,7 @@ import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
 import com.intellij.openapi.vfs.newvfs.events.VFilePropertyChangeEvent;
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFS;
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFsConnectionListener;
+import com.intellij.openapi.vfs.newvfs.persistent.executor.AsyncFileContentWriteRequestor;
 import com.intellij.pom.core.impl.PomModelImpl;
 import com.intellij.psi.AbstractFileViewProvider;
 import com.intellij.psi.ExternalChangeActionUtil;
@@ -118,7 +117,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-public class FileDocumentManagerImpl extends FileDocumentManagerBase implements SafeWriteRequestor {
+public class FileDocumentManagerImpl extends FileDocumentManagerBase implements SafeWriteRequestor, AsyncFileContentWriteRequestor {
   private static final Logger LOG = Logger.getInstance(FileDocumentManagerImpl.class);
 
   public static final Key<Object> NOT_RELOADABLE_DOCUMENT_KEY = new Key<>("NOT_RELOADABLE_DOCUMENT_KEY");
@@ -127,6 +126,7 @@ public class FileDocumentManagerImpl extends FileDocumentManagerBase implements 
   private static final Key<String> LINE_SEPARATOR_KEY = Key.create("LINE_SEPARATOR_KEY");
   private static final Key<Boolean> MUST_RECOMPUTE_FILE_TYPE = Key.create("Must recompute file type");
 
+  private final List<ConflictsSolverOverride> myConflictsSolverOverrides = ContainerUtil.createLockFreeCopyOnWriteList();
   private final Set<Document> myUnsavedDocuments = ConcurrentCollectionFactory.createConcurrentSet();
 
   private final FileDocumentManagerListenerBackgroundableBridge bridge = new FileDocumentManagerListenerBackgroundableBridge();
@@ -170,16 +170,14 @@ public class FileDocumentManagerImpl extends FileDocumentManagerBase implements 
     @Override
     public boolean canClose(@NotNull Project project) {
       FileDocumentManagerImpl manager = (FileDocumentManagerImpl)getInstance();
-      if (!manager.myUnsavedDocuments.isEmpty()) {
-        manager.myOnClose = true;
-        try {
-          manager.saveAllDocuments();
-        }
-        finally {
-          manager.myOnClose = false;
-        }
+      if (manager.myUnsavedDocuments.isEmpty()) return true;
+      manager.myOnClose = true;
+      try {
+        return manager.saveDocuments(null, true);
       }
-      return manager.myUnsavedDocuments.isEmpty();
+      finally {
+        manager.myOnClose = false;
+      }
     }
   }
 
@@ -257,23 +255,26 @@ public class FileDocumentManagerImpl extends FileDocumentManagerBase implements 
     saveDocuments(filter, true);
   }
 
-  private void saveDocuments(@Nullable Predicate<? super Document> filter, boolean isExplicit) {
-    ((TransactionGuardImpl)TransactionGuard.getInstance()).assertWriteActionAllowed();
+  /**
+   * @return {@code true} if saving was performed without errors, and {@code false} otherwise
+   */
+  private boolean saveDocuments(@Nullable Predicate<? super Document> filter, boolean isExplicit) {
+    ((TransactionGuardImpl)TransactionGuard.getInstance()).assertWriteSafeEnvironment();
 
     ApplicationManager.getApplication().getMessageBus().syncPublisher(FileDocumentManagerListenerBackgroundable.TOPIC)
       .beforeAllDocumentsSaving();
-    if (myUnsavedDocuments.isEmpty()) return;
+    if (myUnsavedDocuments.isEmpty()) return true;
 
     if (EDT.isCurrentThreadEdt()) {
-      saveDocumentsOnEdt(isExplicit, filter);
+      return saveDocumentsOnEdt(isExplicit, filter);
     }
     else {
-      doSave(null, isExplicit, filter);
+      return doSave(null, isExplicit, filter);
     }
   }
 
   @RequiresEdt
-  private void saveDocumentsOnEdt(boolean isExplicit, @Nullable Predicate<? super Document> filter) {
+  private boolean saveDocumentsOnEdt(boolean isExplicit, @Nullable Predicate<? super Document> filter) {
     ProgressIndicator current = ProgressManager.getInstance().getProgressIndicator();
     PotemkinProgress myProgress = current instanceof PotemkinProgress p ? p :
                                   new PotemkinProgress("", null, null, null);
@@ -282,10 +283,14 @@ public class FileDocumentManagerImpl extends FileDocumentManagerBase implements 
     try {
       // if already run under progress, reuse it with another title, otherwise create and show the progress dialog
       if (current instanceof PotemkinProgress) {
-        doSave(myProgress, isExplicit, filter);
+        return doSave(myProgress, isExplicit, filter);
       }
       else {
-        myProgress.runInSwingThread(() -> doSave(myProgress, isExplicit, filter));
+        boolean[] result = new boolean[1];
+        myProgress.runInSwingThread(() -> {
+          result[0] = doSave(myProgress, isExplicit, filter);
+        });
+        return result[0];
       }
     }
     finally {
@@ -293,7 +298,7 @@ public class FileDocumentManagerImpl extends FileDocumentManagerBase implements 
     }
   }
 
-  private void doSave(@Nullable PotemkinProgress myProgress, boolean isExplicit, @Nullable Predicate<? super Document> filter) {
+  private boolean doSave(@Nullable PotemkinProgress myProgress, boolean isExplicit, @Nullable Predicate<? super Document> filter) {
     Map<Document, IOException> failedToSave = new HashMap<>();
     Set<Document> vetoed = new HashSet<>();
     while (true) {
@@ -327,9 +332,9 @@ public class FileDocumentManagerImpl extends FileDocumentManagerBase implements 
 
       if (count == 0) break;
     }
-    if (!failedToSave.isEmpty()) {
-      handleErrorsOnSave(failedToSave);
-    }
+    if (failedToSave.isEmpty()) return true;
+    handleErrorsOnSave(failedToSave);
+    return false;
   }
 
   @Override
@@ -338,7 +343,7 @@ public class FileDocumentManagerImpl extends FileDocumentManagerBase implements 
   }
 
   public void saveDocument(@NotNull Document document, boolean explicit) {
-    ((TransactionGuardImpl)TransactionGuard.getInstance()).assertWriteActionAllowed();
+    ((TransactionGuardImpl)TransactionGuard.getInstance()).assertWriteSafeEnvironment();
 
     ApplicationManager.getApplication().getMessageBus().syncPublisher(FileDocumentManagerListenerBackgroundable.TOPIC)
       .beforeAnyDocumentSaving(document, explicit);
@@ -517,8 +522,19 @@ public class FileDocumentManagerImpl extends FileDocumentManagerBase implements 
   }
 
   private static boolean needsRefresh(@NotNull VirtualFile file) {
-    VirtualFileSystem fs = file.getFileSystem();
-    return fs instanceof NewVirtualFileSystem newFs && file.getTimeStamp() != newFs.getTimeStamp(file);
+    if (!(file.getFileSystem() instanceof NewVirtualFileSystem newFs)) {
+      return false;
+    }
+
+    long fileTimeStamp = file.getTimeStamp();
+    long fsTimeStamp = newFs.getTimeStamp(file);
+    boolean timestampsNotMatch = (fileTimeStamp != fsTimeStamp);
+    if (timestampsNotMatch) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("[" + file + "].timestamp(=" + fileTimeStamp + " <> FS.timeStamp(=" + fsTimeStamp + ") -> needs refresh");
+      }
+    }
+    return timestampsNotMatch;
   }
 
   public static @NotNull String getLineSeparator(@NotNull Document document, @NotNull VirtualFile virtualFile) {
@@ -653,8 +669,7 @@ public class FileDocumentManagerImpl extends FileDocumentManagerBase implements 
   }
 
   private static boolean isBinaryWithDecompiler(@NotNull VirtualFile file) {
-    FileType type = file.getFileType();
-    return type.isBinary() && BinaryFileTypeDecompilers.getInstance().forFileType(type) != null;
+    return BinaryFileTypeDecompilers.getInstance().hasDecompiler(file);
   }
 
   static final class MyAsyncFileListener implements AsyncFileListener {
@@ -687,7 +702,7 @@ public class FileDocumentManagerImpl extends FileDocumentManagerBase implements 
           for (VFileContentChangeEvent event : contentChanges) {
             // new range markers could've appeared after "prepareChange" in some read action
             prepareForRangeMarkerUpdate(strongRefsToDocuments, event.getFile());
-            if (ourConflictsSolverEnabled) {
+            if (myFileDocumentManager.isConflictsSolverEnabled()) {
               myFileDocumentManager.myConflictResolver.beforeContentChange(event);
             }
           }
@@ -845,7 +860,7 @@ public class FileDocumentManagerImpl extends FileDocumentManagerBase implements 
       project,
       null,
       indicator -> {
-        decompiledText[0] = LoadTextUtil.loadText(file);
+        decompiledText[0] = BinaryFileTypeDecompilers.getInstance().allowDecompilerSlowOperation(() -> LoadTextUtil.loadText(file));
       }
     );
 
@@ -877,6 +892,17 @@ public class FileDocumentManagerImpl extends FileDocumentManagerBase implements 
     MemoryDiskConflictResolver old = myConflictResolver;
     myConflictResolver = newProcessor;
     Disposer.register(disposable, () -> myConflictResolver = old);
+  }
+
+  @Override
+  public void overrideConflictsSolverEnabled(boolean enabled, @NotNull Disposable parentDisposable) {
+    ContainerUtil.add(new ConflictsSolverOverride(enabled), myConflictsSolverOverrides, parentDisposable);
+  }
+
+  @ApiStatus.Internal
+  public boolean isConflictsSolverEnabled() {
+    ConflictsSolverOverride override = ContainerUtil.getLastItem(myConflictsSolverOverrides);
+    return override == null || override.myEnabled;
   }
 
   // NB: virtualFile might be invalid by now
@@ -995,10 +1021,13 @@ public class FileDocumentManagerImpl extends FileDocumentManagerBase implements 
     });
   }
 
-  /** @deprecated another dirty Rider hack; don't use */
-  @Deprecated(forRemoval = true)
-  @SuppressWarnings("StaticNonFinalField")
-  public static boolean ourConflictsSolverEnabled = true;
+  private static final class ConflictsSolverOverride {
+    private final boolean myEnabled;
+
+    private ConflictsSolverOverride(boolean enabled) {
+      myEnabled = enabled;
+    }
+  }
 
   @Override
   protected void fileContentLoaded(@NotNull VirtualFile file, @NotNull Document document) {
@@ -1083,7 +1112,7 @@ public class FileDocumentManagerImpl extends FileDocumentManagerBase implements 
 
 
     FileDocumentManagerListenerBackgroundableBridge() {
-      InvocationHandler handler = (__, method, args) -> {
+      InvocationHandler handler = (_, method, args) -> {
         if (method.getDeclaringClass() != FileDocumentManagerListener.class) {
           // only FileDocumentManagerListener methods should be called on this proxy
           throw new UnsupportedOperationException(method.toString());

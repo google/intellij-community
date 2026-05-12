@@ -11,7 +11,9 @@ import com.intellij.psi.PsiReference
 import com.intellij.refactoring.RefactoringActionHandler
 import com.intellij.refactoring.rename.inplace.VariableInplaceRenameHandler
 import com.intellij.refactoring.rename.inplace.VariableInplaceRenamer
+import org.jetbrains.kotlin.idea.base.psi.isNameBased
 import org.jetbrains.kotlin.idea.base.psi.unquoteKotlinIdentifier
+import org.jetbrains.kotlin.psi.KtDestructuringDeclaration
 import org.jetbrains.kotlin.psi.KtDestructuringDeclarationEntry
 import org.jetbrains.kotlin.psi.KtImportAlias
 import org.jetbrains.kotlin.psi.KtLabeledExpression
@@ -21,7 +23,7 @@ open class KotlinVariableInplaceRenameHandler : VariableInplaceRenameHandler() {
     companion object {
         fun isInplaceRenameAvailable(element: PsiElement): Boolean {
             return when (element) {
-                is KtDestructuringDeclarationEntry -> true
+                is KtDestructuringDeclarationEntry -> !element.isNameBased() || element.initializer != null
                 is KtParameter -> element.isLoopParameter || element.isCatchParameter || element.isLambdaParameter
                 is KtLabeledExpression, is KtImportAlias -> true
                 else -> false

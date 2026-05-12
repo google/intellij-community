@@ -1,4 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.jps.entities.impl
 
 import com.intellij.platform.workspace.jps.entities.FacetEntity
@@ -22,12 +24,11 @@ import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBas
 import com.intellij.platform.workspace.storage.impl.SoftLinkable
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
-import com.intellij.platform.workspace.storage.impl.extractOneToManyParent
 import com.intellij.platform.workspace.storage.impl.indices.WorkspaceMutableIndex
-import com.intellij.platform.workspace.storage.impl.updateOneToManyParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
 @GeneratedCodeApiVersion(3)
@@ -67,9 +68,10 @@ internal class FacetEntityImpl(private val dataSource: FacetEntityData) : FacetE
       return dataSource.configurationXmlTag
     }
   override val module: ModuleEntity
-    get() = snapshot.extractOneToManyParent(MODULE_CONNECTION_ID, this)!!
+    get() = snapshot.instrumentation.getParent(MODULE_CONNECTION_ID, this) as? ModuleEntity
+            ?: error("Parent module not found for FacetEntity")
   override val underlyingFacet: FacetEntity?
-    get() = snapshot.extractOneToManyParent(UNDERLYINGFACET_CONNECTION_ID, this)
+    get() = snapshot.instrumentation.getParent(UNDERLYINGFACET_CONNECTION_ID, this) as? FacetEntity
 
   override val entitySource: EntitySource
     get() {
@@ -122,7 +124,7 @@ internal class FacetEntityImpl(private val dataSource: FacetEntityData) : FacetE
         error("Field FacetEntity#typeId should be initialized")
       }
       if (_diff != null) {
-        if (_diff.extractOneToManyParent<WorkspaceEntityBase>(MODULE_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getParentBuilder(MODULE_CONNECTION_ID, this) == null) {
           error("Field FacetEntity#module should be initialized")
         }
       }
@@ -191,12 +193,11 @@ internal class FacetEntityImpl(private val dataSource: FacetEntityData) : FacetE
       get() {
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(MODULE_CONNECTION_ID, this) as? ModuleEntityBuilder)
-          ?: (this.entityLinks[EntityLink(false, MODULE_CONNECTION_ID)]!! as ModuleEntityBuilder)
+          ?: (this.entityLinks[EntityLink(false, MODULE_CONNECTION_ID)] as? ModuleEntityBuilder) ?: error("module is null for FacetEntity")
         }
         else {
-          this.entityLinks[EntityLink(false, MODULE_CONNECTION_ID)]!! as ModuleEntityBuilder
+          (this.entityLinks[EntityLink(false, MODULE_CONNECTION_ID)] as? ModuleEntityBuilder) ?: error("module is null for FacetEntity")
         }
       }
       set(value) {
@@ -212,7 +213,7 @@ internal class FacetEntityImpl(private val dataSource: FacetEntityData) : FacetE
           _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
         }
         if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)) {
-          _diff.updateOneToManyParentOfChild(MODULE_CONNECTION_ID, this, value)
+          _diff.instrumentation.addChild(MODULE_CONNECTION_ID, value, this)
         }
         else {
 // Setting backref of the list
@@ -230,12 +231,11 @@ internal class FacetEntityImpl(private val dataSource: FacetEntityData) : FacetE
       get() {
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(UNDERLYINGFACET_CONNECTION_ID, this) as? FacetEntityBuilder)
           ?: (this.entityLinks[EntityLink(false, UNDERLYINGFACET_CONNECTION_ID)] as? FacetEntityBuilder)
         }
         else {
-          this.entityLinks[EntityLink(false, UNDERLYINGFACET_CONNECTION_ID)] as? FacetEntityBuilder
+          (this.entityLinks[EntityLink(false, UNDERLYINGFACET_CONNECTION_ID)] as? FacetEntityBuilder)
         }
       }
       set(value) {
@@ -251,7 +251,7 @@ internal class FacetEntityImpl(private val dataSource: FacetEntityData) : FacetE
           _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
         }
         if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)) {
-          _diff.updateOneToManyParentOfChild(UNDERLYINGFACET_CONNECTION_ID, this, value)
+          _diff.instrumentation.addChild(UNDERLYINGFACET_CONNECTION_ID, value, this)
         }
         else {
 // Setting backref of the list
@@ -325,7 +325,6 @@ internal class FacetEntityData : WorkspaceEntityData<FacetEntity>(), SoftLinkabl
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): FacetEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {

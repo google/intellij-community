@@ -7,13 +7,14 @@ import com.intellij.ide.util.projectWizard.WizardContext;
 import com.intellij.openapi.components.StorageScheme;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsContexts;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.ListCellRenderer;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
@@ -58,8 +59,8 @@ public class ProjectFormatPanel {
     final String savedValue = instance.getValue(STORAGE_FORMAT_PROPERTY, StorageFormat.DIR_BASED.getTag());
     myStorageFormatCombo.setSelectedItem(StorageFormat.of(savedValue));
 
-    final SimpleListCellRenderer<StorageFormat> renderer = SimpleListCellRenderer.create(StorageFormat.FILE_BASED.getTitle(),
-                                                                                         LocalizationAware::getTitle);
+    final ListCellRenderer<StorageFormat> renderer = BuilderKt.textListCellRenderer(StorageFormat.FILE_BASED.getTitle(),
+                                                                                    LocalizationAware::getTitle);
     myStorageFormatCombo.setRenderer(renderer);
   }
 

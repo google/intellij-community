@@ -11,13 +11,8 @@ import com.fasterxml.jackson.databind.SerializerProvider
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.google.common.io.Resources
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.runInEdt
-import com.intellij.openapi.application.writeAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.module.Module
-import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.util.Version
 import com.intellij.util.PathUtilRt
 import com.intellij.util.Url
@@ -25,7 +20,6 @@ import com.intellij.util.Urls
 import com.intellij.util.system.CpuArch
 import com.intellij.util.system.OS
 import com.jetbrains.python.psi.LanguageLevel
-import com.jetbrains.python.sdk.legacy.PythonSdkUtil.isPythonSdk
 import org.jetbrains.annotations.ApiStatus
 import java.net.URL
 import java.nio.charset.StandardCharsets
@@ -192,62 +186,4 @@ object SdksKeeper {
   }
 
   private fun load() = configUrl?.let { Resources.toString(it, StandardCharsets.UTF_8) }
-}
-
-// Non suspend version is required for all cases where it is possible to call it from quick-fixes,
-// as right now calling pyModuleBlocking from quick-fix is not allowed in EDT.
-@ApiStatus.Internal
-fun Sdk.setAssociationToModuleAsync(module: Module) {
-  requirePythonSdk()
-
-  val path = module.baseDir?.path
-  assert(path != null) { "Module $module has not paths, and can't be associated" }
-
-  val data = getOrCreateAdditionalData()
-    .also {
-      it.associatedModulePath = path
-    }
-
-  val modificator = sdkModificator
-  modificator.sdkAdditionalData = data
-
-  runInEdt {
-    ApplicationManager.getApplication().runWriteAction {
-      modificator.commitChanges()
-    }
-  }
-}
-
-@ApiStatus.Internal
-suspend fun Sdk.setAssociationToModule(module: Module) {
-  requirePythonSdk()
-
-  val path = module.baseDir?.path
-  assert(path != null) { "Module $module has not paths, and can't be associated" }
-  setAssociationToPath(path)
-}
-
-@ApiStatus.Internal
-suspend fun Sdk.setAssociationToPath(path: String?) {
-  requirePythonSdk()
-
-  val data = getOrCreateAdditionalData()
-    .also {
-      it.associatedModulePath = path
-    }
-
-  val modificator = sdkModificator
-  modificator.sdkAdditionalData = data
-
-  writeAction {
-    modificator.commitChanges()
-  }
-}
-
-/**
- * @throws IllegalArgumentException if sdk is not a python sdk
- */
-@ApiStatus.Internal
-fun Sdk.requirePythonSdk() {
-  require(isPythonSdk(this, true)) { "Can't be called only for PythonSdkType and not for $sdkType" }
 }

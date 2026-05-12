@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.core.nio.fs;
 
 import org.jetbrains.annotations.ApiStatus;
@@ -169,7 +169,11 @@ public final class MultiRoutingFsPath implements Path, sun.nio.fs.BasicFileAttri
   @Override
   public WatchKey register(WatchService watcher, WatchEvent.Kind<?>[] events, WatchEvent.Modifier... modifiers) throws IOException {
     if (watcher instanceof MultiRoutingWatchServiceDelegate delegated) {
-      return myDelegate.register(delegated.myDelegate, events, modifiers);
+      // Use getCurrentDelegate() to re-resolve through current routing, so WSL paths
+      // that were initially created with a Windows delegate get routed to the IJent backend.
+      Path delegate = getCurrentDelegate();
+      WatchService backendWs = delegated.getBackendWatchService(delegate.getFileSystem());
+      return delegated.wrapDelegateKey(delegate.register(backendWs, events, modifiers));
     }
     return myDelegate.register(watcher, events, modifiers);
   }
@@ -177,7 +181,9 @@ public final class MultiRoutingFsPath implements Path, sun.nio.fs.BasicFileAttri
   @Override
   public WatchKey register(WatchService watcher, WatchEvent.Kind<?>... events) throws IOException {
     if (watcher instanceof MultiRoutingWatchServiceDelegate delegated) {
-      return myDelegate.register(delegated.myDelegate, events);
+      Path delegate = getCurrentDelegate();
+      WatchService backendWs = delegated.getBackendWatchService(delegate.getFileSystem());
+      return delegated.wrapDelegateKey(delegate.register(backendWs, events));
     }
     return myDelegate.register(watcher, events);
   }
@@ -273,14 +279,19 @@ public final class MultiRoutingFsPath implements Path, sun.nio.fs.BasicFileAttri
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
-    MultiRoutingFsPath paths = (MultiRoutingFsPath)o;
-    return Objects.equals(myDelegate, paths.myDelegate) &&
-           Objects.equals(myFileSystem, paths.myFileSystem);
+    if (o instanceof MultiRoutingFsPath paths) {
+      boolean isAbsolute = isAbsolute();
+      return isAbsolute == paths.isAbsolute()
+             && Objects.equals(myFileSystem, paths.myFileSystem)
+             && (myDelegate.equals(paths.myDelegate) || !isAbsolute && myDelegate.toString().equals(paths.myDelegate.toString()));
+    }
+    return false;
   }
 
   @Override
   public int hashCode() {
-    return myDelegate.hashCode() * 31 + myFileSystem.hashCode();
+    int result = myFileSystem.hashCode();
+    result = 31 * result + (isAbsolute() ? myDelegate.hashCode() : myDelegate.toString().hashCode());
+    return result;
   }
 }

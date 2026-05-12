@@ -2,6 +2,7 @@
 package com.intellij.platform.util.io.storages.blobstorage;
 
 import com.intellij.openapi.util.IntRef;
+import com.intellij.openapi.util.io.FileTooBigException;
 import com.intellij.platform.util.io.storages.StorageTestingUtils;
 import com.intellij.util.io.ClosedStorageException;
 import com.intellij.util.io.blobstorage.SpaceAllocationStrategy;
@@ -50,14 +51,14 @@ public abstract class StreamlinedBlobStorageTestBase<S extends StreamlinedBlobSt
   @DataPoints
   public static List<SpaceAllocationStrategy> allocationStrategiesToTry() {
     return Arrays.asList(
-      new WriterDecidesStrategy(StreamlinedBlobStorageHelper.MAX_CAPACITY, 1024),
-      new WriterDecidesStrategy(StreamlinedBlobStorageHelper.MAX_CAPACITY, 256),
-      new DataLengthPlusFixedPercentStrategy(256, 1024, StreamlinedBlobStorageHelper.MAX_CAPACITY, 30),
-      new DataLengthPlusFixedPercentStrategy(64, 256, StreamlinedBlobStorageHelper.MAX_CAPACITY, 30),
+      new WriterDecidesStrategy(StreamlinedBlobStorageOverMMappedFile.MAX_CAPACITY, 1024),
+      new WriterDecidesStrategy(StreamlinedBlobStorageOverMMappedFile.MAX_CAPACITY, 256),
+      new DataLengthPlusFixedPercentStrategy(256, 1024, StreamlinedBlobStorageOverMMappedFile.MAX_CAPACITY, 30),
+      new DataLengthPlusFixedPercentStrategy(64, 256, StreamlinedBlobStorageOverMMappedFile.MAX_CAPACITY, 30),
 
       //put stress on allocation/reallocation code paths
-      new DataLengthPlusFixedPercentStrategy(64, 128, StreamlinedBlobStorageHelper.MAX_CAPACITY, 0),
-      new DataLengthPlusFixedPercentStrategy(2, 2, StreamlinedBlobStorageHelper.MAX_CAPACITY, 0)
+      new DataLengthPlusFixedPercentStrategy(64, 128, StreamlinedBlobStorageOverMMappedFile.MAX_CAPACITY, 0),
+      new DataLengthPlusFixedPercentStrategy(2, 2, StreamlinedBlobStorageOverMMappedFile.MAX_CAPACITY, 0)
     );
   }
 
@@ -245,7 +246,7 @@ public abstract class StreamlinedBlobStorageTestBase<S extends StreamlinedBlobSt
 
   @Test
   public void manyRecordsWritten_WithBigPayload_CouldAllBeReadBackUnchanged_ById() throws Exception {
-    //Specifically check payloads close to maxPayloadSize (-some margin for record header)
+    //Specifically check payloads close to maxPayloadSize
 
     int enoughRecordsButNotTooManyToNotTriggerOoM = 100;
     ThreadLocalRandom rnd = ThreadLocalRandom.current();
@@ -273,7 +274,7 @@ public abstract class StreamlinedBlobStorageTestBase<S extends StreamlinedBlobSt
     //maxPayloadSupported is generally about records being on a single page.
     // But don't want to expose recordSize/payloadSize internal relationship, neither recordHeader size, hence
     // I just vary payload size _around_ storage.maxPayloadSupported() to check that records are either stored
-    // OK, or throw IAE without breaking the storage
+    // OK, or throw FileTooBigException without breaking the storage
     final int margin = 16;
     final int maxPayloadSupported = storage.maxPayloadSupported();
     final List<StorageRecord> recordsActuallyWritten = new ArrayList<>();
@@ -292,7 +293,7 @@ public abstract class StreamlinedBlobStorageTestBase<S extends StreamlinedBlobSt
       }
       fail("_Some_ payload size around PAGE_SIZE must be rejected by storage");
     }
-    catch (IllegalArgumentException | IllegalStateException e) {
+    catch (FileTooBigException e) {
       //this is expectable
     }
 

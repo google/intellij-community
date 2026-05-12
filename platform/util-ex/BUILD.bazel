@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.util.ex` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "util-ex_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "util-ex",
   module_name = "intellij.platform.util.ex",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":util-ex_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//libraries/kotlin/reflect",
@@ -24,6 +19,7 @@ jvm_library(
     "//libraries/netty/buffer",
     "//libraries/caffeine",
     "//platform/util/base",
+    "//platform/util/base/multiplatform",
     "//platform/util-class-loader:util-classLoader",
     "//libraries/lz4",
     "//platform/diagnostic",
@@ -35,6 +31,7 @@ jvm_library(
 
 jvm_library(
   name = "util-ex_test_lib",
+  testonly = True,
   module_name = "intellij.platform.util.ex",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -49,6 +46,7 @@ jvm_library(
     "//libraries/netty/buffer:buffer_test_lib",
     "//libraries/caffeine:caffeine_test_lib",
     "//platform/util/base:base_test_lib",
+    "//platform/util/base/multiplatform:multiplatform_test_lib",
     "//platform/util-class-loader:util-classLoader_test_lib",
     "//libraries/lz4:lz4_test_lib",
     "//platform/diagnostic:diagnostic_test_lib",
@@ -58,3 +56,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.util.ex` end
+
+### auto-generated section `iml intellij.platform.util.ex` start
+exports_files([
+  "intellij.platform.util.ex.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.util.ex` end

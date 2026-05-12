@@ -48,4 +48,5 @@ sealed interface MutableTerminalOutputModel : TerminalOutputModel {
 fun MutableTerminalOutputModel.updateContent(event: TerminalContentUpdatedEvent) {
   val styles = event.styles.map { it.toStyleRange() }
   updateContent(event.startLineLogicalIndex, event.text, styles)
+  updateCursorPosition(event.cursorLogicalLineIndex, event.cursorColumnIndex)
 }

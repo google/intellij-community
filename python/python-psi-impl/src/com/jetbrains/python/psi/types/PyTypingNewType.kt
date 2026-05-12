@@ -5,7 +5,6 @@ import com.jetbrains.python.PyNames
 import com.jetbrains.python.psi.AccessDirection
 import com.jetbrains.python.psi.PyCallSiteExpression
 import com.jetbrains.python.psi.PyExpression
-import com.jetbrains.python.psi.PyQualifiedNameOwner
 import com.jetbrains.python.psi.PyTargetExpression
 import com.jetbrains.python.psi.resolve.PyResolveContext
 import com.jetbrains.python.psi.resolve.RatedResolveResult
@@ -15,19 +14,19 @@ import org.jetbrains.annotations.ApiStatus
 class PyTypingNewType(
   val classType: PyClassType,
   override val name: String,
-  private val declaration: PyTargetExpression?,
+  override val declarationElement: PyTargetExpression,
 ) : PyClassType by classType {
 
-  override fun getCallType(context: TypeEvalContext, callSite: PyCallSiteExpression): PyType? {
-    return PyTypingNewType(classType.toInstance(), name, declaration)
+  override fun getCallType(context: TypeEvalContext, callSite: PyCallSiteExpression): PyType {
+    return PyTypingNewType(classType.toInstance(), name, declarationElement)
   }
 
   override fun toClass(): PyTypingNewType {
-    return if (isDefinition) this else PyTypingNewType(classType.toClass(), name, declaration)
+    return if (isDefinition) this else PyTypingNewType(classType.toClass(), name, declarationElement)
   }
 
   override fun toInstance(): PyTypingNewType {
-    return if (isDefinition) PyTypingNewType(classType.toInstance(), name, declaration) else this
+    return if (isDefinition) PyTypingNewType(classType.toInstance(), name, declarationElement) else this
   }
 
   override val isBuiltin: Boolean = false
@@ -38,7 +37,7 @@ class PyTypingNewType(
 
   override fun getParameters(context: TypeEvalContext): List<PyCallableParameter>? {
     return if (isCallable) {
-      listOf(PyCallableParameterImpl.nonPsi(null, classType.toInstance(), null))
+      listOf(PyCallableParameterImpl.nonPsi(null, classType.toInstance()))
     }
     else {
       null
@@ -77,7 +76,6 @@ class PyTypingNewType(
     return listOf(classType) + classType.getAncestorTypes(context)
   }
 
-  override val declarationElement: PyQualifiedNameOwner? = declaration ?: classType.declarationElement
 
   override fun equals(other: Any?): Boolean {
     if (this === other) return true
@@ -87,7 +85,7 @@ class PyTypingNewType(
 
     if (classType != other.classType) return false
     if (name != other.name) return false
-    if (declaration != null && other.declaration != null && declaration != other.declaration) return false
+    if (declarationElement != other.declarationElement) return false
 
     return true
   }

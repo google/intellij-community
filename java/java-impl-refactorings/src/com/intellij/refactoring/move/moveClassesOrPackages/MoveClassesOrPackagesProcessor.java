@@ -345,7 +345,7 @@ public class MoveClassesOrPackagesProcessor extends BaseRefactoringProcessor {
         if (aClass.hasModifierProperty(PsiModifier.PACKAGE_LOCAL)) {
           if (PsiTreeUtil.getParentOfType(element, PsiImportStatement.class) != null) continue;
           PsiElement container = ConflictsUtil.getContainer(element);
-          Set<PsiElement> reported = reportedClassToContainers.computeIfAbsent(aClass, __ -> new HashSet<>());
+          Set<PsiElement> reported = reportedClassToContainers.computeIfAbsent(aClass, _ -> new HashSet<>());
 
           if (!reported.contains(container)) {
             reported.add(container);
@@ -857,7 +857,7 @@ public class MoveClassesOrPackagesProcessor extends BaseRefactoringProcessor {
     private void visitPackageLocalMemberReference(PsiJavaCodeReferenceElement qualified,
                                                   PsiModifierListOwner member, PsiElement[] elementsToMove) {
       PsiElement container = ConflictsUtil.getContainer(qualified);
-      Set<PsiElement> reportedContainers = myReportedElementToContainer.computeIfAbsent(member, __ -> new HashSet<>());
+      Set<PsiElement> reportedContainers = myReportedElementToContainer.computeIfAbsent(member, _ -> new HashSet<>());
 
       if (!reportedContainers.contains(container)) {
         reportedContainers.add(container);

@@ -9,8 +9,8 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.packageDependencies.DependencyValidationManager;
 import com.intellij.psi.search.scope.packageSet.NamedScope;
 import com.intellij.psi.search.scope.packageSet.PackageSet;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.editors.JBComboBoxTableCellEditorComponent;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.DefaultComboBoxModel;
@@ -86,7 +86,7 @@ public class PackageSetChooserCombo extends ComponentWithBrowseButton<JComponent
     }
 
     if (component instanceof JComboBox) {
-      ((JComboBox<NamedScope>)component).setRenderer(SimpleListCellRenderer.create("", NamedScope::getPresentableName));
+      ((JComboBox<NamedScope>)component).setRenderer(BuilderKt.textListCellRenderer("", NamedScope::getPresentableName));
     }
     else {
       ((JBComboBoxTableCellEditorComponent)component).setToString(o -> o == null ? "" : ((NamedScope)o).getPresentableName());

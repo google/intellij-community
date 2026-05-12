@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.gradle.java.performance` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "performance_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "performance",
   module_name = "intellij.gradle.java.performance",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":performance_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:jetbrains-annotations",
@@ -31,17 +26,21 @@ jvm_library(
     "//platform/util/concurrency",
     "//platform/core-api:core",
     "//platform/core-ui",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/execution",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//platform/lang-impl",
     "//plugins/maven",
     "//plugins/gradle/java",
     "//platform/lang-core",
+    "//plugins/maven/performanceTesting",
   ]
 )
 
 jvm_library(
   name = "performance_test_lib",
+  testonly = True,
   module_name = "intellij.gradle.java.performance",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -62,12 +61,21 @@ jvm_library(
     "//platform/util/concurrency:concurrency_test_lib",
     "//platform/core-api:core_test_lib",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/editor-ui-api:editor-ui_test_lib",
     "//platform/execution:execution_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/lang-impl:lang-impl_test_lib",
     "//plugins/maven:maven_test_lib",
     "//plugins/gradle/java:java_test_lib",
     "//platform/lang-core:lang-core_test_lib",
+    "//plugins/maven/performanceTesting:performanceTesting_test_lib",
   ]
 )
 ### auto-generated section `build intellij.gradle.java.performance` end
+
+### auto-generated section `iml intellij.gradle.java.performance` start
+exports_files([
+  "intellij.gradle.java.performance.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.gradle.java.performance` end

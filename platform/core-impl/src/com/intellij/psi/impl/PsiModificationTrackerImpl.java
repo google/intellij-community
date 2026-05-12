@@ -86,7 +86,7 @@ public final class PsiModificationTrackerImpl implements PsiModificationTracker,
   }
 
   private void fireEvent() {
-    ((TransactionGuardImpl)TransactionGuard.getInstance()).assertWriteActionAllowed();
+    ((TransactionGuardImpl)TransactionGuard.getInstance()).assertWriteSafeEnvironment();
     myPublisher.modificationCountChanged();
   }
 
@@ -153,11 +153,6 @@ public final class PsiModificationTrackerImpl implements PsiModificationTracker,
   @Override
   public long getModificationCount() {
     return myModificationCount.getModificationCount();
-  }
-
-  @Override
-  public @NotNull ModificationTracker getJavaStructureModificationTracker() {
-    return myModificationCount;
   }
 
   // used by Kotlin

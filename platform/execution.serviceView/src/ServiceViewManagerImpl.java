@@ -770,7 +770,7 @@ public final class ServiceViewManagerImpl implements ServiceViewManager, Persist
       toolWindowId = descriptor.getToolWindowId();
     }
     Collection<ServiceViewContributor<?>> contributors =
-      myGroups.computeIfAbsent(toolWindowId, __ -> ConcurrentCollectionFactory.createConcurrentSet());
+      myGroups.computeIfAbsent(toolWindowId, _ -> ConcurrentCollectionFactory.createConcurrentSet());
     contributors.add(contributor);
   }
 
@@ -1297,7 +1297,7 @@ public final class ServiceViewManagerImpl implements ServiceViewManager, Persist
       ServiceViewToolWindowDescriptor descriptor = getContributorToolWindowDescriptor(contributor);
       String toolWindowId = descriptor.getToolWindowId();
       Collection<ServiceViewContributor<?>> contributors =
-        myGroups.computeIfAbsent(toolWindowId, __ -> ConcurrentCollectionFactory.createConcurrentSet());
+        myGroups.computeIfAbsent(toolWindowId, _ -> ConcurrentCollectionFactory.createConcurrentSet());
       if (contributors.isEmpty()) {
         toolWindowIds.add(toolWindowId);
       }

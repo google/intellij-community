@@ -35,6 +35,9 @@ public final class VFileCreateEvent extends VFileEvent {
     ChildInfo @Nullable("null means children not available (e.g. the created file is not a directory) or unknown") [] children
   ) {
     super(requestor);
+    if (!parent.isDirectory()) {
+      throw new IllegalArgumentException("parent[" + parent + "] must be directory");
+    }
     myParent = parent;
     myDirectory = isDirectory;
     myAttributes = attributes;

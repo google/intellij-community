@@ -3,6 +3,7 @@ package com.intellij.database.run.ui.grid.editors;
 import com.intellij.database.DataGridBundle;
 import com.intellij.database.datagrid.DataGrid;
 import com.intellij.database.datagrid.DocumentDataHookUp;
+import com.intellij.database.datagrid.GridCellRequest;
 import com.intellij.database.datagrid.GridColumn;
 import com.intellij.database.datagrid.GridRow;
 import com.intellij.database.datagrid.GridUtil;
@@ -11,7 +12,6 @@ import com.intellij.database.extractors.ObjectFormatterUtil;
 import com.intellij.database.remote.jdbc.LobInfo;
 import com.intellij.database.run.ReservedCellValue;
 import com.intellij.database.run.actions.LoadFileAction;
-import com.intellij.database.run.ui.DataAccessType;
 import com.intellij.database.settings.DataGridSettings;
 import com.intellij.database.util.LobInfoHelper;
 import com.intellij.notification.Notification;
@@ -33,17 +33,14 @@ import java.util.EventObject;
 public class DefaultTextEditorFactory implements GridCellEditorFactory {
 
   @Override
-  public int getSuitability(@NotNull DataGrid grid, @NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
-    if (grid.getDataHookup() instanceof DocumentDataHookUp) return SUITABILITY_MAX; // allow text in numeric CSV columns
-    return getCommonSuitability(grid, row, column);
+  public int getSuitability(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    if (request.getGrid().getDataHookup() instanceof DocumentDataHookUp) return SUITABILITY_MAX; // allow text in numeric CSV columns
+    return getCommonSuitability(request);
   }
 
   @Override
-  public @NotNull ValueFormatter getValueFormatter(@NotNull DataGrid grid,
-                                                   @NotNull ModelIndex<GridRow> rowIdx,
-                                                   @NotNull ModelIndex<GridColumn> columnIdx,
-                                                   @Nullable Object value) {
-    return getValueFormatter(grid, columnIdx, value);
+  public @NotNull ValueFormatter getValueFormatter(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    return getValueFormatter((DataGrid)request.getGrid(), request.getColumnIdx(), request.getValue());
   }
 
   private static ValueFormatter getValueFormatter(@NotNull DataGrid grid,
@@ -53,11 +50,10 @@ public class DefaultTextEditorFactory implements GridCellEditorFactory {
   }
 
   @Override
-  public @NotNull ValueParser getValueParser(@NotNull DataGrid grid,
-                                             @NotNull ModelIndex<GridRow> rowIdx,
-                                             @NotNull ModelIndex<GridColumn> columnIdx) {
-    Object initialValue = grid.getDataModel(DataAccessType.DATA_WITH_MUTATIONS).getValueAt(rowIdx, columnIdx);
-    String initialText = getValueFormatter(grid, rowIdx, columnIdx, initialValue).format().text;
+  public @NotNull ValueParser getValueParser(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    Object initialValue = request.getValue();
+    // Respect the editor opening value so editSelectedCellWithValue() can control the unchanged commit result.
+    String initialText = getValueFormatter(request).format().text;
     return (text, document) -> {
       boolean valueChanged = !initialText.equals(text);
       return valueChanged ? text : ObjectUtils.notNull(initialValue, ReservedCellValue.NULL);
@@ -82,20 +78,14 @@ public class DefaultTextEditorFactory implements GridCellEditorFactory {
   }
 
   @Override
-  public @NotNull GridCellEditor createEditor(@NotNull DataGrid grid,
-                                              @NotNull ModelIndex<GridRow> row,
-                                              @NotNull ModelIndex<GridColumn> column,
-                                              @Nullable Object object,
-                                              EventObject initiator) {
-    ValueParser parser = getValueParser(grid, row, column);
-    ValueFormatter formatter = getValueFormatter(grid, row, column, object);
-    return new GridTextCellEditor(grid, row, column, object, initiator, getIsEditableChecker(), parser, formatter);
+  public @NotNull GridCellEditor createEditor(@NotNull GridCellRequest<GridRow, GridColumn> request, EventObject initiator) {
+    ValueParser parser = getValueParser(request);
+    ValueFormatter formatter = getValueFormatter(request);
+    return new GridTextCellEditor(request, initiator, getIsEditableChecker(), parser, formatter);
   }
 
-  private static int getCommonSuitability(@NotNull DataGrid grid,
-                                          @NotNull ModelIndex<GridRow> row,
-                                          @NotNull ModelIndex<GridColumn> column) {
-    return switch (GridCellEditorHelper.get(grid).guessJdbcTypeForEditing(grid, row, column)) {
+  private static int getCommonSuitability(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    return switch (GridCellEditorHelper.get(request.getGrid()).guessJdbcTypeForEditing(request)) {
       case Types.NCHAR, Types.CHAR, Types.VARCHAR, Types.NVARCHAR, Types.CLOB, Types.NCLOB, Types.LONGVARCHAR,
         Types.LONGNVARCHAR, Types.SQLXML -> SUITABILITY_MIN;
       default -> SUITABILITY_UNSUITABLE;
@@ -105,22 +95,17 @@ public class DefaultTextEditorFactory implements GridCellEditorFactory {
   private static class GridTextCellEditor extends GridTextCellEditorBase implements LoadFileAction.LoadFileActionHandler {
     private static final Logger LOG = Logger.getInstance(GridTextCellEditor.class);
 
-    private final ModelIndex<GridColumn> myColumnIdx;
     private final ValueParser myValueParser;
 
-    private GridTextCellEditor(@NotNull DataGrid grid,
-                               @NotNull ModelIndex<GridRow> row,
-                               @NotNull ModelIndex<GridColumn> column,
-                               @Nullable Object value,
+    private GridTextCellEditor(@NotNull GridCellRequest<GridRow, GridColumn> request,
                                EventObject initiator,
                                @NotNull IsEditableChecker editableChecker,
                                @NotNull ValueParser valueParser,
                                @NotNull ValueFormatter valueFormatter) {
-      super(grid, row, column, value, initiator, editableChecker, valueFormatter);
-      myColumnIdx = column;
+      super(request, initiator, editableChecker, valueFormatter);
       myValueParser = valueParser;
-      if (grid.getDataHookup() instanceof DocumentDataHookUp && ObjectFormatterUtil.isNumericCell(grid, row, column)) {
-        myTextField.addSettingsProvider(editor -> GridUtil.configureNumericEditor(grid, editor));
+      if (request.getGrid().getDataHookup() instanceof DocumentDataHookUp && ObjectFormatterUtil.isNumericCell(request)) {
+        myTextField.addSettingsProvider(editor -> GridUtil.configureNumericEditor(getGrid(), editor));
       }
     }
 
@@ -136,13 +121,13 @@ public class DefaultTextEditorFactory implements GridCellEditorFactory {
 
     @Override
     public void fileChosen(@NotNull VirtualFile file) {
-      myValue = loadValueFromFile(file, GridUtil.getSettings(myGrid));
+      myValue = loadValueFromFile(file, GridUtil.getSettings(getGrid()));
       if (myValue == null || myValue instanceof LobInfo.FileClobInfo) {
         // either a file is too big or it has a binary format - no further editing available
-        myGrid.stopEditing();
+        getGrid().stopEditing();
       }
       else {
-        ValueFormatterResult result = getValueFormatter(myGrid, myColumnIdx, myValue).format();
+        ValueFormatterResult result = getValueFormatter(getGrid(), getColumnIdx(), myValue).format();
         myTextField.setText(result.text);
       }
     }

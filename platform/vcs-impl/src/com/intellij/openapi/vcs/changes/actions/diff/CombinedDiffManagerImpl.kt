@@ -12,6 +12,7 @@ import com.intellij.diff.tools.combined.CombinedDiffViewer
 import com.intellij.diff.tools.combined.CombinedPathBlockId
 import com.intellij.diff.util.DiffUserDataKeys
 import com.intellij.openapi.ListSelection
+import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.ChangeViewDiffRequestProcessor.Wrapper
 import com.intellij.openapi.vcs.changes.ui.ChangeDiffRequestChain
@@ -19,16 +20,28 @@ import com.intellij.openapi.vcs.changes.ui.PresentableChange
 import org.jetbrains.annotations.ApiStatus
 
 internal class CombinedDiffManagerImpl(private val project: Project) : CombinedDiffManager {
-  override fun createProcessor(diffPlace: String?): CombinedDiffComponentProcessor {
+  override fun createProcessor(
+    diffPlace: String?,
+    contextActions: List<AnAction>?,
+    goToChangeToolbarActions: List<AnAction>?,
+  ): CombinedDiffComponentProcessor {
     val model = CombinedDiffModel(project)
     model.context.putUserData(DiffUserDataKeys.PLACE, diffPlace)
-    val goToChangePopupAction = MyGoToChangePopupAction(model)
+    model.context.putUserData(DiffUserDataKeys.CONTEXT_ACTIONS, contextActions)
+    val goToChangePopupAction = MyGoToChangePopupAction(model, goToChangeToolbarActions.orEmpty())
     return CombinedDiffComponentProcessorImpl(model, goToChangePopupAction)
   }
 }
 
-internal class MyGoToChangePopupAction(val model: CombinedDiffModel) : PresentableGoToChangePopupAction.Default<PresentableChange>() {
+internal class MyGoToChangePopupAction(
+  val model: CombinedDiffModel,
+  private val toolbarActions: List<AnAction>,
+) : PresentableGoToChangePopupAction.Default<PresentableChange>() {
   private val viewer get() = model.context.getUserData(COMBINED_DIFF_VIEWER_KEY)
+
+  override fun createToolbarActions(): List<AnAction> {
+    return toolbarActions
+  }
 
   override fun getChanges(): ListSelection<out PresentableChange> {
     val changes = model.requests.map { it.producer }.filterIsInstance<PresentableChange>()

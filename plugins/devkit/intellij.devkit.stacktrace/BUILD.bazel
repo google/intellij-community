@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.devkit.stacktrace` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "stacktrace_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "stacktrace",
   module_name = "intellij.devkit.stacktrace",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":stacktrace_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//plugins/devkit/devkit-core:core",
@@ -27,6 +22,7 @@ jvm_library(
     "//java/java-impl:impl",
     "//java/unscramble",
     "//platform/util/coroutines",
+    "//platform/util:util-ui",
     "//platform/threadDumpParser",
     "//platform/diagnostic/freezeAnalyzer",
   ]
@@ -34,6 +30,7 @@ jvm_library(
 
 jvm_library(
   name = "stacktrace_test_lib",
+  testonly = True,
   module_name = "intellij.devkit.stacktrace",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -51,8 +48,15 @@ jvm_library(
     "//java/java-impl:impl_test_lib",
     "//java/unscramble:unscramble_test_lib",
     "//platform/util/coroutines:coroutines_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//platform/threadDumpParser:threadDumpParser_test_lib",
     "//platform/diagnostic/freezeAnalyzer:freezeAnalyzer_test_lib",
   ]
 )
 ### auto-generated section `build intellij.devkit.stacktrace` end
+
+### auto-generated section `iml intellij.devkit.stacktrace` start
+exports_files([
+  "intellij.devkit.stacktrace.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.devkit.stacktrace` end

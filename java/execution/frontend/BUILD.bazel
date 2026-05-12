@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.java.execution.impl.frontend` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "frontend_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "frontend",
   module_name = "intellij.java.execution.impl.frontend",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":frontend_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//libraries/kotlinx/serialization/core",
     "//libraries/kotlinx/serialization/json",
@@ -22,15 +17,19 @@ jvm_library(
     "//platform/editor-ui-api:editor-ui",
     "//platform/platform-impl/rpc",
     "//platform/platform-impl:ide-impl",
+    "//platform/ide-core",
     "//platform/kernel/shared:kernel",
     "//platform/project/shared:project",
     "//platform/testRunner",
+    "//platform/util:util-ui",
     "//java/java-frontback-impl:frontback-impl",
+    "//fleet/rhizomedb",
   ]
 )
 
 jvm_library(
   name = "frontend_test_lib",
+  testonly = True,
   module_name = "intellij.java.execution.impl.frontend",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -44,10 +43,19 @@ jvm_library(
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//platform/platform-impl/rpc:rpc_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/kernel/shared:kernel_test_lib",
     "//platform/project/shared:project_test_lib",
     "//platform/testRunner:testRunner_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//java/java-frontback-impl:frontback-impl_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.java.execution.impl.frontend` end
+
+### auto-generated section `iml intellij.java.execution.impl.frontend` start
+exports_files([
+  "intellij.java.execution.impl.frontend.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.java.execution.impl.frontend` end

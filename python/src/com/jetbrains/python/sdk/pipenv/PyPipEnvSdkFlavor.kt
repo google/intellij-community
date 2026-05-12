@@ -5,13 +5,14 @@ import com.intellij.python.community.impl.pipenv.PIPENV_ICON
 import com.jetbrains.python.sdk.flavors.CPythonSdkFlavor
 import com.jetbrains.python.sdk.flavors.PyFlavorData
 import com.jetbrains.python.sdk.flavors.PythonFlavorProvider
+import java.nio.file.Path
 import javax.swing.Icon
 
 object PyPipEnvSdkFlavor : CPythonSdkFlavor<PyFlavorData.Empty>() {
   override fun getIcon(): Icon = PIPENV_ICON
   override fun getFlavorDataClass(): Class<PyFlavorData.Empty> = PyFlavorData.Empty::class.java
 
-  override fun isValidSdkPath(pathStr: String): Boolean = false
+  override fun isValidSdkPath(pythonBinaryPath: Path): Boolean = false
 }
 
 class PyPipEnvSdkFlavorProvider : PythonFlavorProvider {

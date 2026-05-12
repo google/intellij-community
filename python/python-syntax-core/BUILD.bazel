@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.python.syntax.core` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "syntax-core_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "syntax-core",
   module_name = "intellij.python.syntax.core",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":syntax-core_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/editor-ui-api:editor-ui",
     "//platform/core-api:core",
@@ -29,11 +24,13 @@ jvm_library(
     "//platform/analysis-api:analysis",
     "//platform/ide-core-impl",
     "//platform/analysis-impl",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
   ]
 )
 
 jvm_library(
   name = "syntax-core_test_lib",
+  testonly = True,
   module_name = "intellij.python.syntax.core",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -54,6 +51,13 @@ jvm_library(
     "//platform/analysis-api:analysis_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
     "//platform/analysis-impl:analysis-impl_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
   ]
 )
 ### auto-generated section `build intellij.python.syntax.core` end
+
+### auto-generated section `iml intellij.python.syntax.core` start
+exports_files([
+  "intellij.python.syntax.core.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.python.syntax.core` end

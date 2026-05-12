@@ -7,17 +7,17 @@ load(
     _KtPluginConfiguration = "KtPluginConfiguration",
     _TOOLCHAIN_TYPE = "TOOLCHAIN_TYPE",
 )
-load(
-    "//:rules/impl/javac-options.bzl",
-    "JavacOptions",
-)
+load("@rules_kotlin//kotlin/internal:opts.bzl", "JavacOptions")
 load(
     "//:rules/impl/kotlinc-options.bzl",
+    "KotlincExtraOptionsInfo",
     "KotlincOptions",
 )
 load("//:rules/impl/transitions.bzl", "scrubbed_host_platform_transition")
 
 visibility("private")
+
+USE_RULES_KOTLIN_BACKEND = False
 
 common_toolchains = [
     _TOOLCHAIN_TYPE,
@@ -70,7 +70,7 @@ kmp_attr = add_dicts(
         "kotlinc_opts": attr.label(
             doc = """Kotlinc options to be used when compiling this target.""",
             default = "//:default-kotlinc-opts",
-            providers = [KotlincOptions],
+            providers = [[KotlincOptions, KotlincExtraOptionsInfo]],
         ),
     },
 )
@@ -120,8 +120,6 @@ common_attr = add_dicts(
         ),
         "_reduced_classpath": attr.bool(default = False),
         "_trace": attr.label(default = "//:trace"),
-        "_kotlin_inc_threshold": attr.label(default = "//:koltin_inc_threshold"),
-        "_java_inc_threshold": attr.label(default = "//:java_inc_threshold"),
     },
 )
 

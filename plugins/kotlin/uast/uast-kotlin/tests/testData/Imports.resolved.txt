@@ -26,15 +26,15 @@ UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = ja
 UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = lang) -> PsiPackage:java.lang: lang
 UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = Thread) -> PsiClass:Thread: Thread
 UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = sleep) -> null: null
-UImportStatement (isOnDemand = false) -> UQualifiedReferenceExpression -> PsiMethod:emptyList: emptyList
+UImportStatement (isOnDemand = false) -> UQualifiedReferenceExpression -> UastFakeDeserializedSourceLightMethod of emptyList: emptyList
 UQualifiedReferenceExpression -> UQualifiedReferenceExpression -> PsiPackage:kotlin.collections: collections
 UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = kotlin) -> PsiPackage:kotlin: kotlin
 UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = collections) -> PsiPackage:kotlin.collections: collections
-UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = emptyList) -> PsiMethod:emptyList: emptyList
-UImportStatement (isOnDemand = false) -> UQualifiedReferenceExpression -> PsiField:SIZE_BYTES: SIZE_BYTES
-UQualifiedReferenceExpression -> UQualifiedReferenceExpression -> PsiClass:IntCompanionObject: IntCompanionObject
+UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = emptyList) -> UastFakeDeserializedSourceLightMethod of emptyList: emptyList
+UImportStatement (isOnDemand = false) -> UQualifiedReferenceExpression -> PROPERTY: SIZE_BYTES
+UQualifiedReferenceExpression -> UQualifiedReferenceExpression -> KtLightClassForDecompiledDeclaration of PsiFile:IntCompanionObject.class: IntCompanionObject
 UQualifiedReferenceExpression -> UQualifiedReferenceExpression -> PsiClass:Integer: Integer
 UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = kotlin) -> PsiPackage:kotlin: kotlin
 UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = Int) -> PsiClass:Integer: Integer
-UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = Companion) -> PsiClass:IntCompanionObject: IntCompanionObject
-UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = SIZE_BYTES) -> PsiField:SIZE_BYTES: SIZE_BYTES
+UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = Companion) -> KtLightClassForDecompiledDeclaration of PsiFile:IntCompanionObject.class: IntCompanionObject
+UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = SIZE_BYTES) -> PROPERTY: SIZE_BYTES

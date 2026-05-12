@@ -51,7 +51,7 @@ public class StaticImportMethodFix extends StaticImportMemberFix<PsiMethod, PsiM
 
   @Override
   public @NotNull IntentionPreviewInfo generatePreview(@NotNull Project project, @NotNull Editor editor, @NotNull PsiFile psiFile) {
-    return generatePreview(psiFile, (__, method) -> AddSingleMemberStaticImportAction.bindAllClassRefs(psiFile, method, method.getName(), method.getContainingClass()));
+    return generatePreview(psiFile, (_, method) -> AddSingleMemberStaticImportAction.bindAllClassRefs(psiFile, method, method.getName(), method.getContainingClass()));
   }
 
   @Override

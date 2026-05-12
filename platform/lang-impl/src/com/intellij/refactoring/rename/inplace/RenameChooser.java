@@ -19,7 +19,7 @@ import com.intellij.psi.PsiReference;
 import com.intellij.refactoring.RefactoringBundle;
 import com.intellij.refactoring.rename.RenameUsagesCollector;
 import com.intellij.testFramework.TestModeFlags;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 
@@ -74,7 +74,7 @@ public abstract class RenameChooser {
         }
       })
       .setTitle(RefactoringBundle.message("rename.string.occurrences.found.title"))
-      .setRenderer(SimpleListCellRenderer.create("", RefactoringBundle::message))
+      .setRenderer(BuilderKt.textListCellRenderer("", RefactoringBundle::message))
       .setMovable(false)
       .setResizable(false)
       .setRequestFocus(true)

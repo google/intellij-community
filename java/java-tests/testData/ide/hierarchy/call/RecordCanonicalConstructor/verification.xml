@@ -1,4 +1,4 @@
-<node text="Person.Person(String, String)  ()" base="true">
-  <node text="Person.Person(String)  ()"/>
-  <node text="Action.main(String[])  ()"/>
+<node text="Person(String, String) (Person)" base="true">
+  <node text="Person(String) (Person)"/>
+  <node text="main(String[]) (Action)"/>
 </node>

@@ -1,31 +1,35 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.groovy.compiler;
 
 import com.intellij.compiler.CompilerConfiguration;
+import com.intellij.openapi.roots.ModuleRootModificationUtil;
+import com.intellij.psi.PsiFile;
+import com.intellij.testFramework.UsefulTestCase;
+import com.intellij.testFramework.fixtures.MavenDependencyUtil;
 import org.jetbrains.groovy.compiler.rt.GroovyRtConstants;
 import org.jetbrains.jps.incremental.groovy.JpsGroovycRunner;
 import org.jetbrains.plugins.groovy.GroovyProjectDescriptors;
 import org.jetbrains.plugins.groovy.TestLibrary;
 
-public final class Groovyc30InProcessWithClassLoaderResolvingTest extends Groovyc25Test {
+import java.io.IOException;
+
+public final class Groovyc30InProcessWithClassLoaderResolvingTest extends GroovycTestBase {
   @Override
   protected TestLibrary getGroovyLibrary() {
     return GroovyProjectDescriptors.LIB_GROOVY_3_0;
   }
 
   @Override
-  protected boolean isRebuildExpectedAfterChangeInJavaClassExtendedByGroovy() {
-    return false;
+  public void testRecompileOneFileThatTriggersChunkRebuildInside() throws IOException {
+    doTestRecompileOneFileThatTriggersChunkRebuildInside(false);
   }
 
   @Override
-  protected boolean isRebuildExpectedAfterChangesInGroovyWhichUseJava() {
-    return true;
-  }
-
-  @Override
-  protected boolean isRebuildExpectedWhileCompilingDependentTrait() {
-    return false;
+  public void testExtendGroovyClassesWithAdditionalDependencies() {
+    ModuleRootModificationUtil.updateModel(getModule(), model -> {
+      MavenDependencyUtil.addFromMaven(model, "org.codehaus.groovy:groovy-test:3.0.20", false);
+    });
+    super.testExtendGroovyClassesWithAdditionalDependencies();
   }
 
   @Override
@@ -37,5 +41,13 @@ public final class Groovyc30InProcessWithClassLoaderResolvingTest extends Groovy
       " -D" + JpsGroovycRunner.GROOVYC_IN_PROCESS + "=true" +
       " -D" + GroovyRtConstants.GROOVYC_ASM_RESOLVING_ONLY + "=false"
     );
+  }
+
+  public void testDependentTrait() throws IOException {
+    PsiFile ca = myFixture.addFileToProject("A.groovy", "class A implements B { }");
+    myFixture.addFileToProject("B.groovy", "trait B { A aaa }");
+    UsefulTestCase.assertEmpty(make());
+    touch(ca.getVirtualFile());
+    UsefulTestCase.assertEmpty(make());
   }
 }

@@ -1,24 +1,18 @@
 ### auto-generated section `build kotlin.inspections` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "inspections_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "inspections",
   module_name = "kotlin.inspections",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":inspections_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinc-kotlin-compiler-common",
     "@lib//:kotlinc-kotlin-jps-common",
     "//platform/core-api:core",
-    "//plugins/kotlin/base/frontend-agnostic",
     "//plugins/kotlin/base/util",
     "//plugins/kotlin/base/facet",
     "//plugins/kotlin/base/code-insight",
@@ -34,13 +28,13 @@ jvm_library(
 
 jvm_library(
   name = "inspections_test_lib",
+  testonly = True,
   module_name = "kotlin.inspections",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
     ":inspections",
     "//platform/core-api:core_test_lib",
-    "//plugins/kotlin/base/frontend-agnostic:frontend-agnostic_test_lib",
     "//plugins/kotlin/base/util:util_test_lib",
     "//plugins/kotlin/base/facet:facet_test_lib",
     "//plugins/kotlin/base/code-insight:code-insight_test_lib",
@@ -54,3 +48,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build kotlin.inspections` end
+
+### auto-generated section `iml kotlin.inspections` start
+exports_files([
+  "kotlin.inspections.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.inspections` end

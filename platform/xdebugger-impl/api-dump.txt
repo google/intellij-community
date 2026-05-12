@@ -39,6 +39,10 @@ com.intellij.xdebugger.attach.XLocalAttachDebugger
 a:com.intellij.xdebugger.impl.actions.handlers.XDebuggerActionHandler
 - pa:isEnabled(com.intellij.xdebugger.XDebugSession,com.intellij.openapi.actionSystem.DataContext):Z
 - pa:perform(com.intellij.xdebugger.XDebugSession,com.intellij.openapi.actionSystem.DataContext):V
+f:com.intellij.xdebugger.impl.breakpoints.XBreakpointUtil
+- sf:hasCustomCondition(com.intellij.xdebugger.breakpoints.XBreakpoint):Z
+f:com.intellij.xdebugger.impl.breakpoints.XBreakpointUtilKt
+- sf:getHasCustomCondition(com.intellij.xdebugger.breakpoints.XBreakpoint):Z
 f:com.intellij.xdebugger.impl.ui.XDebugSessionTabCustomizerKt
 - sf:allowFramesViewCustomization(com.intellij.xdebugger.XDebugProcess):Z
 - sf:forceShowNewDebuggerUi(com.intellij.xdebugger.XDebugProcess):Z

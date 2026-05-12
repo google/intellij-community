@@ -1,4 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.jps.entities.impl
 
 import com.intellij.platform.workspace.jps.entities.ProjectSettingsEntity
@@ -181,7 +183,6 @@ internal class ProjectSettingsEntityData : WorkspaceEntityData<ProjectSettingsEn
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): ProjectSettingsEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {

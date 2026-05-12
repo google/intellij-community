@@ -153,7 +153,7 @@ public abstract class AbstractExternalSystemTask extends UserDataHolderBase impl
         });
       });
     }
-    catch (CancellationException __) {
+    catch (CancellationException _) {
       // the exception shouldn't be thrown due to the legacy architecture decision
       // if the exception would be thrown, the cancellation will never be handled due to
       // {@link com.intellij.openapi.externalSystem.util.ExternalSystemUtil.handleSyncResult}

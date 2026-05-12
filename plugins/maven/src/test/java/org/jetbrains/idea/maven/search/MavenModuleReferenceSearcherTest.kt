@@ -17,7 +17,12 @@ class MavenModuleReferenceSearcherTest : MavenDomTestCase() {
     withContext(Dispatchers.EDT) {
       writeIntentReadAction {
         val renameDialog = RenameDialog(project, directory, directory, null)
-        renameDialog.performRename(newName)
+        try {
+          renameDialog.performRename(newName)
+        }
+        finally {
+          renameDialog.close()
+        }
       }
     }
     awaitConfiguration()

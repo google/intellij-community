@@ -20,7 +20,7 @@ class MyClass2(object):
 
 
 def builder():
-    return MetaClass()
+    return MetaClass("MyClass", (), {})
 
 
 Generated = builder()

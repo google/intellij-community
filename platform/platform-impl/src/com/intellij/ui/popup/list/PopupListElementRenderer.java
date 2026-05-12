@@ -69,6 +69,7 @@ public class PopupListElementRenderer<E> extends GroupedItemsListRenderer<E> {
 
   private JPanel myButtonPane;
   private Boolean hasExtraButtons = null; // state initialized in updateExtraButtons
+  private boolean reserveSpaceForExtraButtons = true;
 
   private JComponent myMainPane;
   protected JComponent myButtonSeparator;
@@ -454,6 +455,35 @@ public class PopupListElementRenderer<E> extends GroupedItemsListRenderer<E> {
     return true;
   }
 
+  /**
+   * The flag that determines whether to leave extra space for inline actions when they're not shown.
+   *
+   * @see #setReserveSpaceForExtraButtons(boolean)
+   * @return the current flag value
+   */
+  public boolean isReserveSpaceForExtraButtons() {
+    return reserveSpaceForExtraButtons;
+  }
+
+  /**
+   * Controls reserving extra space for the inline actions when they're not shown.
+   * <p>
+   *   Inline actions are only shown when the item is selected.
+   *   Reserving extra space (the default) helps to avoid resizing
+   *   of the contents when the selection moves, because the inline actions will take that reserved space as they appear.
+   *   In the current implementation the space is reserved for a single button only, which is a common case.
+   * </p>
+   * <p>
+   *   However, some popups may wish to disable this behavior, because their size could be preset
+   *   to accommodate exactly as much text as needed. In this case, reserving extra space won't make the popup bigger
+   *   (because the size is preset), but rather waste valuable space, cutting values off.
+   * </p>
+   * @param reserveSpaceForExtraButtons the new flag value
+   */
+  public void setReserveSpaceForExtraButtons(boolean reserveSpaceForExtraButtons) {
+    this.reserveSpaceForExtraButtons = reserveSpaceForExtraButtons;
+  }
+
   private boolean updateExtraButtons(JList<? extends E> list, E value, ListPopupStep<Object> step, boolean isSelected, boolean hasNextIcon) {
     GridBag gb = new GridBag().setDefaultFill(GridBagConstraints.BOTH)
       .setDefaultAnchor(GridBagConstraints.CENTER)
@@ -488,7 +518,7 @@ public class PopupListElementRenderer<E> extends GroupedItemsListRenderer<E> {
       }
       hasExtraButtons = true;
     }
-    else if (!hasNextIcon && myInlineActionsSupport.hasExtraButtons(value)) {
+    else if (!hasNextIcon && isReserveSpaceForExtraButtons() && myInlineActionsSupport.hasExtraButtons(value)) {
       myButtonPane.removeAll();
       myButtonSeparator.setVisible(false);
       myButtonPane.add(Box.createHorizontalStrut(InlineActionsUtilKt.buttonWidth()), gb.next());

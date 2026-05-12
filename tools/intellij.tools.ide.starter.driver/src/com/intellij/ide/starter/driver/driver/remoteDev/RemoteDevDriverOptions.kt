@@ -11,8 +11,11 @@ class RemoteDevDriverOptions {
 
   val frontendOptions: DriverOptions by lazy {
     DriverOptions(port = getAvailablePort(proposedPort = 8889),
+                  rmiPort = getAvailablePort(proposedPort = 11500),
                   webServerPort = getAvailablePort(proposedPort = 7778),
-                  additionalProperties = mapOf("rdct.tests.backendJmxPort" to backendOptions.port.toString()) + remoteDevVmOptions)
+                  additionalProperties = mapOf("rdct.tests.backendJmxPort" to backendOptions.port.toString(),
+                                               "rdct.tests.backendJmxHost" to backendOptions.host.hostAddress)
+                                         + remoteDevVmOptions)
   }
 
   val debugPort: Int by lazy { getAvailablePort(proposedPort = 5010) }
@@ -22,8 +25,6 @@ class RemoteDevDriverOptions {
    */
   private val remoteDevVmOptions: Map<String, String> =
     mapOf(
-      "ide.mac.file.chooser.native" to "false",
-      "apple.laf.useScreenMenuBar" to "false",
-      "jbScreenMenuBar.enabled" to "false",
+      "ide.mac.file.chooser.native" to "false"
     )
 }

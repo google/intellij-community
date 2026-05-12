@@ -1,12 +1,12 @@
 package com.intellij.database.run.ui.grid.editors;
 
 import com.intellij.database.datagrid.DataGrid;
+import com.intellij.database.datagrid.GridCellRequest;
 import com.intellij.database.datagrid.GridColumn;
 import com.intellij.database.datagrid.GridRow;
 import com.intellij.database.datagrid.ModelIndex;
 import com.intellij.database.extractors.FormatterCreator;
 import com.intellij.database.run.ReservedCellValue;
-import com.intellij.database.run.ui.DataAccessType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.popup.JBPopup;
 import com.intellij.openapi.wm.IdeFocusManager;
@@ -56,23 +56,21 @@ public class DefaultTimestampEditorFactory extends DefaultTemporalEditorFactory 
   }
 
   @Override
-  protected @NotNull Formatter getFormatInner(@NotNull DataGrid grid, @NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
-    GridColumn c = Objects.requireNonNull(grid.getDataModel(DataAccessType.DATA_WITH_MUTATIONS).getColumn(column));
-    return FormatterCreator.get(grid).create(getFormatterKey(grid, c));
+  protected @NotNull Formatter getFormatInner(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    GridColumn c = Objects.requireNonNull(request.getColumn());
+    return FormatterCreator.get(request.getGrid()).create(getFormatterKey((DataGrid)request.getGrid(), c));
   }
 
   @Override
-  public int getSuitability(@NotNull DataGrid grid, @NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
-    return GridCellEditorHelper.get(grid).guessJdbcTypeForEditing(grid, row, column) == getExpectedJdbcType()
+  public int getSuitability(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    return GridCellEditorHelper.get(request.getGrid()).guessJdbcTypeForEditing(request) == getExpectedJdbcType()
            ? SUITABILITY_MIN
            : SUITABILITY_UNSUITABLE;
   }
 
   @Override
-  public @NotNull ValueParser getValueParser(@NotNull DataGrid grid,
-                                             @NotNull ModelIndex<GridRow> rowIdx,
-                                             @NotNull ModelIndex<GridColumn> columnIdx) {
-    ValueParser parser = super.getValueParser(grid, rowIdx, columnIdx);
+  public @NotNull ValueParser getValueParser(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    ValueParser parser = super.getValueParser(request);
     return (text, document) -> {
       Object v = parser.parse(text, document);
       if (!(v instanceof Date date)) return v;
@@ -86,23 +84,23 @@ public class DefaultTimestampEditorFactory extends DefaultTemporalEditorFactory 
 
   @Override
   protected @NotNull FormatBasedGridCellEditor createEditorImpl(@NotNull Project project,
-                                                                final @NotNull DataGrid grid,
+                                                                @NotNull GridCellRequest<GridRow, GridColumn> request,
                                                                 @NotNull Formatter format,
                                                                 @Nullable ReservedCellValue nullValue,
                                                                 EventObject initiator,
                                                                 @Nullable TextCompletionProvider provider,
-                                                                @NotNull ModelIndex<GridRow> row,
-                                                                @NotNull ModelIndex<GridColumn> column,
                                                                 @NotNull ValueParser valueParser,
                                                                 @NotNull ValueFormatter valueFormatter) {
     return new FormatBasedGridCellEditor.WithBrowseButton<CalendarView, Date>(
-      project, grid, format, nullValue, initiator, row, column, Date.class, provider, valueParser, valueFormatter, this) {
+      project, request, format, nullValue, initiator, Date.class, provider, valueParser, valueFormatter, this) {
 
       @Override
       protected @NotNull CalendarView getPopupComponent() {
         CalendarView calendarView = new CalendarView(myCalendarMode);
         calendarView.setFocusCycleRoot(true);
         calendarView.getCalendar().setTimeZone(DataGridFormattersUtilCore.getDefaultTimeZone());
+        ModelIndex<GridColumn> column = getColumnIdx();
+        DataGrid grid = getGrid();
         Date initial = DataGridFormattersUtilCore.getBoundedValue(
           DataGridFormattersUtilCore.getDateFrom(getValue(), grid, column, FormatsCache.get(grid), FormatterCreator.get(grid)), column, grid);
         calendarView.setDate(initial);

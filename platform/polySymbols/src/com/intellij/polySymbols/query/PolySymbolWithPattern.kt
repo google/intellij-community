@@ -3,6 +3,7 @@ package com.intellij.polySymbols.query
 
 import com.intellij.polySymbols.PolySymbol
 import com.intellij.polySymbols.patterns.PolySymbolPattern
+import com.intellij.polySymbols.patterns.polySymbolPattern
 
 /**
  * A symbol, which might consist of other symbols and provides a pattern, which describes the relationship.
@@ -14,6 +15,10 @@ interface PolySymbolWithPattern : PolySymbol {
    * A pattern may specify that a reference to other Poly Symbols is expected in some part of it.
    * For such places, appropriate segments with referenced Poly Symbols will be created and navigation,
    * validation and refactoring support is available out-of-the-box.
+   *
+   * To build a pattern use [polySymbolPattern] builder.
+   *
+   * @see [PolySymbolPattern]
    */
   val pattern: PolySymbolPattern
 

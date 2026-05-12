@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.refactoring.ui;
 
 import com.intellij.ide.util.TreeClassChooser;
@@ -9,12 +9,10 @@ import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.psi.JavaCodeFragment;
 import com.intellij.psi.JavaCodeFragmentFactory;
-import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiJavaFile;
 import com.intellij.psi.PsiModifier;
-import com.intellij.psi.PsiPackage;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.ui.ReferenceEditorWithBrowseButton;
 import org.jetbrains.annotations.NotNull;
@@ -37,8 +35,7 @@ public class ClassNameReferenceEditor extends ReferenceEditorWithBrowseButton {
   public ClassNameReferenceEditor(final @NotNull Project project, final @Nullable PsiClass selectedClass,
                                   final @Nullable GlobalSearchScope resolveScope) {
     super(null, project, s -> {
-      PsiPackage defaultPackage = JavaPsiFacade.getInstance(project).findPackage("");
-      final JavaCodeFragment fragment = JavaCodeFragmentFactory.getInstance(project).createReferenceCodeFragment(s, defaultPackage, true, true);
+      final JavaCodeFragment fragment = JavaCodeFragmentFactory.getInstance(project).createReferenceCodeFragmentInPackage(s, "", true);
       fragment.setVisibilityChecker(JavaCodeFragment.VisibilityChecker.EVERYTHING_VISIBLE);
       if (resolveScope != null) {
         fragment.forceResolveScope(resolveScope);

@@ -276,12 +276,15 @@ open class IdeStarter : ModernApplicationStarter() {
 private suspend fun loadProjectFromExternalCommandLine(commandLineArgs: List<String>): Project? {
   val result = CommandLineProcessor.processExternalCommandLine(commandLineArgs, currentDirectory = null)
   if (result.hasError) {
+    logger<IdeStarter>().warn(result.getErrorMessage() ?: "Can't process command line")
     withContext(Dispatchers.EDT) {
       if (!ApplicationManagerEx.isInIntegrationTest() ||
           !java.lang.Boolean.parseBoolean(System.getProperty("closeIDESilentlyOnStartupErrorInTests"))) {
         result.showError()
       }
-      ApplicationManager.getApplication().exit(true, true, false)
+      if (!AppMode.isRemoteDevHost()) {
+        ApplicationManager.getApplication().exit(true, true, false)
+      }
     }
   }
   return result.project

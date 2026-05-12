@@ -18,7 +18,7 @@ public class DefaultStubBuilder implements StubBuilder {
   private static final Logger LOG = Logger.getInstance(DefaultStubBuilder.class);
 
   @Override
-  public StubElement buildStubTree(@NotNull PsiFile file) {
+  public @NotNull StubElement buildStubTree(@NotNull PsiFile file) {
     return buildStubTreeFor(file.getNode(), createStubForFile(file));
   }
 

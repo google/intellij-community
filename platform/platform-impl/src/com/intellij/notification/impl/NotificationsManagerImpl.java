@@ -387,7 +387,7 @@ public final class NotificationsManagerImpl extends NotificationsManager {
   private void showNotificationWithSpan(Notification notification, @Nullable Project project) {
     TraceKt.use(myTracer.spanBuilder("show notification")
                   .setAttribute("project", project == null ? null : project.toString())
-                  .setAttribute("notification", notification.toString()), __ -> {
+                  .setAttribute("notification", notification.toString()), _ -> {
       showNotificationInner(notification, project);
       return null;
     });
@@ -1033,7 +1033,7 @@ public final class NotificationsManagerImpl extends NotificationsManager {
     }
 
     DropDownAction dropDownAction = new DropDownAction(IdeCoreBundle.message("notifications.action.more"),
-                                                       (link, _1) -> showPopup(notification, link, group, actionPanel.popupAlarm));
+                                                       (link, _) -> showPopup(notification, link, group, actionPanel.popupAlarm));
     actionPanel.addAction(dropDownAction);
   }
 

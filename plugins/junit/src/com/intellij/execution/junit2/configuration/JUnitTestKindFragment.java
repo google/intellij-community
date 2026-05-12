@@ -28,9 +28,9 @@ import com.intellij.psi.PsiElement;
 import com.intellij.ui.EditorTextFieldWithBrowseButton;
 import com.intellij.ui.InsertPathAction;
 import com.intellij.ui.RawCommandLineEditor;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.TextAccessor;
 import com.intellij.ui.components.fields.ExpandableTextField;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.IconUtil;
 import org.jetbrains.annotations.Nls;
@@ -82,7 +82,7 @@ public class JUnitTestKindFragment extends SettingsEditorFragment<JUnitConfigura
     myModel.reloadTestKindModel(myTypeChooser, myModuleSelector.getModule(), () -> {
       myTypeChooser.addActionListener(e -> myModel.setType(myTypeChooser.getItem()));
     });
-    myTypeChooser.setRenderer(SimpleListCellRenderer.create("", value -> getKindName(value)));
+    myTypeChooser.setRenderer(BuilderKt.textListCellRenderer("", value -> getKindName(value)));
 
     EditorTextFieldWithBrowseButton packageField = new EditorTextFieldWithBrowseButton(project, false);
     TextFieldWithBrowseButton pattern = new TextFieldWithBrowseButton(new ExpandableTextField(text -> Arrays.asList(text.split("\\|\\|")),

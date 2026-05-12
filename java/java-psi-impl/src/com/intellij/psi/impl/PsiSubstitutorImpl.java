@@ -231,7 +231,8 @@ public final class PsiSubstitutorImpl implements PsiSubstitutor {
       }
       PsiSubstitutor resultSubstitutor = processClass(aClass, resolveResult.getSubstitutor());
       return new PsiImmediateClassType(aClass, resultSubstitutor, classType.getLanguageLevel(),
-                                       classType.getAnnotationProvider(), classType.getPsiContext());
+                                       classType.getAnnotationProvider(), classType.getPsiContext())
+        .withNullability(classType.getNullability());
     }
 
     private @NotNull PsiSubstitutor processClass(@NotNull PsiClass resolve, @NotNull PsiSubstitutor originalSubstitutor) {

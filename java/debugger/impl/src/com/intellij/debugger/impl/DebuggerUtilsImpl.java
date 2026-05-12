@@ -548,6 +548,13 @@ public final class DebuggerUtilsImpl extends DebuggerUtilsEx {
         Enumeration<URL> urls = aClass.getClassLoader().getResources(resourcePath);
         while (urls.hasMoreElements()) {
           URL url = urls.nextElement();
+          // try to exclude idea_rt.jar
+          if (url.getProtocol().equals(URLUtil.JAR_PROTOCOL) && !url.getFile().contains("idea_rt.jar")) {
+            Pair<String, String> jarUrl = URLUtil.splitJarUrl(url.toString());
+            if (jarUrl != null) {
+              return jarUrl.first;
+            }
+          }
           // prefer dir
           if (url.getProtocol().equals(URLUtil.FILE_PROTOCOL)) {
             String path = URLUtil.urlToFile(url).getPath();
@@ -601,7 +608,7 @@ public final class DebuggerUtilsImpl extends DebuggerUtilsEx {
   public static @NotNull CompletableFuture<List<NodeRenderer>> getApplicableRenderers(List<? extends NodeRenderer> renderers, Type type) {
     DebuggerManagerThreadImpl.assertIsManagerThread();
     CompletableFuture<Boolean>[] futures = renderers.stream().map(r -> r.isApplicableAsync(type)).toArray(CompletableFuture[]::new);
-    return CompletableFuture.allOf(futures).thenApply(__ -> {
+    return CompletableFuture.allOf(futures).thenApply(_ -> {
       List<NodeRenderer> res = new SmartList<>();
       for (int i = 0; i < futures.length; i++) {
         try {

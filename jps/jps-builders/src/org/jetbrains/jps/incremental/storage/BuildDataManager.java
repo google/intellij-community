@@ -1,8 +1,7 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.jps.incremental.storage;
 
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.io.FileUtilRt;
 import com.intellij.openapi.util.io.NioFiles;
 import com.intellij.tracing.Tracer;
@@ -33,6 +32,8 @@ import org.jetbrains.jps.dependency.NodeSource;
 import org.jetbrains.jps.dependency.NodeSourcePathMapper;
 import org.jetbrains.jps.dependency.ReferenceID;
 import org.jetbrains.jps.dependency.impl.DependencyGraphImpl;
+import org.jetbrains.jps.dependency.impl.ElementInternerImpl;
+import org.jetbrains.jps.dependency.impl.GraphElementInterner;
 import org.jetbrains.jps.dependency.impl.LoggingDependencyGraph;
 import org.jetbrains.jps.dependency.impl.PathSourceMapper;
 import org.jetbrains.jps.incremental.ProjectBuildException;
@@ -42,6 +43,8 @@ import org.jetbrains.jps.incremental.storage.graph.PersistentMapletFactory;
 import org.jetbrains.jps.util.Iterators;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collection;
@@ -244,13 +247,7 @@ public final class BuildDataManager {
 
   public @NotNull SourceToOutputMapping getSourceToOutputMap(@NotNull BuildTarget<?> target) throws IOException {
     if (newDataManager == null) {
-      try {
-        return buildTargetToSourceToOutputMapping.computeIfAbsent(target, this::createSourceToOutputMap);
-      }
-      catch (BuildDataCorruptedException e) {
-        LOG.info(e);
-        throw e.getCause();
-      }
+      return buildTargetToSourceToOutputMapping.computeIfAbsent(target, this::createSourceToOutputMap);
     }
     else {
       return newDataManager.getSourceToOutputMapping(target);
@@ -264,7 +261,7 @@ public final class BuildDataManager {
       map = new SourceToOutputMappingImpl(file, myRelativizer);
     }
     catch (IOException e) {
-      LOG.info(e);
+      LOG.info("Assuming storage data is corrupted:", e);
       throw new BuildDataCorruptedException(e);
     }
     return new SourceToOutputMappingWrapper(map, targetStateManager.impl.getBuildTargetId(target), outputToTargetMapping);
@@ -361,7 +358,15 @@ public final class BuildDataManager {
     }
   }
 
+  /**
+   * @deprecated the passed asyncTaskCollector is no longer used. Use the {@link BuildDataManager#clean()} method instead
+   */
+  @Deprecated
   public void clean(@NotNull Consumer<Future<?>> asyncTaskCollector) throws IOException {
+    clean();
+  }
+
+  public void clean() throws IOException {
     if (myFileStampService != null) {
       try {
         myFileStampService.clean();
@@ -379,7 +384,7 @@ public final class BuildDataManager {
     }
 
     try {
-      allTargetStorages(asyncTaskCollector).clean();
+      allTargetStorages().clean();
       myTargetStorages.clear();
       if (newDataManager == null) {
         buildTargetToSourceToOutputMapping.clear();
@@ -428,18 +433,28 @@ public final class BuildDataManager {
         DependencyGraph depGraph = myDepGraph;
         if (depGraph == null) {
           if (deleteExisting) {
-            FileUtil.delete(mappingsRoot);
+            NioFiles.deleteRecursively(mappingsRoot);
           }
+          GraphElementInterner.setImplementation(new ElementInternerImpl());
           myDepGraph = asSynchronizedGraph(new DependencyGraphImpl(new PersistentMapletFactory(mappingsRoot.toString())));
         }
         else {
-          try {
-            depGraph.close();
-          }
-          finally {
-            if (deleteExisting) {
-              FileUtil.delete(mappingsRoot);
+          if (deleteExisting) {
+            try {
+              depGraph.close();
             }
+            catch (Throwable suppressed) {
+              // the existing graph storage is going to be deleted, so suppressing any errors is fine
+              LOG.info("Error closing dependency graph", suppressed);
+            }
+            finally {
+              NioFiles.deleteRecursively(mappingsRoot);
+              myDepGraph = asSynchronizedGraph(new DependencyGraphImpl(new PersistentMapletFactory(mappingsRoot.toString())));
+            }
+          }
+          else {
+            // just re-create the graph
+            depGraph.close();
             myDepGraph = asSynchronizedGraph(new DependencyGraphImpl(new PersistentMapletFactory(mappingsRoot.toString())));
           }
         }
@@ -667,7 +682,7 @@ public final class BuildDataManager {
     myRelativizer.reportUnhandledPaths();
   }
 
-  private @NotNull StorageOwner allTargetStorages(@NotNull Consumer<Future<?>> asyncTaskCollector) {
+  private @NotNull StorageOwner allTargetStorages() {
     return new CompositeStorageOwner() {
       @Override
       public void clean() throws IOException {
@@ -675,7 +690,7 @@ public final class BuildDataManager {
           close();
         }
         finally {
-          asyncTaskCollector.accept(FileUtil.asyncDelete(myDataPaths.getTargetsDataRoot().toFile()));
+          NioFiles.deleteRecursively(myDataPaths.getTargetsDataRoot());
         }
       }
 
@@ -687,10 +702,6 @@ public final class BuildDataManager {
         );
       }
     };
-  }
-
-  private @NotNull StorageOwner allTargetStorages() {
-    return allTargetStorages(f -> {});
   }
 
   private static final class SourceToOutputMappingWrapper implements SourceToOutputMapping {
@@ -840,9 +851,32 @@ public final class BuildDataManager {
       }
 
       @Override
+      public void importSnapshot(InputStream in) throws IOException {
+        lock.writeLock().lock();
+        try {
+          delegate.importSnapshot(in);
+        }
+        finally {
+          lock.writeLock().unlock();
+        }
+      }
+
+      @Override
+      public void exportSnapshot(OutputStream out) throws IOException {
+        lock.writeLock().lock();
+        try {
+          delegate.exportSnapshot(out);
+        }
+        finally {
+          lock.writeLock().unlock();
+        }
+      }
+
+      @Override
       public void close() throws IOException {
         lock.writeLock().lock();
         try {
+          GraphElementInterner.clear();
           delegate.close();
         }
         finally {

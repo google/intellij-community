@@ -8,13 +8,14 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.highlighter.HighlighterIterator;
 import com.intellij.psi.CustomHighlighterTokenType;
 import com.intellij.psi.tree.IElementType;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author Maxim.Mossienko
  */
 public final class CustomFileTypeQuoteHandler implements QuoteHandler {
   @Override
-  public boolean isClosingQuote(HighlighterIterator iterator, int offset) {
+  public boolean isClosingQuote(@NotNull HighlighterIterator iterator, int offset) {
     final IElementType tokenType = iterator.getTokenType();
 
     if (isQuotedToken(tokenType)){
@@ -41,7 +42,7 @@ public final class CustomFileTypeQuoteHandler implements QuoteHandler {
   }
 
   @Override
-  public boolean isOpeningQuote(HighlighterIterator iterator, int offset) {
+  public boolean isOpeningQuote(@NotNull HighlighterIterator iterator, int offset) {
     if (isQuotedToken(iterator.getTokenType())){
       int start = iterator.getStart();
       return offset == start;
@@ -50,7 +51,7 @@ public final class CustomFileTypeQuoteHandler implements QuoteHandler {
   }
 
   @Override
-  public boolean hasNonClosedLiteral(Editor editor, HighlighterIterator iterator, int offset) {
+  public boolean hasNonClosedLiteral(@NotNull Editor editor, @NotNull HighlighterIterator iterator, int offset) {
     try {
       Document doc = editor.getDocument();
       CharSequence chars = doc.getCharsSequence();
@@ -74,7 +75,7 @@ public final class CustomFileTypeQuoteHandler implements QuoteHandler {
   }
 
   @Override
-  public boolean isInsideLiteral(HighlighterIterator iterator) {
+  public boolean isInsideLiteral(@NotNull HighlighterIterator iterator) {
     return isQuotedToken(iterator.getTokenType());
   }
 }

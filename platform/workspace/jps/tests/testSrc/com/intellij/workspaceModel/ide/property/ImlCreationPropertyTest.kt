@@ -12,6 +12,7 @@ import com.intellij.platform.workspace.jps.JpsImportedEntitySource
 import com.intellij.platform.workspace.jps.JpsProjectConfigLocation
 import com.intellij.platform.workspace.jps.JpsProjectFileEntitySource
 import com.intellij.platform.workspace.jps.entities.ContentRootEntity
+import com.intellij.platform.workspace.jps.entities.ExternalSystemModuleOptionsEntity
 import com.intellij.platform.workspace.jps.entities.ModuleEntity
 import com.intellij.platform.workspace.jps.entities.modifyModuleEntity
 import com.intellij.platform.workspace.jps.serialization.impl.JpsProjectSerializersImpl
@@ -28,10 +29,10 @@ import com.intellij.util.io.createDirectories
 import com.intellij.workspaceModel.ide.impl.jps.serialization.createProjectSerializers
 import com.intellij.workspaceModel.ide.impl.jps.serialization.saveAllEntities
 import com.intellij.workspaceModel.ide.toPath
+import kotlinx.coroutines.runBlocking
 import org.jetbrains.jetCheck.Generator
 import org.jetbrains.jetCheck.ImperativeCommand
 import org.jetbrains.jetCheck.PropertyChecker
-import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
@@ -75,7 +76,7 @@ class ImlCreationPropertyTest {
 
   @Test
   fun createAndSave() {
-    Assumptions.assumeTrue(UsefulTestCase.IS_UNDER_TEAMCITY, "Skip slow test on local run")
+    //Assumptions.assumeTrue(UsefulTestCase.IS_UNDER_TEAMCITY, "Skip slow test on local run")
 
     PropertyChecker.customized().withIterationCount(30).withSizeHint { it % 30 }.checkScenarios {
       ImperativeCommand { env ->
@@ -92,7 +93,9 @@ class ImlCreationPropertyTest {
         CreateModule(storage),
         CreateContentRoot(storage),
       ))
-      serializers.saveAllEntities(storage, configLocation)
+      runBlocking {
+        serializers.saveAllEntities(storage, configLocation)
+      }
 
       storage.entities(ModuleEntity::class.java).forEach { moduleEntity ->
         val modulesXml = if (moduleEntity.isExternal) prj.cache.project.modulesXml.readText() else prj.idea.modulesXml.readText()
@@ -178,7 +181,14 @@ class ImlCreationPropertyTest {
       if (env.generateValue(Generator.booleans(), null)) {
         entitySource = entitySource.external()
       }
-      storage addEntity ModuleEntity(moduleName, emptyList(), entitySource)
+      val moduleEntity = ModuleEntity(moduleName, emptyList(), entitySource)
+      if (entitySource is JpsImportedEntitySource) {
+        storage addEntity ExternalSystemModuleOptionsEntity(entitySource) {
+          this.module = moduleEntity
+          this.externalSystem = entitySource.externalSystemId
+        }
+      }
+      storage addEntity moduleEntity
     }
   }
 

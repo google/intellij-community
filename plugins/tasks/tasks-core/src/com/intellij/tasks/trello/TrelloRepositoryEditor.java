@@ -12,9 +12,9 @@ import com.intellij.tasks.impl.TaskUiUtil;
 import com.intellij.tasks.trello.model.TrelloBoard;
 import com.intellij.tasks.trello.model.TrelloList;
 import com.intellij.ui.DocumentAdapter;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.Consumer;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.UIUtil;
@@ -96,7 +96,7 @@ public class TrelloRepositoryEditor extends BaseRepositoryEditor<TrelloRepositor
         doApply();
       }
     });
-    myBoardComboBox.setRenderer(SimpleListCellRenderer.create(TaskBundle.message("label.set.token.first"), board ->
+    myBoardComboBox.setRenderer(BuilderKt.textListCellRenderer(TaskBundle.message("label.set.token.first"), board ->
       board.isClosed() ? board.getName() + TaskBundle.message("label.closed") : board.getName()));
 
     myListComboBox.addItemListener(new ItemListener() {
@@ -110,7 +110,7 @@ public class TrelloRepositoryEditor extends BaseRepositoryEditor<TrelloRepositor
         }
       }
     });
-    myListComboBox.setRenderer(SimpleListCellRenderer.create(TaskBundle.message("label.select.board.first"), list -> {
+    myListComboBox.setRenderer(BuilderKt.textListCellRenderer(TaskBundle.message("label.select.board.first"), list -> {
       String text = list.getName();
       if (list.isClosed() && list.isMoved()) {
         text += TaskBundle.message("label.archived.moved");

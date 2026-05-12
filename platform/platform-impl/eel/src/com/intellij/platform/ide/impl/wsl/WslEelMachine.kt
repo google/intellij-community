@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.ide.impl.wsl
 
 import com.intellij.execution.wsl.WSLDistribution
@@ -10,30 +10,31 @@ import com.intellij.platform.eel.EelMachine
 import com.intellij.platform.eel.EelTunnelsApi
 import com.intellij.platform.eel.ThrowsChecked
 import com.intellij.platform.eel.provider.EelMachineResolver
-import com.intellij.platform.eel.provider.getEelDescriptor
 import com.intellij.platform.eel.provider.localEel
 import com.intellij.platform.ijent.IjentPosixApi
 import com.intellij.platform.ijent.IjentTunnelsPosixApi
 import org.jetbrains.annotations.ApiStatus
-import java.nio.file.Path
+import org.jetbrains.annotations.VisibleForTesting
 
 private suspend fun WSLDistribution.getIjent(descriptor: EelDescriptor): IjentPosixApi {
   return WslIjentManager.instanceAsync().getIjentApi(descriptor, this, null, false)
 }
 
-internal class WslEelMachineResolver : EelMachineResolver {
-  override suspend fun resolveEelMachine(eelDescriptor: EelDescriptor): EelMachine? {
+@VisibleForTesting
+@ApiStatus.Internal
+class WslEelMachineResolver : EelMachineResolver {
+  override suspend fun resolveEelMachine(eelDescriptor: EelDescriptor): WslEelMachine? {
     return getResolvedEelMachine(eelDescriptor)
   }
 
-  override suspend fun resolveEelMachineByInternalName(internalName: String): EelMachine? {
+  override suspend fun resolveEelMachineByInternalName(internalName: String): WslEelMachine? {
     return if (internalName.startsWith("WSL-"))
       WslEelMachine(WSLDistribution(internalName.substring(4)))
     else
       null
   }
 
-  override fun getResolvedEelMachine(eelDescriptor: EelDescriptor): EelMachine? {
+  override fun getResolvedEelMachine(eelDescriptor: EelDescriptor): WslEelMachine? {
     val wslDescriptor = eelDescriptor as? WslEelDescriptor ?: return null
     return WslEelMachine(wslDescriptor.distribution)
   }
@@ -76,9 +77,14 @@ class WslEelMachine internal constructor(val distribution: WSLDistribution) : Ee
     return result
   }
 
-  override fun ownsPath(path: Path): Boolean {
-    val descriptor = path.getEelDescriptor() as? WslEelDescriptor ?: return false
-    return descriptor.distribution == distribution
+  override fun ownsDescriptor(descriptor: EelDescriptor): Boolean {
+    return descriptor is WslEelDescriptor && descriptor.distribution == distribution
+  }
+
+  companion object {
+    @VisibleForTesting
+    fun createInTests(distribution: WSLDistribution): WslEelMachine =
+      WslEelMachine(distribution)
   }
 }
 

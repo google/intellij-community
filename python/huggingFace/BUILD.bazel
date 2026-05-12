@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.python.community.impl.huggingFace` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "huggingFace_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "huggingFace",
   module_name = "intellij.python.community.impl.huggingFace",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
-  resources = [":huggingFace_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:gradle",
@@ -30,6 +25,7 @@ jvm_library(
     "//python/python-psi-api:psi",
     "//python:python-community-impl",
     "//platform/platform-api:ide",
+    "//platform/ide-core",
     "//platform/markdown-utils",
     "//platform/statistics",
     "//json/backend",
@@ -39,6 +35,7 @@ jvm_library(
 
 jvm_library(
   name = "huggingFace_test_lib",
+  testonly = True,
   module_name = "intellij.python.community.impl.huggingFace",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -58,6 +55,7 @@ jvm_library(
     "//python/python-psi-api:psi_test_lib",
     "//python:python-community-impl_test_lib",
     "//platform/platform-api:ide_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/markdown-utils:markdown-utils_test_lib",
     "//platform/statistics:statistics_test_lib",
     "//json/backend:backend_test_lib",
@@ -65,3 +63,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.python.community.impl.huggingFace` end
+
+### auto-generated section `iml intellij.python.community.impl.huggingFace` start
+exports_files([
+  "intellij.python.community.impl.huggingFace.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.python.community.impl.huggingFace` end

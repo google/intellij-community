@@ -136,7 +136,7 @@ public final class StructuralSearchFakeInspection extends LocalInspectionTool {
   public @NotNull JComponent createOptionsPanel() {
     final MyListModel model = new MyListModel();
     final JButton button = new JButton(SSRBundle.message("edit.metadata.button"));
-    button.addActionListener(__ -> performEditMetaData(button));
+    button.addActionListener(_ -> performEditMetaData(button));
 
     final JList<Configuration> list = new JBList<>(model) {
       @Override

@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.grazie.properties` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "properties_resources",
-  srcs = glob(["src/main/resources/**/*"]),
-  strip_prefix = "src/main/resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "properties",
   module_name = "intellij.grazie.properties",
   visibility = ["//visibility:public"],
   srcs = glob(["src/main/kotlin/**/*.kt", "src/main/kotlin/**/*.java", "src/main/kotlin/**/*.form"], allow_empty = True),
-  resources = [":properties_resources"],
+  resources = glob(["src/main/resources/**/*"]),
+  resource_strip_prefix = "src/main/resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//plugins/grazie/src:core",
@@ -28,6 +23,7 @@ jvm_library(
 
 jvm_library(
   name = "properties_test_lib",
+  testonly = True,
   module_name = "intellij.grazie.properties",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -44,3 +40,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.grazie.properties` end
+
+### auto-generated section `iml intellij.grazie.properties` start
+exports_files([
+  "intellij.grazie.properties.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.grazie.properties` end

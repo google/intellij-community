@@ -333,7 +333,7 @@ public class XLightBreakpointPropertiesPanel implements XSuspendPolicyPanel.Dele
     }
 
     XBreakpointCustomPropertiesPanel customPropertiesPanel = breakpointType.createCustomPropertiesPanel(project);
-    if (customPropertiesPanel != null) {
+    if (customPropertiesPanel != null && (myShowAllOptions || isVisibleOnPopup(customPropertiesPanel))) {
       myCustomPropertiesPanelWrapper.add(customPropertiesPanel.getComponent(), BorderLayout.CENTER);
       myCustomPanels.add(customPropertiesPanel);
     }
@@ -342,7 +342,7 @@ public class XLightBreakpointPropertiesPanel implements XSuspendPolicyPanel.Dele
     }
 
     XBreakpointCustomPropertiesPanel customConditionPanel = breakpointType.createCustomConditionsPanel();
-    if (customConditionPanel != null) {
+    if (customConditionPanel != null && (myShowAllOptions || isVisibleOnPopup(customConditionPanel))) {
       myCustomConditionsPanelWrapper.add(customConditionPanel.getComponent(), BorderLayout.CENTER);
       myCustomPanels.add(customConditionPanel);
     }
@@ -351,14 +351,7 @@ public class XLightBreakpointPropertiesPanel implements XSuspendPolicyPanel.Dele
     }
 
     XBreakpointCustomPropertiesPanel customRightConditionPanel = breakpointType.createCustomRightPropertiesPanel(project);
-    boolean isVisibleOnPopup = false;
-    if (customRightConditionPanel != null) {
-      XBreakpoint<?> monolithBreakpoint = XDebuggerEntityConverter.getBreakpoint(myBreakpoint.getId());
-      if (monolithBreakpoint != null) {
-        isVisibleOnPopup = customRightConditionPanel.isVisibleOnPopup(monolithBreakpoint);
-      }
-    }
-    if (customRightConditionPanel != null && (myShowAllOptions || isVisibleOnPopup)) {
+    if (customRightConditionPanel != null && (myShowAllOptions || isVisibleOnPopup(customRightConditionPanel))) {
       myCustomRightPropertiesPanelWrapper.add(customRightConditionPanel.getComponent(), BorderLayout.CENTER);
       myCustomPanels.add(customRightConditionPanel);
     }
@@ -368,7 +361,7 @@ public class XLightBreakpointPropertiesPanel implements XSuspendPolicyPanel.Dele
     }
 
     XBreakpointCustomPropertiesPanel customTopPropertiesPanel = breakpointType.createCustomTopPropertiesPanel(project);
-    if (customTopPropertiesPanel != null) {
+    if (customTopPropertiesPanel != null && (myShowAllOptions || isVisibleOnPopup(customTopPropertiesPanel))) {
       myCustomTopPropertiesPanelWrapper.add(customTopPropertiesPanel.getComponent(), BorderLayout.CENTER);
       myCustomPanels.add(customTopPropertiesPanel);
     }
@@ -418,6 +411,11 @@ public class XLightBreakpointPropertiesPanel implements XSuspendPolicyPanel.Dele
         myRestoreLink.setVisible(pair.getSecond());
       })
       .submit(AppExecutorUtil.getAppExecutorService());
+  }
+
+  private boolean isVisibleOnPopup(@NotNull XBreakpointCustomPropertiesPanel panel) {
+    XBreakpoint<?> monolithBreakpoint = XDebuggerEntityConverter.getBreakpoint(myBreakpoint.getId());
+    return monolithBreakpoint != null && panel.isVisibleOnPopup(monolithBreakpoint);
   }
 
   /** @noinspection ALL */

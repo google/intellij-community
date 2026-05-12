@@ -218,7 +218,7 @@ class IndexUpdateRunner(
               LOG.debug("Coroutine $workerNo has finished gracefully")
             }
             catch (e: Throwable) {
-              if (e !is ControlFlowException) {
+              if (!Logger.shouldRethrow(e)) {
                 LOG.warn("Coroutine $workerNo finished exceptionally", e)
               }
               else {

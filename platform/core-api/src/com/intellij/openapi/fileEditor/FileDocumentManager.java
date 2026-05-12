@@ -2,9 +2,11 @@
 package com.intellij.openapi.fileEditor;
 
 import com.intellij.core.CoreBundle;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.AccessToken;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.EditorLockFreeTyping;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
@@ -18,7 +20,6 @@ import com.intellij.psi.FileViewProvider;
 import com.intellij.util.Processor;
 import com.intellij.util.concurrency.annotations.RequiresBlockingContext;
 import com.intellij.util.concurrency.annotations.RequiresReadLock;
-import com.intellij.util.concurrency.annotations.RequiresWriteLock;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.ApiStatus.Internal;
 import org.jetbrains.annotations.NotNull;
@@ -41,11 +42,11 @@ public abstract class FileDocumentManager implements SavingRequestor {
 
   /**
    * Returns the document for the specified virtual file.<p/>
-   *
+   * <p>
    * Documents are cached on weak or strong references, depending on the nature of the virtual file. If the document
    * for the given virtual file is not yet cached, the file's contents are read from VFS and loaded into heap memory.
    * An appropriate encoding is used. All line separators are converted to {@code \n}.<p/>
-   *
+   * <p>
    * Should be invoked in a read action.
    *
    * @param file the file for which the document is requested.
@@ -59,8 +60,9 @@ public abstract class FileDocumentManager implements SavingRequestor {
 
   @Internal
   @ApiStatus.Experimental
-  @RequiresReadLock
+  @RequiresReadLock(generateAssertion = false) // assert for real file
   public @Nullable Document getDocument(@NotNull VirtualFile file, @NotNull Project preferredProject) {
+    EditorLockFreeTyping.assertReadAccess(file);
     try (AccessToken ignored = ProjectLocator.withPreferredProject(file, preferredProject)) {
       return getDocument(file);
     }
@@ -68,7 +70,7 @@ public abstract class FileDocumentManager implements SavingRequestor {
 
   /**
    * Returns the document for the specified file which has already been loaded into memory.<p/>
-   *
+   * <p>
    * Client code shouldn't normally use this method, because it's unpredictable and any garbage collection can result in it returning null.
    *
    * @param file the file for which the document is requested.
@@ -88,52 +90,52 @@ public abstract class FileDocumentManager implements SavingRequestor {
    * Saves all unsaved documents to disk. This operation can modify documents that will be saved
    * (due to 'Strip trailing spaces on Save' functionality). When saving, {@code \n} line separators are converted into
    * the ones used normally on the system, or the ones explicitly specified by the user. Encoding settings are honored.<p/>
-   *
-   * Should be invoked on the event dispatch thread under the write intent lock.
+   * <p>
+   * Can be invoked on any thread. Will trigger synchronous write action.
    */
-  @RequiresWriteLock
   public abstract void saveAllDocuments();
 
   /**
    * Saves unsaved documents which pass provided filter to disk. This operation can modify documents that will be saved
    * (due to 'Strip trailing spaces on Save' functionality). When saving, {@code \n} line separators are converted into
    * the ones used normally on the system, or the ones explicitly specified by the user. Encoding settings are honored.<p/>
+   * <p>
+   * Can be invoked on any thread. Will trigger synchronous write action.
    *
-   * Should be invoked on the event dispatch thread under the write intent lock.
    * @param filter the filter for documents to save. If it returns `true`, the document will be saved.
    */
-  @RequiresWriteLock
   public abstract void saveDocuments(@NotNull Predicate<? super Document> filter);
 
   /**
    * Saves the specified document to disk. This operation can modify the document (due to 'Strip
    * trailing spaces on Save' functionality). When saving, {@code \n} line separators are converted into
    * the ones used normally on the system, or the ones explicitly specified by the user. Encoding settings are honored.<p/>
+   * <p>
+   * Can be invoked on any thread. Will trigger synchronous write action.
    *
-   * Should be invoked on the event dispatch thread under the write intent lock.
    * @param document the document to save.
    */
-  @RequiresWriteLock
   public abstract void saveDocument(@NotNull Document document);
 
   /**
    * Saves the document without stripping the trailing spaces or adding a blank line in the end of the file.<p/>
-   *
-   * Should be invoked on the event dispatch thread under the write intent lock.
+   * <p>
+   * Can be invoked on any thread. Will trigger synchronous write action.
    *
    * @param document the document to save.
    */
-  @RequiresWriteLock
   public abstract void saveDocumentAsIs(@NotNull Document document);
 
   /**
    * Returns all documents that have unsaved changes.
+   *
    * @return the documents that have unsaved changes.
    */
   public abstract Document @NotNull [] getUnsavedDocuments();
 
   /**
    * Feeds all documents that have unsaved changes to the processor passed
+   *
    * @param processor - Processor to collect all the unsaved documents. Return false to stop processing or true to continue.
    * @return false if processing has been stopped before all the unsaved documents where processed
    */
@@ -209,6 +211,12 @@ public abstract class FileDocumentManager implements SavingRequestor {
    */
   public abstract void reloadFiles(VirtualFile @NotNull ... files);
 
+  /**
+   * Overrides whether file content conflicts should be handled until {@code parentDisposable} is disposed.
+   */
+  @ApiStatus.Experimental
+  public void overrideConflictsSolverEnabled(boolean enabled, @NotNull Disposable parentDisposable) { }
+
   @Internal
   public void reloadBinaryFiles() { }
 
@@ -248,10 +256,10 @@ public abstract class FileDocumentManager implements SavingRequestor {
       myHyperlinkListener = hyperlinkListener;
     }
 
-    public boolean hasWriteAccess() {return myWithWriteAccess;}
+    public boolean hasWriteAccess() { return myWithWriteAccess; }
 
-    public @NotNull @NlsContexts.HintText String getReadOnlyMessage() {return myReadOnlyMessage;}
+    public @NotNull @NlsContexts.HintText String getReadOnlyMessage() { return myReadOnlyMessage; }
 
-    public @Nullable HyperlinkListener getHyperlinkListener() {return myHyperlinkListener;}
+    public @Nullable HyperlinkListener getHyperlinkListener() { return myHyperlinkListener; }
   }
 }

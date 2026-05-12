@@ -161,7 +161,7 @@ public abstract class AbstractJavaCopyPasteReferenceProcessor<TRef extends PsiEl
             if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
               reviewImports(project, file, imported);
             }
-          }), ModalityState.nonModal(), __ -> editor.isDisposed());
+          }), ModalityState.nonModal(), _ -> editor.isDisposed());
       }
     };
     consumer.accept(null);

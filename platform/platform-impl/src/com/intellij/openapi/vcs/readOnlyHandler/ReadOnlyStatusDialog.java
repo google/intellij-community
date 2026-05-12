@@ -119,7 +119,7 @@ public final class ReadOnlyStatusDialog extends OptionsDialog {
     myFileList.setPreferredSize(getDialogPreferredSize());
     initFileList();
 
-    ActionListener listener = __ -> myChangelist.setEnabled(myUsingVcsRadioButton.isSelected());
+    ActionListener listener = _ -> myChangelist.setEnabled(myUsingVcsRadioButton.isSelected());
     myUsingVcsRadioButton.addActionListener(listener);
     myUsingFileSystemRadioButton.addActionListener(listener);
     (myUsingVcsRadioButton.isEnabled() ? myUsingVcsRadioButton : myUsingFileSystemRadioButton).setSelected(true);

@@ -128,7 +128,7 @@ public final class PersistentSubIndexerRetriever<SubIndexerType, SubIndexerVersi
 
   private static IntFileAttribute getFileAttribute(String name, int version) {
     synchronized (ourAttributes) {
-      return ourAttributes.computeIfAbsent(new Pair<>(name, version), __ -> {
+      return ourAttributes.computeIfAbsent(new Pair<>(name, version), _ -> {
         return IntFileAttribute.create(name + ".index.version", version);
       });
     }

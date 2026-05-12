@@ -2,6 +2,7 @@
 package org.jetbrains.plugins.github.ui
 
 import com.intellij.collaboration.auth.ui.AccountsPanelFactory
+import com.intellij.collaboration.auth.ui.AccountsPanelFactory.Companion.addWarningForEnabledCredentialHelper
 import com.intellij.collaboration.auth.ui.AccountsPanelFactory.Companion.addWarningForMemoryOnlyPasswordSafeAndGet
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
@@ -17,6 +18,7 @@ import com.intellij.ui.dsl.builder.bindIntText
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.columns
 import com.intellij.ui.dsl.builder.panel
+import git4idea.config.GitVcsApplicationSettings
 import kotlinx.coroutines.Dispatchers
 import org.jetbrains.plugins.github.authentication.accounts.GHAccountManager
 import org.jetbrains.plugins.github.authentication.accounts.GithubProjectDefaultAccountHolder
@@ -71,13 +73,16 @@ internal class GithubSettingsConfigurable internal constructor(
         @Suppress("DialogTitleCapitalization")
         label(message("settings.timeout.seconds"))
           .gap(RightGap.COLUMNS)
-
-        addWarningForMemoryOnlyPasswordSafeAndGet(
-          scope,
-          service<GHAccountManager>().canPersistCredentials,
-          ::panel
-        ).align(AlignX.RIGHT)
       }
+
+      addWarningForMemoryOnlyPasswordSafeAndGet(
+        scope,
+        service<GHAccountManager>().canPersistCredentials,
+        ::panel
+      ).align(AlignX.LEFT)
+
+      addWarningForEnabledCredentialHelper(GitVcsApplicationSettings.getInstance().isUseCredentialHelper, ::panel)
+        .align(AlignX.LEFT)
     }
   }
 }

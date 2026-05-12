@@ -9,7 +9,9 @@ import com.intellij.codeInsight.template.macro.IterableComponentTypeMacro;
 import com.intellij.codeInsight.template.macro.SuggestVariableNameMacro;
 import com.intellij.codeInsight.template.postfix.templates.editable.JavaEditablePostfixTemplate;
 import com.intellij.codeInsight.template.postfix.templates.editable.JavaPostfixTemplateExpressionCondition;
+import com.intellij.codeInsight.template.postfix.util.JavaPostfixTemplatesUtils;
 import com.intellij.java.syntax.parser.JavaKeywords;
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.pom.java.JavaFeature;
 import com.intellij.pom.java.LanguageLevel;
@@ -32,9 +34,21 @@ public class ForeachPostfixTemplate extends JavaEditablePostfixTemplate implemen
   }
 
   @Override
+  public boolean isApplicable(@NotNull PsiElement context, @NotNull Document copyDocument, int newOffset) {
+    return super.isApplicable(context, copyDocument, newOffset) && !JavaPostfixTemplatesUtils.isInExpressionFile(context);
+  }
+
+  @Override
   public boolean isBuiltin() {
     return true;
   }
+
+
+  @Override
+  public boolean isApplicableForModCommand() {
+    return true;
+  }
+
 
   @Override
   protected void addTemplateVariables(@NotNull PsiElement element, @NotNull Template template) {
@@ -53,7 +67,8 @@ public class ForeachPostfixTemplate extends JavaEditablePostfixTemplate implemen
     MacroCallNode name = new MacroCallNode(new SuggestVariableNameMacro());
     template.addVariable("NAME", name, name, true);
 
-    String finalPart = JavaFileCodeStyleFacade.forContext(element.getContainingFile()).isGenerateFinalLocals() ? "final " : null;
+    boolean generateFinal = JavaFileCodeStyleFacade.forContext(element.getContainingFile()).isGenerateFinalLocals();
+    String finalPart = generateFinal ? "final " : null;
     if (finalPart != null) {
       template.addVariable("FINAL", new TextExpression(finalPart), false);
     }

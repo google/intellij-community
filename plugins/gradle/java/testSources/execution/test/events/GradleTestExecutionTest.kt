@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.execution.test.events
 
 import com.intellij.openapi.application.edtWriteAction
@@ -15,15 +15,16 @@ import org.jetbrains.plugins.gradle.service.execution.GradleExecutionContext
 import org.jetbrains.plugins.gradle.service.project.GradleExecutionHelperExtension
 import org.jetbrains.plugins.gradle.testFramework.GradleTestExecutionTestCase
 import org.jetbrains.plugins.gradle.testFramework.annotations.AllGradleVersionsSource
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatConfigurationCacheIsSupported
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatGradleIsAtLeast
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatGradleIsOlderThan
+import org.jetbrains.plugins.gradle.testFramework.util.CONFIGURATION_CACHE_SUPPORTED_VERSIONS
+import org.jetbrains.plugins.gradle.testFramework.util.JUNIT_5_SUPPORTED_VERSIONS
+import org.jetbrains.plugins.gradle.tooling.annotation.TargetVersions
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.params.ParameterizedTest
 
 class GradleTestExecutionTest : GradleTestExecutionTestCase() {
 
   @ParameterizedTest
+  @TargetVersions(JUNIT_5_SUPPORTED_VERSIONS)
   @AllGradleVersionsSource
   fun `test grouping events of the same suite comes from different tasks`(gradleVersion: GradleVersion) {
     testJunitPlatformProject(gradleVersion) {
@@ -474,10 +475,8 @@ class GradleTestExecutionTest : GradleTestExecutionTestCase() {
 
   @ParameterizedTest
   @AllGradleVersionsSource
+  @TargetVersions("<7.6", reason = "IDEA-340676 flaky test")
   fun `test task execution order`(gradleVersion: GradleVersion) {
-    assumeThatGradleIsOlderThan(gradleVersion, "7.6"){
-      "IDEA-340676 flaky test"
-    }
     testJavaProject(gradleVersion) {
       writeText("src/test/java/org/example/TestCase.java", """
         |package org.example;
@@ -557,8 +556,8 @@ class GradleTestExecutionTest : GradleTestExecutionTestCase() {
 
   @ParameterizedTest
   @AllGradleVersionsSource
+  @TargetVersions(CONFIGURATION_CACHE_SUPPORTED_VERSIONS)
   fun `test configuration cache for tests`(gradleVersion: GradleVersion) {
-    assumeThatConfigurationCacheIsSupported(gradleVersion)
     testJavaProject(gradleVersion) {
       writeText("src/test/java/org/example/TestCase.java", """
         |package org.example;
@@ -626,6 +625,7 @@ class GradleTestExecutionTest : GradleTestExecutionTestCase() {
 
   @ParameterizedTest
   @AllGradleVersionsSource
+  @TargetVersions(JUNIT_5_SUPPORTED_VERSIONS)
   fun `test test task execution with additional gradle listeners`(gradleVersion: GradleVersion) {
     val extension = object : GradleExecutionHelperExtension {
       override fun configureOperation(operation: LongRunningOperation, context: GradleExecutionContext) {
@@ -673,8 +673,8 @@ class GradleTestExecutionTest : GradleTestExecutionTestCase() {
 
   @ParameterizedTest
   @AllGradleVersionsSource
+  @TargetVersions("7.5+")
   fun `test Gradle test distribution nodes are hidden by default`(gradleVersion: GradleVersion) {
-    assumeThatGradleIsAtLeast(gradleVersion, "7.5")
     testJunitPlatformProject(gradleVersion) {
       // Project configuration without an existing directory is not allowed
       runBlocking {

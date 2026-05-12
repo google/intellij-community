@@ -1,17 +1,13 @@
 ### auto-generated section `build intellij.platform.compose.markdown` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "markdown_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "markdown",
+  module_name = "intellij.platform.compose.markdown",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
-  resources = [":markdown_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   exports = [
     "//platform/compose",
     "//platform/jewel/markdown/core",
@@ -37,6 +33,7 @@ jvm_library(
 
 jvm_library(
   name = "markdown_test_lib",
+  testonly = True,
   module_name = "intellij.platform.compose.markdown",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -72,3 +69,9 @@ jvm_library(
   plugins = ["@lib//:compose-plugin"]
 )
 ### auto-generated section `build intellij.platform.compose.markdown` end
+
+### auto-generated section `iml intellij.platform.compose.markdown` start
+exports_files([
+  "intellij.platform.compose.markdown.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.compose.markdown` end

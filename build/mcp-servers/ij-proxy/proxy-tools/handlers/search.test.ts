@@ -13,7 +13,6 @@ describe('ij MCP proxy search', {timeout: SUITE_TIMEOUT_MS}, () => {
       buildUpstreamTool('search_in_files_by_text', {project_path: {type: 'string'}}, ['project_path'])
     ]
     await withProxy({
-      proxyEnv: {JETBRAINS_MCP_TOOL_MODE: 'cc'},
       tools,
       onToolCall({name, args}) {
         calls.push({name, args})
@@ -43,8 +42,8 @@ describe('ij MCP proxy search', {timeout: SUITE_TIMEOUT_MS}, () => {
 
       const payload = JSON.parse(response.result.content[0].text)
       deepStrictEqual(payload.items, [
-        {filePath: 'src/a.txt', lineNumber: 3, lineText: 'alpha'},
-        {filePath: 'src/b.txt', lineNumber: 1, lineText: 'beta'}
+        {filePath: 'src/a.txt', startLine: 3},
+        {filePath: 'src/b.txt', startLine: 1}
       ])
       strictEqual(calls.length, 1)
 
@@ -67,7 +66,6 @@ describe('ij MCP proxy search', {timeout: SUITE_TIMEOUT_MS}, () => {
     ]
     await withProxy({
       proxyEnv: {
-        JETBRAINS_MCP_TOOL_MODE: 'cc',
         JETBRAINS_MCP_PROXY_DISABLE_NEW_SEARCH: 'true'
       },
       tools,
@@ -98,7 +96,7 @@ describe('ij MCP proxy search', {timeout: SUITE_TIMEOUT_MS}, () => {
 
       const payload = JSON.parse(response.result.content[0].text)
       deepStrictEqual(payload.items, [
-        {filePath: 'src/a.txt', lineNumber: 1, lineText: 'alpha'}
+        {filePath: 'src/a.txt', startLine: 1}
       ])
       strictEqual(calls.length, 1)
       strictEqual(calls[0].name, 'search_in_files_by_text')
@@ -113,7 +111,6 @@ describe('ij MCP proxy search', {timeout: SUITE_TIMEOUT_MS}, () => {
     ]
     await withProxy({
       proxyEnv: {
-        JETBRAINS_MCP_TOOL_MODE: 'cc',
         JETBRAINS_MCP_PROXY_DISABLE_NEW_SEARCH: 'true'
       },
       tools,
@@ -144,7 +141,7 @@ describe('ij MCP proxy search', {timeout: SUITE_TIMEOUT_MS}, () => {
 
       const payload = JSON.parse(response.result.content[0].text)
       deepStrictEqual(payload.items, [
-        {filePath: 'src/a.txt', lineNumber: 3, lineText: 'alpha'}
+        {filePath: 'src/a.txt', startLine: 3}
       ])
       strictEqual(calls.length, 1)
       strictEqual(calls[0].name, 'search_in_files_by_regex')
@@ -159,7 +156,6 @@ describe('ij MCP proxy search', {timeout: SUITE_TIMEOUT_MS}, () => {
     ]
     await withProxy({
       proxyEnv: {
-        JETBRAINS_MCP_TOOL_MODE: 'cc',
         JETBRAINS_MCP_PROXY_DISABLE_NEW_SEARCH: 'true'
       },
       tools,
@@ -196,7 +192,6 @@ describe('ij MCP proxy search', {timeout: SUITE_TIMEOUT_MS}, () => {
       buildUpstreamTool('find_files_by_glob', {project_path: {type: 'string'}}, ['project_path'])
     ]
     await withProxy({
-      proxyEnv: {JETBRAINS_MCP_TOOL_MODE: 'cc'},
       tools,
       onToolCall({name, args}) {
         calls.push({name, args})
@@ -234,7 +229,6 @@ describe('ij MCP proxy search', {timeout: SUITE_TIMEOUT_MS}, () => {
       buildUpstreamTool('search_in_files_by_regex', {project_path: {type: 'string'}}, ['project_path'])
     ]
     await withProxy({
-      proxyEnv: {JETBRAINS_MCP_TOOL_MODE: 'cc'},
       tools,
       onToolCall({name, args}) {
         calls.push({name, args})
@@ -263,7 +257,7 @@ describe('ij MCP proxy search', {timeout: SUITE_TIMEOUT_MS}, () => {
       })
 
       const payload = JSON.parse(response.result.content[0].text)
-      deepStrictEqual(payload.items, [{filePath: 'src/a.txt', lineNumber: 3, lineText: 'alpha'}])
+      deepStrictEqual(payload.items, [{filePath: 'src/a.txt', startLine: 3}])
       strictEqual(calls.length, 1)
 
       const call = calls[0]
@@ -281,7 +275,6 @@ describe('ij MCP proxy search', {timeout: SUITE_TIMEOUT_MS}, () => {
       buildUpstreamTool('find_files_by_glob', {project_path: {type: 'string'}}, ['project_path'])
     ]
     await withProxy({
-      proxyEnv: {JETBRAINS_MCP_TOOL_MODE: 'cc'},
       tools,
       onToolCall({name, args}) {
         calls.push({name, args})

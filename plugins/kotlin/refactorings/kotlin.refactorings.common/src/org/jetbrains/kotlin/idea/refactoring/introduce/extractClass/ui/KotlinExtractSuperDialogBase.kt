@@ -30,6 +30,7 @@ import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
 import org.jetbrains.kotlin.psi.psiUtil.isIdentifier
 import org.jetbrains.kotlin.psi.psiUtil.quoteIfNeeded
+import org.jetbrains.kotlin.resolve.jvm.JvmConstants
 import java.awt.BorderLayout
 import javax.swing.BorderFactory
 import javax.swing.JComponent
@@ -166,9 +167,12 @@ abstract class KotlinExtractSuperDialogBase(
     override fun isExtractSuperclass(): Boolean = true
 
     override fun validateName(name: String): String? {
+        val unquotedName = name.unquoteKotlinIdentifier()
         return when {
-            !name.quoteIfNeeded().isIdentifier() -> RefactoringMessageUtil.getIncorrectIdentifierMessage(name)
-            name.unquoteKotlinIdentifier() == mySourceClass.name -> KotlinBundle.message("error.text.different.name.expected")
+            !name.quoteIfNeeded().isIdentifier() || unquotedName.any { it in JvmConstants.INVALID_CHARS } ->
+                RefactoringMessageUtil.getIncorrectIdentifierMessage(name)
+
+            unquotedName == mySourceClass.name -> KotlinBundle.message("error.text.different.name.expected")
             else -> null
         }
     }

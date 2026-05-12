@@ -64,6 +64,7 @@ private const val CENTER_RIGHT_GAP = 4
 /**
  * Should be used for in cases one label, label with icon, and other similar re
  */
+@ApiStatus.Internal
 @Deprecated("Use com.intellij.ui.dsl.listCellRenderer.BuilderKt.listCellRenderer instead")
 open class IconCompOptionalCompPanel<C1 : JComponent>(
   @ApiStatus.Internal val center: C1) : IconPanel() {

@@ -176,7 +176,7 @@ internal object MultiplatformCodepoints {
     }
 
     fun isISOControl(codepoint: Int): Boolean =
-        // C0 control codes (U+0000..U+001F) and C1 control codes (U+007F..U+009F)
+      // C0 control codes (U+0000..U+001F) and C1 control codes (U+007F..U+009F)
         codepoint in 0x00..0x1F || codepoint in 0x7F..0x9F
 
     fun getUnicodeScript(codepoint: Int): UnicodeScript = ScriptData.getScript(codepoint)

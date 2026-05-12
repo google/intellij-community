@@ -144,6 +144,8 @@ public class ProblemsHolder {
    * <p/>
    * Such problems would be silently skipped in batch. During local analysis they would signal 'RedundantSuppression' inspection
    * that this part was not fully processed by initial inspection and that the suppression may be not redundant
+   * 
+   * @see ProblemHighlightType#POSSIBLE_PROBLEM
    */
   @SuppressWarnings({"HardCodedStringLiteral", "DialogTitleCapitalization"})
   public void registerPossibleProblem(PsiElement identifier) {

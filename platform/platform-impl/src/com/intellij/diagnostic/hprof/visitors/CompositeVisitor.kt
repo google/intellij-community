@@ -22,8 +22,10 @@ import com.intellij.diagnostic.hprof.parser.InstanceFieldEntry
 import com.intellij.diagnostic.hprof.parser.RecordType
 import com.intellij.diagnostic.hprof.parser.StaticFieldEntry
 import com.intellij.diagnostic.hprof.parser.Type
-import java.nio.ByteBuffer
+import com.intellij.diagnostic.hprof.util.HProfReadBufferSlidingWindow
+import org.jetbrains.annotations.ApiStatus
 
+@ApiStatus.Internal
 class CompositeVisitor(private vararg val visitors: HProfVisitor) : HProfVisitor() {
   override fun preVisit() {
     visitors.forEach {
@@ -143,8 +145,13 @@ class CompositeVisitor(private vararg val visitors: HProfVisitor) : HProfVisitor
     visitors.forEach { it.visitRootThreadObject(objectId, threadSerialNumber, stackTraceSerialNumber) }
   }
 
-  override fun visitPrimitiveArrayDump(arrayObjectId: Long, stackTraceSerialNumber: Long, numberOfElements: Long, elementType: Type, primitiveArrayData: ByteBuffer) {
-    visitors.forEach { it.visitPrimitiveArrayDump(arrayObjectId, stackTraceSerialNumber, numberOfElements, elementType, primitiveArrayData) }
+  override fun visitPrimitiveArrayDump(arrayObjectId: Long, stackTraceSerialNumber: Long, numberOfElements: Long, elementType: Type, primitiveArrayData: HProfReadBufferSlidingWindow) {
+    val initialPosition = primitiveArrayData.position()
+    visitors.forEach {
+      primitiveArrayData.position(initialPosition)
+      it.visitPrimitiveArrayDump(arrayObjectId, stackTraceSerialNumber, numberOfElements, elementType, primitiveArrayData)
+    }
+    primitiveArrayData.position(initialPosition)
   }
 
   override fun visitClassDump(classId: Long,
@@ -165,8 +172,13 @@ class CompositeVisitor(private vararg val visitors: HProfVisitor) : HProfVisitor
     visitors.forEach { it.visitObjectArrayDump(arrayObjectId, stackTraceSerialNumber, arrayClassObjectId, objects) }
   }
 
-  override fun visitInstanceDump(objectId: Long, stackTraceSerialNumber: Long, classObjectId: Long, bytes: ByteBuffer) {
-    visitors.forEach { it.visitInstanceDump(objectId, stackTraceSerialNumber, classObjectId, bytes) }
+  override fun visitInstanceDump(objectId: Long, stackTraceSerialNumber: Long, classObjectId: Long, bytes: HProfReadBufferSlidingWindow) {
+    val initialPosition = bytes.position()
+    visitors.forEach {
+      bytes.position(initialPosition)
+      it.visitInstanceDump(objectId, stackTraceSerialNumber, classObjectId, bytes)
+    }
+    bytes.position(initialPosition)
   }
 
   override fun visitUnloadClass(classSerialNumber: Long) {

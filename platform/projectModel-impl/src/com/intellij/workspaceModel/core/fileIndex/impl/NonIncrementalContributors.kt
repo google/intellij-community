@@ -13,9 +13,11 @@ import com.intellij.openapi.roots.OrderRootType
 import com.intellij.openapi.roots.SyntheticLibrary
 import com.intellij.openapi.roots.impl.DirectoryIndexExcludePolicy
 import com.intellij.openapi.roots.impl.RootFileValidityChecker
+import com.intellij.openapi.util.Condition
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.platform.backend.workspace.WorkspaceModel
+import com.intellij.platform.diagnostic.telemetry.helpers.MillisecondsMeasurer
 import com.intellij.platform.workspace.storage.EntityPointer
 import com.intellij.platform.workspace.storage.EntityStorage
 import com.intellij.platform.workspace.storage.WorkspaceEntity
@@ -26,9 +28,12 @@ import com.intellij.workspaceModel.core.fileIndex.EntityStorageKind
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileKind
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileSet
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileSetData
+import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileSetExclusionCondition
+import com.intellij.workspaceModel.ide.impl.workspaceModelMetrics
 import it.unimi.dsi.fastutil.objects.Object2IntMap
 import it.unimi.dsi.fastutil.objects.Object2IntMaps
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
+import kotlin.system.measureTimeMillis
 
 /**
  * Integrates data provided by [DirectoryIndexExcludePolicy] and [AdditionalLibraryRootsProvider] extensions to [com.intellij.workspaceModel.core.fileIndex.WorkspaceFileIndex].
@@ -45,50 +50,69 @@ internal class NonIncrementalContributors(private val project: Project) {
   fun updateIfNeeded(fileSets: MutableMap<VirtualFile, StoredFileSetCollection>,
                      fileSetsByPackagePrefix: PackagePrefixStorage,
                      nonExistingFilesRegistry: NonExistingWorkspaceRootsRegistry) {
-    if (!upToDate) {
-      ApplicationManager.getApplication().assertReadAccessAllowed()
-      val (newExcludedRoots, newExcludedUrls) = computeCustomExcludedRoots()
-      val newFileSets = computeFileSets()
-
-      /*
-      This function requires 'read access' only, so multiple thread may execute it in parallel, and we need to synchronize write access to
-      the shared fileSets* maps. Modifications here are performed under exclusive lock while holding the global 'Read Action', and other 
-      modifications are performed under the global 'Write Action' lock. The maps are always read under 'Read Action', and this function is
-      called under the same 'Read Action' before accessing the map, and `upToDate` flag will not be reset before that read action finishes,
-      so read/write conflicts shouldn't happen. 
-      */
-      synchronized(lock) {
-        if (!upToDate) {
-          allRoots.forEach { file ->
-            fileSets.removeValueIf(file) { fileSet: StoredFileSet -> fileSet.entityPointer === NonIncrementalMarker }
-            fileSetsByPackagePrefix.removeByPrefixAndPointer("", NonIncrementalMarker)
-          }
-          excludedUrls.forEach {
-            nonExistingFilesRegistry.unregisterUrl(it, NonIncrementalMarker, EntityStorageKind.MAIN)
-          }
-          val newRoots = HashSet<VirtualFile>()
-          Object2IntMaps.fastForEach(newExcludedRoots) { 
-            fileSets.putValue(it.key, ExcludedFileSet.ByFileKind(it.key, it.intValue, NonIncrementalMarker))
-            newRoots.add(it.key)
-          }
-          newExcludedUrls.forEach {
-            nonExistingFilesRegistry.registerUrl(it, NonIncrementalMarker, EntityStorageKind.MAIN, NonExistingFileSetKind.EXCLUDED_FROM_CONTENT)
-          }
-          newFileSets.forEach { (root, sets) ->
-            sets.forEach { set ->
-              fileSets.putValue(root, set)
-              val fileSet = set as? WorkspaceFileSetImpl
-              if (fileSet != null && fileSet.data is JvmPackageRootDataInternal) {
-                fileSetsByPackagePrefix.addFileSet("", fileSet)
-              }
-            }
-            newRoots.add(root)
-          }
-          allRoots = newRoots
-          excludedUrls = newExcludedUrls
-          upToDate = true
-        }
+    if (upToDate) {
+      return
+    }
+    synchronized(lock) {
+      if (upToDate) {
+        return
       }
+      ApplicationManager.getApplication().assertReadAccessAllowed()
+
+      val excludeRootsComputationTime: Long
+      val fileSetsComputationTime: Long
+      val updateTime = measureTimeMillis {
+        val newExcludedRoots: Object2IntMap<VirtualFile>
+        val newExcludedUrls: Set<VirtualFileUrl>
+        excludeRootsComputationTime = measureTimeMillis {
+          val result = computeCustomExcludedRoots()
+          newExcludedRoots = result.first
+          newExcludedUrls = result.second
+        }
+        val newFileSets: Map<VirtualFile, StoredFileSetCollection>
+        fileSetsComputationTime = measureTimeMillis {
+          newFileSets = computeFileSets()
+        }
+
+        /*
+        This function requires 'read access' only, so multiple thread may execute it in parallel, and we need to synchronize write access to
+        the shared fileSets* maps. Modifications here are performed under exclusive lock while holding the global 'Read Action', and other
+        modifications are performed under the global 'Write Action' lock. The maps are always read under 'Read Action', and this function is
+        called under the same 'Read Action' before accessing the map, and `upToDate` flag will not be reset before that read action finishes,
+        so read/write conflicts shouldn't happen.
+        */
+        allRoots.forEach { file ->
+          fileSets.removeValueIf(file) { fileSet: StoredFileSet -> fileSet.entityPointer === NonIncrementalMarker }
+          fileSetsByPackagePrefix.removeByPrefixAndPointer("", NonIncrementalMarker)
+        }
+        excludedUrls.forEach {
+          nonExistingFilesRegistry.unregisterUrl(it, NonIncrementalMarker, EntityStorageKind.MAIN)
+        }
+        val newRoots = HashSet<VirtualFile>()
+        Object2IntMaps.fastForEach(newExcludedRoots) {
+          fileSets.putValue(it.key, ExcludedFileSet.ByFileKind(it.key, it.intValue, NonIncrementalMarker))
+          newRoots.add(it.key)
+        }
+        newExcludedUrls.forEach {
+          nonExistingFilesRegistry.registerUrl(it, NonIncrementalMarker, EntityStorageKind.MAIN, NonExistingFileSetKind.EXCLUDED_FROM_CONTENT)
+        }
+        newFileSets.forEach { (root, sets) ->
+          sets.forEach { set ->
+            fileSets.putValue(root, set)
+            val fileSet = set as? WorkspaceFileSetImpl
+            if (fileSet != null && fileSet.data is JvmPackageRootDataInternal) {
+              fileSetsByPackagePrefix.addFileSet("", fileSet)
+            }
+          }
+          newRoots.add(root)
+        }
+        allRoots = newRoots
+        excludedUrls = newExcludedUrls
+        upToDate = true
+      }
+      totalUpdateTimeMs.duration.addAndGet(updateTime)
+      excludeRootsComputationTimeMs.duration.addAndGet(excludeRootsComputationTime)
+      fileSetsComputationTimeMs.duration.addAndGet(fileSetsComputationTime)
     }
   }
   
@@ -167,9 +191,9 @@ internal class NonIncrementalContributors(private val project: Project) {
           result.putValue(it, ExcludedFileSet.ByFileKind(it, WorkspaceFileKindMask.EXTERNAL, NonIncrementalMarker))
         }
         library.unitedExcludeCondition?.let { condition ->
-          val predicate = { file: VirtualFile -> condition.value(file) }
+          val exclusionCondition = UnifiedLibraryExclusionCondition(library, condition)
           (library.sourceRoots + library.binaryRoots).forEach { root ->
-            result.putValue(root, ExcludedFileSet.ByCondition(root, predicate, NonIncrementalMarker, EntityStorageKind.MAIN))
+            result.putValue(root, ExcludedFileSet.ByCondition(root, exclusionCondition, NonIncrementalMarker, EntityStorageKind.MAIN))
           }
         }
       }
@@ -190,6 +214,10 @@ internal class NonIncrementalContributors(private val project: Project) {
   }
 
   companion object {
+    private val totalUpdateTimeMs = MillisecondsMeasurer()
+    private val excludeRootsComputationTimeMs = MillisecondsMeasurer()
+    private val fileSetsComputationTimeMs = MillisecondsMeasurer()
+
     internal fun isFromAdditionalLibraryRootsProvider(fileSet: WorkspaceFileSet): Boolean {
       return fileSet.asSafely<WorkspaceFileSetImpl>()?.entityPointer is NonIncrementalMarker
     }
@@ -199,13 +227,40 @@ internal class NonIncrementalContributors(private val project: Project) {
     }
     
     private val LOG = logger<NonIncrementalContributors>()
+
+    init {
+      val meter = workspaceModelMetrics.meter
+      val nonIncrementalContributorsUpdateCounter = meter.counterBuilder("workspaceModel.non.incremental.contributors.total.update.time.ms").buildObserver()
+      val excludeRootsComputationCounter = meter.counterBuilder("workspaceModel.non.incremental.contributors.exclude.roots.computation.time.ms").buildObserver()
+      val fileSetsComputationCounter = meter.counterBuilder("workspaceModel.non.incremental.contributors.file.sets.computation.time.ms").buildObserver()
+
+      meter.batchCallback({
+                            nonIncrementalContributorsUpdateCounter.record(totalUpdateTimeMs.asMilliseconds())
+                            excludeRootsComputationCounter.record(excludeRootsComputationTimeMs.asMilliseconds())
+                            fileSetsComputationCounter.record(fileSetsComputationTimeMs.asMilliseconds())
+                          }, nonIncrementalContributorsUpdateCounter, excludeRootsComputationCounter, fileSetsComputationCounter)
+    }
   }
 }
 
 private object SyntheticLibrarySourceRootData : ModuleOrLibrarySourceRootData
 
+private class UnifiedLibraryExclusionCondition(
+  private val library: SyntheticLibrary,
+  private val condition: Condition<in VirtualFile>,
+) : WorkspaceFileSetExclusionCondition {
+  override fun shouldExclude(file: VirtualFile): Boolean = condition.value(file)
+
+  override fun equals(other: Any?): Boolean {
+    return other is UnifiedLibraryExclusionCondition && library == other.library
+  }
+
+  override fun hashCode(): Int = library.hashCode()
+}
+
 private object NonIncrementalMarker : EntityPointer<WorkspaceEntity> {
   override fun resolve(storage: EntityStorage): WorkspaceEntity? = null
   override fun isPointerTo(entity: WorkspaceEntity): Boolean = false
   override fun isPointerToEntityOfSameTypeAs(other: EntityPointer<*>): Boolean = other === this
+  override fun classHashcode(): Int = 0
 }

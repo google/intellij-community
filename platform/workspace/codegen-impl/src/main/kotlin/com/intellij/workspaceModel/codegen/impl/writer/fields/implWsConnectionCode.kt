@@ -57,30 +57,21 @@ fun ObjProperty<*, *>.refsConnectionType(ref: ValueType.ObjRef<*>): String {
   return ""
 }
 
-fun ObjProperty<*, *>.refsConnectionMethodCode(genericType: String = ""): String {
+fun ObjProperty<*, *>.refsConnectionMethodCode(builder: Boolean = false): String {
   val ref = valueType.getRefType()
   val connectionName = name.uppercase() + "_CONNECTION_ID"
   val getterName = if (ref.child) {
-    if (ref.target.openness.extendable)
-      "${EntityStorage.extractOneToAbstractOneChild}$genericType"
-    else
-      "${EntityStorage.extractOneToOneChild}$genericType"
+      "${Instrumentation.getOneChild}"
   }
   else {
-    var valueType = referencedField.valueType
-    if (valueType is ValueType.Optional<*>) {
-      valueType = valueType.type
+    val valueType = referencedField.valueType.let { if (it is ValueType.Optional<*>) it.type else it }
+    if (valueType !is ValueType.List<*> && valueType !is ValueType.ObjRef<*>) {
+      error("Unsupported reference type")
     }
-    when (valueType) {
-      is ValueType.List<*> -> if (receiver.openness.extendable)
-        "${EntityStorage.extractOneToAbstractManyParent}$genericType"
-      else
-        "${EntityStorage.extractOneToManyParent}$genericType"
-      is ValueType.ObjRef<*> -> if (receiver.openness.extendable)
-        "${EntityStorage.extractOneToAbstractOneParent}$genericType"
-      else
-        "${EntityStorage.extractOneToOneParent}$genericType"
-      else -> error("Unsupported reference type")
+    if (builder) {
+      "${Instrumentation.getParentBuilder}"
+    } else {
+      "${Instrumentation.getParent}"
     }
   }
   return "$getterName($connectionName, this)"

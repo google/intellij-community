@@ -182,7 +182,7 @@ public final class MadTestingUtil {
 
   private static void revertVfs(Label label, Project project) throws LocalHistoryException {
     watchDocumentChanges(() -> label.revert(project, PlatformTestUtil.getOrCreateProjectBaseDir(project)),
-                               __ -> {
+                               _ -> {
                                  PsiDocumentManager documentManager = PsiDocumentManager.getInstance(project);
                                  if (documentManager.getUncommittedDocuments().length > 3) {
                                    documentManager.commitAllDocuments();

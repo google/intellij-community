@@ -15,6 +15,7 @@ import com.intellij.execution.process.ProcessListener;
 import com.intellij.ide.projectView.ProjectView;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.colors.EditorColorsListener;
 import com.intellij.openapi.editor.colors.EditorColorsManager;
 import com.intellij.openapi.editor.colors.EditorColorsScheme;
@@ -35,6 +36,9 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -163,12 +167,22 @@ public class CoverageDataManagerImpl extends CoverageDataManager implements Disp
   }
 
   @Override
-  public CoverageSuite addExternalCoverageSuite(@NotNull String selectedFileName,
-                                                long timeStamp,
-                                                @NotNull CoverageRunner coverageRunner,
-                                                @NotNull CoverageFileProvider fileProvider) {
+  public CoverageSuite addExternalCoverageSuite(@NotNull Path file, @NotNull CoverageRunner coverageRunner) {
+    Path fileName = file.getFileName();
+    String selectedFileName = fileName == null ? file.toString() : fileName.toString();
+    Path absoluteFile = file.toAbsolutePath();
+    long timeStamp = getLastModified(absoluteFile);
     return CoverageDataSuitesManager.getInstance(myProject)
-      .addExternalCoverageSuite(selectedFileName, coverageRunner, fileProvider, timeStamp);
+      .addExternalCoverageSuite(selectedFileName, coverageRunner, new DefaultCoverageFileProvider(absoluteFile), timeStamp);
+  }
+
+  private static long getLastModified(@NotNull Path file) {
+    try {
+      return Files.getLastModifiedTime(file).toMillis();
+    }
+    catch (IOException e) {
+      return 0;
+    }
   }
 
   @Override
@@ -389,7 +403,7 @@ public class CoverageDataManagerImpl extends CoverageDataManager implements Disp
     synchronized (myLock) {
       if (myIsProjectClosing) return null;
     }
-    return ApplicationManager.getApplication().runReadAction(computation);
+    return ReadAction.computeBlocking(computation::compute);
   }
 
   @Override

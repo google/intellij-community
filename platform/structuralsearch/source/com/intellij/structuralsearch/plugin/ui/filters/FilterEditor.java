@@ -24,7 +24,7 @@ public abstract class FilterEditor<T extends NamedScriptableDefinition> extends 
   public final JBTableRow getValue() {
     saveValues();
     myConstraintChangedCallback.run();
-    return __ -> this;
+    return _ -> this;
   }
 
   @Override

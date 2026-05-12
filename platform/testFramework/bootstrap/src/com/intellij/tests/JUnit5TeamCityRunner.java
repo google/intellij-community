@@ -3,6 +3,7 @@ package com.intellij.tests;
 
 import jetbrains.buildServer.messages.serviceMessages.ServiceMessage;
 import jetbrains.buildServer.messages.serviceMessages.ServiceMessageTypes;
+import jetbrains.buildServer.messages.serviceMessages.TestFailed;
 import jetbrains.buildServer.messages.serviceMessages.TestFinished;
 import jetbrains.buildServer.messages.serviceMessages.TestStarted;
 import jetbrains.buildServer.messages.serviceMessages.TestStdOut;
@@ -15,12 +16,9 @@ import junit.framework.TestSuite;
 import org.junit.platform.commons.logging.LogRecordListener;
 import org.junit.platform.commons.logging.LoggerFactory;
 import org.junit.platform.engine.DiscoverySelector;
-import org.junit.platform.engine.EngineDiscoveryRequest;
-import org.junit.platform.engine.ExecutionRequest;
 import org.junit.platform.engine.Filter;
 import org.junit.platform.engine.FilterResult;
 import org.junit.platform.engine.TestDescriptor;
-import org.junit.platform.engine.TestEngine;
 import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.TestSource;
 import org.junit.platform.engine.UniqueId;
@@ -30,14 +28,13 @@ import org.junit.platform.engine.reporting.ReportEntry;
 import org.junit.platform.engine.support.descriptor.ClassSource;
 import org.junit.platform.engine.support.descriptor.EngineDescriptor;
 import org.junit.platform.engine.support.descriptor.MethodSource;
-import org.junit.platform.launcher.EngineFilter;
 import org.junit.platform.launcher.Launcher;
 import org.junit.platform.launcher.LauncherDiscoveryRequest;
 import org.junit.platform.launcher.PostDiscoveryFilter;
+import org.junit.platform.launcher.TagFilter;
 import org.junit.platform.launcher.TestExecutionListener;
 import org.junit.platform.launcher.TestIdentifier;
 import org.junit.platform.launcher.TestPlan;
-import org.junit.platform.launcher.core.LauncherConfig;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
 import org.junit.runner.Description;
@@ -49,6 +46,7 @@ import org.junit.vintage.engine.descriptor.VintageTestDescriptor;
 import org.opentest4j.AssertionFailedError;
 import org.opentest4j.MultipleFailuresError;
 
+import java.io.IOException;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -57,10 +55,12 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,22 +70,29 @@ import java.util.logging.Level;
 import java.util.logging.LogRecord;
 
 /**
- * Runs JUnit 3/4 tests using {@linkplain VintageTestEngine}/{@linkplain OrderedVintageTestEngine}, or JUnit 5 tests using {@linkplain JupiterTestEngine}.
+ * Runs JUnit 3/4 tests using {@linkplain VintageTestEngine}, or JUnit 5 tests using {@linkplain JupiterTestEngine}.
  *
  * Supported options:
  * - __class__ className[;...]
  * - __package__ packageName
  * - __classpathroot__
- *   if {@systemProperty intellij.build.test.engine.vintage} is set, {@code only} runs only JUnit 3/4 tests using {@linkplain OrderedVintageTestEngine}, {@code false} runs only JUnit 5 tests; otherwise, both are run
- *   if {@systemProperty intellij.build.test.reverse.order} is set, JUnit 3/4 tests are run in reverse order
+ *   if {@systemProperty intellij.build.test.reverse.order} is set, tests are run in reverse order
  * - className
  * - className methodName
  * if {@systemProperty intellij.build.test.list.classes} is set, only test discovery is performed and the resulting list of test classes is saved to the file specified by this property
  */
 @SuppressWarnings("UseOfSystemOutOrSystemErr")
 public final class JUnit5TeamCityRunner {
-  private static final String ENGINE_VINTAGE = System.getProperty("intellij.build.test.engine.vintage");
+  private static final String IGNORE_FIRST_AND_LAST_TESTS = System.getProperty("intellij.build.test.ignoreFirstAndLastTests");
+  private static final String LIST_CLASSES = System.getProperty("intellij.build.test.list.classes");
   private static final String REVERSE_ORDER = System.getProperty("intellij.build.test.reverse.order");
+  private static final String INCLUDE_TAGS = System.getProperty("intellij.build.test.tags");
+  private static final String EXCLUDE_TAGS = System.getProperty("intellij.build.test.excluded.tags");
+
+  static boolean isUnderTeamCity() {
+    var teamCityVersion = System.getenv("TEAMCITY_VERSION");
+    return teamCityVersion != null && !teamCityVersion.isEmpty();
+  }
 
   public static void main(String[] args) throws ClassNotFoundException {
     if (args.length != 1 && args.length != 2) {
@@ -93,18 +100,20 @@ public final class JUnit5TeamCityRunner {
       System.exit(1);
     }
 
-    TCExecutionListener listener = null;
+    TestExecutionListenerEx listener = null;
     Throwable caughtException = null;
 
     try {
       ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
       List<? extends DiscoverySelector> selectors;
       List<Filter<?>> filters = new ArrayList<>(0);
-      Optional<OrderedVintageTestEngine> optionalOrderedVintageEngine = Optional.empty();
 
       if (args[0].equals("__class__")) {
         String[] classNames = args[1].split(";");
-        selectors = Arrays.stream(classNames).map(DiscoverySelectors::selectClass).toList();
+        selectors = Arrays.stream(classNames).map(className -> {
+          String[] parts = className.split("#", 2);
+          return parts.length == 1 ? DiscoverySelectors.selectClass(className) : DiscoverySelectors.selectMethod(parts[0], parts[1]);
+        }).toList();
         // no filters
       }
       else if (args[0].equals("__package__")) {
@@ -114,31 +123,16 @@ public final class JUnit5TeamCityRunner {
         filters.add(ClassNameFilter.excludeClassNamePatterns("\\Q" + args[1] + "\\E\\.[^.]+\\..*"));
       }
       else if (args[0].equals("__classpathroot__")) {
-        Set<Path> classpathRoots = JUnit5TeamCityRunnerForTestsOnClasspath.getClassPathRoots(classLoader);
+        Set<Path> classpathRoots = getClassRoots(classLoader);
         if (classpathRoots == null) throw new RuntimeException("Failed to get classpath roots");
         selectors = DiscoverySelectors.selectClasspathRoots(classpathRoots);
-        filters.add(JUnit5TeamCityRunnerForTestsOnClasspath.createClassNameFilter(classLoader));      // name check
-        filters.add(JUnit5TeamCityRunnerForTestsOnClasspath.createPostDiscoveryFilter(classLoader));  // bucketing
-        if (!"false".equals(ENGINE_VINTAGE)) filters.add(new IgnorePostDiscoveryFilter());            // IJIgnore and Ignore support in JUnit 3/4
-        filters.add(new PerformancePostDiscoveryFilter());                                            // PerformanceUnitTest support
-        if (!"false".equals(ENGINE_VINTAGE)) filters.add(new HeadlessPostDiscoveryFilter());          // SkipInHeadlessEnvironment support in JUnit 3/4
-
-        // filter engines
-        if ("false".equals(ENGINE_VINTAGE)) {  // JUnit 5 tests only
-          filters.add(EngineFilter.excludeEngines(VintageTestDescriptor.ENGINE_ID));
-        }
-        else {
-          // TODO: use vintage by default
-          optionalOrderedVintageEngine = Optional.of(new OrderedVintageTestEngine());
-          filters.add(EngineFilter.excludeEngines(VintageTestDescriptor.ENGINE_ID));  // mask VintageTestEngine to avoid running JUnit 3/4 tests twice
-
-          if ("only".equals(ENGINE_VINTAGE)) {  // JUnit 3/4 tests only
-            filters.add(EngineFilter.includeEngines(OrderedVintageTestEngine.ENGINE_ID));
-          }
-          else if (ENGINE_VINTAGE == null) {  // all tests
-          }
-          else throw new RuntimeException("Unsupported 'intellij.build.test.engine.vintage' value: " + ENGINE_VINTAGE);
-        }
+        filters.add(new CommonTestClassesFilter());         // name check
+        filters.add(new BucketingClassNameFilter());        // bucketing
+        filters.add(new IgnorePostDiscoveryFilter());       // IJIgnore and Ignore support in JUnit 3/4
+        filters.add(new PerformancePostDiscoveryFilter());  // PerformanceUnitTest support
+        filters.add(new HeadlessPostDiscoveryFilter());     // SkipInHeadlessEnvironment support in JUnit 3/4
+        if (INCLUDE_TAGS != null) filters.add(TagFilter.includeTags(INCLUDE_TAGS.split(";")));        // JUnit 5 tag filter
+        if (EXCLUDE_TAGS != null) filters.add(TagFilter.excludeTags(EXCLUDE_TAGS.split(";")));        // JUnit 5 tag exclusion filter
       }
       else if (args.length == 1) {
         String className = args[0];
@@ -154,28 +148,33 @@ public final class JUnit5TeamCityRunner {
 
       LoggerFactory.addListener(new TCLogRecordListener());  // report warnings/errors as build problems on TeamCity, incl. test discovery
 
-      Launcher launcher = LauncherFactory.create(LauncherConfig.builder().addTestEngines(optionalOrderedVintageEngine.stream().toArray(TestEngine[]::new)).build());
+      Launcher launcher = LauncherFactory.create();
       LauncherDiscoveryRequest discoveryRequest = LauncherDiscoveryRequestBuilder.request()
         .selectors(selectors)
         .filters(filters.toArray(Filter[]::new))
         .build();
       TestPlan testPlan = launcher.discover(discoveryRequest);
 
-      boolean reportAsBootstrapTestsSuite = "only".equals(ENGINE_VINTAGE);  // mask suite names to preserve test identity on TeamCity
-      listener = new TCExecutionListener(reportAsBootstrapTestsSuite);
+      boolean reportAsBootstrapTestsSuite = args[0].equals("__classpathroot__");  // mask JUnit 3/4 suite names to preserve test identity on TeamCity
+      listener = isUnderTeamCity() ? new TCExecutionListener(reportAsBootstrapTestsSuite) : new ConsoleTestExecutionListener();
 
-      if (JUnit5TeamCityRunnerForTestsOnClasspath.LIST_CLASSES != null) {
-        JUnit5TeamCityRunnerForTestsOnClasspath.saveListOfTestClasses(testPlan);  // save only
+      if (LIST_CLASSES != null) {
+        saveListOfTestClasses(testPlan);  // save only
+      }
+      else if ("true".equals(REVERSE_ORDER)) {
+        executeInReverseOrder(launcher, testPlan, listener, filters);  // used by [IDEA Trunk / Tests / Linux x86_64 Reversed Order / Aggregator](https://buildserver.labs.intellij.net/buildConfiguration/ijplatform_master_Idea_Tests_AggregatorRevX64)
+        listener.finalizeOutput();
       }
       else {
         launcher.execute(testPlan, listener);
+        listener.finalizeOutput();
       }
     }
     catch (Throwable e) {
       caughtException = e;
     }
     finally {
-      JUnit5TeamCityRunnerForTestsOnClasspath.assertNoUnhandledExceptions("JUnit5TeamCityRunnerForTestAllSuite", caughtException);  // TODO: rename to JUnit5TeamCityRunner
+      assertNoUnhandledExceptions(caughtException);
     }
 
     // Determine exit code OUTSIDE of try/catch/finally to avoid finally overriding the exit code
@@ -195,6 +194,87 @@ public final class JUnit5TeamCityRunner {
     }
 
     System.exit(exitCode);
+  }
+
+  private static void assertNoUnhandledExceptions(Throwable e) {
+    String testProcessName = System.getProperty("intellij.build.test.process.name", "");
+    if (!testProcessName.isEmpty()) testProcessName = "(" + testProcessName + ")";
+    String buildConfName = System.getProperty("teamcity.buildConfName", "");
+    if (!buildConfName.isEmpty()) buildConfName = "[" + buildConfName + "]";
+    final String testName = "JUnit5TeamCityRunner.assertNoUnhandledExceptions" + testProcessName + buildConfName;
+
+    if (isUnderTeamCity()) {
+      System.out.println(new TestStarted(testName, true, null));
+    }
+    if (e != null) {
+      var testFailedServiceMessage = new TestFailed(testName, e).toString();
+      if (assertNoUnhandledExceptions_isLeak(testFailedServiceMessage) && !"true".equals(IGNORE_FIRST_AND_LAST_TESTS)) {
+        // leaks are already checked by _LastInSuiteTest.testProjectLeak, ignore
+      }
+      else {
+        if (isUnderTeamCity()) {
+          System.out.println(testFailedServiceMessage);
+        } else {
+          System.out.println("Unhandled exception in runner: " + e);
+        }
+      }
+    }
+    if (isUnderTeamCity()) {
+      System.out.println(new TestFinished(testName, 0));
+    }
+  }
+
+  private static boolean assertNoUnhandledExceptions_isLeak(String testFailedServiceMessage) {
+    return
+      // copied from com.intellij.testFramework.LeakHunter#getLeakedObjectDetails
+      testFailedServiceMessage.contains("Found a leaked instance of") ||
+      // copied from com.intellij.openapi.util.ObjectNode#assertNoChildren
+      testFailedServiceMessage.contains("Memory leak detected") &&
+      testFailedServiceMessage.contains("was registered in Disposer");
+  }
+
+  private static Set<Path> getClassRoots(ClassLoader classLoader) throws Throwable {
+    //noinspection unchecked
+    List<Path> testRoots = (List<Path>)MethodHandles.publicLookup()
+      .findStatic(Class.forName("com.intellij.TestAll", false, classLoader),
+                  "getClassRoots", MethodType.methodType(List.class))
+      .invokeExact();
+    return new HashSet<>(testRoots);
+  }
+
+  private static void executeInReverseOrder(Launcher launcher, TestPlan testPlan, TestExecutionListener listener, List<Filter<?>> filters) {
+    List<? extends DiscoverySelector> selectors = testPlan.getRoots().stream().flatMap(root -> {  // keep engine order
+      List<TestIdentifier> children = new ArrayList<>(testPlan.getChildren(root));
+      Collections.reverse(children);
+      return children.stream().map(child -> DiscoverySelectors.selectUniqueId(child.getUniqueIdObject()));
+    }).toList();
+
+    LauncherDiscoveryRequest discoveryRequest = LauncherDiscoveryRequestBuilder.request()
+      .selectors(selectors)
+      .filters(filters.toArray(Filter[]::new))
+      .build();
+    launcher.execute(discoveryRequest, listener);
+  }
+
+  private static void saveListOfTestClasses(TestPlan testPlan) {
+    ArrayList<String> testClasses = new ArrayList<>(0);
+    for (TestIdentifier root : testPlan.getRoots()) {
+      Set<TestIdentifier> firstLevel = testPlan.getChildren(root);
+      for (TestIdentifier identifier : firstLevel) {
+        identifier.getSource()
+          .filter(source -> source instanceof ClassSource)
+          .map(source -> ((ClassSource)source).getClassName())
+          .ifPresent(name -> testClasses.add(name));
+      }
+    }
+    Path path = Path.of(LIST_CLASSES);
+    try {
+      Files.createDirectories(path.getParent());
+      Files.write(path, testClasses);
+    }
+    catch (IOException e) {
+      throw new RuntimeException("Cannot save list of test classes to " + path.toAbsolutePath(), e);
+    }
   }
 
   public static JUnit4TestAdapterCache createJUnit4TestAdapterCache() {
@@ -248,12 +328,185 @@ public final class JUnit5TeamCityRunner {
     public void logRecordSubmitted(LogRecord r) {
       if (r.getLevel() == Level.WARNING && KNOWN_EXCEPTIONAL_WARNINGS.stream().noneMatch(w -> r.getMessage().startsWith(w)) ||
           r.getLevel() == Level.SEVERE) {
-        System.out.println(ServiceMessage.asString(ServiceMessageTypes.BUILD_PROBLEM, Map.of("description", r.getMessage())));
+        if (isUnderTeamCity()) {
+          System.out.println(ServiceMessage.asString(ServiceMessageTypes.BUILD_PROBLEM, Map.of("description", r.getMessage())));
+        }
+        else {
+          System.out.println("[" + r.getLevel() + "] " + r.getMessage());
+        }
       }
     }
   }
 
-  public static class TCExecutionListener implements TestExecutionListener {
+  public interface TestExecutionListenerEx extends TestExecutionListener {
+    boolean smthExecuted();
+    boolean hasFailures();
+    default void finalizeOutput() { }
+  }
+
+  private static class ConsoleTestExecutionListener implements TestExecutionListenerEx {
+    private static final String ANSI_RESET = "\u001B[0m";
+    private static final String ANSI_RED = "\u001B[31m";
+    private static final String ANSI_GREEN = "\u001B[32m";
+    private static final String ANSI_YELLOW = "\u001B[33m";
+
+    private static final int MAX_STACKTRACE_MESSAGE_LENGTH =
+      Integer.getInteger("intellij.build.test.stacktrace.max.length", 100 * 1024);
+
+    private boolean mySomethingExecuted;
+    private final List<String> myFailedPaths = new ArrayList<>();
+    private int myFailed;
+    private int myPassed;
+    private int mySkipped;
+    private int myTotal;
+    private long myPlanStartNanos;
+
+    private static void printStacktrace(Throwable throwable) {
+      String trace = TCExecutionListener.getTrace(throwable, MAX_STACKTRACE_MESSAGE_LENGTH);
+      for (String line : trace.split("\n", -1)) {
+        if (line.isEmpty()) continue;
+        System.out.println("\t" + line.trim());
+      }
+    }
+
+    private static String colored(String text, String ansiColor) {
+      return ansiColor != null ? ansiColor + text + ANSI_RESET : text;
+    }
+
+    private static String displayName(TestIdentifier id) {
+      String displayName = id.getDisplayName();
+
+      return id.getSource()
+        .map(source -> switch (source) {
+          case ClassSource classSource -> classSource.getClassName();
+          case MethodSource methodSource -> methodSource.getClassName() + "#" + methodSource.getMethodName();
+          default -> displayName;
+        })
+        .orElse(displayName);
+    }
+
+    private static String escapeNewlines(String s) {
+      if (s == null) return "null";
+      return s.replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n");
+    }
+
+
+    @Override
+    public boolean smthExecuted() {
+      return mySomethingExecuted;
+    }
+
+    @Override
+    public boolean hasFailures() {
+      return myFailed > 0;
+    }
+
+    @Override
+    public void testPlanExecutionStarted(TestPlan testPlan) {
+      myPlanStartNanos = System.nanoTime();
+    }
+
+    @Override
+    public void executionStarted(TestIdentifier testIdentifier) {
+      if (!testIdentifier.isTest()) return;
+      mySomethingExecuted = true;
+      System.out.println(displayName(testIdentifier) + " :: " + colored("STARTED", null));
+    }
+
+    @Override
+    public void executionSkipped(TestIdentifier testIdentifier, String reason) {
+      mySomethingExecuted = true;
+      myTotal++;
+      mySkipped++;
+      System.out.println(displayName(testIdentifier) + " :: " + colored("SKIPPED", ANSI_YELLOW));
+      if (reason != null && !reason.isEmpty()) {
+        System.out.println("\tReason: " + escapeNewlines(reason));
+      }
+    }
+
+    private void printFinished(TestIdentifier testIdentifier, String status, Throwable throwable) {
+      System.out.println(displayName(testIdentifier) + " :: " + status);
+      if (throwable != null) {
+        printStacktrace(throwable);
+      }
+    }
+
+    @Override
+    public void executionFinished(TestIdentifier testIdentifier, TestExecutionResult testExecutionResult) {
+      TestExecutionResult.Status status = testExecutionResult.getStatus();
+      Throwable throwable = testExecutionResult.getThrowable().orElse(null);
+      if (testIdentifier.isTest()) {
+        switch (status) {
+          case SUCCESSFUL -> {
+            printFinished(testIdentifier, colored("SUCCESSFUL", ANSI_GREEN), null);
+            myTotal++;
+            myPassed++;
+          }
+          case FAILED -> {
+            String path = displayName(testIdentifier);
+            printFinished(testIdentifier, colored("FAILED", ANSI_RED), throwable);
+            myTotal++;
+            myFailed++;
+            myFailedPaths.add(path);
+          }
+          case ABORTED -> {
+            printFinished(testIdentifier, colored("ABORTED", ANSI_YELLOW), throwable);
+            myTotal++;
+            mySkipped++;
+          }
+        }
+        return;
+      }
+      if (throwable == null) return;
+      if (status == TestExecutionResult.Status.FAILED) {
+        String syntheticPath = displayName(testIdentifier) + " > <classInitializationError>";
+        System.out.println(syntheticPath + " :: " + colored("FAILED", ANSI_RED));
+        printStacktrace(throwable);
+        mySomethingExecuted = true;
+        myTotal++;
+        myFailed++;
+        myFailedPaths.add(syntheticPath);
+      }
+      else if (status == TestExecutionResult.Status.ABORTED) {
+        String syntheticPath = displayName(testIdentifier) + " > <classInitializationSkipped>";
+        String message = throwable.getMessage();
+        System.out.println(syntheticPath + " :: " + colored("SKIPPED", ANSI_YELLOW));
+        if (message != null && !message.isEmpty()) {
+          System.out.println("\tReason: " + escapeNewlines(message));
+        }
+        mySomethingExecuted = true;
+        myTotal++;
+        mySkipped++;
+      }
+    }
+
+    @Override
+    public void finalizeOutput() {
+      if (myPlanStartNanos == 0L && myTotal == 0) return;
+      String line = "====================================================";
+      String durationSuffix = myPlanStartNanos != 0L
+                              ? " (" + ((System.nanoTime() - myPlanStartNanos) / 1_000_000L) + " ms)"
+                              : "";
+      System.out.println();
+      System.out.println(line);
+      System.out.println("Results: " + myTotal + (myTotal == 1 ? " test, " : " tests, ") +
+                    colored(myPassed + " passed", ANSI_GREEN) + ", " +
+                    colored(myFailed + " failed", myFailed > 0 ? ANSI_RED : null) + ", " +
+                    colored(mySkipped + " skipped", mySkipped > 0 ? ANSI_YELLOW : null) +
+                    durationSuffix);
+      if (!myFailedPaths.isEmpty()) {
+        System.out.println();
+        System.out.println(colored("Failed tests:", ANSI_RED));
+        for (String path : myFailedPaths) {
+          System.out.println("  " + path);
+        }
+      }
+      System.out.println(line);
+      System.out.flush();
+    }
+  }
+
+  public static class TCExecutionListener implements TestExecutionListenerEx {
     /**
      * The same constant as com.intellij.rt.execution.TestListenerProtocol.CLASS_CONFIGURATION
      */
@@ -261,7 +514,8 @@ public final class JUnit5TeamCityRunner {
     private final PrintStream myPrintStream;
 
     private static final String BOOTSTRAP_TESTS_SUITE_NAME = "com.intellij.tests.BootstrapTests";
-    private final boolean myReportAsBootstrapTestsSuite;
+    private static final String VINTAGE_UNIQUE_ID = UniqueId.forEngine(VintageTestDescriptor.ENGINE_ID).toString();
+    private boolean myReportAsBootstrapTestsSuite;
 
     private TestPlan myTestPlan;
     private long myCurrentTestStart = 0;
@@ -286,20 +540,18 @@ public final class JUnit5TeamCityRunner {
       }
     }
 
-    public TCExecutionListener() {
-      this(false);
-    }
-
     private TCExecutionListener(boolean reportAsBootstrapTestsSuite) {
       myReportAsBootstrapTestsSuite = reportAsBootstrapTestsSuite;
       myPrintStream = System.out;
       myPrintStream.println("##teamcity[enteredTheMatrix]");
     }
 
+    @Override
     public boolean smthExecuted() {
       return myCurrentTestStart != 0;
     }
 
+    @Override
     public boolean hasFailures() {
       return myHasFailures;
     }
@@ -316,16 +568,6 @@ public final class JUnit5TeamCityRunner {
     @Override
     public void testPlanExecutionStarted(TestPlan testPlan) {
       myTestPlan = testPlan;
-      if (myReportAsBootstrapTestsSuite) {
-        myPrintStream.println(new TestSuiteStarted(BOOTSTRAP_TESTS_SUITE_NAME));
-      }
-    }
-
-    @Override
-    public void testPlanExecutionFinished(TestPlan testPlan) {
-      if (myReportAsBootstrapTestsSuite) {
-        myPrintStream.println(new TestSuiteFinished(BOOTSTRAP_TESTS_SUITE_NAME));
-      }
     }
 
     @Override
@@ -344,6 +586,11 @@ public final class JUnit5TeamCityRunner {
         myFinishCount = 0;
         if (!myReportAsBootstrapTestsSuite) {
           myPrintStream.println(new TestSuiteStarted(getName(testIdentifier)));
+        }
+      }
+      else {  // root
+        if (myReportAsBootstrapTestsSuite && testIdentifier.getUniqueId().equals(VINTAGE_UNIQUE_ID)) {  // mask JUnit 3/4 suite names
+          myPrintStream.println(new TestSuiteStarted(BOOTSTRAP_TESTS_SUITE_NAME));
         }
       }
     }
@@ -387,20 +634,12 @@ public final class JUnit5TeamCityRunner {
         myFinishCount++;
       }
       else if (hasNonTrivialParent(testIdentifier)) {
-        String messageName = null;
         if (status == TestExecutionResult.Status.FAILED) {
-          messageName = ServiceMessageTypes.TEST_FAILED;
+          myPrintStream.println(new TestStarted(CLASS_CONFIGURATION, false, null));
+          testFailure(CLASS_CONFIGURATION, ServiceMessageTypes.TEST_FAILED, throwableOptional, 0, reason);
+          myPrintStream.println(new TestFinished(CLASS_CONFIGURATION, 0));
         }
-        else if (status == TestExecutionResult.Status.ABORTED) {
-          messageName = ServiceMessageTypes.TEST_IGNORED;
-        }
-        if (messageName != null) {
-          if (status == TestExecutionResult.Status.FAILED) {
-            myPrintStream.println(new TestStarted(CLASS_CONFIGURATION, false, null));
-            testFailure(CLASS_CONFIGURATION, messageName, throwableOptional, 0, reason);
-            myPrintStream.println(new TestFinished(CLASS_CONFIGURATION, 0));
-          }
-
+        if (status != TestExecutionResult.Status.SUCCESSFUL) {
           final Set<TestIdentifier> descendants = myTestPlan != null ? myTestPlan.getDescendants(testIdentifier) : Collections.emptySet();
           if (!descendants.isEmpty() && myFinishCount == 0) {
             for (TestIdentifier childIdentifier : descendants) {
@@ -416,6 +655,24 @@ public final class JUnit5TeamCityRunner {
           myPrintStream.println(new TestSuiteFinished(getName(testIdentifier)));
         }
         if (status == TestExecutionResult.Status.ABORTED) myCurrentTestStart = 1;  // mark ignored classes as #smthExecuted
+      }
+      else {
+        if (status == TestExecutionResult.Status.FAILED) {
+          String testProcessName = System.getProperty("intellij.build.test.process.name", "");
+          if (!testProcessName.isEmpty()) testProcessName = "(" + testProcessName + ")";
+          String buildConfName = System.getProperty("teamcity.buildConfName", "");
+          if (!buildConfName.isEmpty()) buildConfName = "[" + buildConfName + "]";
+          final String testName = CLASS_CONFIGURATION + testProcessName + buildConfName;
+          myPrintStream.println(new TestSuiteStarted(getName(testIdentifier)));  // root (e.g. JupiterTestEngine)
+          myPrintStream.println(new TestStarted(testName, false, null));
+          testFailure(testName, ServiceMessageTypes.TEST_FAILED, throwableOptional, 0, reason);
+          myPrintStream.println(new TestFinished(testName, 0));
+          myPrintStream.println(new TestSuiteFinished(getName(testIdentifier)));
+        }
+        if (myReportAsBootstrapTestsSuite && testIdentifier.getUniqueId().equals(VINTAGE_UNIQUE_ID)) {  // mask JUnit 3/4 suite names
+          myPrintStream.println(new TestSuiteFinished(BOOTSTRAP_TESTS_SUITE_NAME));
+          myReportAsBootstrapTestsSuite = false;  // don't mask JUnit 5 suite names
+        }
       }
     }
 
@@ -472,11 +729,12 @@ public final class JUnit5TeamCityRunner {
         if (duration > 0) {
           attrs.put("duration", Long.toString(duration));
         }
+        if (ex != null) {
+          attrs.put("message", limit(ex.toString()));  // if empty reason
+          attrs.put("details", getTrace(ex, MAX_STACKTRACE_MESSAGE_LENGTH));
+        }
         if (reason != null) {
           attrs.put("message", limit(reason));
-        }
-        if (ex != null) {
-          attrs.put("details", getTrace(ex, MAX_STACKTRACE_MESSAGE_LENGTH));
         }
         if (ex != null) {
           if (ex instanceof MultipleFailuresError && ((MultipleFailuresError)ex).hasFailures()) {
@@ -668,6 +926,66 @@ public final class JUnit5TeamCityRunner {
     }
   }
 
+  public static class CommonTestClassesFilter implements ClassNameFilter {
+    private static final MethodHandle isClassNameIncluded;
+
+    static {
+      try {
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        isClassNameIncluded = MethodHandles.publicLookup()
+          .findStatic(Class.forName("com.intellij.TestCaseLoader", true, classLoader),
+                      "isClassNameIncluded", MethodType.methodType(boolean.class, String.class));
+        boolean ignored = (boolean)isClassNameIncluded.invokeExact(Object.class.getName() + "Test");  // force load test classes filter, *Test matches ClassFinder#isSuitableTestClassName
+      }
+      catch (Throwable e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    @Override
+    public FilterResult apply(String className) {
+      try {
+        if ((boolean)isClassNameIncluded.invokeExact(className)) {
+          return FilterResult.included(null);
+        }
+        return FilterResult.excluded(null);
+      }
+      catch (Throwable e) {
+        return FilterResult.excluded(e.getMessage());
+      }
+    }
+  }
+
+  public static class BucketingClassNameFilter implements ClassNameFilter {
+    private static final MethodHandle matchesCurrentBucket;
+
+    static {
+      try {
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        matchesCurrentBucket = MethodHandles.publicLookup()
+          .findStatic(Class.forName("com.intellij.TestCaseLoader", true, classLoader),
+                      "matchesCurrentBucket", MethodType.methodType(boolean.class, String.class));
+        boolean ignored = (boolean)matchesCurrentBucket.invokeExact(Object.class.getName());  // force load bucketing scheme
+      }
+      catch (Throwable e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    @Override
+    public FilterResult apply(String className) {
+      try {
+        if ((boolean)matchesCurrentBucket.invokeExact(className)) {
+          return FilterResult.included(null);
+        }
+        return FilterResult.excluded(null);
+      }
+      catch (Throwable e) {
+        return FilterResult.excluded(e.getMessage());
+      }
+    }
+  }
+
   public static class PerformancePostDiscoveryFilter implements PostDiscoveryFilter {
     private static final boolean isIncludingPerformanceTestsRun;
     private static final boolean isPerformanceTestsRun;
@@ -813,39 +1131,6 @@ public final class JUnit5TeamCityRunner {
         return FilterResult.included(null);
       }
       return FilterResult.included("Unknown source type " + source.getClass());
-    }
-  }
-
-  public static final class OrderedVintageTestEngine implements TestEngine {
-    public static final String ENGINE_ID = "ordered-vintage";
-
-    @SuppressWarnings("FieldMayBeStatic") private final VintageTestEngine delegate = new VintageTestEngine();
-
-    @Override
-    public String getId() {
-      return ENGINE_ID;
-    }
-
-    @Override
-    public TestDescriptor discover(EngineDiscoveryRequest request, UniqueId uniqueId) {
-      TestDescriptor root = delegate.discover(request, uniqueId);
-      root.orderChildren(children -> {
-        Collections.sort(children, (a, b) -> {
-          assert a.getSource().isPresent() && a.getSource().get() instanceof ClassSource;
-          ClassSource aClass = (ClassSource)a.getSource().get();
-          assert b.getSource().isPresent() && b.getSource().get() instanceof ClassSource;
-          ClassSource bClass = (ClassSource)b.getSource().get();
-          return aClass.getJavaClass().getName().compareTo(bClass.getJavaClass().getName());
-        });
-        if ("true".equals(REVERSE_ORDER)) Collections.reverse(children);
-        return children;
-      });
-      return root;
-    }
-
-    @Override
-    public void execute(ExecutionRequest request) {
-      delegate.execute(request);
     }
   }
 }

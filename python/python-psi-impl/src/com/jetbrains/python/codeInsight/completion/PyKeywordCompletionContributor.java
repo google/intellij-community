@@ -807,6 +807,7 @@ public final class PyKeywordCompletionContributor extends CompletionContributor 
         .andOr(IN_IMPORT_AFTER_REF, IN_WITH_AFTER_REF, IN_EXCEPT_AFTER_REF)
         .andNot(AFTER_QUALIFIER)
         .andNot(IN_COMMENT)
+        .andNot(IN_STRING_LITERAL)
       ,
       new PyKeywordCompletionProvider(PyNames.AS)
     );

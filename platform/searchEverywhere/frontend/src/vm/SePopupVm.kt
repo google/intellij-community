@@ -1,4 +1,6 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(IntellijInternalApi::class)
+
 package com.intellij.platform.searchEverywhere.frontend.vm
 
 import com.intellij.ide.IdeBundle
@@ -25,6 +27,7 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.IncompleteDependenciesService
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.wm.ToolWindowManager.Companion.getInstance
 import com.intellij.platform.searchEverywhere.SeItemData
@@ -33,6 +36,7 @@ import com.intellij.platform.searchEverywhere.frontend.SeSelectionResult
 import com.intellij.platform.searchEverywhere.frontend.SeTab
 import com.intellij.platform.searchEverywhere.frontend.SeTabInfo
 import com.intellij.platform.searchEverywhere.frontend.SeTabsCustomizer
+import com.intellij.platform.searchEverywhere.frontend.ml.SeMlService
 import com.intellij.platform.searchEverywhere.frontend.tabs.actions.SeActionsTab
 import com.intellij.platform.searchEverywhere.frontend.withPrevious
 import com.intellij.platform.searchEverywhere.providers.SeLegacyContributors
@@ -254,17 +258,17 @@ class SePopupVm(
   suspend fun itemsSelected(indexedItems: List<Pair<Int, SeItemData>>, areIndexesOriginal: Boolean, modifiers: Int): List<SeSelectionResult> {
     val currentTab = currentTab
 
+    SeMlService.getInstanceIfEnabled()?.onResultsSelected(indexedItems)
+
     return coroutineScope {
       indexedItems.map { item ->
-        async {
-          currentTab.itemSelected(item, areIndexesOriginal, modifiers, searchPattern.value)
-        }
+        async { currentTab.itemSelected(item, areIndexesOriginal, modifiers, searchPattern.value) }
       }.awaitAll()
     }
   }
 
-  suspend fun openInFindWindow(session: SeSession, initEvent: AnActionEvent): Boolean {
-    return currentTab.openInFindWindow(session, initEvent)
+  suspend fun openInFindWindow(session: SeSession): Boolean {
+    return currentTab.openInFindWindow(session)
   }
 
   fun selectNextTab() {

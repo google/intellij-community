@@ -1,14 +1,21 @@
 *:com.intellij.concurrency.IntelliJContextElement
 - kotlin.coroutines.CoroutineContext$Element
-- afterChildCompleted(kotlin.coroutines.CoroutineContext):V
-- beforeChildStarted(kotlin.coroutines.CoroutineContext):V
-- childCanceled(kotlin.coroutines.CoroutineContext):V
 - produceChildElement(kotlin.coroutines.CoroutineContext,Z):com.intellij.concurrency.IntelliJContextElement
 *f:com.intellij.concurrency.IntelliJContextElement$DefaultImpls
 - s:fold(com.intellij.concurrency.IntelliJContextElement,java.lang.Object,kotlin.jvm.functions.Function2):java.lang.Object
 - s:get(com.intellij.concurrency.IntelliJContextElement,kotlin.coroutines.CoroutineContext$Key):kotlin.coroutines.CoroutineContext$Element
 - s:minusKey(com.intellij.concurrency.IntelliJContextElement,kotlin.coroutines.CoroutineContext$Key):kotlin.coroutines.CoroutineContext
 - s:plus(com.intellij.concurrency.IntelliJContextElement,kotlin.coroutines.CoroutineContext):kotlin.coroutines.CoroutineContext
+*:com.intellij.concurrency.IntelliJThreadContextElement
+- com.intellij.concurrency.IntelliJContextElement
+- a:afterCompleted(kotlin.coroutines.CoroutineContext,java.lang.Object):V
+- a:beforeStarted(kotlin.coroutines.CoroutineContext):java.lang.Object
+- canceled(kotlin.coroutines.CoroutineContext):V
+*f:com.intellij.concurrency.IntelliJThreadContextElement$DefaultImpls
+- s:fold(com.intellij.concurrency.IntelliJThreadContextElement,java.lang.Object,kotlin.jvm.functions.Function2):java.lang.Object
+- s:get(com.intellij.concurrency.IntelliJThreadContextElement,kotlin.coroutines.CoroutineContext$Key):kotlin.coroutines.CoroutineContext$Element
+- s:minusKey(com.intellij.concurrency.IntelliJThreadContextElement,kotlin.coroutines.CoroutineContext$Key):kotlin.coroutines.CoroutineContext
+- s:plus(com.intellij.concurrency.IntelliJThreadContextElement,kotlin.coroutines.CoroutineContext):kotlin.coroutines.CoroutineContext
 *f:com.intellij.concurrency.ThreadContext
 - sf:currentThreadContext():kotlin.coroutines.CoroutineContext
 - sf:installThreadContext(kotlin.coroutines.CoroutineContext,Z):com.intellij.openapi.application.AccessToken
@@ -46,7 +53,6 @@ f:com.intellij.openapi.util.io.NioFiles
 - *s:copyRecursively(java.nio.file.Path,java.nio.file.Path,java.util.function.Predicate):V
 - *s:deleteQuietly(java.nio.file.Path):V
 - *s:deleteQuietly(java.nio.file.Path,java.util.function.Consumer):V
-- *s:readCaseSensitivity(java.nio.file.Path,java.nio.file.LinkOption[]):com.intellij.openapi.util.io.FileAttributes$CaseSensitivity
 c:com.intellij.openapi.util.registry.RegistryValue
 - *f:asBooleanFlow():kotlinx.coroutines.flow.Flow
 - *f:asDoubleFlow():kotlinx.coroutines.flow.Flow
@@ -111,6 +117,8 @@ f:com.intellij.openapi.util.text.HtmlChunkUtilKt
 - build():com.intellij.openapi.util.text.MarkupText
 com.intellij.ui.IconManager
 - *:colorizedIcon(javax.swing.Icon,kotlin.jvm.functions.Function0):javax.swing.Icon
+f:com.intellij.util.CoroutineScopeKt
+- *sf:cancelOnDispose(kotlinx.coroutines.Job,com.intellij.openapi.Disposable):V
 *f:com.intellij.util.JavaCoroutines
 - sf:suspendJava(java.util.function.Consumer,kotlin.coroutines.Continuation):java.lang.Object
 f:com.intellij.util.TimeoutUtil
@@ -183,3 +191,6 @@ com.intellij.util.io.PersistentMap
 - withVersion(I):com.intellij.util.io.PersistentMapBuilder
 - withWal(Z):com.intellij.util.io.PersistentMapBuilder
 - withWalExecutor(java.util.concurrent.ExecutorService):com.intellij.util.io.PersistentMapBuilder
+f:com.intellij.util.io.ProcessKt
+- *sf:computeDetached(kotlin.coroutines.CoroutineContext,kotlin.jvm.functions.Function2,kotlin.coroutines.Continuation):java.lang.Object
+- *bs:computeDetached$default(kotlin.coroutines.CoroutineContext,kotlin.jvm.functions.Function2,kotlin.coroutines.Continuation,I,java.lang.Object):java.lang.Object

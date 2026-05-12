@@ -12,21 +12,19 @@ import com.intellij.testFramework.common.assertNonDefaultProjectsAreNotLeaked
 import com.intellij.testFramework.common.cleanApplicationState
 import com.intellij.testFramework.common.disposeTestApplication
 import com.intellij.testFramework.common.initTestApplication
+import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.common.waitForAppLeakingThreads
 import com.intellij.util.ui.EDT
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import org.jetbrains.annotations.TestOnly
 import org.junit.jupiter.api.extension.AfterEachCallback
 import org.junit.jupiter.api.extension.BeforeAllCallback
 import org.junit.jupiter.api.extension.ExtensionContext
 import java.lang.AutoCloseable
-import java.time.Duration
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 
 @TestOnly
 class TestApplicationExtension : BeforeAllCallback, AfterEachCallback {
@@ -60,27 +58,24 @@ private class TestApplicationResource(val initializationResult: Result<Unit>) : 
     // The JVM will terminate after all tests complete anyway, and
     // disposing here would break JUnit 4 tests that run after JUnit 5 tests.
     // See BAZEL-2843 for details.
-    if (BazelTestUtil.isUnderBazelTest) {
+    if (BazelTestUtil.isUnderBazelTest || skipTestApplicationDispose()) {
       return
     }
 
-    runBlocking {
-      withTimeout(Duration.ofSeconds(20).toMillis()) {
-        withContext(Dispatchers.EDT) {
-          val application = ApplicationManager.getApplication()
-          application.messageBus.syncPublisher(AppLifecycleListener.TOPIC).appWillBeClosed(false)
-          yield()
-          withContext(Dispatchers.IO) {
-            runInterruptible {
-              waitForAppLeakingThreads(application, 10, TimeUnit.SECONDS)
-            }
-          }
-          assertNonDefaultProjectsAreNotLeaked() // TODO? ability to disable this check for local (=non-build-server) runs
-          yield()
-          disposeTestApplication()
-        }
-        assertDisposerEmpty()
+    timeoutRunBlocking(20.seconds, "TestApplication.close()") {
+      withContext(Dispatchers.EDT) {
+        val application = ApplicationManager.getApplication()
+        application.messageBus.syncPublisher(AppLifecycleListener.TOPIC).appWillBeClosed(false)
+        yield()
+        waitForAppLeakingThreads(application, 10, TimeUnit.SECONDS)
+        assertNonDefaultProjectsAreNotLeaked() // TODO? ability to disable this check for local (=non-build-server) runs
+        yield()
+        disposeTestApplication()
       }
+      assertDisposerEmpty()
     }
   }
 }
+
+private fun skipTestApplicationDispose(): Boolean =
+  System.getProperty("intellij.testFramework.junit5.skip.test.application.dispose", "false").toBooleanStrict()

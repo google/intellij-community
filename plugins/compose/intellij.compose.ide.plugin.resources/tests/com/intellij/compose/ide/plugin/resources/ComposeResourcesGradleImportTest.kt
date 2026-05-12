@@ -2,6 +2,7 @@
 package com.intellij.compose.ide.plugin.resources
 
 import com.intellij.compose.ide.plugin.gradleTooling.rt.ComposeResourcesModel
+import com.intellij.openapi.externalSystem.service.project.ProjectDataManager
 import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.vfs.VirtualFile
@@ -9,6 +10,7 @@ import com.intellij.openapi.vfs.readText
 import com.intellij.openapi.vfs.writeText
 import org.jetbrains.kotlin.test.TestMetadata
 import org.jetbrains.plugins.gradle.tooling.annotation.TargetVersions
+import org.jetbrains.plugins.gradle.util.GradleConstants.SYSTEM_ID
 import org.jetbrains.plugins.gradle.util.GradleUtil
 import org.junit.Test
 import kotlin.test.assertEquals as kAssertEquals
@@ -22,6 +24,7 @@ class ComposeResourcesGradleImportTest : ComposeResourcesTestCase() {
   fun `test default composeResources`() = doTestWithComposeResourcesModel { composeResourcesModel ->
     kAssertEquals("Res", composeResourcesModel.nameOfResClass)
     kAssertEquals(false, composeResourcesModel.isPublicResClass)
+    kAssertEquals("", composeResourcesModel.packageOfResClass)
 
     assertNotEmpty(composeResourcesModel.customComposeResourcesDirs.entries)
     val composeResources = composeResourcesModel.customComposeResourcesDirs[sourceSetName]
@@ -39,6 +42,7 @@ class ComposeResourcesGradleImportTest : ComposeResourcesTestCase() {
     """
         nameOfResClass = "CustomRes"
         publicResClass = true
+        packageOfResClass = "custom.package.name"
         customDirectory(
           sourceSetName = "${sourceSetName}",
           directoryProvider = provider { layout.projectDirectory.dir("customDir") }
@@ -48,6 +52,7 @@ class ComposeResourcesGradleImportTest : ComposeResourcesTestCase() {
   ) { composeResourcesModel ->
     kAssertEquals("CustomRes", composeResourcesModel.nameOfResClass)
     kAssertEquals(true, composeResourcesModel.isPublicResClass)
+    kAssertEquals("custom.package.name", composeResourcesModel.packageOfResClass)
     assertNotEmpty(composeResourcesModel.customComposeResourcesDirs.entries)
 
     val composeResources = composeResourcesModel.customComposeResourcesDirs[sourceSetName]
@@ -72,7 +77,16 @@ class ComposeResourcesGradleImportTest : ComposeResourcesTestCase() {
     val moduleData = GradleUtil.findGradleModuleData(module)
     kAssertNotNull(moduleData)
 
-    val composeResourcesModel = ExternalSystemApiUtil.find(moduleData, COMPOSE_RESOURCES_KEY)?.data
+    val externalProjectData = ProjectDataManager.getInstance()
+      .getExternalProjectsData(myProject, SYSTEM_ID)
+
+    val composeResourcesModels = externalProjectData
+      .mapNotNull { it.externalProjectStructure }
+      .flatMap { ExternalSystemApiUtil.findAllRecursively(it, COMPOSE_RESOURCES_KEY) }
+      .mapNotNull { it.data }
+
+    assertSize(1, composeResourcesModels)
+    val composeResourcesModel = composeResourcesModels.singleOrNull()
     kAssertNotNull(composeResourcesModel)
 
     block(composeResourcesModel)

@@ -7,8 +7,8 @@ import com.intellij.openapi.ui.ComboBox;
 import com.intellij.tasks.TaskBundle;
 import com.intellij.tasks.config.BaseRepositoryEditor;
 import com.intellij.tasks.impl.TaskUiUtil;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBLabel;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.Consumer;
 import com.intellij.util.ui.FormBuilder;
@@ -106,10 +106,10 @@ public class MantisRepositoryEditor extends BaseRepositoryEditor<MantisRepositor
   protected @Nullable JComponent createCustomPanel() {
     myProjectLabel = new JBLabel(TaskBundle.message("label.project"), SwingConstants.RIGHT);
     myProjectCombobox = new ComboBox<>(200);
-    myProjectCombobox.setRenderer(SimpleListCellRenderer.create(TaskBundle.message("label.login.first"), MantisProject::getName));
+    myProjectCombobox.setRenderer(BuilderKt.textListCellRenderer(TaskBundle.message("label.login.first"), MantisProject::getName));
     myFilterLabel = new JBLabel(TaskBundle.message("label.filter"), SwingConstants.RIGHT);
     myFilterCombobox = new ComboBox<>(200);
-    myFilterCombobox.setRenderer(SimpleListCellRenderer.create(TaskBundle.message("label.login.first"), MantisFilter::getName));
+    myFilterCombobox.setRenderer(BuilderKt.textListCellRenderer(TaskBundle.message("label.login.first"), MantisFilter::getName));
     return FormBuilder.createFormBuilder()
       .addLabeledComponent(myProjectLabel, myProjectCombobox)
       .addLabeledComponent(myFilterLabel, myFilterCombobox)

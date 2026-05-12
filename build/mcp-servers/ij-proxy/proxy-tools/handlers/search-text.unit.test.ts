@@ -45,8 +45,8 @@ describe('search text handler (unit)', () => {
 
       const payload = JSON.parse(result)
       deepStrictEqual(payload.items, [
-        {filePath: 'src/a.txt', lineNumber: 3, lineText: 'alpha'},
-        {filePath: 'src/b.txt', lineNumber: 1, lineText: 'beta'}
+        {filePath: 'src/a.txt', startLine: 3},
+        {filePath: 'src/b.txt', startLine: 1}
       ])
 
       const call = assertSingleCall(calls)
@@ -81,7 +81,46 @@ describe('search text handler (unit)', () => {
       }, projectPath, callUpstreamTool, baseCapabilities)
 
       const payload = JSON.parse(result)
-      deepStrictEqual(payload.items, [{filePath: 'src/a.txt', lineNumber: 1, lineText: 'alpha'}])
+      deepStrictEqual(payload.items, [{filePath: 'src/a.txt', startLine: 1}])
+    } finally {
+      rmSync(projectPath, {recursive: true, force: true})
+    }
+  })
+
+  it('normalizes native search output to coordinate-only items', async () => {
+    const projectPath = mkdtempSync(join(tmpdir(), 'ijproxy-search-'))
+    mkdirSync(join(projectPath, 'src'), {recursive: true})
+    const capabilities: SearchCapabilities = {
+      ...baseCapabilities,
+      hasSearchText: true,
+    }
+    const {callUpstreamTool} = createMockToolCaller({
+      search_text: () => ({
+        structuredContent: {
+          items: [
+            {
+              filePath: 'src/a.txt',
+              startLine: 3,
+              startColumn: 2,
+              endLine: 3,
+              endColumn: 7,
+              startOffset: 20,
+              endOffset: 25,
+              lineText: 'alpha'
+            }
+          ]
+        }
+      })
+    })
+
+    try {
+      const result = await handleSearchTextTool({
+        q: 'alpha',
+        limit: 5
+      }, projectPath, callUpstreamTool, capabilities)
+
+      const payload = JSON.parse(result)
+      deepStrictEqual(payload.items, [{filePath: 'src/a.txt', startLine: 3, startColumn: 2, endLine: 3, endColumn: 7}])
     } finally {
       rmSync(projectPath, {recursive: true, force: true})
     }
@@ -111,7 +150,7 @@ describe('search regex handler (unit)', () => {
       }, projectPath, callUpstreamTool, baseCapabilities)
 
       const payload = JSON.parse(result)
-      deepStrictEqual(payload.items, [{filePath: 'src/a.txt', lineNumber: 3, lineText: 'alpha'}])
+      deepStrictEqual(payload.items, [{filePath: 'src/a.txt', startLine: 3}])
 
       const call = assertSingleCall(calls)
       strictEqual(call.name, 'search_in_files_by_regex')

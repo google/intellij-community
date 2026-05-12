@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.java.lexer;
 
 import com.intellij.testFramework.syntax.LexerTestCase;
@@ -421,6 +421,24 @@ public abstract class AbstractBasicJavaLexerTest extends LexerTestCase {
              IDENTIFIER ('a')
              STRING_TEMPLATE_END ('} String"')
              TEXT_BLOCK_TEMPLATE_END ('}\\nxx""\"')""");
+  }
+
+  public void testStringTemplateStateResetOnRestart() {
+    var lexer = createLexer();
+
+    // First pass: lex an unclosed string template — leaves template state (depth 1) on the lexer's internal stack
+    doTest("\"\\{x", """
+      STRING_TEMPLATE_BEGIN ('"\\{')
+      IDENTIFIER ('x')""", lexer);
+
+    // Second pass (same lexer instance): lex a closed template followed by a regular '}'.
+    // Before the fix, the stale template state caused '}' to be incorrectly tokenized as STRING_TEMPLATE_END.
+    doTest("\"\\{x}\" }", """
+      STRING_TEMPLATE_BEGIN ('"\\{')
+      IDENTIFIER ('x')
+      STRING_TEMPLATE_END ('}"')
+      WHITE_SPACE (' ')
+      RBRACE ('}')""", lexer);
   }
 
   public void testStringLiterals() {

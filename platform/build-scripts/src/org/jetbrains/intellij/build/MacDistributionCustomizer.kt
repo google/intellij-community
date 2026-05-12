@@ -1,10 +1,11 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build
 
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.persistentListOf
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.intellij.build.impl.support.RepairUtilityBuilder
+import org.jetbrains.intellij.build.impl.support.bundleRepairUtility
 import java.nio.file.Path
 import java.util.UUID
 import java.util.function.Predicate
@@ -51,32 +52,29 @@ inline fun macCustomizer(projectHome: Path, configure: MacCustomizerBuilder.() -
 /**
  * Builder class for creating [MacDistributionCustomizer] instances using a DSL.
  */
+@Suppress("unused")
 @MacCustomizerDsl
 class MacCustomizerBuilder @PublishedApi internal constructor(private val projectHome: Path) {
   /**
-   * Path to .icns file containing product bundle icons, relative to projectHome.
+   * Path to an .icns file containing product bundle icons, relative to [projectHome].
    * Specify as a relative string path (e.g., "build/resources/icon.icns").
-   * Will be automatically resolved against projectHome during build.
    */
   var icnsPath: String? = null
 
   /**
-   * Path to .icns file for EAP builds, relative to projectHome.
+   * Path to an .icns file for EAP builds, relative to [projectHome].
    * If null, [icnsPath] will be used.
-   * Specify as a relative string path - will be resolved against projectHome during build.
    */
   var icnsPathForEAP: String? = null
 
   /**
-   * Path to alternative .icns file in macOS Big Sur style, relative to projectHome.
-   * Specify as a relative string path - will be resolved against projectHome during build.
+   * Path to an alternative .icns file in macOS Big Sur style, relative to [projectHome].
    */
   @Deprecated("BigSur-style icons are now used by default")
   var icnsPathForAlternativeIcon: String? = null
 
   /**
-   * Path to alternative .icns file in macOS Big Sur style for EAP, relative to projectHome.
-   * Specify as a relative string path - will be resolved against projectHome during build.
+   * Path to an alternative .icns file in macOS Big Sur style for EAP, relative to [projectHome].
    */
   @Deprecated("BigSur-style icons are now used by default")
   var icnsPathForAlternativeIconForEAP: String? = null
@@ -88,15 +86,13 @@ class MacCustomizerBuilder @PublishedApi internal constructor(private val projec
   var bundleIdentifier: String? = null
 
   /**
-   * Path to image which will be injected into the .dmg file, relative to projectHome.
-   * Specify as a relative string path - will be resolved against projectHome during build.
+   * Path to the .dmg background image (in the TIFF format), relative to [projectHome].
    */
   var dmgImagePath: String? = null
 
   /**
-   * Path to image which will be injected into .dmg file for EAP builds, relative to projectHome.
+   * Path to the .dmg background image (in the TIFF format) for EAP builds, relative to [projectHome].
    * If null, [dmgImagePath] will be used.
-   * Specify as a relative string path - will be resolved against projectHome during build.
    */
   var dmgImagePathForEAP: String? = null
 
@@ -142,7 +138,7 @@ class MacCustomizerBuilder @PublishedApi internal constructor(private val projec
   var extraExecutables: PersistentList<String> = persistentListOf()
 
   // Method override handlers (stored as lambdas)
-  private var copyAdditionalFilesHandler: (suspend (BuildContext, Path, JvmArchitecture) -> Unit)? = null
+  private var copyAdditionalFilesHandler: (suspend (Path, JvmArchitecture, BuildContext) -> Unit)? = null
   private var rootDirectoryNameHandler: ((ApplicationInfoProperties, String) -> String)? = null
   private var customIdeaPropertiesHandler: ((ApplicationInfoProperties) -> Map<String, String>)? = null
   private var binariesToSignHandler: ((BuildContext, JvmArchitecture) -> List<String>)? = null
@@ -151,13 +147,13 @@ class MacCustomizerBuilder @PublishedApi internal constructor(private val projec
 
   /**
    * Gets the current copyAdditionalFiles handler for wrapping purposes.
-   * @return the current handler, or null if none is set
+   * @return the current handler, or `null` if none is set
    */
-  fun getCopyAdditionalFilesHandler(): (suspend (BuildContext, Path, JvmArchitecture) -> Unit)? = copyAdditionalFilesHandler
+  fun getCopyAdditionalFilesHandler(): (suspend (Path, JvmArchitecture, BuildContext) -> Unit)? = copyAdditionalFilesHandler
 
   /**
    * Gets the current distributionUUID handler for checking if one is set.
-   * @return the current handler, or null if none is set
+   * @return the current handler, or `null` if none is set
    */
   fun getDistributionUUIDHandler(): ((BuildContext, UUID?) -> UUID)? = distributionUUIDHandler
 
@@ -165,46 +161,38 @@ class MacCustomizerBuilder @PublishedApi internal constructor(private val projec
    * Adds custom logic for copying additional files to the macOS distribution.
    * This handler is called after the base copyAdditionalFiles logic.
    *
-   * @param handler Lambda receiving context, targetDir, and arch
+   * @see [ProductProperties.copyAdditionalOsSpecificFiles]
    */
-  fun copyAdditionalFiles(handler: suspend (context: BuildContext, targetDir: Path, arch: JvmArchitecture) -> Unit) {
-    this.copyAdditionalFilesHandler = handler
+  fun copyAdditionalFiles(handler: suspend (targetDir: Path, arch: JvmArchitecture, context: BuildContext) -> Unit) {
+    copyAdditionalFilesHandler = handler
   }
 
   /**
    * Sets a custom application bundle name (<name>.app).
-   *
-   * @param handler Lambda receiving ApplicationInfoProperties and buildNumber, returning the root directory name
    */
   fun rootDirectoryName(handler: (ApplicationInfoProperties, String) -> String) {
-    this.rootDirectoryNameHandler = handler
+    rootDirectoryNameHandler = handler
   }
 
   /**
-   * Sets custom properties to be added to bin/idea.properties file.
-   *
-   * @param handler Lambda receiving ApplicationInfoProperties and returning a map of properties
+   * Sets custom properties to be added to the `bin/idea.properties` file.
    */
   fun customIdeaProperties(handler: (ApplicationInfoProperties) -> Map<String, String>) {
-    this.customIdeaPropertiesHandler = handler
+    customIdeaPropertiesHandler = handler
   }
 
   /**
    * Sets which binaries should be signed.
-   *
-   * @param handler Lambda receiving BuildContext and JvmArchitecture, returning a list of relative paths
    */
   fun binariesToSign(handler: (BuildContext, JvmArchitecture) -> List<String>) {
-    this.binariesToSignHandler = handler
+    binariesToSignHandler = handler
   }
 
   /**
    * Sets a custom UUID generator for the distribution.
-   *
-   * @param handler Lambda receiving BuildContext and current UUID, returning the distribution UUID
    */
   fun distributionUUID(handler: (BuildContext, UUID?) -> UUID) {
-    this.distributionUUIDHandler = handler
+    distributionUUIDHandler = handler
   }
 
   /**
@@ -217,20 +205,16 @@ class MacCustomizerBuilder @PublishedApi internal constructor(private val projec
    *   base + listOf("bin/custom/$arch/tool")
    * }
    * ```
-   *
-   * @param handler Lambda receiving base patterns, includeRuntime flag, arch, and context, returning a sequence of patterns
    */
   fun executableFilePatterns(handler: (basePatterns: Sequence<String>, Boolean, JvmArchitecture, BuildContext) -> Sequence<String>) {
-    this.executableFilePatternsHandler = handler
+    executableFilePatternsHandler = handler
   }
 
   /**
    * Builds the [MacDistributionCustomizer] with the configured settings.
    * Automatically prefixes relative paths with projectHome.
    */
-  fun build(): MacDistributionCustomizer {
-    return MacDistributionCustomizerImpl(builder = this, projectHome = projectHome)
-  }
+  fun build(): MacDistributionCustomizer = MacDistributionCustomizerImpl(builder = this, projectHome)
 
   private class MacDistributionCustomizerImpl(
     private val builder: MacCustomizerBuilder,
@@ -258,7 +242,8 @@ class MacCustomizerBuilder @PublishedApi internal constructor(private val projec
 
     override suspend fun copyAdditionalFiles(context: BuildContext, targetDir: Path, arch: JvmArchitecture) {
       super.copyAdditionalFiles(context = context, targetDir = targetDir, arch = arch)
-      builder.copyAdditionalFilesHandler?.invoke(context, targetDir, arch)
+      context.productProperties.copyAdditionalOsSpecificFiles(targetDir, OsFamily.MACOS, arch, context)
+      builder.copyAdditionalFilesHandler?.invoke(targetDir, arch, context)
     }
 
     override fun getRootDirectoryName(appInfo: ApplicationInfoProperties, buildNumber: String): String {
@@ -287,44 +272,43 @@ class MacCustomizerBuilder @PublishedApi internal constructor(private val projec
 }
 
 /**
- * Creates a [MacDistributionCustomizer] with Community edition defaults using a builder DSL.
+ * Creates a [MacDistributionCustomizer] with open source build defaults using a builder DSL.
  *
  * Example usage:
  * ```kotlin
  * communityMacCustomizer(projectHome) {
- *   // Override or extend Community defaults
+ *   // override or extend the defaults
  *   urlSchemes += "myscheme"
  * }
  * ```
  */
-inline fun communityMacCustomizer(projectHome: Path, configure: MacCustomizerBuilder.() -> Unit = {}): MacDistributionCustomizer {
-  return macCustomizer(projectHome) {
-    // Set Community defaults
-    icnsPath = "build/conf/ideaCE/mac/images/idea.icns"
-    icnsPathForEAP = "build/conf/ideaCE/mac/images/communityEAP.icns"
-    urlSchemes = listOf("idea")
-    associateIpr = true
-    fileAssociations = FileAssociation.from("java", "groovy", "kt", "kts")
-    bundleIdentifier = "com.jetbrains.intellij.ce"
-    dmgImagePath = "build/conf/ideaCE/mac/images/dmg_background.tiff"
-    
-    rootDirectoryName { appInfo, buildNumber ->
-      if (appInfo.isEAP) {
-        "IntelliJ IDEA ${appInfo.majorVersion}.${appInfo.minorVersionMainPart} CE EAP.app"
-      }
-      else {
-        "IntelliJ IDEA CE.app"
-      }
+inline fun communityMacCustomizer(
+  projectHome: Path,
+  configure: MacCustomizerBuilder.() -> Unit = {}
+): MacDistributionCustomizer = macCustomizer(projectHome) {
+  icnsPath = "build/conf/ideaCE/mac/images/idea.icns"
+  icnsPathForEAP = "build/conf/ideaCE/mac/images/communityEAP.icns"
+  urlSchemes = listOf("idea")
+  associateIpr = true
+  fileAssociations = FileAssociation.from("java", "groovy", "kt", "kts")
+  bundleIdentifier = "com.jetbrains.intellij.ce"
+  dmgImagePath = "build/conf/ideaCE/mac/images/dmg_background.tiff"
+
+  rootDirectoryName { appInfo, _ ->
+    if (appInfo.isEAP) {
+      "IntelliJ IDEA ${appInfo.majorVersion}.${appInfo.minorVersionMainPart} CE EAP.app"
     }
-    
-    executableFilePatterns { base, includeRuntime, arch, context ->
-      val kotlinExecutables = org.jetbrains.intellij.build.kotlin.KotlinBinaries.kotlinCompilerExecutables
-      (base + kotlinExecutables).filterNot { it == "plugins/**/*.sh" }
+    else {
+      "IntelliJ IDEA CE.app"
     }
-    
-    // Apply user configuration
-    configure()
   }
+
+  executableFilePatterns { base, _, _, _ ->
+    val kotlinExecutables = org.jetbrains.intellij.build.kotlin.KotlinBinaries.kotlinCompilerExecutables
+    (base + kotlinExecutables).filterNot { it == "plugins/**/*.sh" }
+  }
+
+  configure()
 }
 
 open class MacDistributionCustomizer {
@@ -360,7 +344,7 @@ open class MacDistributionCustomizer {
   var icnsPathForAlternativeIconForEAP: Path? = null
 
   /**
-   * Relative paths to files in macOS distribution which should take 'executable' permissions.
+   * Relative paths to files in the macOS distribution which should have 'executable' permissions.
    */
   var extraExecutables: PersistentList<String> = persistentListOf()
 
@@ -427,7 +411,7 @@ open class MacDistributionCustomizer {
   var binFilesFilter: Predicate<Path> = Predicate { true }
 
   /**
-   * Relative paths to files in macOS distribution which should be signed.
+   * Relative paths to files in the macOS distribution that should be signed.
    */
   open fun getBinariesToSign(context: BuildContext, arch: JvmArchitecture): List<String> = listOf()
 
@@ -459,11 +443,12 @@ open class MacDistributionCustomizer {
    * Override this method to copy additional files to the macOS distribution of the product.
    */
   open suspend fun copyAdditionalFiles(context: BuildContext, targetDir: Path, arch: JvmArchitecture) {
-    RepairUtilityBuilder.bundle(os = OsFamily.MACOS, arch = arch, distributionDir = targetDir, context = context)
+    bundleRepairUtility(os = OsFamily.MACOS, arch = arch, distributionDir = targetDir, context = context)
   }
 
   open fun generateExecutableFilesPatterns(includeRuntime: Boolean, arch: JvmArchitecture, context: BuildContext): Sequence<String> {
-    val basePatterns = sequenceOf(
+    val basePatterns = if (context.isLanguageServer) sequenceOf("bin/${context.productProperties.baseFileName}")
+    else sequenceOf(
       "bin/*.sh",
       "plugins/**/*.sh",
       "bin/fsnotifier",

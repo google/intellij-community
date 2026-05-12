@@ -35,7 +35,7 @@ internal class ExternalCompilerConfigurationStorage(private val project: Project
       return result
     }
 
-    val map = if (project.isDefault) emptyMap() else (CompilerConfiguration.getInstance(project) as CompilerConfigurationImpl).modulesBytecodeTargetMap
+    val map = if (project.isDefault) emptyMap() else (CompilerConfiguration.getInstance(project) as CompilerConfigurationImpl).modulesBytecodeTargetMap.toMap()
     val moduleNames = getFilteredModuleNameList(project, map, true)
     if (moduleNames.isNotEmpty()) {
       val element = Element(JpsJavaCompilerConfigurationSerializer.BYTECODE_TARGET_LEVEL)

@@ -2,13 +2,13 @@ fun main() {
     val list = listOf(1)
     val a = buildSet {
         addAll(setOf(1, 2))
-        mapTo<Int, Int, _>(this) { it + 1 }
-        mapNotNullTo<Int,<caret> Int, _>(this) { it + 1 }
-        mapIndexedTo<Int, Int, _>(this) { i, e -> e - 2 }
-        filterTo<Int, _>(this) { it % 2 == 1 }
-        filterNotTo<Int, _>(this) { it % 2 == 1 }
-        filterNotNullTo<_, Int>(this)
-        filterIsInstanceTo<Int, _>(this)
+        list.mapTo<Int, Int, _>(this) { it + 1 }
+        list.mapNotN<caret>ullTo<Int, Int, _>(this) { it + 1 }
+        list.mapIndexedTo<Int, Int, _>(this) { i, e -> e - 2 }
+        list.filterTo<Int, _>(this) { it % 2 == 1 }
+        list.filterNotTo<Int, _>(this) { it % 2 == 1 }
+        list.filterNotNullTo<_, Int>(this)
+        list.filterIsInstanceTo<Int, _>(this)
         add(5)
     }
 }

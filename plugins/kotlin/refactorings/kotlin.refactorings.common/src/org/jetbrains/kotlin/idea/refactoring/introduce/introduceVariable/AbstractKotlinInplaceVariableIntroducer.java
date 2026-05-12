@@ -72,7 +72,7 @@ public abstract class AbstractKotlinInplaceVariableIntroducer<D extends KtCallab
         }
     };
 
-    private static final Consumer<? super JComponent> DO_NOTHING = __ -> {};
+    private static final Consumer<? super JComponent> DO_NOTHING = _ -> {};
 
     protected static final class ControlWrapper {
         private final @NotNull Function0<JComponent> factory;

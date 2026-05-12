@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.core.impl` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "core-impl_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "core-impl",
   module_name = "intellij.platform.core.impl",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":core-impl_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = "@community//:k8",
   deps = [
     "//platform/core-api:core",
@@ -32,15 +27,20 @@ jvm_library(
     "@lib//:opentelemetry",
     "@lib//:opentelemetry-semconv",
     "//platform/util/coroutines",
+    "//platform/util/multiplatform",
+    "//platform/util/base",
     "//platform/pluginSystem/parser/impl",
     "//platform/syntax/syntax-api:syntax",
     "//platform/eel",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//platform/eel-nioFs",
   ],
   exports = ["@lib//:kotlin-stdlib"]
 )
 
 jvm_library(
   name = "core-impl_test_lib",
+  testonly = True,
   module_name = "intellij.platform.core.impl",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -62,9 +62,19 @@ jvm_library(
     "//platform/util:util_test_lib",
     "//platform/diagnostic/telemetry:telemetry_test_lib",
     "//platform/util/coroutines:coroutines_test_lib",
+    "//platform/util/multiplatform:multiplatform_test_lib",
+    "//platform/util/base:base_test_lib",
     "//platform/pluginSystem/parser/impl:impl_test_lib",
     "//platform/syntax/syntax-api:syntax_test_lib",
     "//platform/eel:eel_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//platform/eel-nioFs:eel-nioFs_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.core.impl` end
+
+### auto-generated section `iml intellij.platform.core.impl` start
+exports_files([
+  "intellij.platform.core.impl.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.core.impl` end

@@ -33,8 +33,8 @@ class MavenUnlinkedProjectAware : ExternalSystemUnlinkedProjectAware {
     MavenProjectsManager.getInstance(project).projects.map { it.directory }.toSet()
 
   override fun subscribe(project: Project, listener: ExternalSystemProjectLinkListener, parentDisposable: Disposable) {
-    val mavenProjectsManager = MavenProjectsManager.getInstance(project)
-    mavenProjectsManager.addProjectsTreeListener(ProjectsTreeListener(project, listener), parentDisposable)
+    project.messageBus.connect(parentDisposable)
+      .subscribe(MavenProjectsTree.Listener.TOPIC, ProjectsTreeListener(project, listener))
   }
 
   override suspend fun linkAndLoadProjectAsync(project: Project, externalProjectPath: String) {

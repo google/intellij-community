@@ -15,6 +15,7 @@ import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.codeInsight.daemon.impl.HighlightInfo.IntentionActionDescriptor
 import com.intellij.codeInsight.daemon.impl.HighlightVisitorBasedInspection
 import com.intellij.codeInsight.daemon.impl.IntentionActionFilter
+import com.intellij.codeInsight.daemon.impl.ProblemDescriptorWithReporterName
 import com.intellij.codeInsight.daemon.impl.SeverityRegistrar
 import com.intellij.codeInsight.daemon.impl.ShowIntentionsPass
 import com.intellij.codeInsight.daemon.impl.ShowIntentionsPass.IntentionsInfo
@@ -35,6 +36,7 @@ import com.intellij.codeInspection.InspectionEngine
 import com.intellij.codeInspection.ProblemDescriptor
 import com.intellij.codeInspection.ProblemDescriptorBase
 import com.intellij.codeInspection.ProblemDescriptorUtil
+import com.intellij.codeInspection.ex.DynamicGroupTool
 import com.intellij.codeInspection.ex.GlobalInspectionToolWrapper
 import com.intellij.codeInspection.ex.InspectionProfileWrapper
 import com.intellij.codeInspection.ex.LocalInspectionToolWrapper
@@ -278,12 +280,26 @@ internal class DirectIntentionCommandProvider : CommandProvider {
           }
           for (entry: MutableMap.MutableEntry<LocalInspectionToolWrapper?, List<ProblemDescriptor?>?> in inspectionResult.entries) {
             val inspectionToolWrapper: LocalInspectionToolWrapper = entry.key ?: continue
-            val toolId = inspectionToolWrapper.shortName
             val descriptors: List<ProblemDescriptor?> = entry.value ?: continue
             for (descriptor in descriptors) {
+              val toolId = inspectionToolWrapper.shortName
               if (descriptor == null) continue
               val fixes = descriptor.fixes ?: continue
               if (descriptor !is ProblemDescriptorBase) continue
+              var additionalToolId: String? = null
+              if (descriptor is ProblemDescriptorWithReporterName) {
+                //let's try to find the original tool
+                val wrappers = inspectionTools.filter {
+                  ((it?.tool as? DynamicGroupTool)?.children ?: emptyList())
+                    .any { child -> child.shortName == descriptor.reportingToolShortName }
+                }
+                if (wrappers.size == 1) {
+                  additionalToolId = wrappers.first()?.shortName ?: continue
+                }
+                else {
+                  continue
+                }
+              }
               var textRange = descriptor.textRange ?: continue
               if (isInjected) {
                 textRange = injectedLanguageManager.injectedToHost(psiFile, textRange)
@@ -309,7 +325,7 @@ internal class DirectIntentionCommandProvider : CommandProvider {
                 val icon = if (isInfo) AllIcons.Actions.IntentionBulbGrey else AllIcons.Actions.IntentionBulb
 
                 result[toolId + ":" + action.text] = CompletionCommandWithErrorLevel(DirectInspectionFixCompletionCommand(
-                  inspectionId = toolId,
+                  inspectionIds = if (additionalToolId == null) listOf(toolId) else listOf(toolId, additionalToolId),
                   presentableName = action.text,
                   priority = priority,
                   icon = icon,

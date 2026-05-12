@@ -18,8 +18,8 @@ import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.ui.CheckBoxList;
 import com.intellij.ui.CheckBoxListListener;
 import com.intellij.ui.CollectionListModel;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBScrollPane;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.uiDesigner.core.GridLayoutManager;
 import com.intellij.uiDesigner.core.Spacer;
@@ -145,7 +145,7 @@ public class DownloadingOptionsDialog extends DialogWrapper {
     for (FrameworkLibraryVersion version : versions) {
       myVersionComboBox.addItem(version);
     }
-    myVersionComboBox.setRenderer(SimpleListCellRenderer.create("", FrameworkLibraryVersion::getDefaultLibraryName));
+    myVersionComboBox.setRenderer(BuilderKt.textListCellRenderer("", FrameworkLibraryVersion::getDefaultLibraryName));
     myVersionComboBox.setSelectedItem(settings.getVersion());
     if (versions.size() > 1) {
       builder.addLabeledComponent(JavaUiBundle.message("label.downloading.options.dialog.version"), myVersionComboBox);

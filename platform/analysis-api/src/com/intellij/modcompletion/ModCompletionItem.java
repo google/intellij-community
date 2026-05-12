@@ -46,17 +46,31 @@ public interface ModCompletionItem {
   ModCompletionItemPresentation presentation();
 
   /**
-   * @return explicit item priority; can be positive or negative. Default is 0.
+   * @return explicit item priority; can be positive or negative. 
+   * Higher priority means the item will appear closer to the top of the list. Default is 0.
    */
   default double priority() {
     return 0;
   }
 
   /**
+   * Generates and returns the {@link ModCommand} necessary to insert this item into the document.
+   * <p> 
+   * It is strongly recommended to extend {@link PsiUpdateCompletionItem} and override
+   * {@link PsiUpdateCompletionItem#update} instead of implementing this method directly.
+   * <p>
+   * If you implement this method directly and the command modifies text, you must account for the fact that
+   * the selection range will already be deleted by the time the command is applied.
+   * To handle this, use the {@code copyCleaner} parameter of
+   * {@link ModCommand#psiUpdate(ActionContext, java.util.function.Consumer, java.util.function.Consumer)},
+   * which lets you adjust the document copy to match the expected state.
+   * If the document texts don't match, the command will not be applied.
+   * 
    * @param actionContext    action context where the completion is performed.
    *                         The selection range denotes the prefix text inserted during the current completion session.
    *                         The command must ignore it, as at the time it will be applied, the selection range will be deleted.
-   * @param insertionContext an insertion context, which describes how exactly the user invoked the completion
+   * @param insertionContext an insertion context, which describes how exactly the user invoked the completion.
+   *                         If a completion character was used, this method must process it (e.g., insert to the document, if necessary).
    * @return the command to perform the completion (e.g., insert the lookup string). The command must assume that the
    * selection range is already deleted.
    */

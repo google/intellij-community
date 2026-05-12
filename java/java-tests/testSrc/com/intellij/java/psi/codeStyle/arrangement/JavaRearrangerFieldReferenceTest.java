@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.java.psi.codeStyle.arrangement;
 
 import com.intellij.psi.codeStyle.arrangement.match.StdArrangementMatchRule;
@@ -15,11 +15,183 @@ import static com.intellij.psi.codeStyle.arrangement.std.StdArrangementTokens.Mo
 import static com.intellij.psi.codeStyle.arrangement.std.StdArrangementTokens.Modifier.PUBLIC;
 import static com.intellij.psi.codeStyle.arrangement.std.StdArrangementTokens.Modifier.STATIC;
 
+@SuppressWarnings("ALL")
 public class JavaRearrangerFieldReferenceTest extends AbstractJavaRearrangerTest {
   private final List<StdArrangementMatchRule> defaultFieldsArrangement =
     List.of(rule(FIELD, STATIC, FINAL), rule(FIELD, PUBLIC),
             rule(FIELD, PROTECTED), rule(FIELD, PACKAGE_PRIVATE),
             rule(FIELD, PRIVATE));
+  
+  public void testFieldInitializerDependsOnFieldItSelf() {
+    doTest("""
+             class Improbabilia {
+                 private static final Thread thread = new Thread(new Runnable() {
+                     @Override
+                     public void run() {
+                         while (true) {
+                             synchronized (thread) {
+                                 // field thread would depend on itself if
+                                 // dependency checker visited anonymous class
+                                 System.out.println(thread);
+                             }
+                         }
+                     }
+                 });
+             
+                 static {
+                     thread.start();
+                 }
+             }""", defaultFieldsArrangement);
+  }
+  
+  public void testMethodReferences() {
+    // IDEA-311599
+    doTest("""
+             public class Foo {
+                 private final Runnable mFooRunnable1 = this::runFooRunnable2;
+                 private final Runnable mFooRunnable2 = makeFooRunnable2();
+                 public Foo() {
+                 }
+                 private Runnable makeFooRunnable2() {
+                     return new Runnable() {
+                         @Override
+                         public void run() {
+                             mFooRunnable1.run();
+                         }
+                     };
+                 }
+                 private void runFooRunnable2() {
+                     mFooRunnable2.run();
+                 }
+             }
+             """, defaultFieldsArrangement);
+
+    // IDEA-314824
+    doTest("""
+             public record Test() {
+                 static final Integer TEMP0 = 3;
+                 static final Integer TEMP1 = run(ITest::temp2);
+                 static final Integer TEMP2 = TEMP0 + 2 + TEMP1;
+                 static Integer run(final Supplier<Integer> supplier) {
+                     return 4;
+                 }
+                 interface ITest {
+                     static int temp2() {
+                         return Test.TEMP2;
+                     }
+                 }
+             }
+             """, defaultFieldsArrangement);
+
+    // IDEA-341366
+    doTest("""
+             import java.util.function.Consumer;
+             public class Showcase {
+                 Consumer<? super Boolean> foo = this::bar;
+                 Object baz;
+                 private void bar(Boolean really) {
+                     System.out.println(foo);
+                 }
+             }
+             """, defaultFieldsArrangement);
+  }
+  
+  public void testDependenciesBetweenFields() {
+    // IDEA-286442
+    doTest("""
+             class Scratch {
+                 private static final String COMMA_DELIMITER = ",";
+                 private static final String UUID_REGEXP = "([0-9A-Za-z-]+)";
+                 private static final String URI_REGEXP = "(http://<some_url_pattern>+,?)";
+                 private static final String URIS_REGEXP = "(" + URI_REGEXP + "|" + "(\\"" + URI_REGEXP + "+\\"))";
+                 private static final String TITLE_REGEXP = "((.+)|(\\".+\\"))";
+                 private static final String FULL_REGEXP = UUID_REGEXP + COMMA_DELIMITER
+                         + URIS_REGEXP + COMMA_DELIMITER
+                         + TITLE_REGEXP;
+                 private static final Pattern PATTERN = Pattern.compile(FULL_REGEXP);
+             }
+             """, defaultFieldsArrangement);
+
+    // IDEA-293864
+    doTest("""
+             import java.util.List;
+             public class TestClass {
+                 static int int1 = 1;
+                 static List<Integer> numbers = List.of(int1);
+                 static int int2 = 2;
+                 static boolean int2Present = numbers.contains(int2);
+             }
+             """, defaultFieldsArrangement);
+
+    // IDEA-280036
+    doTest("""
+             class FormatterDependencyIssue {
+                public static final String AA = "aa";
+                public static final String ZZ = "zz";
+                public static final String COMPOSED = AA + ZZ;
+                public static String AA_NON_FINAL = "aa";
+                public static String ZZ_NON_FINAL = "zz";
+                public final String AA_NON_STATIC = "aa";
+                public final String ZZ_NON_STATIC = "zz";
+                public String AA_NON_STATIC_NON_FINAL = "aa";
+                public String ZZ_NON_STATIC_NON_FINAL = "zz";
+                public static String COMPOSED_NON_FINAL = AA_NON_FINAL + ZZ_NON_FINAL;
+                public final String COMPOSED_NON_STATIC = AA_NON_STATIC + ZZ_NON_STATIC;
+                public String COMPOSED_NON_STATIC_NON_FINAL = AA_NON_STATIC_NON_FINAL + ZZ_NON_STATIC_NON_FINAL;
+             }""", defaultFieldsArrangement);
+
+    // IDEA-333223
+    doTest("""
+             class Foo {
+                 public static final String upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                 public static final String lower = upper.toLowerCase(Locale.ROOT);
+                 public static final String digits = "0123456789";
+                 public static final String alphanum = lower + digits;
+             }""", defaultFieldsArrangement);
+
+    // IDEA-321048
+    doTest("""
+             class MyTestKO {
+             
+                 private static final String TENANT_ID = "tenantId";
+                 private static final String ASSET_ID_NAMESPACE_1 = "assetIdNamespace1";
+                 private static final String ASSET_ID_NAMESPACE_2 = "assetIdNamespace2";
+                 private static final String ASSET_ID_1 = "assetId1";
+                 private static final String ASSET_ID_2 = "assetId2";
+                 private static final String DEVICE_ID_1 = "urn:lo:nsid:" + ASSET_ID_NAMESPACE_1 + ":" + ASSET_ID_1;
+             
+                 private static final String RESOURCE_ID_1 = "resourceId1";
+                 private static final String RESOURCE_ID_2 = "resourceId2";
+                 private static final String SOURCE_VERSION_1 = "sourceVersion1";
+                 private static final String SOURCE_VERSION_2 = "sourceVersion2";
+                 private static final String TARGET_VERSION_1 = "targetVersion1";
+                 private static final String TARGET_VERSION_2 = "targetVersion2";
+                 private static final String DEVICE_ID_2 = "urn:lo:nsid:" + ASSET_ID_NAMESPACE_2 + ":" + ASSET_ID_2;
+             
+                 private static final StateModel UPDATE_A = StateModel.builder()
+                         .tenantId(TENANT_ID).deviceId(DEVICE_ID_1)
+                         .resourceId(RESOURCE_ID_1)
+                         .sourceVersion(SOURCE_VERSION_1)
+                         .targetVersion(TARGET_VERSION_1)
+                         .build();
+                 private static final StateModel UPDATE_B = StateModel.builder()
+                         .tenantId(TENANT_ID).deviceId(DEVICE_ID_2)
+                         .resourceId(RESOURCE_ID_2)
+                         .sourceVersion(SOURCE_VERSION_2)
+                         .targetVersion(TARGET_VERSION_2)
+                         .build();
+             }""", defaultFieldsArrangement);
+
+    // IDEA-291785
+    doTest("""
+             class RearrangeCodeBugExample {
+                 int var0;
+                 int var1 = var0 + 1;
+                 int var2 = 2;
+                 int sum = var1 + var2;
+             }
+             """, defaultFieldsArrangement);
+  }
 
   public void test_keep_referenced_package_private_field_before_public_one_which_has_reference_through_binary_expression() {
     doTest("""
@@ -318,14 +490,12 @@ public class JavaRearrangerFieldReferenceTest extends AbstractJavaRearrangerTest
 
   public void test_IDEA_128071() {
     doTest("""
-
              public class FormatTest {
                  public int a = 3;
                  private static final String FACEBOOK_CLIENT_ID = "";
                  public static final String FACEBOOK_OAUTH_URL = "".concat(FACEBOOK_CLIENT_ID).concat("");
              }
              """, """
-
              public class FormatTest {
                  private static final String FACEBOOK_CLIENT_ID = "";
                  public static final String FACEBOOK_OAUTH_URL = "".concat(FACEBOOK_CLIENT_ID).concat("");
@@ -337,7 +507,6 @@ public class JavaRearrangerFieldReferenceTest extends AbstractJavaRearrangerTest
 
   public void test_field_dependency_through_method_call() {
     doTest("""
-
              public class TmpTest {
                  private static final Object[] EMPTY_OBJECT_ARRAY = new Object[0];
                  static final String SUB_MESSAGE_REQUEST_SNAPSHOT = create(1);
@@ -351,7 +520,6 @@ public class JavaRearrangerFieldReferenceTest extends AbstractJavaRearrangerTest
                  }
              }
              """, """
-
              public class TmpTest {
                  private static final Object[] EMPTY_OBJECT_ARRAY = new Object[0];
                  static final String SUB_MESSAGE_REQUEST_SNAPSHOT = create(1);
@@ -370,7 +538,6 @@ public class JavaRearrangerFieldReferenceTest extends AbstractJavaRearrangerTest
 
   public void test_only_dependencies_withing_same_initialization_scope() {
     doTest("""
-
              public class TestArrangementBuilder {
                  private String theString = "";
                  private static final TestArrangement DEFAULT = new TestArrangementBuilder().build();
@@ -392,7 +559,6 @@ public class JavaRearrangerFieldReferenceTest extends AbstractJavaRearrangerTest
                  }
              }
              """, """
-
              public class TestArrangementBuilder {
                  private static final TestArrangement DEFAULT = new TestArrangementBuilder().build();
                  private String theString = "";
@@ -417,9 +583,8 @@ public class JavaRearrangerFieldReferenceTest extends AbstractJavaRearrangerTest
                           rule(PRIVATE, FINAL), rule(PRIVATE)));
   }
 
-  public void testIdea264100() {
+  public void test_IDEA_246100() {
     doTest("""
-
              public class Test {
                  private static final String AAA = "aaa";
                  static final String BBB = AAA;
@@ -434,7 +599,6 @@ public class JavaRearrangerFieldReferenceTest extends AbstractJavaRearrangerTest
                  private static final Object B4 = O1.toString() + DA;
              }
              """, """
-
              public class Test {
                  public static final Object O1 = "";
                  public static final Object DR = "";
@@ -451,19 +615,13 @@ public class JavaRearrangerFieldReferenceTest extends AbstractJavaRearrangerTest
              """, List.of(rule(STATIC, FINAL), rule(PRIVATE, STATIC, FINAL)));
   }
 
-  public void testIdea218936() {
+  public void test_IDEA_218936() {
     doTest("""
-
              public class TestOne {
                  int value;
                  public int a = 0, b = value;
              }
-             """, """
-
-             public class TestOne {
-                 int value;
-                 public int a = 0, b = value;
-             }
-             """, List.of(rule(PUBLIC), rule(PACKAGE_PRIVATE)));
+             """,
+           List.of(rule(PUBLIC), rule(PACKAGE_PRIVATE)));
   }
 }

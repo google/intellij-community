@@ -43,11 +43,11 @@ public class PyClassNameCompletionTest extends PyTestCase {
   }
 
   public void testModule() {
-    runWithAdditionalFileInLibDir("collections.py", "", (__) -> doTest());
+    runWithAdditionalFileInLibDir("collections.py", "", (_) -> doTest());
   }
 
   public void testVariable() {
-    runWithAdditionalFileInLibDir("datetime.py", "MAXYEAR = 10", (__) -> doTest());
+    runWithAdditionalFileInLibDir("datetime.py", "MAXYEAR = 10", (_) -> doTest());
   }
 
   public void testSubmodule() {  // PY-7887
@@ -123,7 +123,7 @@ public class PyClassNameCompletionTest extends PyTestCase {
     runWithAdditionalFileInLibDir(
       "sys.py",
       "path = 10",
-      (__) -> doTestCompletionOrder("local_pkg.path", "local_pkg.local_module.path", "sys.path")
+      (_) -> doTestCompletionOrder("local_pkg.path", "local_pkg.local_module.path", "sys.path")
     );
   }
 
@@ -152,7 +152,7 @@ public class PyClassNameCompletionTest extends PyTestCase {
     runWithAdditionalFileInLibDir(
       "sys.py",
       "path = 10",
-      (__) -> doTestCompletionOrder("combinedOrdering.path1", "first.foo.path", "sys.path")
+      (_) -> doTestCompletionOrder("combinedOrdering.path1", "first.foo.path", "sys.path")
     );
   }
 
@@ -202,6 +202,20 @@ public class PyClassNameCompletionTest extends PyTestCase {
       assertDoesntContain(variantQNames, "pip._vendor.requests", "pip._vendor.requests.request");
       assertContainsElements(variantQNames, "requests", "requests.request");
     });
+  }
+  // PY-88016
+  public void testReuseExistingFromImportForModule() {
+    doTest();
+  }
+
+  // PY-88016
+  public void testReuseExistingRegularImportForModule() {
+    doTestWithoutFromImport();
+  }
+
+  // PY-88016
+  public void testReuseExistingFromImportForModuleViaAlias() {
+    doTest();
   }
 
   // PY-80238

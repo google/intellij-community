@@ -18,8 +18,8 @@ import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiTreeChangeAdapter
 import com.intellij.psi.PsiTreeChangeEvent
-import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.common.timeoutRunBlocking
+import com.intellij.testFramework.common.waitForAllDocumentsCommitted
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.TestDisposable
 import com.intellij.testFramework.junit5.fixture.moduleFixture
@@ -124,7 +124,7 @@ class DocumentCommitOnBackgroundTest {
       val file = file.get()
       val document = psiDocumentManager.getDocument(file)!!
       WriteCommandAction.runWriteCommandAction(project.get()) { document.insertString(0, "def") }
-      PlatformTestUtil.waitForAllDocumentsCommitted(10, TimeUnit.SECONDS)
+      waitForAllDocumentsCommitted(10, TimeUnit.SECONDS)
     }
 
     DumbService.getInstance(project.get()).waitForSmartMode()
@@ -155,7 +155,7 @@ class DocumentCommitOnBackgroundTest {
       val file = file.get()
       val document = psiDocumentManager.getDocument(file)!!
       WriteCommandAction.runWriteCommandAction(project.get()) { document.insertString(0, "abc") }
-      PlatformTestUtil.waitForAllDocumentsCommitted(10, TimeUnit.SECONDS)
+      waitForAllDocumentsCommitted(10, TimeUnit.SECONDS)
     }
 
     assertTrue(plainListener.recorder.invoked.get() > 0)

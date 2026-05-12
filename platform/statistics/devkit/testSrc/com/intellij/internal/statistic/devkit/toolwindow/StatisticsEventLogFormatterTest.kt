@@ -423,8 +423,91 @@ class StatisticsEventLogFormatterTest : BasePlatformTestCase() {
     assertEquals(multiLineLogSeveralEqualEvents, formatedLogMessage)
   }
 
+  /**
+   * Check that a message without '{' does not throw StringIndexOutOfBoundsException and is returned as-is.
+   */
+  fun testFormatMessageWithoutBraceDoesNotThrow() {
+    val processingResult = MyProcessingResult(ProcessOutputType.STDOUT, true, null)
+    val logFilterModel = TestStatisticsLogFilterModel(processingResult)
+    val formatter = StatisticsEventLogFormatter(logFilterModel)
+    val msg = "plain message without opening brace"
+    assertEquals(msg, formatter.formatMessage(msg))
+  }
+
+  /**
+   * Test that malformed JSON input returns the original message without throwing exceptions.
+   */
+  fun testMalformedJsonReturnsOriginalMessage() {
+    val malformedJson = "$formattedEventTime - [\"$EVENT_GROUP\", v$GROUP_VERSION]: \"$EVENT_ID\" {\"field1\":\"test\", \"field2\":"
+    val formattedMessage = getFormatedMessage(malformedJson, ProcessOutputType.STDOUT, false)
+    assertEquals(malformedJson, formattedMessage)
+  }
+
+  /**
+   * Test that input with missing colon separator returns the original message.
+   */
+  fun testMissingColonSeparatorReturnsOriginalMessage() {
+    val invalidFormat = "$formattedEventTime - [\"$EVENT_GROUP\", v$GROUP_VERSION]: \"$EVENT_ID\" {\"field1\"\"test\"}"
+    val formattedMessage = getFormatedMessage(invalidFormat, ProcessOutputType.STDOUT, false)
+    assertEquals(invalidFormat, formattedMessage)
+  }
+
+  /**
+   * Test that input with invalid JSON structure returns the original message.
+   */
+  fun testInvalidJsonStructureReturnsOriginalMessage() {
+    val invalidJson = "$formattedEventTime - [\"$EVENT_GROUP\", v$GROUP_VERSION]: \"$EVENT_ID\" {\"field1\":}"
+    val formattedMessage = getFormatedMessage(invalidJson, ProcessOutputType.STDOUT, false)
+    assertEquals(invalidJson, formattedMessage)
+  }
+
+  /**
+   * Test that input with unclosed braces returns the original message.
+   */
+  fun testUnclosedBracesReturnsOriginalMessage() {
+    val unclosedBraces = "$formattedEventTime - [\"$EVENT_GROUP\", v$GROUP_VERSION]: \"$EVENT_ID\" {\"field1\":\"test\""
+    val formattedMessage = getFormatedMessage(unclosedBraces, ProcessOutputType.STDOUT, false)
+    assertEquals(unclosedBraces, formattedMessage)
+  }
+
+  /**
+   * Test that input with empty field name returns the original message.
+   */
+  fun testEmptyFieldNameReturnsOriginalMessage() {
+    val emptyFieldName = "$formattedEventTime - [\"$EVENT_GROUP\", v$GROUP_VERSION]: \"$EVENT_ID\" {\"\":\"test\"}"
+    val formattedMessage = getFormatedMessage(emptyFieldName, ProcessOutputType.STDOUT, false)
+    // This might actually be valid JSON, so it may format correctly
+    assertNotNull(formattedMessage)
+  }
+
+  /**
+   * Test that completely invalid input (no braces) returns the original message.
+   */
+  fun testNoBracesReturnsOriginalMessage() {
+    val noBraces = "$formattedEventTime - [\"$EVENT_GROUP\", v$GROUP_VERSION]: \"$EVENT_ID\""
+    val formattedMessage = getFormatedMessage(noBraces, ProcessOutputType.STDOUT, false)
+    assertEquals(noBraces, formattedMessage)
+  }
+
+  /**
+   * Test multiline formatting with malformed JSON returns the original message.
+   */
+  fun testMalformedJsonMultilineReturnsOriginalMessage() {
+    val malformedJson = "$formattedEventTime - [\"$EVENT_GROUP\", v$GROUP_VERSION]: \"$EVENT_ID\" {\"field1\":\"test\", \"field2\":"
+    val formattedMessage = getFormatedMessage(malformedJson, ProcessOutputType.STDOUT, true)
+    assertEquals(malformedJson, formattedMessage)
+  }
+
   private fun getFormatedMessage(action: LogEventAction, outputType: ProcessOutputType, isMultilineLog: Boolean): String? {
     val logMessage = StatisticsEventLogMessageBuilder().buildLogMessage(buildLogEvent(action), EVENT_ID, emptyMap())
+    val processingResult = MyProcessingResult(outputType, true, null)
+    val logFilterModel = TestStatisticsLogFilterModel(processingResult)
+    val formatter = StatisticsEventLogFormatter(logFilterModel)
+    formatter.updateLogPresentation(isMultilineLog)
+    return formatter.formatMessage(logMessage)
+  }
+
+  private fun getFormatedMessage(logMessage: String, outputType: ProcessOutputType, isMultilineLog: Boolean): String? {
     val processingResult = MyProcessingResult(outputType, true, null)
     val logFilterModel = TestStatisticsLogFilterModel(processingResult)
     val formatter = StatisticsEventLogFormatter(logFilterModel)

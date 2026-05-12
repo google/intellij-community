@@ -4,6 +4,7 @@ package com.intellij.codeInsight.hints
 import com.intellij.codeInsight.completion.CompletionMemory
 import com.intellij.codeInsight.completion.JavaMethodCallElement
 import com.intellij.codeInsight.hints.HintInfo.MethodInfo
+import com.intellij.codeInsight.hints.ParameterNameHintsSuppressor.All.isSuppressedFor
 import com.intellij.codeInsight.hints.declarative.HintFormat
 import com.intellij.codeInsight.hints.declarative.InlayHintsCollector
 import com.intellij.codeInsight.hints.declarative.InlayHintsProvider
@@ -183,12 +184,19 @@ public class JavaInlayParameterHintsProvider : InlayParameterHintsProvider {
       file: PsiFile,
       editor: Editor,
     ): InlayHintsCollector {
+      val filter = MethodInfoExcludeListFilter.forLanguage(file.language)
       return object : SharedBypassCollector {
         override fun collectFromElement(
           element: PsiElement,
           sink: InlayTreeSink,
         ) {
-          getParameterHints(element).forEach { hint ->
+          val hints = getParameterHints(element)
+          if (hints.isEmpty()) return
+          val info: HintInfo? = getHintInfo(element, file)
+          val showHints = info == null || info is HintInfo.OptionInfo || filter.showHint(info)
+          hints.forEach { hint ->
+            if (!showHints && hint.isFilterByExcludeList) return@forEach
+            if (isSuppressedFor(file, hint)) return
             sink.addPresentation(
               position = InlineInlayPosition(hint.offset, false),
               hintFormat = HintFormat.default,

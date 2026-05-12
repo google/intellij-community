@@ -12,7 +12,6 @@ jvm_library(
     "@lib//:kotlinc-kotlin-jps-common",
     "//platform/projectModel-api:projectModel",
     "//platform/util",
-    "//plugins/kotlin/base/frontend-agnostic",
     "//platform/util/jdom",
     "//platform/core-api:core",
     "//platform/projectModel-impl",
@@ -21,6 +20,7 @@ jvm_library(
 
 jvm_library(
   name = "compiler-configuration_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.base.compilerConfiguration",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -28,10 +28,15 @@ jvm_library(
     ":compiler-configuration",
     "//platform/projectModel-api:projectModel_test_lib",
     "//platform/util:util_test_lib",
-    "//plugins/kotlin/base/frontend-agnostic:frontend-agnostic_test_lib",
     "//platform/util/jdom:jdom_test_lib",
     "//platform/core-api:core_test_lib",
     "//platform/projectModel-impl:projectModel-impl_test_lib",
   ]
 )
 ### auto-generated section `build intellij.kotlin.base.compilerConfiguration` end
+
+### auto-generated section `iml intellij.kotlin.base.compilerConfiguration` start
+exports_files([
+  "intellij.kotlin.base.compilerConfiguration.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.base.compilerConfiguration` end

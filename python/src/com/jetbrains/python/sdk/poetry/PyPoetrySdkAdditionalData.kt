@@ -14,8 +14,6 @@ class PyPoetrySdkAdditionalData : PythonSdkAdditionalData {
     this.associatedModulePath = associatedModulePath?.toString()
   }
 
-  constructor(data: PythonSdkAdditionalData) : super(data)
-
   override fun save(element: Element) {
     super.save(element)
     // We use this flag to create an instance of the correct additional data class. The flag itself is not used after that

@@ -89,7 +89,7 @@ public final class QueueElementPanel {
       new IconButton(CoreBundle.message("button.cancel"),
                      AllIcons.Process.StopHovered,
                      AllIcons.Process.StopHovered),
-      __ -> cancelRequest());
+      _ -> cancelRequest());
 
     cancelButton.setVisible(true);
     cancelButton.setFillBg(true);

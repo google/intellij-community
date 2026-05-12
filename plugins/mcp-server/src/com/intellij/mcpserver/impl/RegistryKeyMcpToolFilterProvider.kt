@@ -1,19 +1,20 @@
 package com.intellij.mcpserver.impl
 
 import com.intellij.mcpserver.McpToolFilterProvider
-import com.intellij.mcpserver.McpToolFilterProvider.MaskBasedMcpToolFilter.Companion.getMaskFilters
+import com.intellij.mcpserver.McpToolFilterProvider.McpToolFilterContext
+import com.intellij.mcpserver.McpToolInvocationMode
 import com.intellij.openapi.util.registry.Registry
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 
-internal class RegistryKeyMcpToolFilterProvider(val cs: CoroutineScope) : McpToolFilterProvider {
-  override fun getFilters(clientInfo: Implementation?): StateFlow<List<McpToolFilterProvider.McpToolFilter>> {
-    return Registry.get("mcp.server.tools.filter").asStringFlow()
-      .map { getMaskFilters(it) }
-      .stateIn(cs, SharingStarted.Eagerly, getMaskFilters(Registry.stringValue("mcp.server.tools.filter")))
+internal class RegistryKeyMcpToolFilterProvider : McpToolFilterProvider {
+  override fun applyFilters(context: McpToolFilterContext, clientInfo: Implementation?, sessionOptions: McpServerService.McpSessionOptions?, invocationMode: McpToolInvocationMode) {
+    McpToolFilterProvider.applyMaskFilter(context, Registry.stringValue("mcp.server.tools.filter"))
+  }
+
+  override fun getUpdates(clientInfo: Implementation?, scope: CoroutineScope, sessionOptions: McpServerService.McpSessionOptions?, invocationMode: McpToolInvocationMode): Flow<Unit> {
+    return Registry.get("mcp.server.tools.filter").asStringFlow().map { }
   }
 }

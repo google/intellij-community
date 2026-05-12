@@ -121,12 +121,12 @@ public final class CyclicDependenciesPanel extends JPanel implements Disposable,
     updateLeftTreeModel();
     updateRightTreeModel();
 
-    myLeftTree.getSelectionModel().addTreeSelectionListener(__ -> {
+    myLeftTree.getSelectionModel().addTreeSelectionListener(_ -> {
       updateRightTreeModel();
       myUsagesPanel.setToInitialPosition();
     });
 
-    myRightTree.getSelectionModel().addTreeSelectionListener(__ -> SwingUtilities.invokeLater(() -> {
+    myRightTree.getSelectionModel().addTreeSelectionListener(_ -> SwingUtilities.invokeLater(() -> {
       final PackageNode selectedPackageNode = getSelectedPackage(myRightTree);
       if (selectedPackageNode == null) {
         return;
@@ -262,7 +262,7 @@ public final class CyclicDependenciesPanel extends JPanel implements Disposable,
             psiFiles.addAll(getPackageFiles(psiPackage));
           }
         }
-        return TreeModelBuilder.createTreeModel(myProject, false, psiFiles, __ -> false, mySettings);
+        return TreeModelBuilder.createTreeModel(myProject, false, psiFiles, _ -> false, mySettings);
       })
       .finishOnUiThread(ModalityState.any(), model -> {
         myLeftTree.setModel(model);
@@ -298,7 +298,7 @@ public final class CyclicDependenciesPanel extends JPanel implements Disposable,
               final Set<PsiFile> dependentFilesInPackage = myBuilder.getDependentFilesInPackage(prevPackage, psiPackage, nextPackage);
 
               final PackageDependenciesNode node = (PackageDependenciesNode)TreeModelBuilder
-                .createTreeModel(myProject, false, dependentFilesInPackage, __ -> false, mySettings).getRoot();
+                .createTreeModel(myProject, false, dependentFilesInPackage, _ -> false, mySettings).getRoot();
               nodes[i] = hideEmptyMiddlePackages((PackageDependenciesNode)node.getChildAt(0), new StringBuffer());
             }
 

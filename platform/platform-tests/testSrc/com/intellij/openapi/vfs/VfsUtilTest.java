@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vfs;
 
 import com.intellij.ide.impl.ProjectUtil;
@@ -6,7 +6,6 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.application.ex.ApplicationManagerEx;
 import com.intellij.openapi.application.ex.PathManagerEx;
-import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleType;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -17,18 +16,15 @@ import com.intellij.openapi.project.impl.ProjectManagerImpl;
 import com.intellij.openapi.roots.ModuleRootModificationUtil;
 import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.util.Disposer;
-import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileAttributes;
 import com.intellij.openapi.util.io.FileSystemUtil;
-import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.io.IoTestUtil;
+import com.intellij.openapi.util.io.NioFiles;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.encoding.EncodingProjectManager;
 import com.intellij.openapi.vfs.encoding.EncodingProjectManagerImpl;
 import com.intellij.openapi.vfs.newvfs.ManagingFS;
-import com.intellij.openapi.vfs.newvfs.NewVirtualFile;
 import com.intellij.openapi.vfs.newvfs.RefreshQueue;
-import com.intellij.openapi.vfs.newvfs.RefreshSession;
 import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent;
 import com.intellij.openapi.vfs.newvfs.impl.VirtualDirectoryImpl;
 import com.intellij.testFramework.EdtTestUtil;
@@ -38,18 +34,20 @@ import com.intellij.testFramework.fixtures.BareTestFixtureTestCase;
 import com.intellij.testFramework.rules.TempDirectory;
 import com.intellij.util.TimeoutUtil;
 import com.intellij.util.concurrency.Semaphore;
+import com.intellij.util.concurrency.ThreadingAssertions;
+import com.intellij.util.io.Compressor;
 import com.intellij.util.io.SuperUserStatus;
+import com.intellij.util.system.OS;
 import com.intellij.util.ui.UIUtil;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Rule;
 import org.junit.Test;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URL;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -58,8 +56,11 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.jar.Manifest;
 import java.util.stream.Stream;
 
+import static com.intellij.openapi.util.io.IoTestUtil.assumeWindows;
+import static com.intellij.openapi.util.io.IoTestUtil.assumeWslPresence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -81,27 +82,27 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
   }
 
   @Test
-  public void testFindFileByUrl() throws IOException {
-    File testDataDir = new File(PathManagerEx.getTestDataPath(), "vfs/findFileByUrl");
+  public void testFindFileByUrl() throws IOException, URISyntaxException {
+    var testDataDir = Path.of(PathManagerEx.getTestDataPath(), "vfs/findFileByUrl");
 
-    VirtualFile vDir = VfsUtil.findFileByURL(testDataDir.toURI().toURL());
+    var vDir = VfsUtil.findFileByURL(testDataDir.toUri().toURL());
     assertNotNull(vDir);
     assertTrue(vDir.isDirectory());
-    List<VirtualFile> list = VfsUtil.getChildren(vDir, file -> !file.getName().endsWith(".new"));
+    var list = VfsUtil.getChildren(vDir, file -> !file.getName().endsWith(".new"));
     assertEquals(2, list.size());
 
-    File zip = new File(testDataDir, "test.zip");
-    URL jarUrl = new URL("jar", "", zip.toURI().toURL().toExternalForm() + "!/");
-    VirtualFile vZipRoot = VfsUtil.findFileByURL(jarUrl);
+    var zip = testDataDir.resolve("test.zip");
+    var jarUrl = new URI("jar", zip.toUri() + "!/", null).toURL();
+    var vZipRoot = VfsUtil.findFileByURL(jarUrl);
     assertNotNull(vZipRoot);
     assertTrue(vZipRoot.isDirectory());
 
-    VirtualFile vZipDir = VfsUtil.findFileByURL(new URL(jarUrl, "com/intellij/installer"));
+    var vZipDir = VfsUtil.findFileByURL(new URI("jar", zip.toUri() + "!/com/intellij/installer", null).toURL());
     assertNotNull(vZipDir);
     assertTrue(vZipDir.isDirectory());
 
-    File file = new File(testDataDir, "1.txt");
-    VirtualFile vFile = VfsUtil.findFileByURL(file.toURI().toURL());
+    var file = testDataDir.resolve("1.txt");
+    var vFile = VfsUtil.findFileByURL(file.toUri().toURL());
     assertNotNull(vFile);
     assertFalse(vFile.isDirectory());
     assertEquals("test text", VfsUtilCore.loadText(vFile));
@@ -109,22 +110,22 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
 
   @Test
   public void testFindRelativeFile() throws IOException {
-    File testDataDir = new File(PathManagerEx.getTestDataPath(), "vfs");
-    VirtualFile vDir = LocalFileSystem.getInstance().findFileByIoFile(testDataDir);
+    var testDataDir = Path.of(PathManagerEx.getTestDataPath(), "vfs");
+    var vDir = LocalFileSystem.getInstance().findFileByNioFile(testDataDir);
     assertNotNull(vDir);
-    assertEquals(vDir, VfsUtilCore.findRelativeFile(VfsUtilCore.convertFromUrl(testDataDir.toURI().toURL()), null));
-    assertEquals(vDir, VfsUtilCore.findRelativeFile(testDataDir.getAbsolutePath(), null));
+    assertEquals(vDir, VfsUtilCore.findRelativeFile(VfsUtilCore.convertFromUrl(testDataDir.toUri().toURL()), null));
+    assertEquals(vDir, VfsUtilCore.findRelativeFile(testDataDir.toAbsolutePath().toString(), null));
     assertEquals(vDir, VfsUtilCore.findRelativeFile("vfs", vDir.getParent()));
   }
 
   @Test
   public void testFindChildWithTrailingSpace() {
-    File tempDir = this.tempDir.newDirectory();
-    VirtualFile vDir = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempDir);
+    var tempDir = this.tempDir.newDirectoryPath();
+    var vDir = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(tempDir);
     assertNotNull(vDir);
     assertTrue(vDir.isDirectory());
 
-    VirtualFile child = vDir.findChild(" ");
+    var child = vDir.findChild(" ");
     assertNull(child);
 
     assertThat(vDir.getChildren()).isEmpty();
@@ -132,29 +133,29 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
 
   @Test
   public void testDirAttributeRefreshes() throws IOException {
-    File file = tempDir.newFile("test");
-    VirtualFile vFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(file);
+    var file = tempDir.newFileNio("test");
+    var vFile = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(file);
     assertNotNull(vFile);
     assertFalse(vFile.isDirectory());
 
-    assertTrue(file.delete());
-    assertTrue(file.mkdir());
-    VirtualFile vFile2 = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(file);
+    Files.delete(file);
+    Files.createDirectory(file);
+    var vFile2 = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(file);
     assertNotNull(vFile2);
     assertTrue(vFile2.isDirectory());
 
-    assertTrue(file.delete());
-    assertTrue(file.createNewFile());
-    VirtualFile vFile3 = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(file);
+    Files.delete(file);
+    Files.createFile(file);
+    var vFile3 = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(file);
     assertNotNull(vFile3);
     assertFalse(vFile3.isDirectory());
   }
 
   @Test
   public void testPresentableUrlSurvivesDeletion() throws IOException {
-    VirtualFile file = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempDir.newFile("file.txt"));
+    var file = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(tempDir.newFileNio("file.txt"));
     assertNotNull(file);
-    String url = file.getPresentableUrl();
+    var url = file.getPresentableUrl();
     assertNotNull(url);
     WriteAction.runAndWait(() -> file.delete(this));
     assertEquals(url, file.getPresentableUrl());
@@ -162,7 +163,7 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
 
   @Test
   public void testToUri() {
-    URI uri = VfsUtil.toUri("file:///asd");
+    var uri = VfsUtil.toUri("file:///asd");
     assertNotNull(uri);
     assertEquals("file", uri.getScheme());
     assertEquals("/asd", uri.getPath());
@@ -181,7 +182,7 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
     assertNotNull(uri);
     assertEquals("someone@example.com", uri.getSchemeSpecificPart());
 
-    if (SystemInfo.isWindows) {
+    if (OS.CURRENT == OS.Windows) {
       uri = VfsUtil.toUri("file://C:/p");
       assertNotNull(uri);
       assertEquals("file", uri.getScheme());
@@ -239,13 +240,14 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
   }
 
   @Test
-  public void testFindRootWithDenormalizedPath() {
-    File tempJar = IoTestUtil.createTestJar(tempDir.newFile("test.jar"));
-    VirtualFile jar = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempJar);
+  public void testFindRootWithDenormalizedPath() throws IOException {
+    var tempJar = tempDir.newFileNio("test.jar");
+    try (var jar = new Compressor.Jar(tempJar)) { jar.addManifest(new Manifest()); }
+    var jar = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(tempJar);
     assertNotNull(jar);
 
-    NewVirtualFile root1 = ManagingFS.getInstance().findRoot(jar.getPath() + "!/", JarFileSystem.getInstance());
-    NewVirtualFile root2 = ManagingFS.getInstance().findRoot(jar.getParent().getPath() + "//" + jar.getName() + "!/", JarFileSystem.getInstance());
+    var root1 = ManagingFS.getInstance().findRoot(jar.getPath() + "!/", JarFileSystem.getInstance());
+    var root2 = ManagingFS.getInstance().findRoot(jar.getParent().getPath() + "//" + jar.getName() + "!/", JarFileSystem.getInstance());
     assertNotNull(root1);
     assertSame(root1, root2);
 
@@ -255,23 +257,23 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
 
   @Test
   public void testFindRootWithCrazySlashes() {
-    for (int i = 0; i < 10; i++) {
-      String path = StringUtil.repeat("/", i);
-      VirtualFile root = LocalFileSystem.getInstance().findFileByPathIfCached(path);
+    for (var i = 0; i < 10; i++) {
+      var path = StringUtil.repeat("/", i);
+      var root = LocalFileSystem.getInstance().findFileByPathIfCached(path);
       assertTrue(path, root == null || !root.getPath().contains("//"));
-      VirtualFile root2 = LocalFileSystem.getInstance().findFileByPath(path);
+      var root2 = LocalFileSystem.getInstance().findFileByPath(path);
       assertTrue(path, root2 == null || !root2.getPath().contains("//"));
     }
   }
 
   @Test
   public void testNotCanonicallyNamedChild() throws IOException {
-    File tempDir = this.tempDir.newDirectory();
-    assertTrue(new File(tempDir, "libFiles").createNewFile());
-    assertTrue(new File(tempDir, "CssInvalidElement").createNewFile());
-    assertTrue(new File(tempDir, "extFiles").createNewFile());
+    var tempDir = this.tempDir.newDirectoryPath();
+    Files.createFile(tempDir.resolve("libFiles"));
+    Files.createFile(tempDir.resolve("CssInvalidElement"));
+    Files.createFile(tempDir.resolve("extFiles"));
 
-    VirtualFile vDir = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempDir);
+    var vDir = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(tempDir);
     assertNotNull(vDir);
     assertTrue(vDir.isDirectory());
 
@@ -299,28 +301,28 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
   public void testRenameDuringPartialRefresh() throws IOException { doRenameAndRefreshTest(false); }
 
   private void doRenameAndRefreshTest(boolean full) throws IOException {
-    ApplicationManager.getApplication().assertIsNonDispatchThread();
+    ThreadingAssertions.assertBackgroundThread();
 
-    File testFile = tempDir.newFile("test/child.txt");
-    VirtualFile parent = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(testFile.getParentFile());
+    var testFile = tempDir.newFileNio("test/child.txt");
+    var parent = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(testFile.getParent());
     assertNotNull(parent);
     if (full) {
       assertEquals(1, parent.getChildren().length);
     }
-    VirtualFile child = parent.findChild(testFile.getName());
+    var child = parent.findChild(testFile.getFileName().toString());
     assertNotNull(child);
 
     ApplicationManagerEx.setInStressTest(true);
     try {
-      List<VirtualFile> files = List.of(parent);
-      Semaphore semaphore = new Semaphore();
-      for (int i = 0; i < 1000; i++) {
+      var files = List.of(parent);
+      var semaphore = new Semaphore();
+      for (var i = 0; i < 1000; i++) {
         semaphore.down();
         VfsUtil.markDirty(true, false, parent);
         LocalFileSystem.getInstance().refreshFiles(files, true, true, semaphore::up);
 
         assertTrue(child.isValid());
-        String newName = "name" + i + ".txt";
+        var newName = "name" + i + ".txt";
         WriteAction.runAndWait(() -> child.rename(this, newName));
         assertTrue(child.isValid());
 
@@ -336,15 +338,15 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
 
   @Test(timeout = 20_000)
   public void testScanNewChildrenMustNotBeRunOutsideOfProjectRoots() throws Exception {
-    checkNewDirAndRefresh(__-> {}, getAllExcludedCalled -> assertFalse(getAllExcludedCalled.get()));
+    checkNewDirAndRefresh(_-> {}, getAllExcludedCalled -> assertFalse(getAllExcludedCalled.get()));
   }
 
   @Test(timeout = 20_000)
   public void testRefreshAndEspeciallyScanChildrenMustBeRunOutsideReadActionToAvoidUILags() throws Exception {
-    AtomicReference<Project> project = new AtomicReference<>();
+    var project = new AtomicReference<Project>();
     checkNewDirAndRefresh(
       temp -> {
-        Project p = ProjectUtil.openOrImport(temp);
+        var p = ProjectUtil.openOrImport(temp);
         Disposer.register(getTestRootDisposable(), () -> PlatformTestUtil.forceCloseProjectWithoutSaving(p));
         project.set(p);
         assertTrue(p.isOpen());
@@ -362,27 +364,24 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
   }
 
   private void checkNewDirAndRefresh(Consumer<? super Path> dirCreatedCallback, Consumer<? super AtomicBoolean> getAllExcludedCalledChecker) throws IOException {
-    AtomicBoolean getAllExcludedCalled = new AtomicBoolean();
+    var getAllExcludedCalled = new AtomicBoolean();
     ((ProjectManagerImpl)ProjectManager.getInstance()).testOnlyGetExcludedUrlsCallback(getTestRootDisposable(), () -> {
       getAllExcludedCalled.set(true);
       assertFalse(ApplicationManager.getApplication().isReadAccessAllowed());
     });
 
-    final File temp = tempDir.newDirectory();
-    VirtualDirectoryImpl vTemp = (VirtualDirectoryImpl)LocalFileSystem.getInstance().refreshAndFindFileByIoFile(temp);
+    final var temp = tempDir.newDirectoryPath();
+    var vTemp = (VirtualDirectoryImpl)LocalFileSystem.getInstance().refreshAndFindFileByNioFile(temp);
     assertNotNull(vTemp);
     vTemp.getChildren(); //to force full dir refresh?!
-    dirCreatedCallback.accept(temp.toPath());
-    File d = new File(temp, "d");
-    assertTrue(d.mkdir());
-    File d1 = new File(d, "d1");
-    assertTrue(d1.mkdir());
-    File x = new File(d1, "x.txt");
-    assertTrue(x.createNewFile());
+    dirCreatedCallback.accept(temp);
+    var d = Files.createDirectory(temp.resolve("d"));
+    var d1 = Files.createDirectory(d.resolve("d1"));
+    Files.createFile(d1.resolve("x.txt"));
 
-    ApplicationManager.getApplication().assertIsNonDispatchThread();
+    ThreadingAssertions.assertBackgroundThread();
     VfsUtil.markDirty(true, false, vTemp);
-    CountDownLatch refreshed = new CountDownLatch(1);
+    var refreshed = new CountDownLatch(1);
     LocalFileSystem.getInstance().refreshFiles(Collections.singletonList(vTemp), false, true, refreshed::countDown);
 
     while (refreshed.getCount() != 0) {
@@ -394,17 +393,18 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
   @Test
   public void asyncRefreshInModalProgressCompletesWithinIt() {
     EdtTestUtil.runInEdtAndWait(() -> {
-      VirtualDirectoryImpl vTemp = (VirtualDirectoryImpl)LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempDir.getRoot());
+      var vTemp = (VirtualDirectoryImpl)LocalFileSystem.getInstance().refreshAndFindFileByNioFile(tempDir.getRootPath());
       assertThat(vTemp.getChildren()).isEmpty();
 
-      tempDir.newFile("x.txt");
+      tempDir.newFileNio("x.txt");
 
+      //noinspection UsagesOfObsoleteApi
       ProgressManager.getInstance().run(new Task.Modal(null, "", false) {
         @Override
         public void run(@NotNull ProgressIndicator indicator) {
-          ApplicationManager.getApplication().assertIsNonDispatchThread();
+          ThreadingAssertions.assertBackgroundThread();
 
-          Semaphore semaphore = new Semaphore(1);
+          var semaphore = new Semaphore(1);
           vTemp.refresh(true, true, semaphore::up);
           assertTrue(semaphore.waitFor(10_000));
           assertThat(vTemp.getChildren()).hasSize(1);
@@ -425,22 +425,23 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
 
   private void checkNonModalThenModalRefresh(boolean waitForDiskRefreshCompletionBeforeStartingModality) throws IOException {
     EdtTestUtil.runInEdtAndWait(() -> {
-      File dir1 = tempDir.newDirectory("dir1");
-      File dir2 = tempDir.newDirectory("dir2");
-      VirtualFile vDir = VfsUtil.findFileByIoFile(tempDir.getRoot(), true);
-      assertThat(Stream.of(vDir.getChildren()).map(VirtualFile::getName)).containsExactly(dir1.getName(), dir2.getName());
-      VirtualFile vDir1 = vDir.getChildren()[0];
-      VirtualFile vDir2 = vDir.getChildren()[1];
+      var dir1 = tempDir.newDirectoryPath("dir1");
+      var dir2 = tempDir.newDirectoryPath("dir2");
+      var vDir = VfsUtil.findFile(tempDir.getRootPath(), true);
+      assertThat(Stream.of(vDir.getChildren()).map(VirtualFile::getName))
+        .containsExactly(NioFiles.getFileName(dir1), NioFiles.getFileName(dir2));
+      var vDir1 = vDir.getChildren()[0];
+      var vDir2 = vDir.getChildren()[1];
       assertThat(vDir1.getChildren()).isEmpty();
       assertThat(vDir2.getChildren()).isEmpty();
 
-      assertTrue(new File(dir1, "a.txt").createNewFile());
-      assertTrue(new File(dir2, "a.txt").createNewFile());
+      Files.createFile(dir1.resolve("a.txt"));
+      Files.createFile(dir2.resolve("a.txt"));
 
       List<String> log = new ArrayList<>();
-      Semaphore semaphore = new Semaphore(1);
+      var semaphore = new Semaphore(1);
 
-      RefreshSession nonModalSession = RefreshQueue.getInstance().createSession(true, true, () -> {
+      var nonModalSession = RefreshQueue.getInstance().createSession(true, true, () -> {
         log.add("non-modal finished");
         semaphore.up();
       });
@@ -449,15 +450,16 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
 
       if (waitForDiskRefreshCompletionBeforeStartingModality) {
         TimeoutUtil.sleep(100);  // hopefully that's enough for refresh thread to see the disk changes
-        UIUtil.dispatchAllInvocationEvents();
+        PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
       }
 
+      //noinspection UsagesOfObsoleteApi
       ProgressManager.getInstance().run(new Task.Modal(null, "", false) {
         @Override
         public void run(@NotNull ProgressIndicator indicator) {
-          ApplicationManager.getApplication().assertIsNonDispatchThread();
+          ThreadingAssertions.assertBackgroundThread();
 
-          Semaphore local = new Semaphore(1);
+          var local = new Semaphore(1);
           vDir2.refresh(true, true, () -> {
             log.add("modal finished");
             local.up();
@@ -467,8 +469,8 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
         }
       });
 
-      for (int i = 0; i < 10_000 && !semaphore.waitFor(1); i++) {
-        UIUtil.dispatchAllInvocationEvents();
+      for (var i = 0; i < 10_000 && !semaphore.waitFor(1); i++) {
+        PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
       }
       assertTrue(semaphore.waitFor(1));
 
@@ -487,38 +489,36 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
 
   @Test
   public void testVfsUtilCopyMustCopyBOMCorrectly() throws IOException {
-    File file = tempDir.newFile("test.txt");
-    VirtualFile vFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(file);
+    var file = tempDir.newFileNio("test.txt");
+    var vFile = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(file);
     assertNotNull(vFile);
     assertFalse(vFile.isDirectory());
     WriteAction.runAndWait(() -> vFile.setBinaryContent(CharsetToolkit.UTF8_BOM));
     assertEquals("", VfsUtilCore.loadText(vFile));
     assertArrayEquals(CharsetToolkit.UTF8_BOM, vFile.getBOM());
-    VirtualFile dir = WriteAction.computeAndWait(() -> vFile.getParent().createChildDirectory(this, "dir"));
 
-    VirtualFile copy = WriteAction.computeAndWait(() -> VfsUtil.copy(this, vFile, dir));
-
+    var dir = WriteAction.computeAndWait(() -> vFile.getParent().createChildDirectory(this, "dir"));
+    var copy = WriteAction.computeAndWait(() -> VfsUtil.copy(this, vFile, dir));
     assertEquals("", VfsUtilCore.loadText(copy));
     assertArrayEquals(CharsetToolkit.UTF8_BOM, copy.getBOM());
   }
 
   @Test
   public void testVfsUtilCopyMustCopyBOMCorrectlyForFileUnderProjectRoot() throws IOException {
-    File dir1 = tempDir.newDirectory("dir1");
-    Project project = PlatformTestUtil.loadAndOpenProject(Paths.get(dir1.getPath()), getTestRootDisposable());
+    var dir1 = tempDir.newDirectoryPath("dir1");
+    var project = PlatformTestUtil.loadAndOpenProject(dir1, getTestRootDisposable());
     WriteAction.runAndWait(() -> {
-      VirtualFile root = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(dir1);
-      Module module1 = PsiTestUtil.addModule(project, ModuleType.EMPTY, "module1", root);
+      var root = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(dir1);
+      var module1 = PsiTestUtil.addModule(project, ModuleType.EMPTY, "module1", root);
       ModuleRootModificationUtil.addContentRoot(module1, root);
-      File f = new File(dir1, "file.txt");
-      FileUtil.writeToFile(f, CharsetToolkit.UTF8_BOM);
-      VirtualFile file = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(f);
+      var f = Files.write(dir1.resolve("file.txt"), CharsetToolkit.UTF8_BOM);
+      var file = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(f);
       assertTrue(ProjectFileIndex.getInstance(project).isInContent(file));
       assertEquals("", VfsUtilCore.loadText(file));
       assertEquals("", VfsUtilCore.loadText(file));
       assertArrayEquals(CharsetToolkit.UTF8_BOM, file.getBOM());
-      VirtualFile dir2 = root.createChildDirectory(this, "dir2");
-      VirtualFile copy = VfsUtil.copy(this, file, dir2);
+      var dir2 = root.createChildDirectory(this, "dir2");
+      var copy = VfsUtil.copy(this, file, dir2);
       assertEquals("", VfsUtilCore.loadText(copy));
       assertEquals("", VfsUtilCore.loadText(copy));
       assertArrayEquals(CharsetToolkit.UTF8_BOM, copy.getBOM());
@@ -527,23 +527,22 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
 
   @Test
   public void testVfsUtilCopyMustCopyBOMLessFileCorrectlyWhenEncodingProjectManagerBOMForNewFilesOptionIsSetToTrue() throws IOException {
-    File dir1 = tempDir.newDirectory("dir1");
-    Project project = PlatformTestUtil.loadAndOpenProject(Paths.get(dir1.getPath()), getTestRootDisposable());
+    var dir1 = tempDir.newDirectoryPath("dir1");
+    var project = PlatformTestUtil.loadAndOpenProject(dir1, getTestRootDisposable());
     WriteAction.runAndWait(() -> {
-      ((EncodingProjectManagerImpl)EncodingProjectManager.getInstance(project)).setBOMForNewUtf8Files(
-        EncodingProjectManagerImpl.BOMForNewUTF8Files.ALWAYS);
-      VirtualFile root = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(dir1);
-      Module module1 = PsiTestUtil.addModule(project, ModuleType.EMPTY, "module1", root);
+      ((EncodingProjectManagerImpl)EncodingProjectManager.getInstance(project))
+        .setBOMForNewUtf8Files(EncodingProjectManagerImpl.BOMForNewUTF8Files.ALWAYS);
+      var root = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(dir1);
+      var module1 = PsiTestUtil.addModule(project, ModuleType.EMPTY, "module1", root);
       ModuleRootModificationUtil.addContentRoot(module1, root);
-      File f = new File(dir1, "file.txt");
-      FileUtil.writeToFile(f, "xxx");
-      VirtualFile file = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(f);
+      var f = Files.writeString(dir1.resolve("file.txt"), "xxx");
+      var file = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(f);
       assertTrue(ProjectFileIndex.getInstance(project).isInContent(file));
       assertEquals("xxx", VfsUtilCore.loadText(file));
       assertEquals("xxx", VfsUtilCore.loadText(file));
       assertArrayEquals(null, file.getBOM());
-      VirtualFile dir2 = root.createChildDirectory(this, "dir2");
-      VirtualFile copy = VfsUtil.copy(this, file, dir2);
+      var dir2 = root.createChildDirectory(this, "dir2");
+      var copy = VfsUtil.copy(this, file, dir2);
       assertEquals("xxx", VfsUtilCore.loadText(copy));
       assertEquals("xxx", VfsUtilCore.loadText(copy));
       assertArrayEquals(null, copy.getBOM());
@@ -552,22 +551,21 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
 
   @Test
   public void refreshAndFindFileMustUpdateParentDirectoryCaseSensitivityToReturnCorrectFile() throws IOException {
-    IoTestUtil.assumeWindows();
-    IoTestUtil.assumeWslPresence();
+    assumeWindows();
+    assumeWslPresence();
     assumeTrue("'fsutil.exe' needs elevated privileges to work", SuperUserStatus.isSuperUser());
 
-    File dir = new File(tempDir.getRoot(), "dir");
-    File file = new File(dir, "child.txt");
-    assertFalse(file.exists());
-    assertEquals(tempDir.getRoot().toString(), FileAttributes.CaseSensitivity.INSENSITIVE, FileSystemUtil.readParentCaseSensitivity(tempDir.getRootPath()));
+    var dir = tempDir.getRootPath().resolve("dir");
+    var file = dir.resolve("child.txt");
+    assertFalse(Files.exists(file));
+    assertEquals(tempDir.getRootPath().toString(), FileAttributes.CaseSensitivity.INSENSITIVE, FileSystemUtil.readParentCaseSensitivity(tempDir.getRootPath()));
 
-    assertTrue(dir.mkdirs());
-    assertTrue(file.createNewFile());
+    Files.createDirectories(dir);
 
     IoTestUtil.setCaseSensitivity(dir, true);
-    File file2 = new File(dir, "CHILD.TXT");
-    assertTrue(file2.createNewFile());
-    VirtualFile vFile2 = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(file2);
+    Files.createFile(file);
+    var file2 = Files.createFile(dir.resolve("CHILD.TXT"));
+    var vFile2 = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(file2);
     assertNotNull(vFile2);
     assertEquals("CHILD.TXT", vFile2.getName());
     assertTrue(vFile2.isCaseSensitive());
@@ -577,10 +575,10 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
 
   @Test
   public void pathEqualsWorksForLegacyWslPaths() {
-    String wslName = IoTestUtil.assumeWorkingWslDistribution();
-    File usrBinFile = new File("\\\\wsl$\\" + wslName + "\\usr\\bin\\");
-    assertTrue(usrBinFile + " doesn't exist", usrBinFile.exists());
-    VirtualFile usrBin = LocalFileSystem.getInstance().findFileByIoFile(usrBinFile);
+    var wslName = IoTestUtil.assumeWorkingWslDistribution();
+    var usrBinFile = Path.of("\\\\wsl$\\" + wslName + "\\usr\\bin\\");
+    assertThat(usrBinFile).exists();
+    var usrBin = LocalFileSystem.getInstance().findFileByNioFile(usrBinFile);
     assertTrue(VfsUtilCore.pathEqualsTo(usrBin, "\\\\wsl$\\" + wslName + "\\usr\\bin\\"));
     assertTrue(VfsUtilCore.pathEqualsTo(usrBin, "//wsl$/" + wslName + "/usr/bin"));
     assertTrue(VfsUtilCore.pathEqualsTo(usrBin, "//wsl$/" + wslName + "/usr/bin/"));
@@ -591,10 +589,10 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
 
   @Test
   public void pathEqualsWorksForWslPaths() {
-    String wslName = IoTestUtil.assumeWorkingWslDistribution();
-    File usrBinFile = new File("\\\\wsl.localhost\\" + wslName + "\\usr\\bin\\");
-    assertTrue(usrBinFile + " doesn't exist", usrBinFile.exists());
-    VirtualFile usrBin = LocalFileSystem.getInstance().findFileByIoFile(usrBinFile);
+    var wslName = IoTestUtil.assumeWorkingWslDistribution();
+    var usrBinFile = Path.of("\\\\wsl.localhost\\" + wslName + "\\usr\\bin\\");
+    assertThat(usrBinFile).exists();
+    var usrBin = LocalFileSystem.getInstance().findFileByNioFile(usrBinFile);
     assertTrue(VfsUtilCore.pathEqualsTo(usrBin, "\\\\wsl.localhost\\" + wslName + "\\usr\\bin\\"));
     assertTrue(VfsUtilCore.pathEqualsTo(usrBin, "//wsl.localhost/" + wslName + "/usr/bin"));
     assertTrue(VfsUtilCore.pathEqualsTo(usrBin, "//wsl.localhost/" + wslName + "/usr/bin/"));
@@ -604,13 +602,14 @@ public class VfsUtilTest extends BareTestFixtureTestCase {
   }
 
   @Test
-  public void testGetPathForVFileCreateEventForJarReturnsNormalizedPathSeparators() {
-    File jarFile = IoTestUtil.createTestJar(tempDir.newFile("test.jar"));
-    assertNotNull(LocalFileSystem.getInstance().refreshAndFindFileByIoFile(jarFile));
-    VirtualFile jarRoot = VirtualFileManager.getInstance().findFileByUrl("jar://" + FileUtil.toSystemIndependentName(jarFile.getPath()) + "!/");
+  public void testGetPathForVFileCreateEventForJarReturnsNormalizedPathSeparators() throws IOException {
+    var jarFile = tempDir.newFileNio("test.jar");
+    try (var jar = new Compressor.Jar(jarFile)) { jar.addManifest(new Manifest()); }
+    assertNotNull(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(jarFile));
+    var jarRoot = VirtualFileManager.getInstance().findFileByUrl("jar://" + jarFile.toString().replace('\\', '/') + "!/");
     assertNotNull(jarRoot);
 
-    VFileCreateEvent event = new VFileCreateEvent(this, jarRoot, "x.txt", false, null, null, null);
-    assertEquals(FileUtil.toSystemIndependentName(jarFile.getPath()) + "!/x.txt", event.getPath());
+    var event = new VFileCreateEvent(this, jarRoot, "x.txt", false, null, null, null);
+    assertEquals(jarFile.toString().replace('\\', '/') + "!/x.txt", event.getPath());
   }
 }

@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 
+@SuppressWarnings("SplitModeApiUsage")
 @State(name = "NotificationConfiguration", storages = @Storage("notifications.xml"), category = SettingsCategory.UI)
 public final class NotificationsConfigurationImpl extends NotificationsConfiguration implements PersistentStateComponent<Element>, Disposable {
   private static final Logger LOG = Logger.getInstance(NotificationsConfigurationImpl.class);
@@ -84,6 +85,7 @@ public final class NotificationsConfigurationImpl extends NotificationsConfigura
     for (String groupId : toRemove) {
       myIdToSettingsMap.remove(groupId);
       myToolWindowCapable.remove(groupId);
+      NotificationGroup.fireGroupEvent(groupId, false);
     }
   }
 
@@ -181,9 +183,11 @@ public final class NotificationsConfigurationImpl extends NotificationsConfigura
     String groupDisplayName = settings.getGroupId();
     if (settings.equals(getDefaultSettings(groupDisplayName))) {
       myIdToSettingsMap.remove(groupDisplayName);
+      NotificationGroup.fireGroupEvent(groupDisplayName, false);
     }
     else {
       myIdToSettingsMap.put(groupDisplayName, settings);
+      NotificationGroup.fireGroupEvent(groupDisplayName, true);
     }
   }
 
@@ -220,6 +224,7 @@ public final class NotificationsConfigurationImpl extends NotificationsConfigura
 
   @Override
   public synchronized void loadState(@NotNull Element state) {
+    myIdToSettingsMap.keySet().forEach(id -> NotificationGroup.fireGroupEvent(id, false));
     myIdToSettingsMap.clear();
     for (Element child : state.getChildren("notification")) {
       NotificationSettings settings = NotificationSettings.Companion.load(child);
@@ -227,6 +232,7 @@ public final class NotificationsConfigurationImpl extends NotificationsConfigura
         String id = settings.getGroupId();
         LOG.assertTrue(!myIdToSettingsMap.containsKey(id), String.format("Settings for '%s' already loaded!", id));
         myIdToSettingsMap.put(id, settings);
+        NotificationGroup.fireGroupEvent(id, true);
       }
     }
     doRemove("Log Only");

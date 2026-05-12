@@ -2,6 +2,7 @@
 package com.intellij.codeWithMe
 
 import com.intellij.concurrency.IntelliJContextElement
+import com.intellij.concurrency.IntelliJThreadContextElement
 import com.intellij.openapi.diagnostic.logger
 import kotlinx.coroutines.CopyableThreadContextElement
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -13,14 +14,14 @@ private val logger = logger<ClientIdContextElement>()
 
 @OptIn(DelicateCoroutinesApi::class, ExperimentalCoroutinesApi::class)
 @ApiStatus.Internal
-class ClientIdContextElement(val clientId: ClientId?) : CopyableThreadContextElement<Unit>, IntelliJContextElement {
+class ClientIdContextElement(val clientId: ClientId?) : CopyableThreadContextElement<Unit>, IntelliJThreadContextElement<Unit> {
   val creationTrace: Throwable? = if (isStacktraceLoggingEnabled()) Throwable("${formatClientId()} created at") else null
 
   companion object Key : CoroutineContext.Key<ClientIdContextElement>
 
   override fun produceChildElement(parentContext: CoroutineContext, isStructured: Boolean): IntelliJContextElement = this
 
-  override fun beforeChildStarted(context: CoroutineContext) {
+  override fun beforeStarted(context: CoroutineContext) {
     val threadClientIdElement = context.clientIdContextElement
     if (threadClientIdElement != this) {
       logger.error(Throwable("Thread context has $threadClientIdElement but coroutine context has $this").apply {
@@ -29,6 +30,9 @@ class ClientIdContextElement(val clientId: ClientId?) : CopyableThreadContextEle
         if (suppressed.isEmpty()) addSuppressed(tracingHint())
       })
     }
+  }
+
+  override fun afterCompleted(context: CoroutineContext, oldState: Unit) {
   }
 
   override val key: CoroutineContext.Key<*>

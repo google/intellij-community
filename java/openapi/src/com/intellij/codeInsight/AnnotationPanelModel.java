@@ -15,12 +15,12 @@ public interface AnnotationPanelModel {
   /**
    * @return list of immediately available annotations
    */
-  @NlsSafe @NotNull List<String> getAnnotations();
+  @NlsSafe @NotNull List<@NotNull String> getAnnotations();
 
   /**
    * @return list of annotations that should be calculated in a slow background action
    */
-  @NlsSafe @NotNull List<String> getAdvancedAnnotations();
+  @NlsSafe @NotNull List<@NotNull String> getAdvancedAnnotations();
 
   /**
    * @return true if there are advanced annotations that should be loaded in background

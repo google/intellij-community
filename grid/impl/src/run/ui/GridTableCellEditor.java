@@ -1,6 +1,8 @@
 package com.intellij.database.run.ui;
 
 import com.intellij.database.datagrid.DataGrid;
+import com.intellij.database.datagrid.GridCellRequest;
+import com.intellij.database.datagrid.GridCellRequestKt;
 import com.intellij.database.datagrid.GridColumn;
 import com.intellij.database.datagrid.GridModel;
 import com.intellij.database.datagrid.GridRow;
@@ -19,7 +21,7 @@ import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.wm.IdeFocusManager;
-import com.intellij.ui.ComponentUtil;
+import com.intellij.ui.ClientProperty;
 import com.intellij.util.ui.AbstractTableCellEditor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -37,9 +39,14 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.util.EventObject;
 
+import static java.lang.Boolean.TRUE;
+
 public class GridTableCellEditor extends AbstractTableCellEditor {
   public static final String TABLE_CELL_EDITOR_PROPERTY = "tableCellEditor";
   public static final Key<EventObject> EDITING_STARTER_CLIENT_PROPERTY_KEY = Key.create("EventThatCausedEditingToStart");
+  public static final Key<Object> CURRENT_VALUE_CLIENT_PROPERTY_KEY = Key.create("CurrentValue");
+  /** Set by the Value Editor when it reopens the inline editor in sync: keeps focus on the Value Editor instead of flickering to the inline cell. */
+  public static final Key<Boolean> SUPPRESS_MOVE_FOCUS_CLIENT_PROPERTY_KEY = Key.create("SuppressMoveFocus");
 
   private final DataGrid myGrid;
   private final ModelIndex<GridRow> myRowIdx;
@@ -47,6 +54,8 @@ public class GridTableCellEditor extends AbstractTableCellEditor {
   private final GridCellEditorFactory myEditorFactory;
 
   private GridCellEditor myEditor = null;
+  private boolean myShouldMoveFocus = true;
+  private boolean myAllowUniqueMultiEdit = false;
 
   public GridTableCellEditor(DataGrid grid,
                              ModelIndex<GridRow> rowIdx,
@@ -59,7 +68,16 @@ public class GridTableCellEditor extends AbstractTableCellEditor {
   }
 
   public boolean shouldMoveFocus() {
-    return myEditor == null || myEditor.shouldMoveFocus();
+    return myShouldMoveFocus && (myEditor == null || myEditor.shouldMoveFocus());
+  }
+
+  /**
+   * True when this editing session bypasses the UNIQUE-multi-edit guard because the active factory's values evaluate
+   * per-row ({@link GridCellEditorFactory#allowsUniqueMultiEdit()}). JTable reuses one editor instance per
+   * editing session, so the flag's lifetime matches the session.
+   */
+  public boolean allowsUniqueMultiEdit() {
+    return myAllowUniqueMultiEdit;
   }
 
   @TestOnly
@@ -72,8 +90,18 @@ public class GridTableCellEditor extends AbstractTableCellEditor {
     if (myEditorFactory == null) return null;
 
     if (myEditor == null) {
-      EventObject e = ComponentUtil.getClientProperty(table, EDITING_STARTER_CLIENT_PROPERTY_KEY);
-      myEditor = myEditorFactory.createEditor(myGrid, myRowIdx, myColumnIdx, value, e);
+      EventObject e = ClientProperty.get(table, EDITING_STARTER_CLIENT_PROPERTY_KEY);
+      GridCellRequest<GridRow, GridColumn> request = GridCellRequestKt.request(myGrid, myRowIdx, myColumnIdx);
+      Object currentValue = ClientProperty.get(table, CURRENT_VALUE_CLIENT_PROPERTY_KEY);
+      myShouldMoveFocus = !TRUE.equals(ClientProperty.get(table, SUPPRESS_MOVE_FOCUS_CLIENT_PROPERTY_KEY));
+      myAllowUniqueMultiEdit = myEditorFactory.allowsUniqueMultiEdit();
+      if (currentValue != null) {
+        request = GridCellRequestKt.overrideValue(request, currentValue);
+      }
+      myEditor = myEditorFactory.createEditor(request, e);
+      if (currentValue != null && !Comparing.equal(currentValue, value)) {
+        myGrid.fireValueEdited(currentValue);
+      }
       myEditor.setEditingListener(object -> {
         myGrid.fireValueEdited(object);
         Rectangle r = calculateSelectedRect(table);
@@ -103,6 +131,14 @@ public class GridTableCellEditor extends AbstractTableCellEditor {
 
   public @Nullable String getCellEditorText() {
     return myEditor != null ? myEditor.getText() : null;
+  }
+
+  public boolean isEditingWithFactory(@NotNull Class<? extends GridCellEditorFactory> factoryClass) {
+    return factoryClass.isInstance(myEditorFactory);
+  }
+
+  public boolean isEditingCell(@NotNull ModelIndex<GridRow> rowIdx, @NotNull ModelIndex<GridColumn> columnIdx) {
+    return myRowIdx.equals(rowIdx) && myColumnIdx.equals(columnIdx);
   }
 
   @Override

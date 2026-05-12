@@ -50,9 +50,9 @@ import com.intellij.openapi.fileEditor.impl.tabActions.CloseTab
 import com.intellij.openapi.options.advanced.AdvancedSettings
 import com.intellij.openapi.util.ActionCallback
 import com.intellij.openapi.util.Disposer
-import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.openapi.util.text.HtmlChunk
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.toolWindow.ToolWindowHeader
 import com.intellij.ui.ColorUtil
@@ -253,7 +253,7 @@ class EditorTabbedContainer internal constructor(
     file: VirtualFile,
     icon: Icon?,
     component: JComponent,
-    tooltip: @NlsContexts.Tooltip String?,
+    tooltip: HtmlChunk?,
     indexToInsert: Int,
     selectedEditor: FileEditor?,
     parentDisposable: Disposable,
@@ -559,6 +559,9 @@ private class EditorTabbedContainerTransferHandler(private val window: EditorWin
   override fun canImport(comp: JComponent, transferFlavors: Array<DataFlavor>): Boolean = containsFileDropTargets(transferFlavors)
 }
 
+private const val EDITOR_TABS_TOOLBAR_ACTION_GROUP_ID: String = "EditorTabsToolbarActions"
+private const val EDITOR_TABS_ENTRY_POINT_ACTION_GROUP_ID: String = "EditorTabsEntryPoint"
+
 private class EditorTabs(
   coroutineScope: CoroutineScope,
   parentDisposable: Disposable,
@@ -611,10 +614,12 @@ private class EditorTabs(
       }
     })
 
-    val source = ActionManager.getInstance().getAction("EditorTabsEntryPoint")
+    val actionManager = ActionManager.getInstance()
+    val toolbarActions = actionManager.getAction(EDITOR_TABS_TOOLBAR_ACTION_GROUP_ID)
+    val source = actionManager.getAction(EDITOR_TABS_ENTRY_POINT_ACTION_GROUP_ID)
     source.templatePresentation.putClientProperty(ActionUtil.HIDE_DROPDOWN_ICON, true)
     source.templatePresentation.putClientProperty(ActionUtil.ALWAYS_VISIBLE_GROUP, true)
-    _entryPointActionGroup = DefaultActionGroup(java.util.List.of(source))
+    _entryPointActionGroup = DefaultActionGroup(java.util.List.of(toolbarActions, source))
     InternalUICustomization.getInstance()?.installEditorBackground(this)
   }
 
@@ -805,7 +810,7 @@ private class EditorTabLabel(info: TabInfo, tabs: JBTabsImpl) : TabLabel(tabs, i
 
   override fun getIconAlpha(): Float = if (paintDimmed()) JBUI.CurrentTheme.EditorTabs.unselectedAlpha() else 1f
 
-  private fun paintDimmed() = ExperimentalUI.isNewUI() && tabs.selectedInfo != info && !tabs.isHoveredTab(this)
+  private fun paintDimmed() = ExperimentalUI.isNewUI() && tabs.selectedInfo != info && !tabs.isHoveredOrWithPopup(this)
 }
 
 internal fun isSingletonEditorInWindow(editors: List<FileEditor>): Boolean {

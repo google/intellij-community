@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.unscramble
 
 import com.intellij.icons.AllIcons
@@ -7,7 +7,6 @@ import com.intellij.openapi.util.NlsSafe
 import com.intellij.threadDumpParser.ThreadOperation
 import com.intellij.threadDumpParser.ThreadState
 import com.intellij.ui.SimpleTextAttributes
-import com.sun.jdi.ObjectReference
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import java.awt.Color
@@ -58,6 +57,12 @@ interface DumpItem {
    */
   val canBeHidden: Boolean
 
+  /**
+   * Serialized representation used when exporting the [DumpItem].
+   * It may differ from [stackTrace] when export requires additional inline metadata.
+   */
+  fun serialize(): @NlsSafe String
+
   companion object {
     @JvmField
     val SLEEPING_ATTRIBUTES: SimpleTextAttributes = SimpleTextAttributes.GRAY_ATTRIBUTES
@@ -75,7 +80,7 @@ interface DumpItem {
 
     @JvmField
     val BY_INTEREST: Comparator<DumpItem> = Comparator<DumpItem> { o1, o2 ->
-      o2.interestLevel - o1.interestLevel
+      o2.interestLevel compareTo o1.interestLevel
     }
   }
 }
@@ -116,20 +121,29 @@ interface MergeableToken {
 class CompoundDumpItem<T : DumpItem>(
   val originalItem: T,
   val counter: Int,
+  override val parentTreeId: Long? = originalItem.parentTreeId
 ) : DumpItem by originalItem {
 
   override val name: String = originalItem.name + (if (counter == 1) "" else " [and ${counter - 1} similar]")
 
   companion object {
     @JvmStatic
-    fun mergeThreadDumpItems(originalItems: List<MergeableDumpItem>): List<DumpItem> =
-      originalItems
-        .groupingBy { it.mergeableToken }
-        .eachCount()
-        .map { (token, count) ->
-          val item = token.item
-          if (count > 1) CompoundDumpItem(item, count) else item
+    fun mergeThreadDumpItems(originalItems: List<MergeableDumpItem>): List<DumpItem> {
+      val groups = originalItems.groupBy { it.mergeableToken }
+      // Map every original treeId to the treeId of the representative of the merge group
+      val idToCompoundId = hashMapOf<Long, Long?>()
+      for ((token, items) in groups) {
+        val compoundId = token.item.treeId
+        for (item in items) {
+          item.treeId?.let { idToCompoundId[it] = compoundId }
         }
+      }
+      return groups.map { (token, items) ->
+        val item = token.item
+        val parentId = item.parentTreeId?.let { idToCompoundId.getOrDefault(it, it) }
+        CompoundDumpItem(item, items.size, parentId)
+      }
+    }
   }
 }
 
@@ -139,35 +153,41 @@ fun toDumpItems(threadStates: List<ThreadState>): List<MergeableDumpItem> =
 
 @ApiStatus.Internal
 fun toDumpItems(threadStates: List<ThreadState>, threadContainerDescriptors: List<JavaThreadContainerDesc>): List<MergeableDumpItem> {
-  val threadDumpItems = threadStates.map(::JavaThreadDumpItem)
+  val threadDumpItems = threadStates.map { ThreadDumpItemFactory.createDumpItem(it) }
 
   val statesToItems = threadStates.zip(threadDumpItems).toMap()
 
   for ((threadState, dumpItem) in statesToItems) {
     val awaitingItems = threadState.awaitingThreads.mapNotNull { statesToItems[it] }.toSet()
-    dumpItem.setAwaitingItems(awaitingItems)
+    // TODO: JavaThreadDumpItem should be created in ThreadDumpItemFactory as well
+    if (dumpItem is JavaThreadDumpItem) {
+      dumpItem.setAwaitingItems(awaitingItems)
+    }
   }
 
   val threadContainerDumpItems = threadContainerDescriptors.map {
-    JavaVirtualThreadContainerItem(it.name, it.containerRef.uniqueID(), it.parentContainerRef?.uniqueID())
+    JavaThreadContainerItem(it.name, it.containerId, it.parentId)
   }
   return threadDumpItems + threadContainerDumpItems
 }
 
+/**
+ * Descriptor of a Java thread container.
+ *
+ * @param name display name of the container
+ * @param containerId unique identifier of the container
+ * @param parentId unique identifier of the owning thread or parent container, or `null` if it's parent is the top-level root container
+ */
 @ApiStatus.Internal
-data class JavaThreadContainerDesc(
-  val name: String,
-  val containerRef: ObjectReference,
-  val parentContainerRef: ObjectReference?
-)
+data class JavaThreadContainerDesc(val name: String, val containerId: Long, val parentId: Long?)
 
-private class JavaThreadDumpItem(private val threadState: ThreadState) : MergeableDumpItem {
+internal class JavaThreadDumpItem(private val threadState: ThreadState) : MergeableDumpItem {
   override val name: String = threadState.name
 
   override val isContainer: Boolean
     get() = false
 
-  override val treeId: Long
+  override val treeId: Long?
     get() = threadState.uniqueId
 
   override val parentTreeId: Long?
@@ -199,7 +219,9 @@ private class JavaThreadDumpItem(private val threadState: ThreadState) : Mergeab
 
   private val isServiceThread: Boolean =
     name.startsWith("Coroutines Debugger Cleaner") ||
-    name.startsWith("IntelliJ Suspend Helper")
+    // obsolete
+    name.startsWith("IntelliJ Suspend Helper") ||
+    name.startsWith("IntelliJ Debugger Helper Thread")
 
   override val interestLevel: Int = when {
     threadState.isEmptyStackTrace -> -10
@@ -262,6 +284,18 @@ private class JavaThreadDumpItem(private val threadState: ThreadState) : Mergeab
 
   override val mergeableToken: MergeableToken get() = JavaMergeableToken()
 
+  override fun serialize(): @NlsSafe String {
+    val separatedText = splitFirstLineAndBody(stackTrace)
+    return serializeThreadDumpItem(
+      itemHeader = separatedText.firstLine,
+      stackTraceBody = separatedText.body,
+      id = treeId,
+      parentId = parentTreeId,
+      type = threadState.type,
+      additionalMetadata = threadState.metadata,
+    )
+  }
+
   private inner class JavaMergeableToken : MergeableToken {
     private val comparableStackTrace: String =
       stackTrace.substringAfter("\n").replace("<0x\\d+>\\s".toRegex(), "<merged>")
@@ -281,7 +315,6 @@ private class JavaThreadDumpItem(private val threadState: ThreadState) : Mergeab
       if (threadState.awaitingThreads != otherThreadState.awaitingThreads) return false
       if (threadState.deadlockedThreads != otherThreadState.deadlockedThreads) return false
       if (this.comparableStackTrace != other.comparableStackTrace) return false
-      if (this.item.parentTreeId != other.item.parentTreeId) return false
       return true
     }
 
@@ -295,14 +328,13 @@ private class JavaThreadDumpItem(private val threadState: ThreadState) : Mergeab
         threadState.extraState,
         threadState.awaitingThreads,
         threadState.deadlockedThreads,
-        comparableStackTrace,
-        parentTreeId
+        comparableStackTrace
       )
     }
   }
 }
 
-private class JavaVirtualThreadContainerItem(private val containerName: String, override val treeId: Long, override val parentTreeId: Long?) : MergeableDumpItem {
+private class JavaThreadContainerItem(private val containerName: String, override val treeId: Long, override val parentTreeId: Long?) : MergeableDumpItem {
   override val name: @NlsSafe String
     get() = formatThreadContainerName(containerName)
 
@@ -323,7 +355,7 @@ private class JavaVirtualThreadContainerItem(private val containerName: String, 
   override val interestLevel: Int
     get() = Int.MAX_VALUE // todo dependent on the number of children, for now kept on top
   override val icon: Icon
-    get() = IconsCache.getIconWithVirtualOverlay(AllIcons.Debugger.ThreadGroup)
+    get() = AllIcons.Debugger.ThreadGroup
   override val iconToolTip: @Nls String
     get() = JavaFrontbackBundle.message("dump.item.java.thread.icon.tooltip.container")
   override val isDeadLocked: Boolean
@@ -333,14 +365,24 @@ private class JavaVirtualThreadContainerItem(private val containerName: String, 
 
   override val mergeableToken: MergeableToken = MergeableToken.Unique(this)
 
+  override fun serialize(): @NlsSafe String =
+    serializeThreadDumpItem(
+      itemHeader = "\"$containerName\" tid=0x0 nid=NA container",
+      // add "Carrying virtual thread" so old ThreadDumpParser will parse it as thread group, not as a runnable thread.
+      stackTraceBody = "   Carrying virtual thread #0",
+      id = treeId,
+      parentId = parentTreeId,
+      type = IntelliJThreadDumpMetadata.CONTAINER_TYPE,
+    )
+
   companion object {
     // see jdk.internal.vm.ThreadContainers.RootContainer.name
     const val ROOT = "<root>"
-    const val VIRTUAL_THREADS_ROOT_CONTAINER = "Root Container of Virtual Threads"
-    const val JUC_PACKAGE = "java.util.concurrent"
+    const val THREADS_ROOT_CONTAINER = "Root Container"
+    const val JUC_PACKAGE = "java.util.concurrent."
 
     fun formatThreadContainerName(name: String) = when {
-      name == ROOT -> VIRTUAL_THREADS_ROOT_CONTAINER
+      name == ROOT -> THREADS_ROOT_CONTAINER
       name.startsWith(JUC_PACKAGE) -> name.removePrefix(JUC_PACKAGE)
       else -> name
     }
@@ -379,5 +421,6 @@ class InfoDumpItem(private val title: @Nls String, private val details: @NlsSafe
     get() = null
 
   override val mergeableToken: MergeableToken = MergeableToken.Unique(this)
-}
 
+  override fun serialize(): @NlsSafe String = details
+}

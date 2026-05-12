@@ -11,14 +11,17 @@ import com.intellij.execution.dashboard.RunDashboardManager
 import com.intellij.execution.impl.RunConfigurable
 import com.intellij.execution.impl.RunDialog
 import com.intellij.execution.impl.callNewConfigurationCreated
+import com.intellij.execution.services.ServiceViewManager
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.PlatformDataKeys
 import com.intellij.openapi.actionSystem.remoting.ActionRemoteBehaviorSpecification
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.NlsSafe
+import com.intellij.platform.execution.dashboard.RunDashboardServiceViewContributor
 import com.intellij.ui.ColoredListCellRenderer
 import com.intellij.util.containers.ContainerUtil
 import java.util.function.Consumer
@@ -34,7 +37,21 @@ class AddRunConfigurationAction : DumbAwareAction(), ActionRemoteBehaviorSpecifi
   override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 
   override fun update(e: AnActionEvent) {
-    e.presentation.isEnabledAndVisible = e.project != null
+    val project = e.project
+    if (project == null) {
+      e.presentation.isEnabledAndVisible = false
+      return
+    }
+
+    val toolWindow = e.getData(PlatformDataKeys.TOOL_WINDOW)
+    if (toolWindow == null) {
+      e.presentation.isEnabledAndVisible = false
+      return
+    }
+
+    val servicesToolWindowId =
+      ServiceViewManager.getInstance(project).getToolWindowId(RunDashboardServiceViewContributor::class.java)
+    e.presentation.isEnabledAndVisible = toolWindow.id == servicesToolWindowId
   }
 
   override fun actionPerformed(e: AnActionEvent) {

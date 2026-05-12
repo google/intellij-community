@@ -1,39 +1,24 @@
-UBlockExpression -> UQualifiedReferenceExpression -> KtUltraLightMethodForSourceDeclaration:foo: foo
-    UCallExpression (kind = UastCallKind(name='constructor_call'), argCount = 0))(resolves to KtUltraLightMethodForSourceDeclaration:A) -> USimpleNameReferenceExpression (identifier = A) -> KtUltraLightClass:open class A {
-    fun foo() {}
-    inline fun inlineFoo() {
-
-    }
-}: A
-    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 0))(resolves to KtUltraLightMethodForSourceDeclaration:foo) -> USimpleNameReferenceExpression (identifier = foo) -> KtUltraLightMethodForSourceDeclaration:foo: foo
-    UBlockExpression -> UQualifiedReferenceExpression -> KtUltraLightMethodForSourceDeclaration:inlineFoo: inlineFoo
-    UCallExpression (kind = UastCallKind(name='constructor_call'), argCount = 0))(resolves to KtUltraLightMethodForSourceDeclaration:A) -> USimpleNameReferenceExpression (identifier = A) -> KtUltraLightClass:open class A {
-    fun foo() {}
-    inline fun inlineFoo() {
-
-    }
-}: A
-    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 0))(resolves to KtUltraLightMethodForSourceDeclaration:inlineFoo) -> USimpleNameReferenceExpression (identifier = inlineFoo) -> KtUltraLightMethodForSourceDeclaration:inlineFoo: inlineFoo
-    UBlockExpression -> UQualifiedReferenceExpression -> PsiMethod:forEach: forEach
-    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to PsiMethod:listOf) -> USimpleNameReferenceExpression (identifier = listOf) -> PsiMethod:listOf: listOf
-    UCallExpression (kind = UastCallKind(name='constructor_call'), argCount = 0))(resolves to KtUltraLightMethodForSourceDeclaration:A) -> USimpleNameReferenceExpression (identifier = A) -> KtUltraLightClass:open class A {
-    fun foo() {}
-    inline fun inlineFoo() {
-
-    }
-}: A
-    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to PsiMethod:forEach) -> USimpleNameReferenceExpression (identifier = forEach) -> PsiMethod:forEach: forEach
-        UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to PsiMethod:println) -> USimpleNameReferenceExpression (identifier = println) -> PsiMethod:println: println
-        UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to PsiMethod:println) -> USimpleNameReferenceExpression (identifier = it) -> Light Parameter: it
-    UBlockExpression -> UQualifiedReferenceExpression -> PsiMethod:joinToString: joinToString
-    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to PsiMethod:listOf) -> USimpleNameReferenceExpression (identifier = listOf) -> PsiMethod:listOf: listOf
-    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 0))(resolves to PsiMethod:joinToString) -> USimpleNameReferenceExpression (identifier = joinToString) -> PsiMethod:joinToString: joinToString
-    UBlockExpression -> UQualifiedReferenceExpression -> PsiMethod:size: size
-    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to PsiMethod:listOf) -> USimpleNameReferenceExpression (identifier = listOf) -> PsiMethod:listOf: listOf
-    UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = size) -> PsiMethod:size: size
-    UBlockExpression -> UQualifiedReferenceExpression -> PsiMethod:getIndices: getIndices
-    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to PsiMethod:listOf) -> USimpleNameReferenceExpression (identifier = listOf) -> PsiMethod:listOf: listOf
-    UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = indices) -> PsiMethod:getIndices: getIndices
+UBlockExpression -> UQualifiedReferenceExpression -> SymbolLightSimpleMethod of SymbolLightClassForClassOrObject: foo
+    UCallExpression (kind = UastCallKind(name='constructor_call'), argCount = 0))(resolves to SymbolLightConstructor of SymbolLightClassForClassOrObject) -> USimpleNameReferenceExpression (identifier = A) -> SymbolLightClassForClassOrObject: A
+    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 0))(resolves to SymbolLightSimpleMethod of SymbolLightClassForClassOrObject) -> USimpleNameReferenceExpression (identifier = foo) -> SymbolLightSimpleMethod of SymbolLightClassForClassOrObject: foo
+    UBlockExpression -> UQualifiedReferenceExpression -> SymbolLightSimpleMethod of SymbolLightClassForClassOrObject: inlineFoo
+    UCallExpression (kind = UastCallKind(name='constructor_call'), argCount = 0))(resolves to SymbolLightConstructor of SymbolLightClassForClassOrObject) -> USimpleNameReferenceExpression (identifier = A) -> SymbolLightClassForClassOrObject: A
+    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 0))(resolves to SymbolLightSimpleMethod of SymbolLightClassForClassOrObject) -> USimpleNameReferenceExpression (identifier = inlineFoo) -> SymbolLightSimpleMethod of SymbolLightClassForClassOrObject: inlineFoo
+    UBlockExpression -> UQualifiedReferenceExpression -> UastFakeDeserializedSourceLightMethod of forEach: forEach
+    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to UastFakeDeserializedSourceLightMethod of listOf) -> USimpleNameReferenceExpression (identifier = listOf) -> UastFakeDeserializedSourceLightMethod of listOf: listOf
+    UCallExpression (kind = UastCallKind(name='constructor_call'), argCount = 0))(resolves to SymbolLightConstructor of SymbolLightClassForClassOrObject) -> USimpleNameReferenceExpression (identifier = A) -> SymbolLightClassForClassOrObject: A
+    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to UastFakeDeserializedSourceLightMethod of forEach) -> USimpleNameReferenceExpression (identifier = forEach) -> UastFakeDeserializedSourceLightMethod of forEach: forEach
+        UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to KtLightMethodForDecompiledDeclaration of KtLightClassForDecompiledFacade of PsiFile:ConsoleKt.class) -> USimpleNameReferenceExpression (identifier = println) -> KtLightMethodForDecompiledDeclaration of KtLightClassForDecompiledFacade of PsiFile:ConsoleKt.class: println
+        UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to KtLightMethodForDecompiledDeclaration of KtLightClassForDecompiledFacade of PsiFile:ConsoleKt.class) -> USimpleNameReferenceExpression (identifier = it) -> Light Parameter: it
+    UBlockExpression -> UQualifiedReferenceExpression -> UastFakeDeserializedSourceLightMethod of joinToString: joinToString
+    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to UastFakeDeserializedSourceLightMethod of listOf) -> USimpleNameReferenceExpression (identifier = listOf) -> UastFakeDeserializedSourceLightMethod of listOf: listOf
+    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 0))(resolves to UastFakeDeserializedSourceLightMethod of joinToString) -> USimpleNameReferenceExpression (identifier = joinToString) -> UastFakeDeserializedSourceLightMethod of joinToString: joinToString
+    UBlockExpression -> UQualifiedReferenceExpression -> PROPERTY: size
+    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to UastFakeDeserializedSourceLightMethod of listOf) -> USimpleNameReferenceExpression (identifier = listOf) -> UastFakeDeserializedSourceLightMethod of listOf: listOf
+    UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = size) -> PROPERTY: size
+    UBlockExpression -> UQualifiedReferenceExpression -> PROPERTY: indices
+    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to UastFakeDeserializedSourceLightMethod of listOf) -> USimpleNameReferenceExpression (identifier = listOf) -> UastFakeDeserializedSourceLightMethod of listOf: listOf
+    UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = indices) -> PROPERTY: indices
     UTypeReferenceExpression (name = java.util.Date) -> USimpleNameReferenceExpression (identifier = java) -> PsiPackage:java: java
     UTypeReferenceExpression (name = java.util.Date) -> USimpleNameReferenceExpression (identifier = util) -> PsiPackage:java.util: util
     UTypeReferenceExpression (name = java.util.Date) -> USimpleNameReferenceExpression (identifier = Date) -> PsiClass:Date: Date
@@ -46,48 +31,38 @@ UBlockExpression -> UQualifiedReferenceExpression -> KtUltraLightMethodForSource
     UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = date) -> LightVariableBuilder:date: date
     UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = time) -> PsiMethod:setTime: setTime
     UBinaryExpression (operator = =) -> USimpleNameReferenceExpression (identifier = =) -> null: null
-    UBlockExpression -> UQualifiedReferenceExpression -> PsiMethod:last: last
-    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to PsiMethod:listOf) -> USimpleNameReferenceExpression (identifier = listOf) -> PsiMethod:listOf: listOf
-    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 0))(resolves to PsiMethod:last) -> USimpleNameReferenceExpression (identifier = last) -> PsiMethod:last: last
+    UBlockExpression -> UQualifiedReferenceExpression -> UastFakeDeserializedSourceLightMethod of last: last
+    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to UastFakeDeserializedSourceLightMethod of listOf) -> USimpleNameReferenceExpression (identifier = listOf) -> UastFakeDeserializedSourceLightMethod of listOf: listOf
+    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 0))(resolves to UastFakeDeserializedSourceLightMethod of last) -> USimpleNameReferenceExpression (identifier = last) -> UastFakeDeserializedSourceLightMethod of last: last
     UBlockExpression -> UQualifiedReferenceExpression -> PsiMethod:setValue: setValue
-    UQualifiedReferenceExpression -> UQualifiedReferenceExpression -> PsiMethod:first: first
-    UQualifiedReferenceExpression -> UQualifiedReferenceExpression -> null: null
-    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to PsiMethod:mutableMapOf) -> USimpleNameReferenceExpression (identifier = mutableMapOf) -> PsiMethod:mutableMapOf: mutableMapOf
-    UBinaryExpression (operator = <other>) -> USimpleNameReferenceExpression (identifier = to) -> PsiMethod:to: to
-    UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = entries) -> null: null
-    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 0))(resolves to PsiMethod:first) -> USimpleNameReferenceExpression (identifier = first) -> PsiMethod:first: first
+    UQualifiedReferenceExpression -> UQualifiedReferenceExpression -> UastFakeDeserializedSourceLightMethod of first: first
+    UQualifiedReferenceExpression -> UQualifiedReferenceExpression -> PROPERTY: entries
+    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to UastFakeDeserializedSourceLightMethod of mutableMapOf) -> USimpleNameReferenceExpression (identifier = mutableMapOf) -> UastFakeDeserializedSourceLightMethod of mutableMapOf: mutableMapOf
+    UBinaryExpression (operator = <other>) -> USimpleNameReferenceExpression (identifier = to) -> KtLightMethodForDecompiledDeclaration of KtLightClassForDecompiledFacade of PsiFile:TuplesKt.class: to
+    UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = entries) -> PROPERTY: entries
+    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 0))(resolves to UastFakeDeserializedSourceLightMethod of first) -> USimpleNameReferenceExpression (identifier = first) -> UastFakeDeserializedSourceLightMethod of first: first
     UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to PsiMethod:setValue) -> USimpleNameReferenceExpression (identifier = setValue) -> PsiMethod:setValue: setValue
-    UTypeReferenceExpression (name = kotlin.ranges.ClosedRange<java.lang.Long>) -> USimpleNameReferenceExpression (identifier = ClosedRange) -> PsiClass:ClosedRange: ClosedRange
+    UTypeReferenceExpression (name = kotlin.ranges.ClosedRange<java.lang.Long>) -> USimpleNameReferenceExpression (identifier = ClosedRange) -> KtLightClassForDecompiledDeclaration of PsiFile:ClosedRange.class: ClosedRange
     UTypeReferenceExpression (name = long) -> USimpleNameReferenceExpression (identifier = Long) -> PsiClass:Long: Long
-    UBinaryExpression (operator = ..) -> USimpleNameReferenceExpression (identifier = ..) -> null: null
-    UBlockExpression -> UQualifiedReferenceExpression -> PsiMethod:longRangeContains: longRangeContains
+    UBinaryExpression (operator = ..) -> USimpleNameReferenceExpression (identifier = ..) -> FUN: rangeTo
+    UBlockExpression -> UQualifiedReferenceExpression -> UastFakeDeserializedSourceLightMethod of contains: contains
     UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = intRange) -> LightVariableBuilder:intRange: intRange
-    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to PsiMethod:longRangeContains) -> USimpleNameReferenceExpression (identifier = contains) -> PsiMethod:longRangeContains: longRangeContains
+    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 1))(resolves to UastFakeDeserializedSourceLightMethod of contains) -> USimpleNameReferenceExpression (identifier = contains) -> UastFakeDeserializedSourceLightMethod of contains: contains
     UBinaryExpressionWithType -> USimpleNameReferenceExpression (identifier = as) -> null: null
     UTypeReferenceExpression (name = int) -> USimpleNameReferenceExpression (identifier = Int) -> PsiClass:Integer: Integer
-    UCallExpression (kind = UastCallKind(name='constructor_call'), argCount = 2))(resolves to PsiMethod:IntRange) -> USimpleNameReferenceExpression (identifier = IntRange) -> PsiClass:IntRange: IntRange
-UTypeReferenceExpression (name = A) -> USimpleNameReferenceExpression (identifier = A) -> KtUltraLightClass:open class A {
-    fun foo() {}
-    inline fun inlineFoo() {
-
-    }
-}: A
-UTypeReferenceExpression (name = T) -> USimpleNameReferenceExpression (identifier = T) -> Light PSI class: T: T
-    UBlockExpression -> UQualifiedReferenceExpression -> KtUltraLightMethodForSourceDeclaration:foo: foo
-    UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = t) -> Light Parameter: t
-    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 0))(resolves to KtUltraLightMethodForSourceDeclaration:foo) -> USimpleNameReferenceExpression (identifier = foo) -> KtUltraLightMethodForSourceDeclaration:foo: foo
+    UCallExpression (kind = UastCallKind(name='constructor_call'), argCount = 2))(resolves to KtLightMethodForDecompiledDeclaration of KtLightClassForDecompiledDeclaration of PsiFile:IntRange.class) -> USimpleNameReferenceExpression (identifier = IntRange) -> KtLightMethodForDecompiledDeclaration of KtLightClassForDecompiledDeclaration of PsiFile:IntRange.class: IntRange
+UTypeReferenceExpression (name = A) -> USimpleNameReferenceExpression (identifier = A) -> SymbolLightClassForClassOrObject: A
+UTypeReferenceExpression (name = T) -> USimpleNameReferenceExpression (identifier = T) -> SymbolLightTypeParameter: T
+    UBlockExpression -> UQualifiedReferenceExpression -> SymbolLightSimpleMethod of SymbolLightClassForClassOrObject: foo
+    UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = t) -> SymbolLightValueParameter: t
+    UCallExpression (kind = UastCallKind(name='method_call'), argCount = 0))(resolves to SymbolLightSimpleMethod of SymbolLightClassForClassOrObject) -> USimpleNameReferenceExpression (identifier = foo) -> SymbolLightSimpleMethod of SymbolLightClassForClassOrObject: foo
 UTypeReferenceExpression (name = java.util.List<? extends A>) -> USimpleNameReferenceExpression (identifier = List) -> PsiClass:List: List
-UTypeReferenceExpression (name = A) -> USimpleNameReferenceExpression (identifier = A) -> KtUltraLightClass:open class A {
-    fun foo() {}
-    inline fun inlineFoo() {
-
-    }
-}: A
-UTypeReferenceExpression (name = T) -> USimpleNameReferenceExpression (identifier = T) -> Light PSI class: T: T
+UTypeReferenceExpression (name = A) -> USimpleNameReferenceExpression (identifier = A) -> SymbolLightClassForClassOrObject: A
+UTypeReferenceExpression (name = T) -> USimpleNameReferenceExpression (identifier = T) -> SymbolLightTypeParameter: T
     UBlockExpression -> UQualifiedReferenceExpression -> PsiMethod:isEmpty: isEmpty
-    UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = listT) -> Light Parameter: listT
+    UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = listT) -> SymbolLightValueParameter: listT
     UCallExpression (kind = UastCallKind(name='method_call'), argCount = 0))(resolves to PsiMethod:isEmpty) -> USimpleNameReferenceExpression (identifier = isEmpty) -> PsiMethod:isEmpty: isEmpty
-    UForEachExpression -> USimpleNameReferenceExpression (identifier = listT) -> Light Parameter: listT
-        UBlockExpression -> UQualifiedReferenceExpression -> KtUltraLightMethodForSourceDeclaration:foo: foo
+    UForEachExpression -> USimpleNameReferenceExpression (identifier = listT) -> SymbolLightValueParameter: listT
+        UBlockExpression -> UQualifiedReferenceExpression -> SymbolLightSimpleMethod of SymbolLightClassForClassOrObject: foo
         UQualifiedReferenceExpression -> USimpleNameReferenceExpression (identifier = a) -> VALUE_PARAMETER: a
-        UCallExpression (kind = UastCallKind(name='method_call'), argCount = 0))(resolves to KtUltraLightMethodForSourceDeclaration:foo) -> USimpleNameReferenceExpression (identifier = foo) -> KtUltraLightMethodForSourceDeclaration:foo: foo
+        UCallExpression (kind = UastCallKind(name='method_call'), argCount = 0))(resolves to SymbolLightSimpleMethod of SymbolLightClassForClassOrObject) -> USimpleNameReferenceExpression (identifier = foo) -> SymbolLightSimpleMethod of SymbolLightClassForClassOrObject: foo

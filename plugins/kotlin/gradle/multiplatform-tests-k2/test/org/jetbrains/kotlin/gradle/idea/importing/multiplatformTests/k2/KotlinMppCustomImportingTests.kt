@@ -25,6 +25,7 @@ import org.jetbrains.kotlin.idea.gradleTooling.supportsKotlinAndroidSourceSetInf
 import org.jetbrains.kotlin.idea.gradleTooling.toKotlinToolingVersion
 import org.jetbrains.kotlin.idea.projectModel.KotlinCompilation
 import org.jetbrains.kotlin.test.TestMetadata
+import org.jetbrains.plugins.gradle.tooling.annotation.PluginTargetVersions
 import org.junit.Assume
 import org.junit.Test
 
@@ -205,6 +206,28 @@ class KotlinMppCustomImportingTests : AbstractKotlinMppGradleImportingTest() {
                 val linuxX64Test = model.getCompilation("linuxArm64", "test")
                 assertEquals(setOf(KotlinCompilationCoordinatesImpl("linuxArm64", "main")), linuxX64Test.associateCompilations)
             }
+        }
+    }
+
+    @PluginTargetVersions(pluginVersion = "2.4.0-dev-8449+")
+    @Test
+    fun testSwiftPMImportIdeModel() = doTest(runImport = false) {
+        runAfterImport {
+            val builtGradleModel = buildKotlinMPPGradleModel()
+            val model = builtGradleModel.getNotNullByProjectPathOrThrow(":")
+            assertEquals(false, model.swiftPMImportModel?.hasSwiftPMDependencies)
+            assertEquals(":integrateLinkagePackage", model.swiftPMImportModel?.integrateLinkagePackageTaskPath)
+            assertEquals("KotlinMultiplatformLinkedPackage", model.swiftPMImportModel?.magicPackageName)
+        }
+    }
+
+    @PluginTargetVersions(pluginVersion = "2.4.0-dev-8449+")
+    @Test
+    fun testDisabledSwiftPMImportIdeModel() = doTest(runImport = false) {
+        runAfterImport {
+            val builtGradleModel = buildKotlinMPPGradleModel()
+            val model = builtGradleModel.getNotNullByProjectPathOrThrow(":")
+            assertEquals(null, model.swiftPMImportModel)
         }
     }
 }

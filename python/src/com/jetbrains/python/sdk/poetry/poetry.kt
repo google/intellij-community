@@ -3,6 +3,7 @@ package com.jetbrains.python.sdk.poetry
 
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.util.NlsSafe
+import com.intellij.platform.util.progress.withProgressText
 import com.intellij.python.pyproject.PyProjectToml
 import com.intellij.util.PathUtil
 import com.jetbrains.python.PyBundle
@@ -31,8 +32,9 @@ suspend fun createNewPoetrySdk(
   basePythonBinaryPath: PythonBinary,
   installPackages: Boolean,
   errorSink: ErrorSink,
+  inProjectEnv: Boolean = false,
 ): PyResult<Sdk> {
-  val pythonBinaryPath = setUpPoetry(moduleBasePath, basePythonBinaryPath, installPackages, errorSink).getOr { return it }
+  val pythonBinaryPath = setUpPoetry(moduleBasePath, basePythonBinaryPath, installPackages, errorSink, inProjectEnv).getOr { return it }
 
   return createPoetrySdk(
     basePath = moduleBasePath,
@@ -44,12 +46,11 @@ suspend fun createNewPoetrySdk(
 suspend fun createPoetrySdk(
   basePath: Path,
   pythonBinaryPath: PathHolder.Eel,
-): PyResult<Sdk> = createSdk(
-  pythonBinaryPath = pythonBinaryPath,
-  associatedModulePath = basePath.toString(),
-  suggestedSdkName = suggestedSdkName(basePath),
-  sdkAdditionalData = PyPoetrySdkAdditionalData(basePath)
-)
+): PyResult<Sdk> = withProgressText(PyBundle.message("python.sdk.progress.poetry.configuring")) {
+  createSdk(
+    pythonBinaryPath = pythonBinaryPath,
+    sdkAdditionalData = PyPoetrySdkAdditionalData(basePath)
+)}
 
 internal val Sdk.isPoetry: Boolean
   get() {
@@ -60,9 +61,9 @@ internal val Sdk.isPoetry: Boolean
     return getOrCreateAdditionalData() is PyPoetrySdkAdditionalData
   }
 
-private suspend fun setUpPoetry(moduleBasePath: Path, basePythonBinaryPath: PythonBinary, installPackages: Boolean, errorSink: ErrorSink): PyResult<PythonBinary> {
+private suspend fun setUpPoetry(moduleBasePath: Path, basePythonBinaryPath: PythonBinary, installPackages: Boolean, errorSink: ErrorSink, inProjectEnv: Boolean = false): PyResult<PythonBinary> {
   val init = PyProjectToml.findInRoot(moduleBasePath) == null
-  val pythonHomePath = setupPoetry(moduleBasePath, basePythonBinaryPath, installPackages, init, errorSink).getOr { return it }
+  val pythonHomePath = setupPoetry(moduleBasePath, basePythonBinaryPath, installPackages, init, errorSink, inProjectEnv).getOr { return it }
   val pythonBinaryPath = pythonHomePath.resolvePythonBinary()
                          ?: return PyResult.localizedError(PyBundle.message("python.sdk.cannot.setup.sdk", pythonHomePath))
   return PyResult.success(pythonBinaryPath)

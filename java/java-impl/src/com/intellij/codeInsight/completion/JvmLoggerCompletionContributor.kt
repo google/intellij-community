@@ -24,7 +24,7 @@ public class JvmLoggerCompletionContributor : CompletionContributor() {
                val parent = parameters.position.parent ?: return
                if (parent !is PsiReferenceExpression ||
                    !ExpressionUtils.isVoidContext(parent) ||
-                   JavaKeywordCompletion.isInstanceofPlace(parameters.position)) return
+                   JavaCompletionUtil.isInstanceofPlace(parameters.position)) return
                val javaResultWithSorting = JavaCompletionSorting.addJavaSorting(parameters, result)
                val module = ModuleUtil.findModuleForFile(parameters.originalFile) ?: return
                val availableLoggers = JvmLogger.findSuitableLoggers(module, true)

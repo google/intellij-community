@@ -4,10 +4,12 @@ package com.intellij.openapi.fileChooser;
 import com.intellij.ide.highlighter.ArchiveFileType;
 import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.util.Comparing;
-import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.vfs.JarFileSystem;
 import com.intellij.openapi.vfs.VFileProperty;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.platform.eel.EelOsFamily;
+import com.intellij.platform.eel.path.EelPath;
+import com.intellij.platform.eel.provider.EelPathConversionsKt;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -88,7 +90,17 @@ public class FileElement {
     return file != null &&
            file.isValid() &&
            file.isInLocalFileSystem() &&
-           (file.is(VFileProperty.HIDDEN) || SystemInfo.isUnix && file.getName().startsWith("."));
+           (file.is(VFileProperty.HIDDEN) || isOnUnix(file) && file.getName().startsWith("."));
+  }
+
+  private static boolean isOnUnix(@NotNull VirtualFile file) {
+    try {
+      EelPath eelPath = EelPathConversionsKt.asEelPath(file.toNioPath());
+      return eelPath.getDescriptor().getOsFamily().equals(EelOsFamily.Posix);
+    }
+    catch (Exception e) {
+      return false;
+    }
   }
 
   public static boolean isArchive(@Nullable VirtualFile file) {

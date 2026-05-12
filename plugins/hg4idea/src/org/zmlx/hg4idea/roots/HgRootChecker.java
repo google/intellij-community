@@ -13,7 +13,8 @@ import java.nio.file.Files;
 final class HgRootChecker extends VcsRootChecker {
   @Override
   public boolean isRoot(@NotNull VirtualFile file) {
-    return file.findChild(HgUtil.DOT_HG) != null;
+    VirtualFile child = file.findChild(HgUtil.DOT_HG);
+    return child != null && child.isValid();
   }
 
   @Override

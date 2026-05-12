@@ -115,7 +115,7 @@ internal class VcsMappingConfigurationDialog(
       row {
         cell(projectRadioButton)
           .applyToComponent {
-            text = DefaultVcsRootPolicy.getInstance(project).getProjectMappingInDialogDescription()
+            text = DefaultVcsRootPolicy.getInstance(project).projectMappingInDialogDescription
           }
       }
     }

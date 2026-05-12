@@ -1,6 +1,6 @@
 ### auto-generated section `build intellij.kotlin.projectStructure` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_project-structure",
@@ -14,18 +14,13 @@ create_kotlinc_options(
   x_context_parameters = True
 )
 
-resourcegroup(
-  name = "project-structure_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "project-structure",
   module_name = "intellij.kotlin.projectStructure",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":project-structure_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_project-structure",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -34,11 +29,13 @@ jvm_library(
     "//platform/workspace/storage",
     "//platform/backend/workspace",
     "//platform/core-api:core",
+    "//platform/core-impl",
     "//plugins/kotlin/base/project-structure",
     "//platform/projectModel-impl",
     "@lib//:kotlinc-analysis-api",
     "//platform/workspace/jps",
     "//java/java-impl:impl",
+    "//java/java-psi-api:psi",
     "@lib//:kotlinc-analysis-api-platform-interface",
     "@lib//:kotlinc-kotlin-compiler-common",
     "//plugins/kotlin/base/util",
@@ -54,6 +51,7 @@ jvm_library(
 
 jvm_library(
   name = "project-structure_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.projectStructure",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -65,10 +63,12 @@ jvm_library(
     "//platform/workspace/storage:storage_test_lib",
     "//platform/backend/workspace:workspace_test_lib",
     "//platform/core-api:core_test_lib",
+    "//platform/core-impl:core-impl_test_lib",
     "//plugins/kotlin/base/project-structure:project-structure_test_lib",
     "//platform/projectModel-impl:projectModel-impl_test_lib",
     "//platform/workspace/jps:jps_test_lib",
     "//java/java-impl:impl_test_lib",
+    "//java/java-psi-api:psi_test_lib",
     "//plugins/kotlin/base/util:util_test_lib",
     "//plugins/kotlin/base/facet:facet_test_lib",
     "//plugins/kotlin/base/platforms:platforms_test_lib",
@@ -78,6 +78,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.kotlin.projectStructure` end
+
+### auto-generated section `iml intellij.kotlin.projectStructure` start
+exports_files([
+  "intellij.kotlin.projectStructure.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.projectStructure` end
 
 ### auto-generated section `build intellij.kotlin.projectStructure.tests` start
 create_kotlinc_options(
@@ -94,12 +100,14 @@ create_kotlinc_options(
 
 jvm_library(
   name = "kotlin-projectStructure-tests",
+  module_name = "intellij.kotlin.projectStructure.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "kotlin-projectStructure-tests_test_lib",
+  testonly = True,
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
   kotlinc_opts = ":custom_kotlin-projectStructure-tests",
@@ -131,6 +139,8 @@ jvm_library(
     "//platform/backend/workspace:workspace_test_lib",
     "//platform/core-api:core",
     "//platform/core-api:core_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//plugins/kotlin/base/project-structure",
     "//plugins/kotlin/base/project-structure:project-structure_test_lib",
     "//platform/projectModel-impl",
@@ -140,12 +150,13 @@ jvm_library(
     "@lib//:kotlinc-analysis-api",
     "//platform/workspace/jps",
     "//platform/workspace/jps:jps_test_lib",
+    "//platform/ide-core",
     "//java/java-impl:impl",
     "//java/java-impl:impl_test_lib",
     "@lib//:kotlinc-analysis-api-platform-interface",
     "@lib//:kotlinc-kotlin-compiler-common",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/base/util",
     "//plugins/kotlin/base/util:util_test_lib",
     "//plugins/kotlin/base/facet",
@@ -174,14 +185,29 @@ jvm_library(
     "//libraries/fastutil:fastutil_test_lib",
     "//java/openapi:java",
     "//java/openapi:java_test_lib",
+    "//java/java-psi-api:psi",
+    "//java/java-psi-api:psi_test_lib",
     "//plugins/kotlin/base/scripting/scripting.k2:kotlin-base-scripting",
     "//plugins/kotlin/base/scripting/scripting.k2:kotlin-base-scripting_test_lib",
     "//plugins/kotlin/intellij.kotlin.base.test:base-test",
     "//plugins/kotlin/intellij.kotlin.base.test:base-test_test_lib",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework_test_lib",
+    "//platform/testFramework/junit5",
+    "//platform/testFramework/junit5:junit5_test_lib",
   ],
-  runtime_deps = [":kotlin-projectStructure-tests"]
+  runtime_deps = [
+    ":kotlin-projectStructure-tests",
+    "//platform/ide-core:ide-core_test_lib",
+  ]
 )
 ### auto-generated section `build intellij.kotlin.projectStructure.tests` end
+
+### auto-generated section `iml intellij.kotlin.projectStructure.tests` start
+exports_files([
+  "intellij.kotlin.projectStructure.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.projectStructure.tests` end
 
 ### auto-generated section `test intellij.kotlin.projectStructure.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

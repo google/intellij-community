@@ -27,7 +27,6 @@ import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.pom.java.LanguageLevel;
-import com.intellij.testFramework.IdeaTestUtil;
 import com.intellij.testFramework.IndexingTestUtil;
 import com.intellij.testFramework.UsefulTestCase;
 import com.intellij.testFramework.builders.JavaModuleFixtureBuilder;
@@ -49,7 +48,7 @@ public abstract class ClsGenericsHighlightingTest extends UsefulTestCase {
     myFixture.setTestDataPath(PathManagerEx.getTestDataPath() + "/codeInsight/clsHighlighting");
     JavaModuleFixtureBuilder builder = projectBuilder.addModule(JavaModuleFixtureBuilder.class);
     builder.setLanguageLevel(getLanguageLevel());
-    builder.addJdk(IdeaTestUtil.getMockJdk18Path().getPath());
+    builder.addJdkVersion(LanguageLevel.JDK_1_8);
     myFixture.setUp();
   }
 

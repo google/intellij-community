@@ -1,13 +1,15 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.storage.testEntities.entities.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
 import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
-import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
@@ -29,9 +31,7 @@ internal class WithSealedEntityImpl(private val dataSource: WithSealedEntityData
 
   private companion object {
 
-
-    private val connections = listOf<ConnectionId>(
-    )
+    private val connections = listOf<ConnectionId>()
 
   }
 
@@ -40,7 +40,6 @@ internal class WithSealedEntityImpl(private val dataSource: WithSealedEntityData
       readField("classes")
       return dataSource.classes
     }
-
   override val interfaces: List<MySealedInterface>
     get() {
       readField("interfaces")
@@ -58,8 +57,8 @@ internal class WithSealedEntityImpl(private val dataSource: WithSealedEntityData
   }
 
 
-  internal class Builder(result: WithSealedEntityData?) : ModifiableWorkspaceEntityBase<WithSealedEntity, WithSealedEntityData>(
-    result), WithSealedEntityBuilder {
+  internal class Builder(result: WithSealedEntityData?) : ModifiableWorkspaceEntityBase<WithSealedEntity, WithSealedEntityData>(result),
+                                                          WithSealedEntityBuilder {
     internal constructor() : this(WithSealedEntityData())
 
     override fun applyToBuilder(builder: MutableEntityStorage) {
@@ -72,15 +71,13 @@ internal class WithSealedEntityImpl(private val dataSource: WithSealedEntityData
           error("Entity WithSealedEntity is already created in a different builder")
         }
       }
-
       this.diff = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
-      // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
-      // Builder may switch to snapshot at any moment and lock entity data to modification
+// After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
+// Builder may switch to snapshot at any moment and lock entity data to modification
       this.currentEntityData = null
-
-      // Process linked entities that are connected without a builder
+// Process linked entities that are connected without a builder
       processLinkedEntities(builder)
       checkInitialization() // TODO uncomment and check failed tests
     }
@@ -131,7 +128,6 @@ internal class WithSealedEntityImpl(private val dataSource: WithSealedEntityData
         changedProperty.add("entitySource")
 
       }
-
     private val classesUpdater: (value: List<MySealedClass>) -> Unit = { value ->
 
       changedProperty.add("classes")
@@ -153,7 +149,6 @@ internal class WithSealedEntityImpl(private val dataSource: WithSealedEntityData
         getEntityData(true).classes = value
         classesUpdater.invoke(value)
       }
-
     private val interfacesUpdater: (value: List<MySealedInterface>) -> Unit = { value ->
 
       changedProperty.add("interfaces")
@@ -178,6 +173,7 @@ internal class WithSealedEntityImpl(private val dataSource: WithSealedEntityData
 
     override fun getEntityClass(): Class<WithSealedEntity> = WithSealedEntity::class.java
   }
+
 }
 
 @OptIn(WorkspaceEntityInternalApi::class)
@@ -195,7 +191,6 @@ internal class WithSealedEntityData : WorkspaceEntityData<WithSealedEntity>() {
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): WithSealedEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {
@@ -207,8 +202,7 @@ internal class WithSealedEntityData : WorkspaceEntityData<WithSealedEntity>() {
   }
 
   override fun getMetadata(): EntityMetadata {
-    return MetadataStorageImpl.getMetadataByTypeFqn(
-      "com.intellij.platform.workspace.storage.testEntities.entities.WithSealedEntity") as EntityMetadata
+    return MetadataStorageImpl.getMetadataByTypeFqn("com.intellij.platform.workspace.storage.testEntities.entities.WithSealedEntity") as EntityMetadata
   }
 
   override fun clone(): WithSealedEntityData {
@@ -224,8 +218,7 @@ internal class WithSealedEntityData : WorkspaceEntityData<WithSealedEntity>() {
   }
 
   override fun createDetachedEntity(parents: List<WorkspaceEntityBuilder<*>>): WorkspaceEntityBuilder<*> {
-    return WithSealedEntity(classes, interfaces, entitySource) {
-    }
+    return WithSealedEntity(classes, interfaces, entitySource)
   }
 
   override fun getRequiredParents(): List<Class<out WorkspaceEntity>> {
@@ -236,9 +229,7 @@ internal class WithSealedEntityData : WorkspaceEntityData<WithSealedEntity>() {
   override fun equals(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as WithSealedEntityData
-
     if (this.entitySource != other.entitySource) return false
     if (this.classes != other.classes) return false
     if (this.interfaces != other.interfaces) return false
@@ -248,9 +239,7 @@ internal class WithSealedEntityData : WorkspaceEntityData<WithSealedEntity>() {
   override fun equalsIgnoringEntitySource(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as WithSealedEntityData
-
     if (this.classes != other.classes) return false
     if (this.interfaces != other.interfaces) return false
     return true

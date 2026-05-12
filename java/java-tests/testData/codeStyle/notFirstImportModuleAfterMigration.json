@@ -268,6 +268,7 @@
       "spaces_within_try_parentheses": false,
       "spaces_within_while_parentheses": false,
       "special_else_if_treatment": true,
+      "strip_whitespace_from_blank_lines_in_text_blocks": false,
       "subclass_name_suffix": "Impl",
       "switch_expressions_wrap": "normal",
       "tab_width": 4,

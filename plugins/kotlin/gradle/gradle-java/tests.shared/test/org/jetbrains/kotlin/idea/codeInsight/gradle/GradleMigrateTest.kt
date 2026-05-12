@@ -66,7 +66,7 @@ class GradleMigrateTest : MultiplePluginVersionGradleImportingTestCase() {
         )
     }
 
-    private fun doMigrationTest(beforeText: String, afterText: String): String? = catchNotificationText(myProject) {
+    private fun doMigrationTest(beforeText: String, afterText: String): String? = catchNotificationText(myProject, testRootDisposable) {
         createProjectSubFile("settings.gradle", "include ':app'")
         val gradleFile = createProjectSubFile("app/build.gradle", beforeText.trimIndent())
 

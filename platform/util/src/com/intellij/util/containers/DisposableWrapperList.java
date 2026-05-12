@@ -349,6 +349,11 @@ public final class DisposableWrapperList<E> extends AbstractList<E> {
         return e.getMessage();
       }
     }
+
+    @Override
+    public String toString() {
+      return super.toString() + " [" + delegate + "]";
+    }
   }
 
   private final class DisposableWrapperListIterator implements ListIterator<E> {

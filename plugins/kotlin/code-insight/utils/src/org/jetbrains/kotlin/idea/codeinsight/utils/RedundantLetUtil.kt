@@ -6,6 +6,7 @@ import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.analysis.api.KaContextParameterApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.components.isMarkedNullable
 import org.jetbrains.kotlin.analysis.api.components.resolveToCall
 import org.jetbrains.kotlin.analysis.api.components.resolveToSymbols
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisFromWriteAction
@@ -87,7 +88,6 @@ fun isLetCallRedundant(
     return singleReferenceNotInsideInnerLambda != null
 }
 
-@OptIn(KaContextParameterApi::class)
 @ApiStatus.Internal
 context(_: KaSession)
 fun KtDotQualifiedExpression.isLetCallRedundant(parameterName: String): Boolean {
@@ -96,9 +96,7 @@ fun KtDotQualifiedExpression.isLetCallRedundant(parameterName: String): Boolean 
             parameterName,
             except = receiver
         )
-    } && callExpression?.resolveToCall()?.let {
-        it.successfulFunctionCallOrNull() == null && it.successfulVariableAccessCall() != null
-    } != true && !getHasNullableReceiverExtensionCall()
+    } && !hasFunctionVariableCall() && !getHasNullableReceiverExtensionCall()
 }
 
 fun removeRedundantLetCall(element: KtCallExpression, updateCaret: (KtElement) -> Unit) {
@@ -267,12 +265,20 @@ private fun KtCallExpression.isApplicable(parameterName: String): Boolean {
 private fun KtExpression.nameUsed(name: String, except: KtNameReferenceExpression? = null): Boolean =
     anyDescendantOfType<KtNameReferenceExpression> { it != except && it.getReferencedName() == name }
 
+@OptIn(KaContextParameterApi::class)
+context(_: KaSession)
+private fun KtDotQualifiedExpression.hasFunctionVariableCall(): Boolean {
+    val calleeExpression = callExpression?.calleeExpression ?: return false
+    return calleeExpression.resolveToCall()?.successfulVariableAccessCall() != null
+}
 
 @OptIn(KaContextParameterApi::class)
 context(_: KaSession)
 private fun KtDotQualifiedExpression.getHasNullableReceiverExtensionCall(): Boolean {
-    val hasNullableType = selectorExpression?.resolveToCall()
-        ?.successfulFunctionCallOrNull()?.partiallyAppliedSymbol?.extensionReceiver?.type?.isNullableAnyType()
+    val hasNullableType = selectorExpression?.resolveToCall()?.let { resolvedCall ->
+        val call = resolvedCall.successfulFunctionCallOrNull() ?: resolvedCall.successfulVariableAccessCall()
+        call?.extensionReceiver?.type?.isMarkedNullable
+    }
     if (hasNullableType == true) return true
     return (KtPsiUtil.deparenthesize(receiverExpression) as? KtDotQualifiedExpression)?.getHasNullableReceiverExtensionCall() == true
 }

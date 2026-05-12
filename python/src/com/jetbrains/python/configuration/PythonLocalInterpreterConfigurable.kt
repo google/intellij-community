@@ -20,7 +20,7 @@ import com.jetbrains.python.sdk.PythonSdkType
 import com.jetbrains.python.sdk.PythonSdkUpdater
 import com.jetbrains.python.sdk.associatedModulePath
 import com.jetbrains.python.sdk.flavors.PythonSdkFlavor
-import com.jetbrains.python.sdk.flavors.VirtualEnvSdkFlavor
+import com.intellij.python.venv.sdk.flavors.VirtualEnvSdkFlavor
 import com.jetbrains.python.sdk.flavors.conda.CondaEnvSdkFlavor
 
 /**
@@ -48,7 +48,7 @@ class PythonLocalInterpreterConfigurable(private val project: Project, private v
         .bindText(interpreterPath)
         .align(AlignX.FILL)
     }
-    val sdkFlavor = PythonSdkFlavor.getPlatformIndependentFlavor(sdk.homePath)
+    val sdkFlavor = PythonSdkFlavor.getFlavor(sdk)
     if (sdkFlavor is VirtualEnvSdkFlavor || sdkFlavor is CondaEnvSdkFlavor) {
       // Add SDK association components only for Virtualenv and Conda interpreters
       val sdkAssociatedModulePath = sdk.associatedModulePath

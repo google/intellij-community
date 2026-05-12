@@ -95,7 +95,7 @@ public abstract class AbstractStepWithProgress<Result> extends ModuleWizardStep 
     progressPanel.add(myProgressLabel2, new GridBagConstraints(0, RELATIVE, 1, 1, 1.0, 1.0, NORTHWEST, HORIZONTAL, JBUI.insets(8, 10, 0, 10), 0, 0));
 
     JButton stopButton = new JButton(JavaUiBundle.message("button.stop.searching"));
-    stopButton.addActionListener(__ -> cancelSearch());
+    stopButton.addActionListener(_ -> cancelSearch());
     progressPanel.add(stopButton, new GridBagConstraints(1, RELATIVE, 1, 2, 0.0, 1.0, NORTHWEST, NONE, JBUI.insets(10, 0, 0, 10), 0, 0));
     return progressPanel;
   }

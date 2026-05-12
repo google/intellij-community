@@ -1,7 +1,16 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package org.jetbrains.plugins.gradle.util.entity.impl
 
-import com.intellij.platform.workspace.storage.*
+import com.intellij.platform.workspace.storage.ConnectionId
+import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
+import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
+import com.intellij.platform.workspace.storage.MutableEntityStorage
+import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
+import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
@@ -20,9 +29,7 @@ internal class GradleTestEntityImpl(private val dataSource: GradleTestEntityData
 
   private companion object {
 
-
-    private val connections = listOf<ConnectionId>(
-    )
+    private val connections = listOf<ConnectionId>()
 
   }
 
@@ -45,8 +52,8 @@ internal class GradleTestEntityImpl(private val dataSource: GradleTestEntityData
   }
 
 
-  internal class Builder(result: GradleTestEntityData?) : ModifiableWorkspaceEntityBase<GradleTestEntity, GradleTestEntityData>(
-    result), GradleTestEntityBuilder {
+  internal class Builder(result: GradleTestEntityData?) : ModifiableWorkspaceEntityBase<GradleTestEntity, GradleTestEntityData>(result),
+                                                          GradleTestEntityBuilder {
     internal constructor() : this(GradleTestEntityData())
 
     override fun applyToBuilder(builder: MutableEntityStorage) {
@@ -59,15 +66,13 @@ internal class GradleTestEntityImpl(private val dataSource: GradleTestEntityData
           error("Entity GradleTestEntity is already created in a different builder")
         }
       }
-
       this.diff = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
-      // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
-      // Builder may switch to snapshot at any moment and lock entity data to modification
+// After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
+// Builder may switch to snapshot at any moment and lock entity data to modification
       this.currentEntityData = null
-
-      // Process linked entities that are connected without a builder
+// Process linked entities that are connected without a builder
       processLinkedEntities(builder)
       checkInitialization() // TODO uncomment and check failed tests
     }
@@ -103,7 +108,6 @@ internal class GradleTestEntityImpl(private val dataSource: GradleTestEntityData
         changedProperty.add("entitySource")
 
       }
-
     override var phase: GradleSyncPhase
       get() = getEntityData().phase
       set(value) {
@@ -115,6 +119,7 @@ internal class GradleTestEntityImpl(private val dataSource: GradleTestEntityData
 
     override fun getEntityClass(): Class<GradleTestEntity> = GradleTestEntity::class.java
   }
+
 }
 
 @OptIn(WorkspaceEntityInternalApi::class)
@@ -130,7 +135,6 @@ internal class GradleTestEntityData : WorkspaceEntityData<GradleTestEntity>() {
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): GradleTestEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {
@@ -150,8 +154,7 @@ internal class GradleTestEntityData : WorkspaceEntityData<GradleTestEntity>() {
   }
 
   override fun createDetachedEntity(parents: List<WorkspaceEntityBuilder<*>>): WorkspaceEntityBuilder<*> {
-    return GradleTestEntity(phase, entitySource) {
-    }
+    return GradleTestEntity(phase, entitySource)
   }
 
   override fun getRequiredParents(): List<Class<out WorkspaceEntity>> {
@@ -162,9 +165,7 @@ internal class GradleTestEntityData : WorkspaceEntityData<GradleTestEntity>() {
   override fun equals(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as GradleTestEntityData
-
     if (this.entitySource != other.entitySource) return false
     if (this.phase != other.phase) return false
     return true
@@ -173,9 +174,7 @@ internal class GradleTestEntityData : WorkspaceEntityData<GradleTestEntity>() {
   override fun equalsIgnoringEntitySource(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as GradleTestEntityData
-
     if (this.phase != other.phase) return false
     return true
   }

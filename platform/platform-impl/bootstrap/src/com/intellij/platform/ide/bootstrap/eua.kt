@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.ide.bootstrap
 
 import com.intellij.ide.gdpr.ConsentOptions
@@ -16,9 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-// On startup 2 dialogs must be shown:
-// - gdpr agreement
-// - eu(l)a
+// On startup, 2 dialogs should be shown: the GDPR agreement and the EU[L]A.
 internal suspend fun loadEuaDocument(appInfoDeferred: Deferred<ApplicationInfoEx>): EndUserAgreementStatus {
   val vendorAsProperty = System.getProperty("idea.vendor.name", "")
   val isVendorJetBrains = if (vendorAsProperty.isNotEmpty()) {
@@ -41,10 +39,7 @@ internal suspend fun loadEuaDocument(appInfoDeferred: Deferred<ApplicationInfoEx
   val isAccepted = span("eua is accepted checking") {
     document.isAccepted
   }
-  if (isAccepted) {
-    return EndUserAgreementStatus.Accepted
-  }
-  return EndUserAgreementStatus.Required(document)
+  return if (isAccepted) EndUserAgreementStatus.Accepted else EndUserAgreementStatus.Required(document)
 }
 
 internal sealed interface EndUserAgreementStatus {

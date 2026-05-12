@@ -269,7 +269,6 @@ c:com.intellij.ui.jcef.utils.JBCefLocalRequestHandler
 - getResourceRequestHandler(org.cef.browser.CefBrowser,org.cef.browser.CefFrame,org.cef.network.CefRequest,Z,Z,java.lang.String,org.cef.misc.BoolRef):org.cef.handler.CefResourceRequestHandler
 c:com.intellij.ui.jcef.utils.JBCefStreamResourceHandler
 - com.intellij.openapi.Disposable
-- org.cef.handler.CefResourceHandler
 - <init>(java.io.InputStream,java.lang.String,com.intellij.openapi.Disposable,java.util.Map):V
 - b:<init>(java.io.InputStream,java.lang.String,com.intellij.openapi.Disposable,java.util.Map,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - cancel():V

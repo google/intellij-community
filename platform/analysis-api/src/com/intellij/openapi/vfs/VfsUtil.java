@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vfs;
 
 import com.intellij.ide.highlighter.ArchiveFileType;
@@ -20,12 +20,12 @@ import com.intellij.util.SmartList;
 import com.intellij.util.SystemProperties;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.io.URLUtil;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -38,12 +38,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+@SuppressWarnings("SplitModeApiUsage")
 public final class VfsUtil extends VfsUtilCore {
   private static final Logger LOG = Logger.getInstance(VfsUtil.class);
 
-  /**
-   * Specifies an average delay between a file system event and a moment the IDE gets pinged about it by fsnotifier.
-   */
+  /// Specifies an average delay between a file system event and a moment the IDE gets pinged about it by fsnotifier.
   public static final long NOTIFICATION_DELAY_MILLIS = 300;
 
   @SuppressWarnings("MethodOverridesStaticMethodOfSuperclass")
@@ -55,18 +54,16 @@ public final class VfsUtil extends VfsUtilCore {
     return text.isEmpty() ? ArrayUtilRt.EMPTY_BYTE_ARRAY : text.getBytes(file.getCharset());
   }
 
-  /**
-   * Copies all files matching the {@code filter} from {@code fromDir} to {@code toDir}.
-   * Symlinks end special files are ignored.
-   *
-   * @param requestor any object to control who called this method. Note that
-   *                  it is considered to be an external change if {@code requestor} is {@code null}.
-   *                  See {@link VirtualFileEvent#getRequestor}
-   * @param fromDir   the directory to copy from
-   * @param toDir     the directory to copy to
-   * @param filter    {@link VirtualFileFilter}
-   * @throws IOException if files failed to be copied
-   */
+  /// Copies all files matching the `filter` from `fromDir` to `toDir`.
+  /// Symlinks end special files are ignored.
+  ///
+  /// @param requestor any object to control who called this method. Note that
+  ///                  it is considered to be an external change if `requestor` is `null`.
+  ///                  See [VirtualFileEvent#getRequestor]
+  /// @param fromDir   the directory to copy from
+  /// @param toDir     the directory to copy to
+  /// @param filter    [VirtualFileFilter]
+  /// @throws IOException if files failed to be copied
   public static void copyDirectory(Object requestor, @NotNull VirtualFile fromDir, @NotNull VirtualFile toDir, @Nullable VirtualFileFilter filter) throws IOException {
     @SuppressWarnings("UnsafeVfsRecursion") var children = fromDir.getChildren();
     for (var child : children) {
@@ -85,17 +82,15 @@ public final class VfsUtil extends VfsUtilCore {
     }
   }
 
-  /**
-   * Makes a copy of the {@code file} in the {@code toDir} folder and returns it.
-   * Handles both files and directories.
-   *
-   * @param requestor any object to control who called this method. Note that
-   *                  it is considered to be an external change if {@code requestor} is {@code null}.
-   *                  See {@link VirtualFileEvent#getRequestor}
-   * @param file      file or directory to make a copy of
-   * @param toDir     directory to make a copy in
-   * @throws IOException if a file failed to be copied
-   */
+  /// Makes a copy of the `file` in the `toDir` folder and returns it.
+  /// Handles both files and directories.
+  ///
+  /// @param requestor any object to control who called this method. Note that
+  ///                  it is considered to be an external change if `requestor` is `null`.
+  ///                  See [VirtualFileEvent#getRequestor]
+  /// @param file      file or directory to make a copy of
+  /// @param toDir     directory to make a copy in
+  /// @throws IOException if a file failed to be copied
   public static @NotNull VirtualFile copy(Object requestor, @NotNull VirtualFile file, @NotNull VirtualFile toDir) throws IOException {
     if (file.isDirectory()) {
       var newDir = toDir.createChildDirectory(requestor, file.getName());
@@ -105,12 +100,11 @@ public final class VfsUtil extends VfsUtilCore {
     return copyFile(requestor, file, toDir);
   }
 
-  /**
-   * Gets the array of common ancestors for passed files.
-   *
-   * @param files array of files
-   * @return array of common ancestors for passed files
-   */
+  /// Gets the array of common ancestors for passed files.
+  ///
+  /// @param files array of files
+  /// @return array of common ancestors for passed files
+  @SuppressWarnings("unused")
   public static VirtualFile @NotNull [] getCommonAncestors(VirtualFile @NotNull [] files) {
     // Separate files by first component in the path.
     var map = new HashMap<VirtualFile, Set<VirtualFile>>();
@@ -146,9 +140,7 @@ public final class VfsUtil extends VfsUtilCore {
     return toVirtualFileArray(ancestorsList);
   }
 
-  /**
-   * Gets the common ancestor for passed files, or {@code null} if the files do not have common ancestors.
-   */
+  /// Gets the common ancestor for passed files, or `null` if the files do not have common ancestors.
   public static @Nullable VirtualFile getCommonAncestor(@NotNull Collection<? extends VirtualFile> files) {
     var ancestor = (VirtualFile)null;
     for (var file : files) {
@@ -179,24 +171,26 @@ public final class VfsUtil extends VfsUtilCore {
     return file;
   }
 
-  /**
-   * Searches for the file specified by given URL.
-   * Note that this method is currently tested only for "file" and "jar" protocols under Unix and Windows.
-   *
-   * @param url the URL to find a file by
-   * @return <code>{@link VirtualFile}</code> if the file was found, {@code null} otherwise
-   */
+  /// Searches for the file specified by given URL.
+  /// Note that this method is currently tested only for "file" and "jar" protocols under Unix and Windows.
+  ///
+  /// @param url the URL to find a file by
+  /// @return `[VirtualFile]` if the file was found, `null` otherwise
   public static @Nullable VirtualFile findFileByURL(@NotNull URL url) {
     var vfsUrl = convertFromUrl(url);
     return VirtualFileManager.getInstance().findFileByUrl(vfsUrl);
   }
 
+  @SuppressWarnings({"IO_FILE_USAGE", "UnnecessaryFullyQualifiedName"})
   public static @Nullable VirtualFile findFile(@NotNull Path file, boolean refreshIfNeeded) {
-    return findFile(file.toAbsolutePath().toString().replace(File.separatorChar, '/'), refreshIfNeeded);
+    return findFile(file.toAbsolutePath().toString().replace(java.io.File.separatorChar, '/'), refreshIfNeeded);
   }
 
-  public static @Nullable VirtualFile findFileByIoFile(@NotNull File file, boolean refreshIfNeeded) {
-    return findFile(file.getAbsolutePath().replace(File.separatorChar, '/'), refreshIfNeeded);
+  /// Use [#findFile(Path, boolean)] instead.
+  @ApiStatus.Obsolete
+  @SuppressWarnings({"IO_FILE_USAGE", "UnnecessaryFullyQualifiedName"})
+  public static @Nullable VirtualFile findFileByIoFile(@NotNull java.io.File file, boolean refreshIfNeeded) {
+    return findFile(file.getAbsolutePath().replace(java.io.File.separatorChar, '/'), refreshIfNeeded);
   }
 
   private static @Nullable VirtualFile findFile(@NotNull String filePath, boolean refreshIfNeeded) {
@@ -208,23 +202,23 @@ public final class VfsUtil extends VfsUtilCore {
     return virtualFile;
   }
 
+  @SuppressWarnings({"IO_FILE_USAGE", "UnnecessaryFullyQualifiedName"})
   public static @Nullable VirtualFile refreshAndFindChild(@NotNull VirtualFile directory, @NotNull String name) {
     if (directory instanceof NewVirtualFile newVirtualFile) {
       return newVirtualFile.refreshAndFindChild(name);
     }
-    return findFileByIoFile(new File(virtualToIoFile(directory), name), true);
+    return findFileByIoFile(new java.io.File(virtualToIoFile(directory), name), true);
   }
 
-  /** @deprecated use {@code file.toPath().toUri()} instead */
+  /// @deprecated use `file.toPath().toUri()` instead
   @Deprecated(forRemoval = true)
-  public static @NotNull URI toUri(@NotNull File file) {
+  @SuppressWarnings({"IO_FILE_USAGE", "UnnecessaryFullyQualifiedName"})
+  public static @NotNull URI toUri(@NotNull java.io.File file) {
     return file.toPath().toUri();
   }
 
-  /**
-   * URI - may be incorrect (escaped or missed "/" before the disk name on Windows, not fully encoded, may contain a query or a fragment)
-   * @return correct URI; must be used only for external communication
-   */
+  /// URI - may be incorrect (escaped or missed "/" before the disk name on Windows, not fully encoded, may contain a query or a fragment)
+  /// @return correct URI; must be used only for external communication
   public static @Nullable URI toUri(@NotNull String uri) {
     var index = uri.indexOf(URLUtil.SCHEME_SEPARATOR);
     if (index < 0) {
@@ -262,7 +256,8 @@ public final class VfsUtil extends VfsUtilCore {
     }
   }
 
-  public static @NotNull String getUrlForLibraryRoot(@NotNull File libraryRoot) {
+  @SuppressWarnings({"IO_FILE_USAGE", "UnnecessaryFullyQualifiedName"})
+  public static @NotNull String getUrlForLibraryRoot(@NotNull java.io.File libraryRoot) {
     return getUrlForLibraryRoot(libraryRoot.getAbsolutePath(), libraryRoot.getName());
   }
 
@@ -288,13 +283,13 @@ public final class VfsUtil extends VfsUtilCore {
     return fileName;
   }
 
-  /** @deprecated primitive, just inline */
+  /// @deprecated primitive, just inline
   @Deprecated(forRemoval = true)
   public static @NotNull VirtualFile createChildSequent(Object requestor, @NotNull VirtualFile dir, @NotNull String prefix, @NotNull String extension) throws IOException {
     return dir.createChildData(requestor, getNextAvailableName(dir, prefix, extension));
   }
 
-  /** @return only 'good' ({@code !isBadName(name)}) file names from the array */
+  /// @return only 'good' (`!isBadName(name)`) file names from the array
   public static String @NotNull [] filterNames(String @NotNull [] names) {
     //optimistic speculation: in most cases all names are 'good':
     var filteredCount = 0;
@@ -313,10 +308,8 @@ public final class VfsUtil extends VfsUtilCore {
     return goodNames;
   }
 
-  /**
-   * Returns {@code true} if the given name is illegal from the VFS point of view.
-   * Rejected are: nulls, empty strings, traversals ({@code "."} and {@code ".."}), and strings containing back- and forward slashes.
-   */
+  /// Returns `true` if the given name is illegal from the VFS point of view.
+  /// Rejected are: nulls, empty strings, traversals (`"."` and `".."`), and strings containing back- and forward slashes.
   @Contract(value = "null -> true", pure = true)
   public static boolean isBadName(String name) {
     if (name == null || name.isEmpty() || ".".equals(name) || "..".equals(name)) {
@@ -435,18 +428,14 @@ public final class VfsUtil extends VfsUtilCore {
     return result != null ? result : List.of();
   }
 
-  /**
-   * Return a URL of the given file's parent directory.
-   */
+  /// Return a URL of the given file's parent directory.
   public static @Nullable String getParentDir(@Nullable String url) {
     if (url == null) return null;
     var index = url.lastIndexOf(VFS_SEPARATOR_CHAR);
     return index < 0 ? null : url.substring(0, index);
   }
 
-  /**
-   * Returns a name of the given file.
-   */
+  /// Returns a name of the given file.
   public static @Nullable @NlsSafe String extractFileName(@Nullable String urlOrPath) {
     if (urlOrPath == null) return null;
     var index = urlOrPath.lastIndexOf(VFS_SEPARATOR_CHAR);
@@ -475,31 +464,35 @@ public final class VfsUtil extends VfsUtilCore {
     return result;
   }
 
-  /**
-   * Refreshes the VFS information of the given files from the local file system.
-   * <p/>
-   * This refresh is performed without the help of the FileWatcher,
-   * which means that all given files will be refreshed even if the FileWatcher didn't report any changes in them.
-   * This method is slower, but more reliable, and should be preferred
-   * when it is essential to make sure all the given VirtualFiles are actually refreshed from disk.
-   * <p/>
-   * NB: when invoking synchronous refresh from a thread other than the event dispatch thread, the current thread must
-   * NOT be in a read action.
-   *
-   * @see VirtualFile#refresh(boolean, boolean)
-   */
+  /// Refreshes the VFS information of the given files from the local file system.
+  ///
+  /// This refresh is performed without the help of the java.io.FileWatcher,
+  /// which means that all given files will be refreshed even if the java.io.FileWatcher didn't report any changes in them.
+  /// This method is slower, but more reliable, and should be preferred
+  /// when it is essential to make sure all the given VirtualFiles are actually refreshed from disk.
+  ///
+  /// NB: when invoking synchronous refresh from a thread other than the event dispatch thread, the current thread must
+  /// NOT be in a read action.
+  ///
+  /// @see VirtualFile#refresh(boolean, boolean)
   public static void markDirtyAndRefresh(boolean async, boolean recursive, boolean reloadChildren, VirtualFile @NotNull ... files) {
     var list = markDirty(recursive, reloadChildren, files);
     if (list.isEmpty()) return;
     LocalFileSystem.getInstance().refreshFiles(list, async, recursive, null);
   }
 
-  /**
-   * @see #markDirtyAndRefresh(boolean, boolean, boolean, VirtualFile...)
-   */
-  public static void markDirtyAndRefresh(boolean async, boolean recursive, boolean reloadChildren, File @NotNull ... files) {
+  /// @see #markDirtyAndRefresh(boolean, boolean, boolean, VirtualFile...)
+  @SuppressWarnings({"IO_FILE_USAGE", "UnnecessaryFullyQualifiedName"})
+  public static void markDirtyAndRefresh(boolean async, boolean recursive, boolean reloadChildren, java.io.File @NotNull ... files) {
     var fileSystem = LocalFileSystem.getInstance();
     var virtualFiles = ContainerUtil.map(files, fileSystem::refreshAndFindFileByIoFile, VirtualFile.EMPTY_ARRAY);
+    markDirtyAndRefresh(async, recursive, reloadChildren, virtualFiles);
+  }
+
+  /// @see #markDirtyAndRefresh(boolean, boolean, boolean, VirtualFile...)
+  public static void markDirtyAndRefresh(boolean async, boolean recursive, boolean reloadChildren, Path @NotNull ... paths) {
+    var fileSystem = LocalFileSystem.getInstance();
+    var virtualFiles = ContainerUtil.map(paths, fileSystem::refreshAndFindFileByNioFile, VirtualFile.EMPTY_ARRAY);
     markDirtyAndRefresh(async, recursive, reloadChildren, virtualFiles);
   }
 

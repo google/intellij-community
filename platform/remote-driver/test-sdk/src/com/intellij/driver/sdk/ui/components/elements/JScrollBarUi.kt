@@ -4,6 +4,7 @@ import com.intellij.driver.client.Remote
 import com.intellij.driver.sdk.ui.Finder
 import com.intellij.driver.sdk.ui.components.ComponentData
 import com.intellij.driver.sdk.ui.components.UiComponent
+import com.intellij.driver.sdk.ui.remote.REMOTE_ROBOT_MODULE_ID
 import com.intellij.driver.sdk.ui.xQuery
 import javax.swing.JScrollBar
 
@@ -51,7 +52,7 @@ interface JScrollBarComponent {
   fun getValue(): Int
 }
 
-@Remote("org.assertj.swing.fixture.JScrollBarFixture")
+@Remote("org.assertj.swing.fixture.JScrollBarFixture", plugin = REMOTE_ROBOT_MODULE_ID)
 interface JScrollBarFixture {
   fun scrollToMaximum(): JScrollBarFixture
   fun scrollToMinimum(): JScrollBarFixture

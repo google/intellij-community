@@ -34,20 +34,20 @@ import kotlin.coroutines.CoroutineContext
  *     installThreadContext(initialContext + childElement) {
  *       // before the execution of a scheduled runnable,
  *       // the created element performs computations
- *       childElement.beforeChildStarted(currentThreadContext())
+ *       childElement.beforeStarted(currentThreadContext())
  *       try {
  *         runSomething()
  *       } finally {
  *         // after the execution of a scheduled runnable,
  *         // the created element performs cleanup
- *         childElement.afterChildCompleted(currentThreadContext())
+ *         childElement.afterCompleted(currentThreadContext())
  *       }
  *     }
  *   }
  * }
  * ```
  *
- * If `queueAsyncActivity` gets canceled for some reason, then [childCanceled] will be called, i.e:
+ * If `queueAsyncActivity` gets canceled for some reason, then [IntelliJThreadContextElement.canceled] will be called, i.e:
  * ```kotlin
  * withContext(myIntelliJElement) {
  *   val initialContext = currentThreadContext()
@@ -55,7 +55,7 @@ import kotlin.coroutines.CoroutineContext
  *   val childElement = myIntelliJElement.produceChildElement(initialContext, ...)
  *   platformScheduler.queueAsyncActivity {
  *     // no `beforeChildStarted` is called here.
- *     childElement.childCanceled(currentThreadContext())
+ *     childElement.canceled(currentThreadContext())
  *   }
  * }
  * ```
@@ -63,7 +63,7 @@ import kotlin.coroutines.CoroutineContext
  * ## Structured propagation
  *
  * Sometimes it is known that the parent process lives strictly longer than the child computation.
- * If this is the case, then we have _structured children_.
+ * If this is the case, then we have _structured propagation_.
  *
  * Example:
  * ```kotlin
@@ -80,7 +80,7 @@ import kotlin.coroutines.CoroutineContext
  * ```kotlin
  * fun foo() {
  *   mutex.lock()
- *   scheduler.queue {
+ *   scheduler.queueAndWait {
  *     mutex.lock() // <- will cause a deadlock if `queue` spawns a structured child
  *   }
  *   mutex.unlock()
@@ -99,47 +99,52 @@ import kotlin.coroutines.CoroutineContext
  *   // with respect to the calling coroutine
  * }
  * ```
- *
- * ## Similar concepts
- * [IntelliJContextElement] is very similar to [kotlinx.coroutines.ThreadContextElement] of kotlinx coroutines.
- * The difference is that [kotlinx.coroutines.ThreadContextElement] invokes its action on every dispatch of a coroutine,
- * while [IntelliJContextElement] performs actions on "dispatch" of IntelliJ-specific asynchronous computations.
- *
  */
 @ApiStatus.Experimental
 interface IntelliJContextElement : CoroutineContext.Element {
 
   /**
    * Called when _scheduling_ of a child computation is requested.
+   * The produced element will be added to the [currentThreadContext] of the scheduled computation.
    *
    * @param parentContext The context of a computation that requests the scheduling
    * @param isStructured indicates whether the spawned computation's lifetime is strictly smaller than the requesting computation's one
    * (see the section about structured propagation).
-   * @return An element that should be added to the context of the child computation, or `null` if nothing should be added.
+   * @return An element that should be added to the context of the scheduled computation, or `null` if nothing should be added.
    */
   fun produceChildElement(parentContext: CoroutineContext, isStructured: Boolean): IntelliJContextElement? {
     return if (isStructured) this else null
   }
+}
 
+
+/**
+ * An extension of [IntelliJContextElement] that allows specifying custom logic before and after execution.
+ *
+ * The API shape is inspired by [kotlinx.coroutines.ThreadContextElement]
+ */
+@ApiStatus.Experimental
+interface IntelliJThreadContextElement<T> : IntelliJContextElement {
   /**
-   * Called before the child computation is started.
-   * The platform maintains an invariant that **only one** of [beforeChildStarted] and [childCanceled] will be called.
+   * Called before a computation is started.
+   * The platform maintains an invariant that **only one** of [beforeStarted] and [canceled] will be called.
    *
    * @param context the context of the executing computation
    */
-  fun beforeChildStarted(context: CoroutineContext) {}
+  fun beforeStarted(context: CoroutineContext) : T
 
   /**
-   * Called when the child computation ends its execution.
-   * [afterChildCompleted] will be called if there was a preceding [beforeChildStarted].
+   * Called when a computation ends its execution (either successfully or by an exception).
+   * [afterCompleted] will be called if there was a preceding [beforeStarted].
    *
    * @param context the context of the executing computation
+   * @param oldState the value returned by the preceding [beforeStarted]
    */
-  fun afterChildCompleted(context: CoroutineContext) {}
+  fun afterCompleted(context: CoroutineContext, oldState: T)
 
   /**
-   * Called when the child computation was canceled without any attempt to execute it.
-   * The platform maintains an invariant that **only one** of [beforeChildStarted] and [childCanceled] will be called.
+   * Called when the computation was canceled without any attempt to execute it.
+   * The platform maintains an invariant that **only one** of [beforeStarted] and [canceled] will be called.
    */
-  fun childCanceled(context: CoroutineContext) {}
+  fun canceled(context: CoroutineContext) {}
 }

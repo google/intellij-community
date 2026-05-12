@@ -13,7 +13,6 @@ import com.intellij.openapi.extensions.PluginDescriptor
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.Sdk
-import com.jetbrains.python.run.PythonInterpreterTargetEnvironmentFactory.Companion.isPackageManagementSupported
 import com.jetbrains.python.run.target.HelpersAwareLocalTargetEnvironmentRequest
 import com.jetbrains.python.run.target.HelpersAwareTargetEnvironmentRequest
 import com.jetbrains.python.target.PyTargetAwareAdditionalData
@@ -96,8 +95,6 @@ interface PythonInterpreterTargetEnvironmentFactory : PluginAware {
   }
 
   companion object {
-    const val UNKNOWN_INTERPRETER_VERSION = "unknown interpreter"
-
     @JvmStatic
     val EP_NAME = ExtensionPointName<PythonInterpreterTargetEnvironmentFactory>("Pythonid.interpreterTargetEnvironmentFactory")
 
@@ -126,8 +123,8 @@ interface PythonInterpreterTargetEnvironmentFactory : PluginAware {
     fun by(configuration: TargetEnvironmentConfiguration): PythonInterpreterTargetEnvironmentFactory? =
       EP_NAME.extensionList.find { it.isFor(configuration) }
 
-    private fun getFallbackSdkName(data: PyTargetAwareAdditionalData, version: String?): String =
-      "Remote ${version ?: UNKNOWN_INTERPRETER_VERSION} (${data.interpreterPath})"
+    private fun getFallbackSdkName(data: PyTargetAwareAdditionalData, @Suppress("UNUSED_PARAMETER") version: String?): String =
+      "Remote (${data.interpreterPath})"
 
     /**
      * Note: let the target be immutable by default though this case seems to be invalid.

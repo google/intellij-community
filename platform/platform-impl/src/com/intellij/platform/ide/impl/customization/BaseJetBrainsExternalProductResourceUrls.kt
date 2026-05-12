@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.ide.impl.customization
 
 import com.intellij.ide.Region
@@ -13,12 +13,14 @@ import com.intellij.platform.ide.customization.FeedbackReporter
 import com.intellij.util.Url
 import com.intellij.util.Urls
 import com.intellij.util.system.CpuArch
+import com.intellij.util.system.LowLevelLocalMachineAccess
 import com.intellij.util.system.OS
 import org.jetbrains.annotations.ApiStatus
 
 /**
  * A base class for implementations of [ExternalProductResourceUrls] describing IDEs developed by JetBrains.
  */
+@ApiStatus.Internal
 abstract class BaseJetBrainsExternalProductResourceUrls : ExternalProductResourceUrls {
   abstract val basePatchDownloadUrl: Url
 
@@ -54,11 +56,10 @@ abstract class BaseJetBrainsExternalProductResourceUrls : ExternalProductResourc
    */
   val baseWebSiteUrl: Url
     get() {
-
-      //China mainland has its own website, on which the default locale is zh; other regions use jetbrains.com with default en
+      // China mainland has its own website, on which the default locale is 'zh'; other regions use 'jetbrains.com' with default 'en'
       val defaultLocales = mapOf(Region.CHINA to "zh")
 
-      //All language URLs currently supported by the website
+      // All language URLs currently supported by the website
       val langToUrl = mapOf(
         "en" to "en-us",
         "zh" to "zh-cn",
@@ -76,16 +77,16 @@ abstract class BaseJetBrainsExternalProductResourceUrls : ExternalProductResourc
       return Urls.newFromEncoded(
         buildString {
           append("https://www.jetbrains.com")
-          if (currentRegion == Region.CHINA)
+          if (currentRegion == Region.CHINA) {
             append(".cn")
+          }
           if (selectedLocale != defaultLocales.getOrDefault(currentRegion, "en")) {
             val locale = langToUrl[selectedLocale]
-            /**
-             * In case the locale is not supported by the website, direct to its default language.
-             * For jetbrains.com it will be English, and for jetbrains.com.cn — Chinese.
-             **/
-            if (locale != null)
-              append("/$locale")
+            // If the locale is not supported by the website, direct to its default language.
+            // For 'jetbrains.com' it will be English, for 'jetbrains.com.cn' — Chinese.
+            if (locale != null) {
+              append("/${locale}")
+            }
           }
         })
     }
@@ -113,9 +114,15 @@ abstract class BaseJetBrainsExternalProductResourceUrls : ExternalProductResourc
       .let { Urls.newFromEncoded(it) }
       .let { UpdateRequestParametersProvider.passUpdateParameters(it) }
 
-  final override fun computePatchUrl(from: BuildNumber, to: BuildNumber): Url =
-    computeCustomPatchDownloadUrl(from, to)
-    ?: basePatchDownloadUrl.resolve(computePatchFileName(from, to))
+  final override fun computePatchUrl(from: BuildNumber, to: BuildNumber): Url {
+    val url = System.getProperty("idea.patches.url")?.let { Urls.newFromEncoded(it) } ?: basePatchDownloadUrl
+
+    val product = ApplicationInfo.getInstance().build.productCode
+    val runtime = if (CpuArch.isArm64()) "-aarch64" else ""
+    val patchFileName = "${product}-${from.withoutProductCode()}-${to.withoutProductCode()}-patch${runtime}-${PatchInfo.OS_SUFFIX}.jar"
+
+    return url.resolve(patchFileName)
+  }
 
   override val bugReportUrl: ((String) -> Url)?
     get() = { description ->
@@ -129,14 +136,13 @@ abstract class BaseJetBrainsExternalProductResourceUrls : ExternalProductResourc
 
   override val technicalSupportUrl: ((description: String) -> Url)?
     get() = { _ ->
-      Urls.newFromEncoded("https://intellij-support.jetbrains.com/hc/en-us/requests/new").addParameters(
-        mapOf(
-          "ticket_form_id" to intellijSupportFormId.toString(),
-          "product" to shortProductNameUsedInForms,
-          "build" to ApplicationInfo.getInstance().getBuild().asStringWithoutProductCode(),
-          "os" to currentOsNameForIntelliJSupport(),
-          "timezone" to System.getProperty("user.timezone")
-        ))
+      Urls.newFromEncoded("https://intellij-support.jetbrains.com/hc/en-us/requests/new").addParameters(mapOf(
+        "ticket_form_id" to intellijSupportFormId.toString(),
+        "product" to shortProductNameUsedInForms,
+        "build" to ApplicationInfo.getInstance().getBuild().asStringWithoutProductCode(),
+        "os" to currentOsNameForIntelliJSupport(),
+        "timezone" to System.getProperty("user.timezone")
+      ))
     }
 
   override val feedbackReporter: FeedbackReporter?
@@ -158,36 +164,25 @@ abstract class BaseJetBrainsExternalProductResourceUrls : ExternalProductResourc
         ))
       }
     }
-}
 
-/**
- * Supported values for [intellij-support.jetbrains.com](https://intellij-support.jetbrains.com):
- * * Windows 10+ - `win-10[-64]`
- * * Windows 8 - `win-8[-64]`
- * * Windows 7- - `win-7[-64]`
- * * macOS - `mac`
- * * Linux - `linux`
- * * Other - `other-os`
- */
-@ApiStatus.Internal
-fun currentOsNameForIntelliJSupport(): String = when (OS.CURRENT) {
-  OS.Windows -> {
-    "win-" +
-    (if (OS.CURRENT.isAtLeast(10, 0)) "-10" else "-8") +
-    (if (CpuArch.CURRENT.width == 64) "-64" else "")
+  /**
+   * Supported values for [intellij-support.jetbrains.com](https://intellij-support.jetbrains.com):
+   * * Windows 10+ - `win-10[-64]`
+   * * Windows 8 - `win-8[-64]`
+   * * Windows 7- - `win-7[-64]`
+   * * macOS - `mac`
+   * * Linux - `linux`
+   * * Other - `other-os`
+   */
+  @OptIn(LowLevelLocalMachineAccess::class)
+  private fun currentOsNameForIntelliJSupport(): String = when (OS.CURRENT) {
+    OS.Windows -> {
+      "win-" +
+      (if (OS.CURRENT.isAtLeast(10, 0)) "-10" else "-8") +
+      (if (CpuArch.CURRENT.width == 64) "-64" else "")
+    }
+    OS.macOS -> "mac"
+    OS.Linux -> "linux"
+    else -> "other-os"
   }
-  OS.macOS -> "mac"
-  OS.Linux -> "linux"
-  else -> "other-os"
-}
-
-internal fun computePatchFileName(from: BuildNumber, to: BuildNumber): String {
-  val product = ApplicationInfo.getInstance().build.productCode
-  val runtime = if (CpuArch.isArm64()) "-aarch64" else ""
-  return "${product}-${from.withoutProductCode().asString()}-${to.withoutProductCode().asString()}-patch${runtime}-${PatchInfo.OS_SUFFIX}.jar"
-}
-
-internal fun computeCustomPatchDownloadUrl(from: BuildNumber, to: BuildNumber): Url? {
-  val customPatchesUrl = System.getProperty("idea.patches.url") ?: return null
-  return Urls.newFromEncoded(customPatchesUrl).resolve(computePatchFileName(from, to))
 }

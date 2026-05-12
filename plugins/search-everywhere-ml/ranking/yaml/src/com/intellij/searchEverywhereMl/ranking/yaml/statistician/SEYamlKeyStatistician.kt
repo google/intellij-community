@@ -5,6 +5,8 @@ import com.intellij.searchEverywhereMl.ranking.core.features.statistician.Search
 import org.jetbrains.yaml.navigation.YAMLKeyNavigationItem
 
 internal class SEYamlKeyStatistician : SearchEverywhereStatistician<YAMLKeyNavigationItem>(YAMLKeyNavigationItem::class.java) {
+  override val requiresReadAction: Boolean = true
+
   override fun getContext(element: YAMLKeyNavigationItem) = element.presentation.locationString
 
   override fun getValue(element: YAMLKeyNavigationItem, location: String) = element.name

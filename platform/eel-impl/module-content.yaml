@@ -1,3 +1,4 @@
 - name: dist.all/lib/intellij.platform.eel.impl.jar
   modules:
   - name: intellij.platform.eel.impl
+  - name: intellij.platform.eel.impl.base

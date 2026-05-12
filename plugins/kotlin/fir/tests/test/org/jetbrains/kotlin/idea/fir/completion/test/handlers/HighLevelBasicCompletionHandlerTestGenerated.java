@@ -304,6 +304,21 @@ public abstract class HighLevelBasicCompletionHandlerTestGenerated extends Abstr
             public void testQualifyEnum() throws Exception {
                 runTest("../../completion/testData/handlers/basic/contextSensitiveResolution/qualifyEnum.kt");
             }
+
+            @TestMetadata("shortenEnumInParameter.kt")
+            public void testShortenEnumInParameter() throws Exception {
+                runTest("../../completion/testData/handlers/basic/contextSensitiveResolution/shortenEnumInParameter.kt");
+            }
+
+            @TestMetadata("shortenEnumInVariableDeclaration.kt")
+            public void testShortenEnumInVariableDeclaration() throws Exception {
+                runTest("../../completion/testData/handlers/basic/contextSensitiveResolution/shortenEnumInVariableDeclaration.kt");
+            }
+
+            @TestMetadata("shortenEnumInWhenBranch.kt")
+            public void testShortenEnumInWhenBranch() throws Exception {
+                runTest("../../completion/testData/handlers/basic/contextSensitiveResolution/shortenEnumInWhenBranch.kt");
+            }
         }
 
         @RunWith(JUnit3RunnerWithInners.class)

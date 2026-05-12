@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.testExtensions` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "testExtensions_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "testExtensions",
   module_name = "intellij.platform.testExtensions",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":testExtensions_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/util/concurrency",
@@ -29,10 +24,11 @@ jvm_library(
     "//platform/util/jdom",
     "@lib//:memoryfilesystem",
     "@lib//:junit4",
-    "@lib//:assert_j",
+    "//libraries/assertj-core",
     "//libraries/snakeyaml",
     "//libraries/fastutil",
     "//platform/core-ui",
+    "//platform/ide-core",
     "@lib//:junit5",
     "//java/java-runtime:rt",
   ]
@@ -40,6 +36,7 @@ jvm_library(
 
 jvm_library(
   name = "testExtensions_test_lib",
+  testonly = True,
   module_name = "intellij.platform.testExtensions",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -57,10 +54,18 @@ jvm_library(
     "//platform/projectModel-impl:projectModel-impl_test_lib",
     "//platform/testFramework:testFramework_test_lib",
     "//platform/util/jdom:jdom_test_lib",
+    "//libraries/assertj-core:assertj-core_test_lib",
     "//libraries/snakeyaml:snakeyaml_test_lib",
     "//libraries/fastutil:fastutil_test_lib",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//java/java-runtime:rt_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.testExtensions` end
+
+### auto-generated section `iml intellij.platform.testExtensions` start
+exports_files([
+  "intellij.platform.testExtensions.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.testExtensions` end

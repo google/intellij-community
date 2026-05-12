@@ -20,13 +20,13 @@ import java.nio.ByteBuffer;
  * chunk all the data must be supplied on chunk allocation, and nothing could be appended later on.
  * <p>
  * 'Appendable' chunks reduce storage overhead for many small records -- instead of appending each such a record in a dedicated
- * chunk, with full header, one could append many small records into a single chunk, with a single header overhead only.
- * It is also reduced the fragmentation if many small records appended not at once, together, but incrementally, one-by-one
+ * chunk, with a full header, one could append many small records into a single chunk, with a single header overhead only.
+ * It also reduces the fragmentation if many small records appended not at once, together, but incrementally, one-by-one
  * -- instead of 'copy-with-append' to the new chunk on each appended record, those small records could be accumulated in one
  * chunk.
  * <p>
- * The downside is that max capacity of 'appendable' chunk is much smaller -- more fields needs to be fit into a header to
- * support append-ability, so less bits remains for a max length. Actual max capacity is implementation-dependent
+ * The downside is that the max capacity of 'appendable' chunk is much smaller -- more fields need to be fit into a header to
+ * support append-ability, so fewer bits remain for a max length. Actual max capacity is implementation-dependent
  */
 @ApiStatus.Internal
 public interface ChunkedAppendOnlyLog extends Closeable, Flushable, CleanableStorage {

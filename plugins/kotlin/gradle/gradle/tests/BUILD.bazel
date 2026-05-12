@@ -1,14 +1,9 @@
 ### auto-generated section `build intellij.kotlin.gradle.gradle.tests` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "tests_test_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tests",
+  module_name = "intellij.kotlin.gradle.gradle.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   exports = ["@lib//:kotlin-tooling-core"],
@@ -17,7 +12,6 @@ jvm_library(
     "@lib//:kotlinc-kotlin-compiler-common",
     "@lib//:kotlinc-kotlin-jps-common",
     "@lib//:kotlinc-kotlin-scripting-compiler-impl",
-    "@lib//:kotlinc-kotlin-compiler-tests",
     "//libraries/guava",
     "@lib//:junit4",
     "@lib//:kotlin-test",
@@ -31,7 +25,7 @@ jvm_library(
     "//plugins/kotlin/base/project-structure",
     "//plugins/kotlin/base/analysis",
     "//plugins/kotlin/base/code-insight",
-    "//plugins/kotlin/base/test",
+    "//plugins/kotlin/base/testFramework",
     "//plugins/kotlin/project-configuration",
     "//plugins/kotlin/frontend-independent",
     "//platform/statistics",
@@ -55,10 +49,12 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.gradle.gradle.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
-  resources = [":tests_test_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinc-kotlin-compiler-common",
@@ -90,8 +86,8 @@ jvm_library(
     "//plugins/kotlin/base/analysis:analysis_test_lib",
     "//plugins/kotlin/base/code-insight",
     "//plugins/kotlin/base/code-insight:code-insight_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/project-configuration",
     "//plugins/kotlin/project-configuration:project-configuration_test_lib",
     "//plugins/kotlin/frontend-independent",
@@ -142,6 +138,8 @@ jvm_library(
     "//platform/testFramework:testFramework_test_lib",
     "//platform/testFramework/junit5",
     "//platform/testFramework/junit5:junit5_test_lib",
+    "//platform/util-ex",
+    "//platform/util-ex:util-ex_test_lib",
   ],
   exports = ["@lib//:kotlin-tooling-core"],
   runtime_deps = [
@@ -150,6 +148,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.kotlin.gradle.gradle.tests` end
+
+### auto-generated section `iml intellij.kotlin.gradle.gradle.tests` start
+exports_files([
+  "intellij.kotlin.gradle.gradle.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.gradle.gradle.tests` end
 
 ### auto-generated section `test intellij.kotlin.gradle.gradle.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

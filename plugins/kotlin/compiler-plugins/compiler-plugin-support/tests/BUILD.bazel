@@ -3,6 +3,7 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tests",
+  module_name = "intellij.kotlin.compilerPlugins.support.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -15,6 +16,7 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.compilerPlugins.support.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -40,12 +42,18 @@ jvm_library(
     "//plugins/kotlin/compiler-plugins/compiler-plugin-support/common:kotlin-compilerPlugins-support_test_lib",
     "//plugins/kotlin/base/plugin",
     "//plugins/kotlin/base/plugin:plugin_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
   ],
   runtime_deps = [":tests"]
 )
 ### auto-generated section `build intellij.kotlin.compilerPlugins.support.tests` end
+
+### auto-generated section `iml intellij.kotlin.compilerPlugins.support.tests` start
+exports_files([
+  "intellij.kotlin.compilerPlugins.support.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.compilerPlugins.support.tests` end
 
 ### auto-generated section `test intellij.kotlin.compilerPlugins.support.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

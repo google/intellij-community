@@ -16,6 +16,7 @@ jvm_library(
 
 jvm_library(
   name = "dev_test_lib",
+  testonly = True,
   module_name = "intellij.platform.bootstrap.dev",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -27,3 +28,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.bootstrap.dev` end
+
+### auto-generated section `iml intellij.platform.bootstrap.dev` start
+exports_files([
+  "intellij.platform.bootstrap.dev.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.bootstrap.dev` end

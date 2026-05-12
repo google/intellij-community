@@ -7,6 +7,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.platform.debugger.impl.frontend.evaluate.quick.FrontendXValue
+import com.intellij.platform.debugger.impl.frontend.util.SequentialRpcRequestsExecutor
 import com.intellij.platform.debugger.impl.rpc.XDebuggerValueMarkupApi
 import com.intellij.platform.debugger.impl.rpc.XValueMarkerDto
 import com.intellij.platform.debugger.impl.shared.proxy.XDebugManagerProxy
@@ -15,9 +16,7 @@ import com.intellij.xdebugger.frame.XValue
 import com.intellij.xdebugger.impl.frame.XValueMarkers
 import com.intellij.xdebugger.impl.ui.tree.ValueMarkup
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.async
 import kotlinx.coroutines.future.asCompletableFuture
-import kotlinx.coroutines.launch
 import org.jetbrains.concurrency.Promise
 import org.jetbrains.concurrency.asPromise
 
@@ -51,11 +50,13 @@ internal class FrontendXValueMarkers<V : XValue, M>(private val project: Project
 }
 
 @Service(Service.Level.PROJECT)
-private class FrontendXValueMarkersService(private val cs: CoroutineScope) {
+private class FrontendXValueMarkersService(cs: CoroutineScope) {
+  private val sequentialExecutor = SequentialRpcRequestsExecutor.create(cs)
+
   fun markValue(value: XValue, markup: ValueMarkup): Promise<Any> {
-    val valueMarked = cs.async {
+    val valueMarked = sequentialExecutor.submit {
       val marker = XValueMarkerDto(markup.text, markup.color.rpcId(), markup.toolTipText)
-      val xValueId = XDebugManagerProxy.getInstance().getXValueId(value) ?: return@async Any()
+      val xValueId = XDebugManagerProxy.getInstance().getXValueId(value) ?: return@submit Any()
       XDebuggerValueMarkupApi.getInstance().markValue(xValueId, marker)
       marker as Any
     }
@@ -63,8 +64,8 @@ private class FrontendXValueMarkersService(private val cs: CoroutineScope) {
   }
 
   fun unmarkValue(value: XValue): Promise<in Any> {
-    val valueUnmarked = cs.async {
-      val xValueId = XDebugManagerProxy.getInstance().getXValueId(value) ?: return@async Any()
+    val valueUnmarked = sequentialExecutor.submit {
+      val xValueId = XDebugManagerProxy.getInstance().getXValueId(value) ?: return@submit Any()
       XDebuggerValueMarkupApi.getInstance().unmarkValue(xValueId)
       Any()
     }
@@ -72,7 +73,7 @@ private class FrontendXValueMarkersService(private val cs: CoroutineScope) {
   }
 
   fun clear(debugSessionProxy: XDebugSessionProxy) {
-    cs.launch {
+    sequentialExecutor.execute {
       XDebuggerValueMarkupApi.getInstance().clear(debugSessionProxy.id)
     }
   }

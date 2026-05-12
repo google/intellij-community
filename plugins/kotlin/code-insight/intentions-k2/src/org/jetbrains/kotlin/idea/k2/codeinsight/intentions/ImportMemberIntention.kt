@@ -29,7 +29,6 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtUserType
 import org.jetbrains.kotlin.psi.psiUtil.isInImportDirective
 
-@OptIn(KaIdeApi::class)
 internal class ImportMemberIntention :
     KotlinApplicableModCommandAction<KtElement, ImportMemberIntention.Context>(KtElement::class) {
 
@@ -79,8 +78,8 @@ internal class ImportMemberIntention :
     }
 }
 
-context(_: KaSession)
 @OptIn(KaIdeApi::class)
+context(_: KaSession)
 private fun computeContext(file: KtFile, symbol: KaSymbol): ImportMemberIntention.Context? {
     return when (symbol) {
         is KaConstructorSymbol,

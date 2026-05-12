@@ -5,7 +5,10 @@ import com.intellij.GroupBasedTestClassFilter
 import com.intellij.TestCaseLoader
 import com.intellij.TestCaseLoader.TEST_RUNNERS_COUNT
 import com.intellij.TestCaseLoader.TEST_RUNNER_INDEX
+import com.intellij.platform.testFramework.teamCity.TeamCityReporter
 import com.intellij.testFramework.TeamCityLogger
+import com.intellij.platform.bazel.runfiles.BazelLabel
+import com.intellij.platform.bazel.runfiles.BazelRunfiles
 import org.jetbrains.annotations.ApiStatus
 import tools.jackson.databind.SerializationFeature
 import tools.jackson.databind.json.JsonMapper
@@ -57,9 +60,9 @@ internal object TestsDurationBucketingUtils {
       }
     }
     if (TeamCityLogger.isUnderTC) {
-      println(String.format("##teamcity[buildStatisticValue key='testDurationClasses.loaded' value='%d']", loadedSize))
-      println(String.format("##teamcity[buildStatisticValue key='testDurationClasses.relevant' value='%d']", relevantSize))
-      println(String.format("##teamcity[buildStatisticValue key='testDurationClasses.missing' value='%d']", missing.size))
+      TeamCityReporter.reportStatisticValue("testDurationClasses.loaded", loadedSize)
+      TeamCityReporter.reportStatisticValue("testDurationClasses.relevant", relevantSize)
+      TeamCityReporter.reportStatisticValue("testDurationClasses.missing", missing.size)
     }
 
     if (classesDurations.isEmpty()) return emptyList()
@@ -82,7 +85,13 @@ internal object TestsDurationBucketingUtils {
   fun loadSeasonData(season: String?): Map<String, Int>? {
     if (season == null) return null
 
-    val files = getDataDirectories().map { it.resolve("seasons/$season.csv") }.filter { Files.isRegularFile(it) }.distinct().toList()
+    val files = if (BazelRunfiles.isRunningFromBazel) {
+      val label = BazelLabel.fromString("//:tests/classes-duration")
+      BazelRunfiles.getFileByLabelOrNull(label)?.absolute()?.resolve("seasons/$season.csv")?.let { listOf(it) } ?: emptyList()
+    } else {
+      getDataDirectories().map { it.resolve("seasons/$season.csv") }.filter { Files.isRegularFile(it) }.distinct().toList()
+    }
+
     if (files.isEmpty()) {
       System.err.println("No CSV file for season '$season' found")
       return null
@@ -121,7 +130,7 @@ internal object TestsDurationBucketingUtils {
 
       println("Dumped bucketing data to: $outputFile")
       if (TeamCityLogger.isUnderTC) {
-        println("##teamcity[publishArtifacts '${outputFile.absolutePathString()}']")
+        TeamCityReporter.reportPublishArtifacts(outputFile.absolutePathString())
       }
     }
     catch (e: Exception) {
@@ -162,9 +171,9 @@ internal object TestsDurationBucketingUtils {
     val averageTime = (buckets.sumOf { it.totalTime.inWholeMilliseconds } / bucketsCount).milliseconds
     println("*** Calculated bucket partitions, average bucket time is ${averageTime}")
     if (TeamCityLogger.isUnderTC) {
-      println(String.format("##teamcity[buildStatisticValue key='buckets.averageMs' value='%d']", averageTime.inWholeMilliseconds))
-      val bucket = buckets[currentBucketIndex]
-      println(String.format("##teamcity[buildStatisticValue key='buckets.currentMs' value='%d']", bucket.totalTime.inWholeMilliseconds))
+      TeamCityReporter.reportStatisticValue("buckets.averageMs", averageTime.inWholeMilliseconds)
+      val bucket = buckets.getOrNull(currentBucketIndex)
+      TeamCityReporter.reportStatisticValue("buckets.currentMs", bucket?.totalTime?.inWholeMilliseconds ?: 0)
     }
     filters.forEachIndexed { index, filter ->
       val bucket = buckets[index]
@@ -192,7 +201,7 @@ internal object TestsDurationBucketingUtils {
 
   private fun createBucketsFromTestsStatistics(statistics: Map<String, Int>,
                                                bucketsCount: Int): List<ItemsAndTotalTime<PackageClassesGroup>> {
-    val partitionPerPackages = statistics.entries.groupBy { it.packageName() }.map {
+    val partitionPerPackages = statistics.entries.groupBy { it.packageName() }.map {  // TODO: partition per jars
       ItemsAndTotalTime(it.value, it.value.sumOf { it.value }.milliseconds)
     }
     val averageTime = (partitionPerPackages.sumOf { it.totalTime.inWholeMilliseconds } / bucketsCount).milliseconds
@@ -225,21 +234,29 @@ internal object TestsDurationBucketingUtils {
       result
     }
 
-    return tossElementsIntoBuckets(partition.map { Pair(it, it.groupTime) }, bucketsCount)
+    return tossElementsIntoBuckets(partition.map { Pair(it, it.groupTime) }, bucketsCount, averageTime, deltaTimeMax)
   }
 
   private data class ItemsAndTotalTime<T>(val items: List<T>, val totalTime: Duration)
 
-  private fun <T> tossElementsIntoBuckets(elements: List<Pair<T, Duration>>, binCount: Int): List<ItemsAndTotalTime<T>> {
+  private fun <T> tossElementsIntoBuckets(elements: List<Pair<T, Duration>>, binCount: Int, averageTime: Duration, deltaTimeMax: Duration): List<ItemsAndTotalTime<T>> {
     val queue = PriorityQueue<ItemsAndTotalTime<T>>(binCount, Comparator.comparing { it.totalTime })
     (0 until binCount).forEach { _ ->
         queue.add(ItemsAndTotalTime(emptyList(), ZERO))
     }
 
-    for (element in elements.sortedByDescending { it.second }) {
-      val smallestBin = queue.poll()
-      queue.add(ItemsAndTotalTime(smallestBin.items + element.first, smallestBin.totalTime + element.second))
+    var smallestBin = queue.poll()
+    for (element in elements) {  // keep alphabetical order
+      // add consecutive elements while they don't exceed the limit, don't skip the big ones to preserve alphabetical order
+      if (smallestBin.totalTime >= averageTime ||
+          smallestBin.totalTime + element.second >= averageTime + deltaTimeMax) {
+        queue.add(smallestBin)
+        smallestBin = queue.poll()
+      }
+
+      smallestBin = ItemsAndTotalTime(smallestBin.items + element.first, smallestBin.totalTime + element.second)
     }
+    queue.add(smallestBin)
 
     return queue.sortedBy { it.totalTime }
   }

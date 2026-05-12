@@ -35,4 +35,10 @@ public interface EntityPointer<out E : WorkspaceEntity> {
 
   @ApiStatus.Experimental
   public fun isPointerToEntityOfSameTypeAs(other: EntityPointer<*>): Boolean
+
+  /**
+   * Returns a hashcode for an entity type this reference points to.
+   */
+  @ApiStatus.Experimental
+  public fun classHashcode(): Int
 }

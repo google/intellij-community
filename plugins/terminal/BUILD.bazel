@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.terminal` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "terminal_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "terminal",
   module_name = "intellij.terminal",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":terminal_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/code-style-api:codeStyle",
@@ -25,6 +20,7 @@ jvm_library(
     "//platform/projectModel-impl",
     "//platform/core-impl",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//libraries/guava",
     "//libraries/pty4j",
     "@lib//:jna",
@@ -65,13 +61,17 @@ jvm_library(
     "//platform/util/jdom",
     "//platform/execution",
     "//platform/observable",
+    "//platform/progress/shared:ide-progress",
     "//platform/remote-topics/shared:rpc-topics",
     "//libraries/fastutil",
+    "//platform/util:util-ui",
+    "//fleet/rhizomedb",
   ]
 )
 
 jvm_library(
   name = "terminal_test_lib",
+  testonly = True,
   module_name = "intellij.terminal",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -88,6 +88,7 @@ jvm_library(
     "//platform/projectModel-impl:projectModel-impl_test_lib",
     "//platform/core-impl:core-impl_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//libraries/guava:guava_test_lib",
     "//libraries/pty4j:pty4j_test_lib",
     "//platform/projectModel-api:projectModel_test_lib",
@@ -125,8 +126,17 @@ jvm_library(
     "//platform/util/jdom:jdom_test_lib",
     "//platform/execution:execution_test_lib",
     "//platform/observable:observable_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
     "//platform/remote-topics/shared:rpc-topics_test_lib",
     "//libraries/fastutil:fastutil_test_lib",
+    "//platform/util:util-ui_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.terminal` end
+
+### auto-generated section `iml intellij.terminal` start
+exports_files([
+  "intellij.terminal.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.terminal` end

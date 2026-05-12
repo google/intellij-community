@@ -130,8 +130,8 @@ internal val ImportCandidate.psi: PsiElement?
         is ClassLikeImportCandidate -> symbol.psi
     }
 
-context(_: KaSession)
 @KaExperimentalApi
+context(_: KaSession)
 internal val ImportCandidate.deprecationStatus: DeprecationInfo?
     get() = symbol.deprecationStatus
 

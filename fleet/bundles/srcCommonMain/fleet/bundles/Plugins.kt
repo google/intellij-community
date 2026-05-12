@@ -24,214 +24,145 @@ sealed class VersionRequirement {
   data class Above(override val version: PluginVersion) : VersionRequirement()
 }
 
-/**
- * Represents <a href="http://semver.org">Semantic Version</a>.
- */
-@Serializable(with = PluginVersionSerializer::class)
-data class PluginVersion(
-  val major: Int,
-  val minor: Int,
-  val patch: Int,
-  val preRelease: String?,
-) : Comparable<PluginVersion> {
+sealed class UnifiedVersionComponent {
+  abstract val stringRepresentation: String
 
-  companion object {
-    fun fromString(s: String): PluginVersion {
-      val major = s.substringBefore('.').toIntOrNull()
-      return when {
-        major == null || major < 0 -> throw IllegalArgumentException("Cannot parse `$s` as PluginVersion, must start by a strictly positive integer")
-        major <= 1 -> fromSemverString(s)
-        else -> fromIntelliJUnifiedVersioningString(s)
-      }
-    }
+  data class Number(val value: Int) : UnifiedVersionComponent() {
+    override val stringRepresentation: String = value.toString()
+  }
+
+  data object Snapshot : UnifiedVersionComponent() {
+    override val stringRepresentation: String = SNAPSHOT
 
     /**
-     * Legacy build numbering of FL was using SemVer
+     * Integer value of a SNAPSHOT component, the numeric value depends on in which position is this SNAPSHOT component, that position in
+     * the original version string must be provided by [componentIndex].
      */
-    private fun fromSemverString(s: String): PluginVersion {
-      val majorEndIdx = s.indexOf('.')
-      if (majorEndIdx >= 0) {
-        val minorEndIdx = s.indexOf('.', majorEndIdx + 1)
-        if (minorEndIdx >= 0) {
-          val preReleaseIdx = s.indexOf('-', minorEndIdx + 1)
-          val patchEndIdx = if (preReleaseIdx >= 0) preReleaseIdx else s.length
-          val major = s.substring(0, majorEndIdx).toIntOrNull()
-          val minor = s.substring(majorEndIdx + 1, minorEndIdx).toIntOrNull()
-          val patch = s.substring(minorEndIdx + 1, patchEndIdx).toIntOrNull()
-          val preRelease = if (preReleaseIdx >= 0) s.substring(preReleaseIdx + 1) else null
-          if (major != null && minor != null && patch != null) {
-            return PluginVersion(major = major, minor = minor, patch = patch, preRelease = preRelease)
-          }
-        }
-      }
-      throw IllegalArgumentException("Cannot parse `$s` as PluginVersion.")
+    fun valueForIndex(componentIndex: Int): Int = when (componentIndex) {
+      1 -> CompatibilityUtils.MAX_FLEET_BUILD_VALUE
+      2 -> CompatibilityUtils.MAX_COMPONENT_VALUE - 1
+      else -> throw IllegalArgumentException("Invalid component index for '$SNAPSHOT': $componentIndex")
     }
+  }
 
+  companion object {
+    private const val SNAPSHOT = "SNAPSHOT"
+
+    fun fromString(s: String?): UnifiedVersionComponent? = when (s) {
+      null -> null
+      SNAPSHOT -> Snapshot
+      else -> when (val i = s.toIntOrNull()) {
+        null -> throw IllegalArgumentException("Cannot parse `$s` as UnifiedVersionComponent, it must be an integer or 'SNAPSHOT'")
+        else -> Number(i)
+      }
+    }
+  }
+}
+
+@Serializable(with = PluginVersionSerializer::class)
+data class PluginVersion(
+  val component0: UnifiedVersionComponent.Number,
+  val component1: UnifiedVersionComponent,
+  val component2: UnifiedVersionComponent?,
+) : Comparable<PluginVersion> {
+  val isSnapshot: Boolean = component2 is UnifiedVersionComponent.Snapshot || component1 is UnifiedVersionComponent.Snapshot
+
+  companion object {
     /**
      * Build numbering of AIR and next products of the Fleet platform, using https://youtrack.jetbrains.com/articles/IJPL-A-109
      */
-    private fun fromIntelliJUnifiedVersioningString(s: String): PluginVersion {
-      val intComponents = s.split(".", limit = 3).map {
-        it.toIntOrSnapshotOrNull() ?: throw IllegalArgumentException("Cannot parse `$s` as PluginVersion, all components must be integers")
+    fun fromString(s: String): PluginVersion {
+      val components = s.split(".")
+      require(components.size == 2 || components.size == 3) {
+        "Cannot parse `$s` as PluginVersion, must be either X.Y or X.Y.Z"
       }
-      return when (intComponents.size) {
-        3 -> {
-          val (major, minor, patch) = intComponents
-          when (major) {
-            UnifiedVersionComponent.Snapshot -> throw IllegalArgumentException("Cannot parse `$s` as PluginVersion, major cannot be '$SNAPSHOT'")
-            is UnifiedVersionComponent.IntComponent -> when (minor) {
-              UnifiedVersionComponent.Snapshot -> throw IllegalArgumentException("Cannot parse `$s` as PluginVersion, minor cannot be '$SNAPSHOT' if there is a patch number")
-              is UnifiedVersionComponent.IntComponent -> when (patch) {
-                is UnifiedVersionComponent.IntComponent -> PluginVersion(major = major.value,
-                                                                         minor = minor.value,
-                                                                         patch = patch.value,
-                                                                         preRelease = null)
-                UnifiedVersionComponent.Snapshot -> PluginVersion(major = major.value,
-                                                                  minor = minor.value,
-                                                                  patch = 0,
-                                                                  preRelease = SNAPSHOT) // hackily set to `0`, I don't see what else we could do here
-              }
-            }
-          }
-        }
-        2 -> { // nightly build
-          val (major, minor) = intComponents
-          when (major) {
-            UnifiedVersionComponent.Snapshot -> throw IllegalArgumentException("Cannot parse `$s` as PluginVersion, major cannot be '$SNAPSHOT'")
-            is UnifiedVersionComponent.IntComponent -> when (minor) {
-              is UnifiedVersionComponent.IntComponent -> PluginVersion(major = major.value,
-                                                                       minor = minor.value,
-                                                                       patch = 0,
-                                                                       preRelease = null)  // hackily set to `0`, I don't see what else we could do here
-              UnifiedVersionComponent.Snapshot -> PluginVersion(major = major.value,
-                                                                minor = 0,
-                                                                patch = 0,
-                                                                preRelease = SNAPSHOT)  // hackily set to `0`, I don't see what else we could do here
-            }
-          }
-        }
-        else -> throw IllegalArgumentException("Cannot parse `$s` as PluginVersion, must be either XXX.YYY or XXX.YYY.ZZZ")
+      val component0 = UnifiedVersionComponent.fromString(components[0])
+      require(component0 != null) {
+        "Cannot parse `$s` as PluginVersion, component 1 must be an integer"
       }
+      require(component0 is UnifiedVersionComponent.Number) {
+        "Cannot parse `$s` as PluginVersion, component 1 must be an integer, it cannot be SNAPSHOT"
+      }
+      val component1 = UnifiedVersionComponent.fromString(components[1])
+      require(component1 != null) {
+        "Cannot parse `$s` as PluginVersion, component 2 must be an integer or 'SNAPSHOT'"
+      }
+      val component2 = UnifiedVersionComponent.fromString(components.getOrNull(2))
+      require(component2 == null || component1 !is UnifiedVersionComponent.Snapshot) {
+        "Cannot parse `$s` as PluginVersion, component 2 cannot be SNAPSHOT if a component 3 is specified"
+      }
+      require(component1 !is UnifiedVersionComponent.Number || component1.value <= CompatibilityUtils.MAX_FLEET_BUILD_VALUE) {
+        "Cannot parse `$s` as PluginVersion, component 2 cannot be greater than ${CompatibilityUtils.MAX_FLEET_BUILD_VALUE}"
+      }
+      require(component2 == null || component2 !is UnifiedVersionComponent.Number || component2.value < CompatibilityUtils.MAX_COMPONENT_VALUE) {
+        "Cannot parse `$s` as PluginVersion, component 3 cannot be greater than ${CompatibilityUtils.MAX_COMPONENT_VALUE}"
+      }
+      return PluginVersion(
+        component0 = component0,
+        component1 = component1,
+        component2 = component2,
+      )
     }
 
-    private const val SNAPSHOT = "SNAPSHOT"
-
-    sealed class UnifiedVersionComponent {
-      data class IntComponent(val value: Int) : UnifiedVersionComponent()
-      data object Snapshot : UnifiedVersionComponent()
-    }
-
-    fun String.toIntOrSnapshotOrNull(): UnifiedVersionComponent? = when (this) {
-      SNAPSHOT -> UnifiedVersionComponent.Snapshot
-      else -> toIntOrNull()?.let { UnifiedVersionComponent.IntComponent(it) }
-    }
   }
 
   val presentableText: String get() = versionString
 
   /**
    * String representation of this [PluginVersion] for Marketplace compatibility range fields of the plugin descriptor's JSON
+   *
+   * @param lowerBound if true, the returned string will be a lower bound for the compatibility range, if false, it will be an upper bound
    */
-  val marketplaceCompatibilityRangeVersionString: String
-    get() = buildVersionString(withSemverPatchEvenWhenZero = true)
-
-  val versionString: String
-    get() = buildVersionString(withSemverPatchEvenWhenZero = false)
-
-  /**
-   * Build the [String] representation of that [PluginVersion] used in business logic.
-   *
-   * Handling of the case where patch=0 depends on [withSemverPatchEvenWhenZero] parameter.
-   *
-   * Note: patch=0 usually happens when the original plugin version was a Nightly version.
-   * Indeed, Nightly versions do not contain a patch component.
-   * For backward compatibility, in such a case, we had to set it to 0 until we change [PluginVersion] altogether not to represent a SemVer.
-   *
-   * @param withSemverPatchEvenWhenZero whether to include a SemVer compatible `.0` patch when patch=0
-   */
-  private fun buildVersionString(withSemverPatchEvenWhenZero: Boolean): String = buildString {
-    append(major)
-    append(".")
-    append(minor)
-    if (withSemverPatchEvenWhenZero || patch != 0) {
-      append(".")
-      append(patch)
-    }
-    if (preRelease != null) {
-      append("-$preRelease")
-    }
-  }
-
-  override fun compareTo(other: PluginVersion): Int {
-    val result = compareValuesBy(this, other, { it.major }, { it.minor }, { it.patch })
-    return if (result != 0) {
-      result
-    }
-    else {
-      comparePreRelease(preRelease, other.preRelease)
-    }
-  }
-
-  private fun comparePreRelease(pre1: String?, pre2: String?): Int {
-    return when {
-      pre1 == pre2 -> 0
-      pre1 == null -> 1
-      pre2 == null -> -1
-      else -> {
-        val iterator1 = pre1.splitToSequence('.').iterator()
-        val iterator2 = pre2.splitToSequence('.').iterator()
-
-        while (iterator1.hasNext() && iterator2.hasNext()) {
-          val segment1 = iterator1.next()
-          val intSegment1 = segment1.toIntOrNull()
-          val segment2 = iterator2.next()
-          val intSegment2 = segment2.toIntOrNull()
-          val result = when {
-            intSegment1 != null && intSegment2 != null -> {
-              intSegment1.compareTo(intSegment2)
-            }
-            intSegment1 == null && intSegment2 == null -> {
-              segment1.compareTo(segment2)
-            }
-            intSegment1 == null -> {
-              // According to SemVer specification numeric segments has lower precedence
-              // than non-numeric segments
-              1
-            }
-            else -> -1
-          }
-          if (result != 0) {
-            return result
-          }
-        }
-        return if (iterator1.hasNext()) {
-          1
-        }
-        else {
-          -1
+  fun marketplaceCompatibilityRangeVersionString(lowerBound: Boolean): String = listOfNotNull(
+    component0.value,
+    when (component1) {
+      is UnifiedVersionComponent.Number -> component1.value
+      UnifiedVersionComponent.Snapshot -> when {
+        lowerBound -> 0
+        else -> UnifiedVersionComponent.Snapshot.valueForIndex(1)
+      }
+    },
+    when (component2) {
+      null -> when (component1) {
+        is UnifiedVersionComponent.Number -> 0
+        UnifiedVersionComponent.Snapshot -> when {
+          lowerBound -> 0
+          else -> UnifiedVersionComponent.Snapshot.valueForIndex(2)
         }
       }
-    }
+      is UnifiedVersionComponent.Number -> component2.value
+      UnifiedVersionComponent.Snapshot -> when {
+        lowerBound -> 0
+        else -> UnifiedVersionComponent.Snapshot.valueForIndex(2)
+      }
+    },
+  ).joinToString(".")
+
+  val versionString: String by lazy {
+    listOfNotNull(component0, component1, component2).joinToString(".") { it.stringRepresentation }
+  }
+
+  override fun compareTo(other: PluginVersion): Int = toLong().compareTo(other.toLong())
+
+  // should be in sync with https://github.com/JetBrains/intellij-plugin-verifier/blob/6a04cd7c94eb806877e26a093378eaf2b85e0d73/intellij-plugin-structure/structure-fleet/src/main/kotlin/com/jetbrains/plugin/structure/fleet/FleetPluginDescriptor.kt#L146
+  private val longRepresentation: Long by lazy {
+    val values = listOfNotNull(
+      component0.value,
+      when (component1) {
+        is UnifiedVersionComponent.Number -> component1.value
+        UnifiedVersionComponent.Snapshot -> UnifiedVersionComponent.Snapshot.valueForIndex(1)
+      },
+      when (component2) {
+        null -> null
+        is UnifiedVersionComponent.Number -> component2.value
+        UnifiedVersionComponent.Snapshot -> UnifiedVersionComponent.Snapshot.valueForIndex(2)
+      },
+    )
+    CompatibilityUtils.versionAsLong(values.toIntArray())
   }
 
   // should be in sync with https://github.com/JetBrains/intellij-plugin-verifier/blob/6a04cd7c94eb806877e26a093378eaf2b85e0d73/intellij-plugin-structure/structure-fleet/src/main/kotlin/com/jetbrains/plugin/structure/fleet/FleetPluginDescriptor.kt#L146
-  fun toLong(): Long {
-    val components = buildList {
-      if (major != 0) {
-        add(major)
-      }
-      if (minor != 0) {
-        add(minor)
-      }
-      if (patch != 0) {
-        add(patch)
-      }
-      if (preRelease != null) {
-        add(SNAPSHOT_VALUE)
-      }
-    }
-    return CompatibilityUtils.versionAsLong(components.toIntArray())
-  }
+  fun toLong(): Long = longRepresentation
 }
 
 /**
@@ -296,9 +227,9 @@ data class PluginSignature(val bytes: ByteArray) {
 
 @Serializable
 data class ShipVersionRange(
-  @Serializable(with = PluginVersionForCompatibilityRangeSerializer::class)
+  @Serializable(with = PluginVersionForFromCompatibilityRangeSerializer::class)
   val from: PluginVersion,
-  @Serializable(with = PluginVersionForCompatibilityRangeSerializer::class)
+  @Serializable(with = PluginVersionForToCompatibilityRangeSerializer::class)
   val to: PluginVersion,
 )
 
@@ -322,11 +253,21 @@ data class PluginLayer(
 data class PluginParts(val layers: Map<LayerSelector, PluginLayer>)
 
 @Serializable
+sealed interface ResourcesBundle {
+  @Serializable
+  data class Tar(val path: String) : ResourcesBundle
+
+  @Serializable
+  data class Plain(val map: Map<String, ResourcesEntry>) : ResourcesBundle
+}
+
+@Serializable
 sealed interface ResourcesEntry {
   @Serializable
-  data class Content(val name: String, val content: String) : ResourcesEntry
+  data class Content(val content: String) : ResourcesEntry
+
   @Serializable
-  data class RelativePath(val path: String): ResourcesEntry
+  data class RelativePath(val path: String) : ResourcesEntry
 }
 
 @Serializable
@@ -360,11 +301,12 @@ data class PluginSet(
   val plugins: Set<PluginDescriptor>,
 )
 
-private const val SNAPSHOT_VALUE = Int.MAX_VALUE
-
 private object CompatibilityUtils {
-  private const val MAX_BUILD_VALUE = 100000
-  private const val MAX_COMPONENT_VALUE = 10000
+  @Deprecated(message = "Must be replaced by `MAX_BUILD_VALUE` once Marketplace stops validating on that minor number")
+  const val MAX_FLEET_BUILD_VALUE = 8191
+  const val MAX_BUILD_VALUE = 100000
+  const val MAX_COMPONENT_VALUE = 10000
+  const val SNAPSHOT_VALUE = Int.MAX_VALUE
   private val NUMBERS_OF_NINES by lazy { initNumberOfNines() }
 
   private fun initNumberOfNines(): IntArray {

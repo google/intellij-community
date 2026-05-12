@@ -61,7 +61,7 @@ final class FormatOnSaveActionInfo extends FormatOnSaveActionInfoBase<FormatOnSa
 
   @Override
   public @NotNull List<? extends ActionLink> getActionLinks() {
-    var result = new ArrayList<>(List.of(new ActionLink(CodeInsightBundle.message("actions.on.save.page.link.configure.scope"), __ -> {
+    var result = new ArrayList<>(List.of(new ActionLink(CodeInsightBundle.message("actions.on.save.page.link.configure.scope"), _ -> {
       GeneralCodeStylePanel.selectFormatterTab(getSettings());
     })));
     result.addAll(FormatOnSavePresentationService.getInstance().getCustomFormatActionLinks(getContext()));

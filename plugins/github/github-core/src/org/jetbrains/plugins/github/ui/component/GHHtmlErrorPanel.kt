@@ -10,6 +10,10 @@ import org.jetbrains.plugins.github.i18n.GithubBundle
 import java.net.UnknownHostException
 
 object GHHtmlErrorPanel {
+  @Deprecated(
+    "Use GHAPIExceptionUtil.getPresentableMessage instead",
+    ReplaceWith("GHAPIExceptionUtil.getPresentableMessage(error)", "org.jetbrains.plugins.github.exceptions.GHAPIExceptionUtil")
+  )
   @Nls
   fun getLoadingErrorText(error: Throwable): String {
     if (error is GithubStatusCodeException && error.error != null && error.error!!.message != null) {

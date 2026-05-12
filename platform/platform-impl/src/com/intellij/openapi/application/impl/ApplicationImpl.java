@@ -26,6 +26,7 @@ import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationBundle;
 import com.intellij.openapi.application.ApplicationListener;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.CoroutinesKt;
 import com.intellij.openapi.application.InstantShutdown;
 import com.intellij.openapi.application.ModalityKt;
 import com.intellij.openapi.application.ModalityState;
@@ -34,7 +35,6 @@ import com.intellij.openapi.application.ThreadingSupport;
 import com.intellij.openapi.application.TransactionGuard;
 import com.intellij.openapi.application.TransactionGuardImpl;
 import com.intellij.openapi.application.WriteActionListener;
-import com.intellij.openapi.application.WriteIntentReadActionListener;
 import com.intellij.openapi.application.WriteLockReacquisitionListener;
 import com.intellij.openapi.application.ex.ApplicationEx;
 import com.intellij.openapi.application.ex.ApplicationUtil;
@@ -66,7 +66,6 @@ import com.intellij.openapi.util.Condition;
 import com.intellij.openapi.util.Conditions;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.NlsContexts;
-import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.ShutDownTracker;
 import com.intellij.openapi.util.ThrowableComputable;
 import com.intellij.openapi.vfs.VirtualFileManager;
@@ -127,8 +126,6 @@ import java.util.function.Supplier;
 import static com.intellij.ide.ShutdownKt.cancelAndJoinBlocking;
 import static com.intellij.openapi.application.ModalityKt.asContextElement;
 import static com.intellij.openapi.application.RuntimeFlagsKt.getReportInvokeLaterWithoutModality;
-import static com.intellij.openapi.application.impl.AppImplKt.rethrowCheckedExceptions;
-import static com.intellij.openapi.application.impl.AppImplKt.runnableUnitFunction;
 import static com.intellij.platform.util.coroutines.CoroutineScopeKt.childScope;
 import static com.intellij.util.concurrency.AppExecutorUtil.propagateContext;
 import static com.intellij.util.concurrency.Propagation.isContextAwareComputation;
@@ -836,7 +833,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
       if (BitUtil.isSet(flags, SAVE)) {
         try {
           TraceKt.use(tracer.spanBuilder("saveSettingsOnExit"),
-                      __ -> SaveAndSyncHandler.getInstance().saveSettingsUnderModalProgress(this));
+                      _ -> SaveAndSyncHandler.getInstance().saveSettingsUnderModalProgress(this));
         }
         catch (Throwable e) {
           logErrorDuringExit("Failed to save settings", e);
@@ -872,7 +869,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
       var manager = ProjectManagerEx.getInstanceExIfCreated();
       if (manager != null) {
         try {
-          boolean projectsClosedSuccessfully = TraceKt.use(tracer.spanBuilder("disposeProjects"), __ -> {
+          boolean projectsClosedSuccessfully = TraceKt.use(tracer.spanBuilder("disposeProjects"), _ -> {
             return manager.closeAndDisposeAllProjects(!force);
           });
           if (!projectsClosedSuccessfully) {
@@ -1095,12 +1092,12 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
   @Override
   public void runIntendedWriteActionOnCurrentThread(@NotNull Runnable action) {
-    getThreadingSupport().runWriteIntentReadAction(runnableUnitFunction(action));
+    getThreadingSupport().runWriteIntentReadAction(CoroutinesKt.runnableToLambda(action));
   }
 
   @Override
   public void runReadAction(@NotNull Runnable action) {
-    getThreadingSupport().runReadAction(runnableUnitFunction(action));
+    getThreadingSupport().runReadAction(CoroutinesKt.runnableToLambda(action));
   }
 
   @Override
@@ -1110,7 +1107,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
   @Override
   public <T, E extends Throwable> T runReadAction(@NotNull ThrowableComputable<T, E> computation) throws E {
-    return getThreadingSupport().runReadAction(rethrowCheckedExceptions(computation));
+    return getThreadingSupport().runReadAction(CoroutinesKt.throwableComputableToLambda(computation));
   }
 
   @Override
@@ -1162,7 +1159,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
   public void runWriteAction(@NotNull Runnable action) {
     incrementBackgroundWriteActionCounter();
     try {
-      getThreadingSupport().runWriteActionBlocking(runnableUnitFunction(action));
+      getThreadingSupport().runWriteActionBlocking(CoroutinesKt.runnableToLambda(action));
     }
     finally {
       decrementBackgroundWriteActionCounter();
@@ -1173,7 +1170,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
   public <T> T runWriteAction(@NotNull Computable<T> computation) {
     incrementBackgroundWriteActionCounter();
     try {
-      return getThreadingSupport().runWriteActionBlocking(computation::compute);
+      return getThreadingSupport().runWriteActionBlocking(CoroutinesKt.computableToLambda(computation));
     }
     finally {
       decrementBackgroundWriteActionCounter();
@@ -1184,7 +1181,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
   public <T, E extends Throwable> T runWriteAction(@NotNull ThrowableComputable<T, E> computation) throws E {
     incrementBackgroundWriteActionCounter();
     try {
-      return getThreadingSupport().runWriteActionBlocking(rethrowCheckedExceptions(computation));
+      return getThreadingSupport().runWriteActionBlocking(CoroutinesKt.throwableComputableToLambda(computation));
     }
     finally {
       decrementBackgroundWriteActionCounter();
@@ -1215,7 +1212,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
   @Override
   public <T, E extends Throwable> T runWriteIntentReadAction(@NotNull ThrowableComputable<T, E> computation) {
-    return getThreadingSupport().runWriteIntentReadAction(rethrowCheckedExceptions(computation));
+    return getThreadingSupport().runWriteIntentReadAction(CoroutinesKt.throwableComputableToLambda(computation));
   }
 
   @Override
@@ -1267,7 +1264,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
   @Override
   public boolean tryRunReadAction(@NotNull Runnable action) {
-    return getThreadingSupport().tryRunReadAction(runnableUnitFunction(action));
+    return getThreadingSupport().tryRunReadAction(CoroutinesKt.runnableToLambda(action));
   }
 
   @Override
@@ -1320,7 +1317,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     @NotNull Runnable runnable
   ) {
     ThreadingAssertions.assertWriteIntentReadAccess();
-    getThreadingSupport().executeSuspendingWriteAction(runnableUnitFunction(
+    getThreadingSupport().executeSuspendingWriteAction(CoroutinesKt.runnableToLambda(
       () -> ProgressManager.getInstance().run(new Task.Modal(project, title, false) {
         @Override
         public void run(@NotNull ProgressIndicator indicator) {
@@ -1476,32 +1473,14 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     IdeEventQueue.getInstance().flushNativeEventQueue();
   }
 
-  @Override
-  public void addWriteActionListener(@NotNull WriteActionListener listener, @NotNull Disposable parentDisposable) {
-    lock.addWriteActionListener(listener);
-    Disposer.register(parentDisposable, () -> lock.removeWriteActionListener(listener));
-  }
-
-  @Override
-  public void addReadActionListener(@NotNull ReadActionListener listener, @NotNull Disposable parentDisposable) {
-    lock.addReadActionListener(listener);
-    Disposer.register(parentDisposable, () -> lock.removeReadActionListener(listener));
-  }
-
-  @Override
-  public void addWriteIntentReadActionListener(@NotNull WriteIntentReadActionListener listener, @NotNull Disposable parentDisposable) {
-    lock.addWriteIntentReadActionListener(listener);
-    Disposer.register(parentDisposable, () -> lock.removeWriteIntentReadActionListener(listener));
-  }
-
   public void addLockAcquisitionListener(@NotNull LockAcquisitionListener<?> listener, @NotNull Disposable parentDisposable) {
     lock.setLockAcquisitionListener(listener);
     Disposer.register(parentDisposable, () -> lock.removeLockAcquisitionListener(listener));
   }
 
   @Override
-  public void prohibitTakingLocksInsideAndRun(@NotNull Runnable runnable, @NlsSafe String advice) {
-    getThreadingSupport().prohibitTakingLocksInsideAndRun(runnableUnitFunction(runnable), advice);
+  public <T> T withLocksProhibited(@NotNull String advice, @NotNull Supplier<T> action) {
+    return getThreadingSupport().withLocksProhibited(advice, () -> action.get());
   }
 
   @Override
@@ -1515,7 +1494,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
   }
 
   @Override
-  public void addSuspendingWriteActionListener(@NotNull WriteLockReacquisitionListener listener, @NotNull Disposable parentDisposable) {
+  public void addSuspendingWriteActionListener(@NotNull WriteLockReacquisitionListener<?> listener, @NotNull Disposable parentDisposable) {
     lock.setWriteLockReacquisitionListener(listener);
     Disposer.register(parentDisposable, () -> lock.removeWriteLockReacquisitionListener(listener));
   }

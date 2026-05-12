@@ -26,7 +26,8 @@ import kotlin.time.Duration.Companion.seconds
  * Command runs local inspection.
  * Runs local inspection using DaemonCodeAnalyzer.
  */
-class DoLocalInspection(text: String, line: Int) : PlaybackCommandCoroutineAdapter(text, line) {
+open class DoLocalInspection(text: String, line: Int) : PlaybackCommandCoroutineAdapter(text, line) {
+
   companion object {
     const val PREFIX: String = CMD_PREFIX + "doLocalInspection"
     const val SPAN_NAME: String = "localInspections"
@@ -118,13 +119,15 @@ class DoLocalInspection(text: String, line: Int) : PlaybackCommandCoroutineAdapt
       }
     }
   }
-  private fun String.parameter(name: String): String? {
+
+  protected fun String.parameter(name: String): String? {
     val splitParams = this.split(" ")
     val keyIndex = splitParams.indexOf(name).takeIf { it >= 0 } ?: return null
     return splitParams.getOrNull(keyIndex + 1)
   }
 
-  private fun isWarmupMode(): Boolean {
+  protected fun isWarmupMode(): Boolean {
     return text.contains("WARMUP")
   }
+
 }

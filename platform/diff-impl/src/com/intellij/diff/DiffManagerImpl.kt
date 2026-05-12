@@ -35,6 +35,8 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.WindowWrapper
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.UserDataHolder
+import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.util.concurrency.annotations.RequiresEdt
@@ -85,7 +87,7 @@ open class DiffManagerImpl : DiffManagerEx() {
   }
 
   override fun createRequestPanel(project: Project?, parent: Disposable, window: Window?): DiffRequestPanel {
-    val panel = DiffRequestPanelImpl(project, window)
+    val panel = DiffRequestPanelImpl(project, window, UserDataHolderBase())
     Disposer.register(parent, panel)
     return panel
   }

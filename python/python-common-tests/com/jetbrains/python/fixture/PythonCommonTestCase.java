@@ -372,7 +372,7 @@ public abstract class PythonCommonTestCase extends TestCase {
   protected void runWithAdditionalClassEntryInSdkRoots(@NotNull VirtualFile directory, @NotNull Runnable runnable) {
     final Sdk sdk = PythonSdkUtil.findPythonSdk(myFixture.getModule());
     assertNotNull(sdk);
-    runWithAdditionalRoot(sdk, directory, OrderRootType.CLASSES, (__) -> runnable.run());
+    runWithAdditionalRoot(sdk, directory, OrderRootType.CLASSES, (_) -> runnable.run());
   }
 
   protected void runWithAdditionalClassEntryInSdkRoots(@NotNull String relativeTestDataPath, @NotNull Runnable runnable) {

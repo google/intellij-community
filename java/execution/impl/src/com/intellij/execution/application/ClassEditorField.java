@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.application;
 
 import com.intellij.execution.JavaExecutionUtil;
@@ -20,7 +20,6 @@ import com.intellij.psi.JavaCodeFragmentFactory;
 import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiDocumentManager;
-import com.intellij.psi.PsiElement;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.ui.EditorTextField;
 import com.intellij.ui.ExtendableEditorSupport;
@@ -55,14 +54,12 @@ public final class ClassEditorField extends EditorTextField {
   public static @NotNull ClassEditorField createClassField(Project project,
                                                           Computable<? extends Module> moduleSelector,
                                                           JavaCodeFragment.VisibilityChecker visibilityChecker,
-                                                          @Nullable BrowseModuleValueActionListener<?> classBrowser
-  ) {
+                                                          @Nullable BrowseModuleValueActionListener<?> classBrowser) {
     if (project.isDefault()) {
       return new ClassEditorField();
     }
-    PsiElement defaultPackage = JavaPsiFacade.getInstance(project).findPackage("");
     JavaCodeFragmentFactory factory = JavaCodeFragmentFactory.getInstance(project);
-    JavaCodeFragment fragment = factory.createReferenceCodeFragment("", defaultPackage, true, true);
+    JavaCodeFragment fragment = factory.createReferenceCodeFragmentInPackage("", "", true);
     fragment.setVisibilityChecker(visibilityChecker);
     Document document = PsiDocumentManager.getInstance(project).getDocument(fragment);
 
@@ -71,7 +68,7 @@ public final class ClassEditorField extends EditorTextField {
       classBrowser.setTextAccessor(field);
     }
     BrowseModuleValueActionListener<?> browser = classBrowser != null ? classBrowser :
-                                            new ClassBrowser.AppClassBrowser<EditorTextField>(project, moduleSelector) {
+                                                 new ClassBrowser.AppClassBrowser<EditorTextField>(project, moduleSelector) {
       @Override
       public String getText() {
         return field.getText();

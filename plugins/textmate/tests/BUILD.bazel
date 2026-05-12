@@ -3,12 +3,14 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tests",
+  module_name = "intellij.textmate.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "intellij.textmate.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["tests/**/*.kt", "tests/**/*.java", "tests/**/*.form"], allow_empty = True),
@@ -53,6 +55,7 @@ jvm_library(
     "//plugins/grazie/src:core_test_lib",
     "//platform/projectModel-api:projectModel",
     "//platform/projectModel-api:projectModel_test_lib",
+    "//platform/ide-core",
     "//plugins/textmate/plugin",
     "//plugins/textmate/plugin:plugin_test_lib",
     "//plugins/textmate/backend",
@@ -61,9 +64,18 @@ jvm_library(
     "//plugins/textmate/core/tests:tests_test_lib",
     "@lib//:kotlin-test-junit5",
   ],
-  runtime_deps = [":tests"]
+  runtime_deps = [
+    ":tests",
+    "//platform/ide-core:ide-core_test_lib",
+  ]
 )
 ### auto-generated section `build intellij.textmate.tests` end
+
+### auto-generated section `iml intellij.textmate.tests` start
+exports_files([
+  "intellij.textmate.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.textmate.tests` end
 
 ### auto-generated section `test intellij.textmate.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

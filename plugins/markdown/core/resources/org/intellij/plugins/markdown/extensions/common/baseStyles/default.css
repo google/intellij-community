@@ -439,6 +439,12 @@ span.user-del {
   text-decoration: line-through;
 }
 
+.footnotes {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

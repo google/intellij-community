@@ -3,10 +3,13 @@ package com.intellij.openapi.vfs.newvfs.persistent;
 
 import com.intellij.concurrency.ConcurrentCollectionFactory;
 import com.intellij.concurrency.JobSchedulerImpl;
+import com.intellij.core.CoreBundle;
 import com.intellij.diagnostic.Activity;
 import com.intellij.diagnostic.StartUpMeasurer;
 import com.intellij.ide.plugins.DynamicPluginListener;
 import com.intellij.ide.plugins.IdeaPluginDescriptor;
+import com.intellij.notification.NotificationGroup;
+import com.intellij.notification.NotificationGroupManager;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.diagnostic.ControlFlowException;
@@ -33,7 +36,6 @@ import com.intellij.openapi.util.io.FileAttributes.CaseSensitivity;
 import com.intellij.openapi.util.io.OSAgnosticPathUtil;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.util.text.Strings;
-import com.intellij.openapi.vfs.AsyncFileListener;
 import com.intellij.openapi.vfs.CharsetToolkit;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.PersistentFSConstants;
@@ -48,9 +50,11 @@ import com.intellij.openapi.vfs.encoding.EncodingManager;
 import com.intellij.openapi.vfs.encoding.EncodingProjectManager;
 import com.intellij.openapi.vfs.encoding.Utf8BomOptionProvider;
 import com.intellij.openapi.vfs.ex.temp.TempFileSystem;
+import com.intellij.openapi.vfs.impl.SymlinksCapableFileSystem;
 import com.intellij.openapi.vfs.impl.local.LocalFileSystemBase;
 import com.intellij.openapi.vfs.impl.local.LocalFileSystemImpl;
 import com.intellij.openapi.vfs.newvfs.ArchiveFileSystem;
+import com.intellij.openapi.vfs.newvfs.AsyncableFileSystem;
 import com.intellij.openapi.vfs.newvfs.AsyncEventSupport;
 import com.intellij.openapi.vfs.newvfs.AttributeInputStream;
 import com.intellij.openapi.vfs.newvfs.AttributeOutputStream;
@@ -90,11 +94,11 @@ import com.intellij.util.ArrayUtil;
 import com.intellij.util.BitUtil;
 import com.intellij.util.ExceptionUtil;
 import com.intellij.util.ExceptionUtilRt;
-import com.intellij.util.PathUtil;
 import com.intellij.util.SmartList;
 import com.intellij.util.Suppressions;
 import com.intellij.util.UriUtil;
 import com.intellij.util.concurrency.ThreadingAssertions;
+import com.intellij.util.concurrency.annotations.RequiresWriteLock;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.HashingStrategy;
 import com.intellij.util.containers.MostlySingularMultiMap;
@@ -127,7 +131,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -144,9 +147,12 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
 import static com.intellij.configurationStore.StorageUtilKt.RELOADING_STORAGE_WRITE_REQUESTOR;
+import static com.intellij.notification.NotificationType.WARNING;
 import static com.intellij.openapi.vfs.newvfs.AsyncEventSupport.afterVfsChange;
 import static com.intellij.openapi.vfs.newvfs.events.VFileEvent.REFRESH_REQUESTOR;
+import static com.intellij.openapi.vfs.newvfs.impl.VfsThreadingUtil.runActionOnBackgroundRegardlessOfCurrentThread;
 import static com.intellij.openapi.vfs.newvfs.impl.VfsThreadingUtil.runActionOnEdtRegardlessOfCurrentThread;
+import static com.intellij.util.ExceptionUtil.runAllAndCollectExceptions;
 import static com.intellij.util.SystemProperties.getBooleanProperty;
 import static com.intellij.util.SystemProperties.getIntProperty;
 import static com.intellij.util.containers.CollectionFactory.createFilePathMap;
@@ -280,29 +286,40 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
         listener.beforeConnectionClosed();
       }
 
-      LOG.info("VFS dispose started");
-      long startedAtNs = System.nanoTime();
-      try {
-        //Give LFSystem a chance to clear caches/stop file watchers:
-        //TODO RC: would be much better use PersistentFsConnectionListener or alike instead of direct calling
-        //         (PFSImpl shouldn't even explicitly know that LocalFileSystem needs cleaning)
-        ((LocalFileSystemImpl)LocalFileSystem.getInstance()).onDisconnecting();
-        // TODO how to make sure we don't have files left in memory after VFS is disconnected?
-        rootsByUrl.clear();
-        missedRootIds.clear();
-      }
-      finally {
-        FSRecordsImpl vfsPeer = this.vfsPeer;
-        if (vfsPeer != null && !vfsPeer.isClosed()) {
-          vfsPeer.close();
-          //better not set this.vfsPeer=null, but leave it as-is: on access instead of just NPE we'll get
-          // more understandable AlreadyDisposedException with additional diagnostic info
-        }
-      }
-      vfsData.close();//stops monitoring
-      vfsData = null;
+      LOG.info("VFS disconnect started");
 
-      LOG.info("VFS dispose completed in " + NANOSECONDS.toMillis(System.nanoTime() - startedAtNs) + " ms.");
+      long startedAtNs = System.nanoTime();
+      List<? extends Throwable> errorsDuringDisconnect = runAllAndCollectExceptions(
+        () -> {
+          //Give LFSystem a chance to clear caches/stop file watchers:
+          //TODO RC: would be much better to use PersistentFsConnectionListener or alike instead of direct calling
+          //         (PFSImpl shouldn't even explicitly know that LocalFileSystem needs cleaning)
+          ((LocalFileSystemImpl)LocalFileSystem.getInstance()).onDisconnecting();
+        },
+        () -> {
+          // TODO how to make sure we don't have VirtualFiles left in memory after VFS is disconnected?
+          rootsByUrl.clear();
+          missedRootIds.clear();
+        },
+        () -> {
+          FSRecordsImpl vfsPeer = this.vfsPeer;
+          if (vfsPeer != null && !vfsPeer.isClosed()) {
+            vfsPeer.close();
+            //Don't clear this.vfsPeer=null, but leave it as-is: on access-after-close we'll get understandable
+            // AlreadyDisposedException with additional diagnostic info -- instead of just NPE.
+          }
+        },
+        () -> {
+          vfsData.close();//unregisters listener & stops monitoring
+          vfsData = null;
+        }
+      );
+      LOG.info("VFS disconnect completed in " + NANOSECONDS.toMillis(System.nanoTime() - startedAtNs) + " ms.");
+      if (!errorsDuringDisconnect.isEmpty()) {
+        RuntimeException compoundError = new RuntimeException("VFS disconnect produced errors");
+        errorsDuringDisconnect.forEach(compoundError::addSuppressed);
+        LOG.error("VFS disconnect produced errors", compoundError);
+      }
     }
   }
 
@@ -372,17 +389,73 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
 
   @Override
   public void dispose() {
-    //noinspection IncorrectCancellationExceptionHandling
+    List<? extends Throwable> errorsDuringDispose = runAllAndCollectExceptions(
+      () -> {
+        try {
+          disconnect();
+        }
+        catch (ProcessCanceledException e) {
+          // Application may be closed before `LocalFileSystem` gets initialized()
+          //noinspection IncorrectCancellationExceptionHandling
+          LOG.warn("Detected cancellation during dispose of PersistentFS. " +
+                   "Application was likely closed before VFS got completely initialized", e.getCause());
+          throw e;
+        }
+      },
+      () -> {
+        otelMonitoringHandle.close();
+      }
+    );
+
+    if (!errorsDuringDispose.isEmpty()) {
+      RuntimeException compoundError = new RuntimeException("VFS disconnect produced errors");
+      errorsDuringDispose.forEach(compoundError::addSuppressed);
+      LOG.error("VFS dispose produced errors", compoundError);
+    }
+  }
+
+  @ApiStatus.Experimental
+  @Override
+  public void flushPendingUpdates() throws IOException {
+    for (AsyncableFileSystem asyncableFileSystem : asyncableFileSystems()) {
+      asyncableFileSystem.fsync();
+    }
+  }
+
+  @ApiStatus.Experimental
+  @Override
+  public void flushPendingUpdates(@NotNull VirtualFile file) throws IOException {
+    if (file.getFileSystem() instanceof @NotNull AsyncableFileSystem afs) {
+      afs.fsync(file);
+    }
+  }
+
+  @ApiStatus.Experimental
+  @Override
+  public void flushPendingUpdatesOrNotify() {
     try {
-      disconnect();
+      flushPendingUpdates();
     }
-    catch (ProcessCanceledException e) {
-      // Application may be closed before `LocalFileSystem` gets initialized()
-      //noinspection IncorrectCancellationExceptionHandling
-      LOG.warn("Detected cancellation during dispose of PersistentFS. " +
-               "Application was likely closed before VFS got completely initialized", e);
+    catch (Exception e) {
+      LOG.error(".fsync() fails", e );
+      NotificationGroup notificationGroup = NotificationGroupManager.getInstance().getNotificationGroup("VFS");
+      notificationGroup.createNotification(
+          CoreBundle.message("vfs.file.save.async.title"),
+          e.getMessage(),
+          WARNING
+        )
+        .setImportant(true)
+        .notify(null);
     }
-    otelMonitoringHandle.close();
+  }
+
+  private static @NotNull Iterable<? extends AsyncableFileSystem> asyncableFileSystems() {
+    //TODO RC: list all FileSystems available, and filter AsyncableFileSystems
+    LocalFileSystem localFileSystem = LocalFileSystem.getInstance();
+    if (localFileSystem instanceof AsyncableFileSystem) {
+      return List.of((AsyncableFileSystem)localFileSystem);
+    }
+    return List.of();
   }
 
   @Override
@@ -862,6 +935,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
   }
 
   @Override
+  @RequiresWriteLock
   public @NotNull VirtualFile copyFile(Object requestor,
                                        @NotNull VirtualFile file,
                                        @NotNull VirtualFile parent,
@@ -878,6 +952,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
     return child;
   }
 
+  @RequiresWriteLock
   @Override
   public @NotNull VirtualFile createChildDirectory(Object requestor,
                                                    @NotNull VirtualFile parent,
@@ -900,6 +975,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
   }
 
   @Override
+  @RequiresWriteLock
   public @NotNull VirtualFile createChildFile(Object requestor,
                                               @NotNull VirtualFile parent,
                                               @NotNull String childName) throws IOException {
@@ -937,6 +1013,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
   }
 
   @Override
+  @RequiresWriteLock
   public void deleteFile(Object requestor, @NotNull VirtualFile file) throws IOException {
     ThreadingAssertions.assertWriteAccess();
 
@@ -947,6 +1024,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
     }
   }
 
+  @RequiresWriteLock
   @Override
   public void renameFile(Object requestor,
                          @NotNull VirtualFile file,
@@ -1211,17 +1289,21 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
       private void writeToDisk(@NotNull NewVirtualFileSystem fs,
                                @NotNull VFileContentChangeEvent event,
                                @NotNull List<VFileEvent> events) throws IOException {
-        try (OutputStream ioFileStream = fs.getOutputStream(file, requestor, modStamp, timeStamp)) {
+        long resolvedTimeStamp = (timeStamp > 0) ? timeStamp : System.currentTimeMillis();
+        try (OutputStream ioFileStream = fs.getOutputStream(file, requestor, modStamp, resolvedTimeStamp)) {
           ioFileStream.write(buf, 0, count);
         }
         finally {
           closed = true;
+
           FileAttributes attributes = fs.getAttributes(file);
-          // due to FS rounding, the timestamp of the file can significantly differ from the current time
+          // due to timestamps rounding in FS, the timestamp of the file can differ from the resolvedTimeStamp just set
           long newTimestamp = attributes != null ? attributes.lastModified : DEFAULT_TIMESTAMP;
+          //TODO RC: why we ever read attribute.length here -- (how) could it be (file.length != count)?
           long newLength = attributes != null ? attributes.length : DEFAULT_LENGTH;
+
           executeTouch(file, false, event.getModificationStamp(), newLength, newTimestamp);
-          fireAfterEvents(getPublisherEdt(), getPublisherBackgroundable(), Collections.emptyList(), events);
+          fireAfterEvents(getPublisherEdt(), getPublisherBackgroundable(), AsyncEventSupport.ChangeAppliers.EMPTY, events);
         }
       }
     };
@@ -1247,6 +1329,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
     return data == vfsData;
   }
 
+  @RequiresWriteLock
   @Override
   public void moveFile(Object requestor, @NotNull VirtualFile file, @NotNull VirtualFile newParent) throws IOException {
     long modCount = newParent.getModificationCount();
@@ -1275,7 +1358,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
       runSuppressing(
         () -> fireBeforeEvents(publisher, publisherBackgroundable, outValidatedEvents),
         () -> applyEvent(event),
-        () -> fireAfterEvents(publisher, publisherBackgroundable, Collections.emptyList(), outValidatedEvents),
+        () -> fireAfterEvents(publisher, publisherBackgroundable, AsyncEventSupport.ChangeAppliers.EMPTY, outValidatedEvents),
         EmptyRunnable.INSTANCE,
         EmptyRunnable.INSTANCE
       );
@@ -1287,11 +1370,15 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
         outApplyActions.add(() -> applyEvent(jarDeleteEvent));
         outValidatedEvents.add(jarDeleteEvent);
       }
-      applyMultipleEvents(publisher, publisherBackgroundable, Collections.emptyList(), outApplyActions, outValidatedEvents, false);
+      applyMultipleEvents(publisher, publisherBackgroundable, AsyncEventSupport.ChangeAppliers.EMPTY, outApplyActions, outValidatedEvents, false);
     }
   }
 
-  private static void runSuppressing(@NotNull Runnable r1, @NotNull Runnable r2, @NotNull Runnable r3, @NotNull Runnable r4, @NotNull Runnable r5) {
+  private static void runSuppressing(@NotNull Runnable r1,
+                                     @NotNull Runnable r2,
+                                     @NotNull Runnable r3,
+                                     @NotNull Runnable r4,
+                                     @NotNull Runnable r5) {
     Throwable t = null;
     try {
       r1.run();
@@ -1594,7 +1681,9 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
   private static final int INNER_ARRAYS_THRESHOLD = 4096;
 
   @ApiStatus.Internal
-  public void processEventsImpl(@NotNull List<CompoundVFileEvent> events, @NotNull List<AsyncFileListener.ChangeApplier> earlyAfterEventChangeAppliers, boolean excludeAsyncListeners) {
+  public void processEventsImpl(@NotNull List<CompoundVFileEvent> events,
+                                @NotNull AsyncEventSupport.ChangeAppliers earlyAfterEventChangeAppliers,
+                                boolean excludeAsyncListeners) {
     ThreadingAssertions.assertWriteAccess();
 
     int startIndex = 0;
@@ -1625,14 +1714,21 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
                                     excludeAsyncListeners);
 
       if (!validated.isEmpty()) {
-        applyMultipleEvents(publisherEdt, publisherBackgroundable, earlyAfterEventChangeAppliers, applyActions, validated, excludeAsyncListeners);
+        applyMultipleEvents(
+          publisherEdt,
+          publisherBackgroundable,
+          earlyAfterEventChangeAppliers,
+          applyActions,
+          validated,
+          excludeAsyncListeners
+        );
       }
     }
   }
 
   private static void applyMultipleEvents(@NotNull BulkFileListener publisher,
                                           @NotNull BulkFileListenerBackgroundable publisherBackgroundable,
-                                          @NotNull List<AsyncFileListener.ChangeApplier> earlyAfterEventChangeAppliers,
+                                          @NotNull AsyncEventSupport.ChangeAppliers earlyAfterEventChangeAppliers,
                                           @NotNull List<? extends @NotNull Runnable> applyActions,
                                           @NotNull List<? extends @NotNull VFileEvent> applyEvents,
                                           boolean excludeAsyncListeners) {
@@ -1681,7 +1777,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
                                        @NotNull BulkFileListenerBackgroundable publisherBackgroundable,
                                        @NotNull List<? extends VFileEvent> toSend) {
     runSuppressing(
-      () -> publisherBackgroundable.before(toSend),
+      () -> runActionOnBackgroundRegardlessOfCurrentThread(() -> publisherBackgroundable.before(toSend)),
       () -> runActionOnEdtRegardlessOfCurrentThread(() -> publisherEdt.before(toSend)),
       () -> ((BulkFileListener)VirtualFilePointerManager.getInstance()).before(toSend),
       EmptyRunnable.INSTANCE,
@@ -1691,14 +1787,14 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
 
   private static void fireAfterEvents(@NotNull BulkFileListener publisherEdt,
                                       @NotNull BulkFileListenerBackgroundable publisherBackgroundable,
-                                      @NotNull List<AsyncFileListener.ChangeApplier> earlyAfterEventChangeAppliers,
+                                      @NotNull AsyncEventSupport.ChangeAppliers earlyAfterEventChangeAppliers,
                                       @NotNull List<? extends VFileEvent> toSend) {
     runSuppressing(
       () -> CachedFileType.clearCache(),
       () -> afterVfsChange(earlyAfterEventChangeAppliers),
       () -> ((BulkFileListener)VirtualFilePointerManager.getInstance()).after(toSend),
       () -> runActionOnEdtRegardlessOfCurrentThread(() -> publisherEdt.after(toSend)),
-      () -> publisherBackgroundable.after(toSend)
+      () -> runActionOnBackgroundRegardlessOfCurrentThread(() -> publisherBackgroundable.after(toSend))
     );
   }
 
@@ -1707,8 +1803,10 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
     for (Map.Entry<VirtualDirectoryImpl, Collection<VFileDeleteEvent>> entry : deletions.entrySet()) {
       VirtualDirectoryImpl parent = entry.getKey();
       Collection<VFileDeleteEvent> deleteEvents = entry.getValue();
-      // no valid containing directory; applying events the old way - one by one
       if (parent == null || !parent.isValid()) {
+        // no valid containing directory; applying events the old way - one by one:
+        //TODO RC: why do we ever need to process invalid directory?
+        //         Shouldn't we just skip it altogether, since it must be already deleted along with it's descendants?
         deleteEvents.forEach(this::applyEvent);
         return;
       }
@@ -1718,13 +1816,15 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
       IntSet childrenIdsDeleted = new IntOpenHashSet(deleteEvents.size());
       List<ChildInfo> deleted = new ArrayList<>(deleteEvents.size());
       for (VFileDeleteEvent event : deleteEvents) {
-        VirtualFile file = event.getFile();
-        int id = fileId(file);
-        childrenNamesDeleted.add(file.getNameSequence());
-        childrenIdsDeleted.add(id);
-        vfsPeer.deleteRecordRecursively(id);
-        invalidateSubtree(file, "Bulk file deletions", event);
-        deleted.add(new ChildInfoImpl(id, ChildInfoImpl.UNKNOWN_ID_YET, null, null, null));
+        VirtualFile child = event.getFile();
+        int childId = fileId(child);
+
+        childrenNamesDeleted.add(child.getNameSequence());
+        childrenIdsDeleted.add(childId);
+        deleted.add(new ChildInfoImpl(childId, ChildInfoImpl.UNKNOWN_ID_YET, null, null, null));
+
+        vfsPeer.deleteRecordRecursively(childId);
+        invalidateSubtree((VirtualFileSystemEntry)child, "Bulk file deletions", event);
       }
       deleted.sort(ChildInfo.BY_ID);
       vfsPeer.update(parent, parentId, oldChildren -> oldChildren.subtract(deleted), /*setAllChildrenCached: */ false);
@@ -2517,7 +2617,9 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
 
     int childId = inserter.insertedChildInfo.getId();
     int nameId = inserter.insertedChildInfo.getNameId();//vfsPeer.getNameId(name);
-    VirtualFileSystemEntry child = parentDir.initializeChildDataIfNotYet(childId, nameId, fileAttributesToFlags(childData.first), isEmptyDirectory);
+    VirtualFileSystemEntry child = parentDir.initializeChildDataIfNotYet(
+      childId, nameId, fileAttributesToFlags(childData.first), isEmptyDirectory
+    );
     parentDir.addChild(child);
     incStructuralModificationCount();
   }
@@ -2529,11 +2631,6 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
                                              @NotNull NewVirtualFileSystem fs,
                                              @NotNull ChildInfo @Nullable [] children) {
     assert parentId > 0 : parentId; // 0 means it's root => should use .writeRootFields() instead
-
-    //VfsData.DirectoryData directoryData = ((VirtualDirectoryImpl)parentFile).directoryData;
-    //if(!Thread.holdsLock(directoryData)){
-    //  LOG.error("Don't hold .directoryData lock!");
-    //}
 
     FileAttributes attributes = childData.first;
     String symLinkTarget = childData.second;
@@ -2614,29 +2711,29 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
     }
 
     vfsPeer.deleteRecordRecursively(fileIdToDelete);
+    invalidateSubtree((VirtualFileSystemEntry)file, "File deleted", event);
 
-    invalidateSubtree(file, "File deleted", event);
     incStructuralModificationCount();
   }
 
-  private static void invalidateSubtree(@NotNull VirtualFile file, @NotNull Object source, @NotNull Object reason) {
-    VirtualFileSystemEntry root = (VirtualFileSystemEntry)file;
+  /**
+   * Invalidates the root and all its descendants, recursively: deepest nodes are invalidated first, the root is the last.
+   * Invalidation is done only in in-memory VFS structures ({@link VfsData}) -- persistent VFS structures (FSRecords) are not touched.
+   */
+  private static void invalidateSubtree(@NotNull VirtualFileSystemEntry root, @NotNull Object source, @NotNull Object reason) {
     if (root.isDirectory()) {
-      Queue<VirtualFile> queue = new ArrayDeque<>(root.getCachedChildren());
-      while (!queue.isEmpty()) {
-        VirtualFileSystemEntry child = (VirtualFileSystemEntry)queue.remove();
-        queue.addAll(child.getCachedChildren());
-        doInvalidate(child, source, reason);
+      for (VirtualFile child : root.getCachedChildren()) {
+        invalidateSubtree((VirtualFileSystemEntry)child, source, reason);
       }
     }
-    doInvalidate(root, source, reason);
+    invalidateSingleNode(root, source, reason);
   }
 
-  private static void doInvalidate(@NotNull VirtualFileSystemEntry file, @NotNull Object source, @NotNull Object reason) {
+  private static void invalidateSingleNode(@NotNull VirtualFileSystemEntry file, @NotNull Object source, @NotNull Object reason) {
     if (file.is(VFileProperty.SYMLINK)) {
       VirtualFileSystem fs = file.getFileSystem();
-      if (fs instanceof LocalFileSystemImpl) {
-        ((LocalFileSystemImpl)fs).symlinkRemoved(file.getId());
+      if (fs instanceof SymlinksCapableFileSystem scfs && scfs.isSymlinksSupported()) {
+        scfs.symlinkRemoved(file.getId());
       }
     }
     file.invalidate(source, reason);
@@ -2676,8 +2773,8 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
     int id = fileId(file);
     vfsPeer.storeSymlinkTarget(id, target);
     VirtualFileSystem fs = file.getFileSystem();
-    if (fs instanceof LocalFileSystemImpl) {
-      ((LocalFileSystemImpl)fs).symlinkUpdated(id, file.getParent(), file.getNameSequence(), file.getPath(), target);
+    if (fs instanceof SymlinksCapableFileSystem scfs && scfs.isSymlinksSupported()) {
+      scfs.symlinkUpdated(id, file.getParent(), file.getNameSequence(), file.getPath(), target);
     }
   }
 

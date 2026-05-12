@@ -3,7 +3,6 @@ package com.jetbrains.python.inspections
 import com.intellij.codeInspection.LocalInspectionToolSession
 import com.intellij.codeInspection.ProblemHighlightType
 import com.intellij.codeInspection.ProblemsHolder
-import com.intellij.openapi.util.Ref
 import com.intellij.psi.PsiElementVisitor
 import com.jetbrains.python.PyPsiBundle
 import com.jetbrains.python.codeInsight.typing.PyTypingTypeProvider
@@ -25,7 +24,12 @@ import com.jetbrains.python.psi.types.PyTypingNewTypeFactoryType
 
 class PyNewTypeInspection : PyInspection() {
   override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, session: LocalInspectionToolSession): PsiElementVisitor {
-    return object : PyInspectionVisitor(holder, getContext(session)) {
+    val context = PyInspectionVisitor.getContext(session)
+    if (context.usesExternalTypeEngine) {
+      return PsiElementVisitor.EMPTY_VISITOR
+    }
+
+    return object : PyInspectionVisitor(holder, context) {
       override fun visitPyTargetExpression(node: PyTargetExpression) {
         val assignedValue = node.findAssignedValue()
         if (assignedValue !is PyCallExpression) return
@@ -44,8 +48,9 @@ class PyNewTypeInspection : PyInspection() {
 
           val typeExpr = PyPsiUtils.flattenParens(assignedValue.getArgument(1, "tp", PyExpression::class.java))
           if (typeExpr != null) {
-            val type = Ref.deref(PyTypingTypeProvider.getType(typeExpr, myTypeEvalContext))
-            if (type !is PyClassType) {
+            val type = myTypeEvalContext.getType(typeExpr)
+            if (type is PyTypingNewTypeFactoryType) return
+            if (type !is PyClassType || !type.isDefinition) {
               registerProblem(typeExpr, PyPsiBundle.message("INSP.NAME.new.type.expected.class"))
             }
             else if (type is PyCollectionType && type.elementTypes.any { it is PyTypeVarType && it.scopeOwner == null }) {

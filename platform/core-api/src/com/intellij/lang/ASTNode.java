@@ -181,6 +181,8 @@ public interface ASTNode extends UserDataHolder {
 
   /**
    * Replaces the specified child node with another node.
+   * <p>
+   * It is guaranteed that {@code newChild} will appear in the resulting tree (i.e., the Platform will not make a copy of it)
    *
    * @param oldChild the child node to replace.
    * @param newChild the node to replace with.

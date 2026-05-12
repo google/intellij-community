@@ -17,13 +17,13 @@ import com.intellij.util.ui.SingleComponentCenteringLayout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.plugins.github.exceptions.GHAPIExceptionUtil
 import org.jetbrains.plugins.github.i18n.GithubBundle.message
 import org.jetbrains.plugins.github.pullrequest.action.GHPRActionKeys
 import org.jetbrains.plugins.github.pullrequest.data.GHPRIdentifier
 import org.jetbrains.plugins.github.pullrequest.ui.GHPRConnectedProjectViewModel
 import org.jetbrains.plugins.github.pullrequest.ui.timeline.GHPRFileEditorComponentFactory
 import org.jetbrains.plugins.github.pullrequest.ui.timeline.GHPRTimelineViewModel
-import org.jetbrains.plugins.github.ui.component.GHHtmlErrorPanel
 import java.awt.BorderLayout
 import java.awt.LayoutManager
 import javax.swing.JComponent
@@ -53,8 +53,8 @@ object GHPRTimelineComponentFactory {
             cancel()
           },
           onFailure = { error ->
-            val errorStatusPresenter = ErrorStatusPresenter.simple(message("cannot.load.details"),
-                                                                   descriptionProvider = GHHtmlErrorPanel::getLoadingErrorText)
+            val errorStatusPresenter = ErrorStatusPresenter.simpleHTML(message("cannot.load.details"),
+                                                                       descriptionProvider = GHAPIExceptionUtil::getPresentableMessage)
             val errorPanel = ErrorStatusPanelFactory.create(error, errorStatusPresenter)
             panel.setLayoutAndComponent(SingleComponentCenteringLayout(), errorPanel)
           }

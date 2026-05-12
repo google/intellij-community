@@ -6,6 +6,7 @@ import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.ExternalStorageConfigurationManager
 import com.intellij.platform.workspace.jps.entities.ModuleSettingsFacetBridgeEntity
+import com.intellij.platform.workspace.jps.serialization.CustomImlComponentNameContributor
 import com.intellij.platform.workspace.jps.serialization.SerializationContext
 import com.intellij.platform.workspace.jps.serialization.impl.CustomFacetRelatedEntitySerializer
 import com.intellij.platform.workspace.jps.serialization.impl.CustomModuleComponentSerializer
@@ -13,7 +14,9 @@ import com.intellij.platform.workspace.jps.serialization.impl.CustomModuleRootsS
 import com.intellij.platform.workspace.jps.serialization.impl.FileInDirectorySourceNames
 import com.intellij.platform.workspace.jps.serialization.impl.JpsFileContentReader
 import com.intellij.platform.workspace.storage.url.VirtualFileUrlManager
+import org.jetbrains.annotations.ApiStatus
 
+@ApiStatus.Internal
 abstract class BaseIdeSerializationContext : SerializationContext {
   override val isJavaPluginPresent: Boolean
     get() = PluginManagerCore.getPlugin(PluginId("com.intellij.java")) != null
@@ -24,6 +27,8 @@ abstract class BaseIdeSerializationContext : SerializationContext {
     get() = CUSTOM_MODULE_ROOTS_SERIALIZER_EP.extensionList
   override val customFacetRelatedEntitySerializers: List<CustomFacetRelatedEntitySerializer<*>>
     get() = CUSTOM_FACET_RELATED_ENTITY_SERIALIZER_EP.extensionList
+  override val customImpComponentNameContributors: List<CustomImlComponentNameContributor>
+    get() = CUSTOM_IML_COMPONENT_NAME_CONTRIBUTOR_EP.extensionList
 
   companion object {
     private val CUSTOM_MODULE_COMPONENT_SERIALIZER_EP: ExtensionPointName<CustomModuleComponentSerializer> =
@@ -32,6 +37,8 @@ abstract class BaseIdeSerializationContext : SerializationContext {
       ExtensionPointName.create("com.intellij.workspaceModel.customModuleRootsSerializer")
     val CUSTOM_FACET_RELATED_ENTITY_SERIALIZER_EP: ExtensionPointName<CustomFacetRelatedEntitySerializer<ModuleSettingsFacetBridgeEntity>> =
       ExtensionPointName.create("com.intellij.workspaceModel.customFacetRelatedEntitySerializer")
+    val CUSTOM_IML_COMPONENT_NAME_CONTRIBUTOR_EP: ExtensionPointName<CustomImlComponentNameContributor> =
+      ExtensionPointName.create("com.intellij.workspaceModel.customImlComponentNameContributor")
 
   }
 }

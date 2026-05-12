@@ -8,6 +8,7 @@ import com.intellij.codeInspection.ProblemHighlightType
 import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.psi.PsiElementVisitor
 import com.intellij.psi.PsiNameIdentifierOwner
+import com.intellij.util.containers.addIfNotNull
 import com.intellij.util.containers.tailOrEmpty
 import com.jetbrains.python.PyNames
 import com.jetbrains.python.PyPsiBundle
@@ -37,7 +38,8 @@ import com.jetbrains.python.psi.PyUtil
 import com.jetbrains.python.psi.impl.ParamHelper
 import com.jetbrains.python.psi.impl.PyCallExpressionHelper
 import com.jetbrains.python.psi.impl.PyEvaluator
-import com.jetbrains.python.psi.types.PyCallableType
+import com.jetbrains.python.psi.impl.stubs.PyDataclassFieldStubImpl
+import com.jetbrains.python.psi.stubs.PyDataclassFieldStub
 import com.jetbrains.python.psi.types.PyClassType
 import com.jetbrains.python.psi.types.PyCollectionType
 import com.jetbrains.python.psi.types.PyStructuralType
@@ -53,8 +55,13 @@ class PyDataclassInspection : PyInspection() {
     holder: ProblemsHolder,
     isOnTheFly: Boolean,
     session: LocalInspectionToolSession,
-  ): PsiElementVisitor = Visitor(
-    holder, PyInspectionVisitor.getContext(session))
+  ): PsiElementVisitor {
+    val context = PyInspectionVisitor.getContext(session)
+    if (context.usesExternalTypeEngine) {
+      return PsiElementVisitor.EMPTY_VISITOR
+    }
+    return Visitor(holder, context)
+  }
 
   private class Visitor(holder: ProblemsHolder, context: TypeEvalContext) : PyInspectionVisitor(holder, context) {
 
@@ -125,16 +132,6 @@ class PyDataclassInspection : PyInspection() {
         }
 
         processAnnotationsExistence(node, dataclassParameters)
-
-        //TODO: remove this check once PY-80837 is fixed
-        node.processClassLevelDeclarations { field, _ ->
-          if (field !is PyTargetExpression) return@processClassLevelDeclarations true
-
-          if (!PyTypingTypeProvider.isClassVar(field, myTypeEvalContext) && !isInitVar(field)) {
-            inspectFieldDefaultFactoryType(field, node, dataclassParameters, myTypeEvalContext)
-          }
-          true
-        }
 
         PyNamedTupleInspection.Helper.inspectFieldsOrder(
           cls = node,
@@ -241,7 +238,12 @@ class PyDataclassInspection : PyInspection() {
         val cls = getInstancePyClass(node.qualifier) ?: return
         val resolved = node.getReference(resolveContext).multiResolve(false)
 
-        if (resolved.isNotEmpty() && resolved.asSequence().map { it.element }.all { it is PyTargetExpression && isInitVar(it) }) {
+        if (
+          resolved.isNotEmpty() &&
+          resolved.asSequence()
+            .map { it.element }
+            .all { it is PyTargetExpression && getInitVarType(it) != null }
+        ) {
           registerProblem(node.lastChild,
                           PyPsiBundle.message("INSP.dataclasses.object.could.have.no.attribute.because.it.declared.as.init.only", cls.name, node.name),
                           ProblemHighlightType.GENERIC_ERROR_OR_WARNING)
@@ -252,14 +254,28 @@ class PyDataclassInspection : PyInspection() {
     private fun checkMutatingFrozenAttribute(expression: PyQualifiedExpression) {
       val cls = getInstancePyClass(expression.qualifier) ?: return
 
-      if (StreamEx
-          .of(cls).append(cls.getAncestorClasses(myTypeEvalContext))
-          .mapNotNull { parseDataclassParameters(it, myTypeEvalContext) }
-          .any { it.frozen == true }) {
+      val allClasses = listOf(cls) + cls.getAncestorClasses(myTypeEvalContext)
+      val allClassesAttributes = allClasses.mapNotNull { parseDataclassParameters(it, myTypeEvalContext) }
+      if (
+        allClassesAttributes.any { it.frozen == true }
+        || expression.isFrozenDataclassField(allClasses)
+      ) {
         registerProblem(expression,
                         PyPsiBundle.message("INSP.dataclasses.object.attribute.read.only", cls.name, expression.name),
                         ProblemHighlightType.GENERIC_ERROR)
       }
+    }
+
+    private fun PyQualifiedExpression.isFrozenDataclassField(allClasses: List<PyClass>): Boolean {
+      val fieldName = name ?: return false
+      val fieldDecl = allClasses.firstNotNullOfOrNull {
+        it.findClassAttribute(fieldName, false, myTypeEvalContext)
+      } ?: return false
+
+      val stub = fieldDecl.stub?.getCustomStub(PyDataclassFieldStub::class.java)
+                 ?: PyDataclassFieldStubImpl.create(fieldDecl)
+                 ?: return false
+      return stub.frozen() == true
     }
 
     private fun getDataclassHierarchyOrder(cls: PyClass, operator: String?): Pair<ClassOrder, PyDataclassParameters.Type?> {
@@ -432,7 +448,7 @@ class PyDataclassInspection : PyInspection() {
       }
 
       if (dataclassParameters.order && dataclassParameters.frozen == true && hashMethod != null) {
-        registerProblem(hashMethod?.nameIdentifier,
+        registerProblem(hashMethod.nameIdentifier,
                         PyPsiBundle.message("INSP.dataclasses.hash.ignored.if.class.already.defines.cmp.or.order.or.frozen.parameters"),
                         ProblemHighlightType.GENERIC_ERROR_OR_WARNING)
       }
@@ -594,18 +610,13 @@ class PyDataclassInspection : PyInspection() {
     }
 
     private fun processAsInitVar(field: PyTargetExpression, postInit: PyFunction?): InitVarField? {
-      val fieldType = myTypeEvalContext.getType(field)
-      if (isInitVar(fieldType)) {
-        if (postInit == null) {
-          registerProblem(field,
-                          PyPsiBundle.message("INSP.dataclasses.attribute.useless.until.post.init.declared", field.name),
-                          ProblemHighlightType.LIKE_UNUSED_SYMBOL)
-        }
-
-        return InitVarField(getInitVarType(fieldType))
+      val innerInitVarType = getInitVarType(field) ?: return null
+      if (postInit == null) {
+        registerProblem(field,
+                        PyPsiBundle.message("INSP.dataclasses.attribute.useless.until.post.init.declared", field.name),
+                        ProblemHighlightType.LIKE_UNUSED_SYMBOL)
       }
-
-      return null
+      return InitVarField(innerInitVarType)
     }
 
     private class InitVarField(val type: PyType?)
@@ -614,7 +625,7 @@ class PyDataclassInspection : PyInspection() {
       val fieldStub = resolveDataclassFieldParameters(dataclass, dataclassParameters, field, myTypeEvalContext) ?: return
       val call = field.findAssignedValue() as? PyCallExpression ?: return
 
-      if (PyTypingTypeProvider.isClassVar(field, myTypeEvalContext) || isInitVar(field)) {
+      if (PyTypingTypeProvider.isClassVar(field, myTypeEvalContext) || getInitVarType(field) != null) {
         if (fieldStub.hasDefaultFactory) {
           registerProblem(call.getKeywordArgument("default_factory"),
                           PyPsiBundle.message("INSP.dataclasses.field.cannot.have.default.factory"),
@@ -649,10 +660,7 @@ class PyDataclassInspection : PyInspection() {
 
         ancestor.processClassLevelDeclarations { element, _ ->
           if (element is PyTargetExpression) {
-            val fieldType = myTypeEvalContext.getType(element)
-            if (isInitVar(fieldType)) {
-              allInitVars.add(getInitVarType(fieldType))
-            }
+            allInitVars.addIfNotNull(getInitVarType(element))
           }
 
           return@processClassLevelDeclarations true
@@ -739,53 +747,12 @@ class PyDataclassInspection : PyInspection() {
       }
     }
 
-    private fun inspectFieldDefaultFactoryType(field : PyTargetExpression, cls: PyClass, dataclassParameters: PyDataclassParameters, context: TypeEvalContext) {
-      val fieldStub = resolveDataclassFieldParameters(cls, dataclassParameters, field, myTypeEvalContext)
-                      ?: return
-
-      if (!fieldStub.hasDefaultFactory) return
-
-      val call = field.findAssignedValue() as? PyCallExpression ?: return
-      val annotationExpr = field.annotation?.value ?: return
-      val expectedType = context.getType(annotationExpr)
-
-      val defaultFactoryExpr = call.getKeywordArgument("default_factory") ?: return
-      val defaultFactoryType = context.getType(defaultFactoryExpr) ?: return
-      val returnType = (defaultFactoryType as? PyCallableType)
-        ?.getReturnType(context)
-
-      val expectedInstanceType: PyType? = when (expectedType) {
-        is PyClassType -> expectedType.toInstance()
-        else -> expectedType
+    private fun getInitVarType(field: PyTargetExpression): PyType? {
+      val fieldType = myTypeEvalContext.getType(field)
+      if (fieldType is PyCollectionType && fieldType.classQName == Dataclasses.DATACLASSES_INITVAR) {
+        return fieldType.elementTypes.singleOrNull()
       }
-
-      val actualInstanceType: PyType = when (val actualType = returnType ?: defaultFactoryType) {
-        is PyClassType -> actualType.toInstance()
-        else -> actualType
-      }
-
-      if (!PyTypeChecker.match(expectedInstanceType, actualInstanceType, context)) {
-        val expectedTypeName = PythonDocumentationProvider.getTypeName(expectedInstanceType, context)
-        val actualTypeName = PythonDocumentationProvider.getTypeName(actualInstanceType, context)
-
-        registerProblem(call,
-                        PyPsiBundle.message("INSP.dataclasses.default.factory.type.incompatible", expectedTypeName, actualTypeName))
-      }
-    }
-
-    private fun isInitVar(field: PyTargetExpression): Boolean {
-      return isInitVar(myTypeEvalContext.getType(field))
-    }
-
-    private fun isInitVar(fieldType: PyType?): Boolean {
-      return fieldType is PyCollectionType && fieldType.classQName == Dataclasses.DATACLASSES_INITVAR
-    }
-
-    private fun getInitVarType(fieldType: PyType?): PyType? {
-      if (fieldType !is PyCollectionType || fieldType.classQName != Dataclasses.DATACLASSES_INITVAR) {
-        throw IllegalArgumentException()
-      }
-      return fieldType.elementTypes.singleOrNull()
+      return null
     }
 
     private fun isExpectedDataclass(

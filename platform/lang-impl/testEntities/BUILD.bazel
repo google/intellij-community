@@ -3,6 +3,7 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "testEntities",
+  module_name = "intellij.platform.lang.testEntities",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
@@ -13,6 +14,7 @@ jvm_library(
 
 jvm_library(
   name = "testEntities_test_lib",
+  testonly = True,
   module_name = "intellij.platform.lang.testEntities",
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form", "testGen/**/*.kt", "testGen/**/*.java"], allow_empty = True),
@@ -24,10 +26,18 @@ jvm_library(
     "//platform/workspace/storage:storage_test_lib",
     "//platform/projectModel-impl",
     "//platform/projectModel-impl:projectModel-impl_test_lib",
+    "//platform/util/base/multiplatform",
+    "//platform/util/base/multiplatform:multiplatform_test_lib",
   ],
   runtime_deps = [":testEntities"]
 )
 ### auto-generated section `build intellij.platform.lang.testEntities` end
+
+### auto-generated section `iml intellij.platform.lang.testEntities` start
+exports_files([
+  "intellij.platform.lang.testEntities.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.lang.testEntities` end
 
 ### auto-generated section `test intellij.platform.lang.testEntities` start
 load("@community//build:tests-options.bzl", "jps_test")

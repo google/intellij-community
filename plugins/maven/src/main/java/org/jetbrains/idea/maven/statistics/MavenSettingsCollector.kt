@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.idea.maven.statistics
 
 import com.intellij.internal.statistic.beans.MetricEvent
@@ -18,6 +18,7 @@ import org.jetbrains.idea.maven.project.MavenImportingSettings.GeneratedSourcesF
 import org.jetbrains.idea.maven.project.MavenImportingSettings.UPDATE_FOLDERS_PHASES
 import org.jetbrains.idea.maven.project.MavenProjectsManager
 import org.jetbrains.idea.maven.server.MavenDistributionsCache
+import org.jetbrains.idea.maven.toolchains.ToolchainFinder
 
 class MavenSettingsCollector : ProjectUsagesCollector() {
 
@@ -45,10 +46,10 @@ class MavenSettingsCollector : ProjectUsagesCollector() {
     @Suppress("DEPRECATION")
     usages.add(LOGGING_LEVEL.metric(generalSettings.loggingLevel))
     try {
-      val mavenDistribution = MavenDistributionsCache.getInstance(project).getMavenDistribution(
-        manager.rootProjects.firstOrNull()?.directory)
-      val mavenVersion = mavenDistribution.version?.let { Version.parseVersion(it)?.toCompactString() } ?: "unknown"
-      usages.add(MAVEN_VERSION.metric(mavenVersion))
+      val mavenVersion = MavenDistributionsCache.getInstance(project).getMavenVersion(
+        manager.rootProjects.firstOrNull()?.file)
+      val parsedMavenVersion = mavenVersion?.let { Version.parseVersion(it)?.toCompactString() } ?: "unknown"
+      usages.add(MAVEN_VERSION.metric(parsedMavenVersion))
     }
     catch (ignore: Exception) {
       // ignore invalid maven home configuration
@@ -95,10 +96,22 @@ class MavenSettingsCollector : ProjectUsagesCollector() {
     usages.add(PASS_PARENT_ENV.metric(runnerSettings.isPassParentEnv))
     usages.add(SKIP_TESTS.metric(runnerSettings.isSkipTests))
     usages.add(HAS_RUNNER_MAVEN_PROPERTIES.metric(!runnerSettings.mavenProperties.isNullOrEmpty()))
+
+    // Toolchains
+    val toolchainFinder = ToolchainFinder()
+    val allToolchainRequirements = manager.projects.flatMap { toolchainFinder.allToolchainRequirements(it) }.toSet()
+    usages.add(HAS_TOOLCHAIN_REQUIREMENTS.metric(allToolchainRequirements.isNotEmpty()))
+    usages.add(HAS_CUSTOM_TOOLCHAINS_FILE.metric(generalSettings.toolchainsPathString.isNotBlank()))
+    allToolchainRequirements
+      .filter { it.type == "jdk" }
+      .mapNotNull { it.params["version"] }
+      .toSet()
+      .forEach { version -> usages.add(TOOLCHAIN_VERSION_REQUIRED.metric(version)) }
+
     return usages
   }
 
-  private val GROUP = EventLogGroup("build.maven.state", 12)
+  private val GROUP = EventLogGroup("build.maven.state", 13)
   private val HAS_MAVEN_PROJECT = GROUP.registerEvent("hasMavenProject", EventFields.Enabled)
   private val ALWAYS_UPDATE_SNAPSHOTS = GROUP.registerEvent("alwaysUpdateSnapshots", EventFields.Enabled)
   private val SHOW_ADVANCED_SETTINGS = GROUP.registerEvent("showDialogWithAdvancedSettings", EventFields.Enabled)
@@ -129,8 +142,11 @@ class MavenSettingsCollector : ProjectUsagesCollector() {
   private val PASS_PARENT_ENV = GROUP.registerEvent("passParentEnv", EventFields.Enabled)
   private val SKIP_TESTS = GROUP.registerEvent("skipTests", EventFields.Enabled)
   private val HAS_RUNNER_MAVEN_PROPERTIES = GROUP.registerEvent("hasRunnerMavenProperties", EventFields.Enabled)
+  private val HAS_TOOLCHAIN_REQUIREMENTS = GROUP.registerEvent("hasToolchainRequirements", EventFields.Enabled)
+  private val HAS_CUSTOM_TOOLCHAINS_FILE = GROUP.registerEvent("hasCustomToolchainsFile", EventFields.Enabled)
 
   private val VERSION_FIELD = EventFields.StringValidatedByRegexpReference("value", "version")
+  private val TOOLCHAIN_VERSION_REQUIRED = GROUP.registerEvent("toolchainVersionRequired", VERSION_FIELD)
 
   private val CHECKSUM_POLICY = GROUP.registerEvent("checksumPolicy", EventFields.Enum("value",
                                                                                        MavenExecutionOptions.ChecksumPolicy::class.java) { it.name.lowercase() })

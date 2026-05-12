@@ -248,9 +248,9 @@ object CallableReturnTypeUpdaterUtils {
         override fun getResult(element: TypeInfo.Type): String = element.longTypeRepresentation
     }
 
-    context(session: KaSession)
     @OptIn(KaExperimentalApi::class)
     @ApiStatus.Internal
+    context(session: KaSession)
     fun <T> calculateAllTypes(
         declaration: KtCallableDeclaration,
         useSmartCastType: Boolean = false,
@@ -281,7 +281,10 @@ object CallableReturnTypeUpdaterUtils {
             ?.distinctBy { createTypeByKtType(it) }
             ?.toList()
             ?: emptyList()
-        val cannotBeNull = overriddenTypes.any { !it.isNullable }
+        val delegatedVarRequiresNonNull = (declaration as? KtProperty)?.let { property ->
+            property.isVar && property.hasDelegate() && declarationTypes.any { it.hasFlexibleNullability }
+        } == true
+        val cannotBeNull = overriddenTypes.any { !it.isNullable } || delegatedVarRequiresNonNull
         val allTypes = (declarationTypes + overriddenTypes)
             // Here we do BFS manually rather than invoke `getAllSuperTypes` because we have multiple starting points. Simply calling
             // `getAllSuperTypes` does not work because it would BFS traverse each starting point and put the result together, in which
@@ -306,9 +309,9 @@ object CallableReturnTypeUpdaterUtils {
     private fun KaClassType.isLocal(): Boolean =
         classId.isLocal
 
-    context(_: KaSession)
     @ApiStatus.Internal
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     fun getTypeInfo(declaration: KtCallableDeclaration, useSmartCastType: Boolean = false, useTemplate: Boolean = true): TypeInfo {
         val calculateAllTypes = calculateAllTypes(declaration, useSmartCastType = useSmartCastType) { declarationType, allTypes, cannotBeNull ->
             if (isUnitTestMode()) {
@@ -395,10 +398,10 @@ object CallableReturnTypeUpdaterUtils {
                 useTemplate: Boolean = false
             ): TypeInfo = TypeInfo(createTypeByKtType(ktType), otherTypes.map { createTypeByKtType(it) }.toList(), useTemplate)
 
-            context(_: KaSession)
             @OptIn(KaExperimentalApi::class)
+            context(_: KaSession)
             internal fun createTypeByKtType(ktType: KaType): Type = Type(
-                isUnit = ktType.isUnitType,
+                isUnit = ktType.isUnitType && !ktType.isMarkedNullable,
                 isError = ktType is KaErrorType,
                 longTypeRepresentation = ktType.render(KaTypeRendererForSource.WITH_QUALIFIED_NAMES_WITHOUT_PARAMETER_NAMES, position = Variance.OUT_VARIANCE),
                 shortTypeRepresentation = ktType.render(KaTypeRendererForSource.WITH_SHORT_NAMES_WITHOUT_PARAMETER_NAMES, position = Variance.OUT_VARIANCE),

@@ -63,6 +63,8 @@ public class MarkdownColorSettingsPage implements ColorSettingsPage {
     result.put("dt", MarkdownHighlighterColors.TERM);
     result.put("dm", MarkdownHighlighterColors.DEFINITION_LIST_MARKER);
 
+    result.put("footnote_def", MarkdownHighlighterColors.FOOTNOTE_DEFINITION);
+
     return result;
   }
 
@@ -154,6 +156,8 @@ public class MarkdownColorSettingsPage implements ColorSettingsPage {
       put("markdown.editor.colors.definition_list_marker", MarkdownHighlighterColors.DEFINITION_LIST_MARKER);
       put("markdown.editor.colors.definition", MarkdownHighlighterColors.DEFINITION);
       put("markdown.editor.colors.term", MarkdownHighlighterColors.TERM);
+
+      put("markdown.editor.colors.footnote_definition", MarkdownHighlighterColors.FOOTNOTE_DEFINITION);
     }
 
     public AttributesDescriptor @NotNull [] get() {

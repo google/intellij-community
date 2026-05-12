@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.junit5.report;
 
 import com.intellij.rt.execution.junit.MapSerializerUtil;
@@ -8,6 +8,7 @@ import org.junit.platform.launcher.TestPlan;
 import java.io.PrintStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 final public class ExecutionState {
   private final PrintStream myOut;
@@ -15,15 +16,22 @@ final public class ExecutionState {
   private TestPlan myPlan;
 
   private long myCurrentTestStartNanos;
+  private final Map<String, Long> mySuiteStartNanos = new ConcurrentHashMap<>();
   private int myFinishCount;
   private String myRootName;
   private String myPresentableName;
   private boolean mySuccessful = true;
   private String myIdSuffix = "";
   private boolean mySendTree;
+  private final boolean myUseSuiteDuration;
 
-  public ExecutionState(PrintStream out) {
+  public ExecutionState(PrintStream out, boolean useSuiteDuration) {
     myOut = out;
+    myUseSuiteDuration = useSuiteDuration;
+  }
+
+  public boolean isUseSuiteDuration() {
+    return myUseSuiteDuration;
   }
 
   public void setPlan(TestPlan plan) {
@@ -88,8 +96,27 @@ final public class ExecutionState {
     myCurrentTestStartNanos = System.nanoTime();
   }
 
+  void setCurrentTestStartNanos(long nanos) {
+    myCurrentTestStartNanos = nanos;
+  }
+
+  public void onSuiteStarted(String id) {
+    if (myUseSuiteDuration) {
+      mySuiteStartNanos.put(id, System.nanoTime());
+    }
+  }
+
+  public long onSuiteFinishedAndGetDurationMs(String id) {
+    return getDurationMsFrom(mySuiteStartNanos.remove(id));
+  }
+
   public long onLeafTestFinishedAndGetDurationMs() {
-    return (System.nanoTime() - myCurrentTestStartNanos) / 1_000_000L;
+    return getDurationMsFrom(myCurrentTestStartNanos);
+  }
+
+  private static long getDurationMsFrom(Long from) {
+    if (from == null) return 0L;
+    return (System.nanoTime() - from) / 1_000_000L;
   }
 
   public void resetFinishCount() {

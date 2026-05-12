@@ -30,7 +30,7 @@ import java.util.List;
 @Deprecated(forRemoval = true)
 public interface InjectedFileViewProvider extends FileViewProvider, FreeThreadedFileViewProvider {
   default void rootChangedImpl(@NotNull PsiFile psiFile) {
-    if (!isPhysical()) return; // injected PSI change happened inside reparse; ignore
+    if (SingleRootInjectedFileViewProvider.disabledTemporarily.get()) return; // injected PSI change happened inside reparse; ignore
     if (getPatchingLeaves()) return;
 
     DocumentWindowImpl documentWindow = getDocument();

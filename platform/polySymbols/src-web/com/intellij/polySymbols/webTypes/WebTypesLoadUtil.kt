@@ -1,18 +1,39 @@
 // Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.polySymbols.webTypes
 
+import com.intellij.openapi.progress.isInCancellableContext
+import com.intellij.openapi.progress.util.runWithCheckCanceled
 import com.intellij.polySymbols.impl.objectMapper
 import com.intellij.polySymbols.webTypes.json.WebTypes
 import com.intellij.util.text.SemVer
+import kotlinx.coroutines.job
 import org.jetbrains.annotations.ApiStatus
 import java.io.InputStream
 import java.util.SortedMap
 import java.util.TreeMap
+import java.util.concurrent.CancellationException
 
 @ApiStatus.Internal
 fun InputStream.readWebTypes(): WebTypes =
-  this.use {
-    objectMapper.readValue(this, WebTypes::class.java)
+  use { stream ->
+    if (!isInCancellableContext()) {
+      return objectMapper.readValue(stream, WebTypes::class.java)
+    }
+    // Not really practical to use DiskQueryRelay here, since streams are not realy reusable
+    // Better to close the stream and cancel reading.
+    runWithCheckCanceled {
+      try {
+        objectMapper.readValue(stream, WebTypes::class.java)
+      }
+      catch (e: CancellationException) {
+        throw e
+      }
+      catch (e: Exception) {
+        if (!this.coroutineContext.job.isCancelled)
+          throw e
+        throw CancellationException("Reading web types from disk was cancelled")
+      }
+    }
   }
 
 @ApiStatus.Internal

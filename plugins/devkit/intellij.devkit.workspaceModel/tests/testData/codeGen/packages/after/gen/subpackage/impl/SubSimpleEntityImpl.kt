@@ -1,3 +1,5 @@
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.workspaceModel.test.api.subpackage.impl
 
 import com.intellij.platform.workspace.storage.ConnectionId
@@ -154,7 +156,6 @@ modifiable.id = createEntityId()
 return modifiable
 }
 
-@OptIn(EntityStorageInstrumentationApi::class)
 override fun createEntity(snapshot: EntityStorageInstrumentation): SubSimpleEntity{
 val entityId = createEntityId()
 return snapshot.initializeEntity(entityId){

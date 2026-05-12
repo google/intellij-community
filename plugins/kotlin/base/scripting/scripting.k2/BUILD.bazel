@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.kotlin.base.scripting` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "kotlin-base-scripting_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "kotlin-base-scripting",
   module_name = "intellij.kotlin.base.scripting",
   visibility = ["//visibility:public"],
   srcs = glob(["gen/**/*.kt", "gen/**/*.java", "src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":kotlin-base-scripting_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/core-api:core",
     "//platform/projectModel-api:projectModel",
@@ -36,8 +31,10 @@ jvm_library(
     "//plugins/kotlin/base/resources:kotlin-base-resources",
     "//plugins/kotlin/base/platforms",
     "//plugins/kotlin/base/facet",
+    "//platform/lang-api:lang",
     "//plugins/kotlin/base/project-structure",
     "//platform/core-ui",
+    "//platform/core-impl",
     "//platform/util/jdom",
     "//platform/util-class-loader:util-classLoader",
     "//platform/projectModel-impl",
@@ -48,15 +45,17 @@ jvm_library(
     "//platform/ide-core-impl",
     "//java/openapi:java",
     "//java/java-indexing-impl:indexing-impl",
-    "//platform/collaboration-tools",
     "//java/java-impl:impl",
+    "//java/java-psi-api:psi",
     "//platform/backend/workspace",
     "//plugins/kotlin/code-insight/utils",
     "//platform/workspace/jps",
     "//platform/external-system-impl:externalSystem-impl",
     "//java/idea-ui:ui",
+    "//java/java-frontback-psi-api:frontback-psi",
     "@lib//:kotlinc-kotlin-scripting-dependencies",
     "//platform/observable",
+    "//platform/progress/shared:ide-progress",
     "//jps/model-api:model",
     "//platform/refactoring",
     "//libraries/guava",
@@ -67,11 +66,15 @@ jvm_library(
     "//platform/execution",
     "//plugins/kotlin/preferences",
     "//platform/util/zip",
+    "//platform/util:util-ui",
+    "//platform/util",
+    "//platform/eel-provider",
   ]
 )
 
 jvm_library(
   name = "kotlin-base-scripting_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.base.scripting",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -90,8 +93,10 @@ jvm_library(
     "//plugins/kotlin/base/resources:kotlin-base-resources_test_lib",
     "//plugins/kotlin/base/platforms:platforms_test_lib",
     "//plugins/kotlin/base/facet:facet_test_lib",
+    "//platform/lang-api:lang_test_lib",
     "//plugins/kotlin/base/project-structure:project-structure_test_lib",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/util/jdom:jdom_test_lib",
     "//platform/util-class-loader:util-classLoader_test_lib",
     "//platform/projectModel-impl:projectModel-impl_test_lib",
@@ -102,14 +107,16 @@ jvm_library(
     "//platform/ide-core-impl:ide-core-impl_test_lib",
     "//java/openapi:java_test_lib",
     "//java/java-indexing-impl:indexing-impl_test_lib",
-    "//platform/collaboration-tools:collaboration-tools_test_lib",
     "//java/java-impl:impl_test_lib",
+    "//java/java-psi-api:psi_test_lib",
     "//platform/backend/workspace:workspace_test_lib",
     "//plugins/kotlin/code-insight/utils:utils_test_lib",
     "//platform/workspace/jps:jps_test_lib",
     "//platform/external-system-impl:externalSystem-impl_test_lib",
     "//java/idea-ui:ui_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
     "//platform/observable:observable_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
     "//jps/model-api:model_test_lib",
     "//platform/refactoring:refactoring_test_lib",
     "//libraries/guava:guava_test_lib",
@@ -120,19 +127,30 @@ jvm_library(
     "//platform/execution:execution_test_lib",
     "//plugins/kotlin/preferences:preferences_test_lib",
     "//platform/util/zip:zip_test_lib",
+    "//platform/util:util-ui_test_lib",
+    "//platform/util:util_test_lib",
+    "//platform/eel-provider:eel-provider_test_lib",
   ]
 )
 ### auto-generated section `build intellij.kotlin.base.scripting` end
 
+### auto-generated section `iml intellij.kotlin.base.scripting` start
+exports_files([
+  "intellij.kotlin.base.scripting.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.base.scripting` end
+
 ### auto-generated section `build intellij.kotlin.base.scripting.tests` start
 jvm_library(
   name = "kotlin-base-scripting-tests",
+  module_name = "intellij.kotlin.base.scripting.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "kotlin-base-scripting-tests_test_lib",
+  testonly = True,
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
   associates = [
@@ -229,8 +247,8 @@ jvm_library(
     "//platform/lang-core:lang-core_test_lib",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//platform/backend/observation",
     "//platform/backend/observation:observation_test_lib",
     "//platform/execution",
@@ -239,6 +257,19 @@ jvm_library(
     "//plugins/kotlin/preferences:preferences_test_lib",
     "//platform/util/zip",
     "//platform/util/zip:zip_test_lib",
+    "//plugins/kotlin/highlighting/highlighting-k2:kotlin-highlighting-tests",
+    "//plugins/kotlin/highlighting/highlighting-k2:kotlin-highlighting-tests_test_lib",
+    "//plugins/kotlin/test-framework",
+    "//plugins/kotlin/test-framework:test-framework_test_lib",
+    "//plugins/kotlin/intellij.kotlin.base.test:base-test",
+    "//plugins/kotlin/intellij.kotlin.base.test:base-test_test_lib",
+    "//plugins/kotlin/tests-common:common-tests",
+    "//plugins/kotlin/tests-common:common-tests_test_lib",
+    "@lib//:kotlinc-kotlin-compiler-tests",
+    "//plugins/kotlin/scripting",
+    "//plugins/kotlin/scripting:scripting_test_lib",
+    "//plugins/kotlin/base/facet/tests",
+    "//plugins/kotlin/base/facet/tests:tests_test_lib",
   ],
   runtime_deps = [
     ":kotlin-base-scripting-tests",
@@ -249,6 +280,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.kotlin.base.scripting.tests` end
+
+### auto-generated section `iml intellij.kotlin.base.scripting.tests` start
+exports_files([
+  "intellij.kotlin.base.scripting.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.base.scripting.tests` end
 
 ### auto-generated section `test intellij.kotlin.base.scripting.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

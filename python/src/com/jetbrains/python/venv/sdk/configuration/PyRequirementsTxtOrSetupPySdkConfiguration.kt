@@ -57,7 +57,7 @@ internal class PyRequirementsTxtOrSetupPySdkConfiguration : PyProjectSdkConfigur
       PythonRequirementTxtSdkUtils.saveRequirementsTxtPath(module.project, sdk, requirementsTxtOrSetupPyFile.toNioPath())
     }
 
-    return PythonPackageManager.forSdk(module.project, sdk).sync().mapSuccess { sdk }
+    return PythonPackageManager.forSdk(module.project, sdk).syncLocked().mapSuccess { sdk }
   }
 
   private fun getRequirementsTxtOrSetupPy(module: Module) =

@@ -9,7 +9,7 @@
   <extensions defaultExtensionNs="com.intellij">
     <projectService serviceInterface="com.intellij.execution.RunManager" open="true"
                     serviceImplementation="com.intellij.execution.impl.RunManagerImpl"/>
-    <projectPreInit implementation="com.intellij.execution.impl.ProjectRunConfigurationInitializer" order="after moduleBridgeLoaderService"/>
+    <projectPreInit implementation="com.intellij.execution.impl.ProjectRunConfigurationInitializer" order="after initialProjectSynchronizer"/>
     <pathMacroFilter implementation="com.intellij.execution.configuration.RunConfigurationPathMacroFilter"/>
 
     <projectFileScanner implementation="com.intellij.execution.impl.RunConfigurationInArbitraryFileScanner"/>
@@ -89,6 +89,9 @@
     <projectService serviceImplementation="com.intellij.execution.configurations.RunConfigurationVcsSupport" open="true"/>
 
     <codeInsight.lineMarkerProvider language="" implementationClass="com.intellij.execution.lineMarker.RunLineMarkerProvider"/>
+    <projectSettings service="com.intellij.execution.ExecutionTargetManagerImpl"/>
+    <applicationSettings service="com.intellij.execution.ui.layout.impl.RunnerLayoutSettings"/>
+    <projectSettings service="com.intellij.execution.impl.RunManagerImpl"/>
   </extensions>
   <projectListeners>
     <listener class="com.intellij.execution.lineMarker.RunnableStatusListener"

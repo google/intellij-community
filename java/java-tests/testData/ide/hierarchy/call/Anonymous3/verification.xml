@@ -1,4 +1,4 @@
-<node text="B.foo()  ()" base="true">
-  <node text="A.blabla()  ()"/>
-  <node text="Anonymous in B() in B.run()  ()"/>
+<node text="foo() (B)" base="true">
+  <node text="blabla() (A)"/>
+  <node text="run() (B.B())"/>
 </node>

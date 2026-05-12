@@ -20,6 +20,7 @@ class KotlinMppTestSourceRootDetectionTest : AbstractKotlinMppGradleImportingTes
     }
 
     @Test
+    @PluginTargetVersions(pluginVersion = "1.8.0 <=> 2.4.0-dev-6429")
     fun testIosAndroidLayoutV1() {
         doTest()
     }

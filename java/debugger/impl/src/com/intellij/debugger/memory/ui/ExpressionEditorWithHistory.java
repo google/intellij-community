@@ -16,7 +16,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.popup.PopupStep;
 import com.intellij.openapi.ui.popup.util.BaseListPopupStep;
 import com.intellij.psi.search.GlobalSearchScope;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.ui.popup.list.ListPopupImpl;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.xdebugger.XExpression;
@@ -78,7 +78,7 @@ class ExpressionEditorWithHistory extends XDebuggerExpressionEditor {
       }) {
         @Override
         protected ListCellRenderer getListElementRenderer() {
-          return SimpleListCellRenderer.create("", XExpression::getExpression);
+          return BuilderKt.textListCellRenderer("", XExpression::getExpression);
         }
       };
 

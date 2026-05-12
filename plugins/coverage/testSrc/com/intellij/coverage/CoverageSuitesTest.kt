@@ -12,6 +12,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 import java.io.File
+import java.nio.file.Path
 
 @RunWith(JUnit4::class)
 class CoverageSuitesTest : CoverageIntegrationBaseTest() {
@@ -20,12 +21,25 @@ class CoverageSuitesTest : CoverageIntegrationBaseTest() {
     assertNoSuites()
     val path = SIMPLE_IJ_REPORT_PATH
     val runner = CoverageRunner.getInstance(IDEACoverageRunner::class.java)
-    val suite = manager.addExternalCoverageSuite(File(path), runner)
+    val suite = manager.addExternalCoverageSuite(Path.of(path), runner)
 
     manager.suites.run {
       Assert.assertEquals(1, size)
       Assert.assertSame(suite, this[0])
     }
+
+    manager.unregisterCoverageSuite(suite)
+    assertNoSuites()
+  }
+
+  @Test
+  fun `test external suite stores absolute path`() {
+    assertNoSuites()
+    val path = Path.of("relative-report.ic")
+    val runner = CoverageRunner.getInstance(IDEACoverageRunner::class.java)
+    val suite = manager.addExternalCoverageSuite(path, runner)
+
+    Assert.assertEquals(path.toAbsolutePath().toString(), suite.coverageDataFileName)
 
     manager.unregisterCoverageSuite(suite)
     assertNoSuites()

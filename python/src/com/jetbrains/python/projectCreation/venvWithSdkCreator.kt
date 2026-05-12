@@ -121,7 +121,7 @@ private suspend fun findExistingVenv(
   venvDirPath: Path,
 ): PythonBinary? = withContext(Dispatchers.IO) {
   val pythonPath = VirtualEnvReader().findPythonInPythonRoot(venvDirPath) ?: return@withContext null
-  val flavor = PythonSdkFlavor.tryDetectFlavorByLocalPath(pythonPath.toString())
+  val flavor = PythonSdkFlavor.tryDetectFlavorByLocalPath(pythonPath)
   if (flavor == null) {
     logger.warn("No flavor found for $pythonPath")
     return@withContext null
@@ -192,5 +192,5 @@ private suspend fun getSdk(pythonPath: PythonBinary, sdkBasePath: Path?): Sdk =
     if (currentSdk != null) return@withProgressText currentSdk
 
     val localPythonVfs = withContext(Dispatchers.IO) { VfsUtil.findFile(pythonPath, true)!! }
-    createSdk(localPythonVfs, sdkBasePath, allJdks)
+    createSdk(localPythonVfs, allJdks)
   }

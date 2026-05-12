@@ -28,10 +28,9 @@ public interface RegExpGroup extends RegExpAtom, PsiNameIdentifierOwner {
   /** @return true, if this is a named group of any kind, false otherwise */
   boolean isAnyNamedGroup();
 
-  @Nullable
-  String getGroupName();
+  @Nullable String getGroupName();
 
-  Type getType();
+  @NotNull Type getType();
 
   enum Type {
     /** (?<name>pattern) */

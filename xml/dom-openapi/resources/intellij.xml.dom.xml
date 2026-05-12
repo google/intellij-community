@@ -1,19 +1,34 @@
 <idea-plugin visibility="public">
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
+    <module name="intellij.libraries.fastutil"/>
+    <module name="intellij.platform.analysis"/>
     <module name="intellij.platform.backend"/>
+    <module name="intellij.platform.core"/>
+    <module name="intellij.platform.core.ui"/>
+    <module name="intellij.platform.editor.ui"/>
+    <module name="intellij.platform.ide"/>
+    <module name="intellij.platform.ide.core"/>
+    <module name="intellij.platform.indexing"/>
+    <module name="intellij.platform.lang"/>
+    <module name="intellij.platform.projectModel"/>
+    <module name="intellij.platform.util.ui"/>
+    <module name="intellij.xml.analysis"/>
     <module name="intellij.xml.psi"/>
   </dependencies>
+  <!-- endregion -->
 
   <extensionPoints>
-    <extensionPoint name="dom.customAnnotationChecker"
+    <extensionPoint qualifiedName="com.intellij.dom.customAnnotationChecker"
                     interface="com.intellij.util.xml.highlighting.DomCustomAnnotationChecker"
                     dynamic="true"/>
-    <extensionPoint name="dom.gotoSuper" interface="com.intellij.util.xml.DomElementNavigationProvider" dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.dom.gotoSuper" interface="com.intellij.util.xml.DomElementNavigationProvider"
+                    dynamic="true"/>
 
-    <extensionPoint name="dom.uiControlsProvider"
+    <extensionPoint qualifiedName="com.intellij.dom.uiControlsProvider"
                     interface="com.intellij.util.Consumer"/>
 
-    <extensionPoint name="dom.fileDescription"
+    <extensionPoint qualifiedName="com.intellij.dom.fileDescription"
                     interface="com.intellij.util.xml.DomFileDescription"
                     dynamic="true"/>
 

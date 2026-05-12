@@ -611,8 +611,8 @@ public final class FindPopupPanel extends JBPanel<FindPopupPanel> implements Fin
 
     header = new FindPopupHeader(myProject, myFilterContextButton, new MyPinAction());
 
-    ItemListener liveResultsPreviewUpdateListener = __ -> scheduleResultsUpdate();
-    header.cbFileFilter.addItemListener(__ -> {
+    ItemListener liveResultsPreviewUpdateListener = _ -> scheduleResultsUpdate();
+    header.cbFileFilter.addItemListener(_ -> {
       if (header.cbFileFilter.isSelected()) {
         header.fileMaskField.setEnabled(true);
         if (header.cbFileFilter.getClientProperty("dontRequestFocus") == null) {
@@ -628,7 +628,7 @@ public final class FindPopupPanel extends JBPanel<FindPopupPanel> implements Fin
       }
     });
     header.cbFileFilter.addItemListener(liveResultsPreviewUpdateListener);
-    header.fileMaskField.addActionListener(__ -> scheduleResultsUpdate());
+    header.fileMaskField.addActionListener(_ -> scheduleResultsUpdate());
     Component editorComponent = header.fileMaskField.getEditor().getEditorComponent();
     if (editorComponent instanceof EditorTextField etf) {
       etf.addDocumentListener(new DocumentListener() {
@@ -659,9 +659,9 @@ public final class FindPopupPanel extends JBPanel<FindPopupPanel> implements Fin
     myReplaceAllButton = new JButton(FindBundle.message("find.popup.replace.all.button"));
     myReplaceSelectedButton = new JButton(FindBundle.message("find.popup.replace.selected.button", 0));
 
-    myOkActionListener = __ -> doOK(true);
+    myOkActionListener = _ -> doOK(true);
     myReplaceAllButton.setOpaque(false);
-    myReplaceAllButton.addActionListener(__ -> doOK(false));
+    myReplaceAllButton.addActionListener(_ -> doOK(false));
     myReplaceSelectedButton.setOpaque(false);
     myReplaceSelectedButton.addActionListener(e -> {
       int rowToSelect = myResultsPreviewTable.getSelectionModel().getMinSelectionIndex();
@@ -707,8 +707,8 @@ public final class FindPopupPanel extends JBPanel<FindPopupPanel> implements Fin
 
     new MyEnterAction(enterAsOK).registerCustomShortcutSet(new CustomShortcutSet(ENTER), this);
     DumbAwareAction.create(
-      __ -> myOkActionListener.actionPerformed(null)).registerCustomShortcutSet(new CustomShortcutSet(ENTER_WITH_MODIFIERS), this);
-    DumbAwareAction.create(__ -> myReplaceAllButton.doClick()).registerCustomShortcutSet(new CustomShortcutSet(REPLACE_ALL), this);
+      _ -> myOkActionListener.actionPerformed(null)).registerCustomShortcutSet(new CustomShortcutSet(ENTER_WITH_MODIFIERS), this);
+    DumbAwareAction.create(_ -> myReplaceAllButton.doClick()).registerCustomShortcutSet(new CustomShortcutSet(REPLACE_ALL), this);
     myReplaceAllButton.setToolTipText(KeymapUtil.getKeystrokeText(REPLACE_ALL));
 
     List<Shortcut> navigationKeyStrokes = new ArrayList<>();
@@ -829,7 +829,7 @@ public final class FindPopupPanel extends JBPanel<FindPopupPanel> implements Fin
       ScrollingUtil.installActions(myResultsPreviewTable, false, component);
     }
 
-    ActionListener helpAction = __ -> HelpManager.getInstance().invokeHelp("reference.dialogs.findinpath");
+    ActionListener helpAction = _ -> HelpManager.getInstance().invokeHelp("reference.dialogs.findinpath");
     registerKeyboardAction(helpAction,KeyStroke.getKeyStroke(KeyEvent.VK_F1, 0),JComponent.WHEN_IN_FOCUSED_WINDOW);
     registerKeyboardAction(helpAction,KeyStroke.getKeyStroke(KeyEvent.VK_HELP, 0),JComponent.WHEN_IN_FOCUSED_WINDOW);
     KeymapManager keymapManager = KeymapManager.getInstance();
@@ -1651,7 +1651,7 @@ public final class FindPopupPanel extends JBPanel<FindPopupPanel> implements Fin
       if (!dotAdded) emptyText.appendText(".");
       emptyText.appendLine(" ");
       if (couldBeRegexp) {
-        emptyText.appendLine(FindBundle.message("message.nothingFound.search.with.regex"), LINK_PLAIN_ATTRIBUTES, __ -> {
+        emptyText.appendLine(FindBundle.message("message.nothingFound.search.with.regex"), LINK_PLAIN_ATTRIBUTES, _ -> {
           toggleOption(myRegexAction);
           mySuggestRegexHintForEmptyResults = false;
         }).appendText(" " + KeymapUtil.getFirstKeyboardShortcutText(myRegexAction.getShortcutSet()));
@@ -1667,13 +1667,13 @@ public final class FindPopupPanel extends JBPanel<FindPopupPanel> implements Fin
         }
         emptyText.appendLine(sb.toString());
         emptyText.appendLine(FindBundle.message("message.nothingFound.clearAll"), LINK_PLAIN_ATTRIBUTES,
-                             __ -> resetAllFilters()).appendText(" " + getOptionText(myResetFiltersAction, true));
+                             _ -> resetAllFilters()).appendText(" " + getOptionText(myResetFiltersAction, true));
       }
       else {
         Object option = usedOptions.get(0);
         emptyText.appendLine(FindBundle.message("message.nothingFound.used.option", getOptionText(option, false)));
         emptyText.appendLine(FindBundle.message("message.nothingFound.clearOption"), LINK_PLAIN_ATTRIBUTES,
-                             __ -> resetAllFilters()).appendText(" " + getOptionText(myResetFiltersAction, true));
+                             _ -> resetAllFilters()).appendText(" " + getOptionText(myResetFiltersAction, true));
       }
     }
     if (isFinish && message.startsWith(FindBundle.message("message.nothingFound"))) {

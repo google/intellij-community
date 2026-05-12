@@ -155,8 +155,8 @@ class KotlinChangeSignatureConflictSearcher(
         return result
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun filterCandidates(function: KtCallableDeclaration, candidateSymbol: KaDeclarationSymbol): Boolean {
         if (candidateSymbol !is KaFunctionSymbol) return false
 

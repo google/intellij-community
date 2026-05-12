@@ -784,7 +784,7 @@ public class JavaCodeStyleManagerImpl extends JavaCodeStyleManager {
           else if (words.size() == 1 || useAllMethodNames) {
             if (Registry.is("add.past.participle.to.suggested.names") && !"equals".equals(firstWord) && !"valueOf".equals(methodName)) {
               String pastParticiple = PastParticiple.pastParticiple(firstWord);
-              String name = StreamEx.of(words).mapFirst(__ -> pastParticiple).joining();
+              String name = StreamEx.of(words).mapFirst(_ -> pastParticiple).joining();
               return new NamesByExprInfo(methodName, pastParticiple, name);
             }
             else {

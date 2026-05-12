@@ -1,6 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:ApiStatus.Experimental
-
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.syntax.util.language
 
 import com.intellij.platform.syntax.SyntaxElementType
@@ -8,7 +6,6 @@ import com.intellij.platform.syntax.SyntaxElementTypeSet
 import com.intellij.platform.syntax.SyntaxLanguage
 import com.intellij.platform.syntax.extensions.ExtensionPointKey
 import com.intellij.platform.syntax.extensions.currentExtensionSupport
-import org.jetbrains.annotations.ApiStatus
 
 /**
  * Specifies which languages a given element type belongs to.
@@ -26,7 +23,6 @@ import org.jetbrains.annotations.ApiStatus
  * @see syntaxElementLanguageProvider
  * @see FiniteSyntaxElementLanguageProvider
  */
-@ApiStatus.Experimental
 fun interface SyntaxElementLanguageProvider {
   fun getLanguages(elementType: SyntaxElementType): Sequence<SyntaxLanguage>
 }
@@ -34,7 +30,6 @@ fun interface SyntaxElementLanguageProvider {
 /**
  * Returns the language that the given element type belongs to or `null` if it doesn't belong to any language or if several languages are possible.
  */
-@ApiStatus.Experimental
 fun SyntaxElementLanguageProvider.getLanguage(elementType: SyntaxElementType): SyntaxLanguage? =
   getLanguages(elementType).singleOrNull()
 
@@ -42,7 +37,6 @@ fun SyntaxElementLanguageProvider.getLanguage(elementType: SyntaxElementType): S
  * Returns a [SyntaxElementLanguageProvider] from the current [ExtensionSupport].
  * Note that if several language providers are registered, the result provider combines them all.
  */
-@ApiStatus.Experimental
 fun syntaxElementLanguageProvider(): SyntaxElementLanguageProvider? {
   val languageProviders = currentExtensionSupport().getExtensions(syntaxElementLanguageProviderEP)
   if (languageProviders.isEmpty()) return null
@@ -63,7 +57,6 @@ fun syntaxElementLanguageProvider(): SyntaxElementLanguageProvider? {
  *
  * @see SyntaxElementLanguageProvider
  */
-@ApiStatus.Experimental
 class FiniteSyntaxElementLanguageProvider(
   private val language: SyntaxLanguage,
   private val elementTypes: SyntaxElementTypeSet,
@@ -78,5 +71,4 @@ class FiniteSyntaxElementLanguageProvider(
   }
 }
 
-@ApiStatus.Experimental
 val syntaxElementLanguageProviderEP: ExtensionPointKey<SyntaxElementLanguageProvider> = ExtensionPointKey<SyntaxElementLanguageProvider>("com.intellij.syntax.syntaxElementLanguageProvider")

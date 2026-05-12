@@ -7,7 +7,7 @@ a:com.intellij.history.core.Content
 - a:isAvailable():Z
 - a:release():V
 - write(java.io.DataOutput):V
-c:com.intellij.history.core.LocalHistoryFacade
+f:com.intellij.history.core.LocalHistoryFacade
 - f:accept(com.intellij.history.core.changes.ChangeVisitor):V
 - f:addChangeInTests(com.intellij.history.core.changes.StructuralChange):V
 - f:addListener(com.intellij.history.core.LocalHistoryFacade$Listener,com.intellij.openapi.Disposable):V

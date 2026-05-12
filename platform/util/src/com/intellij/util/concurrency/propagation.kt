@@ -8,6 +8,7 @@ package com.intellij.util.concurrency
 import com.intellij.concurrency.ContextAwareCallable
 import com.intellij.concurrency.ContextAwareRunnable
 import com.intellij.concurrency.IntelliJContextElement
+import com.intellij.concurrency.IntelliJThreadContextElement
 import com.intellij.concurrency.client.captureClientIdInBiConsumer
 import com.intellij.concurrency.client.captureClientIdInCallable
 import com.intellij.concurrency.client.captureClientIdInFunction
@@ -205,19 +206,23 @@ data class ChildContext internal constructor(
 
   @DelicateCoroutinesApi
   fun applyContextActions(installThreadContext: Boolean = true): AccessToken {
-    val alreadyAppliedElements = mutableListOf<IntelliJContextElement>()
+    val alreadyAppliedElements = mutableListOf<Pair<IntelliJThreadContextElement<Any?>, Any?>>()
     try {
       for (elem in ijElements) {
-        elem.beforeChildStarted(context)
-        alreadyAppliedElements.add(elem)
+        if (elem is IntelliJThreadContextElement<*>) {
+          val associatedPayload = elem.beforeStarted(context)
+          @Suppress("UNCHECKED_CAST")
+          alreadyAppliedElements.add(elem as IntelliJThreadContextElement<Any?> to associatedPayload)
+        }
       }
     }
     catch (e: Throwable) {
-      cleanupList(e, alreadyAppliedElements.reversed()) {
-        it.afterChildCompleted(context)
+      cleanupList(e, alreadyAppliedElements.reversed()) { (contextElement, associatedPayload) ->
+        contextElement.afterCompleted(context, associatedPayload)
       }
     }
     val installToken = if (installThreadContext) {
+      @Suppress("DEPRECATION")
       installThreadContext(context, replace = false)
     }
     else {
@@ -226,8 +231,8 @@ data class ChildContext internal constructor(
     return object : AccessToken() {
       override fun finish() {
         installToken.finish()
-        ijElements.reversed().forEachGuaranteed {
-          it.afterChildCompleted(context)
+        alreadyAppliedElements.reversed().forEachGuaranteed { (contextElement, associatedPayload) ->
+          contextElement.afterCompleted(context, associatedPayload)
         }
       }
     }
@@ -235,7 +240,9 @@ data class ChildContext internal constructor(
 
   fun cancelAllIntelliJElements() {
     ijElements.forEachGuaranteed {
-      it.childCanceled(context)
+      if (it is IntelliJThreadContextElement<*>) {
+        it.canceled(context)
+      }
     }
   }
 }
@@ -329,7 +336,9 @@ private fun gatherAppliedChildContext(parentContext: CoroutineContext, isStructu
   }
   catch (e: Throwable) {
     cleanupList(e, ijElements.reversed()) {
-      it.childCanceled(parentContext)
+      if (it is IntelliJThreadContextElement<*>) {
+        it.canceled(parentContext)
+      }
     }
   }
 }
@@ -422,6 +431,7 @@ fun isContextAwareComputation(runnable: Any): Boolean {
  * @param completeOnFinish whether to complete [continuation] on the computation finish. Most of the time, this is the desired default behavior.
  * However, sometimes in non-linear execution scenarios (such as NonBlockingReadAction), more precise control over the completion of a job is needed.
  */
+@Suppress("IncorrectCancellationExceptionHandling")
 @Internal
 @Throws(ProcessCanceledException::class)
 @OptIn(DelicateCoroutinesApi::class, ExperimentalCoroutinesApi::class)

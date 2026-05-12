@@ -2,7 +2,6 @@
 package com.intellij.openapi.updateSettings.impl
 
 import com.intellij.ide.IdeBundle
-import com.intellij.ide.ui.LafManager
 import com.intellij.ide.ui.ProductIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationInfo
@@ -11,10 +10,10 @@ import com.intellij.openapi.application.IdeUrlTrackingParametersProvider
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.ui.DialogBackgroundImageProvider
+import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.VerticalFlowLayout
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.NlsSafe
-import com.intellij.openapi.wm.impl.IdeBackgroundUtil
 import com.intellij.platform.ide.customization.ExternalProductResourceUrls
 import com.intellij.ui.BrowserHyperlinkListener
 import com.intellij.ui.JBColor
@@ -30,7 +29,6 @@ import com.intellij.ui.dsl.gridLayout.UnscaledGapsY
 import com.intellij.util.FontUtil
 import com.intellij.util.IconUtil
 import com.intellij.util.system.OS
-import com.intellij.util.ui.JBInsets
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.StartupUiUtil
 import com.intellij.util.ui.UIUtil
@@ -39,6 +37,8 @@ import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.FlowLayout
 import java.awt.Font
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
 import java.nio.file.Files
 import java.nio.file.Path
 import javax.swing.JEditorPane
@@ -137,7 +137,7 @@ internal class UpdateInfoPanel(
     return panel
   }
 
-  fun createNew(): JPanel {
+  fun createNew(dialog: DialogWrapper): JPanel {
     val productIcon = ProductIcons.getInstance().productIcon
 
     val mainPanel = BorderLayoutPanel().apply {
@@ -213,16 +213,15 @@ internal class UpdateInfoPanel(
 
     mainPanel.addToCenter(infoPanel)
     mainPanel.addToBottom(additionalInfoPanel)
-    val isDark = LafManager.getInstance().currentUIThemeLookAndFeel?.isDark ?: true
-    val bgImage = DialogBackgroundImageProvider.getInstance().getImage(isDark)
+    val bgImage = DialogBackgroundImageProvider.getInstance().getImage()
     if (bgImage != null) {
-      IdeBackgroundUtil
-        .createTemporaryBackgroundTransform(mainPanel,
-                                            bgImage,
-                                            IdeBackgroundUtil.Fill.SCALE,
-                                            IdeBackgroundUtil.Anchor.TOP_RIGHT,
-                                            1f, JBInsets.emptyInsets(),
-                                            parentDisposable)
+      DialogBackgroundImageProvider.getInstance().setBackgroundImageToDialog(dialog, bgImage)
+      mainPanel.putClientProperty(DialogWrapper.IS_VISUAL_PADDING_COMPENSATED_ON_COMPONENT_LEVEL_KEY, false)
+      dialog.rootPane?.addComponentListener(object : ComponentAdapter() {
+        override fun componentResized(e: ComponentEvent) {
+          dialog.rootPane?.repaint()
+        }
+      })
     }
     return mainPanel
   }

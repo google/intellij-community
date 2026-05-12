@@ -49,6 +49,7 @@ import com.intellij.ui.components.labels.LinkListener;
 import com.intellij.ui.components.panels.NonOpaquePanel;
 import com.intellij.ui.components.panels.OpaquePanel;
 import com.intellij.ui.components.panels.Wrapper;
+import com.intellij.util.concurrency.annotations.RequiresEdt;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.JBDimension;
 import com.intellij.util.ui.JBUI;
@@ -89,6 +90,7 @@ public class PluginUpdateDialog extends DialogWrapper {
 
   private @Nullable Runnable myFinishCallback;
 
+  @RequiresEdt
   public PluginUpdateDialog(@Nullable Project project,
                             @NotNull Collection<PluginUiModel> updates,
                             @Nullable Collection<PluginUiModel> customRepositoryPlugins,
@@ -156,7 +158,7 @@ public class PluginUpdateDialog extends DialogWrapper {
       }
     };
     PluginManagerConfigurablePanel.registerCopyProvider(myPluginsPanel);
-    myPluginsPanel.setSelectionListener(__ -> myDetailsPage.showPlugins(myPluginsPanel.getSelection()));
+    myPluginsPanel.setSelectionListener(_ -> myDetailsPage.showPlugins(myPluginsPanel.getSelection()));
 
     for (PluginUiModel descriptor : updates) {
       myGroup.addModel(descriptor);

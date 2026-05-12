@@ -158,12 +158,13 @@ def func8(x: str) -> A:
 
 
 def func8(x: Any) -> Any:
-    ...
+    raise NotImplementedError
 
 
-assert_type(func8("foo"), C)  # First overload
-assert_type(func8("bar"), B)  # Second overload
-assert_type(func8(input()), A)  # Third overload
+def call_func8(x: str) -> None:
+    assert_type(func8("foo"), C)  # First overload
+    assert_type(func8("bar"), B)  # Second overload
+    assert_type(func8(x), A)  # Third overload
 
 
 def func9(val: list[LiteralString]):

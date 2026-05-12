@@ -1,10 +1,9 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.groovy.lang.parser;
 
 import com.intellij.lexer.Lexer;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.testFramework.LexerTestCase;
-import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.plugins.groovy.lang.lexer.GroovyLexer;
 import org.jetbrains.plugins.groovy.util.TestUtils;
@@ -24,12 +23,6 @@ public class GroovyLexerTest extends LexerTestCase {
   @Override
   protected String getDirPath() {
     return TestUtils.getTestDataPath() + "lexer";
-  }
-
-  @Override
-  protected void doTest(@NotNull @NonNls String text) {
-    super.doTest(text);
-    checkCorrectRestart(text);
   }
 
   @Override

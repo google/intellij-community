@@ -17,16 +17,16 @@ abstract class MdnDocumentedSymbol : PolySymbol {
   protected abstract fun getMdnDocumentation(): MdnSymbolDocumentation?
 
   override fun getDocumentationTarget(location: PsiElement?): DocumentationTarget? =
-    PolySymbolDocumentationTarget.create(this, location) { symbol, location ->
+    PolySymbolDocumentationTarget.create(this, location) { symbol, _ ->
       val mdnDoc = symbol.mdnDoc ?: return@create
-      description = mdnDoc.description
-      docUrl = mdnDoc.url
-      descriptionSections.putAll(mdnDoc.sections)
-      footnote = mdnDoc.footnote
-      defaultValue = symbol.defaultValue
+      description(mdnDoc.description)
+      docUrl(mdnDoc.url)
+      descriptionSections(mdnDoc.sections)
+      footnote(mdnDoc.footnote)
+      defaultValue(symbol.defaultValue)
 
       // already contained in MDN documentation sections
-      apiStatus = null
+      apiStatus(null)
     }
 
   open val defaultValue: @NlsSafe String? get() = null

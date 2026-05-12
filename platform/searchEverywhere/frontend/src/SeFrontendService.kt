@@ -1,4 +1,6 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(IntellijInternalApi::class)
+
 package com.intellij.platform.searchEverywhere.frontend
 
 import com.intellij.ide.actions.SearchEverywhereManagerFactory
@@ -18,12 +20,15 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.WindowStateService
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.platform.project.projectId
 import com.intellij.platform.searchEverywhere.SeSession
 import com.intellij.platform.searchEverywhere.SeSessionEntity
 import com.intellij.platform.searchEverywhere.asRef
+import com.intellij.platform.searchEverywhere.frontend.ml.SeMlService
+import com.intellij.platform.searchEverywhere.frontend.resultsProcessing.DataContextWithRpcId
 import com.intellij.platform.searchEverywhere.frontend.tabs.SeAdaptedTab
 import com.intellij.platform.searchEverywhere.frontend.tabs.SeAdaptedTabFilterEditor
 import com.intellij.platform.searchEverywhere.frontend.tabs.actions.SeActionsTab
@@ -52,14 +57,15 @@ import com.intellij.util.ui.EDT
 import com.intellij.util.ui.StartupUiUtil
 import com.intellij.util.ui.UIUtil
 import fleet.kernel.change
-import fleet.kernel.onDispose
 import fleet.kernel.rebase.shared
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -137,24 +143,44 @@ class SeFrontendService(val project: Project?, private val coroutineScope: Corou
 
       try {
         popupSemaphore.withPermit {
-          val providersHolder = SeProvidersHolder.initialize(initEvent, project, session, "Frontend", false)
-          localProvidersHolder = providersHolder
-          initializeVmAndSetToPopup(popupFuture,
-                                    popup,
-                                    popupContentPane,
-                                    searchStatePublisher,
-                                    tabFactories,
-                                    tabId,
-                                    searchText,
-                                    initEvent,
-                                    popupScope,
-                                    session,
-                                    providersHolder)
+          val mlService = SeMlService.getInstanceIfEnabled()
+          mlService?.onSessionStarted(project, tabId)
 
-          val showPopupEndTime = System.currentTimeMillis()
-          SeLog.log { "Search Everywhere popup opened in ${showPopupEndTime - showPopupStartTime} ms" }
+          try {
+            val dataContextWithRpcId = readAction {
+              val dataContext = initEvent.dataContext
+              val dataContextId = dataContext.rpcId()
+              DataContextWithRpcId(dataContext, dataContextId)
+            }
 
-          popupClosedCompletable.await()
+            val initEvent = initEvent.withDataContext(dataContextWithRpcId)
+            val providersHolder = SeProvidersHolder.initialize(initEvent, project, session, "Frontend", false)
+            localProvidersHolder = providersHolder
+            initializeVmAndSetToPopup(popupFuture,
+                                      popup,
+                                      popupContentPane,
+                                      searchStatePublisher,
+                                      tabFactories,
+                                      tabId,
+                                      searchText,
+                                      initEvent,
+                                      popupScope,
+                                      session,
+                                      providersHolder)
+
+            val showPopupEndTime = System.currentTimeMillis()
+            SeLog.log { "Search Everywhere popup opened in ${showPopupEndTime - showPopupStartTime} ms" }
+
+            popupClosedCompletable.await()
+          }
+          finally {
+            withContext(NonCancellable) {
+              // Keep ML session callbacks within the same permit window to avoid finishing
+              // a session while tab flows may still emit state updates.
+              popupScope.coroutineContext[Job]?.cancelAndJoin()
+              mlService?.onSessionFinished()
+            }
+          }
         }
       }
       finally {
@@ -245,7 +271,7 @@ class SeFrontendService(val project: Project?, private val coroutineScope: Corou
         popupScope.launch(NonCancellable) {
           removeSessionRef.set(false)
           try {
-            it.openInFindWindow(session, initEvent)
+            it.openInFindWindow(session)
           }
           finally {
             change {
@@ -431,7 +457,7 @@ class SeFrontendService(val project: Project?, private val coroutineScope: Corou
     return if (project != null) WindowStateService.getInstance(project) else WindowStateService.getInstance()
   }
 
-  override fun isShown(): Boolean = popupInstance != null
+  override fun isShown(): Boolean = popupInstanceFuture != null
 
   @Deprecated("Deprecated in the interface")
   override fun getCurrentlyShownUI(): SearchEverywhereUI {

@@ -1,0 +1,14 @@
+// IGNORE_K1
+// COMPILER_ARGUMENTS: -Xcontext-parameters
+// "Change parameter 'b' type of function 'foo' to 'Unit'" "true"
+// K2_ERROR: Argument type mismatch: actual type is 'Unit', but 'Int' was expected.
+
+context(_: String)
+fun main() {
+    foo(1, <caret>Unit)
+}
+
+context(_: String)
+fun foo(a: Int, b: Int) {}
+
+// FUS_K2_QUICKFIX_NAME: org.jetbrains.kotlin.idea.k2.refactoring.changeSignature.quickFix.ChangeParameterTypeFix

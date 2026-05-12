@@ -2,12 +2,16 @@
 package com.intellij.openapi.vfs;
 
 import com.intellij.core.CoreBundle;
+import com.intellij.diagnostic.PluginException;
+import com.intellij.openapi.application.Application;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.roots.ContentIterator;
 import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.NotNullLazyValue;
+import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.util.SystemInfoRt;
 import com.intellij.openapi.util.io.BufferExposingByteArrayInputStream;
@@ -16,7 +20,11 @@ import com.intellij.openapi.util.io.FileUtilRt;
 import com.intellij.openapi.util.io.OSAgnosticPathUtil;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.util.text.StringUtilRt;
+import com.intellij.openapi.vfs.impl.InputStreamSkippingBOM;
+import com.intellij.openapi.vfs.impl.VfsUtilCoreApplicationService;
 import com.intellij.openapi.vfs.limits.FileSizeLimit;
+import com.intellij.util.ArrayUtil;
+import com.intellij.util.ExceptionUtil;
 import com.intellij.util.PathUtil;
 import com.intellij.util.Processor;
 import com.intellij.util.containers.ContainerUtil;
@@ -30,7 +38,6 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.SystemIndependent;
 import org.jetbrains.annotations.Unmodifiable;
 
-import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,6 +52,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+
+import static com.intellij.openapi.progress.ContextKt.isInCancellableContext;
 
 /**
  * Various utility methods for working with {@link VirtualFile}.
@@ -270,16 +279,7 @@ public class VfsUtilCore {
   }
 
   public static @NotNull InputStream inputStreamSkippingBOM(@NotNull InputStream stream, @NotNull VirtualFile file) throws IOException {
-    if (!stream.markSupported()) {
-      //noinspection IOResourceOpenedButNotSafelyClosed
-      stream = new BufferedInputStream(stream);
-    }
-    byte[] bom = CharsetToolkit.detectBOMFromStream(stream);
-    if (bom != null && file.getBOM() == null) {
-      // this method was called before com.intellij.openapi.fileEditor.impl.LoadTextUtil.detectCharsetAndSetBOM
-      file.setBOM(bom);
-    }
-    return stream;
+    return new InputStreamSkippingBOM(stream, file);
   }
 
   public static @NotNull OutputStream outputStreamAddingBOM(@NotNull OutputStream stream, @NotNull VirtualFile file) throws IOException {
@@ -427,6 +427,25 @@ public class VfsUtilCore {
    * @see com.intellij.openapi.fileEditor.impl.LoadTextUtil#loadText(VirtualFile, int)
    */
   public static @NotNull String loadText(@NotNull VirtualFile file, int length) throws IOException {
+    Application application = ApplicationManager.getApplication();
+    if (application.isReadAccessAllowed() && isInCancellableContext()
+        // FileUtilRt.loadText might try to take a read action, in which case it will freeze
+        // if accessDiskWithCheckCanceled is called within a write action.
+        && !application.isWriteAccessAllowed()) {
+      try {
+        // Use DiskQueryRelay to delegate file loading to a background thread.
+        return application.getService(VfsUtilCoreApplicationService.class).getLoadTextDQR()
+          .accessDiskWithCheckCanceled(Pair.create(file, length));
+      }
+      catch (RuntimeException e) {
+        // Unwrap the IO exception.
+        IOException t = ExceptionUtil.findCause(e, IOException.class);
+        if (t != null) {
+          throw t;
+        }
+        throw e;
+      }
+    }
     try (InputStreamReader reader = new InputStreamReader(file.getInputStream(), file.getCharset())) {
       return new String(FileUtilRt.loadText(reader, length));
     }
@@ -452,6 +471,11 @@ public class VfsUtilCore {
    */
   public static byte @NotNull [] loadNBytes(@NotNull VirtualFile virtualFile, int maxLength) throws IOException {
     try (InputStream stream = virtualFile.getInputStream()) {
+      //noinspection ConstantValue
+      if (stream == null) {
+        LOG.error(PluginException.createByClass(virtualFile + "("+virtualFile.getClass()+").getInputStream() returned null. Its file system was "+virtualFile.getFileSystem()+"("+virtualFile.getFileSystem().getClass()+")", null, virtualFile.getClass()));
+        return ArrayUtil.EMPTY_BYTE_ARRAY;
+      }
       byte[] buffer = new byte[(int)Math.min(maxLength, virtualFile.getLength())];
       byte[] bom = virtualFile.getBOM();
       int o = 0;
@@ -460,11 +484,11 @@ public class VfsUtilCore {
         o = bom.length;
       }
       int n;
-      int nread = o;
-      while ((n = stream.read(buffer, nread, buffer.length - nread)) > 0) {
-        nread += n;
+      int nRead = o;
+      while ((n = stream.read(buffer, nRead, buffer.length - nRead)) > 0) {
+        nRead += n;
       }
-      return nread == buffer.length ? buffer : Arrays.copyOf(buffer, nread);
+      return nRead == buffer.length ? buffer : Arrays.copyOf(buffer, nRead);
     }
   }
 
@@ -589,7 +613,7 @@ public class VfsUtilCore {
   }
 
   /**
-   * Converts VsfUrl info {@link URL}.
+   * Converts VFS url into {@link URL}.
    *
    * @param vfsUrl VFS url (as constructed by {@link VirtualFile#getUrl()}
    * @return converted URL or null if error has occurred.
@@ -772,7 +796,7 @@ public class VfsUtilCore {
    * @return virtual files that represents paths from root to the passed file
    */
   @ApiStatus.Internal
-  public static VirtualFile @NotNull [] getPathComponents(@NotNull VirtualFile file) {
+  protected static VirtualFile @NotNull [] getPathComponents(@NotNull VirtualFile file) {
     List<VirtualFile> componentsList = new ArrayList<>();
     while (file != null) {
       componentsList.add(file);
@@ -824,7 +848,7 @@ public class VfsUtilCore {
     }
     return 0;
   }
-  
+
   public static boolean hasInvalidFiles(@NotNull Iterable<? extends VirtualFile> files) {
     for (VirtualFile file : files) {
       if (!file.isValid()) {

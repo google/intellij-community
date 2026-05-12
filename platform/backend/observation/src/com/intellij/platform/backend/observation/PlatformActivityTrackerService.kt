@@ -2,6 +2,7 @@
 package com.intellij.platform.backend.observation
 
 import com.intellij.concurrency.IntelliJContextElement
+import com.intellij.concurrency.IntelliJThreadContextElement
 import com.intellij.concurrency.currentThreadContext
 import com.intellij.concurrency.installThreadContext
 import com.intellij.openapi.components.Service
@@ -113,7 +114,7 @@ internal class PlatformActivityTrackerService(private val scope: CoroutineScope)
   }
 
 
-  internal class ObservationTracker(private val mainJob: Job, val currentJob: CompletableJob) : AbstractCoroutineContextElement(Key), IntelliJContextElement {
+  internal class ObservationTracker(private val mainJob: Job, val currentJob: CompletableJob) : AbstractCoroutineContextElement(Key), IntelliJThreadContextElement<Unit> {
     companion object Key : CoroutineContext.Key<ObservationTracker>
 
     override fun produceChildElement(oldContext: CoroutineContext, isStructured: Boolean): IntelliJContextElement {
@@ -123,13 +124,16 @@ internal class PlatformActivityTrackerService(private val scope: CoroutineScope)
       return ObservationTracker(mainJob, newJob)
     }
 
-    override fun afterChildCompleted(context: CoroutineContext) {
+    override fun beforeStarted(context: CoroutineContext) {
+    }
+
+    override fun afterCompleted(context: CoroutineContext, oldState: Unit) {
       removeObservedComputation(currentJob)
       currentJob.complete()
     }
 
-    override fun childCanceled(context: CoroutineContext) {
-      afterChildCompleted(context)
+    override fun canceled(context: CoroutineContext) {
+      afterCompleted(context, Unit)
     }
   }
 

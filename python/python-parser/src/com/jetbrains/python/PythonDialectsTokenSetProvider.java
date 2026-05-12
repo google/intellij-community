@@ -83,7 +83,7 @@ public final class PythonDialectsTokenSetProvider implements Disposable {
   }
 
   private @NotNull TokenSet getTokenSet(@NotNull String key, @NotNull Function<? super PythonDialectsTokenSetContributor, ? extends TokenSet> getter) {
-    return myCache.computeIfAbsent(key, __ -> orSets(getter));
+    return myCache.computeIfAbsent(key, _ -> orSets(getter));
   }
 
   private static @NotNull TokenSet orSets(@NotNull Function<? super PythonDialectsTokenSetContributor, ? extends TokenSet> getter) {

@@ -159,7 +159,9 @@ open class JEditorUiComponent(data: ComponentData) : UiComponent(data) {
   fun getFontSize(): Int = editor.getColorsScheme().getEditorFontSize()
 
   fun clickOn(text: String, button: RemoteMouseButton = RemoteMouseButton.LEFT, times: Int = 1) {
-    val offset = this.text.indexOf(text) + text.length / 2
+    val textIndex = this.text.indexOf(text)
+    assert(textIndex >= 0) { "Text '$text' not found in editor" }
+    val offset = textIndex + text.length / 2
     val point = interact {
       val p = offsetToVisualPosition(offset)
       visualPositionToXY(p)
@@ -492,7 +494,7 @@ class EditorSearchReplaceComponent(data: ComponentData) : UiComponent(data) {
   val searchHistoryButton: ActionButtonUi = actionButton { byAccessibleName("Search History") }
 
   // The components below are available in "find in large file" only
-  val matchCaseCheckBox: JCheckBoxUi = checkBox { byAccessibleName("Match case") }
+  val matchCaseCheckBox: JCheckBoxUi = checkBox { byAccessibleName("Match сase") }
   val wordsCheckBox: JCheckBoxUi = checkBox { byAccessibleName("Words") }
   val regexCheckBox: JCheckBoxUi = checkBox { byAccessibleName("Regex") }
   val searchAllButton: ActionButtonUi = actionButton { byAccessibleName("Search All") }

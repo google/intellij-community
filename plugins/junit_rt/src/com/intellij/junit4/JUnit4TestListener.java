@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package com.intellij.junit4;
 
@@ -25,11 +25,14 @@ import java.util.Map;
 public class JUnit4TestListener extends RunListener {
   public static final String EMPTY_SUITE_NAME = "junit.framework.TestSuite$1";
   public static final String EMPTY_SUITE_WARNING = "warning";
+  public static final String SUITE_DURATION = "test.use.suite.duration";
 
   private final List<Description> myStartedSuites = new ArrayList<>();
   private final Map<Description, List<List<Description>>> myParents = new HashMap<>();
   private final Map<Description, String> myMethodNames = new HashMap<>();
+  private final SuiteDurationTracker myDurationTracker = new SuiteDurationTracker();
   private final PrintStream myPrintStream;
+  private final boolean myUseSuiteDuration;
   private String myRootName;
   private long myCurrentTestStart;
 
@@ -44,6 +47,7 @@ public class JUnit4TestListener extends RunListener {
 
   public JUnit4TestListener(PrintStream printStream) {
     myPrintStream = printStream;
+    myUseSuiteDuration = Boolean.parseBoolean(System.getProperty(SUITE_DURATION, "true"));
     myPrintStream.println("##teamcity[enteredTheMatrix]");
   }
 
@@ -70,12 +74,28 @@ public class JUnit4TestListener extends RunListener {
     }
     finally {
       for (int i = myStartedSuites.size() - 1; i>= 0; i--) {
-        String className = JUnit4ReflectionUtil.getClassName(myStartedSuites.get(i));
+        Description suite = myStartedSuites.get(i);
+        String className = JUnit4ReflectionUtil.getClassName(suite);
         if (!className.equals(myRootName)) {
-          myPrintStream.println("##teamcity[testSuiteFinished name='" + escapeName(getShortName(className)) + "']");
+          myPrintStream.println("##teamcity[testSuiteFinished name='" + escapeName(getShortName(className)) + "'" + suiteDurationAttr(suite) + "]");
         }
       }
       myStartedSuites.clear();
+      myDurationTracker.clear();
+    }
+  }
+
+  @Override
+  public void testSuiteStarted(Description description) {
+    if (myUseSuiteDuration) {
+      myDurationTracker.suiteStarted(description);
+    }
+  }
+
+  @Override
+  public void testSuiteFinished(Description description) {
+    if (myUseSuiteDuration) {
+      myDurationTracker.suiteFinished(description);
     }
   }
 
@@ -127,7 +147,7 @@ public class JUnit4TestListener extends RunListener {
     for (int i = myStartedSuites.size() - 1; i >= idx; i--) {
       currentClass = myStartedSuites.remove(i);
       myPrintStream.println(
-        "##teamcity[testSuiteFinished name='" + escapeName(getShortName(JUnit4ReflectionUtil.getClassName(currentClass))) + "']");
+        "##teamcity[testSuiteFinished name='" + escapeName(getShortName(JUnit4ReflectionUtil.getClassName(currentClass))) + "'" + suiteDurationAttr(currentClass) + "]");
     }
 
     for (int i = idx; i < parentsHierarchy.size(); i++) {
@@ -137,6 +157,9 @@ public class JUnit4TestListener extends RunListener {
       if (!className.equals(myRootName)) {
         myPrintStream.println("##teamcity[testSuiteStarted name='" + escapeName(className) +
                               "'" + getSuiteLocation(descriptionFromHistory, description, fqName) + "]");
+      }
+      if (myUseSuiteDuration) {
+        myDurationTracker.suiteStarted(descriptionFromHistory);
       }
       myStartedSuites.add(descriptionFromHistory);
     }
@@ -154,6 +177,53 @@ public class JUnit4TestListener extends RunListener {
     }
     else {
       return System.identityHashCode(currentClass) != System.identityHashCode(currentParent);
+    }
+  }
+
+  private String suiteDurationAttr(Description suite) {
+    if (!myUseSuiteDuration) return "";
+    Long duration = myDurationTracker.takeDuration(suite);
+    if (duration == null) return "";
+    return duration > 0 ? " duration='" + duration + "'" : "";
+  }
+
+  private static final class SuiteDurationTracker {
+    private final Map<Description, SuiteDuration> myDurations = new HashMap<>();
+
+    void suiteStarted(Description suite) {
+      myDurations.computeIfAbsent(suite, s -> new SuiteDuration(System.nanoTime()));
+    }
+
+    void suiteFinished(Description suite) {
+      myDurations.computeIfPresent(suite, (s, measurement) -> measurement.finish());
+    }
+
+    Long takeDuration(Description suite) {
+      SuiteDuration measurement = myDurations.remove(suite);
+      return measurement == null ? null : measurement.getDuration();
+    }
+
+    void clear() {
+      myDurations.clear();
+    }
+
+    private static final class SuiteDuration {
+      private final long myStart;
+      private long myFinish = -1;
+
+      private SuiteDuration(long startNanos) {
+        myStart = startNanos;
+      }
+
+      SuiteDuration finish() {
+        myFinish = System.nanoTime();
+        return this;
+      }
+
+      long getDuration() {
+        long finishNanos = myFinish >= 0 ? myFinish : System.nanoTime();
+        return (finishNanos - myStart) / 1_000_000L;
+      }
     }
   }
 
@@ -546,7 +616,7 @@ public class JUnit4TestListener extends RunListener {
 
   public void sendTree(Description description) {
     myRootName = JUnit4ReflectionUtil.getClassName(description);
-    sendTree(description, null, new ArrayList<Description>());
+    sendTree(description, null, new ArrayList<>());
     myPrintStream.println("##teamcity[treeEnded]");
   }
 

@@ -8,6 +8,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.TestOnly;
 
+import java.io.IOException;
 import java.util.function.Function;
 
 public abstract class ManagingFS implements FileSystemInterface {
@@ -36,8 +37,8 @@ public abstract class ManagingFS implements FileSystemInterface {
 
   /**
    * @return a number that's incremented every time something changes for the file: name, size, flags, content.
-   * This number has persisted between IDE sessions and so it'll always increase.
-   * This method invocation means disk access, so it's not terribly cheap.
+   * This number persists between IDE sessions and so it'll always increase.
+   * The method invocation may access the disk, so it's not terribly cheap.
    * @deprecated to be dropped as there is no real use for it
    */
   //FIXME RC: drop this method from API -- the only use is in test code
@@ -77,6 +78,39 @@ public abstract class ManagingFS implements FileSystemInterface {
   public abstract VirtualFile @NotNull [] getLocalRoots();
 
   public abstract @Nullable VirtualFile findFileById(int id);
+
+  /**
+   * Flush pending/in-progress operations (e.g. async IO), if any.
+   * <p/>
+   * 'Experimental' because in most use-cases you shouldn't need this method: if you access files via VFS only, then VFS
+   * hides all the asynchronicity involved.
+   * But if you switch between VFS and java.io.File/Path APIs to access files, then the fact that VFS may postpone
+   * some IO operations becomes observable -- and you may need this method. Also, it may be necessary than switching
+   * outside IDE and then running external processes that access the files modified via VFS.
+   */
+  @ApiStatus.Experimental
+  public abstract void flushPendingUpdates() throws IOException;
+
+  /**
+   * Flush pending/in-progress operations (e.g. async IO), if any, for a given file -- i.e., the scope is smaller than
+   * for {@linkplain #flushPendingUpdates()}.
+   * <p/>
+   * 'Experimental' because in most use-cases you shouldn't need this method: if you access files via VFS only, then VFS
+   * hides all the asynchronicity involved.
+   * But if you switch between VFS and java.io.File/Path APIs to access files, then the fact that VFS may postpone
+   * some IO operations becomes observable -- and you may need this method. Also, it may be necessary than switching
+   * outside IDE and then running external processes that access the files modified via VFS.
+   */
+  @ApiStatus.Experimental
+  public abstract void flushPendingUpdates(@NotNull VirtualFile file) throws IOException;
+
+  /**
+   * Does {@linkplain #flushPendingUpdates()}, catches exceptions if any, and <b>show notification to user</b>.
+   * @see #flushPendingUpdates()
+   */
+  @ApiStatus.Experimental
+  public abstract void flushPendingUpdatesOrNotify();
+
 
   @ApiStatus.Internal
   protected abstract @NotNull <P, R> Function<P, R> accessDiskWithCheckCanceled(Function<? super P, ? extends R> function);

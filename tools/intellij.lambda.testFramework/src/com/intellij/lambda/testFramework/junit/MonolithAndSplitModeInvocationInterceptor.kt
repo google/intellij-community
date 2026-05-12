@@ -80,7 +80,7 @@ internal suspend fun IdeWithLambda.runNamedLambda(params: LambdaRdTestActionPara
 }
 
 internal suspend fun IdeWithLambda.runNamedLambdaInBackend(params: LambdaRdTestActionParameters) {
-  return (backendRdSession ?: rdSession).runNamedLambda(params)
+  return (backendIdeWithLambda ?: this).runNamedLambda(params)
 }
 
 internal suspend fun LambdaRdTestSession.runNamedLambda(params: LambdaRdTestActionParameters) {

@@ -1,5 +1,7 @@
 package com.intellij.ide.starter.ide
 
+import com.intellij.ide.starter.config.ConfigurationStorage
+import com.intellij.ide.starter.config.useDockerContainer
 import com.intellij.ide.starter.models.VMOptions
 import com.intellij.ide.starter.process.exec.ExecOutputRedirect
 import com.intellij.ide.starter.process.exec.ProcessExecutor
@@ -35,7 +37,10 @@ class LinuxIdeDistribution : IdeDistribution() {
 
     fun linuxCommandLine(xvfbRunLog: Path, vmOptions: VMOptions): List<String> {
       return when {
-        System.getenv("DISPLAY") != null || vmOptions.environmentVariables["DISPLAY"] != null || vmOptions.hasHeadlessMode() -> listOf()
+        ConfigurationStorage.useDockerContainer()
+          || System.getenv("DISPLAY") != null
+          || vmOptions.environmentVariables["DISPLAY"] != null
+          || vmOptions.hasHeadlessMode() -> listOf()
         else ->
           //hint https://gist.github.com/tullmann/2d8d38444c5e81a41b6d
           listOf(

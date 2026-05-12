@@ -1,17 +1,13 @@
 ### auto-generated section `build kotlin.plugin.k1` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "k1_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "k1",
+  module_name = "kotlin.plugin.k1",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
-  resources = [":k1_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   runtime_deps = [
     "//plugins/kotlin/plugin/common",
     "//plugins/kotlin/plugin",
@@ -54,26 +50,21 @@ jvm_library(
     "//plugins/kotlin/base/fe10/obsolete-compat",
     "//plugins/kotlin/base/fe10/project-structure",
     "//plugins/kotlin/compiler-plugins/allopen/common-k1:kotlin-compiler-plugins-allopen-common-k1",
-    "//plugins/kotlin/compiler-plugins/allopen/gradle",
     "//plugins/kotlin/compiler-plugins/allopen/maven",
     "//plugins/kotlin/compiler-plugins/compiler-plugin-support/common:kotlin-compilerPlugins-support",
     "//plugins/kotlin/compiler-plugins/compiler-plugin-support/gradle",
     "//plugins/kotlin/compiler-plugins/compiler-plugin-support/maven",
     "//plugins/kotlin/compiler-plugins/kapt",
     "//plugins/kotlin/compiler-plugins/kotlinx-serialization/common",
-    "//plugins/kotlin/compiler-plugins/kotlinx-serialization/gradle",
     "//plugins/kotlin/compiler-plugins/kotlinx-serialization/maven",
     "//plugins/kotlin/compiler-plugins/noarg/common",
-    "//plugins/kotlin/compiler-plugins/noarg/gradle",
     "//plugins/kotlin/compiler-plugins/noarg/maven",
     "//plugins/kotlin/compiler-plugins/parcelize/common",
     "//plugins/kotlin/compiler-plugins/parcelize/gradle",
     "//plugins/kotlin/compiler-plugins/parcelize/k1",
     "//plugins/kotlin/compiler-plugins/sam-with-receiver/common",
-    "//plugins/kotlin/compiler-plugins/sam-with-receiver/gradle",
     "//plugins/kotlin/compiler-plugins/sam-with-receiver/maven",
     "//plugins/kotlin/compiler-plugins/assignment/common-k1:kotlin-compiler-plugins-assignment-common-k1",
-    "//plugins/kotlin/compiler-plugins/assignment/gradle",
     "//plugins/kotlin/compiler-plugins/assignment/maven",
     "//plugins/kotlin/compiler-plugins/kotlin-dataframe/maven",
     "//plugins/kotlin/compiler-plugins/scripting",
@@ -145,7 +136,6 @@ jvm_library(
     "//plugins/kotlin/uast/uast-kotlin-idea-base:kotlin-uast-idea-base",
     "//plugins/kotlin/uast/uast-kotlin-idea",
     "//plugins/kotlin/features-trainer",
-    "//plugins/kotlin/compiler-plugins/lombok/gradle",
     "//plugins/kotlin/compiler-plugins/lombok/maven",
     "//plugins/kotlin/code-insight/api",
     "//plugins/kotlin/code-insight/utils",
@@ -181,6 +171,7 @@ jvm_library(
 
 jvm_library(
   name = "k1_test_lib",
+  testonly = True,
   module_name = "kotlin.plugin.k1",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -221,26 +212,21 @@ jvm_library(
     "//plugins/kotlin/base/fe10/obsolete-compat:obsolete-compat_test_lib",
     "//plugins/kotlin/base/fe10/project-structure:project-structure_test_lib",
     "//plugins/kotlin/compiler-plugins/allopen/common-k1:kotlin-compiler-plugins-allopen-common-k1_test_lib",
-    "//plugins/kotlin/compiler-plugins/allopen/gradle:gradle_test_lib",
     "//plugins/kotlin/compiler-plugins/allopen/maven:maven_test_lib",
     "//plugins/kotlin/compiler-plugins/compiler-plugin-support/common:kotlin-compilerPlugins-support_test_lib",
     "//plugins/kotlin/compiler-plugins/compiler-plugin-support/gradle:gradle_test_lib",
     "//plugins/kotlin/compiler-plugins/compiler-plugin-support/maven:maven_test_lib",
     "//plugins/kotlin/compiler-plugins/kapt:kapt_test_lib",
     "//plugins/kotlin/compiler-plugins/kotlinx-serialization/common:common_test_lib",
-    "//plugins/kotlin/compiler-plugins/kotlinx-serialization/gradle:gradle_test_lib",
     "//plugins/kotlin/compiler-plugins/kotlinx-serialization/maven:maven_test_lib",
     "//plugins/kotlin/compiler-plugins/noarg/common:common_test_lib",
-    "//plugins/kotlin/compiler-plugins/noarg/gradle:gradle_test_lib",
     "//plugins/kotlin/compiler-plugins/noarg/maven:maven_test_lib",
     "//plugins/kotlin/compiler-plugins/parcelize/common:common_test_lib",
     "//plugins/kotlin/compiler-plugins/parcelize/gradle:gradle_test_lib",
     "//plugins/kotlin/compiler-plugins/parcelize/k1:k1_test_lib",
     "//plugins/kotlin/compiler-plugins/sam-with-receiver/common:common_test_lib",
-    "//plugins/kotlin/compiler-plugins/sam-with-receiver/gradle:gradle_test_lib",
     "//plugins/kotlin/compiler-plugins/sam-with-receiver/maven:maven_test_lib",
     "//plugins/kotlin/compiler-plugins/assignment/common-k1:kotlin-compiler-plugins-assignment-common-k1_test_lib",
-    "//plugins/kotlin/compiler-plugins/assignment/gradle:gradle_test_lib",
     "//plugins/kotlin/compiler-plugins/assignment/maven:maven_test_lib",
     "//plugins/kotlin/compiler-plugins/kotlin-dataframe/maven:maven_test_lib",
     "//plugins/kotlin/compiler-plugins/scripting:scripting_test_lib",
@@ -312,7 +298,6 @@ jvm_library(
     "//plugins/kotlin/uast/uast-kotlin-idea-base:kotlin-uast-idea-base_test_lib",
     "//plugins/kotlin/uast/uast-kotlin-idea:uast-kotlin-idea_test_lib",
     "//plugins/kotlin/features-trainer:features-trainer_test_lib",
-    "//plugins/kotlin/compiler-plugins/lombok/gradle:gradle_test_lib",
     "//plugins/kotlin/compiler-plugins/lombok/maven:maven_test_lib",
     "//plugins/kotlin/code-insight/api:api_test_lib",
     "//plugins/kotlin/code-insight/utils:utils_test_lib",
@@ -346,3 +331,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build kotlin.plugin.k1` end
+
+### auto-generated section `iml kotlin.plugin.k1` start
+exports_files([
+  "kotlin.plugin.k1.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.plugin.k1` end

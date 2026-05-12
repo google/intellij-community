@@ -1,4 +1,4 @@
-// Copyright 2000-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger;
 
 import com.intellij.icons.AllIcons;
@@ -334,7 +334,7 @@ public class XDebuggerAssertions extends XDebuggerTestUtil {
     CompletableFuture<String> result = new CompletableFuture<>();
     node.myFullValueEvaluator.startEvaluation(new XFullValueEvaluator.XFullValueEvaluationCallback() {
       @Override
-      public void evaluated(@NotNull String fullValue, @Nullable Font font) {
+      public void evaluated(@NotNull String fullValue) {
         result.complete(fullValue);
       }
 

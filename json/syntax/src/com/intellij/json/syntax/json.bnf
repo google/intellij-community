@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 {
   generate=[parser-api="syntax"]
   parserClass = 'com.intellij.json.syntax.JsonSyntaxParser'
@@ -11,7 +11,7 @@
   psiClassPrefix = "Json"
   psiVisitorName = "JsonElementVisitor"
   
-  psiOutputPath="community/json"
+  psiOutputPath=".."
   syntaxElementTypeHolderClass="com.intellij.json.syntax.JsonSyntaxElementTypes"
   elementTypeConverterFactoryClass="com.intellij.json.psi.JsonElementTypeConverterFactory"
 

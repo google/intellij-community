@@ -3,6 +3,7 @@ package org.jetbrains.kotlin.idea.codeInsight.gradle
 
 import com.intellij.codeInsight.daemon.quickFix.ActionHint
 import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.application.readActionBlocking
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.application.writeIntentReadAction
@@ -12,14 +13,20 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess
 import com.intellij.psi.PsiFile
+import com.intellij.psi.createSmartPointer
 import com.intellij.testFramework.IndexingTestUtil
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.RunAll
 import com.intellij.testFramework.TemporaryDirectory
 import com.intellij.testFramework.common.timeoutRunBlocking
+import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl
 import com.intellij.testFramework.utils.vfs.refreshAndGetVirtualDirectory
+import com.intellij.util.ArrayUtilRt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
+import org.gradle.util.GradleVersion
+import org.jetbrains.kotlin.idea.configuration.KotlinDependencyProvider
 import org.jetbrains.kotlin.idea.configuration.KotlinProjectConfigurationService
 import org.jetbrains.kotlin.idea.core.util.toPsiFile
 import org.jetbrains.kotlin.idea.quickfix.QuickFixTest
@@ -30,6 +37,7 @@ import org.jetbrains.kotlin.psi.KtFile
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.path.CopyActionResult
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.copyToRecursively
@@ -54,7 +62,7 @@ abstract class AbstractGradleMultiFileQuickFixTest : MultiplePluginVersionGradle
     * Check unexpected diagnostics in the file.
     * Called from a read action.
     */
-    protected abstract fun checkUnexpectedErrors(mainFile: File,ktFile: KtFile, fileText: String)
+    protected abstract fun checkUnexpectedErrors(mainFile: File, ktFile: KtFile, fileText: String)
 
     private lateinit var afterDirectory: Path
 
@@ -68,7 +76,8 @@ abstract class AbstractGradleMultiFileQuickFixTest : MultiplePluginVersionGradle
         val jdk11Home = System.getenv("JDK_11") ?: System.getenv("JAVA11_HOME")
         jdk11Home?.let { roots += it }
 
-        val jdk17Home = System.getenv("JDK_17_0") ?: System.getenv("JAVA17_0_HOME")
+        val jdk17Home =
+            System.getenv("JDK_17_0") ?: System.getenv("JAVA17_0_HOME") ?: System.getenv("JDK_17") ?: System.getenv("JAVA17_HOME")
         jdk17Home?.let { roots += it }
 
         val javaHome = System.getenv("JAVA_HOME") ?: error("env JAVA_HOME is not set")
@@ -76,12 +85,18 @@ abstract class AbstractGradleMultiFileQuickFixTest : MultiplePluginVersionGradle
         VfsRootAccess.allowRootAccess(testRootDisposable, *roots.toTypedArray())
 
         val javaSdk = JavaSdk.getInstance()
-        val gradle = javaSdk.createJdk("Gradle JDK", jdk11Home ?: jdk8Home ?: jdk17Home ?: javaHome)
+        val gradle = javaSdk.createJdk("Gradle JDK", gradleJdk(jdk8Home, jdk11Home, jdk17Home, javaHome))
 
         populateJdkTable(listOf(gradle))
     }
 
-    @OptIn(ExperimentalPathApi::class)
+    protected open fun gradleJdk(jdk8Home: String?, jdk11Home: String?, jdk17Home: String?, javaHome: String): String =
+        if (currentGradleVersion >= GradleVersion.version("7.3")) {
+            jdk17Home ?: javaHome
+        } else {
+            jdk11Home ?: jdk8Home ?: jdk17Home ?: javaHome
+        }
+
     override fun setUp() {
         setUpWithKotlinPlugin {
             super.setUp()
@@ -106,36 +121,36 @@ abstract class AbstractGradleMultiFileQuickFixTest : MultiplePluginVersionGradle
         ignoreChangesInBuildScriptFiles: Boolean = true,
         afterDirectorySanitizer: (sourcePath: Path, text: String) -> String = { _, text -> text },
         additionalResultFileFilter: (VirtualFile) -> Boolean = { true },
+        customAction: (suspend () -> Unit)? = null
     ) {
-        configureByFiles()
         val projectPath = myProjectRoot.toNioPath()
+        val mainFileInfo = setupProjectAndReturnMainFile(afterDirectorySanitizer)
 
-        val (mainFilePath, mainFileText) = Files.walk(projectPath).asSequence()
-            .filter { it.isRegularFile() }
-            .firstNotNullOfOrNull {
-                val text = kotlin.runCatching { it.readText() }.getOrNull()
-                if (text?.startsWith("// \"") == true) it to text else null
-            } ?: error("file with action is not found")
-
-        importProject()
-
-        copyAfterDirectory(afterDirectorySanitizer)
-
-        val ktFile = runReadAction {
-            LocalFileSystem.getInstance().findFileByNioFile(mainFilePath)?.toPsiFile(myProject)
-        } as KtFile
-
-        val inspections = parseInspectionsToEnable(ktFile.virtualFile.path, mainFileText).toTypedArray()
-        codeInsightTestFixture.enableInspections(*inspections)
-
-        val actionHint = ktFile.actionHint(mainFileText)
-        codeInsightTestFixture.configureFromExistingVirtualFile(ktFile.virtualFile)
+        val mainPsiFile = mainFileInfo.psiFile
+        val mainFileContent = mainFileInfo.fileText
+        val mainFilePath = mainFileInfo.filePath
 
         timeoutRunBlocking(3.minutes) {
+            val mainFilePointer = readAction { mainPsiFile.createSmartPointer() }
             val actions = codeInsightTestFixture.availableIntentions
-            val action = actionHint.findAndCheck(actions) { "Test file: ${projectPath.relativize(mainFilePath).pathString}" }
-            if (action != null) {
-                codeInsightTestFixture.launchAction(action)
+
+            val action = if (customAction == null) {
+                val actionHint = mainPsiFile.actionHint(mainFileContent)
+                actionHint.findAndCheck(actions) { "Test file: ${projectPath.relativize(mainFilePath).pathString}" }
+            } else {
+                null
+            }
+            if (action != null || customAction != null) {
+                val kotlinDependencyProvider = KotlinDependencyProvider.getInstance()
+                val jobReference = AtomicReference<Job>()
+                kotlinDependencyProvider.jobReference = jobReference
+                if (action != null) {
+                    codeInsightTestFixture.launchAction(action)
+                } else {
+                    customAction!!.invoke()
+                }
+                jobReference.getAndSet(null)?.join()
+
                 KotlinProjectConfigurationService.getInstance(myProject).awaitSyncFinished()
 
                 IndexingTestUtil.waitUntilIndexesAreReady(myProject)
@@ -174,13 +189,55 @@ abstract class AbstractGradleMultiFileQuickFixTest : MultiplePluginVersionGradle
 
             IndexingTestUtil.waitUntilIndexesAreReady(myProject)
 
-            codeInsightTestFixture.doHighlighting()
+            CodeInsightTestFixtureImpl.instantiateAndRun(
+                /* psiFile = */ codeInsightTestFixture.file,
+                /* editor = */ codeInsightTestFixture.editor,
+                /* toIgnore = */ ArrayUtilRt.EMPTY_INT_ARRAY,
+                /* canChangeDocument = */ true,
+                /* readEditorMarkupModel = */ true
+            )
 
             readActionBlocking {
-                DirectiveBasedActionUtils.checkAvailableActionsAreExpected(ktFile, action?.let { actions - it } ?: actions)
-                checkUnexpectedErrors(mainFilePath.toFile(), ktFile, mainFileText)
+                val file = mainFilePointer.element ?: return@readActionBlocking
+                DirectiveBasedActionUtils.checkAvailableActionsAreExpected(file, action?.let { actions - it } ?: actions)
+                (file as? KtFile)?.let {
+                    checkUnexpectedErrors(mainFilePath.toFile(), it, mainFileContent)
+                }
             }
         }
+    }
+
+    protected data class MainClassInfo(
+        val psiFile: PsiFile,
+        val filePath: Path,
+        val fileText: String
+    )
+
+    protected fun setupProjectAndReturnMainFile(afterDirectorySanitizer: (sourcePath: Path, text: String) -> String): MainClassInfo {
+        configureByFiles()
+        val projectPath = myProjectRoot.toNioPath()
+
+        val (mainFilePath, mainFileText) = Files.walk(projectPath).asSequence()
+            .filter { it.isRegularFile() }
+            .firstNotNullOfOrNull {
+                val text = kotlin.runCatching { it.readText() }.getOrNull()
+                if (text?.startsWith("// \"") == true) it to text else null
+            } ?: error("file with action is not found")
+
+        importProject()
+
+        copyAfterDirectory(afterDirectorySanitizer)
+
+        val psiFile = runReadAction {
+            LocalFileSystem.getInstance().findFileByNioFile(mainFilePath)?.toPsiFile(myProject)
+        } as PsiFile
+
+        val inspections = parseInspectionsToEnable(psiFile.virtualFile.path, mainFileText).toTypedArray()
+        codeInsightTestFixture.enableInspections(*inspections)
+
+        codeInsightTestFixture.configureFromExistingVirtualFile(psiFile.virtualFile)
+
+        return MainClassInfo(psiFile, mainFilePath, mainFileText)
     }
 
     @OptIn(ExperimentalPathApi::class)

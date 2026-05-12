@@ -66,7 +66,24 @@ kotlin {
     implementation(jps.org.jetbrains.kotlinx.kotlinx.io.core.jvm479158162.get().let { "${it.group}:kotlinx-io-core:${it.version}" }) {
       exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
     }
+    implementation(jps.org.slf4j.slf4j.api2013636515.get().let { "${it.group}:${it.name}:${it.version}" }) {
+      isTransitive = false
+      exclude(group = "org.slf4j", module = "slf4j-jdk14")
+    }
+    implementation(jps.ch.qos.logback.logback.classic410158546.get().let { "${it.group}:${it.name}:${it.version}" }) {
+      exclude(group = "org.slf4j", module = "slf4j-api")
+      exclude(group = "com.sun.mail", module = "javax.mail")
+    }
     implementation(jps.org.jetbrains.intellij.deps.kotlinx.kotlinx.coroutines.core.jvm930800474.get().let { "${it.group}:kotlinx-coroutines-core:${it.version}" }) {
+      isTransitive = false
+    }
+    implementation(jps.com.google.devtools.ksp.symbol.processing.api1172187089.get().let { "${it.group}:${it.name}:${it.version}" }) {
+      isTransitive = false
+    }
+    implementation(jps.com.google.devtools.ksp.symbol.processing.aa.embeddable356149943.get().let { "${it.group}:${it.name}:${it.version}" }) {
+      isTransitive = false
+    }
+    implementation(jps.com.google.devtools.ksp.symbol.processing.common.deps1883862941.get().let { "${it.group}:${it.name}:${it.version}" }) {
       isTransitive = false
     }
     api(jps.com.github.ajalt.clikt.clikt.core.jvm23167398.get().let { "${it.group}:clikt-core:${it.version}" }) {

@@ -1,12 +1,12 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.idea;
 
 import com.google.gson.GsonBuilder;
 import one.profiler.AsyncProfiler;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.PrintStream;
+import java.io.*;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,7 +15,7 @@ import java.util.*;
 import java.util.stream.IntStream;
 
 public class TestMain {
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args) throws Throwable {
     if (args.length > 0 && "serverMode".equals(args[0])) {
       System.out.println("Started in server mode");
       args = Arrays.copyOfRange(args, 1, args.length);
@@ -32,6 +32,7 @@ public class TestMain {
         case "sigsegv" -> segmentationViolation();
         case "main-class" -> mainClassName();
         case "remoteDevStatus" -> checkStatus();
+        case "stdout-redirect" -> stdoutRedirect(args);
         default -> {
           System.err.println(
             "unexpected command: " + Arrays.toString(args) + '\n' +
@@ -42,8 +43,12 @@ public class TestMain {
             "  print-cwd\n" +
             "  async-profiler\n" +
             "  exit-code <number>\n" +
+            "  exception\n" +
             "  sigsegv\n" +
-            "  main-class");
+            "  main-class\n" +
+            "  remoteDevStatus\n" +
+            "  stdout-redirect"
+          );
           System.exit(1);
         }
       }
@@ -84,7 +89,8 @@ public class TestMain {
     System.out.println("Dumped to " + outputFile.getFileName());
   }
 
-  private static void printCwd() {
+  private static void printCwd() throws InterruptedException {
+    Thread.sleep(500);  // macOS `open -W` command needs time to attach `kevent`
     System.out.println("CWD=" + Path.of(".").toAbsolutePath());
   }
 
@@ -112,6 +118,15 @@ public class TestMain {
   }
 
   private static void exception() {
+    try {
+      nestedException();
+    }
+    catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static void nestedException() {
     throw new UnsupportedOperationException("aw, snap");
   }
 
@@ -147,6 +162,32 @@ public class TestMain {
     if (debugOption.isPresent()) {
       System.err.println("VM options contain the debug option: " + debugOption.get());
       System.exit(1);
+    }
+  }
+
+  private static void stdoutRedirect(String[] args) throws Throwable {
+    if (List.of(args).contains("--stdio")) {
+      var fdObj = getFileDescriptor();
+      var stdOut = new PrintStream(new FileOutputStream(fdObj));
+      stdOut.println("<<redirected stdout>>");
+      stdOut.flush();
+    }
+    System.out.println("<<original stdout>>");
+  }
+
+  private static FileDescriptor getFileDescriptor() throws Throwable {
+    var fdNum = Long.getLong("jb.launcher.stdout.fd", -1);
+    if (fdNum < 0) throw new IllegalArgumentException("'jb.launcher.stdout.fd' not set");
+    if (System.getProperty("os.name", "").startsWith("Windows")) {
+      var fdObj = new FileDescriptor();
+      MethodHandles.privateLookupIn(FileDescriptor.class, MethodHandles.lookup())
+        .findVirtual(FileDescriptor.class, "setHandle", MethodType.methodType(void.class, long.class))
+        .invoke(fdObj, fdNum);
+      return fdObj;
+    } else {
+      return (FileDescriptor)MethodHandles.privateLookupIn(FileDescriptor.class, MethodHandles.lookup())
+        .findConstructor(FileDescriptor.class, MethodType.methodType(void.class, int.class))
+        .invoke(fdNum.intValue());
     }
   }
 }

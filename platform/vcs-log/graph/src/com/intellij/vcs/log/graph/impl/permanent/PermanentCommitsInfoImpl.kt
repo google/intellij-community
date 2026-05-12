@@ -27,8 +27,20 @@ class PermanentCommitsInfoImpl<CommitId : Any> private constructor(private val r
     return rowsMapping.getTimestamp(nodeId)
   }
 
-  // todo optimize with special map
+  /**
+   * Returns the node id assigned to the given [commitId] within this permanent graph.
+   *
+   * Possible return values:
+   * * a non-negative integer in `[0, nodesCount)` — the node id of a regular, loaded commit
+   *   (its row in [rowsMapping]);
+   * * a negative integer `<= -2` — the synthetic id of a commit that is referenced as a parent
+   *   by some loaded commit but is not itself part of the loaded set
+   *   (see [notLoadedCommits] and `NotLoadedCommitsIdsGenerator`);
+   * * `-1` — the commit is unknown to this permanent graph (neither loaded nor referenced as a
+   *   not-loaded parent).
+   */
   override fun getNodeId(commitId: CommitId): VcsLogGraphNodeId {
+    // todo optimize with special map
     val indexOf = rowsMapping.commitIdMapping.indexOf(commitId)
     if (indexOf != -1) return indexOf
 

@@ -51,7 +51,7 @@ internal fun emptyStateProjectPanel(disposable: Disposable): JComponent = panel 
     }.customize(UnscaledGapsY(bottom = 7))
   }
 
-  if (Registry.`is`("station.enable.welcome.screen.promo")) {
+  if (isStationWelcomeScreenPromoEnabled()) {
     val actionManager = ActionManager.getInstance()
     val group = actionManager.getAction(IdeActions.GROUP_WELCOME_SCREEN_QUICKSTART_EMPTY_STATE) as ActionGroup
     val toolbar = createFrameWelcomeScreenVerticalToolbar(group, disposable)

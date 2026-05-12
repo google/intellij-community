@@ -45,8 +45,8 @@ data class ExplicitReceiverInfo(
 )
 
 @OptIn(KaContextParameterApi::class)
-context(_: KaSession)
 @ApiStatus.Internal
+context(_: KaSession)
 fun KtExpression.getImplicitReceiverInfo(): ImplicitReceiverInfo? {
     val reference = when (this) {
         is KtSimpleNameExpression -> this
@@ -64,8 +64,8 @@ fun KtExpression.getImplicitReceiverInfo(): ImplicitReceiverInfo? {
     return getImplicitReceiverInfoOfClass(allImplicitReceivers, declarationAssociatedClass)
 }
 
-context(_: KaSession)
 @ApiStatus.Internal
+context(_: KaSession)
 fun getLabelToBeReferencedByThis(symbol: KaSymbol): ExplicitReceiverInfo? {
     val (receiverProvidedBy, associatedTag) = when (symbol) {
         is KaClassSymbol -> symbol.psi to symbol.name

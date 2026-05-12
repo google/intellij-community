@@ -53,6 +53,7 @@ import com.intellij.util.messages.impl.MessageBusEx
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.ApiStatus.Internal
@@ -132,12 +133,24 @@ open class ProjectImpl(parent: ComponentManagerImpl, private val isLightTestProj
     @Suppress("LeakingThis")
     putUserData(CREATION_TIME, System.nanoTime())
 
-    registerNewProjectId(this)
+    // Once `registerNewProjectId(this)` adds this object to `ProjectIdsStorage.idsToProject`, the
+    // partially constructed `this` is globally reachable. If anything in this init block throws
+    // afterwards, the constructor never returns and the caller has no reference to dispose, so the
+    // entry would stay in the map forever. Wrapping everything into in `try/catch` and calling `unregisterProjectId(this)`
+    // to avoid project leakage.
+    try {
+      registerNewProjectId(this)
 
-    @Suppress("LeakingThis")
-    registerServiceInstance(Project::class.java, this, fakeCorePluginDescriptor)
+      @Suppress("LeakingThis")
+      registerServiceInstance(Project::class.java, this, fakeCorePluginDescriptor)
 
-    cachedName = projectName
+      cachedName = projectName
+    }
+    catch (e: Throwable) {
+      unregisterProjectId(this)
+      getCoroutineScope().coroutineContext.job.cancel()
+      throw e
+    }
   }
 
   final override fun <T : Any> findConstructorAndInstantiateClass(lookup: MethodHandles.Lookup, aClass: Class<T>): T {

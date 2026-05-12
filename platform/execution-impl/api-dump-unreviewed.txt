@@ -217,7 +217,6 @@ a:com.intellij.execution.RunManagerEx
 - s:getInstanceEx(com.intellij.openapi.project.Project):com.intellij.execution.RunManagerEx
 - f:getSortedConfigurations():java.util.Collection
 - s:getTasksCount(com.intellij.openapi.project.Project,com.intellij.execution.configurations.RunConfiguration,com.intellij.openapi.util.Key[]):I
-- f:setActiveConfiguration(com.intellij.execution.RunnerAndConfigurationSettings):V
 - a:setBeforeRunTasks(com.intellij.execution.configurations.RunConfiguration,java.util.List):V
 - f:setBeforeRunTasks(com.intellij.execution.configurations.RunConfiguration,java.util.List,Z):V
 f:com.intellij.execution.TerminateRemoteProcessDialog
@@ -408,7 +407,6 @@ f:com.intellij.execution.configuration.EmptyRunProfileState
 - execute(com.intellij.execution.Executor,com.intellij.execution.runners.ProgramRunner):com.intellij.execution.ExecutionResult
 f:com.intellij.execution.configuration.EnvFilesDialog
 - com.intellij.openapi.ui.DialogWrapper
-- <init>(javax.swing.JComponent,java.util.List):V
 - f:getPaths():java.util.List
 - getPreferredFocusedComponent():com.intellij.ui.components.JBList
 f:com.intellij.execution.configuration.EnvFilesDialogKt
@@ -1484,6 +1482,7 @@ a:com.intellij.execution.target.TargetWizardModel
 - a:getLanguageConfigForIntrospection():com.intellij.execution.target.LanguageRuntimeConfiguration
 - a:getProject():com.intellij.openapi.project.Project
 - a:getSubject():com.intellij.execution.target.TargetEnvironmentConfiguration
+- prepareTarget():V
 com.intellij.execution.ui.AdjustingTabSettingsEditor
 a:com.intellij.execution.ui.BaseContentCloseListener
 - com.intellij.openapi.Disposable
@@ -2209,26 +2208,19 @@ f:com.intellij.terminal.TerminalTitle
 - f:getUserDefinedTitle():java.lang.String
 f:com.intellij.terminal.TerminalTitle$State
 - <init>():V
-- <init>(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.Boolean):V
-- b:<init>(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.Boolean,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - f:component1():java.lang.String
 - f:component2():java.lang.String
 - f:component3():java.lang.String
 - f:component4():java.lang.String
-- f:component5():java.lang.Boolean
-- f:copy(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.Boolean):com.intellij.terminal.TerminalTitle$State
-- bs:copy$default(com.intellij.terminal.TerminalTitle$State,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.Boolean,I,java.lang.Object):com.intellij.terminal.TerminalTitle$State
 - equals(java.lang.Object):Z
 - f:getApplicationTitle():java.lang.String
 - f:getDefaultTitle():java.lang.String
 - f:getTag():java.lang.String
-- f:getTrackTerminalApplicationTitleChanges():java.lang.Boolean
 - f:getUserDefinedTitle():java.lang.String
 - hashCode():I
 - f:setApplicationTitle(java.lang.String):V
 - f:setDefaultTitle(java.lang.String):V
 - f:setTag(java.lang.String):V
-- f:setTrackTerminalApplicationTitleChanges(java.lang.Boolean):V
 - f:setUserDefinedTitle(java.lang.String):V
 f:com.intellij.terminal.TerminalTitleKt
 - sf:bindApplicationTitle(com.intellij.terminal.TerminalTitle,com.jediterm.terminal.Terminal,com.intellij.openapi.Disposable):V

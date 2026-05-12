@@ -1,25 +1,28 @@
-import org.gradle.api.JavaVersion.VERSION_1_7
-
 plugins {
-    application
-    kotlin("jvm") version "1.7.255-SNAPSHOT"
+    id("java")
+    kotlin("jvm") version "2.3.20-SNAPSHOT"
 }
 
-application {
-    mainClassName = "samples.HelloWorld"
-}
+group = "org.example"
+version = "1.0-SNAPSHOT"
 
 repositories {
-    jcenter()
+    mavenCentral()
     maven("https://oss.sonatype.org/content/repositories/snapshots")
 }
 
 dependencies {
-    testCompile("junit:junit:4.12")
-    implementation(kotlin("stdlib-jdk8"))
+    testImplementation(platform("org.junit:junit-bom:6.0.0"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation(kotlin("test"))
 }
 
-// VERSION: 1.7.255-SNAPSHOT
+tasks.test {
+    useJUnitPlatform()
+}
+
+// VERSION: 2.3.20-SNAPSHOT
 kotlin {
     jvmToolchain(8)
 }

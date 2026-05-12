@@ -8,6 +8,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.diagnostic.DefaultLogger;
 import com.intellij.openapi.util.SystemInfo;
+import com.intellij.openapi.util.ThrowableComputable;
 import com.intellij.openapi.util.io.FileAttributes;
 import com.intellij.openapi.util.io.FileAttributes.CaseSensitivity;
 import com.intellij.openapi.util.io.FileSystemUtil;
@@ -24,6 +25,7 @@ import com.intellij.openapi.vfs.VirtualFileWithId;
 import com.intellij.openapi.vfs.ex.temp.TempFileSystemMarker;
 import com.intellij.openapi.vfs.impl.local.LocalFileSystemImpl;
 import com.intellij.openapi.vfs.limits.FileSizeLimit;
+import com.intellij.openapi.vfs.newvfs.AsyncableFileSystem;
 import com.intellij.openapi.vfs.newvfs.BulkFileListener;
 import com.intellij.openapi.vfs.newvfs.ManagingFS;
 import com.intellij.openapi.vfs.newvfs.NewVirtualFile;
@@ -40,6 +42,7 @@ import com.intellij.openapi.vfs.newvfs.impl.VirtualDirectoryImpl;
 import com.intellij.openapi.vfs.newvfs.impl.VirtualFileSystemEntry;
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFS;
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFSImpl;
+import com.intellij.openapi.vfs.newvfs.persistent.executor.AsyncFileContentWriteRequestor;
 import com.intellij.testFramework.PerformanceUnitTest;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.TestLoggerKt;
@@ -57,6 +60,7 @@ import org.junit.Rule;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
@@ -75,6 +79,7 @@ import java.util.function.Function;
 
 import static com.intellij.testFramework.EdtTestUtil.runInEdtAndWait;
 import static com.intellij.util.io.DirectoryContentSpecKt.jarFile;
+import static java.nio.charset.StandardCharsets.US_ASCII;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -127,6 +132,46 @@ public class LocalFileSystemTest extends BareTestFixtureTestCase {
   @After
   public void tearDown() {
     myFS = null;
+  }
+
+  @Test
+  public void localFileSystemIsAsyncable()  {
+    assertThat(myFS).isInstanceOf(AsyncableFileSystem.class);
+  }
+
+  @Test
+  public void fileSystem_behavesAsIfUpdatesAppliedSynchronously_regardlessOfSynchronousOrAsynchronousImplementationUnderneath() throws IOException {
+    VirtualFile file = tempDir.newVirtualFile("testFile.tst", "initial content".getBytes(US_ASCII));
+    var asyncAllowingRequestor = new AsyncFileContentWriteRequestor() {};
+    int enoughAttempts = 100_000;
+    ApplicationManager.getApplication().runWriteAction((ThrowableComputable<Void, IOException>)() -> {
+      for (int i = 0; i < enoughAttempts; i++) {
+        byte[] newContent = ("new content: " + "a".repeat(i)).getBytes(US_ASCII);
+        try (OutputStream stream = file.getOutputStream(asyncAllowingRequestor)) {
+          stream.write(newContent);
+        }
+
+        //Regardless of LocalFileSystem implementation being synchronous or asynchronous, for outside observer
+        // they both must look as-if content is actually changed right after new content is written (outputStream
+        // is closed):
+
+        long lengthViaFs = myFS.getLength(file);
+        assertEquals("FS.getLength(file) must return content.length immediately after content update is finished",
+                     newContent.length,
+                     lengthViaFs
+        );
+
+        assertEquals("VirtualFile.timestamp must be == underlying FS.timestamp after file content update is finished",
+                     file.getTimeStamp(),
+                     myFS.getTimeStamp(file)
+        );
+        assertEquals("VirtualFile.length must be == underlying FS.length after file content update is finished",
+                     file.getLength(),
+                     lengthViaFs
+        );
+      }
+      return null;
+    });
   }
 
   @Test
@@ -311,7 +356,7 @@ public class LocalFileSystemTest extends BareTestFixtureTestCase {
     assertNotNull(root);
 
     var jarFile = tempDir.newFileNio("test.jar");
-    jarFile(__ -> Unit.INSTANCE).generate(jarFile);
+    jarFile(_ -> Unit.INSTANCE).generate(jarFile);
     assertNotNull(myFS.refreshAndFindFileByNioFile(jarFile));
     root = VirtualFileManager.getInstance().findFileByUrl("jar://" + jarFile + "!/");
     assertNotNull(root);
@@ -403,7 +448,7 @@ public class LocalFileSystemTest extends BareTestFixtureTestCase {
       settings.setUseSafeWrite(false);
 
       var targetFile = tempDir.newFileNio("targetFile");
-      var hardLinkFile =tempDir.getRootPath().resolve("hardLinkFile");
+      var hardLinkFile = tempDir.getRootPath().resolve("hardLinkFile");
       Files.createLink(hardLinkFile, targetFile);
 
       var file = myFS.refreshAndFindFileByNioFile(targetFile);
@@ -931,57 +976,63 @@ public class LocalFileSystemTest extends BareTestFixtureTestCase {
     checkAttributesAreEqual(root, (LocalFileSystemImpl)myFS);
   }
 
-  @SuppressWarnings("IO_FILE_USAGE")
   @Test
+  @SuppressWarnings("IO_FILE_USAGE")
   public void testRefreshIoFiles() {
-    LocalFileSystem fs = LocalFileSystem.getInstance();
-    testRefreshFiles(relativePath -> tempDir.newDirectory(relativePath),
-                     relativePath -> tempDir.newFile(relativePath),
-                     (file, child) -> file.toPath().resolve(child).toFile(),
-                     path -> fs.findFileByIoFile(path),
-                     files -> fs.refreshIoFiles(files));
+    var fs = LocalFileSystem.getInstance();
+    testRefreshFiles(
+      relativePath -> tempDir.newDirectoryPath(relativePath).toFile(),
+      relativePath -> tempDir.newFileNio(relativePath).toFile(),
+      (file, child) -> file.toPath().resolve(child).toFile(),
+      path -> fs.findFileByIoFile(path),
+      files -> fs.refreshIoFiles(files)
+    );
   }
 
   @Test
   public void testRefreshNioFiles() {
-    LocalFileSystem fs = LocalFileSystem.getInstance();
-    testRefreshFiles(relativePath -> tempDir.newDirectoryPath(relativePath),
-                     relativePath -> tempDir.newFileNio(relativePath),
-                     (path, child) -> path.resolve(child),
-                     path -> fs.findFileByNioFile(path),
-                     files -> fs.refreshNioFiles(files));
+    var fs = LocalFileSystem.getInstance();
+    testRefreshFiles(
+      relativePath -> tempDir.newDirectoryPath(relativePath),
+      relativePath -> tempDir.newFileNio(relativePath),
+      (path, child) -> path.resolve(child),
+      path -> fs.findFileByNioFile(path),
+      files -> fs.refreshNioFiles(files)
+    );
   }
 
-  private <T> void testRefreshFiles(Function<String, T> createDir,
-                                    Function<String, T> createFile,
-                                    BiFunction<T, String, T> addPath,
-                                    Function<T, VirtualFile> findFile,
-                                    Consumer<List<T>> refresh) {
-    String dirName = "dir";
-    T directory = createDir.apply("dir");
-    T preloadedFile = createFile.apply(dirName + "/preloaded_file.txt");
+  private <T> void testRefreshFiles(
+    Function<String, T> createDir,
+    Function<String, T> createFile,
+    BiFunction<T, String, T> addPath,
+    Function<T, VirtualFile> findFile,
+    Consumer<List<T>> refresh
+  ) {
+    var dirName = "dir";
+    var directory = createDir.apply("dir");
+    var preloadedFile = createFile.apply(dirName + "/preloaded_file.txt");
     assertNotNull(findFile.apply(preloadedFile));
-    VirtualFile vDirectory = findFile.apply(directory);
+    var vDirectory = findFile.apply(directory);
     assertNotNull(vDirectory);
 
     vDirectory.getChildren(); // cache children list
-    T newFile = createFile.apply(dirName + "/new_file.txt");
-    T newFile2 = createFile.apply(dirName + "/new_file_2.txt");
-    T deepFile = createFile.apply(dirName + "/a/b/c/d/deep_file.txt");
-    T nonExistingFile = addPath.apply(directory, dirName + "non_existing_file.txt");
+    var newFile = createFile.apply(dirName + "/new_file.txt");
+    var newFile2 = createFile.apply(dirName + "/new_file_2.txt");
+    var deepFile = createFile.apply(dirName + "/a/b/c/d/deep_file.txt");
+    var nonExistingFile = addPath.apply(directory, dirName + "non_existing_file.txt");
     assertNull(findFile.apply(newFile));
     assertNull(findFile.apply(newFile2));
     assertNull(findFile.apply(deepFile));
 
-    final int[] invocationsCount = {0};
-    List<String> names = new ArrayList<>();
+    var invocationsCount = new int[]{0};
+    var names = new ArrayList<String>();
 
     var connection = ApplicationManager.getApplication().getMessageBus().connect(getTestRootDisposable());
     connection.subscribe(VirtualFileManager.VFS_CHANGES, new BulkFileListener() {
       @Override
       public void after(@NotNull List<? extends @NotNull VFileEvent> events) {
         invocationsCount[0]++;
-        for (VFileEvent event : events) {
+        for (var event : events) {
           if (event instanceof VFileCreateEvent) {
             names.add(event.getFile().getName());
           }
@@ -1134,7 +1185,7 @@ public class LocalFileSystemTest extends BareTestFixtureTestCase {
     Files.walkFileTree(top, new SimpleFileVisitor<>() {
       @Override
       public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
-        for (int k = 1; k <= 3; k++) {
+        for (var k = 1; k <= 3; k++) {
           var name = "file_" + k;
           IoTestUtil.unchecked(() -> Files.writeString(dir.resolve(name), "."));
         }

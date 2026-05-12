@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.jvmcompat
 
 import com.intellij.openapi.components.State
@@ -115,7 +115,7 @@ class GradleJvmSupportMatrix : IdeVersionedDataStorage<GradleCompatibilityState>
   }
 
   private fun getOldestNonDeprecatedGradleVersionByIdeaImpl(): GradleVersion {
-    return GradleVersion.version("6.0")
+    return GradleVersion.version(OLDEST_NON_DEPRECATED_GRADLE_VERSION_STRING)
   }
 
   private fun getRecommendedGradleVersionByIdeaImpl(): GradleVersion {
@@ -136,6 +136,8 @@ class GradleJvmSupportMatrix : IdeVersionedDataStorage<GradleCompatibilityState>
   }
 
   companion object {
+
+    const val OLDEST_NON_DEPRECATED_GRADLE_VERSION_STRING: String = "6.0"
 
     @JvmStatic
     fun getInstance(): GradleJvmSupportMatrix {

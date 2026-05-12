@@ -16,6 +16,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
+import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -49,13 +51,30 @@ public abstract class JavaCoverageEngineExtension {
    * @param suite      the coverage suite for which the information is being requested.
    * @param classFiles the set to be filled with class files produced from this source file.
    * @return true if the extension has filled the file list, false if this extension doesn't handle this file type.
+   * @deprecated Use {@link #collectOutputPaths(PsiFile, VirtualFile, VirtualFile, CoverageSuitesBundle, Set)} instead.
    */
+  @SuppressWarnings({"IO_FILE_USAGE", "unused"})
+  @Deprecated
   public boolean collectOutputFiles(final @NotNull PsiFile srcFile,
                                     final @Nullable VirtualFile output,
                                     final @Nullable VirtualFile testoutput,
                                     final @NotNull CoverageSuitesBundle suite,
                                     final @NotNull Set<File> classFiles){
     return false;
+  }
+
+  @SuppressWarnings("IO_FILE_USAGE")
+  public boolean collectOutputPaths(final @NotNull PsiFile srcFile,
+                                    final @Nullable VirtualFile output,
+                                    final @Nullable VirtualFile testoutput,
+                                    final @NotNull CoverageSuitesBundle suite,
+                                    final @NotNull Set<Path> classFiles) {
+    final Set<File> files = new HashSet<>();
+    if (!collectOutputFiles(srcFile, output, testoutput, suite, files)) return false;
+    for (File file : files) {
+      classFiles.add(file.toPath());
+    }
+    return true;
   }
 
   /**
@@ -102,9 +121,17 @@ public abstract class JavaCoverageEngineExtension {
    *
    * @param bundle the coverage suites bundle being indexed.
    * @param classFile the class file.
+   * @deprecated Use {@link #ignoreCoverageForClass(CoverageSuitesBundle, Path)} instead.
    */
+  @SuppressWarnings({"IO_FILE_USAGE", "unused"})
+  @Deprecated
   public boolean ignoreCoverageForClass(CoverageSuitesBundle bundle, File classFile) {
     return false;
+  }
+
+  @SuppressWarnings("IO_FILE_USAGE")
+  public boolean ignoreCoverageForClass(CoverageSuitesBundle bundle, Path classFile) {
+    return ignoreCoverageForClass(bundle, classFile.toFile());
   }
 
   /**
@@ -116,8 +143,16 @@ public abstract class JavaCoverageEngineExtension {
    *
    * @param bundle the coverage suites bundle being indexed.
    * @param classFile the class file.
+   * @deprecated Use {@link #keepCoverageInfoForClassWithoutSource(CoverageSuitesBundle, Path)} instead.
    */
+  @SuppressWarnings({"IO_FILE_USAGE", "unused"})
+  @Deprecated
   public boolean keepCoverageInfoForClassWithoutSource(CoverageSuitesBundle bundle, File classFile) {
     return false;
+  }
+
+  @SuppressWarnings("IO_FILE_USAGE")
+  public boolean keepCoverageInfoForClassWithoutSource(CoverageSuitesBundle bundle, Path classFile) {
+    return keepCoverageInfoForClassWithoutSource(bundle, classFile.toFile());
   }
 }

@@ -20,12 +20,16 @@ import com.intellij.polySymbols.customElements.impl.CustomElementsMemberSymbol
 import com.intellij.polySymbols.customElements.impl.CustomElementsSlotSymbol
 import com.intellij.polySymbols.impl.StaticPolySymbolScopeBase
 import com.intellij.polySymbols.patterns.PolySymbolPattern
-import com.intellij.polySymbols.patterns.PolySymbolPatternFactory
+import com.intellij.polySymbols.patterns.polySymbolPattern
 import com.intellij.polySymbols.query.PolySymbolQueryExecutor
 import com.intellij.polySymbols.utils.PolySymbolTypeSupport
 
 fun Reference.createPattern(origin: CustomElementsJsonOrigin): PolySymbolPattern? =
-  createQueryPathList(origin)?.let { PolySymbolPatternFactory.createSingleSymbolReferencePattern(it) }
+  createQueryPathList(origin)?.let {path ->
+    polySymbolPattern {
+      symbolReference(path)
+    }
+  }
 
 fun Reference.resolve(origin: CustomElementsJsonOrigin, queryExecutor: PolySymbolQueryExecutor): List<PolySymbol> =
   createQueryPathList(origin)

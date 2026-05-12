@@ -9,6 +9,7 @@ import com.intellij.ide.starter.profiler.ProfilerInjector
 import com.intellij.ide.starter.profiler.ProfilerType
 import com.intellij.ide.starter.runner.IDERunContext
 import com.intellij.tools.ide.performanceTesting.commands.CommandChain
+import examples.data.IdeaCommunityCases
 import examples.data.TestCases
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
@@ -41,7 +42,7 @@ class ProfilerInjectionTest {
     val ideTestContext = IDETestContext(
       paths = ideDataPaths,
       ide = installedIDE,
-      testCase = TestCases.IC.GradleJitPackSimple,
+      testCase = IdeaCommunityCases.GradleJitPackSimple,
       testName = testInfo.hyphenateWithClass(),
       _resolvedProjectHome = null
     )

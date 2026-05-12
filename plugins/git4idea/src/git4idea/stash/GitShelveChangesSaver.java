@@ -14,7 +14,6 @@ import com.intellij.openapi.vcs.changes.shelf.ShelvedChangeList;
 import com.intellij.openapi.vcs.changes.shelf.ShelvedChangesViewManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.containers.ContainerUtil;
-import com.intellij.vcsUtil.VcsFileUtil;
 import git4idea.GitUtil;
 import git4idea.commands.Git;
 import git4idea.commands.GitCommand;
@@ -26,6 +25,7 @@ import git4idea.index.GitFileStatus;
 import git4idea.repo.GitRepository;
 import git4idea.repo.GitRepositoryManager;
 import git4idea.util.GitFileUtils;
+import kotlin.Unit;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -143,15 +143,14 @@ public final class GitShelveChangesSaver extends GitChangesSaver {
   }
 
   private static void restoreStaged(@NotNull Project project, @NotNull VirtualFile root, @NotNull List<FilePath> filePaths) {
-    for (List<String> paths : VcsFileUtil.chunkPaths(root, filePaths)) {
-      GitLineHandler handler = new GitLineHandler(project, root, GitCommand.RESTORE);
-      handler.addParameters("--staged", "--source=HEAD");
-      handler.endOptions();
-      handler.addParameters(paths);
-      GitCommandResult result = Git.getInstance().runCommand(handler);
-      if (!result.success()) {
-        LOG.warn("Can't restore changes:" + result.getErrorOutputAsJoinedString());
-      }
+    try {
+      GitFileUtils.executeForFiles(project, root, GitCommand.RESTORE, filePaths, handler -> {
+        handler.addParameters("--staged", "--source=HEAD");
+        return Unit.INSTANCE;
+      });
+    }
+    catch (VcsException e) {
+      LOG.warn("Can't restore changes:" + e.getMessage());
     }
   }
 

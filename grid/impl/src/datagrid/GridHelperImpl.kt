@@ -131,9 +131,7 @@ open class GridHelperImpl(
   }
 
   override fun getCellLanguage(
-    grid: CoreGrid<GridRow, GridColumn>,
-    row: ModelIndex<GridRow>,
-    column: ModelIndex<GridColumn>
+    request: GridCellRequest<GridRow, GridColumn>
   ): Language? {
     return null
   }
@@ -141,9 +139,7 @@ open class GridHelperImpl(
   override fun createCellCodeFragment(
     text: String,
     project: Project,
-    grid: CoreGrid<GridRow, GridColumn>,
-    row: ModelIndex<GridRow>,
-    column: ModelIndex<GridColumn>
+    request: GridCellRequest<GridRow, GridColumn>
   ): PsiCodeFragment? {
     return null
   }

@@ -1,30 +1,20 @@
 ### auto-generated section `build intellij.java.debugger.impl` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "impl_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
-resourcegroup(
-  name = "impl_test_resources",
-  srcs = glob(["testResources/**/*"]),
-  strip_prefix = "testResources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "impl",
   module_name = "intellij.java.debugger.impl",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":impl_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//java/debugger/openapi:java-debugger",
     "//java/openapi:java",
     "//java/execution/openapi:java-execution",
+    "//java/java-syntax:syntax",
+    "//java/java-psi-api:psi",
     "//java/java-indexing-api:indexing",
-    "//resources:java-resources",
     "//platform/analysis-api:analysis",
     "//platform/util/concurrency",
     "//platform/core-api:core",
@@ -39,6 +29,7 @@ jvm_library(
     "//platform/forms_rt:java-guiForms-rt",
     "//java/java-runtime:rt",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//java/jsp-openapi:jsp",
     "//java/java-impl:impl",
     "//java/java-impl-refactorings:impl-refactorings",
@@ -53,8 +44,11 @@ jvm_library(
     "//libraries/stream",
     "//platform/statistics",
     "//platform/core-ui",
+    "//platform/core-impl",
     "//libraries/fastutil",
     "//platform/platform-util-io-impl:ide-util-io-impl",
+    "//platform/platform-util-io:ide-util-io",
+    "//platform/progress/shared:ide-progress",
     "//libraries/gson",
     "//libraries/asm",
     "//platform/util/jdom",
@@ -65,10 +59,13 @@ jvm_library(
     "//libraries/kotlinx/serialization/core",
     "//libraries/kotlinx/serialization/json",
     "//platform/util/coroutines",
+    "//platform/util:util-ui",
+    "//platform/util-ex",
     "//platform/threadDumpParser",
     "//java/debugger/shared",
     "//platform/eel-provider",
     "//java/codeserver/highlighting",
+    "//java/java-frontback-psi-api:frontback-psi",
     "//xml/xml-psi-api:psi",
     "//platform/xdebugger-impl/shared",
     "//platform/xdebugger-impl/rpc",
@@ -77,14 +74,17 @@ jvm_library(
     "//platform/kernel/rpc",
     "//platform/remote-topics/shared:rpc-topics",
     "//platform/execution",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
   ]
 )
 
 jvm_library(
   name = "impl_test_lib",
+  testonly = True,
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
-  resources = [":impl_test_resources"],
+  resources = glob(["testResources/**/*"]),
+  resource_strip_prefix = "testResources",
   associates = [":impl"],
   deps = [
     "//java/debugger/openapi:java-debugger",
@@ -93,10 +93,12 @@ jvm_library(
     "//java/openapi:java_test_lib",
     "//java/execution/openapi:java-execution",
     "//java/execution/openapi:java-execution_test_lib",
+    "//java/java-syntax:syntax",
+    "//java/java-syntax:syntax_test_lib",
+    "//java/java-psi-api:psi",
+    "//java/java-psi-api:psi_test_lib",
     "//java/java-indexing-api:indexing",
     "//java/java-indexing-api:indexing_test_lib",
-    "//resources:java-resources",
-    "//resources:java-resources_test_lib",
     "//platform/analysis-api:analysis",
     "//platform/analysis-api:analysis_test_lib",
     "//platform/util/concurrency",
@@ -124,6 +126,7 @@ jvm_library(
     "//java/java-runtime:rt",
     "//java/java-runtime:rt_test_lib",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "//java/jsp-openapi:jsp",
     "//java/jsp-openapi:jsp_test_lib",
     "//java/java-impl:impl",
@@ -149,9 +152,13 @@ jvm_library(
     "//platform/statistics:statistics_test_lib",
     "//platform/core-ui",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//libraries/fastutil",
     "//libraries/fastutil:fastutil_test_lib",
     "//platform/platform-util-io-impl:ide-util-io-impl",
+    "//platform/platform-util-io:ide-util-io",
+    "//platform/progress/shared:ide-progress",
     "//libraries/gson",
     "//libraries/gson:gson_test_lib",
     "//libraries/asm",
@@ -172,6 +179,10 @@ jvm_library(
     "//libraries/kotlinx/serialization/json:json_test_lib",
     "//platform/util/coroutines",
     "//platform/util/coroutines:coroutines_test_lib",
+    "//platform/util:util-ui",
+    "//platform/util:util-ui_test_lib",
+    "//platform/util-ex",
+    "//platform/util-ex:util-ex_test_lib",
     "//platform/threadDumpParser",
     "//platform/threadDumpParser:threadDumpParser_test_lib",
     "//java/debugger/shared",
@@ -180,6 +191,8 @@ jvm_library(
     "//platform/eel-provider:eel-provider_test_lib",
     "//java/codeserver/highlighting",
     "//java/codeserver/highlighting:highlighting_test_lib",
+    "//java/java-frontback-psi-api:frontback-psi",
+    "//java/java-frontback-psi-api:frontback-psi_test_lib",
     "//xml/xml-psi-api:psi",
     "//xml/xml-psi-api:psi_test_lib",
     "//platform/xdebugger-impl/shared",
@@ -194,18 +207,31 @@ jvm_library(
     "//platform/kernel/rpc:rpc_test_lib",
     "//platform/testFramework/common",
     "//platform/testFramework/common:common_test_lib",
+    "//platform/bazel-runfiles",
+    "//platform/bazel-runfiles:bazel-runfiles_test_lib",
     "//platform/remote-topics/shared:rpc-topics",
     "//platform/remote-topics/shared:rpc-topics_test_lib",
     "//platform/execution",
     "//platform/execution:execution_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
   ],
   runtime_deps = [
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/platform-util-io-impl:ide-util-io-impl_test_lib",
+    "//platform/platform-util-io:ide-util-io_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
   ]
 )
 ### auto-generated section `build intellij.java.debugger.impl` end
+
+### auto-generated section `iml intellij.java.debugger.impl` start
+exports_files([
+  "intellij.java.debugger.impl.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.java.debugger.impl` end
 
 ### auto-generated section `test intellij.java.debugger.impl` start
 load("@community//build:tests-options.bzl", "jps_test")

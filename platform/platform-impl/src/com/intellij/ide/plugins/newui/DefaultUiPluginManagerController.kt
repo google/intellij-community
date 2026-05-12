@@ -76,6 +76,8 @@ import com.intellij.openapi.util.io.FileUtil
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresReadLockAbsence
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
@@ -477,10 +479,10 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
   }
 
   override fun connectToUpdateServiceWithCounter(sessionId: String, callback: (Int?) -> Unit): PluginUpdatesService {
-    val session = PluginManagerSessionService.getInstance().getSession(sessionId)
+    val session = createSession(sessionId)
     val service = PluginUpdatesService.connectWithCounter(callback)
-    service.setFilter { session?.isPluginEnabled(it.pluginId) ?: true }
-    session?.updateService = service
+    service.setFilter { session.isPluginEnabled(it.pluginId) }
+    session.updateService = service
     return service
   }
 
@@ -780,6 +782,7 @@ object DefaultUiPluginManagerController : UiPluginManagerController {
       return PluginSearchResult(plugins)
     }
     catch (e: IOException) {
+      currentCoroutineContext().ensureActive()
       LOG.warn(e)
       return PluginSearchResult(emptyList(), e.message)
     }

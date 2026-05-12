@@ -2,6 +2,7 @@ package com.intellij.lambda.sampleTestsWithPlugin
 
 import com.intellij.lambda.testFramework.junit.RunInMonolithAndSplitMode
 import com.intellij.openapi.application.ApplicationManager
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.TestTemplate
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
@@ -27,6 +28,7 @@ class UnitSplitExampleTest {
   @ParameterizedTest
   @ValueSource(strings = ["param1", "param2"])
   fun simpleParameterizedTest1(param: String) {
+    assertThat(param).startsWith("param")
     ApplicationManager.getApplication().invokeAndWait { println("Parameterized test 1: param $param") }
   }
 
@@ -58,4 +60,3 @@ class UnitSplitExampleTest {
     ApplicationManager.getApplication().invokeAndWait { println("Parameterized test 2: params $param") }
   }
 }
-

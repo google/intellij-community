@@ -11,26 +11,27 @@ import com.intellij.util.containers.Java11Shim
 import com.intellij.util.graph.DFSTBuilder
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.VisibleForTesting
 import java.util.Arrays
 import java.util.function.Supplier
 
 @ApiStatus.Internal
-class PluginSetBuilder(@JvmField val unsortedPlugins: Set<PluginMainDescriptor>) {
+class PluginSetBuilder(initContext: PluginInitializationContext, @JvmField val unsortedPlugins: UnambiguousPluginSet) {
   private val moduleGraph: ModuleGraph
   private val sortedModulesWithDependencies: ModulesWithDependencies
   private val builder: DFSTBuilder<PluginModuleDescriptor>
   val topologicalComparator: Comparator<PluginModuleDescriptor>
 
   init {
-    val (unsortedModulesWithDependencies, additionalEdges) = createModulesWithDependenciesAndAdditionalEdges(unsortedPlugins)
+    val (unsortedModulesWithDependencies, additionalEdges) = createModulesWithDependenciesAndAdditionalEdges(initContext, unsortedPlugins)
     moduleGraph = ModuleGraph(unsortedModulesWithDependencies, additionalEdges)
     builder = DFSTBuilder(moduleGraph, null, true)
     topologicalComparator = toCoreAwareComparator(builder.comparator())
     sortedModulesWithDependencies = unsortedModulesWithDependencies.sorted(topologicalComparator)
   }
 
-  private val enabledPluginIds = HashMap<PluginId, PluginModuleDescriptor>(unsortedPlugins.size)
-  private val enabledModuleV2Ids = HashMap<PluginModuleId, ContentModuleDescriptor>(unsortedPlugins.size * 2)
+  private val enabledPluginIds = HashMap<PluginId, PluginModuleDescriptor>(unsortedPlugins.plugins.size)
+  private val enabledModuleV2Ids = HashMap<PluginModuleId, ContentModuleDescriptor>(unsortedPlugins.plugins.size * 2)
 
   internal fun checkPluginCycles(): List<PluginLoadingError> {
     if (builder.isAcyclic) {
@@ -47,41 +48,15 @@ class PluginSetBuilder(@JvmField val unsortedPlugins: Set<PluginMainDescriptor>)
         plugin.isMarkedForLoading = false
       }
 
-      val pluginString =
-        component.joinToString(separator = ", ") { "'${it.name} (${it.pluginId.idString}${if (it.contentModuleName != null) ":" + it.contentModuleName else ""})'" }
-      errors.add(PluginLoadingError(
-        reason = null,
-        htmlMessageSupplier = Supplier {
-          val message = CoreBundle.message("plugin.loading.error.plugins.cannot.be.loaded.because.they.form.a.dependency.cycle", pluginString)
-          HtmlChunk.text(message)
-        },
-        error = null,
-      ))
-      val detailedMessage = StringBuilder()
-      val pluginToString: (IdeaPluginDescriptorImpl) -> String = { "id = ${it.pluginId.idString}@${it.contentModuleName} (${it.name})" }
-      detailedMessage.append("Detected plugin dependencies cycle details (only related dependencies are included):\n")
-      component
-        .asSequence()
-        .map { Pair(it, pluginToString(it)) }
-        .sortedWith(Comparator.comparing({ it.second }, String.CASE_INSENSITIVE_ORDER))
-        .forEach {
-          detailedMessage.append("  ").append(it.second).append(" depends on:\n")
-          moduleGraph.getIn(it.first).asSequence()
-            .filter { o: IdeaPluginDescriptorImpl -> component.contains(o) }
-            .map(pluginToString)
-            .sortedWith(java.lang.String.CASE_INSENSITIVE_ORDER)
-            .forEach { dep: String? ->
-              detailedMessage.append("    ").append(dep).append("\n")
-            }
-        }
-      PluginManagerCore.logger.info(detailedMessage.toString())
+      val error = createCyclePluginLoadingError(component) { moduleGraph.getIn(it) }
+      errors.add(error)
     }
     return errors
   }
 
   // Only plugins returned. Not modules. See PluginManagerTest.moduleSort test to understand the issue.
   private fun getSortedPlugins(): Array<PluginMainDescriptor> {
-    val pluginToNumber = Object2IntOpenHashMap<PluginId>(unsortedPlugins.size)
+    val pluginToNumber = Object2IntOpenHashMap<PluginId>(unsortedPlugins.plugins.size)
     pluginToNumber.put(PluginManagerCore.CORE_ID, 0)
     var number = 0
     for (module in sortedModulesWithDependencies.modules) {
@@ -90,7 +65,7 @@ class PluginSetBuilder(@JvmField val unsortedPlugins: Set<PluginMainDescriptor>)
         pluginToNumber.putIfAbsent(module.pluginId, number++)
       }
     }
-    val sorted = unsortedPlugins.toTypedArray()
+    val sorted = unsortedPlugins.plugins.toTypedArray()
     Arrays.sort(sorted, Comparator { o1, o2 ->
       pluginToNumber.getInt(o1.pluginId) - pluginToNumber.getInt(o2.pluginId)
     })
@@ -265,50 +240,6 @@ class PluginSetBuilder(@JvmField val unsortedPlugins: Set<PluginMainDescriptor>)
     return loadingErrors
   }
 
-  private fun checkVisibilityAndReturnErrorMessage(sourceModule: PluginModuleDescriptor, targetModule: ContentModuleDescriptor): String? {
-    if (pluginModuleVisibilityCheck == PluginModuleVisibilityCheckOption.DISABLED) {
-      return null
-    }
-
-    val errorMessage = when (targetModule.visibility) {
-      ModuleVisibility.PUBLIC -> null
-      ModuleVisibility.INTERNAL -> {
-        if (targetModule.parent.namespace != null && targetModule.parent.namespace == sourceModule.namespace) null
-        else {
-          val sourceNamespace = sourceModule.namespace?.let { "is from namespace '$it'" } ?: "has no namespace specified"
-          val targetNamespace = targetModule.parent.namespace?.let { "namespace '$it'" } ?: "unspecified namespace"
-          "it $sourceNamespace and depends on module '${targetModule.contentModuleName}' which is registered in '${targetModule.parent.pluginId}' plugin with internal visibility in $targetNamespace"
-        }
-      }
-      ModuleVisibility.PRIVATE -> {
-        if (sourceModule.pluginId == targetModule.pluginId) null
-        else "it depends on module '${targetModule.contentModuleName}' which private visibility in '${targetModule.pluginId}' plugin"
-      }
-    }
-    if (errorMessage == null) {
-      return null
-    }
-
-    val sourceModuleId = sourceModule.contentModuleName ?: sourceModule.pluginId
-    return when (pluginModuleVisibilityCheck) {
-      PluginModuleVisibilityCheckOption.REPORT_WARNING -> {
-        PluginManagerCore.logger.warn("$sourceModuleId has accessibility problem which is currently ignored: $errorMessage")
-        null
-      }
-      PluginModuleVisibilityCheckOption.REPORT_ERROR -> {
-        PluginManagerCore.logger.error(PluginException("$sourceModuleId isn't loaded: $errorMessage", sourceModule.pluginId))
-        errorMessage
-      }
-      PluginModuleVisibilityCheckOption.DISABLED -> null
-    }
-  }
-
-  private val PluginModuleDescriptor.namespace: String?
-    get() = when (this) {
-      is ContentModuleDescriptor -> parent.namespace
-      is PluginMainDescriptor -> namespace
-    }
-
   private fun markModuleAsEnabled(moduleId: PluginModuleId, moduleDescriptor: ContentModuleDescriptor) {
     enabledModuleV2Ids.put(moduleId, moduleDescriptor)
     for (pluginAlias in moduleDescriptor.pluginAliases) {
@@ -355,6 +286,7 @@ class PluginSetBuilder(@JvmField val unsortedPlugins: Set<PluginMainDescriptor>)
         }
       },
       topologicalComparator = topologicalComparator,
+      resolvedPluginSet = null,
     )
   }
 
@@ -399,6 +331,78 @@ class PluginSetBuilder(@JvmField val unsortedPlugins: Set<PluginMainDescriptor>)
       shouldNotifyUser = isNotifyUser,
     )
   }
+
+  companion object {
+    @VisibleForTesting
+    fun checkVisibilityAndReturnErrorMessage(sourceModule: PluginModuleDescriptor, targetModule: ContentModuleDescriptor): String? {
+      if (pluginModuleVisibilityCheck == PluginModuleVisibilityCheckOption.DISABLED) {
+        return null
+      }
+
+      val errorMessage = when (targetModule.visibility) {
+        ModuleVisibility.PUBLIC -> null
+        ModuleVisibility.INTERNAL -> {
+          if (targetModule.parent.namespace != null && targetModule.parent.namespace == sourceModule.namespace) null
+          else {
+            val sourceNamespace = sourceModule.namespace?.let { "is from namespace '$it'" } ?: "has no namespace specified"
+            val targetNamespace = targetModule.parent.namespace?.let { "namespace '$it'" } ?: "unspecified namespace"
+            "it $sourceNamespace and depends on module '${targetModule.contentModuleName}' which is registered in '${targetModule.parent.pluginId}' plugin with internal visibility in $targetNamespace"
+          }
+        }
+        ModuleVisibility.PRIVATE -> {
+          if (sourceModule.pluginId == targetModule.pluginId) null
+          else "it depends on module '${targetModule.contentModuleName}' which has private visibility in '${targetModule.pluginId}' plugin"
+        }
+      }
+      if (errorMessage == null) {
+        return null
+      }
+
+      val sourceModuleId = sourceModule.contentModuleName ?: sourceModule.pluginId
+      return when (pluginModuleVisibilityCheck) {
+        PluginModuleVisibilityCheckOption.REPORT_WARNING -> {
+          PluginManagerCore.logger.warn("$sourceModuleId has accessibility problem which is currently ignored: $errorMessage")
+          null
+        }
+        PluginModuleVisibilityCheckOption.REPORT_ERROR -> {
+          PluginManagerCore.logger.error(PluginException("$sourceModuleId isn't loaded: $errorMessage", sourceModule.pluginId))
+          errorMessage
+        }
+        PluginModuleVisibilityCheckOption.DISABLED -> null
+      }
+    }
+
+    internal fun createCyclePluginLoadingError(component: Collection<PluginModuleDescriptor>, getDependencies: (PluginModuleDescriptor) -> Iterator<PluginModuleDescriptor>): PluginLoadingError {
+      val pluginString =
+        component.joinToString(separator = ", ") { "'${it.name} (${it.pluginId.idString}${if (it.contentModuleName != null) ":" + it.contentModuleName else ""})'" }
+      val detailedMessage = StringBuilder()
+      val pluginToString: (IdeaPluginDescriptorImpl) -> String = { "id = ${it.pluginId.idString}@${it.contentModuleName} (${it.name})" }
+      detailedMessage.append("Detected plugin dependencies cycle details (only related dependencies are included):\n")
+      component
+        .asSequence()
+        .map { Pair(it, pluginToString(it)) }
+        .sortedWith(Comparator.comparing({ it.second }, String.CASE_INSENSITIVE_ORDER))
+        .forEach {
+          detailedMessage.append("  ").append(it.second).append(" depends on:\n")
+          getDependencies(it.first).asSequence()
+            .filter { o: IdeaPluginDescriptorImpl -> component.contains(o) }
+            .map(pluginToString)
+            .sortedWith(java.lang.String.CASE_INSENSITIVE_ORDER)
+            .forEach { dep: String? ->
+              detailedMessage.append("    ").append(dep).append("\n")
+            }
+        }
+      PluginManagerCore.logger.info(detailedMessage.toString())
+      return PluginLoadingError(
+        reason = null,
+        htmlMessageSupplier = Supplier {
+          val message = CoreBundle.message("plugin.loading.error.plugins.cannot.be.loaded.because.they.form.a.dependency.cycle", pluginString)
+          HtmlChunk.text(message)
+        },
+        error = null,
+      )
+    }
+  }
 }
 
 private enum class PluginModuleVisibilityCheckOption {
@@ -417,7 +421,7 @@ private val pluginModuleVisibilityCheck by lazy {
     "warning" -> PluginModuleVisibilityCheckOption.REPORT_WARNING
     "error" -> PluginModuleVisibilityCheckOption.REPORT_ERROR
     "disabled" -> PluginModuleVisibilityCheckOption.DISABLED
-    else -> PluginModuleVisibilityCheckOption.REPORT_WARNING
+    else -> PluginModuleVisibilityCheckOption.REPORT_ERROR
   }
 }
 
@@ -443,3 +447,9 @@ private fun getAllPluginDependencies(plugin: IdeaPluginDescriptorImpl): Sequence
            .map { it.pluginId } +
          plugin.moduleDependencies.plugins.asSequence()
 }
+
+private val PluginModuleDescriptor.namespace: String?
+  get() = when (this) {
+    is ContentModuleDescriptor -> parent.namespace
+    is PluginMainDescriptor -> namespace
+  }

@@ -81,13 +81,6 @@ public class MoveModulesToGroupAction extends AnAction {
     }
 
     String targetGroupName = group == null ? null : group.toString();
-    if (!ProjectSettingsService.getInstance(project).processModulesMoved(modules, targetGroupName) && pane != null) {
-      if (group != null) {
-        pane.selectModuleGroup(group, true);
-      }
-      else {
-        pane.selectModule(modules[0], true);
-      }
-    }
+    ProjectSettingsService.getInstance(project).processModulesMoved(modules, targetGroupName);
   }
 }

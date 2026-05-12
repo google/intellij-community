@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger.impl.breakpoints
 
 import com.intellij.openapi.application.ApplicationManager
@@ -28,6 +28,7 @@ import com.intellij.openapi.util.Comparing
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointManagerProxy
+import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointProxy
 import com.intellij.platform.debugger.impl.shared.proxy.XDebugManagerProxy
 import com.intellij.platform.debugger.impl.shared.proxy.XLightLineBreakpointProxy
 import com.intellij.platform.debugger.impl.shared.proxy.XLineBreakpointHighlighterRange
@@ -35,11 +36,14 @@ import com.intellij.platform.debugger.impl.shared.proxy.XLineBreakpointProxy
 import com.intellij.util.DocumentUtil
 import com.intellij.util.ThreeState
 import com.intellij.xdebugger.XDebuggerUtil
+import com.intellij.xdebugger.breakpoints.SuspendPolicy
+import com.intellij.xdebugger.impl.ui.DebuggerUIUtil
 import com.intellij.xdebugger.ui.DebuggerColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -75,9 +79,11 @@ class XBreakpointVisualRepresentation(
           }
         }
         finally {
-          // Guarantee that the highlighter is removed when the scope is canceled
-          removeHighlighter()
-          redrawInlineInlays()
+          withContext(NonCancellable) {
+            // Guarantee that the highlighter is removed when the scope is canceled
+            removeHighlighter()
+            redrawInlineInlays()
+          }
         }
       }
     }
@@ -168,7 +174,7 @@ class XBreakpointVisualRepresentation(
   private fun getBreakpointAttributes(): TextAttributes? {
     var attributes = EditorColorsManager.getInstance().getGlobalScheme().getAttributes(DebuggerColors.BREAKPOINT_ATTRIBUTES)
 
-    if (!myBreakpoint.isEnabled()) {
+    if (!myBreakpoint.isEnabled() || (myBreakpoint as? XBreakpointProxy)?.getSuspendPolicy() == SuspendPolicy.NONE) {
       attributes = attributes.clone()
       attributes.backgroundColor = null
     }
@@ -206,7 +212,7 @@ class XBreakpointVisualRepresentation(
       if (!mayDecompile && file.fileType.isBinary()) {
         return null
       }
-      document = FileDocumentManager.getInstance().getDocument(file) ?: return null
+      document = getDocumentOrNull(file) ?: return null
     }
 
     // TODO IJPL-185322 support XBreakpointTypeWithDocumentDelegation
@@ -216,14 +222,28 @@ class XBreakpointVisualRepresentation(
     return document
   }
 
-  fun removeHighlighter() {
-    try {
-      rangeMarker?.dispose()
+  private fun getDocumentOrNull(file: VirtualFile): Document? {
+    return try {
+      FileDocumentManager.getInstance().getDocument(file)
     }
     catch (e: Exception) {
-      LOG.error(e)
+      // See IJPL-202734 for the reason why we handle the exception here
+      LOG.warn("Failed to load document for breakpoint file: ${file.url}", e)
+      null
     }
+  }
+
+  fun removeHighlighter() {
+    val marker = rangeMarker ?: return
     rangeMarker = null
+    DebuggerUIUtil.invokeLater {
+      try {
+        marker.dispose()
+      }
+      catch (e: Exception) {
+        LOG.error(e)
+      }
+    }
   }
 
   private fun redrawInlineInlays() {
@@ -261,6 +281,7 @@ class XBreakpointVisualRepresentation(
             if (sessionProxy != null) {
               breakpointManager.onBreakpointRemoval(myBreakpoint, sessionProxy)
             }
+            DebuggerUIUtil.notifyBreakpointAttachments(myBreakpoint)
             return true
           }
         }
@@ -290,7 +311,7 @@ class XBreakpointVisualRepresentation(
 
   private fun canMoveTo(line: Int, file: VirtualFile?): Boolean {
     if (file != null && myBreakpoint.type.canPutAtFast(file, line, myProject) == ThreeState.YES) {
-      val existing = myBreakpointManager.findBreakpointAtLine(myBreakpoint.type, file, line)
+      val existing = myBreakpointManager.findBreakpointAtLine(myBreakpoint.type, file, line, myBreakpoint.getPlacement())
       return existing == null || existing == myBreakpoint
     }
     return false

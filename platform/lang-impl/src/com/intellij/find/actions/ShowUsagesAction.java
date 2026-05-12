@@ -9,6 +9,7 @@ import com.intellij.find.FindBundle;
 import com.intellij.find.FindManager;
 import com.intellij.find.FindUsagesSettings;
 import com.intellij.find.findUsages.AbstractFindUsagesDialog;
+import com.intellij.find.findUsages.CommonFindUsagesDialog;
 import com.intellij.find.findUsages.FindUsagesHandler;
 import com.intellij.find.findUsages.FindUsagesHandlerBase;
 import com.intellij.find.findUsages.FindUsagesHandlerUi;
@@ -24,7 +25,6 @@ import com.intellij.ide.DataManager;
 import com.intellij.ide.actions.searcheverywhere.ExtendedInfo;
 import com.intellij.ide.actions.searcheverywhere.footer.ExtendedInfoComponent;
 import com.intellij.ide.actions.searcheverywhere.footer.ExtendedInfoImplKt;
-import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.ide.util.gotoByName.ModelDiff;
 import com.intellij.ide.util.scopeChooser.ScopeChooserGroup;
 import com.intellij.internal.statistic.eventLog.events.EventPair;
@@ -71,6 +71,7 @@ import com.intellij.openapi.fileEditor.impl.text.AsyncEditorLoader;
 import com.intellij.openapi.keymap.KeymapUtil;
 import com.intellij.openapi.options.advanced.AdvancedSettings;
 import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.util.ProgressIndicatorBase;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.DumbService;
@@ -133,6 +134,7 @@ import com.intellij.usages.UsageSearchPresentation;
 import com.intellij.usages.UsageSearcher;
 import com.intellij.usages.UsageTarget;
 import com.intellij.usages.UsageView;
+import com.intellij.usages.UsageViewProjectProperties;
 import com.intellij.usages.impl.CodeNavigateSource;
 import com.intellij.usages.impl.GroupNode;
 import com.intellij.usages.impl.NullUsage;
@@ -229,7 +231,6 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
 
   private static final String DIMENSION_SERVICE_KEY = "ShowUsagesActions.dimensionServiceKey";
   private static final String SPLITTER_SERVICE_KEY = "ShowUsagesActions.splitterServiceKey";
-  private static final String PREVIEW_PROPERTY_KEY = "ShowUsagesActions.previewPropertyKey";
 
   private static final IJTracer myFindUsagesTracer = TelemetryManager.getInstance().getTracer(FindUsagesScope);
 
@@ -669,9 +670,9 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
 
     Consumer<AbstractPopup> tableResizer = popup -> {
       if (popup != null && popup.isVisible() && !manuallyResized.get()) {
-        PropertiesComponent properties = PropertiesComponent.getInstance(project);
+        var properties = UsageViewProjectProperties.getInstance(project);
         int dataSize = table.getModel().getRowCount();
-        setPopupSize(table, popup, parameters.popupPosition, parameters.minWidth, properties.isValueSet(PREVIEW_PROPERTY_KEY), dataSize);
+        setPopupSize(table, popup, parameters.popupPosition, parameters.minWidth, properties.isPreviewSource(), dataSize);
       }
     };
 
@@ -811,7 +812,7 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
           return false;
         }
 
-        UsageNode nodes = ReadAction.compute(() -> usageView.doAppendUsage(usage));
+        UsageNode nodes = ReadAction.computeBlocking(() -> usageView.doAppendUsage(usage));
         usages.add(usage);
         firstUsageAddedTS.compareAndSet(0, System.nanoTime()); // Successes only once - at first assignment
 
@@ -937,7 +938,7 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
       VirtualFile file = editor.getVirtualFile();
       int offset = editor.getCaretModel().getOffset();
       if (file == null || offset <= 0) {
-        return __ -> false;
+        return _ -> false;
       }
 
       int line = editor.getDocument().getLineNumber(offset);
@@ -948,7 +949,7 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
           }
 
           for (UsageInfo info : adapter.getMergedInfos()) {
-            Segment range = doIfNotNull(info.getPsiFileRange(), it -> ReadAction.compute(it::getRange));
+            Segment range = doIfNotNull(info.getPsiFileRange(), it -> ReadAction.computeBlocking(it::getRange));
             if (range != null && range.containsInclusive(offset)) {
               return true;
             }
@@ -958,7 +959,7 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
         return false;
       };
     }
-    return __ -> false;
+    return _ -> false;
   }
 
   private static boolean showPopupIfNeedTo(@NotNull JBPopup popup, @NotNull RelativePoint popupPosition, @NotNull Ref<? super Long> popupShownTime) {
@@ -972,6 +973,20 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
 
   private static @Nullable FindUsagesOptions showDialog(@NotNull FindUsagesHandlerBase handler) {
     UIEventLogger.ShowUsagesPopupShowSettings.log(handler.getProject());
+    if (handler.precomputedIsInFileOnly == null) {
+      if (!ProgressManager.getInstance().runProcessWithProgressSynchronously(
+        () -> {
+          ReadAction.runBlocking(() -> {
+            CommonFindUsagesDialog.precomputeFindUsagesDialogData(handler);
+          });
+        },
+        FindBundle.message("progress.title.prepare.find.usages"),
+        true,
+        handler.getProject()
+      )) {
+        return null;
+      }
+    }
     AbstractFindUsagesDialog dialog;
     if (handler instanceof FindUsagesHandlerUi) {
       dialog = ((FindUsagesHandlerUi)handler).getFindUsagesDialog(false, false, false);
@@ -1009,8 +1024,8 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
       setCancelKeyEnabled(true).
       setDimensionServiceKey(DIMENSION_SERVICE_KEY);
 
-    PropertiesComponent properties = PropertiesComponent.getInstance(project);
-    boolean addCodePreview = properties.isValueSet(PREVIEW_PROPERTY_KEY);
+    var properties = UsageViewProjectProperties.getInstance(project);
+    boolean addCodePreview = properties.isPreviewSource();
     OnePixelSplitter contentSplitter = null;
     if (addCodePreview) {
       contentSplitter = new OnePixelSplitter(true, .6f);
@@ -1051,14 +1066,14 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
     usageView.addFilteringActions(filteringGroup);
     ActionManager actionManager = ActionManager.getInstance();
 
-    DefaultActionGroup showOptionsActionGroup = createShowOptionsActionGroup(properties, extendedInfoPanel);
+    DefaultActionGroup showOptionsActionGroup = createShowOptionsActionGroup();
     filteringGroup.add(showOptionsActionGroup);
     filteringGroup.add(Separator.getInstance());
 
     filteringGroup.add(new ToggleAction(UsageViewBundle.message("preview.usages.action.text"), null, AllIcons.Actions.PreviewDetailsVertically) {
       @Override
       public boolean isSelected(@NotNull AnActionEvent e) {
-        return properties.isValueSet(PREVIEW_PROPERTY_KEY);
+        return properties.isPreviewSource();
       }
 
       @Override
@@ -1069,7 +1084,7 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
       @Override
       public void setSelected(@NotNull AnActionEvent e, boolean state) {
         if (e.getDataContext() != DataContext.EMPTY_CONTEXT) { // Avoid fake events
-          properties.setValue(PREVIEW_PROPERTY_KEY, state);
+          properties.setPreviewSource(state);
           cancel(popupRef.get(), actionHandler, CLOSE_REASON_PREVIEW);
 
           WindowStateService.getInstance().putSize(DIMENSION_SERVICE_KEY, null);
@@ -1174,7 +1189,7 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
       }.installOn(table);
 
       builder.setAutoselectOnMouseMove(false).setCloseOnEnter(false).
-        registerKeyboardAction(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), __ -> WriteIntentReadAction.run(itemChoseCallback));
+        registerKeyboardAction(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), _ -> WriteIntentReadAction.run(itemChoseCallback));
 
       Runnable updatePreviewRunnable = () -> {
         if (popupRef.get().isDisposed()) return;
@@ -1277,7 +1292,7 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
     return popup;
   }
 
-  private static DefaultActionGroup createShowOptionsActionGroup(PropertiesComponent properties, JPanel extendedInfoPanel) {
+  private static DefaultActionGroup createShowOptionsActionGroup() {
     ActionManager actionManager = ActionManager.getInstance();
     DefaultActionGroup showOptionsGroup = new DefaultActionGroup(UsageViewBundle.message("show.options.action.group.description"), null, AllIcons.Actions.Show);
     showOptionsGroup.setPopup(true);
@@ -1504,8 +1519,8 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
         calcMaxWidth(table); // compute column widths
       }
       else {
-        PropertiesComponent properties = PropertiesComponent.getInstance(project);
-        setPopupSize(table, popup, popupPosition, minWidth, properties.isValueSet(PREVIEW_PROPERTY_KEY), data.size());
+        var properties = UsageViewProjectProperties.getInstance(project);
+        setPopupSize(table, popup, popupPosition, minWidth, properties.isPreviewSource(), data.size());
       }
     }
   }

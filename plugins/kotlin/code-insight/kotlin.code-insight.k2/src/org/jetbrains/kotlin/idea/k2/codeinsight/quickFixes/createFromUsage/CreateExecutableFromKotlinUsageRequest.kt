@@ -9,17 +9,15 @@ import com.intellij.psi.PsiJvmSubstitutor
 import com.intellij.psi.PsiSubstitutor
 import com.intellij.psi.SmartPsiElementPointer
 import com.intellij.psi.createSmartPointer
-import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage.K2CreateFunctionFromUsageUtil.computeExpectedParams
-import org.jetbrains.kotlin.psi.KtCallElement
+import org.jetbrains.kotlin.psi.KtElement
 
-internal abstract class CreateExecutableFromKotlinUsageRequest<out T : KtCallElement>(
+internal abstract class CreateExecutableFromKotlinUsageRequest<out T : KtElement>(
     call: T,
+    private val expectedParameterInfo: List<ExpectedParameter>,
     private val modifiers: Collection<JvmModifier>,
 ) : CreateExecutableRequest {
     private val project = call.project
     private val callPointer: SmartPsiElementPointer<T> = call.createSmartPointer()
-    private val expectedParameterInfo: List<ExpectedParameter> = analyze(call) { computeExpectedParams(call) }
 
     internal val call: T get() = callPointer.element ?: error("dead pointer")
 

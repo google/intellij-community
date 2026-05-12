@@ -53,7 +53,16 @@ class IjentWslNioPath(
 
   override fun resolve(other: Path): IjentWslNioPath = presentablePath.resolve(other.toOriginalPath()).toIjentWslPath()
 
-  override fun relativize(other: Path): IjentWslNioPath = presentablePath.relativize(other.toOriginalPath()).toIjentWslPath()
+  override fun relativize(other: Path): IjentWslNioPath {
+    if (isAbsolute != other.isAbsolute) {
+      throw IllegalArgumentException(
+        "Tried to relativize a relative and an absolute path: `$this` and `$other`." +
+        " Check for possible confusion." +
+        " Maybe some code up the call stack tried to use a path from the Linux machine as a WSL path for Windows."
+      )
+    }
+    return presentablePath.relativize(other.toOriginalPath()).toIjentWslPath()
+  }
 
   override fun toUri(): URI = presentablePath.toUri()
 
@@ -86,8 +95,15 @@ class IjentWslNioPath(
     return originalPath.toIjentWslPath()
   }
 
-  override fun register(watcher: WatchService, events: Array<out WatchEvent.Kind<*>?>?, vararg modifiers: WatchEvent.Modifier?): WatchKey =
-    actualPath.register(watcher, events, *modifiers)  // TODO Not well tested.
+  override fun register(watcher: WatchService, events: Array<out WatchEvent.Kind<*>?>?, vararg modifiers: WatchEvent.Modifier?): WatchKey {
+    val ijentPath: Path = fileSystem.provider().toIjentNioPath(this)
+    @Suppress("UNCHECKED_CAST")
+    return ijentPath.register(
+      watcher,
+      (events ?: emptyArray()) as Array<out WatchEvent.Kind<*>>,
+      *modifiers.filterNotNull().toTypedArray()
+    )
+  }
 
   override fun compareTo(other: Path): Int = presentablePath.compareTo(other.toOriginalPath())
 

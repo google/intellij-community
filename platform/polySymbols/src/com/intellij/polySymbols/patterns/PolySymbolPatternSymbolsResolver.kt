@@ -8,12 +8,13 @@ import com.intellij.polySymbols.query.PolySymbolQueryExecutor
 import com.intellij.polySymbols.query.PolySymbolQueryStack
 import org.jetbrains.annotations.ApiStatus
 
-@ApiStatus.Internal
 interface PolySymbolPatternSymbolsResolver {
+
   fun getSymbolKinds(context: PolySymbol?): Set<PolySymbolKind> =
     emptySet()
 
-  val delegate: PolySymbol?
+  @get:ApiStatus.Internal
+  val delegate: PolySymbol? get() = null
 
   fun codeCompletion(
     name: String,

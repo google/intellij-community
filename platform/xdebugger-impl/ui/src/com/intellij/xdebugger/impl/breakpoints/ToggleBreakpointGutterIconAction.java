@@ -7,6 +7,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointProxy;
 import com.intellij.xdebugger.XDebuggerBundle;
+import com.intellij.xdebugger.impl.ui.DebuggerUIUtil;
 import org.jetbrains.annotations.NotNull;
 
 class ToggleBreakpointGutterIconAction extends DumbAwareAction {
@@ -22,5 +23,6 @@ class ToggleBreakpointGutterIconAction extends DumbAwareAction {
   @Override
   public void actionPerformed(final @NotNull AnActionEvent e) {
     myBreakpoint.setEnabled(!myBreakpoint.isEnabled());
+    DebuggerUIUtil.notifyBreakpointAttachments(myBreakpoint);
   }
 }

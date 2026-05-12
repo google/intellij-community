@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.core.nio.fs;
 
 import org.jetbrains.annotations.NotNull;
@@ -94,12 +94,12 @@ public final class MultiRoutingFileSystem extends DelegatingFileSystem<MultiRout
   }
 
   @Override
-  protected @NotNull FileSystem getDelegate() {
+  public @NotNull FileSystem getDelegate() {
     return myLocalFS;
   }
 
   @Override
-  protected @NotNull FileSystem getDelegate(@NotNull String root) {
+  public @NotNull FileSystem getDelegate(@NotNull String root) {
     if (MultiRoutingFileSystemProvider.ourForceDefaultFs) {
       return myLocalFS;
     }
@@ -175,6 +175,6 @@ public final class MultiRoutingFileSystem extends DelegatingFileSystem<MultiRout
   @Override
   public WatchService newWatchService() throws IOException {
     // TODO Move it to DelegatingFileSystem.
-    return new MultiRoutingWatchServiceDelegate(super.newWatchService(), myProvider);
+    return new MultiRoutingWatchServiceDelegate(super.newWatchService(), myProvider, myLocalFS);
   }
 }

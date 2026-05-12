@@ -27,7 +27,7 @@ interface UvLowLevel<P : PathHolder> {
   /**
   * Manage project dependencies by adding/removing them to the project along side installation
   */
-  suspend fun addDependency(pyPackages: PythonPackageInstallRequest, options: List<String>): PyResult<Unit>
+  suspend fun addDependency(pyPackages: PythonPackageInstallRequest, options: List<String>, workspaceMember: PyWorkspaceMember? = null): PyResult<Unit>
   suspend fun removeDependencies(pyPackages: Array<out String>, workspaceMember: PyWorkspaceMember? = null): PyResult<Unit>
 
   /**
@@ -38,9 +38,7 @@ interface UvLowLevel<P : PathHolder> {
 
   suspend fun listPackages(): PyResult<List<PythonPackage>>
   suspend fun listOutdatedPackages(): PyResult<List<PythonOutdatedPackage>>
-  suspend fun listTopLevelPackages(): PyResult<List<PythonPackage>>
   suspend fun listPackageRequirements(name: PythonPackage): PyResult<List<PyPackageName>>
-  suspend fun listPackageRequirementsTree(name: PythonPackage): PyResult<String>
   suspend fun listProjectStructureTree(): PyResult<String>
   suspend fun listAllPackagesTree(): PyResult<String>
 

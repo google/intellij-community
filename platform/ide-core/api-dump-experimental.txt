@@ -7,8 +7,17 @@ f:com.intellij.notification.Notifications$Bus
 - *s:notifyAndHide(com.intellij.notification.Notification,com.intellij.openapi.project.Project):V
 *:com.intellij.openapi.options.Configurable$InnerWithModifiableParent
 - a:getModifiableParents():java.util.List
+c:com.intellij.openapi.options.ConfigurableEP
+- com.intellij.openapi.extensions.PluginAware
+- *:searchableInActions:Z
 *:com.intellij.openapi.options.ConfigurationQuickFix
 - a:applyFix(com.intellij.openapi.actionSystem.DataContext):V
+com.intellij.openapi.options.SearchableConfigurable
+- com.intellij.openapi.options.ConfigurableWithId
+- *:isSearchableInActions():Z
+c:com.intellij.openapi.options.SearchableConfigurable$Delegate
+- com.intellij.openapi.options.SearchableConfigurable
+- *:isSearchableInActions():Z
 f:com.intellij.openapi.project.ProjectUtil
 - *sf:clearCachesForAllProjects(java.lang.String):V
 - *sf:clearCachesForAllProjectsStartingWith(java.lang.String):V
@@ -77,5 +86,31 @@ f:com.intellij.util.ui.UiScopeKt
 - *bs:launchOnShow$default(java.awt.Component,java.lang.String,kotlin.coroutines.CoroutineContext,kotlin.jvm.functions.Function2,I,java.lang.Object):kotlinx.coroutines.Job
 - *sf:launchOnceOnShow(java.awt.Component,java.lang.String,kotlin.coroutines.CoroutineContext,kotlin.jvm.functions.Function2):kotlinx.coroutines.Job
 - *bs:launchOnceOnShow$default(java.awt.Component,java.lang.String,kotlin.coroutines.CoroutineContext,kotlin.jvm.functions.Function2,I,java.lang.Object):kotlinx.coroutines.Job
+*f:com.intellij.util.ui.update.DebouncedUpdates
+- sf:INSTANCE:com.intellij.util.ui.update.DebouncedUpdates
+- sf:forComponent(javax.swing.JComponent,java.lang.String,I):com.intellij.util.ui.update.DebouncedUpdates$Builder
+- f:forComponent-SxA4cEA(javax.swing.JComponent,java.lang.String,J):com.intellij.util.ui.update.DebouncedUpdates$Builder
+- sf:forScope(kotlinx.coroutines.CoroutineScope,java.lang.String,I):com.intellij.util.ui.update.DebouncedUpdates$Builder
+- f:forScope-SxA4cEA(kotlinx.coroutines.CoroutineScope,java.lang.String,J):com.intellij.util.ui.update.DebouncedUpdates$Builder
+*f:com.intellij.util.ui.update.DebouncedUpdates$Builder
+- *sf:Companion:com.intellij.util.ui.update.DebouncedUpdates$Builder$Companion
+- f:restartTimerOnAdd(Z):com.intellij.util.ui.update.DebouncedUpdates$Builder
+- bs:restartTimerOnAdd$default(com.intellij.util.ui.update.DebouncedUpdates$Builder,Z,I,java.lang.Object):com.intellij.util.ui.update.DebouncedUpdates$Builder
+- f:runBatched(java.util.function.Consumer):com.intellij.util.ui.update.UpdateQueue
+- bf:runBatched(kotlin.jvm.functions.Function2):com.intellij.util.ui.update.UpdateQueue
+- f:runBatchedDistinct(java.util.function.Consumer):com.intellij.util.ui.update.UpdateQueue
+- bf:runBatchedDistinct(kotlin.jvm.functions.Function2):com.intellij.util.ui.update.UpdateQueue
+- f:runLatest(java.util.function.Consumer):com.intellij.util.ui.update.UpdateQueue
+- bf:runLatest(kotlin.jvm.functions.Function2):com.intellij.util.ui.update.UpdateQueue
+- f:withComponentModality(javax.swing.JComponent):com.intellij.util.ui.update.DebouncedUpdates$Builder
+- f:withContext(kotlin.coroutines.CoroutineContext):com.intellij.util.ui.update.DebouncedUpdates$Builder
+*f:com.intellij.util.ui.update.DebouncedUpdates$Builder$Companion
 f:com.intellij.util.ui.update.UiNotifyConnector$Companion
 - *f:forceNotifyIsShown(java.awt.Component):V
+*:com.intellij.util.ui.update.UpdateQueue
+- a:awaitAllExecuted(kotlin.coroutines.Continuation):java.lang.Object
+- a:cancelOnDispose(com.intellij.openapi.Disposable):com.intellij.util.ui.update.UpdateQueue
+- a:isAllExecuted():Z
+- a:queue(java.lang.Object):V
+- a:waitForAllExecuted(J):V
+- a:waitForAllExecuted-LRDsOJo(J):V

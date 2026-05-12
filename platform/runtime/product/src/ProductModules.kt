@@ -14,14 +14,7 @@ interface ProductModules {
   val mainModuleGroup: RuntimeModuleGroup
 
   /**
-   * Returns description of module groups corresponding to the bundled plugins. Modules from these groups may be disabled if the corresponding
-   * plugin is disabled by the user.
+   * Returns IDs of modules containing `META-INF/plugin.xml` files of the bundled plugins.
    */
-  val bundledPluginModuleGroups: List<PluginModuleGroup>
-
-  /**
-   * Returns mapping from an ID of a bundled plugin module which wasn't loaded because some dependency wasn't found, to the path to the
-   * transitive dependency which wasn't found.
-   */
-  val notLoadedBundledPluginModules: Map<RuntimeModuleId, List<RuntimeModuleId>>
+  val bundledPluginDescriptorModules: List<RuntimeModuleId>
 }

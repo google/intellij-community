@@ -6,11 +6,9 @@ import com.intellij.openapi.vfs.newvfs.persistent.AttributesStorageOnTheTopOfBlo
 import com.intellij.openapi.vfs.newvfs.persistent.AttributesStorageOverBlobStorage;
 import com.intellij.openapi.vfs.newvfs.persistent.VFSAttributesStorage;
 import com.intellij.platform.util.io.storages.StorageFactory;
-import com.intellij.platform.util.io.storages.blobstorage.StreamlinedBlobStorageHelper;
 import com.intellij.platform.util.io.storages.blobstorage.StreamlinedBlobStorageOverMMappedFile;
 import com.intellij.platform.util.io.storages.mmapped.MMappedFileStorageFactory;
 import com.intellij.util.indexing.impl.IndexDebugProperties;
-import com.intellij.util.io.StorageLockContext;
 import com.intellij.util.io.blobstorage.SpaceAllocationStrategy;
 import com.intellij.util.io.blobstorage.SpaceAllocationStrategy.DataLengthPlusFixedPercentStrategy;
 import com.intellij.util.io.blobstorage.StreamlinedBlobStorage;
@@ -28,7 +26,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,15 +39,14 @@ import static org.junit.Assert.assertTrue;
 public class AttributesStorageOnTheTopOfBlobStorage_PropertyBasedTest {
 
   private static final int PAGE_SIZE = 1 << 14;
-  private static final StorageLockContext LOCK_CONTEXT = new StorageLockContext(true, true);
 
   private static final SpaceAllocationStrategy SPACE_ALLOCATION_STRATEGY = new DataLengthPlusFixedPercentStrategy(
     64, 256,
-    StreamlinedBlobStorageHelper.MAX_CAPACITY,
+    StreamlinedBlobStorageOverMMappedFile.MAX_CAPACITY,
     30
   );
 
-  private static final int ITERATION_COUNT = 100;
+  private static final int ITERATION_COUNT = 300;
 
   @BeforeClass
   public static void beforeClass() {
@@ -81,11 +77,6 @@ public class AttributesStorageOnTheTopOfBlobStorage_PropertyBasedTest {
     this.storageFactory = storageFactory;
   }
 
-  protected AttributesStorageOverBlobStorage createStorage(Path storagePath) throws Exception {
-    StreamlinedBlobStorage storage = storageFactory.open(storagePath);
-    return new AttributesStorageOverBlobStorage(storage);
-  }
-
   @Test
   public void insertsUpdatesDeletesAttributesInAnyOrderCreateCoherentStorageBehaviour() {
     PropertyChecker.customized()
@@ -96,16 +87,19 @@ public class AttributesStorageOnTheTopOfBlobStorage_PropertyBasedTest {
       .checkScenarios(() -> {
         return env -> {
           final Attributes attributes = new Attributes();
-          try (AttributesStorageOverBlobStorage storage = createStorage(temporaryFolder.newFile().toPath())) {
-            final List<AttributeRecord> records = new ArrayList<>();
-            //updates count 10x of inserts/deletes
-            final Generator<ImperativeCommand> commandsGenerator = Generator.frequency(
-              1, constant(new InsertAttribute(attributes, storage, records)),
-              10, constant(new UpdateAttribute(attributes, storage, records)),
-              1, constant(new DeleteAttribute(attributes, storage, records))
-            );
-            env.executeCommands(commandsGenerator);
-            env.logMessage("Total records: " + records.size());
+          try {
+            StreamlinedBlobStorage blobStorage = storageFactory.open(temporaryFolder.newFile().toPath());
+            try (AttributesStorageOverBlobStorage attributesStorage = new AttributesStorageOverBlobStorage(blobStorage)) {
+              final List<AttributeRecord> records = new ArrayList<>();
+              //updates count 10x of inserts/deletes
+              final Generator<ImperativeCommand> commandsGenerator = Generator.frequency(
+                1, constant(new InsertAttribute(attributes, attributesStorage, records, PAGE_SIZE - 32)),
+                10, constant(new UpdateAttribute(attributes, attributesStorage, records)),
+                1, constant(new DeleteAttribute(attributes, attributesStorage, records))
+              );
+              env.executeCommands(commandsGenerator);
+              env.logMessage("Total records: " + records.size());
+            }
           }
           catch (Exception e) {
             throw new AssertionError(e);
@@ -120,15 +114,18 @@ public class AttributesStorageOnTheTopOfBlobStorage_PropertyBasedTest {
     private final Attributes attributes;
     private final AttributesStorageOverBlobStorage storage;
     private final List<AttributeRecord> records;
+    private final int maxPayloadSize;
 
     private final Int2IntMap fileIdToAttributeId = new Int2IntOpenHashMap();
 
     public InsertAttribute(final @NotNull Attributes attributes,
                            final @NotNull AttributesStorageOverBlobStorage storage,
-                           final @NotNull List<AttributeRecord> records) {
+                           final @NotNull List<AttributeRecord> records,
+                           int maxPayloadSize) {
       this.attributes = attributes;
       this.storage = storage;
       this.records = records;
+      this.maxPayloadSize = maxPayloadSize;
     }
 
     @Override
@@ -149,7 +146,7 @@ public class AttributesStorageOnTheTopOfBlobStorage_PropertyBasedTest {
 
           final AttributeRecord insertedRecord = attributes.insertOrUpdateRecord(
             AttributeRecord.newAttributeRecord(fileId, attributeId)
-              .withRandomAttributeBytes(1029),
+              .withRandomAttributeBytes(maxPayloadSize),
             storage
           );
           records.add(insertedRecord);

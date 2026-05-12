@@ -9,9 +9,9 @@ import com.intellij.tasks.TaskBundle;
 import com.intellij.tasks.config.BaseRepositoryEditor;
 import com.intellij.tasks.impl.TaskUiUtil;
 import com.intellij.tasks.redmine.model.RedmineProject;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.Consumer;
 import com.intellij.util.containers.Stack;
 import com.intellij.util.ui.FormBuilder;
@@ -101,7 +101,7 @@ public class RedmineRepositoryEditor extends BaseRepositoryEditor<RedmineReposit
     myProjectLabel = new JBLabel(TaskBundle.message("label.project"), SwingConstants.RIGHT);
     myProjectCombo = new ComboBox<>(300);
     //myProjectCombo.setRenderer(new TaskUiUtil.SimpleComboBoxRenderer("Set URL and password/token first"));
-    myProjectCombo.setRenderer(SimpleListCellRenderer.create(TaskBundle.message("label.set.url.password.token.first"), value -> {
+    myProjectCombo.setRenderer(BuilderKt.textListCellRenderer(TaskBundle.message("label.set.url.password.token.first"), value -> {
       if (myProjectCombo.isPopupVisible()) {
         //if (value.myLevel == 0 && value.myProject != RedmineRepository.UNSPECIFIED_PROJECT) {
         //setFont(UIUtil.getListFont().deriveFont(Font.BOLD));

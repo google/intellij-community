@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.editor.ui` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "editor-ui_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "editor-ui",
   module_name = "intellij.platform.editor.ui",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":editor-ui_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/core-api:core",
     "//jps/model-api:model",
@@ -24,13 +19,17 @@ jvm_library(
     "@lib//:jetbrains-annotations",
     "//platform/util/concurrency",
     "//platform/util:util-ui",
+    "//platform/util/multiplatform",
+    "//platform/util/base",
     "//platform/core-ui",
     "//platform/diagnostic",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
   ]
 )
 
 jvm_library(
   name = "editor-ui_test_lib",
+  testonly = True,
   module_name = "intellij.platform.editor.ui",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -44,8 +43,17 @@ jvm_library(
     "//platform/util/jdom:jdom_test_lib",
     "//platform/util/concurrency:concurrency_test_lib",
     "//platform/util:util-ui_test_lib",
+    "//platform/util/multiplatform:multiplatform_test_lib",
+    "//platform/util/base:base_test_lib",
     "//platform/core-ui:core-ui_test_lib",
     "//platform/diagnostic:diagnostic_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.editor.ui` end
+
+### auto-generated section `iml intellij.platform.editor.ui` start
+exports_files([
+  "intellij.platform.editor.ui.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.editor.ui` end

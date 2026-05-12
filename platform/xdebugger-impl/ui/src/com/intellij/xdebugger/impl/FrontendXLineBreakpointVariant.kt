@@ -44,10 +44,10 @@ interface FrontendXLineBreakpointVariant {
   val useAsInlineVariant: Boolean
 }
 
-@ApiStatus.Internal
-fun XLineBreakpointInstallationInfo.toRequest(hasBreakpoints: Boolean): XLineBreakpointInstallationRequest = XLineBreakpointInstallationRequest(
+private suspend fun XLineBreakpointInstallationInfo.toRequest(hasBreakpoints: Boolean) = XLineBreakpointInstallationRequest(
   types.map { XBreakpointTypeId(it.id) },
   position.toRpc(),
+  placement,
   isTemporary,
   isLogging,
   logExpression,
@@ -91,9 +91,9 @@ internal fun computeBreakpointProxy(
                        ?: throw kotlin.coroutines.cancellation.CancellationException()
         when (response) {
           is XRemoveBreakpointResponse -> {
-            val breakpoint = XBreakpointUIUtil.findBreakpointsAtLine(project, info).firstOrNull()
-            if (breakpoint != null) {
-              XBreakpointUIUtil.removeBreakpointIfPossible(info, breakpoint).await()
+            val breakpoints = XBreakpointUIUtil.findBreakpointsAtLine(project, info)
+            if (breakpoints.isNotEmpty()) {
+              XBreakpointUIUtil.removeBreakpointIfPossible(info, *breakpoints.toTypedArray()).await()
             }
             result.complete(null)
           }

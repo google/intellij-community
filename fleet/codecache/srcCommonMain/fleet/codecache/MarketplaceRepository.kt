@@ -24,7 +24,7 @@ private object Marketplace {
 fun marketPlaceRepository(httpClient: suspend () -> HttpClient, host: String, defaultRepository: PluginRepository? = null): PluginRepository {
   return object : PluginRepository {
     override suspend fun getLatestVersions(names: Set<PluginName>, shipVersion: PluginVersion): Map<PluginName, PluginVersion> {
-      Marketplace.logger.debug("Querying latest versions of '$names' compatible with '$shipVersion'...")
+      Marketplace.logger.debug { "Querying latest versions of '$names' compatible with '$shipVersion'..." }
       tailrec suspend fun loop(
         out: HashMap<PluginName, PluginVersion> = HashMap(),
         offset: Int = 0,
@@ -37,7 +37,7 @@ fun marketPlaceRepository(httpClient: suspend () -> HttpClient, host: String, de
             setBody(TextContent(queryStr, ContentType.Application.Json))
           }.bodyAsText()
           val response = Json.decodeFromString(VersionsResponse.serializer(), body)
-          Marketplace.logger.debug("URL:\n$url\nQuery:\n$queryStr\nResponse:\n$response")
+          Marketplace.logger.debug { "URL:\n$url\nQuery:\n$queryStr\nResponse:\n$response" }
           response.data.updates.updates.map { versionInfo ->
             PluginName(versionInfo.xmlId) to PluginVersion.fromString(versionInfo.version)
           }
@@ -56,26 +56,26 @@ fun marketPlaceRepository(httpClient: suspend () -> HttpClient, host: String, de
       }
 
       val versionMap = loop()
-      Marketplace.logger.debug("Found latest versions '$versionMap'")
+      Marketplace.logger.debug { "Found latest versions '$versionMap'" }
       return versionMap
     }
 
-    override suspend fun getPlugin(pluginName: PluginName, pluginVersion: PluginVersion): PluginDescriptor? = run {
+    override suspend fun getPlugin(pluginName: PluginName, pluginVersion: PluginVersion): PluginDescriptor = run {
       // we should not download the descriptor from the internet if we already did it once, we have it in the trusted repo
       // this optimization should speed up the plugin management significantly
       defaultRepository?.getPlugin(pluginName, pluginVersion) ?: run {
-        Marketplace.logger.debug("Querying marketplace $host for a plugin $pluginName")
+        Marketplace.logger.debug { "Querying marketplace $host for a plugin $pluginName" }
         val uri = bundleUri(host, pluginName.name, pluginVersion.versionString)
         try {
           val bundleStr = httpClient().get(uri).bodyAsText()
-          Marketplace.logger.debug("getPlugin($pluginName, $pluginVersion) => ${bundleStr.length} bytes")
+          Marketplace.logger.debug { "getPlugin($pluginName, $pluginVersion) => ${bundleStr.length} bytes" }
           Json.decodeFromString(PluginDescriptor.serializer(), bundleStr)
         }
         catch (x: CancellationException) {
           throw x
         }
         catch (x: Throwable) {
-          Marketplace.logger.debug(x, "got error from $uri")
+          Marketplace.logger.debug(x) { "got error from $uri" }
           throw x
         }
       }

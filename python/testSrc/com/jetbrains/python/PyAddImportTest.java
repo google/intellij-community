@@ -29,11 +29,11 @@ public class PyAddImportTest extends PyTestCase {
     runWithAdditionalFileInLibDir(
       "sys.py",
       "",
-      (__) ->
+      (_) ->
         runWithAdditionalFileInLibDir(
           "datetime.py",
           "",
-          (___) -> doAddImport("re", BUILTIN)
+          (_) -> doAddImport("re", BUILTIN)
         )
     );
   }
@@ -58,11 +58,11 @@ public class PyAddImportTest extends PyTestCase {
     runWithAdditionalFileInLibDir(
       "sys.py",
       "",
-      (__) ->
+      (_) ->
         runWithAdditionalFileInLibDir(
           "datetime.py",
           "",
-          (___) -> doAddImportWithResolveInProject("sys", BUILTIN)
+          (_) -> doAddImportWithResolveInProject("sys", BUILTIN)
         )
     );
   }
@@ -122,7 +122,7 @@ public class PyAddImportTest extends PyTestCase {
     runWithAdditionalFileInLibDir(
       "sys.py",
       "path = 10",
-      (__) -> {
+      (_) -> {
         myFixture.configureByFile(getTestName(true) + ".py");
         myFixture.enableInspections(PyUnresolvedReferencesInspection.class);
         assertNotNull(myFixture.findSingleIntention("Import 'sys' locally"));

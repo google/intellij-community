@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.util;
 
 import com.intellij.gradle.toolingExtension.util.GradleVersionUtil;
@@ -34,6 +34,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.plugins.gradle.GradleManager;
 import org.jetbrains.plugins.gradle.model.data.GradleProjectBuildScriptData;
+import org.jetbrains.plugins.gradle.service.GradleInstallationManager;
 import org.jetbrains.plugins.gradle.settings.GradleProjectSettings;
 import org.jetbrains.plugins.gradle.settings.GradleSettings;
 
@@ -120,6 +121,11 @@ public final class GradleUtil {
     Properties wrapperProperties = new Properties();
     setFromWrapperConfiguration(wrapperConfiguration, wrapperProperties);
     return writeWrapperConfigurationToByteArray(wrapperProperties);
+  }
+
+  public static @NotNull String writeWrapperConfigurationToString(@NotNull WrapperConfiguration wrapperConfiguration) {
+    byte[] wrapperConfigurationByteArray = writeWrapperConfigurationToByteArray(wrapperConfiguration);
+    return new String(wrapperConfigurationByteArray, StandardCharsets.ISO_8859_1);
   }
 
   public static @Nullable WrapperConfiguration readWrapperConfiguration(@NotNull Path wrapperPropertiesFile) {
@@ -427,7 +433,14 @@ public final class GradleUtil {
   public static @Nullable GradleVersion getGradleVersion(String externalProjectPath, Project project) {
     GradleSettings settings = GradleSettings.getInstance(project);
     GradleProjectSettings projectSettings = settings.getLinkedProjectSettings(externalProjectPath);
-    return projectSettings != null ? projectSettings.resolveGradleVersion() : null;
+    if (projectSettings == null) {
+      return null;
+    }
+    GradleVersion guessedGradleVersion = GradleInstallationManager.guessGradleVersion(projectSettings);
+    if (guessedGradleVersion == null) {
+      return GradleVersion.current();
+    }
+    return guessedGradleVersion;
   }
 
   @SuppressWarnings("unused") // used externally

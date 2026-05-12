@@ -387,7 +387,7 @@ public class PopupChooserBuilder<T> implements IPopupChooserBuilder<T> {
       registerClosePopupKeyboardAction(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), true);
     }
     else if (myItemChosenRunnable != null) {
-      registerKeyboardAction(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), __ -> myItemChosenRunnable.run());
+      registerKeyboardAction(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), _ -> myItemChosenRunnable.run());
     }
     for (KeyStroke keystroke : myAdditionalKeystrokes) {
       registerClosePopupKeyboardAction(keystroke, true);

@@ -10,7 +10,7 @@ import org.jetbrains.annotations.NotNull;
  * {@link SoftWrap} implementation that is built around {@link TextChangeImpl}.
  */
 @ApiStatus.Internal
-public final class SoftWrapImpl implements SoftWrap {
+public final class SoftWrapImpl implements SoftWrapEx {
 
   private final TextChangeImpl myChange;
   private final int myIndentInColumns;
@@ -56,6 +56,7 @@ public final class SoftWrapImpl implements SoftWrap {
     return myChange;
   }
 
+  @Override
   public void advance(int diff) {
     myChange.advance(diff);
   }

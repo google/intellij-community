@@ -31,7 +31,7 @@ jvm_library(
     "//java/java-runtime:rt",
     "//build/tasks",
     "@lib//:junit5",
-    "@lib//:assert_j",
+    "//libraries/assertj-core",
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
     "//libraries/kotlinx/coroutines/core",
     "//libraries/kotlinx/serialization/core",
@@ -52,11 +52,13 @@ jvm_library(
     "//platform/buildData",
     "//platform/util/zip",
     "//platform/distribution-content:distributionContent-testFramework",
+    "//platform/build-scripts/licenses",
   ]
 )
 
 jvm_library(
   name = "testFramework_test_lib",
+  testonly = True,
   module_name = "intellij.platform.buildScripts.testFramework",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -72,6 +74,7 @@ jvm_library(
     "//platform/testFramework/core:core_test_lib",
     "//java/java-runtime:rt_test_lib",
     "//build/tasks:tasks_test_lib",
+    "//libraries/assertj-core:assertj-core_test_lib",
     "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
     "//libraries/kotlinx/coroutines/core:core_test_lib",
     "//libraries/kotlinx/serialization/core:core_test_lib",
@@ -90,6 +93,13 @@ jvm_library(
     "//platform/buildData:buildData_test_lib",
     "//platform/util/zip:zip_test_lib",
     "//platform/distribution-content:distributionContent-testFramework_test_lib",
+    "//platform/build-scripts/licenses:licenses_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.buildScripts.testFramework` end
+
+### auto-generated section `iml intellij.platform.buildScripts.testFramework` start
+exports_files([
+  "intellij.platform.buildScripts.testFramework.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.buildScripts.testFramework` end

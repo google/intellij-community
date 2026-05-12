@@ -1,4 +1,5 @@
 // "Import extension function 'String.ext'" "true"
+// K2_ERROR: Unresolved reference 'ext' on receiver of type 'String'.
 package p
 
 open class Base<T> {

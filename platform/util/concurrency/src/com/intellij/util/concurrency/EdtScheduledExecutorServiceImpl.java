@@ -34,7 +34,7 @@ final class EdtScheduledExecutorServiceImpl extends SchedulingWrapper implements
       public void executeMeInBackendExecutor() {
         // optimization: can be cancelled already
         if (!isDone()) {
-          ApplicationManager.getApplication().invokeLater(this, modalityState, __ -> {
+          ApplicationManager.getApplication().invokeLater(this, modalityState, _ -> {
             return isCancelled();
           });
         }

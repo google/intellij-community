@@ -16,4 +16,5 @@ internal class KotlinReturnPostfixTemplate : StringBasedPostfixTemplate, DumbAwa
 
     override fun getTemplateString(element: PsiElement): String = "return \$expr$\$END$"
     override fun getElementToRemove(expr: PsiElement): PsiElement = expr
+    override fun isApplicableForModCommand(): Boolean = true
 }

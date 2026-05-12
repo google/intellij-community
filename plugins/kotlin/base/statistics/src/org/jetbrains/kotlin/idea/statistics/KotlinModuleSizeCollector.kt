@@ -16,10 +16,14 @@ import com.intellij.openapi.components.Storage
 import com.intellij.openapi.components.StoragePathMacros
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.module.Module
+import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.checkCanceled
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.modules
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileFilter
 import com.intellij.psi.search.FileTypeIndex
 import com.intellij.psi.search.GlobalSearchScope
 import org.jetbrains.kotlin.idea.KotlinFileType
@@ -151,6 +155,37 @@ internal class KotlinModuleSizeCollector : ProjectUsagesCollector() {
         return path.contains("build/generated-sources/kotlin")
     }
 
+    private fun Module.collectModuleStatistics(): ModuleStatistics {
+        val moduleStatistics = ModuleStatistics()
+        val moduleFileIndex = ModuleRootManager.getInstance(this).fileIndex
+
+        val noGeneratedGradleFilesFilter = VirtualFileFilter { file ->
+            !file.isGeneratedGradleFile()
+        }
+
+        var iteratedFiles = 0
+        // Note: there is no read action on purpose. It might cause slightly
+        // inconsistent results, but it is perfectly acceptable for this use case.
+        moduleFileIndex.iterateContent({ file ->
+            // Some modules could have a huge number of files, so
+            // we should periodically check for cancellation
+            if (++iteratedFiles % 100 == 0) {
+                ProgressManager.checkCanceled()
+                iteratedFiles = 0
+            }
+
+            if (file.extension == KotlinFileType.EXTENSION) {
+                moduleStatistics.fileCount++
+                moduleStatistics.fileSize += file.length.toInt()
+            } else if (file.extension == JavaFileType.DEFAULT_EXTENSION) {
+                moduleStatistics.hasJavaFiles = true
+            }
+            true
+        }, noGeneratedGradleFilesFilter)
+
+        return moduleStatistics
+    }
+
     private suspend fun Project.gatherProjectStatistics(): Set<MetricEvent> {
         val projectStatistics = ProjectStatistics(
             fileCountBuckets = FILE_COUNT_BUCKETS,
@@ -158,21 +193,11 @@ internal class KotlinModuleSizeCollector : ProjectUsagesCollector() {
         )
 
         for (module in modules) {
-            val startTime = System.currentTimeMillis()
-            val moduleStatistics = ModuleStatistics()
+            checkCanceled()
 
-            readAction {
-                val moduleFileIndex = ModuleRootManager.getInstance(module).fileIndex
-                moduleFileIndex.iterateContent { file ->
-                    if (file.extension == KotlinFileType.EXTENSION && !file.isGeneratedGradleFile()) {
-                        moduleStatistics.fileCount++
-                        moduleStatistics.fileSize += file.length.toInt()
-                    } else if (file.extension == JavaFileType.DEFAULT_EXTENSION) {
-                        moduleStatistics.hasJavaFiles = true
-                    }
-                    true
-                }
-            }
+            val startTime = System.currentTimeMillis()
+
+            val moduleStatistics = module.collectModuleStatistics()
 
             projectStatistics.increaseLineCountBucket(moduleStatistics.fileSize)
             projectStatistics.increaseFileCountBucket(moduleStatistics.fileCount)

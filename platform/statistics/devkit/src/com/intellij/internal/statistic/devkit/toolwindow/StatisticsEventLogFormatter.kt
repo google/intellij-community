@@ -35,10 +35,21 @@ class StatisticsEventLogFormatter(private val model: LogFilterModel) : DefaultLo
     colorGreen = getColorForCurrentTheme(JsonSyntaxHighlighterFactory.JSON_STRING, JBColor.GREEN)
 
     val eventDataOffset = msg.indexOf('{')
-    val fieldValueList = parseEventData(msg.substring(eventDataOffset))
-    val formatedEventData = if (isMultilineLog) formatEventDataToMultiline(fieldValueList, isStderr)
-    else formatEventDataToOneLine(fieldValueList, isStderr)
-    return msg.take(eventDataOffset).trim() + formatedEventData
+    // There is no event data offset if messages come in from outside the standard
+    // com.intellij.internal.statistic.devkit.toolwindow.StatisticsEventLogMessageBuilder.buildLogMessage —
+    // for example external EP providers — which bypass buildLogMessage entirely and arrive as plain text without {.
+    if (eventDataOffset == -1) return msg
+    
+    return try {
+      val fieldValueList = parseEventData(msg.substring(eventDataOffset))
+      val formatedEventData = if (isMultilineLog) formatEventDataToMultiline(fieldValueList, isStderr)
+      else formatEventDataToOneLine(fieldValueList, isStderr)
+      msg.take(eventDataOffset).trim() + formatedEventData
+    }
+    catch (e: Exception) {
+      // Return original message if parsing fails due to malformed JSON or unexpected format
+      msg
+    }
   }
 
   fun updateLogPresentation(isMultilineLog: Boolean) {
@@ -95,9 +106,14 @@ class StatisticsEventLogFormatter(private val model: LogFilterModel) : DefaultLo
             continue
           }
           if (startEventDataOffset != 0) {
-            endEventDataOffset = parser.currentTokenLocation().charOffset.toInt()
-            val fieldValuePair = parseFieldValuePair(eventData.substring(startEventDataOffset, endEventDataOffset))
-            fieldValueList.add(fieldValuePair)
+            val location = parser.currentTokenLocation()
+            if (location != null) {
+              endEventDataOffset = location.charOffset.toInt()
+              if (endEventDataOffset <= eventData.length && startEventDataOffset < endEventDataOffset) {
+                val fieldValuePair = parseFieldValuePair(eventData.substring(startEventDataOffset, endEventDataOffset))
+                fieldValueList.add(fieldValuePair)
+              }
+            }
           }
           isFieldValueInProgress = false
         }
@@ -106,11 +122,19 @@ class StatisticsEventLogFormatter(private val model: LogFilterModel) : DefaultLo
           isFieldValueInProgress = true
           if (bracketsCount > 0) continue
           if (startEventDataOffset != 0) {
-            endEventDataOffset = parser.currentTokenLocation().charOffset.toInt()
-            val fieldValuePair = parseFieldValuePair(eventData.substring(startEventDataOffset, endEventDataOffset - 1).trim())
-            fieldValueList.add(fieldValuePair)
+            val location = parser.currentTokenLocation()
+            if (location != null) {
+              endEventDataOffset = location.charOffset.toInt()
+              if (endEventDataOffset > 0 && endEventDataOffset - 1 <= eventData.length && startEventDataOffset < endEventDataOffset - 1) {
+                val fieldValuePair = parseFieldValuePair(eventData.substring(startEventDataOffset, endEventDataOffset - 1).trim())
+                fieldValueList.add(fieldValuePair)
+              }
+            }
           }
-          startEventDataOffset = parser.currentTokenLocation().charOffset.toInt()
+          val location = parser.currentTokenLocation()
+          if (location != null) {
+            startEventDataOffset = location.charOffset.toInt()
+          }
         }
         else -> {
           continue
@@ -122,8 +146,16 @@ class StatisticsEventLogFormatter(private val model: LogFilterModel) : DefaultLo
 
   private fun parseFieldValuePair(fieldValuePair: String): Pair<String, String> {
     val valueOffset = fieldValuePair.indexOf(':')
+    if (valueOffset == -1) {
+      // Malformed field-value pair without ':', return the whole string as field with empty value
+      return Pair(fieldValuePair.trim(), "")
+    }
     val field = fieldValuePair.take(valueOffset)
-    val value = fieldValuePair.substring(valueOffset + 1).trimEnd(',')
+    val value = if (valueOffset + 1 <= fieldValuePair.length) {
+      fieldValuePair.substring(valueOffset + 1).trimEnd(',')
+    } else {
+      ""
+    }
     return Pair(field, value)
   }
 

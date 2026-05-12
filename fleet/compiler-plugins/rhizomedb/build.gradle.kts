@@ -18,7 +18,7 @@ val pluginVersion = run {
 }
 
 // the compiler plugin will be used together with this Kotlin compiler
-val KOTLIN_VERSION = "2.3.10-RC"
+val KOTLIN_VERSION = "2.3.21-RC2"
 
 // the compiler plugin will be built with these Kotlin LV/APIV
 val KOTLIN_LANGUAGE_VERSION = "2.3"
@@ -29,8 +29,11 @@ version = pluginVersion
 
 repositories {
   mavenCentral()
-  if ("SNAPSHOT" in KOTLIN_VERSION || "dev" in KOTLIN_VERSION) {
-    maven("https://packages.jetbrains.team/maven/p/kt/bootstrap")
+  // !! configuration for builds as a Kotlin user project
+  //    please do not change it before discussing it in #ij-monorepo-kotlin
+  maven("https://packages.jetbrains.team/maven/p/kt/bootstrap/") // periodic dev-builds of the Kotlin compiler (stable availability)
+  maven("https://packages.jetbrains.team/maven/p/kt/dev/") // per-commit dev-builds of the Kotlin compiler (unpublished after 1-2 weeks)
+  if ("SNAPSHOT" in KOTLIN_VERSION || KOTLIN_VERSION.count { it == '-' } > 1) { // e.g., X.Y.Z-SNAPSHOT, X.Y.Z-dev-1234, X.Y.Z-ReleaseN-1234
     mavenLocal()
   }
 }
@@ -48,9 +51,9 @@ java {
 kotlin {
   compilerOptions {
     jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-    apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.fromVersion(KOTLIN_LANGUAGE_VERSION))
-    languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.fromVersion(KOTLIN_API_VERSION))
-    // FREE COMPILER ARGS PLACEHOLDER PLEASE DO NOT CHANGE IT BEFORE DISCUSS IN #ij-monorepo-kotlin
+    languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.fromVersion(KOTLIN_LANGUAGE_VERSION))
+    apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.fromVersion(KOTLIN_API_VERSION))
+    // FREE COMPILER ARGS PLACEHOLDER PLEASE DO NOT CHANGE IT BEFORE DISCUSSING IN #ij-monorepo-kotlin
   }
 }
 
@@ -87,3 +90,17 @@ publishing {
 
 fun prop(name: String): String? =
   extra.properties[name] as? String
+
+// !! configuration for builds as a Kotlin user project
+//    please do not change it before discussing it in #ij-monorepo-kotlin
+if ("SNAPSHOT" in KOTLIN_VERSION || KOTLIN_VERSION.count { it == '-' } > 1) { // e.g., X.Y.Z-SNAPSHOT, X.Y.Z-dev-1234, X.Y.Z-ReleaseN-1234
+  tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().configureEach kotlinCompilationTask@ {
+    compilerOptions {
+      // see "Deprecation of old APIs" @ KT-A-521
+      freeCompilerArgs.add("-opt-in=org.jetbrains.kotlin.DeprecatedCompilerApi")
+      logger.info("<KUP> ${this@kotlinCompilationTask.path} — opted into org.jetbrains.kotlin.DeprecatedCompilerApi")
+      freeCompilerArgs.add("-opt-in=org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi")
+      logger.info("<KUP> ${this@kotlinCompilationTask.path} — opted into org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi")
+    }
+  }
+}

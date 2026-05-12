@@ -1,9 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.plugins
 
-import com.intellij.ide.plugins.PluginModuleId.Companion.getId
 import com.intellij.openapi.util.IntellijInternalApi
-import com.intellij.util.SystemProperties
 import com.intellij.util.containers.CollectionFactory
 import org.jetbrains.annotations.ApiStatus
 
@@ -15,7 +13,13 @@ import org.jetbrains.annotations.ApiStatus
 @ApiStatus.Internal
 @IntellijInternalApi
 class PluginModuleId private constructor(val name: String, val namespace: String) {
-  override fun toString(): String = name
+  /**
+   * A human-readable form of the ID. It can be used for debugging and logging purposes only.
+   */
+  val displayName: String
+    get() = if (namespace != JETBRAINS_NAMESPACE) "$name (namespace=$namespace)" else name
+
+  override fun toString(): String = displayName
 
   override fun equals(other: Any?): Boolean {
     if (this === other) return true
@@ -23,17 +27,15 @@ class PluginModuleId private constructor(val name: String, val namespace: String
 
     other as PluginModuleId
 
-    return name == other.name && (!useNamespaceInId || namespace == other.namespace)
+    return name == other.name && namespace == other.namespace
   }
 
   override fun hashCode(): Int {
-    return if (useNamespaceInId) name.hashCode() + 31 * namespace.hashCode() else name.hashCode()
+    return name.hashCode() + 31 * namespace.hashCode()
   }
 
   companion object {
     private val interner = CollectionFactory.createConcurrentWeakKeyWeakValueMap<String, PluginModuleId>()
-    /** this property is temporarily added to allow using modules without specifying namespace */
-    private val useNamespaceInId = SystemProperties.getBooleanProperty("intellij.platform.plugin.modules.use.namespace.in.id", false)
 
     @JvmStatic
     fun getId(name: String, namespace: String): PluginModuleId {

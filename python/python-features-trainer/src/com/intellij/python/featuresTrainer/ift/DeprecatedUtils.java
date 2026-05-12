@@ -3,7 +3,7 @@ package com.intellij.python.featuresTrainer.ift;
 
 import com.intellij.openapi.projectRoots.Sdk;
 import com.jetbrains.python.sdk.PreferredSdkComparator;
-import com.jetbrains.python.sdk.PySdkExtKt;
+import com.jetbrains.python.sdk.SdkExtKt;
 import com.jetbrains.python.sdk.PythonSdkType;
 import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.ApiStatus;
@@ -26,7 +26,7 @@ final class DeprecatedUtils {
   static @NotNull List<@NotNull Sdk> getValidPythonSdks(@NotNull List<@NotNull Sdk> existingSdks) {
     return StreamEx
       .of(existingSdks)
-      .filter(sdk -> sdk.getSdkType() instanceof PythonSdkType && PySdkExtKt.getSdkSeemsValid(sdk))
+      .filter(sdk -> sdk.getSdkType() instanceof PythonSdkType && SdkExtKt.isSdkSeemsValid(sdk))
       .sorted(new PreferredSdkComparator())
       .toList();
   }

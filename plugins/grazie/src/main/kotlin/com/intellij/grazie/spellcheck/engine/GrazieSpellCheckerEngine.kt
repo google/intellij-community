@@ -16,6 +16,7 @@ import ai.grazie.spell.language.LanguageModel
 import ai.grazie.spell.suggestion.filter.feature.RadiusSuggestionFilter
 import ai.grazie.utils.mpp.Resources
 import com.github.benmanes.caffeine.cache.Caffeine
+import com.intellij.grazie.GrazieConfig
 import com.intellij.grazie.spellcheck.async.WordListLoader
 import com.intellij.grazie.spellcheck.dictionary.ExtendedWordListWithFrequency
 import com.intellij.grazie.spellcheck.dictionary.WordListAdapter
@@ -24,10 +25,12 @@ import com.intellij.grazie.spellcheck.ranker.DiacriticSuggestionRanker
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.readAction
+import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.extensions.ExtensionNotApplicableException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.util.io.FileUtil
+import com.intellij.spellchecker.SpellCheckerManager
 import com.intellij.spellchecker.dictionary.Dictionary
 import com.intellij.spellchecker.dictionary.EditableDictionary
 import com.intellij.spellchecker.dictionary.Loader
@@ -66,6 +69,7 @@ class GrazieSpellCheckerEngine(private val project: Project, private val corouti
 
   override fun getTransformation(): Transformation = Transformation()
 
+  private val manager by lazy { SpellCheckerManager.getInstance(project) }
   private val loader = WordListLoader(project, coroutineScope)
   private val adapter = WordListAdapter()
   private val replacingRules: Set<RuleDictionary> = getReplacingRules()
@@ -83,6 +87,7 @@ class GrazieSpellCheckerEngine(private val project: Project, private val corouti
 
     override suspend fun execute(project: Project) {
       getInstance(project).initializeSpeller(project)
+      project.serviceAsync<SpellCheckerManager>()
       knownPhrases.computeIfAbsent(Language.ENGLISH) { KnownPhrases.forLanguage(Language.ENGLISH) }
         .validPhrases("Bugfix")
     }
@@ -103,6 +108,7 @@ class GrazieSpellCheckerEngine(private val project: Project, private val corouti
   @OptIn(ExperimentalCoroutinesApi::class)
   private val suggestionCache = Caffeine.newBuilder().maximumSize(1024).build<SuggestionRequest, List<String>> { request ->
     val speller = speller!!
+    manager.updateBundledDictionaries()
     synchronized(speller) {
       speller.suggest(request.word, request.maxSuggestions).take(request.maxSuggestions)
     }
@@ -172,10 +178,8 @@ class GrazieSpellCheckerEngine(private val project: Project, private val corouti
     if (word.length > MAX_WORD_LENGTH) {
       return true
     }
-    if (speller.isAlien(word)) {
-      return true
-    }
-    return !speller.isMisspelled(word, caseSensitive = false)
+    manager.updateBundledDictionaries()
+    return speller.isAlien(word) || !speller.isMisspelled(word, caseSensitive = false)
   }
 
   override fun getSuggestions(word: String, maxSuggestions: Int, maxMetrics: Int): List<String> {
@@ -225,10 +229,7 @@ class GrazieSpellCheckerEngine(private val project: Project, private val corouti
 
       override fun iterator(): Iterator<RuleDictionary> {
         val replacingRules = mutableSetOf(IgnoreRuleDictionary.standard(tooShortLength = 2), enDictionary.ruleDictionary!!)
-        val hunspellReplacingRules = dictionaryNames
-          .map { adapter.getDictionary(it) }
-          .mapNotNull { (it as? HunspellDictionary)?.ruleDictionary }
-          .toSet()
+        val hunspellReplacingRules = GrazieConfig.get().dictionaries.mapNotNull { it.ruleDictionary }
         return (replacingRules + hunspellReplacingRules).iterator()
       }
     }

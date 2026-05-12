@@ -5,7 +5,7 @@ import com.intellij.codeInspection.CommonQuickFixBundle;
 import com.intellij.java.syntax.parser.JavaKeywords;
 import com.intellij.openapi.roots.ModuleRootModificationUtil;
 import com.intellij.pom.java.JavaFeature;
-import com.intellij.testFramework.IdeaTestUtil;
+import com.intellij.pom.java.LanguageLevel;
 import com.intellij.testFramework.builders.JavaModuleFixtureBuilder;
 import com.intellij.testFramework.fixtures.DefaultLightProjectDescriptor;
 import com.siyeh.ig.IGQuickFixesTestCase;
@@ -27,7 +27,7 @@ public class IfCanBePrimitivePatternSwitchTightenedFixTest extends IGQuickFixesT
   protected void tuneFixture(JavaModuleFixtureBuilder builder) throws Exception {
     super.tuneFixture(builder);
     builder.setLanguageLevel(JavaFeature.PATTERNS_WITH_TIGHTENED_DOMINANCE.getMinimumLevel());
-    builder.addJdk(IdeaTestUtil.getMockJdk18Path().getPath());
+    builder.addJdkVersion(LanguageLevel.JDK_1_8);
   }
 
   public void testEnumDomination() { assertQuickfixNotAvailable(); }

@@ -9,7 +9,8 @@ import org.jetbrains.annotations.ApiStatus
 @IntellijInternalApi
 interface SearchEverywhereElementKeyProvider {
   companion object {
-    val EP_NAME = ExtensionPointName.create<SearchEverywhereElementKeyProvider>("com.intellij.searchEverywhereMl.searchEverywhereElementKeyProvider")
+    val EP_NAME: ExtensionPointName<SearchEverywhereElementKeyProvider> =
+      ExtensionPointName.create("com.intellij.searchEverywhereMl.searchEverywhereElementKeyProvider")
 
     fun getKeyOrNull(element: Any): Any? = EP_NAME.extensionList
       .filter { getPluginInfo(it.javaClass).isDevelopedByJetBrains() }
@@ -17,7 +18,10 @@ interface SearchEverywhereElementKeyProvider {
   }
 
   /**
-   * Returns a key used to identify the same element in Search Everywhere throughout different states
+   * Returns a key used to identify the same element in Search Everywhere throughout different states.
+   *
+   * Providers are called without an outer read-action.
+   * Implementations that access PSI trees must wrap only that access in a read action themselves.
    */
   fun getKeyOrNull(element: Any): Any?
 }

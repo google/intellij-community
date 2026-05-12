@@ -109,7 +109,7 @@ class AddLibraryDependencyFix extends OrderEntryFix {
     ModalityState modality = ModalityState.defaultModalityState();
     JavaProjectModelModificationService.getInstance(project)
       .addDependency(myCurrentModule, library, myScope, myExported)
-      .onSuccess(__ -> {
+      .onSuccess(_ -> {
         if (editor == null) return;
         ReadAction.nonBlocking(() -> {
             PsiReference reference = restoreReference();

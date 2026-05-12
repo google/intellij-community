@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.impl.java.stubs.index;
 
 import com.intellij.ide.highlighter.ArchiveFileType;
@@ -21,6 +21,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.jar.JarFile;
 
 import static java.util.Collections.singletonMap;
 
@@ -29,8 +30,11 @@ public final class JavaAutoModuleNameIndex extends ScalarIndexExtension<String> 
 
   private final FileBasedIndex.InputFilter myFilter = new DefaultFileTypeSpecificInputFilter(ArchiveFileType.INSTANCE) {
     @Override
-    public boolean acceptInput(@NotNull VirtualFile f) {
-      return f.isDirectory() && f.getParent() == null && "jar".equalsIgnoreCase(f.getExtension());
+    public boolean acceptInput(@NotNull VirtualFile file) {
+      return file.isDirectory() &&
+             file.getParent() == null &&
+             "jar".equalsIgnoreCase(file.getExtension()) &&
+             file.findFileByRelativePath(JarFile.MANIFEST_NAME) == null;
     }
   };
 
@@ -48,7 +52,7 @@ public final class JavaAutoModuleNameIndex extends ScalarIndexExtension<String> 
 
   @Override
   public int getVersion() {
-    return 6;
+    return 7;
   }
 
   @Override

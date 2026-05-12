@@ -1,7 +1,17 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.storage.testEntities.entities.impl
 
-import com.intellij.platform.workspace.storage.*
+import com.intellij.platform.workspace.storage.ConnectionId
+import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
+import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
+import com.intellij.platform.workspace.storage.MutableEntityStorage
+import com.intellij.platform.workspace.storage.SymbolicEntityId
+import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
+import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.SoftLinkable
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
@@ -17,14 +27,12 @@ import com.intellij.platform.workspace.storage.testEntities.entities.WithSoftLin
 @GeneratedCodeApiVersion(3)
 @GeneratedCodeImplVersion(7)
 @OptIn(WorkspaceEntityInternalApi::class)
-internal class WithSoftLinkEntityImpl(private val dataSource: WithSoftLinkEntityData) : WithSoftLinkEntity, WorkspaceEntityBase(
-  dataSource) {
+internal class WithSoftLinkEntityImpl(private val dataSource: WithSoftLinkEntityData) : WithSoftLinkEntity,
+                                                                                        WorkspaceEntityBase(dataSource) {
 
   private companion object {
 
-
-    private val connections = listOf<ConnectionId>(
-    )
+    private val connections = listOf<ConnectionId>()
 
   }
 
@@ -45,8 +53,8 @@ internal class WithSoftLinkEntityImpl(private val dataSource: WithSoftLinkEntity
   }
 
 
-  internal class Builder(result: WithSoftLinkEntityData?) : ModifiableWorkspaceEntityBase<WithSoftLinkEntity, WithSoftLinkEntityData>(
-    result), WithSoftLinkEntityBuilder {
+  internal class Builder(result: WithSoftLinkEntityData?) :
+    ModifiableWorkspaceEntityBase<WithSoftLinkEntity, WithSoftLinkEntityData>(result), WithSoftLinkEntityBuilder {
     internal constructor() : this(WithSoftLinkEntityData())
 
     override fun applyToBuilder(builder: MutableEntityStorage) {
@@ -59,15 +67,13 @@ internal class WithSoftLinkEntityImpl(private val dataSource: WithSoftLinkEntity
           error("Entity WithSoftLinkEntity is already created in a different builder")
         }
       }
-
       this.diff = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
-      // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
-      // Builder may switch to snapshot at any moment and lock entity data to modification
+// After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
+// Builder may switch to snapshot at any moment and lock entity data to modification
       this.currentEntityData = null
-
-      // Process linked entities that are connected without a builder
+// Process linked entities that are connected without a builder
       processLinkedEntities(builder)
       checkInitialization() // TODO uncomment and check failed tests
     }
@@ -103,7 +109,6 @@ internal class WithSoftLinkEntityImpl(private val dataSource: WithSoftLinkEntity
         changedProperty.add("entitySource")
 
       }
-
     override var link: NameId
       get() = getEntityData().link
       set(value) {
@@ -115,6 +120,7 @@ internal class WithSoftLinkEntityImpl(private val dataSource: WithSoftLinkEntity
 
     override fun getEntityClass(): Class<WithSoftLinkEntity> = WithSoftLinkEntity::class.java
   }
+
 }
 
 @OptIn(WorkspaceEntityInternalApi::class)
@@ -134,7 +140,7 @@ internal class WithSoftLinkEntityData : WorkspaceEntityData<WithSoftLinkEntity>(
   }
 
   override fun updateLinksIndex(prev: Set<SymbolicEntityId<*>>, index: WorkspaceMutableIndex<SymbolicEntityId<*>>) {
-    // TODO verify logic
+// TODO verify logic
     val mutablePreviousSet = HashSet(prev)
     val removedItem_link = mutablePreviousSet.remove(link)
     if (!removedItem_link) {
@@ -167,7 +173,6 @@ internal class WithSoftLinkEntityData : WorkspaceEntityData<WithSoftLinkEntity>(
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): WithSoftLinkEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {
@@ -179,8 +184,7 @@ internal class WithSoftLinkEntityData : WorkspaceEntityData<WithSoftLinkEntity>(
   }
 
   override fun getMetadata(): EntityMetadata {
-    return MetadataStorageImpl.getMetadataByTypeFqn(
-      "com.intellij.platform.workspace.storage.testEntities.entities.WithSoftLinkEntity") as EntityMetadata
+    return MetadataStorageImpl.getMetadataByTypeFqn("com.intellij.platform.workspace.storage.testEntities.entities.WithSoftLinkEntity") as EntityMetadata
   }
 
   override fun getEntityInterface(): Class<out WorkspaceEntity> {
@@ -188,8 +192,7 @@ internal class WithSoftLinkEntityData : WorkspaceEntityData<WithSoftLinkEntity>(
   }
 
   override fun createDetachedEntity(parents: List<WorkspaceEntityBuilder<*>>): WorkspaceEntityBuilder<*> {
-    return WithSoftLinkEntity(link, entitySource) {
-    }
+    return WithSoftLinkEntity(link, entitySource)
   }
 
   override fun getRequiredParents(): List<Class<out WorkspaceEntity>> {
@@ -200,9 +203,7 @@ internal class WithSoftLinkEntityData : WorkspaceEntityData<WithSoftLinkEntity>(
   override fun equals(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as WithSoftLinkEntityData
-
     if (this.entitySource != other.entitySource) return false
     if (this.link != other.link) return false
     return true
@@ -211,9 +212,7 @@ internal class WithSoftLinkEntityData : WorkspaceEntityData<WithSoftLinkEntity>(
   override fun equalsIgnoringEntitySource(other: Any?): Boolean {
     if (other == null) return false
     if (this.javaClass != other.javaClass) return false
-
     other as WithSoftLinkEntityData
-
     if (this.link != other.link) return false
     return true
   }

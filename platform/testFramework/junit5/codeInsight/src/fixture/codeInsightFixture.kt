@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.testFramework.junit5.codeInsight.fixture
 
+import com.intellij.idea.AppMode
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.modules
@@ -102,10 +103,7 @@ fun <T: CodeInsightTestFixture> codeInsightFixture(
 private fun getTestDataPathString(context: TestContext): String {
   val rootPath = context.findAnnotation(TestDataPath::class.java)?.value?.removePrefix($$"$PROJECT_ROOT/") ?: ""
   val subPath = context.findAnnotation(TestSubPath::class.java)?.value ?: ""
-  val homeDir = IdeaTestExecutionPolicy.getHomePathWithPolicy().toNioPathOrNull()
-  check(homeDir != null) {
-    "Couldn't create nio.Path from ${IdeaTestExecutionPolicy.getHomePathWithPolicy()}"
-  }
+  val homeDir = getHomePath()
   val resolvedPath = homeDir.resolve(rootPath).resolve(subPath)
   if (resolvedPath.exists()) {
    return resolvedPath.pathString
@@ -116,4 +114,23 @@ private fun getTestDataPathString(context: TestContext): String {
     "The test data path is not located in community folder, but it doesn't exist in the ultimate."
   }
   return homeDir.resolve("../").resolve(rootPath).resolve(subPath).pathString
+}
+
+private fun getHomePath(): Path {
+  val homeDir = IdeaTestExecutionPolicy.getHomePathWithPolicy().toNioPathOrNull()
+  check(homeDir != null) {
+    "Couldn't create nio.Path from ${IdeaTestExecutionPolicy.getHomePathWithPolicy()}"
+  }
+
+  return if (AppMode.isRunningFromDevBuild()) {
+    val resolvedHomeDir = AppMode.getDevIdeaProjectDir()
+    check(resolvedHomeDir != null) {
+      "Couldn't find dev-idea project directory"
+    }
+
+    Path.of(resolvedHomeDir)
+  }
+  else {
+    homeDir
+  }
 }

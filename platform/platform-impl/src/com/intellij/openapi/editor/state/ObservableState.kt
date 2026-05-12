@@ -47,6 +47,9 @@ abstract class ObservableState {
   inline fun <reified T> property(noinline defaultValueCalculator: () -> T): StateProperty<T> = property(
     defaultValueCalculator(), SyncDefaultValueCalculator(defaultValueCalculator))
 
+  inline fun <reified T> property(alwaysTransfer: Boolean, noinline defaultValueCalculator: () -> T): StateProperty<T> = property(
+    defaultValueCalculator(), SyncDefaultValueCalculator(defaultValueCalculator), alwaysTransfer = alwaysTransfer)
+
   /**
    * You MUST NOT refer to other properties while calculating [initialValue] here, because normally this method
    * is called during construction of the state and some properties are not initialized yet.
@@ -59,17 +62,19 @@ abstract class ObservableState {
   inline fun <reified T> property(initialValue: T,
                                   defaultValueCalculator: SyncDefaultValueCalculator<T>? = null,
                                   outValueModifier: CustomOutValueModifier<T>? = null,
-                                  customPropertySerializer: CustomPropertySerializer<T>? = null): StateProperty<T> = property(
-    typeOf<T>(), initialValue, defaultValueCalculator, outValueModifier, customPropertySerializer)
+                                  customPropertySerializer: CustomPropertySerializer<T>? = null,
+                                  alwaysTransfer: Boolean = false): StateProperty<T> = property(
+    typeOf<T>(), initialValue, defaultValueCalculator, outValueModifier, customPropertySerializer, alwaysTransfer)
 
   fun <T> property(clazz: KType,
                    initialValue: T,
                    defaultValueCalculator: SyncDefaultValueCalculator<T>? = null,
                    outValueModifier: CustomOutValueModifier<T>? = null,
-                   customPropertySerializer: CustomPropertySerializer<T>? = null): StateProperty<T> {
+                   customPropertySerializer: CustomPropertySerializer<T>? = null,
+                   alwaysTransfer: Boolean = false): StateProperty<T> {
     val property = createProperty(clazz, initialValue,
                                   defaultValueCalculator ?: FixedDefaultValue(initialValue),
-                                  outValueModifier, customPropertySerializer)
+                                  outValueModifier, customPropertySerializer, alwaysTransfer)
     return addProperty(property)
   }
 
@@ -77,9 +82,11 @@ abstract class ObservableState {
                                  initialValue: T,
                                  defaultValueCalculator: SyncDefaultValueCalculator<T>,
                                  outValueModifier: CustomOutValueModifier<T>?,
-                                 customPropertySerializer: CustomPropertySerializer<T>?): ObjectStateProperty<T> {
+                                 customPropertySerializer: CustomPropertySerializer<T>?,
+                                 alwaysTransfer: Boolean = false): ObjectStateProperty<T> {
     if (customPropertySerializer != null)
-      return TransferableObjectStateProperty(clazz, initialValue, defaultValueCalculator, outValueModifier, customPropertySerializer)
+      return TransferableObjectStateProperty(clazz, initialValue, defaultValueCalculator, outValueModifier, customPropertySerializer,
+                                             alwaysTransfer)
 
     val defaultSerializer = if (isNotRecommendedForSerialization(clazz)) null
     else try {
@@ -90,7 +97,7 @@ abstract class ObservableState {
     }
 
     return if (defaultSerializer != null)
-      TransferableObjectStateProperty(clazz, initialValue, defaultValueCalculator, outValueModifier, null)
+      TransferableObjectStateProperty(clazz, initialValue, defaultValueCalculator, outValueModifier, null, alwaysTransfer)
     else
       ObjectStateProperty(initialValue, defaultValueCalculator, outValueModifier)
   }

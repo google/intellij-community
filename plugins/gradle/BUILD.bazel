@@ -3,12 +3,6 @@ load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
 
 resourcegroup(
   name = "gradle_resources",
-  srcs = glob(["plugin-resources/**/*"]),
-  strip_prefix = "plugin-resources"
-)
-
-resourcegroup(
-  name = "gradle_resources_1",
   srcs = glob(["resources/**/*"]),
   strip_prefix = "resources"
 )
@@ -18,11 +12,11 @@ jvm_library(
   module_name = "intellij.gradle",
   visibility = ["//visibility:public"],
   srcs = glob(["generated/**/*.kt", "generated/**/*.java", "src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [
-    ":gradle_resources",
-    ":gradle_resources_1",
-  ],
+  resources = glob(["plugin-resources/**/*"]),
+  resource_strip_prefix = "plugin-resources",
+  resource_jars = [":gradle_resources"],
   deps = [
+    "//plugins/gradle/settings",
     "//platform/analysis-api:analysis",
     "//platform/util/concurrency",
     "//platform/editor-ui-api:editor-ui",
@@ -45,6 +39,7 @@ jvm_library(
     "//platform/util/progress",
     "@lib//:slf4j-jdk14",
     "//platform/ide-core-impl",
+    "//platform/ide-core",
     "@lib//:gradle",
     "//libraries/gson",
     "//platform/object-serializer:objectSerializer-annotations",
@@ -69,6 +64,7 @@ jvm_library(
     "//platform/workspace/jps",
     "//platform/backend/observation",
     "//platform/platform-impl/ui",
+    "//platform/progress/shared:ide-progress",
     "//platform/eel-provider",
     "//platform/ijent",
     "//platform/core-api:core",
@@ -79,10 +75,14 @@ jvm_library(
     "//platform/forms_rt:java-guiForms-rt",
     "//libraries/jspecify",
     "//platform/util/text-matching",
+    "//platform/util:util-ui",
+    "//platform/util-ex",
+    "//platform/testRunner",
     "@lib//:org-codehaus-groovy-groovy-provided",
     "@lib//:org-codehaus-groovy-groovy-ant-provided",
   ],
   exports = [
+    "//plugins/gradle/settings",
     "//platform/external-system-api:externalSystem",
     "//plugins/gradle/tooling-extension-api:toolingExtension",
     "@lib//:slf4j-api",
@@ -93,10 +93,13 @@ jvm_library(
 
 jvm_library(
   name = "gradle_test_lib",
+  testonly = True,
   module_name = "intellij.gradle",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   exports = [
+    "//plugins/gradle/settings",
+    "//plugins/gradle/settings:settings_test_lib",
     "//platform/external-system-api:externalSystem",
     "//platform/external-system-api:externalSystem_test_lib",
     "//plugins/gradle/tooling-extension-api:toolingExtension",
@@ -107,6 +110,7 @@ jvm_library(
   ],
   runtime_deps = [
     ":gradle",
+    "//plugins/gradle/settings:settings_test_lib",
     "//platform/analysis-api:analysis_test_lib",
     "//platform/util/concurrency:concurrency_test_lib",
     "//platform/editor-ui-api:editor-ui_test_lib",
@@ -127,6 +131,7 @@ jvm_library(
     "//platform/smRunner:smRunner_test_lib",
     "//platform/util/progress:progress_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//libraries/gson:gson_test_lib",
     "//platform/object-serializer:objectSerializer-annotations_test_lib",
     "//libraries/ion:ion_test_lib",
@@ -149,6 +154,7 @@ jvm_library(
     "//platform/workspace/jps:jps_test_lib",
     "//platform/backend/observation:observation_test_lib",
     "//platform/platform-impl/ui:ui_test_lib",
+    "//platform/progress/shared:ide-progress_test_lib",
     "//platform/eel-provider:eel-provider_test_lib",
     "//platform/ijent:ijent_test_lib",
     "//platform/core-api:core_test_lib",
@@ -159,15 +165,25 @@ jvm_library(
     "//platform/forms_rt:java-guiForms-rt_test_lib",
     "//libraries/jspecify:jspecify_test_lib",
     "//platform/util/text-matching:text-matching_test_lib",
+    "//platform/util:util-ui_test_lib",
+    "//platform/util-ex:util-ex_test_lib",
+    "//platform/testRunner:testRunner_test_lib",
     "@lib//:org-codehaus-groovy-groovy-provided",
     "@lib//:org-codehaus-groovy-groovy-ant-provided",
   ]
 )
 ### auto-generated section `build intellij.gradle` end
 
+### auto-generated section `iml intellij.gradle` start
+exports_files([
+  "intellij.gradle.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.gradle` end
+
 ### auto-generated section `build intellij.gradle.common` start
 jvm_library(
   name = "gradle-common",
+  module_name = "intellij.gradle.common",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   exports = ["//plugins/gradle"],
@@ -176,6 +192,7 @@ jvm_library(
 
 jvm_library(
   name = "gradle-common_test_lib",
+  testonly = True,
   module_name = "intellij.gradle.common",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -190,15 +207,16 @@ jvm_library(
 )
 ### auto-generated section `build intellij.gradle.common` end
 
-### auto-generated section `build intellij.gradle.tests` start
-resourcegroup(
-  name = "gradle-tests_test_resources",
-  srcs = glob(["testData/**/*"]),
-  strip_prefix = "testData"
-)
+### auto-generated section `iml intellij.gradle.common` start
+exports_files([
+  "intellij.gradle.common.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.gradle.common` end
 
+### auto-generated section `build intellij.gradle.tests` start
 jvm_library(
   name = "gradle-tests",
+  module_name = "intellij.gradle.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   exports = ["//platform/external-system-api/testFramework"],
@@ -211,16 +229,18 @@ jvm_library(
     "//libraries/gson",
     "//libraries/guava",
     "//platform/forms_rt:java-guiForms-rt",
-    "//plugins/repository-search/common",
+    "//plugins/repository-search/completion",
   ]
 )
 
 jvm_library(
   name = "gradle-tests_test_lib",
+  testonly = True,
   module_name = "intellij.gradle.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["testGen/**/*.kt", "testGen/**/*.java", "testSources/**/*.kt", "testSources/**/*.java", "testSources/**/*.form"], allow_empty = True),
-  resources = [":gradle-tests_test_resources"],
+  resources = glob(["testData/**/*"]),
+  resource_strip_prefix = "testData",
   deps = [
     "@lib//:jmock",
     "@lib//:jmock-junit4",
@@ -251,6 +271,7 @@ jvm_library(
     "//platform/external-system-impl:externalSystem-impl_test_lib",
     "//platform/observable",
     "//platform/platform-util-io:ide-util-io",
+    "//platform/ide-core",
     "//plugins/gradle/java",
     "//plugins/gradle/java:java_test_lib",
     "//plugins/gradle/java/plugin",
@@ -281,7 +302,8 @@ jvm_library(
     "//plugins/gradle/tooling-extension-impl:toolingExtension-tests_test_lib",
     "//java/execution/impl",
     "//java/execution/impl:impl_test_lib",
-    "@lib//:assert_j",
+    "//libraries/assertj-core",
+    "//libraries/assertj-core:assertj-core_test_lib",
     "@lib//:org-codehaus-groovy-groovy-json",
     "//libraries/commons/cli",
     "//libraries/commons/cli:cli_test_lib",
@@ -291,8 +313,14 @@ jvm_library(
     "//platform/boot:boot_test_lib",
     "//platform/core-ui",
     "//platform/core-ui:core-ui_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/util/jdom",
     "//platform/util/jdom:jdom_test_lib",
+    "//platform/util:util-ui",
+    "//platform/util:util-ui_test_lib",
+    "//platform/util-ex",
+    "//platform/util-ex:util-ex_test_lib",
     "//plugins/groovy",
     "//plugins/groovy:groovy_test_lib",
     "//libraries/kotlinx/coroutines/core",
@@ -315,6 +343,8 @@ jvm_library(
     "//libraries/guava:guava_test_lib",
     "//platform/execution",
     "//platform/execution:execution_test_lib",
+    "//java/java-syntax:syntax",
+    "//java/java-syntax:syntax_test_lib",
     "//platform/eel",
     "//platform/eel:eel_test_lib",
     "//platform/eel-provider",
@@ -326,10 +356,20 @@ jvm_library(
     "//java/testFramework/backend",
     "//java/testFramework/backend:backend_test_lib",
     "@lib//:junit5Pioneer",
-    "//plugins/repository-search/common",
-    "//plugins/repository-search/common:common_test_lib",
+    "//plugins/repository-search/completion",
+    "//plugins/repository-search/completion:completion_test_lib",
     "//plugins/gradle/completion",
     "//plugins/gradle/completion:completion_test_lib",
+    "//platform/code-style-api:codeStyle",
+    "//platform/code-style-api:codeStyle_test_lib",
+    "//platform/util/concurrency",
+    "//platform/util/concurrency:concurrency_test_lib",
+    "//platform/testRunner",
+    "//platform/testRunner:testRunner_test_lib",
+    "//plugins/groovy:groovy-tests",
+    "//plugins/groovy:groovy-tests_test_lib",
+    "//platform/statistics",
+    "//platform/statistics:statistics_test_lib",
   ],
   exports = [
     "//platform/external-system-api/testFramework",
@@ -339,10 +379,17 @@ jvm_library(
     ":gradle-tests",
     "//platform/observable:observable_test_lib",
     "//platform/platform-util-io:ide-util-io_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/execution.dashboard:execution.dashboard_test_lib",
   ]
 )
 ### auto-generated section `build intellij.gradle.tests` end
+
+### auto-generated section `iml intellij.gradle.tests` start
+exports_files([
+  "intellij.gradle.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.gradle.tests` end
 
 ### auto-generated section `test intellij.gradle.tests` start
 load("@community//build:tests-options.bzl", "jps_test")
@@ -352,3 +399,45 @@ jps_test(
   runtime_deps = [":gradle-tests_test_lib"]
 )
 ### auto-generated section `test intellij.gradle.tests` end
+
+### auto-generated section `build intellij.gradle.tests.main` start
+jvm_library(
+  name = "gradle-tests-main",
+  module_name = "intellij.gradle.tests.main",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True)
+)
+
+jvm_library(
+  name = "gradle-tests-main_test_lib",
+  testonly = True,
+  module_name = "intellij.gradle.tests.main",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True),
+  resources = glob(["testResources/**/*"]),
+  resource_strip_prefix = "testResources",
+  runtime_deps = [
+    ":gradle-tests-main",
+    "//platform/bootstrap/coroutine",
+    "//platform/bootstrap/coroutine:coroutine_test_lib",
+    "//plugins/gradle/java:java-tests",
+    "//plugins/gradle/java:java-tests_test_lib",
+    "//plugins/gradle/java/toml/tests",
+    "//plugins/gradle/java/toml/tests:tests_test_lib",
+    "//plugins/gradle/jps-plugin:jps-tests",
+    "//plugins/gradle/jps-plugin:jps-tests_test_lib",
+    "//plugins/gradle:gradle-tests",
+    "//plugins/gradle:gradle-tests_test_lib",
+    "//plugins/gradle/tooling-extension-impl:toolingExtension-tests",
+    "//plugins/gradle/tooling-extension-impl:toolingExtension-tests_test_lib",
+    "//plugins/gradle/native/tooling:gradle-native-tooling-tests",
+    "//plugins/gradle/native/tooling:gradle-native-tooling-tests_test_lib",
+  ]
+)
+### auto-generated section `build intellij.gradle.tests.main` end
+
+### auto-generated section `iml intellij.gradle.tests.main` start
+exports_files([
+  "intellij.gradle.tests.main.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.gradle.tests.main` end

@@ -31,7 +31,7 @@ public final class MatchResult {
         schemas.add(node.getSchema());
       }
       else {
-        oneOfGroups.computeIfAbsent(groupNumber, __ -> new ArrayList<>()).add(node.getSchema());
+        oneOfGroups.computeIfAbsent(groupNumber, _ -> new ArrayList<>()).add(node.getSchema());
       }
       return true;
     });

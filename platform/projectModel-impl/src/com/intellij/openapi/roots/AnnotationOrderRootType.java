@@ -8,6 +8,7 @@ import org.jetbrains.annotations.NotNull;
 
 public class AnnotationOrderRootType extends PersistentOrderRootType {
   public static final String ANNOTATIONS_ID = "ANNOTATIONS";
+  public static final String SDK_ROOT_NAME = "annotationsPath";
 
   /**
    * @return External annotations path
@@ -18,7 +19,7 @@ public class AnnotationOrderRootType extends PersistentOrderRootType {
 
   @ApiStatus.Internal
   public AnnotationOrderRootType() {
-    super(ANNOTATIONS_ID, "annotationsPath", "annotation-paths", null);
+    super(ANNOTATIONS_ID, SDK_ROOT_NAME, "annotation-paths", null);
   }
 
   @Override

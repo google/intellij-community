@@ -44,6 +44,8 @@
       implementation="com.intellij.remoteServer.impl.configuration.deployment.ModuleDeploymentSourceType"/>
 
     <execution.syntheticConfigurationTypeProvider implementation="com.intellij.remoteServer.impl.configuration.deployment.DeployToServerConfigurationTypesRegistrar$Provider"/>
+    <applicationSettings service="com.intellij.remoteServer.impl.runtime.clientLibrary.ClientLibraryManagerImpl"/>
+    <applicationSettings service="com.intellij.remoteServer.impl.configuration.RemoteServersManagerImpl"/>
   </extensions>
 
   <applicationListeners>

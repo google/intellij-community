@@ -55,4 +55,9 @@ public interface BaseCompletionParameters {
    * >1 for next completion invocations when one lookup is already active
    */
   int getInvocationCount();
+
+  /**
+   * @return the completion process associated with current parameters
+   */
+  @NotNull CompletionProcess getProcess();
 }

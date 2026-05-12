@@ -105,7 +105,7 @@ public final class ReferenceExpressionCompletionContributor {
     return result;
   }
 
-  static boolean matchesExpectedType(LookupElement item, Set<ExpectedTypeInfo> infos) {
+  public static boolean matchesExpectedType(LookupElement item, Set<ExpectedTypeInfo> infos) {
     return ContainerUtil.exists(infos, info -> matchesExpectedType(item, info.getType()));
   }
 

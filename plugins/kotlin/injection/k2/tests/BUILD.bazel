@@ -9,12 +9,14 @@ create_kotlinc_options(
 
 jvm_library(
   name = "tests",
+  module_name = "intellij.kotlin.injection.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.injection.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -22,6 +24,8 @@ jvm_library(
   deps = [
     "//platform/core-api:core",
     "//platform/core-api:core_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//plugins/kotlin/plugin/k2",
     "//plugins/kotlin/plugin/k2:k2_test_lib",
     "//plugins/kotlin/test-framework",
@@ -36,10 +40,12 @@ jvm_library(
     "//plugins/kotlin/base/plugin:plugin_test_lib",
     "//plugins/kotlin/tests-common:common-tests",
     "//plugins/kotlin/tests-common:common-tests_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//java/testFramework",
     "//java/testFramework:testFramework_test_lib",
+    "//java/java-psi-api:psi",
+    "//java/java-psi-api:psi_test_lib",
     "@lib//:kotlinc-kotlin-compiler-tests",
     "@lib//:kotlinc-kotlin-compiler-common",
     "@lib//:kotlinc-analysis-api",
@@ -49,6 +55,12 @@ jvm_library(
   runtime_deps = [":tests"]
 )
 ### auto-generated section `build intellij.kotlin.injection.tests` end
+
+### auto-generated section `iml intellij.kotlin.injection.tests` start
+exports_files([
+  "intellij.kotlin.injection.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.injection.tests` end
 
 ### auto-generated section `test intellij.kotlin.injection.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

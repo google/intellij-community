@@ -73,7 +73,7 @@ public final class LightEditUtil {
         virtualFile.putUserData(SUGGEST_SWITCH_TO_PROJECT, true);
       }
       Project project = LightEditService.getInstance().openFile(virtualFile);
-      LightEditFeatureUsagesUtil.logFileOpen(project, CommandLine);
+      LightEditFeatureUsagesUtil.logFileOpen(project, virtualFile, CommandLine);
       return project;
     }
     else {

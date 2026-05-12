@@ -60,6 +60,8 @@ import com.intellij.openapi.vfs.FileIdAdapter
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.FocusWatcher
 import com.intellij.openapi.wm.IdeFocusManager
+import com.intellij.platform.diagnostic.telemetry.Scope
+import com.intellij.platform.diagnostic.telemetry.TelemetryManager
 import com.intellij.platform.diagnostic.telemetry.impl.span
 import com.intellij.platform.fileEditor.FileEntry
 import com.intellij.platform.fileEditor.FileEntryTab
@@ -221,10 +223,15 @@ open class EditorComposite internal constructor(
         }
       }
 
-      coroutineScope.launch(ModalityState.any().asContextElement() + clientId.asContextElement()) {
-        initDeferred.await()
-        model.collect {
-          handleModel(it)
+      coroutineScope.launch(ModalityState.any().asContextElement() + clientId.asContextElement() + tracer.rootSpan("EditorComposite model flow", arrayOf("file", file.name))) {
+        span("waiting initDeferred") {
+          initDeferred.await()
+        }
+        model.collect { newModel ->
+          val representation = newModel.fileEditorAndProviderList.map { it.fileEditor.name }
+          span("model change: $representation") {
+            handleModel(newModel)
+          }
         }
       }
     }
@@ -1240,3 +1247,5 @@ private fun stateToElement(state: FileEditorState, provider: FileEditorProvider,
   }
   return null
 }
+
+private val tracer by lazy { TelemetryManager.getSimpleTracer(Scope("editor")) }

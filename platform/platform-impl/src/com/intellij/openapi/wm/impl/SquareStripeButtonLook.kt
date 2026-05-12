@@ -6,6 +6,7 @@ import com.intellij.openapi.actionSystem.ActionButtonComponent
 import com.intellij.openapi.actionSystem.impl.ActionButton
 import com.intellij.openapi.actionSystem.impl.IdeaActionButtonLook
 import com.intellij.toolWindow.ResizeStripeManager
+import com.intellij.ui.icons.HoledIcon
 import com.intellij.ui.icons.toStrokeIcon
 import com.intellij.util.ui.JBInsets
 import com.intellij.util.ui.JBUI
@@ -84,9 +85,21 @@ internal open class SquareStripeButtonLook(private val button: ActionButton) : I
     val rect = Rectangle(actionButton.getWidth(), actionButton.getHeight())
     JBInsets.removeFrom(rect, actionButton.insets)
     JBInsets.removeFrom(rect, getIconPadding(button.isOnTheLeftStripe()))
-    val x = rect.x + (rect.width - icon.iconWidth) / 2
-    val y = rect.y + (rect.height - icon.iconHeight) / 2
-    return Point(x, y)
+    if (icon is HoledIcon) {
+      // If the icon has a badge, we need to make sure that the original icon stays in place and not "dancing"
+      // as the badge is added and removed (e.g., a build is starting and finishing).
+      val originalIcon = icon.icon
+      val point = centerIcon(rect, originalIcon)
+      // Now we have exactly the same location as the original icon,
+      // but we need to shift it to take the badge into consideration.
+      val badgeInsets = icon.getExtraInsets()
+      point.x -= badgeInsets.left
+      point.y -= badgeInsets.top
+      return point
+    }
+    else {
+      return centerIcon(rect, icon)
+    }
   }
 
   override fun paintIcon(g: Graphics?, actionButton: ActionButtonComponent?, icon: Icon) {
@@ -100,4 +113,10 @@ internal open class SquareStripeButtonLook(private val button: ActionButton) : I
   }
 
   override fun getButtonArc() = JBUI.CurrentTheme.Toolbar.stripeButtonArc(UISettings.getInstance().compactMode)
+}
+
+private fun centerIcon(rect: Rectangle, icon: Icon): Point {
+  val x = rect.x + (rect.width - icon.iconWidth) / 2
+  val y = rect.y + (rect.height - icon.iconHeight) / 2
+  return Point(x, y)
 }

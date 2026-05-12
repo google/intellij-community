@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.analysis.impl` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "analysis-impl_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "analysis-impl",
   module_name = "intellij.platform.analysis.impl",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
-  resources = [":analysis-impl_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/util/concurrency",
@@ -46,17 +41,21 @@ jvm_library(
     "//libraries/jackson3/jackson:libraries-jackson3",
     "//libraries/jackson3/module-kotlin:libraries-jackson3-module-kotlin",
     "//platform/util-class-loader:util-classLoader",
+    "//platform/util-ex",
     "//libraries/kotlinx/serialization/core",
     "//libraries/kotlinx/serialization/json",
     "//platform/workspace/jps",
     "//platform/backend/workspace",
     "//platform/workspace/storage",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable",
+    "//libraries/caffeine",
   ],
   exports = ["//platform/projectModel-impl"]
 )
 
 jvm_library(
   name = "analysis-impl_test_lib",
+  testonly = True,
   module_name = "intellij.platform.analysis.impl",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -95,11 +94,20 @@ jvm_library(
     "//libraries/jackson3/jackson:libraries-jackson3_test_lib",
     "//libraries/jackson3/module-kotlin:libraries-jackson3-module-kotlin_test_lib",
     "//platform/util-class-loader:util-classLoader_test_lib",
+    "//platform/util-ex:util-ex_test_lib",
     "//libraries/kotlinx/serialization/core:core_test_lib",
     "//libraries/kotlinx/serialization/json:json_test_lib",
     "//platform/workspace/jps:jps_test_lib",
     "//platform/backend/workspace:workspace_test_lib",
     "//platform/workspace/storage:storage_test_lib",
+    "//libraries/kotlinx/collections-immutable:libraries-kotlinx-collections-immutable_test_lib",
+    "//libraries/caffeine:caffeine_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.analysis.impl` end
+
+### auto-generated section `iml intellij.platform.analysis.impl` start
+exports_files([
+  "intellij.platform.analysis.impl.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.analysis.impl` end

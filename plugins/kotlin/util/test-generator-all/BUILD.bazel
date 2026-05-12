@@ -3,12 +3,14 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "test-generator-all",
+  module_name = "kotlin.util.test-generator-all",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "test-generator-all_test_lib",
+  testonly = True,
   module_name = "kotlin.util.test-generator-all",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -23,8 +25,8 @@ jvm_library(
     "//plugins/kotlin/util/test-generator-fe10",
     "//plugins/kotlin/util/test-generator-fe10:test-generator-fe10_test_lib",
     "@lib//:junit4",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/tests-common:common-tests",
     "//plugins/kotlin/tests-common:common-tests_test_lib",
     "//plugins/kotlin/util/project-model-updater",
@@ -75,6 +77,12 @@ jvm_library(
   runtime_deps = [":test-generator-all"]
 )
 ### auto-generated section `build kotlin.util.test-generator-all` end
+
+### auto-generated section `iml kotlin.util.test-generator-all` start
+exports_files([
+  "kotlin.util.test-generator-all.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.util.test-generator-all` end
 
 ### auto-generated section `test kotlin.util.test-generator-all` start
 load("@community//build:tests-options.bzl", "jps_test")

@@ -1,7 +1,6 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
-// this attribute doesn't do anything on macos/linux
-// same as /SUBSYSTEM:WINDOWS, doesn't allocate/attach to a console by default
+// main entry point (the attribute is ignored on Unix targets)
 #![windows_subsystem = "windows"]
 use xplat_launcher::main_lib;
 

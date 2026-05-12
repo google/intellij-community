@@ -4,14 +4,13 @@ package com.intellij.platform.debugger.impl.frontend
 import com.intellij.frontend.FrontendApplicationInfo
 import com.intellij.frontend.FrontendType
 import com.intellij.ide.ui.icons.icon
-import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.debugger.impl.frontend.util.SequentialRpcRequestsExecutor
 import com.intellij.platform.debugger.impl.rpc.XBreakpointApi
 import com.intellij.platform.debugger.impl.rpc.XBreakpointTypeApi
 import com.intellij.platform.debugger.impl.rpc.XBreakpointTypeDto
@@ -24,36 +23,42 @@ import com.intellij.platform.debugger.impl.shared.proxy.XLineBreakpointTypeProxy
 import com.intellij.platform.debugger.impl.ui.XDebuggerEntityConverter
 import com.intellij.platform.project.projectId
 import com.intellij.util.ThreeState
+import com.intellij.xdebugger.breakpoints.BreakpointFileProhibitionPolicy
 import com.intellij.xdebugger.breakpoints.SuspendPolicy
 import com.intellij.xdebugger.breakpoints.XBreakpoint
 import com.intellij.xdebugger.breakpoints.XBreakpointType.StandardPanels
 import com.intellij.xdebugger.breakpoints.XLineBreakpointType
 import com.intellij.xdebugger.breakpoints.ui.XBreakpointCustomPropertiesPanel
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import javax.swing.Icon
 
 internal fun createFrontendXBreakpointType(
   project: Project,
+  cs: CoroutineScope,
   dto: XBreakpointTypeDto,
 ): XBreakpointTypeProxy {
   val lineTypeInfo = dto.lineTypeInfo
   return if (lineTypeInfo != null) {
-    FrontendXLineBreakpointType(project, dto, lineTypeInfo)
+    FrontendXLineBreakpointType(project, cs, dto, lineTypeInfo)
   }
   else {
-    FrontendXBreakpointType(project, dto)
+    FrontendXBreakpointType(project, cs, dto)
   }
 }
 
 private class FrontendXLineBreakpointType(
   project: Project,
+  cs: CoroutineScope,
   dto: XBreakpointTypeDto,
   lineTypeInfo: XLineBreakpointTypeInfo,
-) : FrontendXBreakpointType(project, dto), XLineBreakpointTypeProxy {
+) : FrontendXBreakpointType(project, cs, dto), XLineBreakpointTypeProxy {
   override val temporaryIcon: Icon? = dto.icons.temporaryIcon?.icon()
 
   override val priority: Int = lineTypeInfo.priority
+
+  private val supportsInterLinePlacement: Boolean = lineTypeInfo.supportsInterLinePlacement
+
+  override fun supportsInterLinePlacement(): Boolean = supportsInterLinePlacement
 
   override suspend fun canPutAt(editor: Editor, line: Int, project: Project): Boolean {
     val availableTypes = FrontendEditorLinesBreakpointsInfoManager.getInstance(project).getBreakpointsInfoForLine(editor, line).types
@@ -97,6 +102,9 @@ private class FrontendXLineBreakpointType(
     if (FrontendApplicationInfo.getFrontendType() !is FrontendType.Monolith) return null
     val monolithType = XDebuggerEntityConverter.getBreakpointType(id) as? XLineBreakpointType<*> ?: return null
     val file = fileProvider() ?: return ThreeState.NO
+    if (BreakpointFileProhibitionPolicy.isBreakpointProhibited(file)) {
+      return ThreeState.NO
+    }
     val canPut = monolithType.canPutAt(file, line, project)
     return ThreeState.fromBoolean(canPut)
   }
@@ -111,8 +119,10 @@ private class FrontendXLineBreakpointType(
 
 private open class FrontendXBreakpointType(
   private val project: Project,
+  cs: CoroutineScope,
   private val dto: XBreakpointTypeDto,
 ) : XBreakpointTypeProxy {
+  private val sequentialExecutor = SequentialRpcRequestsExecutor.create(cs)
   override val id: String = dto.id.id
   override val index: Int = dto.index
   override val title: String = dto.title
@@ -137,7 +147,7 @@ private open class FrontendXBreakpointType(
   override fun setDefaultSuspendPolicy(policy: SuspendPolicy) {
     _defaultSuspendPolicy = policy
 
-    project.service<FrontendXBreakpointTypeProjectCoroutineScope>().cs.launch {
+    sequentialExecutor.execute {
       XBreakpointApi.getInstance().setDefaultSuspendPolicy(project.projectId(), dto.id, policy)
     }
   }
@@ -200,6 +210,3 @@ private open class FrontendXBreakpointType(
     return "FrontendXBreakpointType(type=$id)"
   }
 }
-
-@Service(Service.Level.PROJECT)
-private class FrontendXBreakpointTypeProjectCoroutineScope(val cs: CoroutineScope)

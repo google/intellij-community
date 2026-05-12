@@ -15,7 +15,11 @@ import org.jetbrains.kotlin.psi.KtIfExpression
 
 internal class RedundantIfInspection : RedundantIfInspectionBase() {
     override fun isBooleanExpression(expression: KtExpression): Boolean = analyze(expression) {
-      expression.expressionType?.isBooleanType == true
+        expression.expressionType?.isBooleanType == true
+    }
+
+    override fun isNotNullableBooleanExpression(expression: KtExpression): Boolean = analyze(expression) {
+        expression.expressionType?.let { it.isBooleanType && !it.isMarkedNullable } == true
     }
 
     @OptIn(KaAllowAnalysisOnEdt::class)

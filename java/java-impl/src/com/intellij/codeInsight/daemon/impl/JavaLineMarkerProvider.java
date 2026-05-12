@@ -435,7 +435,7 @@ public class JavaLineMarkerProvider extends LineMarkerProviderDescriptor impleme
 
     @Override
     public @NotNull Function<? super PsiElement, String> getCommonTooltip(@NotNull List<? extends MergeableLineMarkerInfo<?>> infos) {
-      return __ -> "Multiple method overrides";
+      return _ -> "Multiple method overrides";
     }
 
     @Override

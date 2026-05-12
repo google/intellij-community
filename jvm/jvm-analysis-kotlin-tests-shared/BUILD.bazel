@@ -3,6 +3,7 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "analysis-kotlin-tests-shared",
+  module_name = "intellij.jvm.analysis.kotlin.tests.shared",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   exports = [
@@ -17,6 +18,7 @@ jvm_library(
 
 jvm_library(
   name = "analysis-kotlin-tests-shared_test_lib",
+  testonly = True,
   module_name = "intellij.jvm.analysis.kotlin.tests.shared",
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
@@ -25,8 +27,12 @@ jvm_library(
     "//platform/analysis-api:analysis_test_lib",
     "//platform/core-api:core",
     "//platform/core-api:core_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/editor-ui-api:editor-ui",
     "//platform/editor-ui-api:editor-ui_test_lib",
+    "//java/java-psi-api:psi",
+    "//java/java-psi-api:psi_test_lib",
     "//jps/model-api:model",
     "//jps/model-api:model_test_lib",
     "//platform/projectModel-api:projectModel",
@@ -43,8 +49,8 @@ jvm_library(
     "//platform/testFramework/junit5:junit5_test_lib",
     "//plugins/kotlin/base/plugin",
     "//plugins/kotlin/base/plugin:plugin_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//jvm/jvm-analysis-testFramework:analysis-testFramework",
     "//jvm/jvm-analysis-testFramework:analysis-testFramework_test_lib",
     "//java/java-impl-refactorings:impl-refactorings",
@@ -57,6 +63,8 @@ jvm_library(
     "//platform/testFramework:testFramework_test_lib",
     "//plugins/kotlin/test-framework",
     "//plugins/kotlin/test-framework:test-framework_test_lib",
+    "//java/java-syntax:syntax",
+    "//java/java-syntax:syntax_test_lib",
   ],
   exports = [
     "//plugins/kotlin/plugin/common",
@@ -75,6 +83,12 @@ jvm_library(
   runtime_deps = [":analysis-kotlin-tests-shared"]
 )
 ### auto-generated section `build intellij.jvm.analysis.kotlin.tests.shared` end
+
+### auto-generated section `iml intellij.jvm.analysis.kotlin.tests.shared` start
+exports_files([
+  "intellij.jvm.analysis.kotlin.tests.shared.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.jvm.analysis.kotlin.tests.shared` end
 
 ### auto-generated section `test intellij.jvm.analysis.kotlin.tests.shared` start
 load("@community//build:tests-options.bzl", "jps_test")

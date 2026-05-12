@@ -199,6 +199,7 @@ import java.util.stream.Stream;
 
 import static com.intellij.debugger.engine.DebuggerUtils.forEachSafe;
 import static com.intellij.debugger.engine.MethodInvokeUtilsKt.tryInvokeWithHelper;
+import static com.intellij.platform.util.coroutines.CoroutineScopeKt.childScope;
 
 public abstract class DebugProcessImpl extends UserDataHolderBase implements DebugProcess {
   private static final Logger LOG = Logger.getInstance(DebugProcessImpl.class);
@@ -257,7 +258,7 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
   volatile ParametersForSuspendAllReplacing myParametersForSuspendAllReplacing = null;
   volatile boolean myPreparingToSuspendAll = false;
 
-  List<Runnable> mySuspendAllListeners = new ArrayList<>();
+  final List<Runnable> mySuspendAllListeners = new ArrayList<>();
 
   private Job otherThreadsJob;
   private int myOtherThreadsReachBreakpointNumber = 0;
@@ -266,8 +267,7 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
   protected DebugProcessImpl(Project project) {
     this.project = project;
     CoroutineScope projectScope = ((XDebuggerManagerImpl)XDebuggerManager.getInstance(project)).getCoroutineScope();
-    myCoroutineScope = com.intellij.platform.util.coroutines.CoroutineScopeKt
-      .childScope(projectScope, "DebugProcessImpl", EmptyCoroutineContext.INSTANCE, true);
+    myCoroutineScope = childScope(projectScope, "DebugProcessImpl", EmptyCoroutineContext.INSTANCE, true);
     myDebuggerManagerThread = createManagerThread();
     myShowStatusManager = new ShowStatusManager(project, myCoroutineScope);
     myRunToCursorManager = new RunToCursorManager(this, myCoroutineScope);
@@ -574,7 +574,17 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
    */
   @ApiStatus.Internal
   public void doStep(@NotNull SuspendContextImpl suspendContext, final ThreadReferenceProxyImpl stepThread, int size, int depth,
-                        RequestHint hint, Object commandToken) {
+                     RequestHint hint, Object commandToken) {
+    doStep(suspendContext, stepThread, size, depth, hint, commandToken, -1, null);
+  }
+
+  /**
+   * @param size the step size. One of {@link StepRequest#STEP_LINE} or {@link StepRequest#STEP_MIN}
+   * @param hint may be null
+   */
+  @ApiStatus.Internal
+  public void doStep(@NotNull SuspendContextImpl suspendContext, final ThreadReferenceProxyImpl stepThread, int size, int depth,
+                        RequestHint hint, Object commandToken, int explicitSuspendPolicy, @Nullable StepRequestor explicitStepRequestor) {
     if (stepThread == null) {
       return;
     }
@@ -586,8 +596,9 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
       deleteStepRequests(suspendContext.getVirtualMachineProxy().eventRequestManager(), stepThreadReference);
       EventRequestManager requestManager = suspendContext.getVirtualMachineProxy().eventRequestManager();
       StepRequest stepRequest = requestManager.createStepRequest(stepThreadReference, size, depth);
-      String policyFromRequestors = suspendContext.getSuspendPolicyFromRequestors();
-      StepRequestor stepRequestor = new StepRequestor(policyFromRequestors);
+      StepRequestor stepRequestor = explicitStepRequestor != null ? explicitStepRequestor :
+                                    new StepRequestor(suspendContext.getSuspendPolicyFromRequestors(), null);
+      String policyFromRequestors = stepRequestor.getSuspendPolicy();
       getRequestsManager().registerRequestInternal(stepRequestor, stepRequest);
       if (!(hint != null && hint.isIgnoreFilters()) && !isPositionFiltered(getLocation(stepThread, suspendContext))) {
         getActiveFilters().forEach(f -> stepRequest.addClassExclusionFilter(f.getPattern()));
@@ -596,9 +607,11 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
       // suspend policy to match the suspend policy of the context:
       // if all threads were suspended, then during stepping all the threads must be suspended
       // if only event thread was suspended, then only this particular thread must be suspended during stepping
-      int policy = (suspendContext.getSuspendPolicy() == EventRequest.SUSPEND_EVENT_THREAD && !DebuggerSettings.SUSPEND_ALL.equals(policyFromRequestors))
+      int policy = explicitSuspendPolicy >= 0 ? explicitSuspendPolicy :
+        (suspendContext.getSuspendPolicy() == EventRequest.SUSPEND_EVENT_THREAD && !DebuggerSettings.SUSPEND_ALL.equals(policyFromRequestors))
                    ? EventRequest.SUSPEND_EVENT_THREAD
                    : EventRequest.SUSPEND_ALL;
+      //noinspection MagicConstant
       stepRequest.setSuspendPolicy(policy);
 
       stepRequest.addCountFilter(1);
@@ -609,7 +622,7 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
       if (commandToken != null) {
         stepRequest.putProperty("commandToken", commandToken);
       }
-      DebuggerUtilsAsync.setEnabled(stepRequest, true).whenComplete((__, e) -> {
+      DebuggerUtilsAsync.setEnabled(stepRequest, true).whenComplete((_, e) -> {
         if (DebuggerUtilsAsync.unwrap(e) instanceof IllegalThreadStateException) {
           DebuggerUtilsAsync.deleteEventRequest(requestManager, stepRequest);
         }
@@ -1010,6 +1023,11 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
     return project;
   }
 
+  @ApiStatus.Internal
+  public @NotNull CoroutineScope getChildScope(@NotNull String name) {
+    return childScope(myCoroutineScope, name, EmptyCoroutineContext.INSTANCE, true);
+  }
+
   public boolean canRedefineClasses() {
     VirtualMachineProxyImpl vm = getManagerThread().getVmProxy();
     return vm != null && vm.canRedefineClasses();
@@ -1118,7 +1136,6 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
       finally {
         if (!(myConnection instanceof RemoteConnectionStub)) {
           VirtualMachineData vmData = new VirtualMachineData(managerThread.getVmProxy(), myConnection, managerThread);
-          myPositionManager = CompoundPositionManager.DISABLED;
           myReturnValueWatcher = null;
           myNodeRenderersMap.clear();
           myRenderers.clear();
@@ -1163,6 +1180,7 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
   private void onRootProcessClosed() {
     myDebuggerManagerThread.cancelScope();
     myWaitFor.up();
+    myPositionManager = CompoundPositionManager.DISABLED;
   }
 
   @Contract(pure = true)
@@ -2415,6 +2433,9 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
       if (!isAttached()) {
         return;
       }
+      if (!mySuspendManager.getPausedContexts().isEmpty()) {
+        return;
+      }
       logThreads();
       if (Registry.is("debugger.evaluate.on.pause")) {
         stopOnAnyMethodEntryAndGetSuspendContext();
@@ -2470,23 +2491,36 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
                 getRequestsManager().deleteRequest(requestor);
                 // Check if the request was processed concurrently (before it was removed on a timeout) and saved the suspendContext.
                 if (evaluatableContextFuture.isDone()) {
-                  var evaluatableContext = evaluatableContextFuture.get();
-                  assert evaluatableContext != null;
-                  setSuspendContextAndCheckConsistency(evaluatableContext);
-                  DebuggerStatistics.logEvaluatablePauseSuccess(project, isDebuggerAgentAvailable());
+                  setEvaluatableContext(evaluatableContextFuture.get());
                 } else {
                   fallbackPauseWithNonEvaluatableContext();
                   DebuggerStatistics.logEvaluatablePauseFailure(project, isDebuggerAgentAvailable());
                 }
               } else {
-                var evaluatableContext = evaluatableContextFuture.get();
-                assert evaluatableContext != null;
-                setSuspendContextAndCheckConsistency(evaluatableContext);
-                DebuggerStatistics.logEvaluatablePauseSuccess(project, isDebuggerAgentAvailable());
+                setEvaluatableContext(evaluatableContextFuture.get());
               }
             }
           });
         });
+    }
+
+    private void setEvaluatableContext(SuspendContextImpl evaluatableContext) {
+      assert evaluatableContext != null;
+      setSuspendContextAndCheckConsistency(evaluatableContext);
+      DebuggerStatistics.logEvaluatablePauseSuccess(project, isDebuggerAgentAvailable());
+    }
+
+    private void fallbackPauseWithNonEvaluatableContext() {
+      var vmProxy = VirtualMachineProxyImpl.getCurrent();
+      vmProxy.suspend();
+      mySuspendManager.myExplicitlyResumedThreads.clear();
+      mySuspendManager.resumeAllSuspendAllContexts(null);
+      SuspendContextImpl suspendContext = mySuspendManager.pushSuspendContext(EventRequest.SUSPEND_ALL, 0);
+      setSuspendContextAndCheckConsistency(suspendContext);
+      forEachSafe(myDebugProcessListeners, it -> it.paused(suspendContext));
+      XDebuggerManagerImpl.getNotificationGroup()
+        .createNotification(JavaDebuggerBundle.message("evaluation.warning.cannot.evaluate.on.pause"), MessageType.WARNING)
+        .notify(getProject());
     }
 
     private void setSuspendContextAndCheckConsistency(@NotNull SuspendContextImpl suspendContext) {
@@ -2512,18 +2546,6 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
       });
     }
 
-    private void fallbackPauseWithNonEvaluatableContext() {
-      var vmProxy = VirtualMachineProxyImpl.getCurrent();
-      vmProxy.suspend();
-      mySuspendManager.myExplicitlyResumedThreads.clear();
-      mySuspendManager.resumeAllSuspendAllContexts(null);
-      SuspendContextImpl suspendContext = mySuspendManager.pushSuspendContext(EventRequest.SUSPEND_ALL, 0);
-      setSuspendContextAndCheckConsistency(suspendContext);
-      forEachSafe(myDebugProcessListeners, it -> it.paused(suspendContext));
-      XDebuggerManagerImpl.getNotificationGroup()
-        .createNotification(JavaDebuggerBundle.message("evaluation.warning.cannot.evaluate.on.pause"), MessageType.WARNING)
-        .notify(getProject());
-    }
   }
 
   private class ResumeThreadCommand extends SuspendContextCommandImpl {

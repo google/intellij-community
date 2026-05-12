@@ -46,11 +46,13 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.Icon;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import static com.intellij.platform.debugger.impl.shared.CoroutineUtilsKt.createMutableSharedFlow;
 import static com.intellij.platform.util.coroutines.CoroutineScopeKt.childScope;
+import static com.intellij.util.progress.CancellationUtil.withLockMaybeCancellable;
 import static com.intellij.xdebugger.impl.proxy.MonolithBreakpointProxyKt.asProxy;
 import static com.intellij.xdebugger.impl.rpc.models.XBreakpointValueIdKt.storeGlobally;
 import static kotlinx.coroutines.CoroutineScopeKt.cancel;
@@ -62,6 +64,7 @@ public class XBreakpointBase<Self extends XBreakpoint<P>, P extends XBreakpointP
   private static final @NonNls String BR_NBSP = "<br>" + CommonXmlStrings.NBSP;
   private final XBreakpointType<Self, P> myType;
   private final @Nullable P myProperties;
+  private final ReentrantLock myLock = new ReentrantLock();
   protected final S myState;
   private final XBreakpointManagerImpl myBreakpointManager;
   private final CoroutineScope myCoroutineScope;
@@ -155,20 +158,28 @@ public class XBreakpointBase<Self extends XBreakpoint<P>, P extends XBreakpointP
   }
 
   protected <T> void updateStateIfNeededAndNotify(long requestId, T newValue, Supplier<? extends T> getter, Consumer<T> setter) {
-    T currentValue = getter.get();
-    boolean updateNeeded = !Objects.equals(currentValue, newValue);
-    if (updateNeeded) {
-      setter.accept(newValue);
-    }
+    boolean updateNeeded = withStateLock(() -> {
+      T currentValue = getter.get();
+      if (!Objects.equals(currentValue, newValue)) {
+        setter.accept(newValue);
+        return true;
+      }
+      return false;
+    });
+
     boolean requestCompleted = myBreakpointManager.getRequestCounter().setRequestCompleted(myId, requestId);
     if (updateNeeded || requestCompleted) {
       fireBreakpointChanged();
     }
   }
 
+  protected final <T> T withStateLock(@NotNull Supplier<T> action) {
+    return withLockMaybeCancellable(myLock, action::get);
+  }
+
   @Override
   public boolean isEnabled() {
-    return myState.isEnabled();
+    return withStateLock(() -> myState.isEnabled());
   }
 
   @Override
@@ -182,7 +193,7 @@ public class XBreakpointBase<Self extends XBreakpoint<P>, P extends XBreakpointP
 
   @Override
   public @NotNull SuspendPolicy getSuspendPolicy() {
-    return myState.getSuspendPolicy();
+    return withStateLock(() -> myState.getSuspendPolicy());
   }
 
   @Override
@@ -201,7 +212,7 @@ public class XBreakpointBase<Self extends XBreakpoint<P>, P extends XBreakpointP
 
   @Override
   public boolean isLogMessage() {
-    return myState.isLogMessage();
+    return withStateLock(() -> myState.isLogMessage());
   }
 
   @Override
@@ -215,7 +226,7 @@ public class XBreakpointBase<Self extends XBreakpoint<P>, P extends XBreakpointP
 
   @Override
   public boolean isLogStack() {
-    return myState.isLogStack();
+    return withStateLock(() -> myState.isLogStack());
   }
 
   @Override
@@ -228,7 +239,7 @@ public class XBreakpointBase<Self extends XBreakpoint<P>, P extends XBreakpointP
   }
 
   public boolean isConditionEnabled() {
-    return myConditionEnabled;
+    return withStateLock(() -> myConditionEnabled);
   }
 
   public void setConditionEnabled(boolean conditionEnabled) {
@@ -242,7 +253,7 @@ public class XBreakpointBase<Self extends XBreakpoint<P>, P extends XBreakpointP
   }
 
   public boolean isLogExpressionEnabled() {
-    return myLogExpressionEnabled;
+    return withStateLock(() -> myLogExpressionEnabled);
   }
 
   public void setLogExpressionEnabled(boolean logExpressionEnabled) {
@@ -272,12 +283,12 @@ public class XBreakpointBase<Self extends XBreakpoint<P>, P extends XBreakpointP
   }
 
   public XExpression getLogExpressionObjectInt() {
-    return myLogExpression;
+    return withStateLock(() -> myLogExpression);
   }
 
   @Override
   public @Nullable XExpression getLogExpressionObject() {
-    return myLogExpressionEnabled ? myLogExpression : null;
+    return withStateLock(() -> myLogExpressionEnabled ? myLogExpression : null);
   }
 
   @Override
@@ -306,12 +317,12 @@ public class XBreakpointBase<Self extends XBreakpoint<P>, P extends XBreakpointP
   }
 
   public XExpression getConditionExpressionInt() {
-    return myCondition;
+    return withStateLock(() -> myCondition);
   }
 
   @Override
   public @Nullable XExpression getConditionExpression() {
-    return myConditionEnabled ? myCondition : null;
+    return withStateLock(() -> myConditionEnabled ? myCondition : null);
   }
 
   @Override
@@ -325,7 +336,7 @@ public class XBreakpointBase<Self extends XBreakpoint<P>, P extends XBreakpointP
 
   @Override
   public long getTimeStamp() {
-    return myState.getTimeStamp();
+    return withStateLock(() -> myState.getTimeStamp());
   }
 
   /**
@@ -350,25 +361,32 @@ public class XBreakpointBase<Self extends XBreakpoint<P>, P extends XBreakpointP
     Object propertiesState = myProperties == null ? null : myProperties.getState();
     Element element = propertiesState == null ? null : XmlSerializer.serialize(propertiesState);
     Element propertiesElement = element == null ? null : JDOMUtil.internElement(element);
-    myState.setCondition(BreakpointState.Condition.create(!myConditionEnabled, myCondition));
-    myState.setLogExpression(BreakpointState.LogExpression.create(!myLogExpressionEnabled, myLogExpression));
-    myState.setPropertiesElement(propertiesElement);
-    return myState;
+    return withStateLock(() -> {
+      myState.setCondition(BreakpointState.Condition.create(!myConditionEnabled, myCondition));
+      myState.setLogExpression(BreakpointState.LogExpression.create(!myLogExpressionEnabled, myLogExpression));
+      myState.setPropertiesElement(propertiesElement);
+      return myState;
+    });
   }
 
-  public XBreakpointDependencyState getDependencyState() {
+  /**
+   * Used only for serialization.
+   * Actual state is stored in {@link XDependentBreakpointManager}.
+   */
+  XBreakpointDependencyState getDependencyState() {
     return myState.getDependencyState();
   }
 
-  public void setDependencyState(XBreakpointDependencyState state) {
-    if (myState.getDependencyState() != state) {
-      myState.setDependencyState(state);
-      fireBreakpointChanged();
-    }
+  /**
+   * Used only for serialization.
+   * Actual state is stored in {@link XDependentBreakpointManager}.
+   */
+  void setDependencyState(XBreakpointDependencyState state) {
+    myState.setDependencyState(state);
   }
 
   public @Nullable String getGroup() {
-    return myState.getGroup();
+    return withStateLock(() -> myState.getGroup());
   }
 
   public void setGroup(String group) {
@@ -381,7 +399,7 @@ public class XBreakpointBase<Self extends XBreakpoint<P>, P extends XBreakpointP
   }
 
   public @NlsSafe String getUserDescription() {
-    return myState.getDescription();
+    return withStateLock(() -> myState.getDescription());
   }
 
   public void setUserDescription(String description) {

@@ -50,6 +50,11 @@
 c:com.intellij.execution.wsl.WSLDistribution
 - com.intellij.execution.wsl.AbstractWslDistribution
 - *:getUNCRootPath():java.nio.file.Path
+*f:com.intellij.formatting.LineWrappingUtil
+- sf:WRAP_LONG_LINE_DURING_FORMATTING_IN_PROGRESS_KEY:com.intellij.openapi.util.Key
+- <init>():V
+- s:doWrapLongLinesIfNecessary(com.intellij.openapi.editor.Editor,com.intellij.openapi.project.Project,com.intellij.openapi.editor.Document,I,I,java.util.List,I):V
+- s:wrapLongLinesIfNecessary(com.intellij.psi.PsiFile,com.intellij.openapi.editor.Document,I,I,java.util.List,I):V
 *:com.intellij.frontend.HostIdeInfoService
 - a:getHostInfo():com.intellij.frontend.HostInfo
 *f:com.intellij.frontend.HostInfo
@@ -88,6 +93,18 @@ f:com.intellij.ide.plugins.PluginNode
 - com.intellij.ide.plugins.IdeaPluginDescriptor
 - *:getChannel():java.lang.String
 - *:setChannel(java.lang.String):V
+*f:com.intellij.ide.settings.SettingsComponentDescriptor
+- com.intellij.openapi.extensions.PluginAware
+- *sf:Companion:com.intellij.ide.settings.SettingsComponentDescriptor$Companion
+- implementationClass:java.lang.String
+- <init>():V
+- f:getImplementationClass():java.lang.String
+- f:getPluginDescriptor():com.intellij.openapi.extensions.PluginDescriptor
+- f:setImplementationClass(java.lang.String):V
+- setPluginDescriptor(com.intellij.openapi.extensions.PluginDescriptor):V
+*f:com.intellij.ide.settings.SettingsComponentDescriptor$Companion
+- f:getAPPLICATION_EP_NAME():com.intellij.openapi.extensions.ExtensionPointName
+- f:getPROJECT_EP_NAME():com.intellij.openapi.extensions.ExtensionPointName
 f:com.intellij.ide.startup.StartupActionScriptManager
 - *s:addActionCommandsToBeginning(java.util.List):V
 *:com.intellij.ide.trustedProjects.TrustedProjectsListener
@@ -244,9 +261,9 @@ f:com.intellij.openapi.editor.impl.EditorImpl
 - com.intellij.openapi.editor.ex.EditorEx
 - com.intellij.openapi.editor.highlighter.HighlighterClient
 - com.intellij.openapi.ui.Queryable
-- com.intellij.psi.codeStyle.CodeStyleSettingsListener
 - java.awt.event.FocusListener
 - *:addHighlightingPredicate(com.intellij.openapi.util.Key,com.intellij.openapi.editor.impl.EditorHighlightingPredicate):com.intellij.openapi.editor.impl.EditorHighlightingPredicate
+- *:getCustomWrapModel():com.intellij.openapi.editor.CustomWrapModel
 - *:removeHighlightingPredicate(com.intellij.openapi.util.Key):com.intellij.openapi.editor.impl.EditorHighlightingPredicate
 *f:com.intellij.openapi.editor.impl.event.EditorGutterHoverEvent
 - java.util.EventObject
@@ -348,6 +365,17 @@ a:com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
 - f:withUsePreviewTab(Z):com.intellij.openapi.fileEditor.ex.FileEditorOpenRequest
 a:com.intellij.openapi.fileEditor.ex.IdeDocumentHistory
 - *a:reallyExcludeCurrentCommandAsNavigation():V
+f:com.intellij.openapi.fileEditor.impl.HTMLEditorProvider
+- com.intellij.openapi.fileEditor.FileEditorProvider
+- com.intellij.openapi.project.DumbAware
+- *sf:openEditorWithoutBlocking(com.intellij.openapi.project.Project,java.lang.String,com.intellij.openapi.fileEditor.impl.HTMLEditorProvider$Request):V
+f:com.intellij.openapi.fileEditor.impl.HTMLEditorProvider$Companion
+- *f:openEditorAsync(com.intellij.openapi.project.Project,java.lang.String,com.intellij.openapi.fileEditor.impl.HTMLEditorProvider$Request,kotlin.coroutines.Continuation):java.lang.Object
+- *f:openEditorWithoutBlocking(com.intellij.openapi.project.Project,java.lang.String,com.intellij.openapi.fileEditor.impl.HTMLEditorProvider$Request):V
+c:com.intellij.openapi.options.ex.ConfigurableWrapper
+- com.intellij.openapi.options.ConfigurableWithId
+- com.intellij.openapi.options.SearchableConfigurable
+- *:isSearchableInActions():Z
 *:com.intellij.openapi.options.ex.MutableConfigurableGroup
 - com.intellij.openapi.Disposable
 - com.intellij.openapi.options.ConfigurableGroup
@@ -378,6 +406,17 @@ f:com.intellij.openapi.project.impl.P3SupportKt
 *f:com.intellij.openapi.updateSettings.PluginUpdateInfo$UpdateAvailable
 - com.intellij.openapi.updateSettings.PluginUpdateInfo
 - f:getUpdate():com.intellij.openapi.updateSettings.impl.PluginDownloader
+*f:com.intellij.openapi.util.io.CancellableComputation
+- java.util.function.Function
+- *sf:Companion:com.intellij.openapi.util.io.CancellableComputation$Companion
+- apply(java.lang.Object):java.lang.Object
+- sf:computeCancellable(com.intellij.openapi.util.ThrowableComputable):java.lang.Object
+- sf:wrapAsCancellable(java.util.function.Function):java.util.function.Function
+*f:com.intellij.openapi.util.io.CancellableComputation$Companion
+- f:computeCancellable(com.intellij.openapi.util.ThrowableComputable):java.lang.Object
+- f:wrapAsCancellable(java.util.function.Function):java.util.function.Function
+*f:com.intellij.openapi.util.io.CancellableComputationKt
+- *sf:wrapCancellable(kotlin.jvm.functions.Function2):kotlin.jvm.functions.Function2
 a:com.intellij.openapi.wm.impl.FrameTitleBuilder
 - *:getFileTitleAsync(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,kotlin.coroutines.Continuation):java.lang.Object
 f:com.intellij.openapi.wm.impl.IdeBackgroundUtil
@@ -541,8 +580,6 @@ f:com.intellij.ui.dsl.builder.components.ValidationTooltipKt
 - s:getEntries():kotlin.enums.EnumEntries
 - s:valueOf(java.lang.String):com.intellij.ui.dsl.builder.components.ValidationType
 - s:values():com.intellij.ui.dsl.builder.components.ValidationType[]
-f:com.intellij.ui.render.RenderersKt
-- *sf:fontInfoRenderer(Z):javax.swing.ListCellRenderer
 *f:com.intellij.util.ui.RestartDialogImpl
 - *sf:Companion:com.intellij.util.ui.RestartDialogImpl$Companion
 - <init>():V

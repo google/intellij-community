@@ -27,6 +27,7 @@ import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.openapi.fileEditor.impl.text.AsyncEditorLoader;
 import com.intellij.openapi.ide.CopyPasteManager;
+import com.intellij.openapi.options.advanced.AdvancedSettings;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.util.SystemInfo;
@@ -41,6 +42,7 @@ import com.intellij.testFramework.fixtures.EditorMouseFixture;
 import com.intellij.ui.ExperimentalUI;
 import com.intellij.util.DocumentUtil;
 import com.intellij.util.ThrowableRunnable;
+import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.UIUtil;
 import org.jetbrains.annotations.NotNull;
 
@@ -216,6 +218,37 @@ public class EditorImplTest extends AbstractEditorTest {
 
     assertEquals(new VisualPosition(1, 5), getEditor().getCaretModel().getVisualPosition());
   }
+
+  public void testForcedSoftWrapsAreDeferredUntilBulkModeFinishes() {
+    int oldForceLimit = AdvancedSettings.getInt("editor.soft.wrap.force.limit");
+    AdvancedSettings.setInt("editor.soft.wrap.force.limit", 10);
+    try {
+      initText("short");
+      EditorImpl editor = (EditorImpl)getEditor();
+      DocumentEx document = editor.getDocument();
+      setEditorVisibleSize(10, 1);
+
+      assertFalse(editor.getSettings().isUseSoftWraps());
+      assertNull(editor.getUserData(EditorImpl.FORCED_SOFT_WRAPS));
+      assertTrue(editor.getSoftWrapModel().getSoftWrapsForRange(0, document.getTextLength()).isEmpty());
+
+      String longLine = StringUtil.repeat("1234567890", 3);
+      runWriteCommand(() -> DocumentUtil.executeInBulk(document, () -> {
+        document.setText(longLine);
+
+        assertFalse(editor.getSettings().isUseSoftWraps());
+        assertNull(editor.getUserData(EditorImpl.FORCED_SOFT_WRAPS));
+        assertTrue(editor.getSoftWrapModel().getSoftWrapsForRange(0, document.getTextLength()).isEmpty());
+      }));
+
+      assertTrue(editor.getSettings().isUseSoftWraps());
+      assertEquals(Boolean.TRUE, editor.getUserData(EditorImpl.FORCED_SOFT_WRAPS));
+      assertFalse(editor.getSoftWrapModel().getSoftWrapsForRange(0, document.getTextLength()).isEmpty());
+    }
+    finally {
+      AdvancedSettings.setInt("editor.soft.wrap.force.limit", oldForceLimit);
+    }
+  }
   
   public void testSuccessiveBulkModeOperations() {
     initText("some text");
@@ -352,7 +385,7 @@ public class EditorImplTest extends AbstractEditorTest {
       }
     }, getTestRootDisposable());
     runWriteCommand(() -> DocumentUtil.executeInBulk(document, ()-> document.insertString(3, "\n\n")));
-    RangeHighlighter[] highlighters = getEditor().getMarkupModel().getAllHighlighters();
+    RangeHighlighter[] highlighters = ContainerUtil.findAllAsArray(getEditor().getMarkupModel().getAllHighlighters(), h->h.isValid());
     assertEquals(1, highlighters.length);
     assertEquals(7, highlighters[0].getStartOffset());
     assertEquals(8, highlighters[0].getEndOffset());
@@ -367,7 +400,7 @@ public class EditorImplTest extends AbstractEditorTest {
                                                        new TextAttributes(null, null, null, null, Font.BOLD),
                                                        HighlighterTargetArea.EXACT_RANGE);
     });
-    RangeHighlighter[] highlighters = getEditor().getMarkupModel().getAllHighlighters();
+    RangeHighlighter[] highlighters = ContainerUtil.findAllAsArray(getEditor().getMarkupModel().getAllHighlighters(), h->h.isValid());
     assertEquals(1, highlighters.length);
     assertEquals(7, highlighters[0].getStartOffset());
     assertEquals(8, highlighters[0].getEndOffset());

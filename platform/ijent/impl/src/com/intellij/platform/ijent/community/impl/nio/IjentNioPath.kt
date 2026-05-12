@@ -62,11 +62,14 @@ sealed class IjentNioPath protected constructor(
 
 
   override fun register(watcher: WatchService, events: Array<out WatchEvent.Kind<*>>, vararg modifiers: WatchEvent.Modifier): WatchKey {
-    TODO("Not yet implemented")
+    if (watcher is IjentNioWatchService) {
+      return watcher.register(this, events)
+    }
+    throw UnsupportedOperationException("Unsupported WatchService: $watcher")
   }
 
   override fun compareTo(other: Path): Int {
-    return toString().compareTo(other.toString(), ignoreCase = nioFs.ijentFs.descriptor.osFamily == EelOsFamily.Windows)
+    return toString().compareTo(other.toString(), ignoreCase = nioFs.eelDescriptor.osFamily == EelOsFamily.Windows)
   }
 }
 
@@ -247,7 +250,7 @@ internal class RelativeIjentNioPath(val segments: List<String>, nioFs: IjentNioF
       is AbsoluteIjentNioPath -> return false
       is RelativeIjentNioPath -> {
         if (segments.size < other.segments.size) return false
-        val ignoreCase = nioFs.ijentFs.descriptor.osFamily == EelOsFamily.Windows
+        val ignoreCase = nioFs.eelDescriptor.osFamily == EelOsFamily.Windows
         return if (ignoreCase)
           segments.take(other.segments.size).zip(other.segments).all { (a, b) -> a.equals(b, ignoreCase = true) }
         else
@@ -264,7 +267,7 @@ internal class RelativeIjentNioPath(val segments: List<String>, nioFs: IjentNioF
       is AbsoluteIjentNioPath -> return false
       is RelativeIjentNioPath -> {
         if (segments.size < other.segments.size) return false
-        val ignoreCase = nioFs.ijentFs.descriptor.osFamily == EelOsFamily.Windows
+        val ignoreCase = nioFs.eelDescriptor.osFamily == EelOsFamily.Windows
         return if (ignoreCase)
           segments.takeLast(other.segments.size).zip(other.segments).all { (a, b) -> a.equals(b, ignoreCase = true) }
         else
@@ -338,14 +341,14 @@ internal class RelativeIjentNioPath(val segments: List<String>, nioFs: IjentNioF
   override fun equals(other: Any?): Boolean {
     if (other !is RelativeIjentNioPath || nioFs != other.nioFs) return false
     if (segments.size != other.segments.size) return false
-    val ignoreCase = nioFs.ijentFs.descriptor.osFamily == EelOsFamily.Windows
+    val ignoreCase = nioFs.eelDescriptor.osFamily == EelOsFamily.Windows
     return if (ignoreCase) segments.zip(other.segments).all { (a, b) -> a.equals(b, ignoreCase = true) }
            else segments == other.segments
   }
 
   override fun hashCode(): Int {
     val effectiveSegments =
-      if (nioFs.ijentFs.descriptor.osFamily == EelOsFamily.Windows) segments.map { it.lowercase() }
+      if (nioFs.eelDescriptor.osFamily == EelOsFamily.Windows) segments.map { it.lowercase() }
       else segments
     return effectiveSegments.hashCode() * 31 + nioFs.hashCode()
   }

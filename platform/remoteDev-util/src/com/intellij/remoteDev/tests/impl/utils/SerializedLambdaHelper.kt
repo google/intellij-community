@@ -1,3 +1,4 @@
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.remoteDev.tests.impl.utils
 
 import java.io.ByteArrayOutputStream
@@ -18,8 +19,6 @@ import kotlin.use
  */
 
 data class SerializedLambda(
-  val clazzName: String,
-  val methodName: String,
   val serializedDataBase64: String,
   val parametersBase64: List<String>,
   val classPath: Set<File>,

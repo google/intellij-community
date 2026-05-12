@@ -28,6 +28,12 @@
       "key": "Banner.successBorderColor"
     },
     {
+      "key": "Banner.aiBackground"
+    },
+    {
+      "key": "Banner.aiBorderColor"
+    },
+    {
       "key": "Banner.warningBackground",
       "description": "The background of banners (experimental UI only)"
     },
@@ -39,12 +45,98 @@
       "description": "Background of alert dialogs"
     },
     {
+      "key": "Badge.blueBackground",
+      "description": "Background color for blue primary badge (e.g. 'New')",
+      "source": "com.intellij.ui.components.Badge",
+      "since": "2026.2"
+    },
+    {
+      "key": "Badge.blueForeground",
+      "description": "Text color for blue primary badge",
+      "source": "com.intellij.ui.components.Badge",
+      "since": "2026.2"
+    },
+    {
+      "key": "Badge.blueSecondaryBackground",
+      "description": "Background color for blue secondary badge",
+      "source": "com.intellij.ui.components.Badge",
+      "since": "2026.2"
+    },
+    {
+      "key": "Badge.blueSecondaryForeground",
+      "description": "Text color for blue secondary badge",
+      "source": "com.intellij.ui.components.Badge",
+      "since": "2026.2"
+    },
+    {
+      "key": "Badge.disabledBackground",
+      "description": "Background color for disabled badge",
+      "source": "com.intellij.ui.components.Badge",
+      "since": "2026.2"
+    },
+    {
+      "key": "Badge.disabledForeground",
+      "description": "Text color for disabled badge",
+      "source": "com.intellij.ui.components.Badge",
+      "since": "2026.2"
+    },
+    {
+      "key": "Badge.graySecondaryBackground",
+      "description": "Background color for gray secondary badge",
+      "source": "com.intellij.ui.components.Badge",
+      "since": "2026.2"
+    },
+    {
+      "key": "Badge.graySecondaryForeground",
+      "description": "Text color for gray secondary badge",
+      "source": "com.intellij.ui.components.Badge",
+      "since": "2026.2"
+    },
+    {
+      "key": "Badge.greenBackground",
+      "description": "Background color for green primary badge",
+      "source": "com.intellij.ui.components.Badge",
+      "since": "2026.2"
+    },
+    {
+      "key": "Badge.greenForeground",
+      "description": "Text color for green primary badge",
+      "source": "com.intellij.ui.components.Badge",
+      "since": "2026.2"
+    },
+    {
       "key": "Badge.greenOutlineBorderColor",
-      "description": "Border color for green outline badge"
+      "description": "Border color for green outline badge",
+      "source": "com.intellij.ui.components.Badge"
     },
     {
       "key": "Badge.greenOutlineForeground",
-      "description": "Foreground color for green outline badge"
+      "description": "Foreground color for green outline badge",
+      "source": "com.intellij.ui.components.Badge"
+    },
+    {
+      "key": "Badge.greenSecondaryBackground",
+      "description": "Background color for green secondary badge",
+      "source": "com.intellij.ui.components.Badge",
+      "since": "2026.2"
+    },
+    {
+      "key": "Badge.greenSecondaryForeground",
+      "description": "Text color for green secondary badge",
+      "source": "com.intellij.ui.components.Badge",
+      "since": "2026.2"
+    },
+    {
+      "key": "Badge.purpleSecondaryBackground",
+      "description": "Background color for purple secondary badge",
+      "source": "com.intellij.ui.components.Badge",
+      "since": "2026.2"
+    },
+    {
+      "key": "Badge.purpleSecondaryForeground",
+      "description": "Text color for purple secondary badge",
+      "source": "com.intellij.ui.components.Badge",
+      "since": "2026.2"
     },
     {
       "key": "Banner.errorBackground"
@@ -1352,21 +1444,6 @@
     {
       "key": "Island.inactiveAlpha",
       "description": "The transparency of islands when it is inactive",
-      "since": "2026.1"
-    },
-    {
-      "key": "Island.inactiveAlphaInStatusBar.os.linux",
-      "description": "The transparency of islands in the status bar when it is inactive on Linux",
-      "since": "2026.1"
-    },
-    {
-      "key": "Island.inactiveAlphaInStatusBar.os.mac",
-      "description": "The transparency of islands in the status bar when it is inactive on macOS",
-      "since": "2026.1"
-    },
-    {
-      "key": "Island.inactiveAlphaInStatusBar.os.windows",
-      "description": "The transparency of islands in the status bar when it is inactive on Windows",
       "since": "2026.1"
     },
     {
@@ -3602,6 +3679,22 @@
       "key": "RecentProject.ColorN.Avatar.End",
       "description": "Avatar gradient end color of recent project",
       "since": "2025.3"
+    },
+    {
+      "key": "VersionControl.Merge.Badge.infoForeground",
+      "description": "Foreground color for the conflicts badge when there are no conflicts resolved"
+    },
+    {
+      "key": "VersionControl.Merge.Badge.infoBackground",
+      "description": "Background color for the conflicts badge when there are no conflicts resolved"
+    },
+    {
+      "key": "VersionControl.Merge.Badge.modifiedItemForeground",
+      "description": "Foreground color for the conflicts badge when there are some conflicts resolved"
+    },
+    {
+      "key": "VersionControl.Merge.Badge.modifiedItemBackground",
+      "description": "Background color for the conflicts badge when there are some conflicts resolved"
     }
   ]
 }

@@ -8,7 +8,10 @@ import com.intellij.platform.eel.provider.utils.asNio
 import com.intellij.platform.workspace.storage.ImmutableEntityStorage
 import com.intellij.platform.workspace.storage.toBuilder
 import org.jetbrains.kotlin.gradle.scripting.k2.GradleKotlinScriptEntityProvider
+import org.jetbrains.kotlin.gradle.scripting.k2.definition.withIdeKeys
+import org.jetbrains.kotlin.gradle.scripting.k2.workspaceModel.GradleKotlinScriptEntitySource
 import org.jetbrains.kotlin.gradle.scripting.shared.definition.GradleDefinitionsParams
+import org.jetbrains.kotlin.gradle.scripting.shared.definition.loadGradleDefinitions
 import org.jetbrains.kotlin.gradle.scripting.shared.importing.collectErrors
 import org.jetbrains.kotlin.gradle.scripting.shared.importing.getKotlinDslScripts
 import org.jetbrains.kotlin.gradle.scripting.shared.importing.kotlinDslSyncListenerInstance
@@ -23,7 +26,7 @@ import kotlin.io.path.pathString
 internal class KotlinDslScriptSyncContributor : GradleSyncContributor {
     override val name: String = "Kotlin DSL Script"
 
-    override val phase: GradleSyncPhase = GradleSyncPhase.ADDITIONAL_MODEL_PHASE
+    override val phase: GradleSyncPhase = GradleSyncPhase.SCRIPT_MODEL_PHASE
 
     override suspend fun createProjectModel(
         context: ProjectResolverContext, storage: ImmutableEntityStorage
@@ -69,26 +72,21 @@ internal class KotlinDslScriptSyncContributor : GradleSyncContributor {
             )
         }
 
-        val scriptData = GradleScriptData(
-            gradleScripts,
-            GradleDefinitionsParams(
-                context.projectPath,
-                gradleHome,
-                javaHome.pathString,
-                context.buildEnvironment.gradle.gradleVersion,
-                context.settings.jvmArguments,
-                context.settings.env
-            )
+        val gradleDefinitionsParams = GradleDefinitionsParams(
+            context.projectPath,
+            gradleHome,
+            javaHome.pathString,
+            context.buildEnvironment.gradle.gradleVersion,
+            context.settings.jvmArguments,
+            context.settings.env
         )
+        val definitions = loadGradleDefinitions(gradleDefinitionsParams).map { it.withIdeKeys() }
 
-        return GradleKotlinScriptEntityProvider.getInstance(project).getUpdatedStorage(scriptData, builder)
+        val entitySource = GradleKotlinDslScriptEntitySource(context.projectPath, phase)
+        return GradleKotlinScriptEntityProvider.getInstance(project)
+            .getUpdatedStorage(builder, entitySource, gradleScripts, definitions, javaHome.pathString)
     }
 }
-
-class GradleScriptData(
-    val models: Collection<GradleScriptModel>,
-    val definitionsParams: GradleDefinitionsParams
-)
 
 class GradleScriptModel(
     val virtualFile: VirtualFile,
@@ -97,3 +95,8 @@ class GradleScriptModel(
     val imports: List<String>,
     val classpathModel: GradleBuildScriptClasspathModel? = null,
 )
+
+internal data class GradleKotlinDslScriptEntitySource(
+    override val projectPath: String,
+    override val phase: GradleSyncPhase,
+) : GradleKotlinScriptEntitySource

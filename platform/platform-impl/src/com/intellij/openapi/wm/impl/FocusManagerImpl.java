@@ -12,6 +12,7 @@ import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.popup.JBPopup;
+import com.intellij.openapi.ui.popup.StackingPopupDispatcher;
 import com.intellij.openapi.util.ActionCallback;
 import com.intellij.openapi.util.ExpirableRunnable;
 import com.intellij.openapi.util.registry.Registry;
@@ -117,6 +118,18 @@ public final class FocusManagerImpl extends IdeFocusManager implements Disposabl
   @DirtyUI
   @Override
   public ActionCallback requestFocusInProject(@NotNull Component c, @Nullable Project project) {
+    if (StartupUiUtil.isWaylandToolkit()) {
+      var currentPopup = StackingPopupDispatcher.getInstance().getFocusedPopup();
+      if (currentPopup != null && !AbstractPopup.isForceCancelOnFocusLoss(currentPopup)) {
+        var currentPopupComponent = currentPopup.getContent();
+        if (!currentPopupComponent.isAncestorOf(c)) {
+          // On Wayland, transferring focus out of a popup is possible,
+          // but usually lead to an uncomfortable state when the popup is still showing,
+          // but doesn't get keyboard input.
+          return ActionCallback.REJECTED;
+        }
+      }
+    }
     // if focus transfer is requested to the active project's window, we call 'requestFocus' to allow focusing detached project windows
     // (editor or tool windows), otherwise we call 'requestFocusInWindow' to avoid unexpected project switching
     Project activeProject = ProjectUtil.getActiveProject();

@@ -22,11 +22,13 @@ jvm_library(
     "//libraries/kotlinx/coroutines/core",
     "//platform/testFramework/common",
     "//platform/build-scripts/downloader",
+    "//platform/bazel-runfiles",
   ]
 )
 
 jvm_library(
   name = "ide-starter-bazel_test_lib",
+  testonly = True,
   module_name = "intellij.tools.ide.starter.bazel",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -39,6 +41,13 @@ jvm_library(
     "//libraries/kotlinx/coroutines/core:core_test_lib",
     "//platform/testFramework/common:common_test_lib",
     "//platform/build-scripts/downloader:downloader_test_lib",
+    "//platform/bazel-runfiles:bazel-runfiles_test_lib",
   ]
 )
 ### auto-generated section `build intellij.tools.ide.starter.bazel` end
+
+### auto-generated section `iml intellij.tools.ide.starter.bazel` start
+exports_files([
+  "intellij.tools.ide.starter.bazel.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.tools.ide.starter.bazel` end

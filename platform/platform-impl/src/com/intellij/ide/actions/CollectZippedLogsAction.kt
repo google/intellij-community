@@ -29,7 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
-import java.io.IOException
+import kotlin.coroutines.cancellation.CancellationException
 
 @ApiStatus.Internal
 const val COLLECT_LOGS_NOTIFICATION_GROUP: String = "Collect Zipped Logs"
@@ -66,23 +66,22 @@ internal class CollectZippedLogsAction : AnAction(), DumbAware {
     }
   }
 
-  private suspend fun collectLogs(project: Project? = null) {
+  private suspend fun collectLogs(project: Project?) {
     try {
-      val logs =
-        if (project == null) {
-          withContext(Dispatchers.EDT) {
-            runWithModalProgressBlocking(
-              owner = ModalTaskOwner.guess(),
-              title = @Suppress("DialogTitleCapitalization") IdeBundle.message("collect.logs.progress.title"),
-              action = { LogPacker.packLogs(project) },
-            )
-          }
+      val logs = if (project == null) {
+        withContext(Dispatchers.EDT) {
+          runWithModalProgressBlocking(
+            owner = ModalTaskOwner.guess(),
+            title = @Suppress("DialogTitleCapitalization") IdeBundle.message("collect.logs.progress.title"),
+            action = { LogPacker.packLogs(project) },
+          )
         }
-        else {
-          withBackgroundProgress(project, IdeBundle.message("collect.logs.progress.title")) {
-            LogPacker.packLogs(project)
-          }
+      }
+      else {
+        withBackgroundProgress(project, IdeBundle.message("collect.logs.progress.title")) {
+          LogPacker.packLogs(project)
         }
+      }
 
       if (RevealFileAction.isSupported()) {
         RevealFileAction.openFile(logs)
@@ -95,7 +94,8 @@ internal class CollectZippedLogsAction : AnAction(), DumbAware {
         ).notify(project)
       }
     }
-    catch (e: IOException) {
+    catch (e: CancellationException) { throw e }
+    catch (e: Exception) {
       thisLogger().warn(e)
       Notification(
         COLLECT_LOGS_NOTIFICATION_GROUP,

@@ -4,16 +4,14 @@ package com.intellij.collaboration.api.httpclient
 import com.intellij.collaboration.api.HttpStatusErrorException
 import com.intellij.collaboration.api.httpclient.HttpClientUtil.CONTENT_ENCODING_GZIP
 import com.intellij.collaboration.api.httpclient.HttpClientUtil.CONTENT_ENCODING_HEADER
-import com.intellij.collaboration.api.httpclient.HttpClientUtil.inflateAndReadWithErrorHandlingAndLogging
 import com.intellij.collaboration.api.logName
 import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ApplicationNamesInfo
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.SystemInfo
-import kotlinx.coroutines.future.await
-import org.jetbrains.annotations.ApiStatus
 import java.io.InputStream
+import java.io.OutputStream
 import java.io.Reader
 import java.io.StringReader
 import java.net.http.HttpRequest
@@ -22,8 +20,6 @@ import java.net.http.HttpResponse.BodySubscriber
 import java.net.http.HttpResponse.BodySubscribers
 import java.net.http.HttpResponse.ResponseInfo
 import java.nio.ByteBuffer
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CompletionStage
 import java.util.concurrent.Flow
 import java.util.zip.GZIPInputStream
 
@@ -46,7 +42,7 @@ object HttpClientUtil {
   fun checkStatusCodeWithLogging(logger: Logger, requestName: String, statusCode: Int, bodyStream: InputStream) {
     logger.debug("$requestName : Status code $statusCode")
     if (statusCode >= 400) {
-      val errorBody = bodyStream.reader().readText()
+      val errorBody = bodyStream.reader().use { it.readText() }
       if (logger.isTraceEnabled) {
         logger.trace("$requestName : Response body: $errorBody")
       }
@@ -70,21 +66,6 @@ object HttpClientUtil {
   }
 
   /**
-   * Reads the request response if the request completed successfully, otherwise throws [HttpStatusErrorException]
-   * Response status is always logged, response body is logged when tracing is enabled in logger
-   */
-  fun <T> readSuccessResponseWithLogging(
-    logger: Logger,
-    request: HttpRequest,
-    responseInfo: ResponseInfo,
-    bodyStream: InputStream,
-    reader: (Reader) -> T,
-  ): T {
-    checkStatusCodeWithLogging(logger, request.logName(), responseInfo.statusCode(), bodyStream)
-    return responseReaderWithLogging(logger, request.logName(), bodyStream).use(reader)
-  }
-
-  /**
    * Shorthand for creating a body handler that inflates the incoming response body if it is zipped, checks that
    * the status code is OK (throws [HttpStatusErrorException] otherwise), and applies the given function to read
    * the result body and map it to some value.
@@ -99,7 +80,8 @@ object HttpClientUtil {
     request: HttpRequest,
     mapToResult: (Reader, ResponseInfo) -> T,
   ): BodyHandler<T> = InflatedStreamReadingBodyHandler { responseInfo, bodyStream ->
-    readSuccessResponseWithLogging(logger, request, responseInfo, bodyStream) { reader ->
+    checkStatusCodeWithLogging(logger, request.logName(), responseInfo.statusCode(), bodyStream)
+    responseReaderWithLogging(logger, request.logName(), bodyStream).use { reader: Reader ->
       mapToResult(reader, responseInfo)
     }
   }
@@ -133,28 +115,13 @@ class ByteArrayProducingBodyPublisher(
   override fun contentLength(): Long = -1
 }
 
-// Look here or elsewhere in this file if you're having trouble fixing "chunked transfer encoding, state: READING_LENGTH" errors ;)
-@ApiStatus.Internal
-class LazyBodyHandler<T>(
-  private val delegate: BodyHandler<T>,
-) : BodyHandler<suspend () -> T> {
-  override fun apply(responseInfo: ResponseInfo?): BodySubscriber<(suspend () -> T)?> {
-    val delegateSubscriber = delegate.apply(responseInfo)
-
-    return object : BodySubscriber<(suspend () -> T)?> {
-      override fun onSubscribe(subscription: Flow.Subscription?) = delegateSubscriber.onSubscribe(subscription)
-      override fun onNext(item: List<ByteBuffer?>?) = delegateSubscriber.onNext(item)
-      override fun onError(throwable: Throwable?) = delegateSubscriber.onError(throwable)
-      override fun onComplete() = delegateSubscriber.onComplete()
-
-      override fun getBody(): CompletionStage<(suspend () -> T)?>? =
-        CompletableFuture.completedFuture {
-          delegateSubscriber.body.await()
-        }
-    }
-  }
-}
-
+/**
+ * Body handler that inflates the incoming response body if it is zipped, and applies the given function to read
+ * the result body and map it to some value.
+ *
+ * Stream passed to [streamReader] will not react to [InputStream.close] calls, to avoid cancelling the request and spawning an obscure
+ * "chunked transfer encoding, state: READING_LENGTH" error.
+ */
 class InflatedStreamReadingBodyHandler<T>(
   private val streamReader: (responseInfo: ResponseInfo, bodyStream: InputStream) -> T,
 ) : BodyHandler<T> {
@@ -167,14 +134,38 @@ class InflatedStreamReadingBodyHandler<T>(
       .contains(CONTENT_ENCODING_GZIP)
 
     val subscriber = if (isGzipContent) {
-      BodySubscribers.mapping<InputStream?, InputStream?>(inputStreamSubscriber, ::GZIPInputStream)
+      BodySubscribers.mapping<InputStream, InputStream>(inputStreamSubscriber, ::GZIPInputStream)
     }
     else {
       inputStreamSubscriber
     }
 
     return BodySubscribers.mapping(subscriber) {
-      streamReader(responseInfo, it)
+      val originalStream = it ?: return@mapping null
+      streamReader(responseInfo, UnclosableInputStream(originalStream))
     }
   }
+}
+
+private class UnclosableInputStream(private val original: InputStream) : InputStream() {
+  override fun close() {
+    // do nothing
+  }
+
+  override fun read(): Int = original.read()
+  override fun read(b: ByteArray?): Int = original.read(b)
+  override fun read(b: ByteArray?, off: Int, len: Int): Int = original.read(b, off, len)
+  override fun readAllBytes(): ByteArray? = original.readAllBytes()
+  override fun readNBytes(len: Int): ByteArray? = original.readNBytes(len)
+  override fun readNBytes(b: ByteArray?, off: Int, len: Int): Int = original.readNBytes(b, off, len)
+  override fun skip(n: Long): Long = original.skip(n)
+  override fun skipNBytes(n: Long) = original.skipNBytes(n)
+  override fun available(): Int = original.available()
+  override fun mark(readlimit: Int) = original.mark(readlimit)
+  override fun reset() = original.reset()
+  override fun markSupported(): Boolean = original.markSupported()
+  override fun transferTo(out: OutputStream?): Long = original.transferTo(out)
+  override fun equals(other: Any?): Boolean = original.equals(other)
+  override fun hashCode(): Int = original.hashCode()
+  override fun toString(): String = original.toString()
 }

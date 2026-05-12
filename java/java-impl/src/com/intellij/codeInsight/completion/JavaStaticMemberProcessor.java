@@ -38,10 +38,12 @@ import java.util.List;
 
 public class JavaStaticMemberProcessor extends StaticMemberProcessor {
   private final PsiElement myOriginalPosition;
+  private final PsiElement myOriginalFile;
 
   public JavaStaticMemberProcessor(@NotNull BaseCompletionParameters parameters) {
     super(parameters.getPosition());
     myOriginalPosition = parameters.getOriginalPosition();
+    myOriginalFile = parameters.getOriginalFile();
     final PsiFile file = parameters.getPosition().getContainingFile();
     if (file instanceof PsiJavaFile) {
       final PsiImportList importList = ((PsiJavaFile)file).getImportList();
@@ -102,10 +104,11 @@ public class JavaStaticMemberProcessor extends StaticMemberProcessor {
   }
 
   private boolean isAccessibleClass(@NotNull PsiClass importFromClass) {
-    boolean importFromDefaultPackage = importFromClass.getContainingFile() instanceof PsiJavaFile javaFile && javaFile.getPackageName().isBlank();
+    boolean importFromDefaultPackage =
+      importFromClass.getContainingFile() instanceof PsiJavaFile javaFile && javaFile.getPackageName().isBlank();
     if (importFromDefaultPackage) {
-      boolean targetClassInDefaultPackage = myOriginalPosition.getContainingFile() instanceof PsiJavaFile targetClass && targetClass.getPackageName().isBlank();
-      if(!targetClassInDefaultPackage) {
+      boolean targetClassInDefaultPackage = myOriginalFile instanceof PsiJavaFile targetClass && targetClass.getPackageName().isBlank();
+      if (!targetClassInDefaultPackage) {
         return false;
       }
     }
@@ -181,7 +184,7 @@ public class JavaStaticMemberProcessor extends StaticMemberProcessor {
   }
 
   protected @NotNull JavaMethodCallElement getMethodCallElement(boolean shouldImport, List<? extends PsiMethod> members) {
-    return new GlobalMethodCallElement(members.get(0), shouldImport, members.size()>1);
+    return new GlobalMethodCallElement(members.getFirst(), shouldImport, members.size() > 1);
   }
 
   private static class GlobalMethodCallElement extends JavaMethodCallElement {

@@ -408,6 +408,35 @@ class DemoTest {
         Assert.assertNotNull(JunitKotlinTestFrameworkProvider.getInstance().getJavaTestEntity(element, checkMethod = true))
     }
 
+    fun testExtensionMethodWithTestAnnotation() {
+        val file = myFixture.configureByText(
+            "MyTest.kt", """
+            import org.junit.jupiter.api.Test
+
+            class MyTest {
+                @Test
+                fun String.extension<caret>Test() {}
+            }
+            """.trimIndent()
+        )
+
+        Assert.assertTrue("Extension test method should have a gutter icon", myFixture.findGuttersAtCaret().isNotEmpty())
+
+        val element = file.findElementAt(myFixture.caretOffset)!!
+        val location = PsiLocation(element)
+        val context = ConfigurationContext.createEmptyContextForLocation(location)
+        val contexts = context.configurationsFromContext
+
+        Assert.assertEquals(1, contexts?.size ?: 0)
+        val fromContext = contexts?.get(0)
+        Assert.assertTrue(fromContext?.configuration is JUnitConfiguration)
+        val configuration = fromContext?.configuration as JUnitConfiguration
+
+        Assert.assertEquals("MyTest.extensionTest", configuration.name)
+        Assert.assertEquals(JUnitConfiguration.TEST_METHOD, configuration.persistentData.TEST_OBJECT)
+        Assert.assertNotNull(JunitKotlinTestFrameworkProvider.getInstance().getJavaTestEntity(element, checkMethod = true))
+    }
+
     fun testMethodWithInnerTestAnnotationAndBeforeEach() {
         val file = myFixture.configureByText(
             "MyTest.kt", """

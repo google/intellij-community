@@ -1,20 +1,7 @@
-/*
- * Copyright 2000-2018 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python;
 
+import com.intellij.idea.TestFor;
 import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.TextRange;
@@ -324,7 +311,7 @@ public class PyTypingTest extends PyTestCase {
   }
 
   public void testFlattenUnions() {
-    doTest("int | str | list",
+    doTest("int | str | list[Any]",
            """
              from typing import Union
              
@@ -479,8 +466,40 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-37515
   public void testNoStringLiteralInjectionUnderCall() {
-    doTestNoInjectedText("class Model:\n" +
-                         "    field: call('<caret>List[str]')");
+    doTestNoInjectedText("x: call('<caret>List[str]')");
+  }
+
+  @TestFor(issues="PY-82245")
+  public void testStringLiteralInjectionUnderCallWithNestedTypeForm() {
+    doTestInjectedText("x: call(set['<caret>str'])");
+  }
+
+  @TestFor(issues="PY-88670")
+  public void testStringLiteralInjectionBaseClasses() {
+    doTestInjectedText("class A(set['<caret>int']): pass");
+  }
+
+  @TestFor(issues="PY-82245")
+  public void testStringLiteralInjectionNestedSubscriptionBaseClass() {
+    doTestInjectedText("class A(set[set['<caret>int']]): pass");
+  }
+
+  @TestFor(issues="PY-88670")
+  public void testNoStringLiteralInjectionForNonTypeBaseClass() {
+    doTestNoInjectedText("class A(namedtuple('Model', '<caret>int')): pass");
+  }
+
+  @TestFor(issues="PY-88670")
+  public void testNoStringLiteralInjectionForNonGenericMetaclass() {
+    doTestNoInjectedText(
+      """
+        class M(type):
+            def __getitem__(self, item): ...
+        
+        class A(metaclass=M): pass
+        
+        print(A["<caret>foo"])
+        """);
   }
 
   // PY-15810
@@ -676,7 +695,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-18254
   public void testFunctionTypeComment() {
-    doTest("(x: int, *args: float, **kwargs: str) -> list[bool]",
+    doTest("(x: int, *args: float | int, **kwargs: str) -> list[bool]",
            """
              from typing import List
              
@@ -1123,7 +1142,7 @@ public class PyTypingTest extends PyTestCase {
   }
 
   public void testGenericInheritedSpecificAndGenericParameters() {
-    doTest("C[float]",
+    doTest("C[float | int]",
            """
              from typing import TypeVar, Generic, Tuple, Iterator, Iterable
              
@@ -1152,7 +1171,7 @@ public class PyTypingTest extends PyTestCase {
   }
 
   public void testCoroutineReturnsGenerator() {
-    doTest("Coroutine[Any, Any, Generator[int, Any, Any]]",
+    doTest("CoroutineType[Any, Any, Generator[int, Any, Any]]",
            """
              from typing import Generator
              
@@ -1200,7 +1219,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-27627
   public void testMultiTypeExplicitlyParametrizedGenericClassInstance() {
-    doTest("float",
+    doTest("float | int",
            """
              from typing import TypeVar, Generic
              
@@ -1845,14 +1864,24 @@ public class PyTypingTest extends PyTestCase {
                        "Callable[..., int]");
   }
 
-  // PY-42334
-  public void testExplicitTypeAliasItselfHasAnyType() {
-    doTest("Any",
+  // PY-42334 PY-89068
+  public void testExplicitTypeAliasType() {
+    doTest("type[int]",
            """
              from typing import TypeAlias
              
              expr: TypeAlias = int
              """);
+  }
+
+  // PY-89068
+  public void testImportedGenericExplicitTypeAliasType() {
+    doMultiFileStubAwareTest("type[list[int]]",
+                             """
+                               from m import MyList
+
+                               expr = MyList[int]
+                               """);
   }
 
   // PY-29257
@@ -1957,32 +1986,39 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-44974
   public void testBitwiseOrUnionIsInstance() {
-    doTest("str | dict | int",
+    doTest("B",
            """
-             a = [42]
-             if isinstance(a, str | dict | int):
+             class A: pass
+             class B(A): pass
+             a = A()
+             if isinstance(a, str | dict | B):
                  expr = a""");
   }
 
   // PY-44974
   public void testBitwiseOrUnionIsSubclass() {
-    doTest("type[str | dict | int]",
+    doTest("type[B]",
            """
-             a = list
-             if issubclass(a, str | dict | int):
+             class A: pass
+             class B(A): pass
+             a = A
+             if issubclass(a, str | dict | B):
                  expr = a""");
   }
 
   // PY-79861
   public void testWalrusIsSubclass() {
-    doTest("type[str | dict | int]",
+    doTest("type[B]",
            """
-             if issubclass(a := list, str | dict | int):
+             class A: pass
+             class B(A): pass
+             if issubclass(a := A, str | dict | B):
                  expr = a""");
   }
 
   // PY-79861
   public void testWalrusCallable() {
+    // TODO
     // should actually be `(...) -> object` ... should actually be `Literal[42] & (...) -> object ... should actually be `Never`
     //  but we don't support this case yet
     doTest("int",
@@ -1993,47 +2029,42 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-44974
   public void testBitwiseOrUnionIsInstanceIntNone() {
-    doTest("int | None",
+    doTest("B",
            """
-             a = [42]
-             if isinstance(a, int | None):
-                 expr = a""");
-  }
-
-  // PY-44974
-  public void testBitwiseOrUnionIsInstanceNoneInt() {
-    doTest("int | None",
-           """
-             a = [42]
-             if isinstance(a, None | int):
+             class A: pass
+             class B(A): pass
+             a = A()
+             if isinstance(a, B | None):
                  expr = a""");
   }
 
   // PY-79861
   public void testWalrusIsInstance() {
-    doTest("int",
+    doTest("B",
            """
-             if isinstance((a := [42]), int):
+             class A: pass
+             class B(A): pass
+             if isinstance((a := A()), B):
                  expr = a""");
   }
 
   // PY-44974
   public void testBitwiseOrUnionIsInstanceUnionInTuple() {
-    doTest("str | list | dict | bool | None",
+    doTest("Literal[42]",
            """
              from typing import Literal
              a: Literal[42] = 42
-             if isinstance(a, (str, (list | dict), bool | None)):
+             if isinstance(a, (str, (list | dict), int | None)):
                  expr = a""");
   }
 
   // PY-44974
   public void testBitwiseOrUnionOfUnionsIsInstance() {
-    doTest("dict | str | bool | list",
+    doTest("Literal[42]",
            """
              from typing import Union, Literal
              a: Literal[42] = 42
-             if isinstance(a, Union[dict, Union[str, Union[bool, list]]]):
+             if isinstance(a, Union[dict, Union[str, Union[int, list]]]):
                  expr = a""");
   }
 
@@ -2068,7 +2099,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-44974
   public void testBitwiseOrUnionParenthesizedUnionOfUnions() {
-    doTest("int | list | dict | float | str",
+    doTest("int | list[Any] | dict[Any, Any] | float | str",
            """
              bar: int | ((list | dict) | (float | str)) = ""
              expr = bar
@@ -2235,7 +2266,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testGenericVariadicByCallablePrefixSuffix() {
-    doTest("tuple[str, str, float, int, bool]",
+    doTest("tuple[str, str, float | int, int, bool]",
            """
              from typing import TypeVar, TypeVarTuple, Callable, Tuple
              
@@ -2253,7 +2284,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testGenericVariadicClass() {
-    doTest("A[float, bool, list[str]]",
+    doTest("A[float | int, bool, list[str]]",
            """
              from typing import TypeVarTuple, Generic, Tuple
              
@@ -2272,7 +2303,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testGenericVariadicClassField() {
-    doTest("tuple[int, float, bool, list[str]]",
+    doTest("tuple[int, float | int, bool, list[str]]",
            """
              from typing import TypeVarTuple, Generic, Tuple
              
@@ -2292,7 +2323,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testGenericVariadicClassMethod() {
-    doTest("tuple[int, bool, float, str]",
+    doTest("tuple[int, bool, float | int, str]",
            """
              from typing import TypeVarTuple, Generic, Tuple
              
@@ -2567,7 +2598,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testGenericVariadicAndGenericTypeAlias() {
-    doTest("tuple[int, str, bool, float]",
+    doTest("tuple[int, str, bool, float | int]",
            """
              from typing import Tuple, TypeVarTuple, TypeVar
              
@@ -2651,7 +2682,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testGenericVariadicsTupleUnpacking() {
-    doTest("tuple[int, str, bool, float]",
+    doTest("tuple[int, str, bool, float | int]",
            """
              from typing import Tuple, TypeVarTuple, TypeVar
              Ts = TypeVarTuple('Ts')
@@ -2686,7 +2717,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testVariadicGenericMatchWithHomogeneousGenericVariadicAndOtherTypesPrefixSuffix() {
-    doTest("Array[*tuple[Any, ...], int, float, str]", """
+    doTest("Array[*tuple[Any, ...], int, float | int, str]", """
       from __future__ import annotations
       
       from typing import TypeVarTuple
@@ -2712,7 +2743,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testVariadicGenericMatchWithHomogeneousGenericVariadicAmbiguousMatchActualGenericFirst() {
-    doTest("Array[*tuple[float, ...], int, float, str]", """
+    doTest("Array[*tuple[float | int, ...], int, float | int, str]", """
       from __future__ import annotations
       
       from typing import TypeVarTuple
@@ -2764,7 +2795,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testGenericVariadicsNotUnifiedBothActualHomogeneousGenericFirst() {
-    doTest("Array[float, *tuple[float, ...]]", """
+    doTest("Array[float | int, *tuple[float | int, ...]]", """
       from __future__ import annotations
       
       from typing import TypeVarTuple
@@ -2789,7 +2820,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testGenericVariadicsNotUnifiedBothActualHomogeneousGenericLast() {
-    doTest("Array[*tuple[float, ...], float]", """
+    doTest("Array[*tuple[float | int, ...], float | int]", """
       from __future__ import annotations
       
       from typing import TypeVarTuple
@@ -2814,7 +2845,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testGenericVariadicsNotUnifiedBothActualHomogeneousGenericsBothSides() {
-    doTest("Array[float, *tuple[float, ...], float, float]", """
+    doTest("Array[float | int, *tuple[float | int, ...], float | int, float | int]", """
       from __future__ import annotations
       
       from typing import TypeVarTuple
@@ -2869,7 +2900,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testGenericVariadicsNotUnifiedBothExpectedExpand() {
-    doTest("Array[float, *Shape, list[str]]", """
+    doTest("Array[float | int, *Shape, list[str]]", """
       from __future__ import annotations
       
       from typing import TypeVarTuple
@@ -3296,7 +3327,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testGenericVariadicMethodCallUnification() {
-    doTest("tuple[int, str, float]", """
+    doTest("tuple[int, str, float | int]", """
       from typing import Generic, TypeVarTuple, Tuple
       
       Ts = TypeVarTuple("Ts")
@@ -3504,7 +3535,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testGenericVariadicClassSpecializesInheritedParameterAndAddsNewOne() {
-    doTest("StrBoxWithExtra[int, str, float]",
+    doTest("StrBoxWithExtra[int, str, float | int]",
            """
              from typing import Generic, TypeVarTuple, Tuple
              
@@ -3596,7 +3627,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testWeakUnionTypeOfOfGenericVariadicMethodCallReceiver() {
-    doTest("tuple[str, int, float]",
+    doTest("tuple[str, int, float | int]",
            """
              from typing import Any, Generic, TypeVarTuple, Tuple
              
@@ -3679,7 +3710,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testGenericVariadicClassTypeHintedInDocstrings() {
-    doTest("tuple[int, str, float]",
+    doTest("tuple[int, str, float | int]",
            """
              from typing import Generic, TypeVar, TypeVarTuple, Tuple
              
@@ -3720,7 +3751,7 @@ public class PyTypingTest extends PyTestCase {
   }
 
   public void testDefaultDictFromDict() {
-    doTest("defaultdict[Any, dict[_KT, Any]]",
+    doTest("defaultdict[Any, dict[Any, Any]]",
            "from collections import defaultdict\n" +
            "expr = defaultdict(dict)");
   }
@@ -3747,7 +3778,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testGenericVariadicDecoratorWithArgumentCalledAsFunction() {
-    doTest("(str, int) -> tuple[int, str, float]",
+    doTest("(str, int) -> tuple[int, str, float | int]",
            """
              from typing import Callable, TypeVar, TypeVarTuple, Tuple
              
@@ -3790,7 +3821,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testGenericVariadicParameterOfExpectedCallable() {
-    doTest("tuple[int, str, float]",
+    doTest("tuple[int, str, float | int]",
            """
              from typing import Callable, Generic, TypeVar, TypeVarTuple, Tuple
              
@@ -3835,7 +3866,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-53105
   public void testGenericVariadicIteratorParameterizedWithAnotherGenericVariadic() {
-    doTest("Entry[str, int, float]",
+    doTest("Entry[str, int, float | int]",
            """
              from typing import Iterator, Generic, Tuple, TypeVarTuple
              
@@ -3912,6 +3943,28 @@ public class PyTypingTest extends PyTestCase {
                      pass
              
              class Pair(Box[T2], Generic[T1, T2]):
+                 pass
+             
+             xs: Pair[int, str] = ...
+             expr = xs.get()
+             """);
+  }
+
+
+  // PY-76902
+  public void testClassInheritsProtocolToOrderTypeParameters() {
+    doTest("str",
+           """
+             from typing import Protocol, TypeVar
+             
+             T1 = TypeVar('T1')
+             T2 = TypeVar('T2')
+             
+             class Box(Protocol[T1]):
+                 def get(self) -> T1:
+                     pass
+             
+             class Pair(Box[T2], Protocol[T1, T2]):
                  pass
              
              xs: Pair[int, str] = ...
@@ -4173,7 +4226,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-61883
   public void testMultiTypeExplicitlyParametrizedGenericClassInstanceWithPEP695Syntax() {
-    doTest("float",
+    doTest("float | int",
            """
              class FirstType[T]: pass
              class SecondType[V]: pass
@@ -4399,7 +4452,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-61883
   public void testGenericVariadicByCallablePrefixSuffixWithPEP695Syntax() {
-    doTest("tuple[str, str, float, int, bool]",
+    doTest("tuple[str, str, float | int, int, bool]",
            """
              from typing import Callable, Tuple
              
@@ -4413,7 +4466,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-61883
   public void testGenericVariadicClassWithPEP695Syntax() {
-    doTest("A[float, bool, list[str]]",
+    doTest("A[float | int, bool, list[str]]",
            """
              from typing import Generic, Tuple
              
@@ -4428,7 +4481,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-61883
   public void testGenericVariadicClassFieldWithPEP695Syntax() {
-    doTest("tuple[int, float, bool, list[str]]",
+    doTest("tuple[int, float | int, bool, list[str]]",
            """
              from typing import Tuple
              
@@ -4734,7 +4787,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testTypeVarDefaultsClassCallFullyParameterized() {
-    doTest("slice[str, bool, complex]", """
+    doTest("slice[str, bool, complex | float | int]", """
       from typing import TypeVar, Generic
       StartT = TypeVar("StartT", default=int)
       StopT = TypeVar("StopT", default=StartT)
@@ -4746,7 +4799,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testTypeVarDefaultsClassCallFullyParameterizedNewSyntax() {
-    doTest("slice[str, bool, complex]", """
+    doTest("slice[str, bool, complex | float | int]", """
       class slice[StartT = int, StopT = StartT, StepT = int | None]: ...
       expr = slice[str, bool, complex]()
       """);
@@ -4924,7 +4977,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testTypeVarTupleWithDefaultOverridenByExplicit() {
-    doTest("Foo[bool, float]", """
+    doTest("Foo[bool, float | int]", """
       from typing import Generic, TypeVarTuple, Unpack
       DefaultTs = TypeVarTuple("DefaultTs", default=Unpack[tuple[str, int]])
       class Foo(Generic[*DefaultTs]): ...
@@ -4934,7 +4987,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testTypeVarTupleWithDefaultParameterizedWithAnotherGeneric() {
-    doTest("Foo[list, list, int]", """
+    doTest("Foo[list[Any], list[Any], int]", """
       from typing import Generic, TypeVarTuple, Unpack, TypeVar
       T = TypeVar("T", default=list)
       DefaultTs = TypeVarTuple("DefaultTs", default=Unpack[tuple[T, int]])
@@ -5060,7 +5113,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testParamSpecWithDefaultsExtendedCase() {
-    doTest("(float, bool) -> int | None", """
+    doTest("(float | int, bool) -> int | None", """
       from typing import Callable, TypeVar, Optional, ParamSpec
       T = TypeVar('T', default=int)
       P = ParamSpec('P', default=[float, bool])
@@ -5086,7 +5139,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testParamSpecWithDefaultsExtendedCaseDefaultsOverridden() {
-    doTest("(a: str, b: int, c: list[float]) -> float | None", """
+    doTest("(a: str, b: int, c: list[float | int]) -> float | int | None", """
       from typing import Callable, TypeVar, Optional
       from typing_extensions import ParamSpec  # or `typing` for `python>=3.10`
       T = TypeVar('T', default=int)
@@ -5162,7 +5215,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testMixedTypeVarsWithDefaultsAndNonDefaults() {
-    doTest("AllTheDefaults[int, complex, str, int, bool]", """
+    doTest("AllTheDefaults[int, complex | float | int, str, int, bool]", """
       from typing import TypeVar, Generic
       T1 = TypeVar("T1")
       T2 = TypeVar("T2")
@@ -5176,7 +5229,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testMixedTypeVarsWithDefaultsAndNonDefaultsReferenceType() {
-    doTest("type[AllTheDefaults[int, complex, str, int, bool]]", """
+    doTest("type[AllTheDefaults[int, complex | float | int, str, int, bool]]", """
       from typing import TypeVar, Generic
       T1 = TypeVar("T1")
       T2 = TypeVar("T2")
@@ -5239,7 +5292,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testTypeVarDefaultsLongTypeVarToTypeVarChainWithFirstOverriden() {
-    doTest("list", """
+    doTest("list[Any]", """
       from typing import TypeVar, Generic
       
       T = TypeVar("T", default=str)
@@ -5281,7 +5334,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testTypeVarDefaultsLongTypeVarToTypeVarChainWithMultipleDefaults() {
-    doTest("str | bool | float", """
+    doTest("str | bool | float | int", """
       from typing import TypeVar, Generic
       
       T = TypeVar("T", default=str)
@@ -5384,7 +5437,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testNewStyleTypeAliasWithDefaultsUnionOverriden() {
-    doTest("bool | float", """
+    doTest("bool | float | int", """
       type Alias[T = int, U = str] = T | U
       expr: Alias[bool, float]
       """);
@@ -5400,7 +5453,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testNewStyleTypeAliasUnionChangedOrderDefaultsOverriden() {
-    doTest("bool | list[float]", """
+    doTest("bool | list[float | int]", """
       type Alias[T = int, U = str] = U | list[T]
       expr: Alias[float, bool]
       """);
@@ -5408,7 +5461,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testTypeAliasOneWithoutDefault() {
-    doTest("dict[Any, str] | list[float]", """
+    doTest("dict[Any, str] | list[float | int]", """
       from typing import TypeVar, TypeAlias
       T = TypeVar("T")
       U = TypeVar("U", default=str)
@@ -5420,7 +5473,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testNewStyleTypeAliasOneWithoutDefault() {
-    doTest("dict[Any, str] | list[float]", """
+    doTest("dict[Any, str] | list[float | int]", """
       type Alias[T, U = str, B = float] = dict[T, U] | list[B]
       expr: Alias
       """);
@@ -5428,7 +5481,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testNewStyleTypeAliasOneWithoutDefaultParameterized() {
-    doTest("dict[int, str] | list[float] | int", """
+    doTest("dict[int, str] | list[float | int] | int", """
       type Alias[T, U = str, B = float] = dict[T, U] | list[B] | T
       expr: Alias[int]
       """);
@@ -5482,7 +5535,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testNewStyleTypeAliasWithAllDefaultTypes() {
-    doTest("(str, int, str, str) -> float", """
+    doTest("(str, int, str, str) -> float | int", """
       from typing import Generic, TypeVarTuple, Unpack, ParamSpec, Callable, Any, Concatenate
       type ReturnTupleAlias[T = float, **P = [str, str], *Ts = Unpack[tuple[str, int]]] = Callable[Concatenate[*Ts, P], T]
       def f() -> ReturnTupleAlias: ...
@@ -5502,7 +5555,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testNewStyleTypeAliasWithAllDefaultTypesReturnAndParamSpecTypeOverriden() {
-    doTest("(str, int, float, float) -> list[str]", """
+    doTest("(str, int, float | int, float | int) -> list[str]", """
       from typing import Generic, TypeVarTuple, Unpack, ParamSpec, Callable, Any, Concatenate
       type ReturnTupleAlias[T = float, **P = [str, str], *Ts = Unpack[tuple[str, int]]] = Callable[Concatenate[*Ts, P], T]
       def f() -> ReturnTupleAlias[list[str], [float, float]]: ...
@@ -5512,7 +5565,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testNewStyleTypeAliasWithAllDefaultTypesAllOverridden() {
-    doTest("(str, float, bool, list[bool], float, float) -> list[str]", """
+    doTest("(str, float | int, bool, list[bool], float | int, float | int) -> list[str]", """
       from typing import Generic, TypeVarTuple, Unpack, ParamSpec, Callable, Any, Concatenate
       type ReturnTupleAlias[T = float, **P = [str, str], *Ts = Unpack[tuple[str, int]]] = Callable[Concatenate[*Ts, P], T]
       def f() -> ReturnTupleAlias[list[str], [float, float], str, float, bool, list[bool]]: ...
@@ -5590,7 +5643,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testTypeAliasWithDefaultsDictTwoDefaultsOverriden() {
-    doTest("dict[str, float]", """
+    doTest("dict[str, float | int]", """
       from typing import Generic, TypeAlias, TypeVar
       T = TypeVar('T', default=int)
       U = TypeVar('U', default=str)
@@ -5601,7 +5654,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testTypeAliasWithAllDefaultTypes() {
-    doTest("(str, int, str, str) -> float", """
+    doTest("(str, int, str, str) -> float | int", """
       from typing import Generic, TypeVarTuple, Unpack, ParamSpec, Callable, Any, Concatenate, TypeAlias, TypeVar
       T = TypeVar('T', default = float)
       P = ParamSpec('P', default=[str ,str])
@@ -5726,7 +5779,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testNewStyleTypeAliasWithAssignedSubscriptionExpressionAliasingUnion() {
-    doTest("bool | list[float]", """
+    doTest("bool | list[float | int]", """
       type Alias[T = int, U = str] = U | list[T]
       type Alias2 = Alias[float, bool]
       expr: Alias2
@@ -5735,7 +5788,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testOldStyleTypeAliasWithAssignedSubscriptionExpressionAliasingUnion() {
-    doTest("float | list[bool]", """
+    doTest("float | int | list[bool]", """
       from typing import TypeVar, Generic, TypeAlias
       T = TypeVar("T", default=int)
       U = TypeVar("U", default=str)
@@ -5793,7 +5846,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-71002
   public void testParamSpecDefaultTypeRefersToAnotherParamSpecWithEllipsis() {
-    doTest("Clazz[Any, [float], [float]]", """
+    doTest("Clazz[Any, [float | int], [float | int]]", """
       class Clazz[**P1, **P2 = P1, **P3 = P2]: ...
       expr = Clazz[..., [float]]()
       """);
@@ -6171,6 +6224,19 @@ public class PyTypingTest extends PyTestCase {
       """);
   }
 
+  @TestFor(issues="PY-57621")
+  public void testEnumTuple() {
+    doTest("tuple[int, str]", """
+      from enum import Enum
+      
+      class Color(Enum):
+        RED = 1, "red"
+        BLUE = 2, "blue"
+      
+      expr = Color.BLUE.value
+      """);
+  }
+
   // PY-76149
   public void testDataclassTransformConstructorSignatureWithFieldsAnnotatedWithDescriptor() {
     doTestExpressionUnderCaret("(id: int, name: str) -> MyClass", """
@@ -6251,6 +6317,15 @@ public class PyTypingTest extends PyTestCase {
       """);
   }
 
+  // PY-88828
+  public void testDataclassTransformConstructorSignatureDecoratorWithMarkedOverloadsNotImplementation() {
+    doMultiFileExpressionUnderCaretTest("(*, name: str) -> Document", """
+      from mod import Document
+      
+      Doc<caret>ument(name="foo")
+      """);
+  }
+
   public void testTypeAliasToAny() {
     doTest("int | Any", """
       from typing import Any, TypeAlias
@@ -6271,7 +6346,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-36416
   public void testReturnTypeOfNonAnnotatedAsyncOverride() {
-    doTest("Coroutine[Any, Any, str]", """
+    doTest("CoroutineType[Any, Any, str]", """
       class Base:
           async def get(self) -> str:
               ...
@@ -6418,7 +6493,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-77601
   public void testParamSpecNotMappedToSingleTypeWithoutSquareBrackets() {
-    doTest("Any", """
+    doTest("(**P) -> int", """
       from typing import ParamSpec, Callable, Generic, TypeVar
       
       P = ParamSpec("P")
@@ -6592,7 +6667,7 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-76908
   public void testSequenceDeepUnpackedTuple() {
-    doTest("Sequence[int | complex | str]",
+    doTest("Sequence[int | complex | float | str]",
            """
              from typing import Sequence, TypeVar
              T = TypeVar("T")
@@ -6857,16 +6932,31 @@ public class PyTypingTest extends PyTestCase {
 
   // PY-85027
   public void testImportedBoundMethodDecoratedWithParamSpec() {
-    doMultiFileStubAwareTest("(x: float, y: float) -> float", """
+    doMultiFileStubAwareTest("(x: float | int, y: float | int) -> float | int", """
       from mod import NonWorkingClass
       
       expr = NonWorkingClass().add_two
       """);
   }
 
+  @TestFor(issues = "PY-89012")
+  public void testPydanticFieldInsideAnnotatedConstructorSignature() {
+    myFixture.copyDirectoryToProject("stubs/pydantic", "pydantic");
+    doTestExpressionUnderCaret("(*, A: str | None, B: str | None) -> MyModel", """
+          from typing import Annotated
+          from pydantic import BaseModel, Field
+
+          class MyModel(BaseModel):
+              a: str | None = Field(default=None, alias="A")
+              b: Annotated[str | None, Field(default=None, alias="B")]
+
+          MyMo<caret>del()
+          """);
+  }
+
   // PY-85027
   public void testBoundMethodDecoratedWithParamSpec() {
-    doTest("(x: float, y: float) -> float", """
+    doTest("(x: float | int, y: float | int) -> float | int", """
       from typing import Callable
       
       def outer_decorator[**P, T](f: Callable[P, T]) -> Callable[P, T]:
@@ -6940,6 +7030,95 @@ public class PyTypingTest extends PyTestCase {
       """);
   }
 
+  public void testSimpleUnknown() {
+    withNewAnyTypeEnabled(() -> {
+      doTest("Unknown", "expr = asdf");
+    });
+  }
+
+  public void testPlainAny() {
+    withNewAnyTypeEnabled(() -> {
+      doTest("Any", """
+        from typing import Any
+        
+        expr: Any
+        """);
+    });
+  }
+
+  // TODO: move to PyTypeInferenceCspTest
+  public void testUnconstrainedTypeVarDefaultAny() {
+    withNewAnyTypeEnabled(() -> {
+      doTest("Any", """
+        from typing import Any
+        
+        def f[T=Any]() -> T: ...
+        
+        expr = f()
+        """);
+    });
+  }
+
+  // TODO: move to PyTypeInferenceCspTest
+  public void testUnconstrainedTypeVar() {
+    withNewAnyTypeEnabled(() -> {
+      doTest("Unknown", """
+        def f[T]() -> T: ...
+        
+        expr = f()
+        """);
+    });
+  }
+
+  public void testPsiStubbedAny() {
+    withNewAnyTypeEnabled(() -> {
+      runWithAdditionalFileInLibDir("other.py", """
+        from typing import Any
+        
+        x: Any
+        """, x -> {
+        myFixture.configureByText(PythonFileType.INSTANCE, """
+          from other import x
+          
+          expr = x
+          """);
+        final PyExpression expr = myFixture.findElementByText("expr", PyExpression.class);
+        final TypeEvalContext codeAnalysis = TypeEvalContext.codeAnalysis(expr.getProject(), expr.getContainingFile());
+        assertType("Failed in code analysis context", "Any", expr, codeAnalysis);
+      });
+    });
+  }
+
+  public void testPsiStubbedUnknown() {
+    withNewAnyTypeEnabled(() -> {
+      runWithAdditionalFileInLibDir("other.py", """
+        x = asdf
+        """, x -> {
+        myFixture.configureByText(PythonFileType.INSTANCE, """
+          from other import x
+          
+          expr = x
+          """);
+        final PyExpression expr = myFixture.findElementByText("expr", PyExpression.class);
+        final TypeEvalContext codeAnalysis = TypeEvalContext.codeAnalysis(expr.getProject(), expr.getContainingFile());
+        assertType("Failed in code analysis context", "Unknown", expr, codeAnalysis);
+      });
+    });
+  }
+
+  @TestFor(issues = "PY-84430")
+  public void testQuotedAny() {
+    fixme("quoted Any", AssertionError.class, "Failed in code analysis context expected:<[Any]> but was:<[Literal[0]]>", () ->
+    doTest("Any", """
+      from typing import Any
+      
+      any: "Any" = 1
+      
+      expr = any.imag
+      """)
+    );
+  }
+
   private void doTestNoInjectedText(@NotNull String text) {
     myFixture.configureByText(PythonFileType.INSTANCE, text);
     final InjectedLanguageManager languageManager = InjectedLanguageManager.getInstance(myFixture.getProject());
@@ -6947,7 +7126,11 @@ public class PyTypingTest extends PyTestCase {
     assertNull(host);
   }
 
-  private void doTestInjectedText(@NotNull String text, @NotNull String expected) {
+  private void doTestInjectedText(@NotNull String text) {
+    doTestInjectedText(text, null);
+  }
+
+  private void doTestInjectedText(@NotNull String text, String expected) {
     myFixture.configureByText(PythonFileType.INSTANCE, text);
     final InjectedLanguageManager languageManager = InjectedLanguageManager.getInstance(myFixture.getProject());
     final PsiLanguageInjectionHost host = languageManager.getInjectionHost(getElementAtCaret());
@@ -6956,7 +7139,9 @@ public class PyTypingTest extends PyTestCase {
     assertNotNull(files);
     assertFalse(files.isEmpty());
     final PsiElement injected = files.get(0).getFirst();
-    assertEquals(expected, injected.getText());
+    if (expected != null) {
+      assertEquals(expected, injected.getText());
+    }
     assertFalse(PsiTreeUtil.hasErrorElements(injected));
   }
 
@@ -6988,6 +7173,19 @@ public class PyTypingTest extends PyTestCase {
     assertProjectFilesNotParsed(expr.getContainingFile());
 
     final TypeEvalContext userInitiated = TypeEvalContext.userInitiated(expr.getProject(), expr.getContainingFile()).withTracing();
+    assertType("Failed in user initiated context", expectedType, expr, userInitiated);
+  }
+
+  private void doMultiFileExpressionUnderCaretTest(@NotNull String expectedType, @NotNull String text) {
+    myFixture.copyDirectoryToProject("types/" + getTestName(false), "");
+    myFixture.configureByText(PythonFileType.INSTANCE, text);
+    PyExpression expr = PsiTreeUtil.getParentOfType(myFixture.getFile().findElementAt(myFixture.getCaretOffset()), PyExpression.class);
+
+    TypeEvalContext codeAnalysis = TypeEvalContext.codeAnalysis(expr.getProject(), expr.getContainingFile());
+    assertType("Failed in code analysis context", expectedType, expr, codeAnalysis);
+    assertProjectFilesNotParsed(expr.getContainingFile());
+
+    TypeEvalContext userInitiated = TypeEvalContext.userInitiated(expr.getProject(), expr.getContainingFile()).withTracing();
     assertType("Failed in user initiated context", expectedType, expr, userInitiated);
   }
 }

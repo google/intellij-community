@@ -126,6 +126,9 @@ public class CustomResourceBundleTest extends BasePlatformTestCase {
     final PsiDirectory newDir = PsiManager.getInstance(getProject()).findDirectory(
       myFixture.getTempDirFixture().findOrCreateDir("new-resources-dir"));
     new MoveFilesOrDirectoriesProcessor(getProject(), new PsiElement[] {file2.getContainingFile()}, newDir, false, false, null, null).run();
+
+    assertTrue(file3.getContainingFile().isValid()); //TODO make sure file3 is re-validated before removing, see IJPL-241524
+
     ApplicationManager.getApplication().runWriteAction(() -> file3.getContainingFile().delete());
 
 

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.syntax.util.parser
 
 import com.intellij.platform.syntax.CancellationProvider
@@ -9,10 +9,8 @@ import com.intellij.platform.syntax.lexer.TokenList
 import com.intellij.platform.syntax.parser.SyntaxTreeBuilder
 import com.intellij.platform.syntax.parser.WhitespacesBinders
 import com.intellij.util.text.CharSequenceSubSequence
-import org.jetbrains.annotations.ApiStatus
 import kotlin.jvm.JvmStatic
 
-@ApiStatus.Experimental
 object SyntaxBuilderUtil {
   /**
    * Advances lexer by given number of tokens (but not beyond the end of token stream).
@@ -83,8 +81,12 @@ object SyntaxBuilderUtil {
   }
 
   /**
-   * tries to parse a code block with corresponding left and right braces.
-   * @return collapsed marker of the block or `null` if there is no code block at all.
+   * Builds a shallow marker which starts with [leftBrace] and ends with [rightBrace].
+   *
+   * If [leftBrace] is missing, returns `null`.
+   * If [rightBrace] is missing, consumes everything until EOF.
+   *
+   * @return collapsed marker of the block or `null` if [leftBrace] is missing.
    */
   @JvmStatic
   fun SyntaxTreeBuilder.parseBlockLazy(
@@ -121,20 +123,19 @@ object SyntaxBuilderUtil {
   }
 
   /**
-   * Checks if [text] looks like a proper block.
-   * In particular, it
-   * (1) checks brace balance
-   * (2) verifies that the block's closing brace is the last token
+   * Checks if [text] looks like a balanced block:
+   * starts with [leftBrace], ends with [rightBrace] as the last token,
+   * and brace balance is maintained throughout.
    *
    * @param text - text to check
    * @param lexer - lexer to use
    * @param leftBrace - left brace element type
    * @param rightBrace - right brace element type
    * @param cancellationProvider - a hook to stop operation if it's not necessary anymore
-   * @return true if `text` passes the checks
+   * @return true if [text] forms a balanced block
    */
   @JvmStatic
-  fun hasProperBraceBalance(
+  fun isBalancedBlock(
     text: CharSequence,
     lexer: Lexer,
     leftBrace: SyntaxElementType,
@@ -147,24 +148,20 @@ object SyntaxBuilderUtil {
       rightBrace = rightBrace,
       cancellationProvider = cancellationProvider,
       advance = lexer::advance,
-      curType = lexer::getTokenType
+      curType = lexer::getTokenType,
+      requireOuterBraces = true,
     )
   }
 
   /**
-   * Checks if [tokenList] looks like a proper block.
-   * In particular, it
-   * (1) checks brace balance
-   * (2) verifies that the block's closing brace is the last token
+   * Checks that [leftBrace]/[rightBrace] are balanced inside the [tokenList]:
+   * equal count and balance never goes negative.
    *
-   * @param tokenList - tokens to check
-   * @param leftBrace - left brace element type
-   * @param rightBrace - right brace element type
-   * @param cancellationProvider - a hook to stop operation if it's not necessary anymore
-   * @return true if `text` passes the checks
+   * Unlike [isBalancedBlock], this does **not** require the first/last token
+   * to be the brace pair — it only checks internal balance.
    */
   @JvmStatic
-  fun hasProperBraceBalance(
+  fun areBracesBalancedInside(
     tokenList: TokenList,
     leftBrace: SyntaxElementType,
     rightBrace: SyntaxElementType,
@@ -176,9 +173,68 @@ object SyntaxBuilderUtil {
       rightBrace = rightBrace,
       cancellationProvider = cancellationProvider,
       advance = { i++ },
-      curType = { tokenList.getTokenType(i) }
+      curType = { tokenList.getTokenType(i) },
+      requireOuterBraces = false,
     )
   }
+
+  /**
+   * Checks if [tokenList] looks like a balanced block:
+   * starts with [leftBrace], ends with [rightBrace] as the last token,
+   * and brace balance is maintained throughout.
+   *
+   * @param tokenList - tokens to check
+   * @param leftBrace - left brace element type
+   * @param rightBrace - right brace element type
+   * @param cancellationProvider - a hook to stop operation if it's not necessary anymore
+   * @return true if [tokenList] forms a balanced block
+   */
+  @JvmStatic
+  fun isBalancedBlock(
+    tokenList: TokenList,
+    leftBrace: SyntaxElementType,
+    rightBrace: SyntaxElementType,
+    cancellationProvider: CancellationProvider?,
+  ): Boolean {
+    var i = 0
+    return checkBraceBalance(
+      leftBrace = leftBrace,
+      rightBrace = rightBrace,
+      cancellationProvider = cancellationProvider,
+      advance = { i++ },
+      curType = { tokenList.getTokenType(i) },
+      requireOuterBraces = true,
+    )
+  }
+
+  // region deprecated
+
+  @Deprecated(
+    "Use isBalancedBlock instead",
+    ReplaceWith("isBalancedBlock(text, lexer, leftBrace, rightBrace, cancellationProvider)"),
+  )
+  @JvmStatic
+  fun hasProperBraceBalance(
+    text: CharSequence,
+    lexer: Lexer,
+    leftBrace: SyntaxElementType,
+    rightBrace: SyntaxElementType,
+    cancellationProvider: CancellationProvider?,
+  ): Boolean = isBalancedBlock(text, lexer, leftBrace, rightBrace, cancellationProvider)
+
+  @Deprecated(
+    "Use isBalancedBlock instead",
+    ReplaceWith("isBalancedBlock(tokenList, leftBrace, rightBrace, cancellationProvider)"),
+  )
+  @JvmStatic
+  fun hasProperBraceBalance(
+    tokenList: TokenList,
+    leftBrace: SyntaxElementType,
+    rightBrace: SyntaxElementType,
+    cancellationProvider: CancellationProvider?,
+  ): Boolean = isBalancedBlock(tokenList, leftBrace, rightBrace, cancellationProvider)
+
+  // endregion
 
   private inline fun checkBraceBalance(
     leftBrace: SyntaxElementType,
@@ -186,24 +242,28 @@ object SyntaxBuilderUtil {
     cancellationProvider: CancellationProvider?,
     advance: () -> Unit,
     curType: () -> SyntaxElementType?,
+    requireOuterBraces: Boolean,
   ): Boolean {
-    if (curType() !== leftBrace) return false
-    advance()
-
-    var balance = 1
+    var balance: Int
+    if (requireOuterBraces) {
+      if (curType() !== leftBrace) return false
+      advance()
+      balance = 1
+    }
+    else {
+      balance = 0
+    }
 
     while (true) {
       cancellationProvider?.checkCancelled()
       val type = curType()
 
       if (type == null) {
-        //eof: checking balance
         return balance == 0
       }
 
-      if (balance == 0) {
-        //the last brace is not the last token
-        return false
+      if (requireOuterBraces && balance == 0) {
+        return false // the last brace is not the last token
       }
 
       if (type === leftBrace) {
@@ -211,6 +271,9 @@ object SyntaxBuilderUtil {
       }
       else if (type === rightBrace) {
         balance--
+        if (!requireOuterBraces && balance < 0) {
+          return false
+        }
       }
 
       advance()

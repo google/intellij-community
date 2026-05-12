@@ -15,6 +15,7 @@ import com.intellij.openapi.fileChooser.ex.FileChooserDialogImpl;
 import com.intellij.openapi.fileChooser.ex.FileSaverDialogImpl;
 import com.intellij.openapi.fileChooser.ex.FileTextFieldImpl;
 import com.intellij.openapi.fileChooser.ex.LocalFsFinder;
+import com.intellij.openapi.fileChooser.universal.UniversalFileChooser;
 import com.intellij.openapi.options.advanced.AdvancedSettings;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.SystemInfo;
@@ -41,6 +42,7 @@ public class LocalFileChooserFactory implements ClientFileChooserFactory {
     var chooser = createNativePathChooserIfEnabled(descriptor, project, parent);
     return chooser != null ? (FileChooserDialog)chooser :
            useNewChooser(descriptor) ? new NewFileChooserDialogImpl(descriptor, parent, project) :
+           UniversalFileChooser.canUseIn(project) ? UniversalFileChooser.create(project, descriptor) :
            parent != null ? new FileChooserDialogImpl(descriptor, parent, project) :
            new FileChooserDialogImpl(descriptor, project);
   }
@@ -54,6 +56,7 @@ public class LocalFileChooserFactory implements ClientFileChooserFactory {
     var chooser = createNativePathChooserIfEnabled(descriptor, project, parent);
     return chooser != null ? chooser :
            useNewChooser(descriptor) ? new NewFileChooserDialogImpl(descriptor, parent, project) :
+           UniversalFileChooser.canUseIn(project) ? UniversalFileChooser.create(project, descriptor) :
            parent != null ? new FileChooserDialogImpl(descriptor, parent, project) :
            new FileChooserDialogImpl(descriptor, project);
   }

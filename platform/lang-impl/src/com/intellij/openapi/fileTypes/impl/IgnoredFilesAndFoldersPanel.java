@@ -52,9 +52,9 @@ final class IgnoredFilesAndFoldersPanel extends JPanel {
     ToolbarDecorator decorator = ToolbarDecorator.createDecorator(myPatternList)
                                                  .setScrollPaneBorder(JBUI.Borders.empty())
                                                  .setPanelBorder(JBUI.Borders.customLine(JBColor.border(),1,1,0,1))
-                                                 .setAddAction(__ -> addPattern())
-                                                 .setEditAction(__ -> editPattern())
-                                                 .setRemoveAction(__ -> removePattern())
+                                                 .setAddAction(_ -> addPattern())
+                                                 .setEditAction(_ -> editPattern())
+                                                 .setRemoveAction(_ -> removePattern())
                                                  .disableUpDownActions();
     add(decorator.createPanel(), BorderLayout.NORTH);
     JPanel listPanel = new JPanel(new BorderLayout());

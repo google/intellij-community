@@ -10,6 +10,7 @@ import org.jetbrains.kotlin.idea.base.test.InTextDirectivesUtils
 import org.jetbrains.kotlin.idea.base.test.ensureFilesResolved
 import org.jetbrains.kotlin.idea.test.Directives
 import org.jetbrains.kotlin.idea.test.KotlinMultiFileLightCodeInsightFixtureTestCase
+import org.jetbrains.kotlin.idea.test.configureRegistryAndRun
 import org.jetbrains.kotlin.idea.test.kmp.KMPProjectDescriptorTestUtilities
 import org.jetbrains.kotlin.idea.test.kmp.KMPTest
 import org.jetbrains.kotlin.idea.test.withCustomCompilerOptions
@@ -29,7 +30,7 @@ abstract class AbstractHighlightingMetaInfoTest : KotlinMultiFileLightCodeInsigh
         }
 
         if (this is KMPTest) {
-            KMPProjectDescriptorTestUtilities.validateTest(files, testPlatform)
+            runReadAction { KMPProjectDescriptorTestUtilities.validateTest(files, testPlatform) }
         }
 
         val mainFileText = runReadAction { psiFile.text }
@@ -47,12 +48,14 @@ abstract class AbstractHighlightingMetaInfoTest : KotlinMultiFileLightCodeInsigh
 
         runInEdtAndWait {
             withCustomCompilerOptions(psiFile.text, project, module) {
-                val directory = psiFile.parent!!
-                directory.withImplicitPackagePrefix(implicitPackagePrefix) {
-                    if (psiFile is KtFile) {
-                        ensureFilesResolved(psiFile)
+                configureRegistryAndRun(project, psiFile.text) {
+                    val directory = psiFile.parent!!
+                    directory.withImplicitPackagePrefix(implicitPackagePrefix) {
+                        if (psiFile is KtFile) {
+                            ensureFilesResolved(psiFile)
+                        }
+                        checkHighlighting(psiFile, expectedHighlighting, globalDirectives, project)
                     }
-                    checkHighlighting(psiFile, expectedHighlighting, globalDirectives, project)
                 }
             }
         }

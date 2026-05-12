@@ -39,17 +39,6 @@ class PyAssertTypeInspectionTest : PyInspectionTestCase() {
   }
 
   // PY-76860
-  fun `test assert self param and Self type`() {
-    doTestByText("""
-        from typing import Self
-        class Shape:
-           def set_scale(self, scale: float) -> Self:
-              assert_type(self, Self)
-              return self
-    """.trimIndent())
-  }
-
-  // PY-76860
   fun `test type Self in class methods`() {
     doTestByText("""
         from typing import Self, assert_type

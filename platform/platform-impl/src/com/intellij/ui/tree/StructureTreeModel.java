@@ -158,7 +158,7 @@ public class StructureTreeModel<Structure extends AbstractTreeStructure>
                                                                     @NotNull Function<? super Node, ? extends Result> function) {
     Object component = path.getLastPathComponent();
     if (component instanceof Node node) {
-      return onValidThread(__ -> disposed || isNodeRemoved(node) ? null : function.apply(node));
+      return onValidThread(_ -> disposed || isNodeRemoved(node) ? null : function.apply(node));
     }
 
     CompletableFuture<Result> cancelledFuture = new CompletableFuture<>();
@@ -210,13 +210,13 @@ public class StructureTreeModel<Structure extends AbstractTreeStructure>
    * Invalidates all nodes and notifies Swing model that a whole tree hierarchy is changed.
    */
   public final @NotNull CompletableFuture<?> invalidateAsync() {
-    return onValidThread(__ -> invalidateInternal(null, true));
+    return onValidThread(_ -> invalidateInternal(null, true));
   }
 
   @ApiStatus.Internal
   public final @NotNull CompletableFuture<?> invalidateAsync(@NotNull TreeModelUpdateRequest request) {
     var requestHandled = new AtomicBoolean();
-    return onValidThread(__ -> {
+    return onValidThread(_ -> {
       var requestRef = updateRequest.get();
       requestRef.set(request);
       try {

@@ -84,7 +84,7 @@ public class JavaStaticGroup extends XValueGroup implements NodeDescriptorProvid
                 .map(l -> createNodes(l, refType))
                 .toArray(CompletableFuture[]::new);
               CompletableFuture.allOf(futures)
-                .thenAccept(__ -> {
+                .thenAccept(_ -> {
                   StreamEx.of(futures).map(CompletableFuture::join).forEach(c -> node.addChildren(c, false));
                   node.addChildren(XValueChildrenList.EMPTY, true);
                 });

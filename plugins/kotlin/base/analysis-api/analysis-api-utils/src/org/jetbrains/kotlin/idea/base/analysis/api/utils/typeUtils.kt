@@ -4,9 +4,7 @@ package org.jetbrains.kotlin.idea.base.analysis.api.utils
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.components.approximateToDenotableSupertypeOrSelf
-import org.jetbrains.kotlin.analysis.api.components.buildClassType
-import org.jetbrains.kotlin.analysis.api.components.buildStarTypeProjection
-import org.jetbrains.kotlin.analysis.api.components.defaultType
+import org.jetbrains.kotlin.analysis.api.components.defaultTypeWithStarProjections
 import org.jetbrains.kotlin.analysis.api.components.expandedSymbol
 import org.jetbrains.kotlin.analysis.api.components.hasCommonSubtypeWith
 import org.jetbrains.kotlin.analysis.api.components.isNullable
@@ -40,19 +38,12 @@ infix fun KaType.isPossiblySubTypeOf(superType: KaType): Boolean {
 }
 
 context(_: KaSession)
-@OptIn(KaExperimentalApi::class)
 private fun buildClassTypeWithStarProjections(symbol: KaClassSymbol, nullability: Boolean): KaType =
     buildClassTypeWithStarProjections(symbol).withNullability(nullability)
 
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class)
-fun buildClassTypeWithStarProjections(symbol: KaClassLikeSymbol): KaType =
-    buildClassType(symbol) {
-        @OptIn(KaExperimentalApi::class)
-        repeat((symbol.defaultType as? KaClassType)?.qualifiers?.sumOf { it.typeArguments.size } ?: 0) {
-            argument(buildStarTypeProjection())
-        }
-    }
+context(_: KaSession)
+fun buildClassTypeWithStarProjections(symbol: KaClassLikeSymbol): KaType = symbol.defaultTypeWithStarProjections
 
 /**
  * Approximates anonymous object types to their denotable supertypes.
@@ -62,8 +53,8 @@ fun buildClassTypeWithStarProjections(symbol: KaClassLikeSymbol): KaType =
  *
  * @return The approximated type if the input is an anonymous object type, otherwise returns the input type unchanged.
  */
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class)
+context(_: KaSession)
 fun KaType.approximateAnonymousObjectToSupertypeOrSelf(): KaType {
     return (this as? KaClassType)?.let { classType ->
         when (val symbol = classType.symbol) {

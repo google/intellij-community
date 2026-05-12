@@ -2,7 +2,7 @@
 // COMPILER_ARGUMENTS: -XXLanguage:+ReferencesToSyntheticJavaProperties
 
 fun main() {
-    funFunction1(Foo::<caret>getFoo)
+    funFunction1(Foo::getFoo<caret>)
 }
 
 fun funFunction1(function: Function1<Foo, Int>) {}

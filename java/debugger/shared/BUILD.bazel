@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.java.debugger.impl.shared` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "shared_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "shared",
   module_name = "intellij.java.debugger.impl.shared",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":shared_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/util/concurrency",
@@ -29,19 +24,23 @@ jvm_library(
     "//libraries/kotlinx/serialization/core",
     "//libraries/kotlinx/serialization/json",
     "//platform/platform-impl/rpc",
+    "//platform/ide-core",
     "//platform/execution",
     "//platform/execution-impl",
     "//java/java-frontback-impl:frontback-impl",
     "//platform/util/coroutines",
+    "//platform/util:util-ui",
     "//platform/xdebugger-impl/rpc",
     "//platform/xdebugger-impl/shared",
     "//platform/xdebugger-impl/ui",
     "//platform/project/shared:project",
+    "//fleet/rhizomedb",
   ]
 )
 
 jvm_library(
   name = "shared_test_lib",
+  testonly = True,
   module_name = "intellij.java.debugger.impl.shared",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -61,14 +60,23 @@ jvm_library(
     "//libraries/kotlinx/serialization/core:core_test_lib",
     "//libraries/kotlinx/serialization/json:json_test_lib",
     "//platform/platform-impl/rpc:rpc_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/execution:execution_test_lib",
     "//platform/execution-impl:execution-impl_test_lib",
     "//java/java-frontback-impl:frontback-impl_test_lib",
     "//platform/util/coroutines:coroutines_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//platform/xdebugger-impl/rpc:rpc_test_lib",
     "//platform/xdebugger-impl/shared:shared_test_lib",
     "//platform/xdebugger-impl/ui:ui_test_lib",
     "//platform/project/shared:project_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.java.debugger.impl.shared` end
+
+### auto-generated section `iml intellij.java.debugger.impl.shared` start
+exports_files([
+  "intellij.java.debugger.impl.shared.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.java.debugger.impl.shared` end

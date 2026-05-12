@@ -9,6 +9,7 @@ create_kotlinc_options(
 
 jvm_library(
   name = "tests",
+  module_name = "kotlin.base.injection.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = ["//platform/editor-ui-ex:editor-ex"]
@@ -16,6 +17,7 @@ jvm_library(
 
 jvm_library(
   name = "tests_test_lib",
+  testonly = True,
   module_name = "kotlin.base.injection.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -25,18 +27,22 @@ jvm_library(
     "//platform/analysis-api:analysis_test_lib",
     "//platform/core-api:core",
     "//platform/core-api:core_test_lib",
+    "//platform/core-impl",
+    "//platform/core-impl:core-impl_test_lib",
     "//platform/editor-ui-api:editor-ui",
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//platform/projectModel-api:projectModel",
     "//platform/projectModel-api:projectModel_test_lib",
     "//plugins/kotlin/tests-common:common-tests",
     "//plugins/kotlin/tests-common:common-tests_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/test-framework",
     "//plugins/kotlin/test-framework:test-framework_test_lib",
     "//java/testFramework",
     "//java/testFramework:testFramework_test_lib",
+    "//java/java-psi-api:psi",
+    "//java/java-psi-api:psi_test_lib",
     "//platform/editor-ui-ex:editor-ex",
     "//platform/editor-ui-ex:editor-ex_test_lib",
     "@lib//:kotlinc-analysis-api",
@@ -49,10 +55,22 @@ jvm_library(
     "@lib//:kotlinc-kotlin-compiler-common",
     "//plugins/IntelliLang/backend",
     "//plugins/IntelliLang/backend:backend_test_lib",
+    "//platform/ide-core",
+    "//xml/xml-parser:parser",
+    "//xml/xml-parser:parser_test_lib",
   ],
-  runtime_deps = [":tests"]
+  runtime_deps = [
+    ":tests",
+    "//platform/ide-core:ide-core_test_lib",
+  ]
 )
 ### auto-generated section `build kotlin.base.injection.tests` end
+
+### auto-generated section `iml kotlin.base.injection.tests` start
+exports_files([
+  "kotlin.base.injection.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.base.injection.tests` end
 
 ### auto-generated section `test kotlin.base.injection.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

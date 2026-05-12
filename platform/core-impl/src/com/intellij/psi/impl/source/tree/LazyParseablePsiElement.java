@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 /*
  * @author max
@@ -22,6 +22,7 @@ import com.intellij.psi.PsiManager;
 import com.intellij.psi.PsiReference;
 import com.intellij.psi.ResolveState;
 import com.intellij.psi.impl.CheckUtil;
+import com.intellij.psi.impl.PsiElementBase;
 import com.intellij.psi.impl.ResolveScopeManager;
 import com.intellij.psi.impl.SharedPsiElementImplUtil;
 import com.intellij.psi.impl.source.SourceTreeToPsiMap;
@@ -58,7 +59,8 @@ public class LazyParseablePsiElement extends LazyParseableElement implements Psi
 
   @Override
   public @NotNull LazyParseablePsiElement clone() {
-    LazyParseablePsiElement clone = (LazyParseablePsiElement)super.clone();
+    LazyParseablePsiElement clone = isParsed() ? (LazyParseablePsiElement)super.clone()
+                                               : (LazyParseablePsiElement)cloneWithoutCopyingChildren();
     clone.setPsi(clone);
     return clone;
   }
@@ -298,7 +300,7 @@ public class LazyParseablePsiElement extends LazyParseableElement implements Psi
 
   @Override
   public void navigate(boolean requestFocus) {
-    PsiNavigationSupport.getInstance().getDescriptor(this).navigate(requestFocus);
+    PsiElementBase.doNavigate(this, requestFocus);
   }
 
   @Override

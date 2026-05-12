@@ -25,7 +25,6 @@ import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.util.Disposer;
-import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vcs.AbstractVcs;
 import com.intellij.openapi.vcs.FilePath;
 import com.intellij.openapi.vcs.VcsBundle;
@@ -45,8 +44,6 @@ import com.intellij.openapi.vcs.impl.LineStatusTrackerManager;
 import com.intellij.openapi.vcs.rollback.RollbackEnvironment;
 import com.intellij.platform.vcs.impl.shared.commit.PartialCommitChangeNodeDecorator;
 import com.intellij.ui.CollectionComboBoxModel;
-import com.intellij.ui.ColoredListCellRenderer;
-import com.intellij.ui.SimpleTextAttributes;
 import com.intellij.util.SlowOperations;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.JBUI;
@@ -62,7 +59,6 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.ComboBoxModel;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
-import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.tree.DefaultTreeModel;
 import java.awt.BorderLayout;
@@ -362,19 +358,11 @@ class MultipleLocalChangeListsBrowser extends CommitDialogChangesBrowser impleme
   }
 
   private class ChangeListChooser extends JPanel {
-    private static final int MAX_NAME_LEN = 35;
     private final @NotNull ComboBox<LocalChangeList> myChooser = new ComboBox<>();
 
     ChangeListChooser() {
       myChooser.setEditable(false);
-      myChooser.setRenderer(new ColoredListCellRenderer<>() {
-        @Override
-        protected void customizeCellRenderer(@NotNull JList<? extends LocalChangeList> list, LocalChangeList value,
-                                             int index, boolean selected, boolean hasFocus) {
-          String name = StringUtil.shortenTextWithEllipsis(value.getName().trim(), MAX_NAME_LEN, 0);
-          append(name, value.isDefault() ? SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES : SimpleTextAttributes.REGULAR_ATTRIBUTES);
-        }
-      });
+      myChooser.setRenderer(UiUtilsKt.createChangeListChooserRenderer());
 
       myChooser.addItemListener(new ItemListener() {
         @Override

@@ -1,58 +1,43 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.util.indexing
 
-import com.intellij.ide.lightEdit.LightEdit
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
-import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.RootsChangeRescanningInfo
 import com.intellij.openapi.projectRoots.SdkType
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.text.StringUtil
-import com.intellij.platform.backend.workspace.WorkspaceModel
+import com.intellij.openapi.wm.ex.isIndexingActivitiesSuppressedSync
 import com.intellij.platform.workspace.jps.entities.LibraryEntity
 import com.intellij.platform.workspace.jps.entities.SdkEntity
-import com.intellij.platform.workspace.storage.EntityChange
 import com.intellij.platform.workspace.storage.EntityStorage
 import com.intellij.platform.workspace.storage.WorkspaceEntity
 import com.intellij.util.SmartList
-import com.intellij.util.indexing.EntityIndexingServiceImpl.WorkspaceEntitiesRootsChangedRescanningInfo
-import com.intellij.util.indexing.EntityIndexingServiceImpl.WorkspaceEventRescanningInfo
 import com.intellij.util.indexing.dependenciesCache.DependenciesIndexedStatusService
 import com.intellij.util.indexing.dependenciesCache.DependenciesIndexedStatusService.StatusMark
 import com.intellij.util.indexing.roots.GenericDependencyIterator
-import com.intellij.util.indexing.roots.IndexableEntityProvider
-import com.intellij.util.indexing.roots.IndexableEntityProvider.Enforced
-import com.intellij.util.indexing.roots.IndexableEntityProvider.IndexableIteratorBuilder
+import com.intellij.util.indexing.roots.IndexableEntityProviderMethods
 import com.intellij.util.indexing.roots.IndexableFilesIterator
-import com.intellij.util.indexing.roots.WorkspaceIndexingRootsBuilder
-import com.intellij.util.indexing.roots.builders.IndexableIteratorBuilders
 import com.intellij.util.indexing.roots.kind.LibraryOrigin
+import com.intellij.util.indexing.roots.origin.IndexingSourceRootHolder
 import com.intellij.util.indexing.roots.processLibraryEntity
 import com.intellij.util.indexing.roots.processModuleRoot
-import com.intellij.workspaceModel.core.fileIndex.DependencyDescription
-import com.intellij.workspaceModel.core.fileIndex.DependencyDescription.OnParent
-import com.intellij.workspaceModel.core.fileIndex.EntityStorageKind
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileIndex
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileIndexChangedEvent
-import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileIndexContributor
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileIndexListener
+import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileKind
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileSet
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileSetWithCustomData
 import com.intellij.workspaceModel.core.fileIndex.impl.ModuleRelatedRootData
-import com.intellij.workspaceModel.core.fileIndex.impl.WorkspaceFileIndexImpl.Companion.EP_NAME
 import com.intellij.workspaceModel.core.fileIndex.impl.getEntityPointer
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import org.jetbrains.annotations.ApiStatus
-import org.jetbrains.annotations.TestOnly
 
 
 @ApiStatus.Internal
@@ -67,7 +52,7 @@ class ProjectEntityIndexingService(
 
   fun indexChanges(changes: List<RootsChangeRescanningInfo>) {
     if (FileBasedIndex.getInstance() !is FileBasedIndexImpl) return
-    if (LightEdit.owns(project)) return
+    if (isIndexingActivitiesSuppressedSync(project)) return
     if (invalidateProjectFilterIfFirstScanningNotRequested(project)) return
 
     if (ModalityState.defaultModalityState() === ModalityState.any()) {
@@ -86,7 +71,7 @@ class ProjectEntityIndexingService(
 
   override fun workspaceFileIndexChanged(event: WorkspaceFileIndexChangedEvent) {
     if (FileBasedIndex.getInstance() !is FileBasedIndexImpl) return
-    if (LightEdit.owns(project)) return
+    if (isIndexingActivitiesSuppressedSync(project)) return
 
     if (ModalityState.defaultModalityState() === ModalityState.any()) {
       LOG.error("Unexpected modality: should not be ANY. Replace with NON_MODAL (130820241337)")
@@ -109,15 +94,10 @@ class ProjectEntityIndexingService(
   }
 
   private fun computeScanningParametersFromWFIEvent(event: WorkspaceFileIndexChangedEvent): Deferred<ScanningParameters> {
-    return if (Registry.`is`("create.coroutines.for.wfi.events.processing")) {
-      scope.async {
-        readAction {
-          processWfiEvent(event)
-        }
+    return scope.async {
+      readAction {
+        processWfiEvent(event)
       }
-    }
-    else {
-      CompletableDeferred(processWfiEvent(event))
     }
   }
 
@@ -137,29 +117,11 @@ class ProjectEntityIndexingService(
     }
   }
 
-  private enum class Change {
-    Added, Replaced, Removed;
-
-    companion object {
-      fun fromEntityChange(change: EntityChange<*>?): Change {
-        if (change is EntityChange.Added<*>) return Added
-        if (change is EntityChange.Replaced<*>) return Replaced
-        if (change is EntityChange.Removed<*>) return Removed
-        throw IllegalStateException("Unexpected change $change")
-      }
-    }
-  }
-
-  fun shouldCauseRescan(oldEntity: WorkspaceEntity?, newEntity: WorkspaceEntity?): Boolean {
-    return tracker.shouldRescan(oldEntity, newEntity, project)
-  }
-
   private fun generateIteratorsFromWFIChangedEvent(
     fileSets: Collection<WorkspaceFileSet>,
     storage: EntityStorage,
     iterators: MutableList<IndexableFilesIterator>,
   ) {
-    val useWfi = Registry.`is`("use.workspace.file.index.for.partial.scanning")
     val libraryOrigins = HashSet<LibraryOrigin>()
 
     for (fileSet in fileSets) {
@@ -169,10 +131,10 @@ class ProjectEntityIndexingService(
       val customData = fileSet.data
       val root = fileSet.root
 
-      if (useWfi && customData is ModuleRelatedRootData) {
+      if (customData is ModuleRelatedRootData) {
         processModuleRoot(fileSet, project, true)?.let(iterators::add)
       }
-      else if (useWfi && fileSet.kind.isContent) {
+      else if (fileSet.kind.isContent) {
         iterators.add(GenericDependencyIterator.forContentRoot(entityPointer, fileSet.recursive, root))
       }
       else {
@@ -191,6 +153,18 @@ class ProjectEntityIndexingService(
             sdkHome = entity.homePath?.url,
             root = fileSet.root
           ))
+        }
+        else if (fileSet.kind == WorkspaceFileKind.CUSTOM) {
+          iterators.add(GenericDependencyIterator.forCustomKindRoot(entityPointer, fileSet.recursive, root))
+        }
+        else {
+          val rootHolder = if (fileSet.kind == WorkspaceFileKind.EXTERNAL_SOURCE) {
+            IndexingSourceRootHolder.fromFiles(emptyList(), listOf(root))
+          }
+          else {
+            IndexingSourceRootHolder.fromFiles(listOf(root), emptyList())
+          }
+          iterators.add(IndexableEntityProviderMethods.createExternalEntityIterators(entityPointer, rootHolder))
         }
       }
     }
@@ -216,67 +190,44 @@ class ProjectEntityIndexingService(
           }
         }
       }
-      val builders = SmartList<IndexableIteratorBuilder>()
+      val iterators = SmartList<IndexableFilesIterator>()
 
       var dependenciesStatusMark: StatusMark? = null
       if (indexDependencies) {
-        val dependencyBuildersPair = DependenciesIndexedStatusService.getInstance(project).getDeltaWithLastIndexedStatus()
-        if (dependencyBuildersPair == null) {
+        val dependencyIteratorsPair = DependenciesIndexedStatusService.getInstance(project).getDeltaWithLastIndexedStatus()
+        if (dependencyIteratorsPair == null) {
           return@async ScanningIterators(
             "Reindex of changed dependencies requested, but status is not initialized",
           )
         }
-        builders.addAll(dependencyBuildersPair.first)
-        dependenciesStatusMark = dependencyBuildersPair.second
+        iterators.addAll(dependencyIteratorsPair.first)
+        dependenciesStatusMark = dependencyIteratorsPair.second
       }
 
-      val entityStorage = project.serviceAsync<WorkspaceModel>().currentSnapshot
-      for (change in changes) {
-        if (change === RootsChangeRescanningInfo.NO_RESCAN_NEEDED || change === RootsChangeRescanningInfo.RESCAN_DEPENDENCIES_IF_NEEDED) {
-          continue
+      if (iterators.isNotEmpty()) {
+        val debugNames = iterators.map { obj -> obj.getDebugName() }
+        LOG.debug("Accumulated iterators: $debugNames")
+        val maxNamesToLog = 10
+        var reasonMessage = "changes in: " + debugNames
+          .asSequence()
+          .take(maxNamesToLog)
+          .joinToString(", ") { StringUtil.wrapWithDoubleQuote(it) }
+        if (debugNames.size > maxNamesToLog) {
+          reasonMessage += " and " + (debugNames.size - maxNamesToLog) + " iterators more"
         }
-        if (change is WorkspaceEventRescanningInfo) {
-          builders.addAll(getBuildersOnWorkspaceChange(project, change.events, entityStorage))
-        }
-        else if (change is WorkspaceEntitiesRootsChangedRescanningInfo) {
-          val pointers = change.pointers
-          val entities = pointers.mapNotNull { ref ->
-            ref.resolve(entityStorage)
-          }
-          builders.addAll(getBuildersOnWorkspaceEntitiesRootsChange(project, entities, entityStorage))
-        }
-        else {
-          LOG.warn("Unexpected change " + change.javaClass + " " + change + ", full reindex requested")
-          return@async ScanningIterators(
-            "Reindex on unexpected change in EntityIndexingServiceImpl",
-          )
-        }
-      }
-      if (!builders.isEmpty()) {
-        val mergedIterators = IndexableIteratorBuilders.instantiateBuilders(builders, project, entityStorage)
-
-        if (!mergedIterators.isEmpty()) {
-          val debugNames = mergedIterators.map { obj -> obj.getDebugName() }
-          LOG.debug("Accumulated iterators: $debugNames")
-          val maxNamesToLog = 10
-          var reasonMessage = "changes in: " + debugNames
-            .asSequence()
-            .take(maxNamesToLog)
-            .map { str -> StringUtil.wrapWithDoubleQuote(str) }
-            .joinToString(", ")
-          if (debugNames.size > maxNamesToLog) {
-            reasonMessage += " and " + (debugNames.size - maxNamesToLog) + " iterators more"
-          }
-          logRootChanges(project, false)
-          return@async ScanningIterators(
-            reasonMessage,
-            mergedIterators,
-            dependenciesStatusMark
-          )
-        }
+        logRootChanges(project, false)
+        return@async ScanningIterators(
+          reasonMessage,
+          iterators,
+          dependenciesStatusMark
+        )
       }
       return@async CancelledScanning
     }
+  }
+
+  fun shouldCauseRescan(oldEntity: WorkspaceEntity?, newEntity: WorkspaceEntity?): Boolean {
+    return tracker.shouldRescan(oldEntity, newEntity, project)
   }
 
   companion object {
@@ -298,217 +249,6 @@ class ProjectEntityIndexingService(
       else {
         ROOT_CHANGES_LOGGER.info(project, isFullReindex)
       }
-    }
-
-    @TestOnly
-    fun getIterators(
-      project: Project,
-      events: Collection<EntityChange<*>>,
-    ): List<IndexableFilesIterator> {
-      val entityStorage: EntityStorage = WorkspaceModel.getInstance(project).currentSnapshot
-      val result = getBuildersOnWorkspaceChange(project, events, entityStorage)
-      return IndexableIteratorBuilders.instantiateBuilders(result, project, entityStorage)
-    }
-
-    private fun getBuildersOnWorkspaceChange(
-      project: Project,
-      events: Collection<EntityChange<*>>,
-      entityStorage: EntityStorage,
-    ): List<IndexableIteratorBuilder> {
-      val builders = SmartList<IndexableIteratorBuilder>()
-      val descriptionsBuilder = WorkspaceIndexingRootsBuilder(false)
-      for (change in events) {
-        collectIteratorBuildersOnChange(Change.fromEntityChange(change), change.oldEntity,
-                                        change.newEntity, project, builders,
-                                        descriptionsBuilder, entityStorage)
-      }
-      builders.addAll(descriptionsBuilder.createBuilders(project))
-      return builders
-    }
-
-    private fun <E : WorkspaceEntity> collectIteratorBuildersOnChange(
-      change: Change,
-      oldEntity: E?,
-      newEntity: E?,
-      project: Project,
-      builders: MutableCollection<in IndexableIteratorBuilder>,
-      descriptionsBuilder: WorkspaceIndexingRootsBuilder,
-      entityStorage: EntityStorage,
-    ) {
-      LOG.assertTrue(newEntity != null || change == Change.Removed, "New entity $newEntity, change $change")
-      LOG.assertTrue(oldEntity != null || change == Change.Added, "Old entity $oldEntity, change $change")
-
-      val entityClass = (newEntity ?: oldEntity)!!.getEntityInterface() as Class<in E>
-
-      val newBuilders = ArrayList<IndexableIteratorBuilder>()
-      collectWFICIteratorsOnChange(change, oldEntity, newEntity, project, newBuilders, descriptionsBuilder, entityClass,
-                                   entityStorage)
-
-      builders.addAll(newBuilders)
-    }
-
-
-    private fun <E : WorkspaceEntity> collectIEPIteratorsOnChange(
-      change: Change,
-      oldEntity: E?,
-      newEntity: E?,
-      project: Project,
-      builders: MutableCollection<in IndexableIteratorBuilder>,
-      entityClass: Class<in E>,
-    ) {
-      LOG.assertTrue(newEntity != null || change == Change.Removed, "New entity $newEntity, change $change")
-      LOG.assertTrue(oldEntity != null || change == Change.Added, "Old entity $oldEntity, change $change")
-
-      for (uncheckedProvider in IndexableEntityProvider.EP_NAME.extensionList) {
-        if (entityClass == uncheckedProvider.getEntityClass() && uncheckedProvider is Enforced<*>) {
-          @Suppress("UNCHECKED_CAST")
-          uncheckedProvider as (IndexableEntityProvider<E>)
-          val generated = when (change) {
-            Change.Added -> uncheckedProvider.getAddedEntityIteratorBuilders(newEntity!!, project)
-            else -> {
-              emptyList()
-            }
-          }
-          builders.addAll(generated)
-        }
-      }
-    }
-
-    private fun <E : WorkspaceEntity> collectWFICIteratorsOnChange(
-      change: Change,
-      oldEntity: E?,
-      newEntity: E?,
-      project: Project,
-      builders: MutableCollection<in IndexableIteratorBuilder>,
-      descriptionsBuilder: WorkspaceIndexingRootsBuilder,
-      entityClass: Class<in E>,
-      entityStorage: EntityStorage,
-    ) {
-      LOG.assertTrue(newEntity != null || change == Change.Removed, "New entity $newEntity, change $change")
-      LOG.assertTrue(oldEntity != null || change == Change.Added, "Old entity $oldEntity, change $change")
-
-      val contributors = EP_NAME.extensionList
-      for (uncheckedContributor in contributors) {
-        if (uncheckedContributor.storageKind != EntityStorageKind.MAIN) {
-          continue
-        }
-        if (entityClass == uncheckedContributor.entityClass) {
-          @Suppress("UNCHECKED_CAST")
-          uncheckedContributor as WorkspaceFileIndexContributor<E>
-          when (change) {
-            Change.Added -> descriptionsBuilder.registerAddedEntity(newEntity!!, uncheckedContributor, entityStorage)
-            Change.Replaced -> descriptionsBuilder.registerChangedEntity(oldEntity!!, newEntity!!, uncheckedContributor, entityStorage)
-            Change.Removed -> descriptionsBuilder.registerRemovedEntity(oldEntity!!, uncheckedContributor, entityStorage)
-          }
-        }
-        handleRelativeEntities(entityClass, oldEntity, newEntity, descriptionsBuilder, uncheckedContributor, entityStorage)
-        if (change == Change.Replaced) {
-          handleDependencies(oldEntity!!, newEntity!!, descriptionsBuilder, entityClass, uncheckedContributor,
-                             entityStorage)
-        }
-      }
-
-      collectIEPIteratorsOnChange(change, oldEntity, newEntity, project, builders, entityClass)
-    }
-
-    private fun <E : WorkspaceEntity, C : WorkspaceEntity> handleDependencies(
-      oldEntity: E,
-      newEntity: E,
-      descriptionsBuilder: WorkspaceIndexingRootsBuilder,
-      entityClass: Class<in E>,
-      contributor: WorkspaceFileIndexContributor<C>,
-      entityStorage: EntityStorage,
-    ) {
-      for (dependency in contributor.dependenciesOnOtherEntities) {
-        handleChildEntities(entityClass, oldEntity, newEntity, descriptionsBuilder, contributor, dependency, entityStorage)
-      }
-    }
-
-    private fun <E : WorkspaceEntity, C : WorkspaceEntity> handleRelativeEntities(
-      entityClass: Class<in E>,
-      oldEntity: E?,
-      newEntity: E?,
-      descriptionsBuilder: WorkspaceIndexingRootsBuilder,
-      contributor: WorkspaceFileIndexContributor<C>,
-      entityStorage: EntityStorage,
-    ) {
-      for (dependency in contributor.dependenciesOnOtherEntities) {
-        if (dependency !is DependencyDescription.OnArbitraryEntity<*, *> || entityClass != dependency.entityClass) {
-          continue
-        }
-        @Suppress("UNCHECKED_CAST")
-        dependency as DependencyDescription.OnArbitraryEntity<C, E>
-
-        val removedEntities: MutableSet<C> = mutableSetOf()
-        val addedEntities: MutableSet<C> = mutableSetOf()
-        oldEntity?.let {
-          dependency.dependantEntitiesGetter(it).toCollection(removedEntities)
-        }
-        newEntity?.let {
-          dependency.dependantEntitiesGetter(it).toCollection(addedEntities)
-        }
-        val entitiesToKeep = mutableSetOf<C>()
-        val entitiesToRemove = mutableSetOf<C>()
-        val entitiesInCurrentStorage = entityStorage.entities(contributor.entityClass).toSet()
-
-        if (removedEntities.isNotEmpty()) {
-          entitiesToKeep.addAll(entitiesInCurrentStorage.intersect(removedEntities))
-        }
-        if (addedEntities.isNotEmpty()) {
-          entitiesToRemove.addAll(addedEntities - entitiesInCurrentStorage)
-        }
-
-        for (element in addedEntities) {
-          descriptionsBuilder.registerAddedEntity(element, contributor, entityStorage)
-        }
-        for (element in removedEntities) {
-          descriptionsBuilder.registerRemovedEntity(element, contributor, entityStorage)
-        }
-        for (element in entitiesToKeep) {
-          descriptionsBuilder.registerAddedEntity(element, contributor, entityStorage)
-        }
-        for (element in entitiesToRemove) {
-          descriptionsBuilder.registerRemovedEntity(element, contributor, entityStorage)
-        }
-      }
-    }
-
-    private fun <E : WorkspaceEntity, C : WorkspaceEntity> handleChildEntities(
-      entityClass: Class<in E>,
-      oldEntity: E,
-      newEntity: E,
-      descriptionsBuilder: WorkspaceIndexingRootsBuilder,
-      contributor: WorkspaceFileIndexContributor<C>,
-      dependency: DependencyDescription<C>,
-      entityStorage: EntityStorage,
-    ) {
-      if (dependency !is OnParent<*, *> || entityClass != dependency.parentClass) {
-        return
-      }
-      @Suppress("UNCHECKED_CAST")
-      val oldElements = (dependency as OnParent<C, E>).childrenGetter(oldEntity).toList<C>()
-      val newElements = dependency.childrenGetter(newEntity).toMutableList<C>()
-
-      newElements.removeAll(oldElements)
-      for (element in newElements) {
-        descriptionsBuilder.registerAddedEntity(element, contributor, entityStorage)
-      }
-    }
-
-    private fun getBuildersOnWorkspaceEntitiesRootsChange(
-      project: Project,
-      entities: Collection<WorkspaceEntity>,
-      entityStorage: EntityStorage,
-    ): MutableCollection<out IndexableIteratorBuilder> {
-      if (entities.isEmpty()) return mutableListOf<IndexableIteratorBuilder>()
-      val builders = SmartList<IndexableIteratorBuilder>()
-
-      val descriptionsBuilder = WorkspaceIndexingRootsBuilder(false)
-      for (entity in entities) {
-        collectIteratorBuildersOnChange(Change.Added, null, entity, project, builders, descriptionsBuilder, entityStorage)
-      }
-      builders.addAll(descriptionsBuilder.createBuilders(project))
-      return builders
     }
   }
 }

@@ -23,13 +23,13 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.JDOMUtil
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.registry.Registry
-import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.dsl.builder.BottomGap
 import com.intellij.ui.dsl.builder.COLUMNS_MEDIUM
 import com.intellij.ui.dsl.builder.Row
 import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.columns
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.io.HttpRequests
@@ -108,7 +108,7 @@ open class StarterInitialStep(contextProvider: StarterContextProvider) : CommonS
         row(JavaStartersBundle.message("title.project.app.type.label")) {
           val applicationTypesModel = DefaultComboBoxModel<StarterAppType>()
           applicationTypesModel.addAll(starterSettings.applicationTypes)
-          comboBox(applicationTypesModel, SimpleListCellRenderer.create("", StarterAppType::title))
+          comboBox(applicationTypesModel, textListCellRenderer("", StarterAppType::title))
             .bindItem(applicationTypeProperty)
             .columns(COLUMNS_MEDIUM)
 

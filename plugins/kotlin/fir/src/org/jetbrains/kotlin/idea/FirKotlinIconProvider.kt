@@ -2,7 +2,8 @@
 package org.jetbrains.kotlin.idea
 
 import org.jetbrains.kotlin.psi.KtDeclaration
+import org.jetbrains.kotlin.psi.psiUtil.hasActualModifier
 
 internal class FirKotlinIconProvider : KotlinIconProvider() {
-    override fun isMatchingExpected(declaration: KtDeclaration) = false
+    override fun isMatchingExpected(declaration: KtDeclaration) = declaration.hasActualModifier()
 }

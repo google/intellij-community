@@ -9,7 +9,7 @@ import com.intellij.openapi.roots.libraries.LibraryTable;
 import com.intellij.openapi.roots.libraries.LibraryType;
 import com.intellij.openapi.roots.ui.configuration.projectRoot.StructureConfigurableContext;
 import com.intellij.openapi.ui.ComboBox;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.ui.FormBuilder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -34,7 +34,7 @@ public class CreateNewLibraryDialog extends LibraryEditorDialogBase {
     }
     myLibraryLevelCombobox = new ComboBox<>(model);
     myLibraryLevelCombobox.setSelectedIndex(selectedTable);
-    myLibraryLevelCombobox.setRenderer(SimpleListCellRenderer.create("", value -> value.getPresentation().getDisplayName(false)));
+    myLibraryLevelCombobox.setRenderer(BuilderKt.textListCellRenderer("", value -> value.getPresentation().getDisplayName(false)));
     init();
   }
 

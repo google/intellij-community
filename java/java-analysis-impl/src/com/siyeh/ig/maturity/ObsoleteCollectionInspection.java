@@ -244,6 +244,6 @@ public final class ObsoleteCollectionInspection extends BaseInspection {
     StringSearcher searcher = new StringSearcher(name, true, true);
     CharSequence contents = file.getViewProvider().getContents();
     int[] count = new int[1];
-    return searcher.processOccurrences(contents, __->++count[0] <= MAX_OCCURRENCES);
+    return searcher.processOccurrences(contents, _->++count[0] <= MAX_OCCURRENCES);
   }
 }

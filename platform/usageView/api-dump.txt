@@ -293,7 +293,6 @@ com.intellij.usages.UsageTargetProvider
 - getTargets(com.intellij.psi.PsiElement):com.intellij.usages.UsageTarget[]
 f:com.intellij.usages.UsageTargetUtil
 - <init>():V
-- s:findUsageTargets(com.intellij.openapi.actionSystem.DataProvider):com.intellij.usages.UsageTarget[]
 - s:findUsageTargets(com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile):com.intellij.usages.UsageTarget[]
 - s:findUsageTargets(com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile,com.intellij.psi.PsiElement):com.intellij.usages.UsageTarget[]
 - s:findUsageTargets(com.intellij.psi.PsiElement):com.intellij.usages.UsageTarget[]
@@ -321,6 +320,7 @@ com.intellij.usages.UsageView
 - addPerformOperationAction(java.lang.Runnable,java.lang.String,java.lang.String,java.lang.String,Z,Z):V
 - a:appendUsage(com.intellij.usages.Usage):V
 - a:close():V
+- a:dispose():V
 - a:excludeUsages(com.intellij.usages.Usage[]):V
 - a:getComponent():javax.swing.JComponent
 - a:getExcludedUsages():java.util.Set
@@ -551,6 +551,7 @@ com.intellij.usages.rules.UsageFilteringRule
 - isVisible(com.intellij.usages.Usage):Z
 - isVisible(com.intellij.usages.Usage,com.intellij.usages.UsageTarget[]):Z
 com.intellij.usages.rules.UsageFilteringRuleProvider
+- sf:RULES_CHANGED:com.intellij.util.messages.Topic
 - createFilteringActions(com.intellij.usages.UsageView):com.intellij.openapi.actionSystem.AnAction[]
 - getActiveRules(com.intellij.openapi.project.Project):com.intellij.usages.rules.UsageFilteringRule[]
 - getApplicableRules(com.intellij.openapi.project.Project):java.util.Collection

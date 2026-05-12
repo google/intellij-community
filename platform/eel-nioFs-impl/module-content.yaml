@@ -1,0 +1,3 @@
+- name: dist.all/lib/intellij.platform.eel.nioFs.impl.jar
+  modules:
+  - name: intellij.platform.eel.nioFs.impl

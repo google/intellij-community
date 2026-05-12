@@ -80,7 +80,7 @@ final class CopyrightProfilesPanel extends MasterDetailsComponent implements Sea
 
     StatusText emptyText = myTree.getEmptyText();
     emptyText.setText(CopyrightBundle.message("copyright.profiles.empty"));
-    emptyText.appendSecondaryText(CopyrightBundle.message("copyright.profiles.add.profile"), SimpleTextAttributes.LINK_ATTRIBUTES, __ -> doAddProfile(true));
+    emptyText.appendSecondaryText(CopyrightBundle.message("copyright.profiles.add.profile"), SimpleTextAttributes.LINK_ATTRIBUTES, _ -> doAddProfile(true));
     String shortcutText = KeymapUtil.getFirstKeyboardShortcutText(CommonActionsPanel.getCommonShortcut(CommonActionsPanel.Buttons.ADD));
     if (!shortcutText.isEmpty()) {
       emptyText.appendSecondaryText(" (" + shortcutText + ")", StatusText.DEFAULT_ATTRIBUTES, null);

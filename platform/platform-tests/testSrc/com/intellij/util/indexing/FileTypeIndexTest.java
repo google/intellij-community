@@ -149,7 +149,7 @@ public class FileTypeIndexTest extends BasePlatformTestCase {
       new FileTypeIndex.IndexChangeListener() {
         @Override
         public void onChangedForFileType(@NotNull FileType fileType) {
-          notifications.compute(fileType, (__, val) -> {
+          notifications.compute(fileType, (_, val) -> {
             if (val == null) {
               return 1;
             }

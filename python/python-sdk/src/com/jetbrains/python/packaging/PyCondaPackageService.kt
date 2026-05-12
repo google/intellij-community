@@ -9,6 +9,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.util.xmlb.XmlSerializerUtil
 import com.intellij.util.xmlb.annotations.Property
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.SystemDependent
 import java.nio.file.Path
 
@@ -29,25 +30,21 @@ class PyCondaPackageService : PersistentStateComponent<PyCondaPackageService> {
 
     fun getInstance(): PyCondaPackageService = service<PyCondaPackageService>()
 
+    @ApiStatus.Internal
     @JvmStatic
-    fun getCondaExecutable(sdkPath: String?): @SystemDependent String? {
-      if (sdkPath != null) {
-        val condaPath = findCondaExecutableRelativeToEnv(Path.of(sdkPath))
-        if (condaPath != null) {
-          LOG.info("Using $condaPath as a conda executable for $sdkPath (found as a relative to the env)")
-          return condaPath.toString()
-        }
-      }
-
+    fun getCondaExecutable(): Path? {
       val preferredCondaPath = getInstance().preferredCondaPath
-      if (!preferredCondaPath.isNullOrEmpty()) {
-        val forSdkPath = if (sdkPath == null) "" else " for $sdkPath"
-        LOG.info("Using $preferredCondaPath as a conda executable$forSdkPath (specified as a preferred conda path)")
-        return preferredCondaPath
+      return if (!preferredCondaPath.isNullOrEmpty()) {
+        LOG.info("Using $preferredCondaPath as a conda executable (specified as a preferred conda path)")
+        Path.of(preferredCondaPath)
       }
-
-      return getSystemCondaExecutable()?.toString()
+      else getSystemCondaExecutable()
     }
+
+    @Deprecated("Use getCondaExecutable(): Path? instead")
+    @JvmStatic
+    @Suppress("unused", "UNUSED_PARAMETER")
+    fun getCondaExecutable(sdkPath: String?): @SystemDependent String? = getCondaExecutable()?.toString()
 
     fun onCondaEnvCreated(condaExecutable: @SystemDependent String) {
       getInstance().preferredCondaPath = condaExecutable

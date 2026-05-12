@@ -96,7 +96,6 @@ internal class KotlinDiagnosticHighlightVisitor : HighlightVisitor, HighlightRan
         return true
     }
 
-    @OptIn(KaExperimentalApi::class)
     private fun analyzeFile(file: KtFile): Map<PsiElement, List<HighlightInfo.Builder>> = analyze(file) {
         // Trigger additional resolution under `analyze` block to have the session on the stack
         // to avoid stop-the-world and GC optimizations
@@ -107,6 +106,7 @@ internal class KotlinDiagnosticHighlightVisitor : HighlightVisitor, HighlightRan
         val analysis = file.collectDiagnostics(KaDiagnosticCheckerFilter.ONLY_COMMON_CHECKERS)
         val filteredAnalysisResult = analysis
             .filterOutCodeFragmentVisibilityErrors(file)
+            .filterOutUnusedExpressionWarnings()
 
         val builders = filteredAnalysisResult
             .map { diagnostic ->
@@ -197,6 +197,15 @@ internal class KotlinDiagnosticHighlightVisitor : HighlightVisitor, HighlightRan
         return filterNot { diagnostic ->
             diagnostic.diagnosticClass == KaFirDiagnostic.InvisibleReference::class
                     || diagnostic.diagnosticClass == KaFirDiagnostic.InvisibleSetter::class
+        }
+    }
+
+    private fun <PSI : PsiElement> Collection<KaDiagnosticWithPsi<PSI>>.filterOutUnusedExpressionWarnings(): Collection<KaDiagnosticWithPsi<PSI>> {
+        // Remove unused expression diagnostics as they already exist as inspections.
+        // TODO(KTIJ-38323): remove this filter entirely once inspection is converted to quickfix.
+        return filterNot { diagnostic ->
+            diagnostic.diagnosticClass == KaFirDiagnostic.UnusedExpression::class
+                    || diagnostic.diagnosticClass == KaFirDiagnostic.UnusedLambdaExpression::class
         }
     }
 
@@ -346,6 +355,7 @@ internal class KotlinDiagnosticHighlightVisitor : HighlightVisitor, HighlightRan
         is KaFirDiagnostic.UselessCast -> true
         is KaFirDiagnostic.UselessElvis -> true
         is KaFirDiagnostic.UselessIsCheck -> true
+        is KaFirDiagnostic.RedundantOpenInInterface -> true
         else -> false
     }
 

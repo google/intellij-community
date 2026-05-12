@@ -22,7 +22,6 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.roots.OrderEnumerator
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.registry.Registry
@@ -41,6 +40,8 @@ import com.intellij.openapi.vcs.changes.ui.SelectFilesDialog
 import com.intellij.openapi.vcs.ignore.IgnoredToExcludedSynchronizerConstants.ASKED_MARK_IGNORED_FILES_AS_EXCLUDED_PROPERTY
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.backend.workspace.WorkspaceModel
+import com.intellij.platform.backend.workspace.virtualFile
+import com.intellij.platform.backend.workspace.workspaceModel
 import com.intellij.platform.ide.progress.withModalProgress
 import com.intellij.platform.workspace.jps.entities.ContentRootEntity
 import com.intellij.platform.workspace.jps.entities.SourceRootEntity
@@ -228,8 +229,10 @@ private fun markIgnoredAsExcluded(project: Project, files: Collection<VirtualFil
   }
 }
 
-private fun getProjectSourceRoots(project: Project): Set<VirtualFile> = runReadAction {
-  OrderEnumerator.orderEntries(project).withoutSdk().withoutLibraries().sources().usingCache().roots.toHashSet()
+private fun getProjectSourceRoots(project: Project): Set<VirtualFile> {
+  return project.workspaceModel.currentSnapshot.entities(SourceRootEntity::class.java).mapNotNull {
+    it.url.virtualFile
+  }.toSet()
 }
 
 private fun containsShelfDirectoryOrUnderIt(filePath: FilePath, shelfPath: String) =

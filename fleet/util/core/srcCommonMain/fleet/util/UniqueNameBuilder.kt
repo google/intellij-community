@@ -1,5 +1,7 @@
 package fleet.util
 
+import fleet.multiplatform.shims.computeIfAbsentShim
+
 /**
  * Copied from com.intellij.filename.UniqueNameBuilder
  */
@@ -32,7 +34,7 @@ class UniqueNameBuilder<T>(private val myRoot: String, val separator: String) {
   //                                                                     |<------[/documentation] <- [/pycharm]  <- [/idea]
   fun addPath(key: T, path: String) {
     val path = path.removePrefix(myRoot)
-    paths.put(key, path)
+    paths[key] = path
 
     var current = rootNode
     val pathComponentsIterator = PathComponentsIterator(path)

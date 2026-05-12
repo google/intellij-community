@@ -7,13 +7,15 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.trace
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.platform.eel.EelPlatform
+import com.intellij.platform.eel.SafeDeferred
+import com.intellij.platform.ijent.IjentScope
 import com.intellij.platform.ijent.IjentUnavailableException
+import com.intellij.platform.ijent.ParentOfIjentScopes
 import com.intellij.platform.ijent.getIjentGrpcArgv
 import com.intellij.platform.ijent.tcp.TcpDeployInfo
 import com.intellij.util.io.copyToAsync
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -45,7 +47,10 @@ interface IjentDeploymentListener {
   fun shellInitialized(initializationTime: Duration)
 }
 
-abstract class IjentDeployingOverShellProcessStrategy(scope: CoroutineScope, currentDispatcher: CoroutineDispatcher) : IjentControlledEnvironmentDeployingStrategy() {
+abstract class IjentDeployingOverShellProcessStrategy(
+  scope: ParentOfIjentScopes,
+  currentDispatcher: CoroutineDispatcher,
+) : IjentControlledEnvironmentDeployingStrategy() {
   protected abstract val ijentLabel: String
 
   /**
@@ -54,7 +59,16 @@ abstract class IjentDeployingOverShellProcessStrategy(scope: CoroutineScope, cur
    */
   protected abstract suspend fun mapPath(path: Path): String?
 
-  protected abstract suspend fun createShellProcess(): Process
+  protected abstract suspend fun createShellProcessFacade(ijentProcessScope: IjentScope): IjentSessionProcessMediator.ProcessFacade
+
+  abstract class JavaProcessBasedStrategy(protected val scope: ParentOfIjentScopes, currentDispatcher: CoroutineDispatcher) :
+    IjentDeployingOverShellProcessStrategy(scope, currentDispatcher) {
+    protected abstract suspend fun createShellProcess(): Process
+
+    override suspend fun createShellProcessFacade(ijentProcessScope: IjentScope): IjentSessionProcessMediator.ProcessFacade {
+      return IjentSessionProcessMediator.JavaProcessFacade(ijentProcessScope, createShellProcess())
+    }
+  }
 
   protected sealed interface ExecutionStrategy {
     data object Default : ExecutionStrategy
@@ -65,13 +79,17 @@ abstract class IjentDeployingOverShellProcessStrategy(scope: CoroutineScope, cur
 
   private val myContext: Deferred<DeployingContextAndShell> = run {
     var createdShellProcess: ShellProcessWrapper? = null
-    val context = scope.async(currentDispatcher, start = CoroutineStart.LAZY) {
-      val shellProcess = ShellProcessWrapper(IjentSessionProcessMediator.create(
+    val context = scope.s.async(currentDispatcher, start = CoroutineStart.LAZY) {
+      val ijentProcessScope = IjentSessionMediatorUtils.createProcessScope(scope, ijentLabel, LOG)
+      val processFacade = createShellProcessFacade(ijentProcessScope)
+      val mediator = IjentSessionProcessMediator.create(
         parentScope = scope,
-        process = createShellProcess(),
+        ijentProcessScope = ijentProcessScope,
+        process = processFacade,
         ijentLabel = ijentLabel,
         isExpectedProcessExit = ::isExpectedProcessExit,
-      ))
+      )
+      val shellProcess = ShellProcessWrapper(processFacade, mediator)
       createdShellProcess = shellProcess
       createDeployingContext(shellProcess.apply {
         val initializationTime = measureTime {
@@ -90,7 +108,7 @@ abstract class IjentDeployingOverShellProcessStrategy(scope: CoroutineScope, cur
     context
   }
 
-  private val myTargetPlatform = scope.async(currentDispatcher, start = CoroutineStart.LAZY) {
+  private val myTargetPlatform = scope.s.async(currentDispatcher, start = CoroutineStart.LAZY) {
     getMyContext().execCommand {
       getTargetPlatform()
     }
@@ -138,11 +156,9 @@ abstract class IjentDeployingOverShellProcessStrategy(scope: CoroutineScope, cur
 
   override suspend fun getConnectionStrategy(): IjentConnectionStrategy = IjentConnectionStrategy.Default
 
-  internal class ShellProcessWrapper(private var mediator: IjentSessionProcessMediator?) {
+  internal class ShellProcessWrapper(private val processFacade: IjentSessionProcessMediator.ProcessFacade, private var mediator: IjentSessionProcessMediator?) {
     @OptIn(DelicateCoroutinesApi::class)
     suspend fun write(data: String) {
-      val process = mediator!!.process
-
       @Suppress("NAME_SHADOWING")
       val data = if (data.endsWith("\n")) data else "$data\n"
       LOG.debug {
@@ -150,9 +166,9 @@ abstract class IjentDeployingOverShellProcessStrategy(scope: CoroutineScope, cur
         "Executing a script inside the shell: $debugData"
       }
       withContext(Dispatchers.IO) {
-        process.outputStream.write(data.toByteArray())
+        processFacade.outputStream.write(data.toByteArray())
         ensureActive()
-        process.outputStream.flush()
+        processFacade.outputStream.flush()
         ensureActive()
       }
     }
@@ -161,14 +177,18 @@ abstract class IjentDeployingOverShellProcessStrategy(scope: CoroutineScope, cur
     suspend fun readLineWithoutBuffering(): String =
       withContext(Dispatchers.IO) {
         val buffer = StringBuilder()
-        val stream = mediator!!.process.inputStream
+        val stream = processFacade.inputStream
         while (true) {
           ensureActive()
           while (stream.available() == 0) {
-            if (mediator!!.processExit.isCompleted) {
-              throw IOException("Shell process exited instead of reading a line.")
+            when (mediator!!.processExit.state) {
+              is SafeDeferred.State.Finished -> {
+                throw IOException("Shell process exited instead of reading a line.")
+              }
+              SafeDeferred.State.Active -> {
+                delay(1.milliseconds)
+              }
             }
-            delay(1.milliseconds)
           }
           val c = stream.read()
           if (c < 0 || c == '\n'.code) {
@@ -183,19 +203,18 @@ abstract class IjentDeployingOverShellProcessStrategy(scope: CoroutineScope, cur
       }
 
     suspend fun copyDataFrom(stream: InputStream) {
-      val process = mediator!!.process
       withContext(Dispatchers.IO) {
-        stream.copyToAsync(process.outputStream)
+        stream.copyToAsync(processFacade.outputStream)
         ensureActive()
-        process.outputStream.flush()
+        processFacade.outputStream.flush()
       }
     }
 
     @OptIn(InternalCoroutinesApi::class)
     suspend fun destroyForciblyAndGetError(): Throwable {
-      mediator!!.process.destroyForcibly()
+      processFacade.destroyForcibly()
       try {
-        val job = mediator!!.ijentProcessScope.coroutineContext.job
+        val job = mediator!!.ijentProcessScope.s.coroutineContext.job
         job.join()
         throw job.getCancellationException()
       }

@@ -100,6 +100,8 @@ class PluginMainDescriptor(
 
   override val moduleDependencies: ModuleDependencies = convertDependencies(raw.dependencies, this)
 
+  override var ownClassPath: List<Path>? = null
+
   init {
     reportMainDescriptorUnexpectedElements(raw) { logUnexpectedElement(this@PluginMainDescriptor, it) }
   }
@@ -107,9 +109,6 @@ class PluginMainDescriptor(
   override fun getPluginId(): PluginId = id
 
   override fun getName(): String {
-    PluginCardOverrides.getNameOverride(id)?.let {
-      return it
-    }
     return name
   }
 
@@ -142,10 +141,6 @@ class PluginMainDescriptor(
     var result = loadedDescriptionText
     if (result != null) {
       return result
-    }
-    PluginCardOverrides.getDescriptionOverride(pluginId)?.let {
-      loadedDescriptionText = it
-      return it
     }
     result = fromPluginBundle("plugin.$pluginId.description", rawDescription)
     loadedDescriptionText = result
@@ -218,7 +213,7 @@ class PluginMainDescriptor(
       val duplicates = HashSet<PluginModuleId>()
       for (item in modules) {
         require(duplicates.add(item.moduleId)) {
-          "Duplicate content module declaration: '${item.moduleId}' in plugin '${id}' located at $pluginPath"
+          "Duplicate content module declaration: '${item.moduleId.displayName}' in plugin '${id}' located at $pluginPath"
         }
       }
     }
@@ -312,3 +307,8 @@ fun PluginMainDescriptor.createContentModuleInTest(
   descriptorPath: String,
   module: PluginContentDescriptor.ModuleItem,
 ): ContentModuleDescriptor = createContentModule(subBuilder, descriptorPath, module)
+
+@Internal
+fun PluginMainDescriptor.sequenceAllDescriptors(): Sequence<IdeaPluginDescriptorImpl> = sequence {
+  yieldAllDescriptors(this@sequenceAllDescriptors)
+}

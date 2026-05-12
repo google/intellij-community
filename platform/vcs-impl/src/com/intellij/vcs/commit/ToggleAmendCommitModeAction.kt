@@ -46,7 +46,7 @@ class ToggleAmendCommitModeAction : CheckboxAction(), DumbAware {
     val handler = getAmendCommitHandler(e)!!
     handler.commitToAmend = if (state) {
       check(handler.commitToAmend is CommitToAmend.None)
-      CommitToAmend.Last
+      CommitToAmend.Last.Unknown
     }
     else CommitToAmend.None
 
@@ -88,6 +88,8 @@ class ToggleAmendCommitModeAction : CheckboxAction(), DumbAware {
     init {
       val spaceWidth = checkBox.getFontMetrics(checkBox.font).charWidth(' ')
       checkBox.border = JBUI.Borders.emptyRight(spaceWidth)
+      linkLabel.border = JBUI.Borders.emptyRight(4)
+      isOpaque = false
 
       add(checkBox)
       add(linkLabel)
@@ -98,6 +100,7 @@ class ToggleAmendCommitModeAction : CheckboxAction(), DumbAware {
       isVisible = presentation.isVisible
       isEnabled = presentation.isEnabled
       linkLabel.isVisible = isAmendSpecificCommitSupported
+      linkLabel.update()
     }
   }
 }

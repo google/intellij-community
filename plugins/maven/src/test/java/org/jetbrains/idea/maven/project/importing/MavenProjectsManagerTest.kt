@@ -126,8 +126,8 @@ class MavenProjectsManagerTest : MavenMultiVersionImportingTestCase() {
   @Test
   fun testDoNotScheduleResolveOfInvalidProjectsDeleted() = runBlocking {
     val called = BooleanArray(1)
-    projectsManager.addProjectsTreeListener(object : MavenProjectsTree.Listener {
-      override fun projectResolved(projectWithChanges: Pair<MavenProject, MavenProjectChanges>) {
+    project.messageBus.connect(testRootDisposable).subscribe(MavenProjectsTree.Listener.TOPIC, object : MavenProjectsTree.Listener {
+      override fun projectsResolved(projects: List<MavenProject>) {
         called[0] = true
       }
     })
@@ -536,7 +536,7 @@ class MavenProjectsManagerTest : MavenMultiVersionImportingTestCase() {
                     <version>1</version>
                     """.trimIndent())
     val log = StringBuilder()
-    projectsManager.addProjectsTreeListener(object : MavenProjectsTree.Listener {
+    project.messageBus.connect(testRootDisposable).subscribe(MavenProjectsTree.Listener.TOPIC, object : MavenProjectsTree.Listener {
       override fun projectsUpdated(updated: List<Pair<MavenProject, MavenProjectChanges>>, deleted: List<MavenProject>) {
         for (each in updated) {
           log.append("updated: ").append(each.first.displayName).append(" ")

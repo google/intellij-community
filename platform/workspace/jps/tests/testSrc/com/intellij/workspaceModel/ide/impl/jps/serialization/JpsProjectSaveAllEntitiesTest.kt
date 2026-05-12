@@ -13,6 +13,7 @@ import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.url.VirtualFileUrlManager
 import com.intellij.testFramework.ApplicationRule
 import com.intellij.testFramework.rules.ProjectModelRule
+import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.ClassRule
 import org.junit.Rule
@@ -32,33 +33,33 @@ class JpsProjectSaveAllEntitiesTest {
   }
 
   @Test
-  fun `test save sample directory based project`() {
+  fun `test save sample directory based project`() = runBlocking {
     val projectFile = File(PathManagerEx.getCommunityHomePath(), "jps/model-serialization/testData/sampleProject")
     checkLoadSave(projectFile)
   }
 
   @Test
-  fun `test save sample ipr project`() {
+  fun `test save sample ipr project`() = runBlocking {
     val projectFile = File(PathManagerEx.getCommunityHomePath(), "jps/model-serialization/testData/sampleProject-ipr/sampleProject.ipr")
     checkLoadSave(projectFile)
   }
 
   @Test
-  fun `test save facets`() {
+  fun `test save facets`() = runBlocking {
     val projectFile = File(PathManagerEx.getCommunityHomePath(),
                            "platform/workspace/jps/tests/testData/serialization/facets/facets.ipr")
     checkLoadSave(projectFile)
   }
 
   @Test
-  fun `test order of attributes in NewModuleRootManager component`() {
+  fun `test order of attributes in NewModuleRootManager component`() = runBlocking {
     val projectFile = File(PathManagerEx.getCommunityHomePath(),
                            "platform/workspace/jps/tests/testData/serialization/orderOfAttributesInRootManagerTag/orderOfAttributes.ipr")
     checkLoadSave(projectFile)
   }
 
   @Test
-  fun `add library to empty project`() {
+  fun `add library to empty project`() = runBlocking {
     val projectDir = FileUtil.createTempDirectory("jpsSaveTest", null)
     val (serializers, configLocation) = createProjectSerializers(projectDir, virtualFileManager)
     val builder = MutableEntityStorage.create()
@@ -74,7 +75,7 @@ class JpsProjectSaveAllEntitiesTest {
   }
 
   @Test
-  fun `escape special symbols in library name`() {
+  fun `escape special symbols in library name`() = runBlocking {
     val projectDir = FileUtil.createTempDirectory("jpsSaveTest", null)
     val (serializers, configLocation) = createProjectSerializers(projectDir, virtualFileManager)
     val builder = MutableEntityStorage.create()
@@ -90,7 +91,7 @@ class JpsProjectSaveAllEntitiesTest {
   }
 
   @Test
-  fun `escape special symbols in library name2`() {
+  fun `escape special symbols in library name2`() = runBlocking {
     val projectDir = FileUtil.createTempDirectory("jpsSaveTest", null)
     val (serializers, configLocation) = createProjectSerializers(projectDir, virtualFileManager)
 
@@ -107,7 +108,7 @@ class JpsProjectSaveAllEntitiesTest {
     assertDirectoryMatches(projectDir, expectedDir, emptySet(), emptyList())
   }
 
-  private fun checkLoadSave(originalProjectFile: File) {
+  private suspend fun checkLoadSave(originalProjectFile: File) {
     val projectData = copyAndLoadProject(originalProjectFile, virtualFileManager)
     FileUtil.delete(projectData.projectDir)
     projectData.serializers.saveAllEntities(projectData.storage, projectData.configLocation)

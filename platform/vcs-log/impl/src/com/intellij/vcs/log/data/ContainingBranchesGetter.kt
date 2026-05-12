@@ -12,6 +12,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.diagnostic.telemetry.TelemetryManager
 import com.intellij.platform.diagnostic.telemetry.helpers.use
 import com.intellij.platform.vcs.impl.shared.telemetry.VcsScope
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.ui.EDT
 import com.intellij.util.ui.UIUtil
@@ -43,11 +44,12 @@ class ContainingBranchesGetter internal constructor(private val logData: VcsLogD
   init {
     taskExecutor = SequentialLimitedLifoExecutor(parentDisposable, 10, CachingTask::run)
     logData.addDataPackChangeListener {
+      // Use logData.graphData (not `it`) for the checksum: when an overlay (transient small) pack fires,
+      // logData.graphData still points to the previous full pack, so the checksum stays stable.
       val checksum = logData.graphData.refsModel.branches.hashCode()
-      if (currentBranchesChecksum != checksum) { // clear cache if branches set changed after refresh
+      if (currentBranchesChecksum != checksum) {
         clearCache()
       }
-      //do not cache transient small data pack branches checksum as it will be substituted by regular data pack
       currentBranchesChecksum = checksum
     }
   }
@@ -130,12 +132,17 @@ class ContainingBranchesGetter internal constructor(private val logData: VcsLogD
   fun getContainedInCurrentBranchCondition(root: VirtualFile): Predicate<Int> =
     conditionsCache.getContainedInCurrentBranchCondition(root)
 
-  @CalledInAny
-  fun getContainingBranchesSynchronously(root: VirtualFile, hash: Hash): List<String> {
+  @RequiresBackgroundThread
+  fun getContainingBranches(root: VirtualFile, hash: Hash): List<String> {
+    val cached = cache.getIfPresent(CommitId(hash, root))
+    if (cached != null) return cached
+    return getContainingBranchesSynchronously(root, hash)
+  }
+
+  private fun getContainingBranchesSynchronously(root: VirtualFile, hash: Hash): List<String> {
     return getContainingBranchesSynchronously(logData.graphData, root, hash)
   }
 
-  @CalledInAny
   private fun getContainingBranchesSynchronously(dataPack: VcsLogGraphData, root: VirtualFile, hash: Hash): List<String> {
     return CachingTask(createTask(root, hash, dataPack), dataPack.refsModel.branches.hashCode()).run()
   }
@@ -149,6 +156,7 @@ class ContainingBranchesGetter internal constructor(private val logData: VcsLogD
   }
 
   private abstract class Task(private val myProvider: VcsLogProvider, val myRoot: VirtualFile, val myHash: Hash) {
+    abstract val shouldCache: Boolean
 
     @Throws(VcsException::class)
     fun getContainingBranches(): List<String> {
@@ -170,9 +178,16 @@ class ContainingBranchesGetter internal constructor(private val logData: VcsLogD
                                                  root: VirtualFile, hash: Hash): List<String>
   }
 
+  /**
+   * Computes containing branches by traversing the permanent graph.
+   * When the graph is not full [VcsLogGraphData.isFull], results are not correct for
+   * ancestor commits not yet loaded into the graph -- they are reported as reachable from no branch.
+   * Results from a partial graph are computed but not cached.
+   */
   private inner class GraphTask(provider: VcsLogProvider, root: VirtualFile, hash: Hash, dataPack: VcsLogGraphData) :
     Task(provider, root, hash) {
 
+    override val shouldCache = dataPack.isFull
     private val graph = dataPack.permanentGraph
     private val refs = dataPack.refsModel
 
@@ -190,6 +205,8 @@ class ContainingBranchesGetter internal constructor(private val logData: VcsLogD
   }
 
   private class ProviderTask(provider: VcsLogProvider, root: VirtualFile, hash: Hash) : Task(provider, root, hash) {
+    override val shouldCache = true
+
     @Throws(VcsException::class)
     override fun getContainingBranches(provider: VcsLogProvider,
                                        root: VirtualFile, hash: Hash) =
@@ -199,9 +216,11 @@ class ContainingBranchesGetter internal constructor(private val logData: VcsLogD
   private inner class CachingTask(private val delegate: Task, private val branchesChecksum: Int) {
     fun run(): List<String> {
       val branches = delegate.getContainingBranches()
-      val commitId = CommitId(delegate.myHash, delegate.myRoot)
-      UIUtil.invokeLaterIfNeeded {
-        cache(commitId, branches, branchesChecksum)
+      if (delegate.shouldCache) {
+        val commitId = CommitId(delegate.myHash, delegate.myRoot)
+        UIUtil.invokeLaterIfNeeded {
+          cache(commitId, branches, branchesChecksum)
+        }
       }
       return branches
     }

@@ -11,5 +11,8 @@ internal interface UISandboxPanel {
   val isScrollbarNeeded: Boolean
     get() = true
 
+  val isInternalApi: Boolean
+    get() = false
+
   fun createContent(disposable: Disposable): JComponent
 }

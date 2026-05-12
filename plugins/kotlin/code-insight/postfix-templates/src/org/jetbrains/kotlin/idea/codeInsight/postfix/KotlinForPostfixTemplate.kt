@@ -47,6 +47,7 @@ internal class KotlinItorPostfixTemplate(
     override fun getTemplateString(element: PsiElement): String = "val \$iterator$ = \$expr$.iterator()\nwhile (\$iterator$.hasNext()) {\n val \$next$ = \$iterator$.next()\n\$END$\n}"
 
     override fun getElementToRemove(expr: PsiElement): PsiElement = expr
+    override fun isApplicableForModCommand(): Boolean = true
 }
 
 internal class KotlinForWithIndexPostfixTemplate(
@@ -67,6 +68,7 @@ internal class KotlinForWithIndexPostfixTemplate(
     override fun getTemplateString(element: PsiElement): String = "for ((\$index$, \$name$) in \$expr$.withIndex()) {\n    \$END$\n}"
 
     override fun getElementToRemove(expr: PsiElement): PsiElement = expr
+    override fun isApplicableForModCommand(): Boolean = true
 }
 
 @Suppress("SpellCheckingInspection")
@@ -104,6 +106,7 @@ internal abstract class AbstractKotlinForPostfixTemplate(
         val name = MacroCallNode(SymbolBasedSuggestVariableNameMacro())
         template.addVariable("name", name, ConstantNode("item"), true)
     }
+    override fun isApplicableForModCommand(): Boolean = true
 }
 
 internal abstract class AbstractKotlinForLoopNumbersPostfixTemplate(
@@ -128,6 +131,7 @@ internal abstract class AbstractKotlinForLoopNumbersPostfixTemplate(
     override fun getTemplateString(element: PsiElement): String = template
 
     override fun getElementToRemove(expr: PsiElement): PsiElement = expr
+    override fun isApplicableForModCommand(): Boolean = true
 }
 
 internal class KotlinForLoopNumbersPostfixTemplate(

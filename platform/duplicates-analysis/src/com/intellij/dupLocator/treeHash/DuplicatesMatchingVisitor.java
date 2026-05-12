@@ -184,7 +184,7 @@ final class DuplicatesMatchingVisitor extends AbstractMatchingVisitor {
     for (PsiElement element : elements1) {
       TreeHashResult result = myTreeHasher.hash(element, null, myNodeSpecificHasher);
       if (result != null) {
-        hashToElement.computeIfAbsent(result.getHash(), __ -> new ArrayList<>()).add(element);
+        hashToElement.computeIfAbsent(result.getHash(), _ -> new ArrayList<>()).add(element);
       }
     }
 

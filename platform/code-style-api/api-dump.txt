@@ -50,7 +50,6 @@ a:com.intellij.codeStyle.CodeStyleFacade
 - a:getIndentSize(com.intellij.openapi.fileTypes.FileType):I
 - s:getInstance():com.intellij.codeStyle.CodeStyleFacade
 - s:getInstance(com.intellij.openapi.project.Project):com.intellij.codeStyle.CodeStyleFacade
-- getLineIndent(com.intellij.openapi.editor.Editor,com.intellij.lang.Language,I,Z):java.lang.String
 - a:useTabCharacter(com.intellij.openapi.fileTypes.FileType):Z
 com.intellij.formatting.ASTBlock
 - com.intellij.formatting.Block
@@ -965,6 +964,16 @@ com.intellij.psi.codeStyle.ImportsLayoutSettings
 - a:setNamesCountToUseImportOnDemand(I):V
 - a:setUseFqClassNames(Z):V
 - a:setUseSingleClassImports(Z):V
+com.intellij.psi.codeStyle.LanguageCodeStyleProvider
+- canInsertSpaceInLineComment(java.lang.String):Z
+- s:findUsingBaseLanguage(com.intellij.lang.Language):com.intellij.psi.codeStyle.LanguageCodeStyleProvider
+- s:forLanguage(com.intellij.lang.Language):com.intellij.psi.codeStyle.LanguageCodeStyleProvider
+- a:getDefaultCommonSettings():com.intellij.psi.codeStyle.CommonCodeStyleSettings
+- a:getDocCommentSettings(com.intellij.psi.codeStyle.CodeStyleSettings):com.intellij.psi.codeStyle.DocCommentSettings
+- a:getLanguage():com.intellij.lang.Language
+- a:getSupportedFields():java.util.Set
+- useBaseLanguageCommonSettings():Z
+- usesCommonKeepLineBreaks():Z
 c:com.intellij.psi.codeStyle.LegacyCodeStyleSettings
 - com.intellij.psi.codeStyle.CommonCodeStyleSettings
 - BLANK_LINES_AROUND_CLASS:I
@@ -1034,6 +1043,7 @@ a:com.intellij.psi.codeStyle.PsiBasedFileIndentOptionsProvider
 - f:getIndentOptions(com.intellij.openapi.project.Project,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.openapi.vfs.VirtualFile):com.intellij.psi.codeStyle.CommonCodeStyleSettings$IndentOptions
 - a:getIndentOptionsByPsiFile(com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.psi.PsiFile):com.intellij.psi.codeStyle.CommonCodeStyleSettings$IndentOptions
 com.intellij.psi.codeStyle.arrangement.ArrangementEntry
+- canBeGrouped():Z
 - a:canBeMatched():Z
 - a:getChildren():java.util.List
 - a:getDependencies():java.util.List
@@ -1474,7 +1484,6 @@ com.intellij.psi.codeStyle.modifier.CodeStyleStatusBarUIContributor
 f:com.intellij.psi.codeStyle.modifier.TransientCodeStyleSettings
 - com.intellij.psi.codeStyle.CodeStyleSettings
 - <init>(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.project.Project,com.intellij.psi.codeStyle.CodeStyleSettings):V
-- <init>(com.intellij.psi.PsiFile,com.intellij.psi.codeStyle.CodeStyleSettings):V
 - addDependencies(java.util.List):V
 - addDependency(com.intellij.openapi.util.ModificationTracker):V
 - getDependencies():java.util.List

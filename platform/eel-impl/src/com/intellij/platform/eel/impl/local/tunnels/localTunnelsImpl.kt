@@ -20,7 +20,7 @@ import com.intellij.platform.eel.EelTunnelsPosixApi
 import com.intellij.platform.eel.EelTunnelsWindowsApi
 import com.intellij.platform.eel.channels.EelReceiveChannel
 import com.intellij.platform.eel.channels.EelSendChannel
-import com.intellij.platform.eel.impl.asResolvedSocketAddress
+import com.intellij.platform.eel.impl.base.network.asResolvedSocketAddress
 import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.provider.LocalEelDescriptor
 import com.intellij.platform.eel.provider.utils.CopyError

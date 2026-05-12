@@ -109,7 +109,7 @@ public final class GistManagerImpl extends GistManager {
     //noinspection unchecked
     return (VirtualFileGist<Data>)myGists.computeIfAbsent(
       id,
-      __ -> new VirtualFileGistOverGistStorage<>(gistStorage.newGist(id, version, externalizer), calcData)
+      _ -> new VirtualFileGistOverGistStorage<>(gistStorage.newGist(id, version, externalizer), calcData)
     );
   }
 

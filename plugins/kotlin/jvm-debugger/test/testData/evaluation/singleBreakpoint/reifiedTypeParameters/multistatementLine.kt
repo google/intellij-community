@@ -14,4 +14,4 @@ inline fun <reified T> bar() {
 
 
 // EXPRESSION: T::class
-// RESULT: Method threw 'java.lang.UnsupportedOperationException' exception.
+// RESULT: Method threw 'java.lang.UnsupportedOperationException: This function has a reified type parameter and thus can only be inlined at compilation time, not called directly.' exception.

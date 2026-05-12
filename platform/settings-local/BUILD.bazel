@@ -1,6 +1,6 @@
 ### auto-generated section `build intellij.platform.settings.local` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_settings-local",
@@ -10,18 +10,13 @@ create_kotlinc_options(
   ]
 )
 
-resourcegroup(
-  name = "settings-local_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "settings-local",
   module_name = "intellij.platform.settings.local",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":settings-local_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_settings-local",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -43,6 +38,7 @@ jvm_library(
     "//platform/util/jdom",
     "//platform/util/xmlDom",
     "//platform/util",
+    "//platform/util-ex",
     "//platform/object-serializer",
     "//libraries/kotlinx/serialization/json",
     "//libraries/aalto-xml",
@@ -52,6 +48,7 @@ jvm_library(
 
 jvm_library(
   name = "settings-local_test_lib",
+  testonly = True,
   module_name = "intellij.platform.settings.local",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -72,6 +69,7 @@ jvm_library(
     "//platform/util/jdom:jdom_test_lib",
     "//platform/util/xmlDom:xmlDom_test_lib",
     "//platform/util:util_test_lib",
+    "//platform/util-ex:util-ex_test_lib",
     "//platform/object-serializer:object-serializer_test_lib",
     "//libraries/kotlinx/serialization/json:json_test_lib",
     "//libraries/aalto-xml:aalto-xml_test_lib",
@@ -79,6 +77,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.settings.local` end
+
+### auto-generated section `iml intellij.platform.settings.local` start
+exports_files([
+  "intellij.platform.settings.local.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.settings.local` end
 
 ### auto-generated section `build intellij.platform.settings.local.tests` start
 create_kotlinc_options(
@@ -91,12 +95,14 @@ create_kotlinc_options(
 
 jvm_library(
   name = "settings-local-tests",
+  module_name = "intellij.platform.settings.local.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "settings-local-tests_test_lib",
+  testonly = True,
   visibility = ["//visibility:public"],
   srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java", "testSrc/**/*.form"], allow_empty = True),
   kotlinc_opts = ":custom_settings-local-tests",
@@ -108,7 +114,8 @@ jvm_library(
     "@lib//:kotlin-stdlib",
     "@lib//:jetbrains-annotations",
     "@lib//:junit5",
-    "@lib//:assert_j",
+    "//libraries/assertj-core",
+    "//libraries/assertj-core:assertj-core_test_lib",
     "//platform/extensions",
     "//platform/extensions:extensions_test_lib",
     "//platform/core-api:core",
@@ -164,6 +171,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.settings.local.tests` end
+
+### auto-generated section `iml intellij.platform.settings.local.tests` start
+exports_files([
+  "intellij.platform.settings.local.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.settings.local.tests` end
 
 ### auto-generated section `test intellij.platform.settings.local.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

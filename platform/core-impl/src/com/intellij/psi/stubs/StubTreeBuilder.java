@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.concurrent.CancellationException;
 
 public final class StubTreeBuilder {
+  private static ThreadLocal<Boolean> isStubBuilding = ThreadLocal.withInitial(() -> false);
 
   private static final Logger LOG = Logger.getInstance(StubTreeBuilder.class);
 
@@ -142,7 +143,15 @@ public final class StubTreeBuilder {
               if (stubBuilder instanceof LightStubBuilder) {
                 LightStubBuilder.FORCED_AST.set(fileContent.getLighterAST());
               }
-              built = handleStubBuilderException(inputData, stubBuilderType, () -> stubBuilder.buildStubTree(psi));
+              built = handleStubBuilderException(inputData, stubBuilderType, () -> {
+                try {
+                  isStubBuilding.set(true);
+                  return stubBuilder.buildStubTree(psi);
+                }
+                finally {
+                  isStubBuilding.set(false);
+                }
+              });
               List<Pair<LanguageStubDescriptor, PsiFile>> stubbedRoots = getStubbedRootDescriptors(viewProvider);
               List<PsiFileStub<?>> stubs = new ArrayList<>(stubbedRoots.size());
               stubs.add((PsiFileStub<?>)built);
@@ -219,5 +228,10 @@ public final class StubTreeBuilder {
     });
 
     return ContainerUtil.map(roots, trinity -> Pair.create(trinity.second, trinity.third));
+  }
+
+  @ApiStatus.Internal
+  public static boolean isBuildingStub() {
+    return isStubBuilding.get();
   }
 }

@@ -42,7 +42,7 @@ class SeTabMock(
   }
 
   companion object {
-    fun create(
+    suspend fun create(
       project: Project?,
       session: SeSession,
       name: String,
@@ -50,7 +50,7 @@ class SeTabMock(
       initEvent: AnActionEvent,
       scope: CoroutineScope,
     ): SeTabMock {
-      val delegate = SeTabDelegate(project, session, name, providerIds, initEvent, scope)
+      val delegate = SeTabDelegate.create(project, session, name, providerIds, initEvent, scope)
       return SeTabMock(name, delegate)
     }
   }

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.execution.build
 
 import com.intellij.execution.RunManager
@@ -8,7 +8,8 @@ import org.gradle.util.GradleVersion
 import org.jetbrains.plugins.gradle.execution.build.GroovyGradleProjectTaskRunnerTest.Companion.GROOVY5_PROJECT
 import org.jetbrains.plugins.gradle.testFramework.GradleExecutionTestCase
 import org.jetbrains.plugins.gradle.testFramework.annotations.AllGradleVersionsSource
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatGroovy5IsSupported
+import org.jetbrains.plugins.gradle.testFramework.util.GROOVY_5_SUPPORTED_VERSIONS
+import org.jetbrains.plugins.gradle.tooling.annotation.TargetVersions
 import org.jetbrains.plugins.groovy.runner.GroovyScriptRunConfiguration
 import org.jetbrains.plugins.groovy.runner.GroovyScriptRunConfigurationType
 import org.junit.jupiter.params.ParameterizedTest
@@ -16,10 +17,10 @@ import org.junit.jupiter.params.ParameterizedTest
 class GroovyGradleApplicationEnvironmentProviderTest : GradleExecutionTestCase() {
   @AllGradleVersionsSource
   @ParameterizedTest
+  @TargetVersions(GROOVY_5_SUPPORTED_VERSIONS)
   fun `test run groovy 5 via gradle`(
     gradleVersion: GradleVersion,
   ) {
-    assumeThatGroovy5IsSupported(gradleVersion)
     test(gradleVersion, GROOVY5_PROJECT) {
 
       writeText("src/main/groovy/org/example/App.groovy", """

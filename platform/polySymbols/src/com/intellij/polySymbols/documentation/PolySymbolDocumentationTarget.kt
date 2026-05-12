@@ -2,8 +2,8 @@
 package com.intellij.polySymbols.documentation
 
 import com.intellij.platform.backend.documentation.DocumentationTarget
+import com.intellij.platform.backend.presentation.TargetPresentation
 import com.intellij.polySymbols.PolySymbol
-import com.intellij.polySymbols.documentation.impl.PolySymbolDocumentationBuilderImpl
 import com.intellij.polySymbols.documentation.impl.PolySymbolDocumentationTargetImpl
 import com.intellij.psi.PsiElement
 import org.jetbrains.annotations.ApiStatus
@@ -17,6 +17,10 @@ interface PolySymbolDocumentationTarget : DocumentationTarget {
 
   val documentation: PolySymbolDocumentation
 
+  fun interface PresentationProvider<T: PolySymbol> {
+    fun getPresentation(symbol: T): TargetPresentation
+  }
+
   companion object {
 
     /**
@@ -25,32 +29,28 @@ interface PolySymbolDocumentationTarget : DocumentationTarget {
      * and both symbol and location can be dereferenced from pointers.
      */
     @JvmStatic
-    fun <T: PolySymbol> create(
+    fun <T : PolySymbol> create(
       symbol: T,
       location: PsiElement?,
       builder: (PolySymbolDocumentationBuilder.(symbol: T, location: PsiElement?) -> Unit),
     ): PolySymbolDocumentationTarget =
-      PolySymbolDocumentationTargetImpl(symbol, location) { symbol, location ->
-        PolySymbolDocumentationBuilderImpl(symbol, location)
-          .also { it.builder(symbol, location) }
-          .build()
-      }
+      PolySymbolDocumentationTargetImpl(symbol, location, null, builder)
         .also { PolySymbolDocumentationTargetImpl.check(builder) }
 
     /**
-     * The provider should use symbol and location parameters,
+     * Provided builder lambda should use symbol and location parameters,
      * since the documentation can be created lazily in another read action
      * and both symbol and location can be dereferenced from pointers.
      */
     @JvmStatic
-    fun <T: PolySymbol> create(
+    fun <T : PolySymbol> create(
       symbol: T,
       location: PsiElement?,
-      provider: PolySymbolDocumentationProvider<T>,
+      presentationProvider: PresentationProvider<T>,
+      builder: (PolySymbolDocumentationBuilder.(symbol: T, location: PsiElement?) -> Unit),
     ): PolySymbolDocumentationTarget =
-      PolySymbolDocumentationTargetImpl(symbol, location, provider)
-        .also { PolySymbolDocumentationTargetImpl.check(provider) }
-
+      PolySymbolDocumentationTargetImpl(symbol, location, presentationProvider, builder)
+        .also { PolySymbolDocumentationTargetImpl.check(builder) }
   }
 
 }

@@ -34,16 +34,16 @@ internal abstract class AbstractImportCandidatesProvider(): ImportCandidatesProv
     private val file: KtFile get() = importContext.position.containingKtFile
     private val fileImports: List<ImportPath> by lazy { file.importDirectives.mapNotNull { it.importPath } }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     protected fun ImportCandidate.isVisible(visibilityChecker: KaUseSiteVisibilityChecker): Boolean = 
         when (this) {
             is CallableImportCandidate -> symbol.isVisible(visibilityChecker) && dispatcherObject?.isVisible(visibilityChecker) != false
             is ClassLikeImportCandidate -> symbol.isVisible(visibilityChecker)
         }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun KaSymbol.isVisible(visibilityChecker: KaUseSiteVisibilityChecker): Boolean =
         this is KaDeclarationSymbol && visibilityChecker.isVisible(this)
 

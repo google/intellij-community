@@ -35,7 +35,7 @@ import java.nio.file.Path
 
 private const val TEST_DATA_SUBFOLDER = "widgetTree"
 
-@TestDataPath("\$CONTENT_ROOT/testData/$TEST_DATA_SUBFOLDER")
+@TestDataPath("\$CONTENT_ROOT/../testData/$TEST_DATA_SUBFOLDER")
 class GitWidgetTreeStructureTest : GitPlatformTest() {
   private lateinit var repo: GitRepository
   private lateinit var broRepoPath: Path

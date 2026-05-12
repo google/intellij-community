@@ -35,8 +35,8 @@ import org.jetbrains.kotlin.psi.KtWhenConditionWithExpression
 import org.jetbrains.kotlin.psi.KtWhenEntry
 import org.jetbrains.kotlin.psi.KtWhileExpression
 
-context(_: KaSession)
 @OptIn(KaNonPublicApi::class)
+context(_: KaSession)
 internal fun isSmartCastNecessary(expr: KtExpression, value: Boolean): Boolean {
     val values = getValuesInExpression(expr)
     if (values.isEmpty()) return false

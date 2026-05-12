@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diff.tools.simple;
 
 import com.intellij.codeWithMe.ClientId;
@@ -148,9 +148,13 @@ public class SimpleDiffViewer extends TwosideTextDiffViewer {
 
   @Override
   protected @NotNull List<AnAction> createToolbarActions() {
-    List<AnAction> group = new ArrayList<>(myTextDiffProvider.getToolbarActions());
-    group.add(new MyToggleExpandByDefaultAction());
-    group.add(new MyToggleAutoScrollAction());
+    List<AnAction> diffActions = new ArrayList<>();
+    diffActions.add(new MyToggleExpandByDefaultAction());
+    diffActions.add(new MyToggleAutoScrollAction());
+    diffActions.addAll(myTextDiffProvider.getDiffSettingsActions());
+    myEditorSettingsAction.setDiffActions(diffActions);
+
+    List<AnAction> group = new ArrayList<>();
     group.add(new MyReadOnlyLockAction());
     group.add(myEditorSettingsAction);
 
@@ -162,9 +166,10 @@ public class SimpleDiffViewer extends TwosideTextDiffViewer {
 
   @Override
   protected @NotNull List<AnAction> createPopupActions() {
-    List<AnAction> group = new ArrayList<>(myTextDiffProvider.getPopupActions());
-    group.add(new MyToggleAutoScrollAction());
+    List<AnAction> group = new ArrayList<>();
     group.add(new MyToggleExpandByDefaultAction());
+    group.add(new MyToggleAutoScrollAction());
+    group.addAll(myTextDiffProvider.getDiffSettingsActions());
 
     group.add(Separator.getInstance());
     group.addAll(super.createPopupActions());

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.testFramework.eelJava
 
 import com.intellij.openapi.diagnostic.logger
@@ -9,8 +9,13 @@ import com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallRequestInf
 import com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstaller
 import com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem
 import com.intellij.openapi.projectRoots.impl.jdkDownloader.ReadJdkItemsForWSL
+import com.intellij.platform.eel.EelDescriptor
+import com.intellij.platform.eel.annotations.MultiRoutingFileSystemPath
+import com.intellij.platform.eel.fs.getPath
+import com.intellij.platform.eel.provider.LocalEelDescriptor
+import com.intellij.platform.eel.provider.asNioPath
 import com.intellij.platform.testFramework.eelJava.EelTestUtil.getEelFixtureEngineJavaHome
-import com.intellij.platform.testFramework.eelJava.EelTestUtil.getFixtureEngine
+import com.intellij.platform.testFramework.eelJava.EelTestUtil.getFileSystemMount
 import com.intellij.platform.testFramework.eelJava.EelTestUtil.getTeamcityWslJdkDefinition
 import org.jetbrains.annotations.ApiStatus
 import java.nio.file.Path
@@ -22,36 +27,42 @@ object EelTestJdkProvider {
   private val LOG = logger<EelTestJdkProvider>()
 
   @JvmStatic
-  fun getJdkPath(): Path? {
-    val engine = getFixtureEngine()
-    if (engine == EelTestUtil.EelFixtureEngine.NONE) {
-      return null
-    }
-    val jdkPath = getEelFixtureEngineJavaHome()
-    if (engine == EelTestUtil.EelFixtureEngine.WSL) {
-      val definition = getTeamcityWslJdkDefinition()
-      if (definition != null) {
-        val jdkToInstall = readJdkItem(definition)
-        checkOrInstallJDK(jdkPath, jdkToInstall)
+  fun getJdkPath(eelDescriptor: EelDescriptor): @MultiRoutingFileSystemPath Path? {
+    val installJdkOnWsl = when (EelTestUtil.getFixtureEngine()) {
+      EelTestUtil.EelFixtureEngine.NONE -> {
+        require(eelDescriptor is LocalEelDescriptor)
+        return null
+      }
+      EelTestUtil.EelFixtureEngine.DOCKER -> {
+        false
+      }
+      EelTestUtil.EelFixtureEngine.WSL -> {
+        true
       }
     }
+
+    val jdkPath = eelDescriptor.getPath(getEelFixtureEngineJavaHome().removePrefix(getFileSystemMount())).asNioPath()
+    if (installJdkOnWsl) {
+      if (jdkPath.resolve("bin/java").exists()) {
+        LOG.info("JDK is installed in $jdkPath. Nothing to do.")
+      }
+      else {
+        val definition = getTeamcityWslJdkDefinition()
+        if (definition != null) {
+          val jdkToInstall = readJdkItem(definition)
+          ProgressManager.getInstance().runUnderEmptyProgress { progress ->
+            val installer = JdkInstaller.getInstance()
+            installer.installJdk(JdkInstallRequestInfo(jdkToInstall, jdkPath), progress, null)
+          }
+        }
+      }
+    }
+
     return jdkPath
   }
 
   private fun readJdkItem(path: Path): JdkItem {
     return ReadJdkItemsForWSL.readJdkItems(path)[0]
-  }
-
-  private fun checkOrInstallJDK(path: Path, jdkItem: JdkItem) {
-    if (path.resolve("bin/java").exists()) {
-      LOG.info("JDK is installed in $path. Nothing to do.")
-    }
-    else {
-      ProgressManager.getInstance().runUnderEmptyProgress { progress ->
-        val installer = JdkInstaller.getInstance()
-        installer.installJdk(JdkInstallRequestInfo(jdkItem, path), progress, null)
-      }
-    }
   }
 
   private fun ProgressManager.runUnderEmptyProgress(fn: (indicator: ProgressIndicator) -> Unit) {

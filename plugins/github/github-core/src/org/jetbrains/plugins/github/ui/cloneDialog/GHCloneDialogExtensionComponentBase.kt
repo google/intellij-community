@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.github.ui.cloneDialog
 
+import com.intellij.collaboration.auth.ui.AccountsPanelFactory.Companion.addWarningForEnabledCredentialHelper
 import com.intellij.collaboration.auth.ui.CompactAccountsPanelFactory
 import com.intellij.collaboration.messages.CollaborationToolsBundle
 import com.intellij.collaboration.ui.CollaborationToolsUIUtil
@@ -39,6 +40,7 @@ import com.intellij.util.ui.cloneDialog.AccountMenuItem
 import com.intellij.util.ui.cloneDialog.VcsCloneDialogUiSpec
 import git4idea.GitUtil
 import git4idea.checkout.GitCloneUtils
+import git4idea.config.GitVcsApplicationSettings
 import git4idea.remote.GitRememberedInputs
 import git4idea.ui.GitShallowCloneComponentFactory
 import git4idea.ui.GitShallowCloneViewModel
@@ -170,6 +172,8 @@ internal abstract class GHCloneDialogExtensionComponentBase(
           }
       }
       GitShallowCloneComponentFactory.appendShallowCloneRow(this, shallowCloneModel)
+      addWarningForEnabledCredentialHelper(GitVcsApplicationSettings.getInstance().isUseCredentialHelper, ::panel)
+        .align(AlignX.RIGHT)
     }
     repositoriesPanel.border = JBEmptyBorder(UIUtil.getRegularPanelInsets())
     setupAccountsListeners()

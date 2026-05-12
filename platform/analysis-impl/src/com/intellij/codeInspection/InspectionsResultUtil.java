@@ -58,7 +58,7 @@ public final class InspectionsResultUtil {
       String[] path = toolWrapper.getGroupPath();
       String groupPath = path.length == 0 ? "" : String.join("/", JBIterable.of(path).take(path.length - 1));
       Set<InspectionToolWrapper<?, ?>> groupInspections = map.computeIfAbsent(
-        new Pair<>(groupName, groupPath), __ -> new HashSet<>());
+        new Pair<>(groupName, groupPath), _ -> new HashSet<>());
       groupInspections.add(toolWrapper);
     }
 

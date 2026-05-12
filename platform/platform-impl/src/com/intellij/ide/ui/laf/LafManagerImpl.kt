@@ -233,11 +233,6 @@ class LafManagerImpl(private val coroutineScope: CoroutineScope) : LafManager(),
     eventDispatcher.addListener(listener)
   }
 
-  @Suppress("removal")
-  override fun removeLafManagerListener(listener: LafManagerListener) {
-    eventDispatcher.removeListener(listener)
-  }
-
   override fun initializeComponent() {
     // must be after updateUI
     isFirstSetup = false
@@ -1264,6 +1259,13 @@ private class OurPopupFactory(private val delegate: PopupFactory) : PopupFactory
     // disable popup caching by runtime
     popup = HeavyWeightPopup(popup, window)
     val rootPane = (window as RootPaneContainer?)!!.rootPane
+
+
+    // In some environments, e.g. native Wayland, the default root and/or window background (white)
+    // may be displayed briefly, causing very noticeable flickering in dark themes (IJPL-222913, IJPL-241229).
+    window.setBackground(contents.getBackground())
+    rootPane.setBackground(contents.getBackground())
+
     rootPane.glassPane = IdeGlassPaneImpl(rootPane, false)
     rootPane.putClientProperty(WINDOW_ALPHA, 1.0f)
     window.addWindowListener(object : WindowAdapter() {

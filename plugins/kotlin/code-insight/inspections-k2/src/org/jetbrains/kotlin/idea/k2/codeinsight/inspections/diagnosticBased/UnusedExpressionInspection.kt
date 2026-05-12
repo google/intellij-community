@@ -28,7 +28,6 @@ internal class UnusedExpressionInspection : KotlinApplicableInspectionBase<KtExp
     @JvmInline
     value class Context(val isQuickFixAvailable: Boolean)
 
-    @OptIn(KaExperimentalApi::class)
     override fun KaSession.prepareContext(element: KtExpression): Context? {
         if (!isAvailable(element)) return null
         return Context(isQuickFixAvailable(element))
@@ -69,7 +68,7 @@ internal class UnusedExpressionInspection : KotlinApplicableInspectionBase<KtExp
 
 @OptIn(KaExperimentalApi::class)
 private fun KaSession.isAvailable(element: KtExpression): Boolean =
-    element.diagnostics(KaDiagnosticCheckerFilter.ONLY_EXTENDED_CHECKERS)
+    element.diagnostics(KaDiagnosticCheckerFilter.ONLY_COMMON_CHECKERS)
         .any { it is KaFirDiagnostic.UnusedExpression }
 
 

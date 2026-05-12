@@ -49,7 +49,7 @@ internal class PolySymbolRenameUsageSearcher : RenameUsageSearcher {
 
     override val fileUpdater: ModifiableRenameUsage.FileUpdater
       get() = fileRangeUpdater {
-        symbol.adjustNameForRefactoring(queryExecutor, symbolName, it, range.substring(file.text))
+        queryExecutor.namesProvider.adjustRename(symbolName, it, range.substring(file.text))
       }
 
     override fun createPointer(): Pointer<out PsiModifiableRenameUsage> {

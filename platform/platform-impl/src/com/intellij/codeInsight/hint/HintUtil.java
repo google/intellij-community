@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.hint;
 
 import com.intellij.icons.AllIcons;
@@ -21,7 +21,7 @@ import com.intellij.util.ui.Html;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.StartupUiUtil;
 import com.intellij.util.ui.UIUtil;
-import org.intellij.lang.annotations.JdkConstants;
+import com.intellij.util.ui.JdkConstants;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
@@ -47,15 +47,11 @@ import static com.intellij.openapi.editor.colors.EditorColorsUtil.getGlobalOrDef
 import static com.intellij.util.ObjectUtils.notNull;
 
 public final class HintUtil {
-  /** @deprecated use getInformationColor() */
-  @Deprecated(forRemoval = true)
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  public static final Color INFORMATION_COLOR = new JBColor(0xF7F7F7, 0x4B4D4D);
   /** @deprecated use HINT_BORDER_COLOR_KEY */
   @Deprecated(forRemoval = true)
   public static final Color INFORMATION_BORDER_COLOR = JBColor.namedColor("InformationHint.borderColor", new JBColor(0xE0E0E0, 0x5C5E61));
 
-  public static final ColorKey INFORMATION_COLOR_KEY = ColorKey.createColorKey("INFORMATION_HINT", INFORMATION_COLOR);
+  public static final ColorKey INFORMATION_COLOR_KEY = ColorKey.createColorKey("INFORMATION_HINT", new JBColor(0xF7F7F7, 0x4B4D4D));
   public static final ColorKey QUESTION_COLOR_KEY = ColorKey.createColorKey("QUESTION_HINT", new JBColor(0xb5d0fb, 0x376c89));
   public static final ColorKey WARNING_COLOR_KEY = ColorKey.createColorKey("WARNING_HINT", new JBColor(0xfff8dc, 0x665014));
   public static final ColorKey ERROR_COLOR_KEY = ColorKey.createColorKey("ERROR_HINT", new JBColor(0xffdcdc, 0x781732));

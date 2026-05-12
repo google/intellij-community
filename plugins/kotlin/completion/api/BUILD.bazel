@@ -20,7 +20,6 @@ jvm_library(
   kotlinc_opts = ":custom_api",
   deps = [
     "@lib//:kotlin-stdlib",
-    "//plugins/kotlin/base/frontend-agnostic",
     "//platform/core-api:core",
     "//platform/analysis-api:analysis",
     "//platform/core-impl",
@@ -37,13 +36,13 @@ jvm_library(
 
 jvm_library(
   name = "api_test_lib",
+  testonly = True,
   module_name = "intellij.kotlin.completion.api",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   kotlinc_opts = ":custom_api",
   runtime_deps = [
     ":api",
-    "//plugins/kotlin/base/frontend-agnostic:frontend-agnostic_test_lib",
     "//platform/core-api:core_test_lib",
     "//platform/analysis-api:analysis_test_lib",
     "//platform/core-impl:core-impl_test_lib",
@@ -56,3 +55,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.kotlin.completion.api` end
+
+### auto-generated section `iml intellij.kotlin.completion.api` start
+exports_files([
+  "intellij.kotlin.completion.api.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.kotlin.completion.api` end

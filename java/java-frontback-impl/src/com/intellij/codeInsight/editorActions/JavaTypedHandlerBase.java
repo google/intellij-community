@@ -10,12 +10,12 @@ import com.intellij.core.JavaPsiBundle;
 import com.intellij.ide.highlighter.JavaFileType;
 import com.intellij.java.syntax.parser.JavaKeywords;
 import com.intellij.lang.xml.XMLLanguage;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorModificationUtil;
 import com.intellij.openapi.editor.EditorModificationUtilEx;
+import com.intellij.openapi.editor.EditorThreading;
 import com.intellij.openapi.editor.highlighter.HighlighterIterator;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
@@ -70,6 +70,7 @@ import org.jetbrains.annotations.Nullable;
 
 public class JavaTypedHandlerBase extends TypedHandlerDelegate {
   private boolean myJavaLTTyped;
+  private boolean myJavaLTTypedInClassBody;
 
   protected JavaTypedHandlerBase() {
   }
@@ -144,12 +145,15 @@ public class JavaTypedHandlerBase extends TypedHandlerDelegate {
     int offsetBefore = editor.getCaretModel().getOffset();
 
     //important to calculate before inserting charTyped
-    myJavaLTTyped = '<' == c &&
-                    !isJspFile(file) &&
-                    CodeInsightSettings.getInstance().AUTOINSERT_PAIR_BRACKET &&
-                    isLanguageLevel5OrHigher(file) &&
-                    TypedHandlerUtil.isAfterClassLikeIdentifierOrDot(offsetBefore, editor, JavaTokenType.DOT, JavaTokenType.IDENTIFIER,
-                                                                     true);
+    myJavaLTTyped = false;
+    myJavaLTTypedInClassBody = false;
+    if ('<' == c &&
+        !isJspFile(file) &&
+        CodeInsightSettings.getInstance().AUTOINSERT_PAIR_BRACKET &&
+        isLanguageLevel5OrHigher(file)) {
+      myJavaLTTypedInClassBody = isAtTopLevelInClassBody(offsetBefore, editor, file);
+      myJavaLTTyped = myJavaLTTypedInClassBody || isAfterGenericLtStart(offsetBefore, editor);
+    }
 
     if ('>' == c) {
       if (!isJspFile(file) && CodeInsightSettings.getInstance().AUTOINSERT_PAIR_BRACKET && isLanguageLevel5OrHigher(file)) {
@@ -244,6 +248,50 @@ public class JavaTypedHandlerBase extends TypedHandlerDelegate {
     }
 
     return Result.CONTINUE;
+  }
+
+  private static boolean isAfterGenericLtStart(int offset, @NotNull Editor editor) {
+    if (TypedHandlerUtil.isAfterClassLikeIdentifierOrDot(offset, editor, JavaTokenType.DOT, JavaTokenType.IDENTIFIER, true)) {
+      return true;
+    }
+
+    HighlighterIterator iterator = editor.getHighlighter().createIterator(offset);
+    if (iterator.atEnd()) {
+      return false;
+    }
+    if (offset != iterator.getEnd() && iterator.getStart() > 0) {
+      iterator.retreat();
+    }
+    return JavaTypingTokenSets.KEYWORDS_BEFORE_METHOD_TYPE_PARAMETERS.contains(iterator.getTokenType());
+  }
+
+  private static boolean isAtTopLevelInClassBody(int offset, @NotNull Editor editor, @NotNull PsiFile file) {
+    PsiDocumentManager.getInstance(file.getProject()).commitDocument(editor.getDocument());
+    PsiElement element = file.findElementAt(offset);
+    if (element == null && offset > 0) {
+      element = file.findElementAt(offset - 1);
+    }
+    if (element == null || !(element.getParent() instanceof PsiClass aClass)) {
+      return false;
+    }
+
+    if (aClass.isAnnotationType()) {
+      return false;
+    }
+    PsiElement lBrace = aClass.getLBrace();
+    if (lBrace == null || offset <= lBrace.getTextRange().getEndOffset()) {
+      return false;
+    }
+    PsiElement rBrace = aClass.getRBrace();
+    if (rBrace != null && offset > rBrace.getTextRange().getStartOffset()) {
+      return false;
+    }
+    PsiElement previousVisibleLeaf = PsiTreeUtil.prevVisibleLeaf(element);
+    if (previousVisibleLeaf != null &&
+        PsiTreeUtil.getParentOfType(previousVisibleLeaf, PsiExpression.class, false, PsiMember.class) != null) {
+      return false;
+    }
+    return true;
   }
 
   private static @Nullable Result processOpenBraceInOneLineCaseRule(@NotNull Project project,
@@ -354,7 +402,15 @@ public class JavaTypedHandlerBase extends TypedHandlerDelegate {
 
     if (myJavaLTTyped) {
       myJavaLTTyped = false;
-      TypedHandlerUtil.handleAfterGenericLT(editor, JavaTokenType.LT, JavaTokenType.GT, JavaTypingTokenSets.INVALID_INSIDE_REFERENCE);
+      if (myJavaLTTypedInClassBody) {
+        myJavaLTTypedInClassBody = false;
+        int offset = editor.getCaretModel().getOffset();
+        editor.getDocument().insertString(offset, ">");
+        TabOutScopesTracker.getInstance().registerEmptyScope(editor, offset);
+      }
+      else {
+        TypedHandlerUtil.handleAfterGenericLT(editor, JavaTokenType.LT, JavaTokenType.GT, JavaTypingTokenSets.INVALID_INSIDE_REFERENCE);
+      }
       return Result.STOP;
     }
     else if (c == ':') {
@@ -413,7 +469,7 @@ public class JavaTypedHandlerBase extends TypedHandlerDelegate {
       return false;
     }
 
-    ApplicationManager.getApplication().assertWriteAccessAllowed();
+    EditorThreading.assertWriteAllowed();
 
     // Note, this feature may be rewritten using only lexer if needed.
     // In that case accuracy will not be 100%, but good enough.

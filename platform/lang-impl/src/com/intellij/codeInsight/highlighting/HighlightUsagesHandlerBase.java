@@ -6,6 +6,7 @@ import com.intellij.codeInsight.CodeInsightBundle;
 import com.intellij.codeInsight.hint.HintManager;
 import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.psi.impl.source.tree.injected.InjectedLanguageEditorUtil;
 import com.intellij.openapi.editor.colors.EditorColors;
 import com.intellij.openapi.project.PossiblyDumbAware;
 import com.intellij.openapi.util.NlsContexts;
@@ -45,11 +46,12 @@ public abstract class HighlightUsagesHandlerBase<T extends PsiElement> implement
   }
 
   private void performHighlighting() {
-    boolean clearHighlights = HighlightUsagesHandler.isClearHighlights(myEditor);
+    Editor targetEditor = InjectedLanguageEditorUtil.getTopLevelEditor(myEditor);
+    boolean clearHighlights = HighlightUsagesHandler.isClearHighlights(targetEditor);
     HighlightUsagesHandler.highlightRanges(HighlightManager.getInstance(myFile.getProject()),
-                                           myEditor, EditorColors.SEARCH_RESULT_ATTRIBUTES, clearHighlights, myReadUsages);
+                                           targetEditor, EditorColors.SEARCH_RESULT_ATTRIBUTES, clearHighlights, myReadUsages);
     HighlightUsagesHandler.highlightRanges(HighlightManager.getInstance(myFile.getProject()),
-                                           myEditor, EditorColors.WRITE_SEARCH_RESULT_ATTRIBUTES, clearHighlights, myWriteUsages);
+                                           targetEditor, EditorColors.WRITE_SEARCH_RESULT_ATTRIBUTES, clearHighlights, myWriteUsages);
     if (!clearHighlights) {
       WindowManager.getInstance().getStatusBar(myFile.getProject()).setInfo(myStatusText);
 

@@ -44,7 +44,8 @@ object DirectiveBasedActionUtils {
      * - all other quickfixes with names not mentioned in "//ACTION" are not available.
      * When no "// ACTION" directives are present in the file, quickfixes are not checked.
      */
-    const val K1_ACTIONS_LIST_DIRECTIVE: String = "// ACTION:"
+    const val ACTION_DIRECTIVE: String = "// ACTION:"
+    const val K1_ACTIONS_LIST_DIRECTIVE: String = ACTION_DIRECTIVE
     const val K2_ACTIONS_LIST_DIRECTIVE: String = "// K2_ACTIONS_LIST:"
     const val IGNORE_IRRELEVANT_ACTIONS_DIRECTIVE: String = "// IGNORE_IRRELEVANT_ACTIONS"
 

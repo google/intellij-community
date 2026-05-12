@@ -5,8 +5,10 @@ import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.provider.utils.getOrThrowFileSystemException
 import com.intellij.platform.ijent.fs.IjentFileSystemApi
 import com.intellij.platform.ijent.fs.IjentFileSystemPosixApi
+import com.intellij.platform.ijent.fs.IjentFileSystemWindowsApi
 import java.nio.file.FileStore
 import java.nio.file.attribute.BasicFileAttributeView
+import java.nio.file.attribute.DosFileAttributeView
 import java.nio.file.attribute.FileAttributeView
 import java.nio.file.attribute.FileStoreAttributeView
 
@@ -53,6 +55,7 @@ internal class IjentNioFileStore(
     }
     when (ijentFsApi) {
       is IjentFileSystemPosixApi -> return type == IjentNioPosixFileAttributeView::class.java
+      is IjentFileSystemWindowsApi -> return type == DosFileAttributeView::class.java
       else -> return false
     }
   }
@@ -63,6 +66,7 @@ internal class IjentNioFileStore(
     }
     when (ijentFsApi) {
       is IjentFileSystemPosixApi -> return name == "posix"
+      is IjentFileSystemWindowsApi -> return name == "dos"
       else -> return false
     }
   }

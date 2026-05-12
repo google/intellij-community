@@ -253,12 +253,12 @@ final class StubTreeLoaderImpl extends StubTreeLoader implements Closeable {
   }
 
   @Override
-  public void rebuildStubTree(VirtualFile virtualFile) {
+  public void rebuildStubTree(@NotNull VirtualFile virtualFile) {
     FileBasedIndex.getInstance().requestReindex(virtualFile);
   }
 
   @Override
-  public boolean canHaveStub(VirtualFile file) {
+  public boolean canHaveStub(@NotNull VirtualFile file) {
     return StubUpdatingIndex.canHaveStub(file);
   }
 

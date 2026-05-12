@@ -18,11 +18,13 @@ import com.intellij.psi.search.searches.FunctionalExpressionSearch
 import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.ui.awt.RelativePoint
 import com.intellij.util.Function
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolModality
 import org.jetbrains.kotlin.analysis.api.symbols.KaValueParameterSymbol
 import org.jetbrains.kotlin.asJava.toLightClass
+import org.jetbrains.kotlin.idea.base.psi.isEffectivelyActual
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeInsight.lineMarkers.dsl.collectHighlightingDslMarkers
 import org.jetbrains.kotlin.idea.codeInsight.lineMarkers.shared.AbstractKotlinLineMarkerProvider
@@ -32,8 +34,10 @@ import org.jetbrains.kotlin.idea.highlighter.markers.InheritanceMergeableLineMar
 import org.jetbrains.kotlin.idea.highlighter.markers.KotlinGutterTooltipHelper
 import org.jetbrains.kotlin.idea.highlighter.markers.KotlinLineMarkerOptions
 import org.jetbrains.kotlin.idea.k2.codeinsight.KotlinGoToSuperDeclarationsHandler
+import org.jetbrains.kotlin.idea.search.ExpectActualUtils.actualsForExpect
 import org.jetbrains.kotlin.idea.search.KotlinSearchUsagesSupport.SearchUtils.isInheritable
 import org.jetbrains.kotlin.idea.search.KotlinSearchUsagesSupport.SearchUtils.isOverridable
+import org.jetbrains.kotlin.idea.searching.inheritors.hasAnyActuals
 import org.jetbrains.kotlin.idea.searching.inheritors.hasAnyInheritors
 import org.jetbrains.kotlin.idea.searching.inheritors.hasAnyOverridings
 import org.jetbrains.kotlin.lexer.KtTokens
@@ -49,6 +53,7 @@ import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
 import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
 import org.jetbrains.kotlin.psi.psiUtil.hasBody
+import org.jetbrains.kotlin.psi.psiUtil.isExpectDeclaration
 import java.awt.event.MouseEvent
 import java.util.concurrent.atomic.AtomicReference
 
@@ -73,7 +78,8 @@ class KotlinLineMarkerProvider : AbstractKotlinLineMarkerProvider() {
     }
 
     private fun collectCallableOverridings(element: KtCallableDeclaration, result: MutableCollection<in LineMarkerInfo<*>>) {
-        if (!element.isOverridable()) {
+        val isExpectDeclaration = element.isExpectDeclaration()
+        if (!element.isOverridable() && !isExpectDeclaration) {
             return
         }
 
@@ -83,7 +89,7 @@ class KotlinLineMarkerProvider : AbstractKotlinLineMarkerProvider() {
         val isAbstract = CallableOverridingsTooltip.isAbstract(element, klass)
         val gutter = if (isAbstract) KotlinLineMarkerOptions.implementedOption else KotlinLineMarkerOptions.overriddenOption
         if (!gutter.isEnabled) return
-        if (!element.hasAnyOverridings() && (element.hasBody() || !isUsedSamInterface(klass))) return
+        if (!element.hasAnyActuals() && !element.hasAnyOverridings() && (element.hasBody() || !isUsedSamInterface(klass))) return
 
         val anchor = element.nameIdentifier ?: element
 
@@ -107,17 +113,18 @@ class KotlinLineMarkerProvider : AbstractKotlinLineMarkerProvider() {
     }
 
     private fun collectSuperDeclarations(declaration: KtCallableDeclaration, result: MutableCollection<in LineMarkerInfo<*>>) {
-        if (!(declaration.hasModifier(KtTokens.OVERRIDE_KEYWORD) || (declaration.containingFile as KtFile).isCompiled)) {
+        if (!(declaration.hasModifier(KtTokens.OVERRIDE_KEYWORD) || declaration.isEffectivelyActual() || (declaration.containingFile as KtFile).isCompiled)) {
             return
         }
 
+        @OptIn(KaExperimentalApi::class)
         analyze(declaration) {
             var callableSymbol = declaration.symbol as? KaCallableSymbol ?: return
             if (callableSymbol is KaValueParameterSymbol) {
                 callableSymbol = callableSymbol.generatedPrimaryConstructorProperty ?: return
             }
             val allOverriddenSymbols = callableSymbol.allOverriddenSymbols.toList()
-            if (allOverriddenSymbols.isEmpty()) return
+            if (allOverriddenSymbols.isEmpty() && callableSymbol.getExpectsForActual().isEmpty()) return
             val implements = callableSymbol.modality != KaSymbolModality.ABSTRACT &&
                     allOverriddenSymbols.all { it.modality == KaSymbolModality.ABSTRACT }
             val gutter = if (implements) KotlinLineMarkerOptions.implementingOption else KotlinLineMarkerOptions.overridingOption
@@ -145,7 +152,8 @@ class KotlinLineMarkerProvider : AbstractKotlinLineMarkerProvider() {
     }
 
     private fun collectInheritedClassMarker(element: KtClass, result: MutableCollection<in LineMarkerInfo<*>>) {
-        if (!element.isInheritable()) {
+        val isExpectDeclaration = element.isExpectDeclaration()
+        if (!element.isInheritable() && !isExpectDeclaration) {
             return
         }
 
@@ -154,7 +162,7 @@ class KotlinLineMarkerProvider : AbstractKotlinLineMarkerProvider() {
         val gutter = if (isInterface) KotlinLineMarkerOptions.implementedOption else KotlinLineMarkerOptions.overriddenOption
         if (!gutter.isEnabled) return
 
-        if (!element.hasAnyInheritors() && !isUsedSamInterface(element)) return
+        if (!element.hasAnyActuals() && !element.hasAnyInheritors() && !isUsedSamInterface(element)) return
 
         val icon = gutter.icon ?: return
 
@@ -205,10 +213,10 @@ object ClassInheritorsTooltip : Function<PsiElement, String> {
         val ktClass = element.parent as? KtClass ?: return null
         var inheritors = KotlinFindUsagesSupport.searchInheritors(ktClass, ktClass.useScope).take(5).toList()
         if (inheritors.isEmpty()) {
+            inheritors = if (ktClass.isExpectDeclaration()) ktClass.actualsForExpect().take(5).toList() else emptyList()
+        }
+        if (inheritors.isEmpty()) {
             inheritors = findFunctionalExpressions(ktClass)
-            if (inheritors.isEmpty()) {
-                return null
-            }
         }
         val isInterface = ktClass.isInterface()
         if (inheritors.size == 5) {
@@ -238,12 +246,12 @@ object CallableOverridingsTooltip : Function<PsiElement, String> {
         val klass = declaration.containingClassOrObject as? KtClass ?: return null
         var overridings = KotlinFindUsagesSupport.searchOverriders(declaration, declaration.useScope).take(5).toList()
         if (overridings.isEmpty()) {
-            overridings = findFunctionalExpressions(klass)
-            if (overridings.isEmpty()) {
-                return null
-            }
+            overridings = declaration.actualsForExpect().take(5).toList()
         }
-        val isAbstract = isAbstract(declaration, klass)
+        if (overridings.isEmpty()) {
+            overridings = findFunctionalExpressions(klass)
+        }
+        val isAbstract = isAbstract(declaration, klass) || declaration.isExpectDeclaration()
         if (overridings.size == 5) {
             return if (isAbstract) DaemonBundle.message("method.is.implemented.too.many") else DaemonBundle.message("method.is.overridden.too.many")
         }
@@ -267,14 +275,16 @@ object CallableOverridingsTooltip : Function<PsiElement, String> {
 object SuperDeclarationMarkerTooltip : Function<PsiElement, String> {
     override fun `fun`(element: PsiElement): String? {
         val declaration = element.getParentOfType<KtCallableDeclaration>(false) ?: return null
-        if (!declaration.hasModifier(KtTokens.OVERRIDE_KEYWORD)) return null
+        if (!declaration.hasModifier(KtTokens.OVERRIDE_KEYWORD) && !declaration.isEffectivelyActual()) return null
+        @OptIn(KaExperimentalApi::class)
         analyze(declaration) {
             var callableSymbol = declaration.symbol as? KaCallableSymbol ?: return null
             if (callableSymbol is KaValueParameterSymbol) {
                 callableSymbol = callableSymbol.generatedPrimaryConstructorProperty ?: return null
             }
             val allOverriddenSymbols = callableSymbol.directlyOverriddenSymbols.toList()
-            if (allOverriddenSymbols.isEmpty()) return ""
+            val expectSymbols = callableSymbol.getExpectsForActual()
+            if (allOverriddenSymbols.isEmpty() && expectSymbols.isEmpty()) return ""
             val isAbstract = callableSymbol.modality == KaSymbolModality.ABSTRACT
             val abstracts = hashSetOf<PsiElement>()
             val supers = allOverriddenSymbols.mapNotNull {
@@ -283,7 +293,12 @@ object SuperDeclarationMarkerTooltip : Function<PsiElement, String> {
                     abstracts.add(superFunction)
                 }
                 superFunction
+            } + expectSymbols.mapNotNull {
+                val expectPsi = it.psi
+                if (expectPsi != null) abstracts.add(expectPsi)
+                expectPsi
             }
+            if (supers.isEmpty()) return ""
             val divider = GutterTooltipBuilder.getElementDivider(false, false, supers.size)
             val reference = AtomicReference("")
 

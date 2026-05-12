@@ -222,8 +222,8 @@ object BranchedFoldingUtils {
      *          - When [leftType] is a non-nullable type, types of right operands of [first] and [second] are both non-nullable, and
      *            they are the same.
      */
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun checkAssignmentsMatch(
         first: KtBinaryExpression,
         second: KtBinaryExpression,

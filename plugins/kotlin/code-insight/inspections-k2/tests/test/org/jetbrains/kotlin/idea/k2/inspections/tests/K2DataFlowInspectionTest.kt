@@ -63,6 +63,7 @@ class K2DataFlowInspectionTest : AbstractK2InspectionTest() {
     fun testIncompleteCode1K2() = doTest()
     fun testInlineClass() = doTest()
     fun testInlineLambda() = doTest()
+    fun testInlineLambdaParameterNonLocalReturn() = doTest()
     fun testInlineStandardCalls() = doTest()
     fun testIndices() = doTest()
     fun testErrorTypes() = doTest()

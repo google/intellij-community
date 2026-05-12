@@ -411,7 +411,7 @@ public final class JavaFunctionalExpressionIndex extends FileBasedIndexExtension
 
             LighterASTNode context = LightTreeUtil.getParentOfType(tree, element, ElementType.MEMBER_BIT_SET, TokenSet.EMPTY);
             if (context != null) {
-              List<IndexEntry> list = result.computeIfAbsent(key, __ -> new ArrayList<>());
+              List<IndexEntry> list = result.computeIfAbsent(key, _ -> new ArrayList<>());
               list.add(new IndexEntry(element.getStartOffset(), index,
                                       context.getStartOffset(), context.getEndOffset(),
                                       createOccurrence(element, resolver)));

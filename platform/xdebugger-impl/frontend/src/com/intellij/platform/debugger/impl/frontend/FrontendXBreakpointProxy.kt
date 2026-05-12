@@ -2,14 +2,11 @@
 package com.intellij.platform.debugger.impl.frontend
 
 import com.intellij.ide.ui.icons.icon
-import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.markup.GutterDraggableObject
 import com.intellij.openapi.editor.markup.GutterIconRenderer
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsSafe
-import com.intellij.platform.debugger.impl.shared.BreakpointRequestCounter
-import com.intellij.platform.debugger.impl.shared.BreakpointRequestCounter.Companion.REQUEST_IS_NOT_NEEDED
+import com.intellij.platform.debugger.impl.frontend.util.SequentialRpcRequestsExecutor
 import com.intellij.platform.debugger.impl.rpc.XBreakpointApi
 import com.intellij.platform.debugger.impl.rpc.XBreakpointCustomPresentationDto
 import com.intellij.platform.debugger.impl.rpc.XBreakpointDto
@@ -17,6 +14,8 @@ import com.intellij.platform.debugger.impl.rpc.XBreakpointDtoState
 import com.intellij.platform.debugger.impl.rpc.XBreakpointId
 import com.intellij.platform.debugger.impl.rpc.toRpc
 import com.intellij.platform.debugger.impl.rpc.xExpression
+import com.intellij.platform.debugger.impl.shared.BreakpointRequestCounter
+import com.intellij.platform.debugger.impl.shared.BreakpointRequestCounter.Companion.REQUEST_IS_NOT_NEEDED
 import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointProxy
 import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointTypeProxy
 import com.intellij.platform.debugger.impl.shared.proxy.XLineBreakpointTypeProxy
@@ -64,6 +63,7 @@ internal open class FrontendXBreakpointProxy(
   override val id: XBreakpointId = dto.id
 
   protected val cs = parentCs.childScope("FrontendXBreakpointProxy#$id")
+  private val sequentialExecutor = SequentialRpcRequestsExecutor.create(cs)
 
   /**
    * Updates should be performed only via [updateStateIfNeeded].
@@ -138,7 +138,7 @@ internal open class FrontendXBreakpointProxy(
     }
     afterStateChanged()
     onBreakpointChange()
-    project.service<FrontendXBreakpointProjectCoroutineService>().cs.launch {
+    sequentialExecutor.execute {
       sendRequest(requestId)
     }
   }
@@ -307,6 +307,10 @@ internal open class FrontendXBreakpointProxy(
     }
   }
 
+  override fun hasCustomCondition(): Boolean {
+    return currentState.hasCustomCondition
+  }
+
   override fun getGeneralDescription(): String {
     return currentState.generalDescription
   }
@@ -334,6 +338,7 @@ internal open class FrontendXBreakpointProxy(
            currentState.suspendPolicy == otherState.suspendPolicy &&
            currentState.group == otherState.group &&
            currentState.lineBreakpointInfo == otherState.lineBreakpointInfo &&
+           currentState.hasCustomCondition == otherState.hasCustomCondition &&
            dependentBreakpointManager.getMasterBreakpoint(this) == dependentBreakpointManager.getMasterBreakpoint(other) &&
            dependentBreakpointManager.isLeaveEnabled(this) == dependentBreakpointManager.isLeaveEnabled(other)
   }
@@ -409,6 +414,3 @@ internal open class FrontendXBreakpointProxy(
     return this::class.simpleName + "(id=$id, type=${type.id})"
   }
 }
-
-@Service(Service.Level.PROJECT)
-internal class FrontendXBreakpointProjectCoroutineService(val cs: CoroutineScope)

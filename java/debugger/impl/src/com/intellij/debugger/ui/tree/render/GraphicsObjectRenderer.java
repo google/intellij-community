@@ -4,12 +4,15 @@ package com.intellij.debugger.ui.tree.render;
 import com.intellij.debugger.JavaDebuggerBundle;
 import com.intellij.debugger.engine.DebuggerUtils;
 import com.intellij.debugger.engine.FullValueEvaluatorProvider;
+import com.intellij.debugger.engine.evaluation.EvaluationContextImpl;
 import com.sun.jdi.ClassType;
 import com.sun.jdi.Field;
 import com.sun.jdi.ObjectReference;
 import com.sun.jdi.ReferenceType;
 import com.sun.jdi.Type;
 import com.sun.jdi.Value;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public final class GraphicsObjectRenderer extends AbstractImageRenderer {
   @Override
@@ -43,12 +46,16 @@ public final class GraphicsObjectRenderer extends AbstractImageRenderer {
         if (!(type instanceof ReferenceType) || !DebuggerUtils.instanceOf(type, "java.awt.Image")) {
           return null;
         }
-        return createImagePopupEvaluator(JavaDebuggerBundle.message("message.node.show.image"), evaluationContext,
-                                         bufImgValue, "imageToBytes");
+        return createImagePopupEvaluator(JavaDebuggerBundle.message("message.node.show.image"), evaluationContext, bufImgValue);
       }
       catch (Exception ignored) {
       }
       return null;
     };
+  }
+
+  @Override
+  protected byte @Nullable [] getImageBytes(@NotNull EvaluationContextImpl evaluationContext, Value obj) {
+    return getImageBytesFromHelper(evaluationContext, obj, "imageToBytes");
   }
 }

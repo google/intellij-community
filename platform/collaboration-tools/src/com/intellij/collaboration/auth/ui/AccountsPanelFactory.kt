@@ -6,7 +6,6 @@ import com.intellij.collaboration.auth.AccountManager
 import com.intellij.collaboration.auth.DefaultAccountHolder
 import com.intellij.collaboration.messages.CollaborationToolsBundle.message
 import com.intellij.collaboration.ui.CollaborationToolsUIUtil.asObservableIn
-import com.intellij.collaboration.ui.HorizontalListPanel
 import com.intellij.collaboration.ui.findIndex
 import com.intellij.collaboration.ui.util.JListHoveredRowMaterialiser
 import com.intellij.credentialStore.PasswordSafeConfigurable
@@ -27,8 +26,8 @@ import com.intellij.ui.LayeredIcon
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.awt.RelativePoint
-import com.intellij.ui.components.ActionLink
 import com.intellij.ui.components.JBList
+import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.Cell
 import com.intellij.ui.dsl.builder.CellBase
 import com.intellij.ui.dsl.builder.Panel
@@ -41,15 +40,14 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.awt.Component
 import java.awt.event.MouseEvent
 import javax.swing.Icon
 import javax.swing.JComponent
-import javax.swing.JLabel
 import javax.swing.JList
 import javax.swing.JPanel
 import javax.swing.ListCellRenderer
 import javax.swing.ListSelectionModel
-import javax.swing.SwingConstants
 
 class AccountsPanelFactory<A : Account, Cred>
 private constructor(private val accountManager: AccountManager<A, Cred>,
@@ -203,6 +201,14 @@ private constructor(private val accountManager: AccountManager<A, Cred>,
   }
 
   companion object {
+    fun addWarningForEnabledCredentialHelper(isCredentialHelperUsed: Boolean, panel: (Panel.() -> Unit) -> Panel): CellBase<Panel> = panel {
+      row {
+        @Suppress("HardCodedStringLiteral")
+        comment("<icon src='AllIcons.General.Warning'>&nbsp;${message("accounts.warning.credentialsHelper.used")}")
+          .align(AlignX.LEFT)
+      }
+    }.visible(isCredentialHelperUsed)
+
     /**
      * Adds a warning to a panel that tells the user that passwords and other credentials
      * are currently not persisted to disk.
@@ -211,26 +217,19 @@ private constructor(private val accountManager: AccountManager<A, Cred>,
      * live on for as long as the scope is live. This means the scope needs to be cancelled
      * manually or through a disposing scope.
      */
+    @Suppress("HardCodedStringLiteral")
     fun addWarningForPersistentCredentials(cs: CoroutineScope,
                                            canPersistCredentials: Flow<Boolean>,
                                            panel: (Panel.() -> Unit) -> Panel,
                                            solution: ((DataContext) -> Unit)? = null): CellBase<Panel> =
       panel {
         row {
-          cell(HorizontalListPanel(4).apply {
-            val warning = message(if (solution != null) "accounts.error.password-not-saved.colon" else "accounts.error.password-not-saved")
+          val warning = message(if (solution != null) "accounts.error.password-not-saved.colon" else "accounts.error.password-not-saved")
+          val linkText = solution?.let { " <a href='solution'>${message("accounts.error.password-not-saved.link")}</a>" }.orEmpty()
 
-            add(JLabel(warning, AllIcons.General.Warning, SwingConstants.LEFT))
-
-            if (solution != null) {
-              add(ActionLink(message("accounts.error.password-not-saved.link")).apply {
-                addActionListener {
-                  if (it.source != this) return@addActionListener
-                  solution(DataManager.getInstance().getDataContext(this))
-                }
-              })
-            }
-          })
+          comment("<icon src='AllIcons.General.Warning'>&nbsp;$warning$linkText") {
+            solution?.invoke(DataManager.getInstance().getDataContext(it.source as? Component ?: return@comment))
+          }.align(AlignX.LEFT)
         }
       }.visibleIf(canPersistCredentials.map { !it }
                     .stateIn(cs, SharingStarted.Lazily, false)

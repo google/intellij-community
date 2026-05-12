@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.credentialStore.ui` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "credentialStore-ui_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "credentialStore-ui",
   module_name = "intellij.platform.credentialStore.ui",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":credentialStore-ui_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/core-api:core",
@@ -23,12 +18,14 @@ jvm_library(
     "//platform/projectModel-api:projectModel",
     "//platform/util:util-ui",
     "//platform/platform-impl:ide-impl",
+    "//platform/ide-core",
     "//platform/core-ui",
   ]
 )
 
 jvm_library(
   name = "credentialStore-ui_test_lib",
+  testonly = True,
   module_name = "intellij.platform.credentialStore.ui",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -42,7 +39,14 @@ jvm_library(
     "//platform/projectModel-api:projectModel_test_lib",
     "//platform/util:util-ui_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/core-ui:core-ui_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.credentialStore.ui` end
+
+### auto-generated section `iml intellij.platform.credentialStore.ui` start
+exports_files([
+  "intellij.platform.credentialStore.ui.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.credentialStore.ui` end

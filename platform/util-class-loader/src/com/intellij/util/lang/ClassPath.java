@@ -435,7 +435,11 @@ public final class ClassPath {
     return loaders.get(loaderIndex);
   }
 
-  // TODO: synchronized should not be needed
+
+  /**
+   * @deprecated this method may not return all items in the classpath, use {@link #getFiles()} instead
+   */
+  @Deprecated
   public synchronized @NotNull List<Path> getBaseUrls() {
     List<Path> result = new ArrayList<>();
     for (Loader loader : loaders) {

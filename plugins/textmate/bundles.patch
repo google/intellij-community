@@ -1,6 +1,6 @@
-diff --git a/community/plugins/textmate/lib/bundles/ruby/package.json b/community/plugins/textmate/lib/bundles/ruby/package.json
---- a/community/plugins/textmate/lib/bundles/ruby/package.json	(revision 31dee44c2ba420529fe593c83217eb6a16ec5784)
-+++ b/community/plugins/textmate/lib/bundles/ruby/package.json	(date 1622045362227)
+diff --git a/ruby/package.json b/ruby/package.json
+--- a/ruby/package.json	(revision 31dee44c2ba420529fe593c83217eb6a16ec5784)
++++ b/ruby/package.json	(date 1622045362227)
 @@ -49,7 +49,9 @@
            "matchfile",
            "scanfile",
@@ -12,66 +12,9 @@ diff --git a/community/plugins/textmate/lib/bundles/ruby/package.json b/communit
          ],
          "aliases": [
            "Ruby",
-diff --git a/community/plugins/textmate/lib/bundles/log/syntaxes/log.tmLanguage.json b/community/plugins/textmate/lib/bundles/log/syntaxes/log.tmLanguage.json
---- a/community/plugins/textmate/lib/bundles/log/syntaxes/log.tmLanguage.json	(revision 31dee44c2ba420529fe593c83217eb6a16ec5784)
-+++ b/community/plugins/textmate/lib/bundles/log/syntaxes/log.tmLanguage.json	(date 1622045593073)
-@@ -17,7 +17,7 @@
- 			"name": "comment log.verbose"
- 		},
- 		{
--			"match": "(?<=^[\\s\\d\\p]*)\\bV\\b",
-+			"match": "(?<=^[\\s\\d])\\bV\\b",
- 			"name": "comment log.verbose"
- 		},
- 		{
-@@ -29,7 +29,7 @@
- 			"name": "markup.changed log.debug"
- 		},
- 		{
--			"match": "(?<=^[\\s\\d\\p]*)\\bD\\b",
-+			"match": "(?<=^[\\s\\d])\\bD\\b",
- 			"name": "markup.changed log.debug"
- 		},
- 		{
-@@ -41,7 +41,7 @@
- 			"name": "markup.inserted log.info"
- 		},
- 		{
--			"match": "(?<=^[\\s\\d\\p]*)\\bI\\b",
-+			"match": "(?<=^[\\s\\d])\\bI\\b",
- 			"name": "markup.inserted log.info"
- 		},
- 		{
-@@ -53,7 +53,7 @@
- 			"name": "markup.deleted log.warning"
- 		},
- 		{
--			"match": "(?<=^[\\s\\d\\p]*)\\bW\\b",
-+			"match": "(?<=^[\\s\\d])\\bW\\b",
- 			"name": "markup.deleted log.warning"
- 		},
- 		{
-@@ -65,7 +65,7 @@
- 			"name": "string.regexp, strong log.error"
- 		},
- 		{
--			"match": "(?<=^[\\s\\d\\p]*)\\bE\\b",
-+			"match": "(?<=^[\\s\\d])\\bE\\b",
- 			"name": "string.regexp, strong log.error"
- 		},
- 		{
-@@ -73,7 +73,7 @@
- 			"name": "comment log.date"
- 		},
- 		{
--			"match": "(?<=(^|\\s))\\d{2}[^\\w\\s]\\d{2}[^\\w\\s]\\d{4}\\b",
-+			"match": "(?<=^|\\s)\\d{2}[^\\w\\s]\\d{2}[^\\w\\s]\\d{4}\\b",
- 			"name": "comment log.date"
- 		},
- 		{
-diff --git a/community/plugins/textmate/lib/bundles/erlang/language-configuration.json b/community/plugins/textmate/lib/bundles/erlang/language-configuration.json
---- a/community/plugins/textmate/lib/bundles/erlang/language-configuration.json
-+++ b/community/plugins/textmate/lib/bundles/erlang/language-configuration.json
+diff --git a/erlang/language-configuration.json b/erlang/language-configuration.json
+--- a/erlang/language-configuration.json
++++ b/erlang/language-configuration.json
 @@ -26,7 +26,7 @@
      // Indent if a line ends brackets, "->" or most keywords. Also if prefixed
      // with "||". This should work with most formatting models.
@@ -81,9 +24,9 @@ diff --git a/community/plugins/textmate/lib/bundles/erlang/language-configuratio
      // Dedent after brackets, end or lone "->". The latter happens in a spec
      // with indented types, typically after "when". Only do this if it's _only_
      // preceded by whitespace.
-diff --git a/community/plugins/textmate/lib/bundles/cmake/package.json b/community/plugins/textmate/lib/bundles/cmake/package.json
---- a/community/plugins/textmate/lib/bundles/cmake/package.json	(revision 56be55b1c6fab2be43c34f4cc23c5d2998e79f8c)
-+++ b/community/plugins/textmate/lib/bundles/cmake/package.json	(date 1676914978628)
+diff --git a/cmake/package.json b/cmake/package.json
+--- a/cmake/package.json	(revision 56be55b1c6fab2be43c34f4cc23c5d2998e79f8c)
++++ b/cmake/package.json	(date 1676914978628)
 @@ -44,7 +44,7 @@
  					".cmake"
  				],
@@ -93,9 +36,9 @@ diff --git a/community/plugins/textmate/lib/bundles/cmake/package.json b/communi
  				],
  				"aliases": [
  					"CMake"
-diff --git a/community/plugins/textmate/lib/bundles/terraform/language-configuration.json b/community/plugins/textmate/lib/bundles/terraform/language-configuration.json
---- a/community/plugins/textmate/lib/bundles/terraform/language-configuration.json	(revision 3e3a2028fd1f0ed13bca9290e5065a201859510e)
-+++ b/community/plugins/textmate/lib/bundles/terraform/language-configuration.json	(revision 77af558e37b0311cdd20a24759053f10944cb698)
+diff --git a/terraform/language-configuration.json b/terraform/language-configuration.json
+--- a/terraform/language-configuration.json	(revision 3e3a2028fd1f0ed13bca9290e5065a201859510e)
++++ b/terraform/language-configuration.json	(revision 77af558e37b0311cdd20a24759053f10944cb698)
 @@ -77,5 +77,9 @@
  			"start": "^\\s*#region",
  			"end": "^\\s*#endregion"
@@ -107,9 +50,9 @@ diff --git a/community/plugins/textmate/lib/bundles/terraform/language-configura
 +    "decreaseIndentPattern": "^((?!.*?\\/\\*).*\\*/)?\\s*[\\)\\}\\]].*$"
 +  }
  }
-diff --git a/community/plugins/textmate/lib/bundles/kconfig/package.json b/community/plugins/textmate/lib/bundles/kconfig/package.json
---- a/community/plugins/textmate/lib/bundles/kconfig/package.json
-+++ b/community/plugins/textmate/lib/bundles/kconfig/package.json
+diff --git a/kconfig/package.json b/kconfig/package.json
+--- a/kconfig/package.json
++++ b/kconfig/package.json
 @@ -141,7 +141,1429 @@
  					"Kconfig.board",
  					"Kconfig.shield",

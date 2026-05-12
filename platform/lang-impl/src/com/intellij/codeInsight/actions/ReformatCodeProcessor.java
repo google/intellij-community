@@ -129,7 +129,7 @@ public class ReformatCodeProcessor extends AbstractLayoutCodeProcessor {
   protected @NotNull FutureTask<Boolean> prepareTask(final @NotNull PsiFile psiFile, final boolean processChangedTextOnly)
     throws IncorrectOperationException
   {
-    Pair<PsiFile, Runnable> fileToFormatAndCommitActionIfNeed = ReadAction.compute(() -> {
+    Pair<PsiFile, Runnable> fileToFormatAndCommitActionIfNeed = ReadAction.computeBlocking(() -> {
       PsiFile psiFileValid = ensureValid(psiFile);
       if (psiFileValid != null) {
         PsiDocumentManager instance = PsiDocumentManager.getInstance(myProject);
@@ -156,13 +156,17 @@ public class ReformatCodeProcessor extends AbstractLayoutCodeProcessor {
     Ref<List<TextRange>> rangesForFormat = Ref.create();
     final Runnable commitAction = fileToFormatAndCommitActionIfNeed.second;
     if (commitAction == null) {
-      rangesForFormat.set(ReadAction.compute(() -> prepareRangesForFormat.compute()));
+      rangesForFormat.set(ReadAction.computeBlocking(() -> prepareRangesForFormat.compute()));
     }
 
     boolean doNotKeepLineBreaks = confirmSecondReformat(psiFile);
+    // Resolve file settings outside the WriteCommandAction. CodeStyleCachedValueProvider
+    // computes settings asynchronously when first requested from EDT/under a write
+    // action, so a cold lookup inside the FutureTask body would return stale defaults
+    // and skip .editorconfig modifiers.
+    final var fileSettings = CodeStyle.getSettings(fileToProcess);
     return new FutureTask<>(() -> {
       Ref<Boolean> result = new Ref<>();
-      final var fileSettings = CodeStyle.getSettings(fileToProcess);
       if (LOG.isDebugEnabled()) {
         //noinspection ObjectToString
         LOG.debug("reformat " + fileToProcess.getName() + " uses " + fileSettings);
@@ -182,7 +186,7 @@ public class ReformatCodeProcessor extends AbstractLayoutCodeProcessor {
   }
 
   private static @NotNull List<TextRange> getChangedRangesToFormat(@NotNull PsiFile psiFile) {
-    ChangedRangesInfo ranges = ReadAction.compute(() -> VcsFacade.getInstance().getChangedRangesInfo(psiFile));
+    ChangedRangesInfo ranges = ReadAction.computeBlocking(() -> VcsFacade.getInstance().getChangedRangesInfo(psiFile));
     return ranges != null ? ranges.allChangedRanges : Collections.emptyList();
   }
 
@@ -191,8 +195,9 @@ public class ReformatCodeProcessor extends AbstractLayoutCodeProcessor {
   }
 
   private boolean confirmSecondReformat(@NotNull PsiFile file) {
-    boolean doNotKeepLineBreaks = ReadAction.compute(() -> isDoNotKeepLineBreaks(file));
+    boolean doNotKeepLineBreaks = ReadAction.computeBlocking(() -> isDoNotKeepLineBreaks(file));
     if (!doNotKeepLineBreaks || isSecondReformatDisabled()) return false;
+
     CodeInsightSettings settings = CodeInsightSettings.getInstance();
     if (!settings.ENABLE_SECOND_REFORMAT) {
       Ref<Boolean> ref = Ref.create(true);

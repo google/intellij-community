@@ -297,6 +297,7 @@ internal val javaPsiElementTypeConverter: ElementTypeConverter = elementTypeConv
   JavaDocSyntaxElementType.DOC_MARKDOWN_CODE_BLOCK to JavaDocElementType.DOC_MARKDOWN_CODE_BLOCK,
   JavaDocSyntaxElementType.DOC_MARKDOWN_REFERENCE_LINK to JavaDocElementType.DOC_MARKDOWN_REFERENCE_LINK,
   JavaDocSyntaxElementType.DOC_MARKDOWN_REFERENCE_LABEL to JavaDocElementType.DOC_MARKDOWN_REFERENCE_LABEL,
+  JavaDocSyntaxElementType.DOC_MARKDOWN_LINK to JavaDocElementType.DOC_MARKDOWN_LINK,
 
   JavaDocSyntaxTokenType.DOC_COMMENT_START to JavaDocTokenType.DOC_COMMENT_START,
   JavaDocSyntaxTokenType.DOC_COMMENT_END to JavaDocTokenType.DOC_COMMENT_END,
@@ -330,5 +331,7 @@ internal val javaPsiElementTypeConverter: ElementTypeConverter = elementTypeConv
   JavaDocSyntaxTokenType.DOC_DOUBLE_SHARP to JavaDocTokenType.DOC_DOUBLE_SHARP,
   JavaDocSyntaxTokenType.DOC_INLINE_CODE_FENCE to JavaDocTokenType.DOC_INLINE_CODE_FENCE,
   JavaDocSyntaxTokenType.DOC_COMMA to JavaDocTokenType.DOC_COMMA,
+  JavaDocSyntaxTokenType.DOC_LT to JavaDocTokenType.DOC_LT,
+  JavaDocSyntaxTokenType.DOC_GT to JavaDocTokenType.DOC_GT,
   JavaDocSyntaxTokenType.DOC_COMMENT_BAD_CHARACTER to JavaDocTokenType.DOC_COMMENT_BAD_CHARACTER,
 )

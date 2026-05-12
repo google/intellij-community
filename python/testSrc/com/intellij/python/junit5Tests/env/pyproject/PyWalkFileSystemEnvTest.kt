@@ -29,6 +29,6 @@ class PyWalkFileSystemEnvTest {
 
   @Test
   fun venvExcludedTest(): Unit = timeoutRunBlocking {
-    walkFileSystemNoTomlContent(tempDir)
+    walkFileSystemNoTomlContent(setOf(tempDir))
   }
 }

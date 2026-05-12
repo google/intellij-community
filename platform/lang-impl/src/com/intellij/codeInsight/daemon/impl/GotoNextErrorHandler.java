@@ -147,7 +147,7 @@ public class GotoNextErrorHandler implements CodeInsightActionHandler {
 
     Disposable hintDisposable = Disposer.newDisposable("GotoNextErrorHandler.showMessageWhenNoHighlights");
     Disposer.register(project, hintDisposable);
-    hint.addHintListener(__ -> Disposer.dispose(hintDisposable));
+    hint.addHintListener(_ -> Disposer.dispose(hintDisposable));
 
     MessageBusConnection busConnection = project.getMessageBus().connect(hintDisposable);
     busConnection.subscribe(DaemonCodeAnalyzer.DAEMON_EVENT_TOPIC, new DaemonCodeAnalyzer.DaemonListener() {

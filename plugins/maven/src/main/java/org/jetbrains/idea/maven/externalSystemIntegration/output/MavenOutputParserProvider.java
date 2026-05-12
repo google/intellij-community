@@ -27,12 +27,10 @@ public class MavenOutputParserProvider implements ExternalSystemOutputParserProv
 
   public static MavenLogOutputParser createMavenOutputParser(@NotNull MavenRunConfiguration runConfiguration,
                                                              @NotNull ExternalSystemTaskId taskId,
-                                                             @NotNull Function<String, String> targetFileMapper,
-                                                             boolean useWrapperedLogging) {
+                                                             @NotNull Function<String, String> targetFileMapper) {
     return new MavenLogOutputParser(runConfiguration,
                                     taskId,
                                     targetFileMapper,
-                                    MavenLoggedEventParser.EP_NAME.getExtensionList(),
-                                    useWrapperedLogging);
+                                    MavenLoggedEventParser.EP_NAME.getExtensionList());
   }
 }

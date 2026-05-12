@@ -21,6 +21,7 @@ import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.fileEditor.FileOpenedSyncListener
 import com.intellij.openapi.fileEditor.ex.FileEditorWithProvider
+import com.intellij.openapi.progress.Cancellation
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
@@ -277,7 +278,11 @@ internal class ActionsRecorder(private val project: Project,
         if (document != null && PsiDocumentManager.getInstance(project).isUncommited(document)) {
           lessonExecutor.taskInvokeLater {
             if (!disposed && !project.isDisposed) {
-              PsiDocumentManager.getInstance(project).commitAndRunReadAction { onDocumentChange() }
+              PsiDocumentManager.getInstance(project).commitAndRunReadAction {
+                Cancellation.executeInNonCancelableSection {
+                  onDocumentChange()
+                }
+              }
             }
           }
         }

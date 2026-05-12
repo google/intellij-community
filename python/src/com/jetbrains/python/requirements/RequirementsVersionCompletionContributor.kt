@@ -24,7 +24,14 @@ class RequirementsVersionCompletionContributor : CompletionContributor() {
 
     val packageName = getNameBySiblings(position) ?: getNameByParent(parent) ?: return
     val sdk = getPythonSdk(parameters.originalFile) ?: return
-    completeVersions(packageName, project, sdk, result, false)
+    // `RequirementsReferenceContributor` attaches a reference to the surrounding `NameReq`
+    // (covering `<name>==<version>`) so Quick Doc dispatch fires on extras / version / marker.
+    // The platform's default completion-prefix derivation uses that reference's range and
+    // returns `<name>==<typed>`, which would filter every version item out by prefix.
+    // Force the prefix to just the typed-version portion (text inside the position leaf up
+    // to the caret) so version items match.
+    val versionResult = result.withPrefixMatcher(versionPrefix(position, parameters.offset))
+    completeVersions(packageName, project, sdk, versionResult, false)
   }
 
   private fun getNameByParent(parent: PsiElement?): String? {
@@ -40,5 +47,10 @@ class RequirementsVersionCompletionContributor : CompletionContributor() {
     val identifier = position.prevLeafs.firstOrNull { it.elementType == RequirementsTypes.IDENTIFIER }
 
     return identifier?.text
+  }
+
+  private fun versionPrefix(position: PsiElement, offsetInFile: Int): String {
+    val offsetInPosition = (offsetInFile - position.textRange.startOffset).coerceIn(0, position.textLength)
+    return position.text.take(offsetInPosition)
   }
 }

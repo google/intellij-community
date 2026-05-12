@@ -10,6 +10,7 @@ import ai.grazie.spell.utils.DictionaryResources.parseReplacingRules
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.spellchecker.dictionary.Dictionary
+import com.intellij.spellchecker.dictionary.Dictionary.LookupStatus
 import com.intellij.util.Consumer
 import java.io.File
 import kotlin.io.path.Path
@@ -46,13 +47,14 @@ class HunspellDictionary : Dictionary {
     this.name = name ?: path
     this.language = language
     this.alphabet = if (this.language == null) null else Language.entries.firstOrNull { it.iso == this.language }?.alphabet
+    val dicText = dic.readText()
     this.dict = HunspellWordList.create(
       aff.readText(),
-      dic.readText(),
+      dicText,
       if (trigrams.exists()) trigrams.readLines() else null
     ) { ProgressManager.checkCanceled() }
     this.ruleDictionary = if (replacingRules?.exists() == true) parseReplacingRules(replacingRules.readText()) else null
-    buildAlphabet(dic.readText())
+    buildAlphabet(dicText)
   }
 
   constructor(dic: String, aff: String, trigrams: List<String>?, name: String, language: LanguageISO, replacingRules: String?) {
@@ -78,10 +80,10 @@ class HunspellDictionary : Dictionary {
 
   override fun getName() = name
 
-  override fun contains(word: String): Boolean? {
-    if (isAlien(word)) return null
-    if (dict.contains(word, false)) return true
-    return false
+  override fun lookup(word: String): LookupStatus {
+    if (isAlien(word)) return LookupStatus.Alien
+    if (dict.contains(word, false)) return LookupStatus.Present
+    return LookupStatus.Absent
   }
 
   override fun consumeSuggestions(word: String, consumer: Consumer<String>) {

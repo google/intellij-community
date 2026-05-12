@@ -1,4 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.jps.entities.impl
 
 import com.intellij.platform.workspace.jps.entities.ContentRootEntity
@@ -18,11 +20,10 @@ import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
 import com.intellij.platform.workspace.storage.impl.containers.MutableWorkspaceList
 import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceList
-import com.intellij.platform.workspace.storage.impl.extractOneToOneParent
-import com.intellij.platform.workspace.storage.impl.updateOneToOneParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import org.jetbrains.annotations.ApiStatus.Internal
@@ -47,7 +48,8 @@ internal class ExcludeUrlOrderEntityImpl(private val dataSource: ExcludeUrlOrder
       return dataSource.order
     }
   override val contentRoot: ContentRootEntity
-    get() = snapshot.extractOneToOneParent(CONTENTROOT_CONNECTION_ID, this)!!
+    get() = snapshot.instrumentation.getParent(CONTENTROOT_CONNECTION_ID, this) as? ContentRootEntity
+            ?: error("Parent contentRoot not found for ExcludeUrlOrderEntity")
 
   override val entitySource: EntitySource
     get() {
@@ -95,7 +97,7 @@ internal class ExcludeUrlOrderEntityImpl(private val dataSource: ExcludeUrlOrder
         error("Field ExcludeUrlOrderEntity#order should be initialized")
       }
       if (_diff != null) {
-        if (_diff.extractOneToOneParent<WorkspaceEntityBase>(CONTENTROOT_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getParentBuilder(CONTENTROOT_CONNECTION_ID, this) == null) {
           error("Field ExcludeUrlOrderEntity#contentRoot should be initialized")
         }
       }
@@ -160,12 +162,13 @@ internal class ExcludeUrlOrderEntityImpl(private val dataSource: ExcludeUrlOrder
       get() {
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(CONTENTROOT_CONNECTION_ID, this) as? ContentRootEntityBuilder)
-          ?: (this.entityLinks[EntityLink(false, CONTENTROOT_CONNECTION_ID)]!! as ContentRootEntityBuilder)
+          ?: (this.entityLinks[EntityLink(false, CONTENTROOT_CONNECTION_ID)] as? ContentRootEntityBuilder)
+          ?: error("contentRoot is null for ExcludeUrlOrderEntity")
         }
         else {
-          this.entityLinks[EntityLink(false, CONTENTROOT_CONNECTION_ID)]!! as ContentRootEntityBuilder
+          (this.entityLinks[EntityLink(false, CONTENTROOT_CONNECTION_ID)] as? ContentRootEntityBuilder)
+          ?: error("contentRoot is null for ExcludeUrlOrderEntity")
         }
       }
       set(value) {
@@ -179,7 +182,7 @@ internal class ExcludeUrlOrderEntityImpl(private val dataSource: ExcludeUrlOrder
           _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
         }
         if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)) {
-          _diff.updateOneToOneParentOfChild(CONTENTROOT_CONNECTION_ID, this, value)
+          _diff.instrumentation.addChild(CONTENTROOT_CONNECTION_ID, value, this)
         }
         else {
           if (value is ModifiableWorkspaceEntityBase<*, *>) {
@@ -209,7 +212,6 @@ internal class ExcludeUrlOrderEntityData : WorkspaceEntityData<ExcludeUrlOrderEn
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): ExcludeUrlOrderEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {

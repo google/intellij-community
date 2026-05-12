@@ -360,7 +360,7 @@ public class DisposerTest  {
     Disposer.register(child, grand);
 
     try {
-      Disposer.disposeChildren(parent, __->true);
+      Disposer.disposeChildren(parent, _->true);
       assertFalse(Disposer.isDisposed(parent));
       Disposer.dispose(parent);
       assertTrue(Disposer.isDisposed(parent));

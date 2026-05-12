@@ -52,7 +52,7 @@ public abstract class ExternalSystemNodeAction<T> extends ExternalSystemAction {
 
     ExternalSystemActionsCollector.trigger(project, projectSystemId, this, e);
 
-    ExternalSystemTelemetryUtil.runWithSpan(projectSystemId, "Perform Action " + getClass().getSimpleName(), __ -> {
+    ExternalSystemTelemetryUtil.runWithSpan(projectSystemId, "Perform Action " + getClass().getSimpleName(), _ -> {
       perform(project, projectSystemId, data, e);
     });
   }

@@ -13,7 +13,6 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementVisitor
 import com.intellij.psi.SmartPsiElementPointer
 import com.intellij.psi.createSmartPointer
-import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaIdeApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
@@ -523,7 +522,6 @@ private class ParameterToReceiverVisitor(
     /**
      * Determines the appropriate qualifier for 'this' expressions based on the receiver value.
      */
-    @OptIn(KaExperimentalApi::class)
     private fun getThisQualifier(receiverValue: KaImplicitReceiverValue): String? {
         val symbol = receiverValue.symbol
         return when {

@@ -343,6 +343,8 @@ public final class GreclipseBuilder extends ModuleLevelBuilder {
     args.add(getClasspathString(chunk));
 
     JavaBuilder.addCompilationOptions(args, context, chunk, profile);
+    // Groovy-Eclipse (ECJ-based) does not support -proc:full added by JavaBuilder for javac 23+
+    args.remove("-proc:full");
 
     args.add("-d");
     args.add(mainOutputDir);

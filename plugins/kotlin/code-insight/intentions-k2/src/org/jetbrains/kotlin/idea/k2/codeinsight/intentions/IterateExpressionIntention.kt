@@ -8,7 +8,7 @@ import com.intellij.modcommand.ActionContext
 import com.intellij.modcommand.ModPsiUpdater
 import com.intellij.modcommand.Presentation
 import com.intellij.openapi.util.TextRange
-import com.intellij.psi.util.endOffset
+import com.intellij.psi.util.startOffset
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
@@ -81,12 +81,11 @@ internal class IterateExpressionIntention : KotlinApplicableModCommandAction<KtE
                     /* dependantVariableName = */ "",
                     /* alwaysStopAt = */ false // This is needed to not making this place editable when staying there with the caret
                 )
+                modTemplateBuilder.finishAt(forExpressionBody.statements.single().startOffset)
             }
-            modTemplateBuilder.finishAt(forExpressionBody.endOffset - 2)
         }
     }
 
-    @OptIn(KaExperimentalApi::class)
     override fun KaSession.prepareContext(element: KtExpression): Unit? {
         if (element.parent !is KtBlockExpression) return null
 

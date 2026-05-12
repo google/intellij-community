@@ -183,7 +183,7 @@ class AddModuleDependencyFix extends OrderEntryFix {
     if (circularModules != null && !showCircularWarning(project, circularModules, module)) return;
 
     JavaProjectModelModificationService.getInstance(project).addDependency(myCurrentModule, module, myScope, myExported)
-      .onSuccess(__ -> {
+      .onSuccess(_ -> {
         ReadAction.nonBlocking(() -> {
             PsiReference ref = restoreReference();
             List<BooleanSupplier> autoImportActions = new ArrayList<>();

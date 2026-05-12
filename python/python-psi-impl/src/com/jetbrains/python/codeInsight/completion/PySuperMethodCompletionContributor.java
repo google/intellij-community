@@ -29,14 +29,13 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiWhiteSpace;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.ProcessingContext;
-import com.jetbrains.python.PyNames;
 import com.jetbrains.python.PyTokenTypes;
-import com.jetbrains.python.psi.LanguageLevel;
 import com.jetbrains.python.psi.PyAnnotation;
 import com.jetbrains.python.psi.PyClass;
 import com.jetbrains.python.psi.PyFunction;
 import com.jetbrains.python.psi.PyParameterList;
 import com.jetbrains.python.psi.PyRecursiveElementVisitor;
+import com.jetbrains.python.psi.PyUtil;
 import com.jetbrains.python.psi.types.TypeEvalContext;
 import com.jetbrains.python.refactoring.PyPsiRefactoringUtil;
 import com.jetbrains.python.refactoring.classes.PyClassRefactoringUtil;
@@ -71,8 +70,6 @@ public final class PySuperMethodCompletionContributor extends CompletionContribu
                for (PyFunction function : containingClass.getMethods()) {
                  seenNames.add(function.getName());
                }
-               LanguageLevel languageLevel = LanguageLevel.forElement(parameters.getOriginalFile());
-               seenNames.addAll(PyNames.getBuiltinMethods(languageLevel).keySet());
                TypeEvalContext typeEvalContext = TypeEvalContext.codeCompletion(containingClass.getProject(),
                                                                                 containingClass.getContainingFile());
                for (PyFunction superMethod : PyPsiRefactoringUtil.getAllSuperMethods(containingClass, typeEvalContext)) {
@@ -91,7 +88,7 @@ public final class PySuperMethodCompletionContributor extends CompletionContribu
                      parameterList = stripAnnotations(superMethod.getParameterList());
                    }
                    builder.append(parameterList.getText());
-                   if (superMethod.getAnnotation() != null && copyAnnotations) {
+                   if (superMethod.getAnnotation() != null && copyAnnotations && !superMethod.getName().equals("__init__")) {
                      builder.append(" ")
                        .append(superMethod.getAnnotation().getText())
                        .append(":");
@@ -110,12 +107,24 @@ public final class PySuperMethodCompletionContributor extends CompletionContribu
                      if (methodName == null || !(methodName.getParent() instanceof PyFunction insertedMethod)) return;
                      WriteCommandAction.writeCommandAction(insertionContext.getFile()).run(() -> {
                        PyClassRefactoringUtil.transplantImportsFromSignature(superMethod, insertedMethod);
+                       addFunctionModifier(superMethod, insertedMethod);
                      });
-                   });
+                   })
+                   .withIcon(superMethod.getIcon(0));
                  result.addElement(TailTypeDecorator.withTail(element, TailTypes.noneType()));
                }
              }
            });
+  }
+
+  private static void addFunctionModifier(PyFunction superMethod, PyFunction insertedMethod) {
+    var newModifier = insertedMethod.getModifier();
+    if (newModifier != null) return;
+
+    var modifier = superMethod.getModifier();
+    if (modifier == null) return;
+
+    PyUtil.addDecorator(insertedMethod, "@" + modifier.getDecoratorName());
   }
 
   private static <T extends PsiElement> @NotNull T stripAnnotations(@NotNull T element) {

@@ -31,7 +31,7 @@ public abstract class MoreAction extends DumbAwareAction implements CustomCompon
     myPanel.setLayout(layout);
     myLoadMoreBtn = new JButton(name);
     myLoadMoreBtn.setMargin(JBUI.insets(2));
-    myLoadMoreBtn.addActionListener(__ -> perform());
+    myLoadMoreBtn.addActionListener(_ -> perform());
     myPanel.add(myLoadMoreBtn);
     myLabel = new JLabel(CommonBundle.getLoadingTreeNodeText());
     myLabel.setForeground(NamedColorUtil.getInactiveTextColor());

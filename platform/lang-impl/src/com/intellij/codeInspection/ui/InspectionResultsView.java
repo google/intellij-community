@@ -550,7 +550,7 @@ public final class InspectionResultsView extends JPanel implements Disposable, U
     }
     EditorEx previewEditor = null;
     if (previewPanel == null) {
-      final Pair<JComponent, EditorEx> panelAndEditor = ReadAction.compute(() -> createBaseRightComponentFor(problemCount, refEntity));
+      var panelAndEditor = ReadAction.computeBlocking(() -> createBaseRightComponentFor(problemCount, refEntity));
       previewPanel = panelAndEditor.getFirst();
       previewEditor = panelAndEditor.getSecond();
     }
@@ -581,7 +581,7 @@ public final class InspectionResultsView extends JPanel implements Disposable, U
     }
     if (previewEditor != null) {
       EditorEx editor = previewEditor;
-      ReadAction.run(() -> ProblemPreviewEditorPresentation.setupFoldingsAndHighlightProblems(editor, this));
+      ReadAction.runBlocking(() -> ProblemPreviewEditorPresentation.setupFoldingsAndHighlightProblems(editor, this));
     }
     mySplitter.setSecondComponent(editorPanel);
   }
@@ -695,7 +695,7 @@ public final class InspectionResultsView extends JPanel implements Disposable, U
   }
 
   void addProblemDescriptors(InspectionToolWrapper<?,?> wrapper, RefEntity refElement, CommonProblemDescriptor[] descriptors) {
-    updateTree(() -> ReadAction.run(() -> {
+    updateTree(() -> ReadAction.runBlocking(() -> {
       if (!isDisposed()) {
         final AnalysisUIOptions uiOptions = myGlobalInspectionContext.getUIOptions();
         final InspectionToolPresentation presentation = myGlobalInspectionContext.getPresentation(wrapper);
@@ -709,7 +709,7 @@ public final class InspectionResultsView extends JPanel implements Disposable, U
         problems.put(refElement, descriptors);
         final Map<String, Set<RefEntity>> contents = new HashMap<>();
         final String groupName = refElement.getRefManager().getGroupName((RefElement)refElement);
-        Set<RefEntity> content = contents.computeIfAbsent(groupName, __ -> new HashSet<>());
+        Set<RefEntity> content = contents.computeIfAbsent(groupName, _ -> new HashSet<>());
         content.add(refElement);
 
         getProvider().appendToolNodeContent(myGlobalInspectionContext,
@@ -776,7 +776,9 @@ public final class InspectionResultsView extends JPanel implements Disposable, U
       final HighlightDisplayKey key = HighlightDisplayKey.find(defaultToolWrapper.getShortName());
       for (ScopeToolState state : myProvider.getTools(currentTools)) {
         InspectionToolWrapper<?,?> toolWrapper = state.getTool();
-        if (ReadAction.compute(() -> myProvider.checkReportedProblems(myGlobalInspectionContext, toolWrapper))) {
+        if (ReadAction
+          .nonBlocking(() -> myProvider.checkReportedProblems(myGlobalInspectionContext, toolWrapper))
+          .executeSynchronously()) {
           addTool(toolWrapper,
                   profile.getErrorLevel(key, state.getScope(getProject()), getProject()),
                   isGroupedBySeverity,
@@ -955,7 +957,7 @@ public final class InspectionResultsView extends JPanel implements Disposable, U
         InspectionToolWrapper<?,?> toolWrapper = state.getTool();
         ThreeState hasReportedProblems = context.getPresentation(toolWrapper).hasReportedProblems();
         if (hasReportedProblems == ThreeState.NO) continue;
-        if (hasReportedProblems == ThreeState.YES || ReadAction.compute(() -> contentProvider.checkReportedProblems(context, toolWrapper))) {
+        if (hasReportedProblems == ThreeState.YES || ReadAction.computeBlocking(() -> contentProvider.checkReportedProblems(context, toolWrapper))) {
           return true;
         }
       }

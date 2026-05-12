@@ -31,7 +31,7 @@ sealed interface EelProcess {
   val stderr: EelReceiveChannel
 
   @get:ApiStatus.Experimental
-  val exitCode: Deferred<Int>
+  val exitCode: SafeDeferred<Int>
 
   /**
    * Sends `SIGKILL` on Unix.

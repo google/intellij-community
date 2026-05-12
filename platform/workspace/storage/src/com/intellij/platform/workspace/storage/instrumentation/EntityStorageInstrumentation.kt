@@ -176,7 +176,7 @@ internal sealed interface Modification {
 public annotation class EntityStorageInstrumentationApi
 
 @EntityStorageInstrumentationApi
-internal val EntityStorage.instrumentation: EntityStorageInstrumentation
+public val EntityStorage.instrumentation: EntityStorageInstrumentation
   get() = this as EntityStorageInstrumentation
 
 @EntityStorageInstrumentationApi
@@ -184,7 +184,7 @@ internal val ImmutableEntityStorage.instrumentation: ImmutableEntityStorageInstr
   get() = this as ImmutableEntityStorageInstrumentation
 
 @EntityStorageInstrumentationApi
-internal val MutableEntityStorage.instrumentation: MutableEntityStorageInstrumentation
+public val MutableEntityStorage.instrumentation: MutableEntityStorageInstrumentation
   get() {
     check(this is MutableEntityStorageInstrumentation) {
       "Every implementation of MutableEntityStorage must also implement the MutableEntityStorageInstrumentation"

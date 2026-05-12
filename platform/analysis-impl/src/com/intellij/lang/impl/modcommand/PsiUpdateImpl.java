@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.lang.impl.modcommand;
 
 import com.intellij.analysis.AnalysisBundle;
@@ -438,7 +438,7 @@ final class PsiUpdateImpl {
         // allow navigating to the beginning of files
         if (file.getViewProvider().getVirtualFile() instanceof LightVirtualFile lvf &&
             lvf.getParent() instanceof ChangedVirtualDirectory cvd) {
-          myNavigationFile = new FutureVirtualFile(cvd.getOriginalFile(), lvf.getName(), lvf.getFileType());
+          myNavigationFile = new FutureVirtualFile(resolveParentForFutureVirtualFile(cvd), lvf.getName(), lvf.getFileType());
         }
         else {
           myNavigationFile = file.getOriginalFile().getVirtualFile();
@@ -455,6 +455,24 @@ final class PsiUpdateImpl {
       Segment range = pointer.getRange();
       if (range == null) return null;
       return TextRange.create(range);
+    }
+
+    /**
+     * Finds the original file for a {@link ChangedVirtualDirectory}.
+     * If the original file doesn't exist, wraps it into a {@link FutureVirtualFile} that has its parent resolved the same way recursively
+     * until the existing original file is found.
+     *
+     * @param directory directory to resolve
+     * @return virtual file representing a directory that can be used as a parent for {@link FutureVirtualFile}
+     */
+    private static @NotNull VirtualFile resolveParentForFutureVirtualFile(@NotNull ChangedVirtualDirectory directory) {
+      VirtualFile original = directory.getOriginalFile();
+      if (original != null) return original;
+      VirtualFile parent = directory.getParent();
+      VirtualFile resolvedParent = parent instanceof ChangedVirtualDirectory parentCvd
+                                   ? resolveParentForFutureVirtualFile(parentCvd)
+                                   : parent;
+      return new FutureVirtualFile(resolvedParent, directory.getName(), null);
     }
 
     private static @NotNull TextRange templateRange(@NotNull TextRange elementRange, @Nullable TextRange rangeInElement) {
@@ -524,6 +542,7 @@ final class PsiUpdateImpl {
           Result result = varName == null
                           ? expression.calculateResult(context)
                           : myTemplateValues.computeIfAbsent(varName, v -> expression.calculateResult(context));
+
           if (result != null) {
             FileTracker tracker = requireNonNull(myTracker); // guarded by getRange call
             String fieldValue = result.toString();
@@ -545,6 +564,38 @@ final class PsiUpdateImpl {
           }
           TextRange range = mapRange(elementRange);
           myTemplateFields.add(new ModStartTemplate.DependantVariableField(range, varName, dependantVariableName, alwaysStopAt));
+          return this;
+        }
+
+        @Override
+        public @NotNull ModTemplateBuilder field(@NotNull PsiElement element,
+                                                 @NotNull TextRange rangeInElement,
+                                                 @NotNull String varName,
+                                                 @NotNull String dependantVariableName,
+                                                 boolean alwaysStopAt) {
+          TextRange elementRange = getRange(element);
+          if (elementRange == null) {
+            throw new IllegalStateException("Unable to restore element for template");
+          }
+          TextRange rangeForTemplate = templateRange(elementRange, rangeInElement);
+          TextRange range = mapRange(rangeForTemplate);
+          myTemplateFields.add(new ModStartTemplate.DependantVariableField(range, varName, dependantVariableName, alwaysStopAt));
+          return this;
+        }
+
+        @Override
+        public @NotNull ModTemplateBuilder field(@NotNull PsiElement element,
+                                                 @NotNull TextRange rangeInElement,
+                                                 @NotNull String varName,
+                                                 @NotNull String dependantVariableName,
+                                                 @Nullable String defaultValue) {
+          TextRange elementRange = getRange(element);
+          if (elementRange == null) {
+            throw new IllegalStateException("Unable to restore element for template");
+          }
+          TextRange rangeForTemplate = templateRange(elementRange, rangeInElement);
+          TextRange range = mapRange(rangeForTemplate);
+          myTemplateFields.add(new ModStartTemplate.DependantVariableField(range, varName, dependantVariableName, false, defaultValue));
           return this;
         }
 
@@ -737,8 +788,8 @@ final class PsiUpdateImpl {
         myRenameSymbol = myRenameSymbol.withRange(updateRange(event, renameSymbolRange));
       }
       myTabOutCommands.replaceAll(command -> {
-        int left = updateOffset(event, command.rangeStart(), true);
-        int right = updateOffset(event, command.rangeEnd(), false);
+        int left = updateOffset(event, command.rangeStart(), false);
+        int right = updateOffset(event, command.rangeEnd(), true);
         int target = updateOffset(event, command.target(), false);
         return new ModRegisterTabOut(command.file(), left, right, target);
       });

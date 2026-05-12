@@ -7,8 +7,8 @@ import com.intellij.openapi.util.NlsSafe;
 import com.intellij.psi.codeStyle.CodeStyleSettings;
 import com.intellij.psi.codeStyle.CodeStyleSettingsCustomizable;
 import com.intellij.psi.codeStyle.CommonCodeStyleSettings;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.fields.valueEditors.CommaSeparatedIntegersValueEditor;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 
@@ -37,7 +37,7 @@ final class MarginOptionsUtil {
   }
 
   static void customizeWrapOnTypingCombo(@NotNull JComboBox<String> wrapOnTypingCombo, @NotNull CodeStyleSettings settings) {
-    wrapOnTypingCombo.setRenderer(SimpleListCellRenderer.create("", (@NlsSafe var value) -> {
+    wrapOnTypingCombo.setRenderer(BuilderKt.textListCellRenderer("", (@NlsSafe var value) -> {
       for (int i = 0; i < CodeStyleSettingsCustomizable.WRAP_ON_TYPING_VALUES.length; i++) {
         if (CodeStyleSettingsCustomizable.WRAP_ON_TYPING_VALUES[i] == CommonCodeStyleSettings.WrapOnTyping.DEFAULT.intValue) {
           if (getInstance().WRAP_ON_TYPING_OPTIONS[i].equals(value)) {

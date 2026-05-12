@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger.impl.actions.handlers
 
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -7,10 +7,14 @@ import com.intellij.openapi.application.runInEdt
 import com.intellij.openapi.diff.impl.DiffUtil
 import com.intellij.openapi.editor.LogicalPosition
 import com.intellij.openapi.editor.ex.EditorEx
+import com.intellij.openapi.editor.ex.util.EditorUtil
+import com.intellij.openapi.editor.impl.InterLineBreakpointProperties
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.UserDataHolder
 import com.intellij.openapi.util.registry.Registry.Companion.`is`
 import com.intellij.platform.debugger.impl.shared.proxy.XDebugManagerProxy
 import com.intellij.util.ThreeState
+import com.intellij.xdebugger.breakpoints.XLineBreakpointVerticalPlacement
 import com.intellij.xdebugger.impl.actions.DebuggerActionHandler
 import com.intellij.xdebugger.impl.actions.ToggleLineBreakpointAction
 import com.intellij.xdebugger.impl.breakpoints.XBreakpointUIUtil
@@ -19,11 +23,15 @@ import com.intellij.xdebugger.impl.ui.DebuggerUIUtil
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.VisibleForTesting
 import java.awt.Point
+import java.awt.event.InputEvent
 import java.awt.event.MouseEvent
 import java.util.concurrent.CompletableFuture
 
 @ApiStatus.Internal
-class XToggleLineBreakpointActionHandler(private val myTemporary: Boolean) : DebuggerActionHandler() {
+class XToggleLineBreakpointActionHandler @JvmOverloads constructor(
+  private val myTemporary: Boolean,
+  private val defaultVerticalPlacement: XLineBreakpointVerticalPlacement = XLineBreakpointVerticalPlacement.ON_LINE,
+) : DebuggerActionHandler() {
   override fun isEnabled(project: Project, event: AnActionEvent): Boolean {
     val editor = event.getData(CommonDataKeys.EDITOR)
     if (editor == null || DiffUtil.isDiffEditor(editor)) {
@@ -36,8 +44,9 @@ class XToggleLineBreakpointActionHandler(private val myTemporary: Boolean) : Deb
       for (breakpointType in breakpointTypes) {
         val file = position.getFile()
         val line = position.getLine()
-        if (breakpointType.canPutAtFast(position.editor, line, project).isAtLeast(ThreeState.UNSURE) ||
-            breakpointManager.findBreakpointAtLine(breakpointType, file, line) != null) {
+        if ((XBreakpointUIUtil.supportsPlacement(breakpointType, defaultVerticalPlacement) &&
+             breakpointType.canPutAtFast(position.editor, line, project).isAtLeast(ThreeState.UNSURE)) ||
+            breakpointManager.findBreakpointAtLine(breakpointType, file, line, defaultVerticalPlacement) != null) {
           return true
         }
       }
@@ -56,11 +65,24 @@ class XToggleLineBreakpointActionHandler(private val myTemporary: Boolean) : Deb
     val inputEvent = event.inputEvent
     val isAltClick = isFromGutterClick && inputEvent != null && inputEvent.isAltDown
     val isShiftClick = isFromGutterClick && inputEvent != null && inputEvent.isShiftDown
-    val canRemove = !isFromGutterClick || (!isShiftClick && !`is`("debugger.click.disable.breakpoints"))
-    val isLoggingBreakpoint = isFromGutterClick && editor != null && inputEvent is MouseEvent
-                              && !isAltClick && isShiftClick
-    val selection = if (isLoggingBreakpoint) editor.getSelectionModel().selectedText else null
-
+    val canCreateInterLineBreakpointFromGutter = EditorUtil.isBreakPointsOnLineNumbers()
+    val isShiftClickForInterLine = isShiftClick && canCreateInterLineBreakpointFromGutter
+    val canRemove = !isFromGutterClick || (!isShiftClickForInterLine && !`is`("debugger.click.disable.breakpoints"))
+    val interLineRequestedFromGutterClick = event.getData(XLineBreakpointManager.INTER_LINE_BREAKPOINT_KEY)
+    val placement = when (interLineRequestedFromGutterClick) {
+      true -> XLineBreakpointVerticalPlacement.INTER_LINE
+      false -> XLineBreakpointVerticalPlacement.ON_LINE
+      null -> defaultVerticalPlacement
+    }
+    val isInterlineLogging =
+      editor != null && (isInterLineAction(inputEvent, placement) || isInterLineMouseClick(inputEvent,
+                                                                                           canCreateInterLineBreakpointFromGutter,
+                                                                                           event))
+    val isMouseClick = inputEvent is MouseEvent
+    val isLoggingBreakpoint = isInterlineLogging ||
+                              isFromGutterClick && editor != null && isMouseClick && !isAltClick && isShiftClick
+    val logExpression = (event.dataContext as? UserDataHolder)?.getUserData(XLineBreakpointManager.LOG_EXPRESSION)
+                        ?: editor?.getSelectionModel()?.selectedText.takeIf { isLoggingBreakpoint }
 
     // do not toggle more than once on the same line
     val processedLines = hashSetOf<Int>()
@@ -69,9 +91,11 @@ class XToggleLineBreakpointActionHandler(private val myTemporary: Boolean) : Deb
       if (processedLines.add(position.getLine())) {
         val future = XBreakpointUIUtil.toggleLineBreakpointProxy(
           project, position, !isFromGutterClick, position.editor, isAltClick || myTemporary,
-          !isFromGutterClick, canRemove, isLoggingBreakpoint, selection
+          !isFromGutterClick, canRemove, isLoggingBreakpoint, logExpression, placement
         ).thenAccept { breakpoint ->
-          if (breakpoint != null && isLoggingBreakpoint) {
+          // isMouseClick is always `true`, but its usage here enables smart cast for nullable `inputEvent`
+          @Suppress("KotlinConstantConditions")
+          if (breakpoint != null && isLoggingBreakpoint && !isInterlineLogging && isMouseClick) {
             runInEdt {
               // edit breakpoint
               val position = LogicalPosition(breakpoint.getLine() + 1, 0)
@@ -85,4 +109,14 @@ class XToggleLineBreakpointActionHandler(private val myTemporary: Boolean) : Deb
     }
     return CompletableFuture.allOf(*futures.toTypedArray())
   }
+
+  private fun isInterLineMouseClick(
+    inputEvent: InputEvent?,
+    canCreateInterLineBreakpointFromGutter: Boolean,
+    event: AnActionEvent,
+  ): Boolean =
+    (inputEvent is MouseEvent && canCreateInterLineBreakpointFromGutter && event.getData(InterLineBreakpointProperties.KEY)?.isLogging == true)
+
+  private fun isInterLineAction(inputEvent: InputEvent?, placement: XLineBreakpointVerticalPlacement): Boolean =
+    inputEvent !is MouseEvent && placement == XLineBreakpointVerticalPlacement.INTER_LINE
 }

@@ -147,7 +147,7 @@ class PluginAdvertiserEditorNotificationProvider : EditorNotificationProvider, D
       val status = if (isCommunityIde()) EditorNotificationPanel.Status.Promo else EditorNotificationPanel.Status.Info
       val panel = object : EditorNotificationPanel(fileEditor, status) {
         init {
-          label = myLabel
+          label = myTextLabel
         }
       }
 

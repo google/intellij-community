@@ -1,13 +1,13 @@
 package com.intellij.database.run.ui.grid.renderers;
 
 import com.intellij.database.datagrid.DataGrid;
+import com.intellij.database.datagrid.GridCellRequest;
 import com.intellij.database.datagrid.GridColumn;
 import com.intellij.database.datagrid.GridRow;
 import com.intellij.database.datagrid.HierarchicalColumnsDataGridModel.ColumnNamesHierarchyNode;
 import com.intellij.database.datagrid.ModelIndex;
 import com.intellij.database.datagrid.NestedTable;
 import com.intellij.database.datagrid.ViewIndex;
-import com.intellij.database.run.ui.DataAccessType;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.ui.EditorTextFieldCellRenderer.AbbreviatingRendererComponent;
 import com.intellij.ui.hover.TableHoverListener;
@@ -29,13 +29,12 @@ public class NestedTableCellRendererFactory implements GridCellRendererFactory {
   }
 
   @Override
-  public boolean supports(@NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
-    Object cellValue = myGrid.getDataModel(DataAccessType.DATA_WITH_MUTATIONS).getValueAt(row, column);
-    return cellValue instanceof NestedTable;
+  public boolean supports(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+    return request.getValue() instanceof NestedTable;
   }
 
   @Override
-  public @NotNull GridCellRenderer getOrCreateRenderer(@NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
+  public @NotNull GridCellRenderer getOrCreateRenderer(@NotNull GridCellRequest<GridRow, GridColumn> request) {
     if (textRenderer == null) {
       textRenderer = new NestedTableTextRenderer(myGrid);
       Disposer.register(myGrid, textRenderer);
@@ -88,9 +87,8 @@ public class NestedTableCellRendererFactory implements GridCellRendererFactory {
     }
 
     @Override
-    public int getSuitability(@NotNull ModelIndex<GridRow> row, @NotNull ModelIndex<GridColumn> column) {
-      Object cellValue = myGrid.getDataModel(DataAccessType.DATA_WITH_MUTATIONS).getValueAt(row, column);
-      return cellValue instanceof NestedTable ? SUITABILITY_MIN+1 : SUITABILITY_UNSUITABLE;
+    public int getSuitability(@NotNull GridCellRequest<GridRow, GridColumn> request) {
+      return request.getValue() instanceof NestedTable ? SUITABILITY_MIN+1 : SUITABILITY_UNSUITABLE;
     }
   }
 }

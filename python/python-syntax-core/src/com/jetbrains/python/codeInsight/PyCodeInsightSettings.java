@@ -36,6 +36,7 @@ public class PyCodeInsightSettings implements PersistentStateComponent<PyCodeIns
 
   public boolean PARENTHESISE_ON_ENTER = true;
   public boolean INCLUDE_IMPORTABLE_NAMES_IN_BASIC_COMPLETION = true;
+  public boolean COPY_TYPE_ANNOTATIONS_FROM_STUBS = true;
 
   @Override
   public PyCodeInsightSettings getState() {

@@ -21,8 +21,7 @@ import org.jetbrains.annotations.Nls
 import org.jetbrains.idea.devkit.DevKitBundle
 import org.jetbrains.idea.devkit.dom.ContentDescriptor.ModuleDescriptor
 import org.jetbrains.idea.devkit.dom.IdeaPlugin
-import org.jetbrains.idea.devkit.dom.index.PluginIdDependenciesIndex
-import org.jetbrains.idea.devkit.util.DescriptorUtil
+import org.jetbrains.idea.devkit.inspections.remotedev.SplitModeInspectionUtil.findDependingContentModuleEntriesInFile
 
 internal class DescriptorsIncludingContentModuleLineMarkerProvider : DevkitRelatedLineMarkerProviderBase() {
 
@@ -55,15 +54,8 @@ internal class DescriptorsIncludingContentModuleLineMarkerProvider : DevkitRelat
   }
 
   private fun findDependingContentModuleEntries(element: PsiElement): List<ModuleDescriptor> {
-    val moduleVirtualFile = element.containingFile.virtualFile ?: return emptyList()
-    val moduleName = moduleVirtualFile.nameWithoutExtension
-    val psiManager = element.manager
-    @Suppress("UNCHECKED_CAST")
-    return PluginIdDependenciesIndex.findDependsTo(element.project, moduleVirtualFile).flatMap { dependingFile ->
-      val psiFile = psiManager.findFile(dependingFile) as? XmlFile ?: return@flatMap emptyList<PsiElement>()
-      val plugin = DescriptorUtil.getIdeaPlugin(psiFile) ?: return@flatMap emptyList<PsiElement>()
-      plugin.content.flatMap { it.moduleEntry }.filter { it.name.stringValue == moduleName }
-    } as List<ModuleDescriptor>
+    val xmlFile = element.containingFile as? XmlFile ?: return emptyList()
+    return findDependingContentModuleEntriesInFile(xmlFile).toList()
   }
 
   private fun createLineMarkerInfo(

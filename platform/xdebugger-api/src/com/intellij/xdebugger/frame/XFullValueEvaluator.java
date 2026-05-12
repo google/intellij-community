@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger.frame;
 
 import com.intellij.xdebugger.Obsolescent;
@@ -87,7 +87,13 @@ public abstract class XFullValueEvaluator {
       evaluated(fullValue, null);
     }
 
-    void evaluated(@NotNull String fullValue, @Nullable Font font);
+    /**
+     * @deprecated use {@link #evaluated(String)} instead
+     */
+    @SuppressWarnings("unused")
+    @Deprecated
+    default void evaluated(@NotNull String fullValue, @Nullable Font font) {
+    }
   }
 
   public static class LinkAttributes {

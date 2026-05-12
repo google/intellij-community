@@ -1,11 +1,13 @@
 package com.intellij.database.run.ui.grid.editors;
 
+import com.intellij.database.datagrid.ActualGridCellRequest;
 import com.intellij.database.datagrid.DataGrid;
+import com.intellij.database.datagrid.GridCellRequest;
+import com.intellij.database.datagrid.GridCellRequestKt;
 import com.intellij.database.datagrid.GridColumn;
 import com.intellij.database.datagrid.GridRow;
 import com.intellij.database.datagrid.GridUtil;
 import com.intellij.database.datagrid.ModelIndex;
-import com.intellij.database.run.ui.DataAccessType;
 import com.intellij.database.run.ui.grid.editors.GridCellEditorFactory.IsEditableChecker;
 import com.intellij.openapi.actionSystem.DataSink;
 import com.intellij.openapi.actionSystem.UiDataProvider;
@@ -21,31 +23,36 @@ import javax.swing.JComponent;
 import java.util.EventObject;
 
 public abstract class GridTextCellEditorBase extends GridCellEditor.Adapter implements UiDataProvider, GridCellEditor.EditorBased {
-  protected final DataGrid myGrid;
   private final IsEditableChecker myEditableChecker;
-  protected final GridColumn myColumn;
+  private final ActualGridCellRequest<GridRow, GridColumn> myOriginalRequest;
   protected final GridCellEditorTextField myTextField;
 
   protected Object myValue;
 
-  protected GridTextCellEditorBase(@NotNull DataGrid grid,
-                                   @NotNull ModelIndex<GridRow> row,
-                                   @NotNull ModelIndex<GridColumn> column,
-                                   @Nullable Object value,
+  protected GridTextCellEditorBase(@NotNull GridCellRequest<GridRow, GridColumn> request,
                                    EventObject initiator,
                                    @NotNull IsEditableChecker editableChecker,
                                    @NotNull GridCellEditorFactory.ValueFormatter valueFormatter) {
-    myGrid = grid;
     myEditableChecker = editableChecker;
-    myColumn = grid.getDataModel(DataAccessType.DATA_WITH_MUTATIONS).getColumn(column);
-    myValue = value;
-    TextCompletionProvider provider = GridUtil.createCompletionProvider(grid, row, column);
+    myOriginalRequest = GridCellRequestKt.actual(request);
+    myValue = request.getValue();
+    TextCompletionProvider provider = GridUtil.createCompletionProvider(request);
 
-    var settings = GridUtil.getSettings(myGrid);
+    var settings = GridUtil.getSettings(getGrid());
     boolean autoPopup = settings == null || settings.isEnableImmediateCompletionInGridCells();
 
-    myTextField = new MyGridCellEditorTextField(initiator, provider, row, column, valueFormatter, autoPopup);
+    myTextField = new MyGridCellEditorTextField(initiator, provider, request, valueFormatter, autoPopup);
     Disposer.register(this, myTextField);
+  }
+
+  @NotNull
+  public DataGrid getGrid() {
+    return (DataGrid)myOriginalRequest.getGrid();
+  }
+
+  @NotNull
+  public ModelIndex<GridColumn> getColumnIdx() {
+    return myOriginalRequest.getColumnIdx();
   }
 
   @Override
@@ -64,17 +71,16 @@ public abstract class GridTextCellEditorBase extends GridCellEditor.Adapter impl
   }
 
   protected boolean isValueEditable() {
-    return myEditableChecker.isEditable(myValue, myGrid, ModelIndex.forColumn(myGrid, myColumn.getColumnNumber()));
+    return myEditableChecker.isEditable(myValue, getGrid(), getColumnIdx());
   }
 
   private class MyGridCellEditorTextField extends GridCellEditorTextField {
     MyGridCellEditorTextField(EventObject initiator,
                               @Nullable TextCompletionProvider provider,
-                              @NotNull ModelIndex<GridRow> row,
-                              @NotNull ModelIndex<GridColumn> column,
+                              @NotNull GridCellRequest<GridRow, GridColumn> request,
                               @NotNull GridCellEditorFactory.ValueFormatter valueFormatter,
                               boolean autoPopup) {
-      super(myGrid.getProject(), myGrid, row, column, true, initiator, provider, autoPopup, valueFormatter);
+      super(request.getGrid().getProject(), request, true, initiator, provider, autoPopup, valueFormatter);
       getDocument().addDocumentListener(new DocumentListener() {
         @Override
         public void documentChanged(@NotNull DocumentEvent e) {

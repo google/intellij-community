@@ -8,23 +8,25 @@ import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.ObjectUtils;
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
 import com.jetbrains.python.PyNames;
 import com.jetbrains.python.PythonRuntimeService;
 import com.jetbrains.python.codeInsight.typing.PyTypeShed;
 import com.jetbrains.python.psi.impl.PyBuiltinCache;
-import com.jetbrains.python.psi.search.PySearchUtilBase;
+import com.jetbrains.python.sdk.PyRichSdk;
+import com.jetbrains.python.sdk.PyRichSdkExtKt;
+import com.jetbrains.python.sdk.PyRichSdkKt;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
+import java.nio.file.Path;
 import java.util.Objects;
 
 import static com.jetbrains.python.sdk.PySdkUtil.getLanguageLevelForSdk;
 import static com.jetbrains.python.sdk.legacy.PythonSdkUtil.findSkeletonsDir;
 import static com.jetbrains.python.sdk.legacy.PythonSdkUtil.isRemote;
-import static com.jetbrains.python.sdk.legacy.PythonSdkUtil.isVirtualEnv;
 
 /**
  * Skeleton logic from the original [com.jetbrains.python.sdk.PythonSdkUtil]
@@ -38,7 +40,7 @@ public final class PySkeletonUtil {
     if (skeletonsDir != null && VfsUtilCore.isAncestor(skeletonsDir, file, false)) {
       PySkeletonHeader skeletonHeader = file.getUserData(CACHED_SKELETON_HEADER);
       if (skeletonHeader == null) {
-        skeletonHeader = PySkeletonHeader.readSkeletonHeader(VfsUtilCore.virtualToIoFile(file));
+        skeletonHeader = PySkeletonHeader.readSkeletonHeader(file.toNioPath());
         file.putUserData(CACHED_SKELETON_HEADER, skeletonHeader);
       }
       return skeletonHeader;
@@ -55,64 +57,62 @@ public final class PySkeletonUtil {
    * Also, on some systems, first of all in system distributions of Python on Linux, there might be no
    * "site-packages" at all, and this method returns {@code null} accordingly in this case.
    */
+  @RequiresBackgroundThread
   public static @Nullable VirtualFile getSitePackagesDirectory(@NotNull Sdk pythonSdk) {
-    final VirtualFile libDir;
-    if (isVirtualEnv(pythonSdk)) {
-      libDir = PySearchUtilBase.findVirtualEnvLibDir(pythonSdk);
-    }
-    else {
-      libDir = PySearchUtilBase.findLibDir(pythonSdk);
-    }
-    return libDir != null ? libDir.findChild(PyNames.SITE_PACKAGES) : null;
+    return PyRichSdkExtKt.sitePackagesDirectory(PyRichSdkKt.pyRichSdk(pythonSdk, false));
   }
 
+  @RequiresBackgroundThread(generateAssertion = false)
   public static boolean isStdLib(@NotNull VirtualFile vFile, @Nullable Sdk pythonSdk) {
-    if (pythonSdk != null) {
-      @Nullable VirtualFile originFile = vFile;
-      @NotNull String originPath = vFile.getPath();
-      boolean checkOnRemoteFS = false;
-      // All binary skeletons are collected under the same root regardless of their original location.
-      // Because of that we need to use paths to the corresponding binary modules recorded in their headers.
-      final PySkeletonHeader header = readSkeletonHeader(originFile, pythonSdk);
-      if (header != null) {
-        // Binary module paths in skeleton headers of Mock SDK don't map to actual physical files.
-        // Fallback to the old heuristic for these stubs.
-        if (ApplicationManager.getApplication().isUnitTestMode() &&
-            Objects.equals(vFile.getParent(), findSkeletonsDir(pythonSdk))) {
-          return true;
-        }
+    if (pythonSdk == null) {
+      return false;
+    }
 
-        final String binaryPath = header.getBinaryFile();
-        // XXX Assume that all pre-generated stubs belong to the interpreter's stdlib -- might change in future with PY-32229
-        if (binaryPath.equals(PySkeletonHeader.BUILTIN_NAME) || binaryPath.equals(PySkeletonHeader.PREGENERATED)) {
-          return true;
-        }
-        if (isRemote(pythonSdk)) {
-          checkOnRemoteFS = true;
-          // Actual file is on remote file system and not available
-          originFile = null;
-        }
-        else {
-          originFile = VfsUtil.findFileByIoFile(new File(binaryPath), true);
-        }
-        originPath = binaryPath;
-      }
-      if (originFile != null) {
-        originFile = ObjectUtils.notNull(originFile.getCanonicalFile(), originFile);
-        originPath = originFile.getPath();
+    @Nullable VirtualFile originFile = vFile;
+    @NotNull String originPath = vFile.getPath();
+    boolean checkOnRemoteFS = false;
+    // All binary skeletons are collected under the same root regardless of their original location.
+    // Because of that we need to use paths to the corresponding binary modules recorded in their headers.
+    final PySkeletonHeader header = readSkeletonHeader(originFile, pythonSdk);
+    if (header != null) {
+      // Binary module paths in skeleton headers of Mock SDK don't map to actual physical files.
+      // Fallback to the old heuristic for these stubs.
+      if (ApplicationManager.getApplication().isUnitTestMode() &&
+          Objects.equals(vFile.getParent(), findSkeletonsDir(pythonSdk))) {
+        return true;
       }
 
-      final VirtualFile libDir = PySearchUtilBase.findLibDir(pythonSdk);
-      if (libDir != null && isUnderLibDirButNotSitePackages(originFile, originPath, libDir, pythonSdk, checkOnRemoteFS)) {
+      final String binaryPath = header.getBinaryFile();
+      // XXX Assume that all pre-generated stubs belong to the interpreter's stdlib -- might change in future with PY-32229
+      if (binaryPath.equals(PySkeletonHeader.BUILTIN_NAME) || binaryPath.equals(PySkeletonHeader.PREGENERATED)) {
         return true;
       }
-      final VirtualFile venvLibDir = PySearchUtilBase.findVirtualEnvLibDir(pythonSdk);
-      if (venvLibDir != null && isUnderLibDirButNotSitePackages(originFile, originPath, venvLibDir, pythonSdk, checkOnRemoteFS)) {
-        return true;
+      if (isRemote(pythonSdk)) {
+        checkOnRemoteFS = true;
+        // Actual file is on remote file system and not available
+        originFile = null;
       }
-      if (PyTypeShed.INSTANCE.isInStandardLibrary(vFile)) {
-        return true;
+      else {
+        originFile = VfsUtil.findFile(Path.of(binaryPath), true);
       }
+      originPath = binaryPath;
+    }
+    if (originFile != null) {
+      originFile = ObjectUtils.notNull(originFile.getCanonicalFile(), originFile);
+      originPath = originFile.getPath();
+    }
+
+    final PyRichSdk pyRichSdk = PyRichSdkKt.pyRichSdk(pythonSdk, false);
+    final VirtualFile libDir = PyRichSdkExtKt.stdlibLibDirectory(pyRichSdk);
+    if (libDir != null && isUnderLibDirButNotSitePackages(originFile, originPath, libDir, pythonSdk, checkOnRemoteFS)) {
+      return true;
+    }
+    final VirtualFile venvLibDir = PyRichSdkExtKt.venvLibDirectory(pyRichSdk);
+    if (venvLibDir != null && isUnderLibDirButNotSitePackages(originFile, originPath, venvLibDir, pythonSdk, checkOnRemoteFS)) {
+      return true;
+    }
+    if (PyTypeShed.INSTANCE.isInStandardLibrary(vFile)) {
+      return true;
     }
     return false;
   }
@@ -162,4 +162,3 @@ public final class PySkeletonUtil {
     return PyBuiltinCache.getBuiltinsFileName(getLanguageLevelForSdk(sdk));
   }
 }
-

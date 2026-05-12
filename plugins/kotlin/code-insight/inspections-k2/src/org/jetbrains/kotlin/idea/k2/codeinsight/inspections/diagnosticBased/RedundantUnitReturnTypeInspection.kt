@@ -45,8 +45,8 @@ internal class RedundantUnitReturnTypeInspection :
         val typeReference = element as? KtTypeReference ?: return null
         val returnType = typeReference.type.fullyExpandedType
 
-        if (!returnType.isMarkedNullable && returnType.isUnitType) {
-            return CallableReturnTypeUpdaterUtils.TypeInfo(CallableReturnTypeUpdaterUtils.TypeInfo.Companion.UNIT)
+        if (returnType.isUnitType) {
+            return CallableReturnTypeUpdaterUtils.TypeInfo(CallableReturnTypeUpdaterUtils.TypeInfo.UNIT)
         }
 
         return null

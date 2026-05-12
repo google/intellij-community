@@ -52,8 +52,8 @@ private fun KtAnnotationEntry.getAnnotatedOptIns(): Set<ClassId> {
     return valueArguments.mapNotNull { it.getAnnotationClassValue() }.toSet()
 }
 
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class)
+context(_: KaSession)
 private fun ValueArgument.getAnnotationClassValue(): ClassId? =
     getArgumentExpression()
         ?.evaluateAsAnnotationValue()

@@ -3,18 +3,32 @@ package com.intellij.java.codeInsight.completion.commands
 
 import com.intellij.codeInsight.CodeInsightBundle
 import com.intellij.codeInsight.completion.LightFixtureCompletionTestCase
-import com.intellij.codeInsight.completion.command.CommandCompletionDocumentationProvider
 import com.intellij.codeInsight.completion.command.CommandCompletionLookupElement
+import com.intellij.codeInsight.completion.command.LookupElementCustomPreviewHolderDocumentationProvider
 import com.intellij.codeInsight.completion.command.configuration.CommandCompletionSettingsService
+import com.intellij.codeInsight.daemon.impl.ProblemDescriptorWithReporterName
 import com.intellij.codeInsight.hint.HintManager
 import com.intellij.codeInsight.hint.HintManagerImpl
 import com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
+import com.intellij.codeInsight.lookup.LookupElementCustomPreviewHolder
 import com.intellij.codeInsight.lookup.LookupElementPresentation
+import com.intellij.codeInsight.template.impl.LiveTemplateCompletionContributor
 import com.intellij.codeInsight.template.impl.TemplateManagerImpl
+import com.intellij.codeInspection.LocalInspectionTool
+import com.intellij.codeInspection.LocalQuickFix
+import com.intellij.codeInspection.ProblemDescriptor
+import com.intellij.codeInspection.ProblemDescriptorBase
+import com.intellij.codeInspection.ProblemHighlightType
+import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.codeInspection.deadCode.UnusedDeclarationInspection
+import com.intellij.codeInspection.ex.DynamicGroupTool
+import com.intellij.codeInspection.ex.LocalInspectionToolWrapper
+import com.intellij.codeInspection.nullable.NullableStuffInspection
 import com.intellij.codeInspection.numeric.RemoveLiteralUnderscoresInspection
 import com.intellij.codeInspection.streamMigration.StreamApiMigrationInspection
 import com.intellij.ide.highlighter.JavaFileType
+import com.intellij.java.codeInspection.DataFlowInspectionTestCase
+import com.intellij.modcommand.ActionContext
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl
@@ -22,12 +36,16 @@ import com.intellij.openapi.command.undo.UndoManager
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.progress.runBlockingMaybeCancellable
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.backend.documentation.AsyncDocumentation
 import com.intellij.platform.backend.documentation.DocumentationData
 import com.intellij.psi.CommonClassNames.JAVA_LANG_CLASS
+import com.intellij.psi.JavaElementVisitor
 import com.intellij.psi.JavaPsiFacade
+import com.intellij.psi.PsiElementVisitor
+import com.intellij.psi.PsiLocalVariable
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.testFramework.LightProjectDescriptor
 import com.intellij.testFramework.NeedsIndex
@@ -128,6 +146,36 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
         } 
       }
     """.trimIndent()
+    assertEquals(preview.modifiedText(), expected)
+  }
+
+  fun testPostfixPreview() {
+    LiveTemplateCompletionContributor.setShowTemplatesInTests(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+      class A { 
+        void foo() {
+          "string".soutv<caret>
+        } 
+      }
+      """.trimIndent())
+    val elements = myFixture.completeBasic()
+    val item = elements.first { element -> element.lookupString.contains("sout", ignoreCase = true) }
+      .`as`(LookupElementCustomPreviewHolder::class.java)
+    if (item == null) {
+      fail()
+      return
+    }
+    val preview = item.preview(ActionContext.from(myFixture.editor, myFixture.file))
+    if (preview !is IntentionPreviewInfo.CustomDiff) {
+      fail()
+      return
+    }
+    val expected = """
+      class A { 
+        void foo() {
+            System.out.println("\"string\" = " + "string");
+        } 
+      }""".trimIndent()
     assertEquals(preview.modifiedText(), expected)
   }
 
@@ -257,7 +305,7 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
       """.trimIndent())
     val elements = myFixture.completeBasic()
     val item = elements.first { element -> element.lookupString.contains("copy ref", ignoreCase = true) }
-    val preview = (item.`as`(CommandCompletionLookupElement::class.java))?.preview
+    val preview = (item.`as`(CommandCompletionLookupElement::class.java))?.preview(ActionContext.from(myFixture.editor, myFixture.file))
     assertEquals("Copy reference for 'foo'.", (preview as IntentionPreviewInfo.Html).content().toString())
     selectItem(item)
     myFixture.performEditorAction(IdeActions.ACTION_EDITOR_PASTE)
@@ -349,6 +397,39 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
       }""".trimIndent())
     val elements = myFixture.completeBasic()
     assertTrue(elements.any { element -> element.lookupString.contains("Optimize im", ignoreCase = true) })
+  }
+
+  fun testOptimizeImportWithMatchedSecondWord() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+      import java.util.ArrayList;
+      import java.util.List;
+      import java.util.List;
+      import java.util.List;
+      
+      public class MainClass {
+          public static void main(CharSequence args) {
+      
+              List<String> a = new ArrayList<>();
+          }
+      
+          ..im<caret>
+      }""".trimIndent())
+    val elements = myFixture.completeBasic()
+    selectItem(elements.first { element -> element.lookupString.contains("Optimize import", ignoreCase = true) })
+    NonBlockingReadActionImpl.waitForAsyncTaskCompletion()
+    myFixture.checkResult("""
+      import java.util.ArrayList;
+      import java.util.List;
+      
+      public class MainClass {
+          public static void main(CharSequence args) {
+      
+              List<String> a = new ArrayList<>();
+          }
+      
+          
+      }""".trimIndent())
   }
 
   fun testGenerateGetter() {
@@ -739,7 +820,7 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
     assertNotNull(lookupElement)
     val element = lookupElement?.`as`(CommandCompletionLookupElement::class.java)
     assertNotNull(element)
-    assertNotNull(element?.preview)
+    assertNotNull(element?.preview(ActionContext.from(myFixture.editor, myFixture.file)))
   }
 
   fun testRedCode() {
@@ -755,7 +836,7 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
     myFixture.type(".")
     val elements = myFixture.completeBasic()
     val item = elements.first { element -> element.lookupString.contains("Convert literal to", ignoreCase = true) }
-    val documentationProvider = CommandCompletionDocumentationProvider()
+    val documentationProvider = LookupElementCustomPreviewHolderDocumentationProvider()
     val documentationTarget = documentationProvider.documentationTarget(psiFile, item, editor.caretModel.offset)
     val documentation = documentationTarget?.computeDocumentation() as? AsyncDocumentation
     assertNotNull(documentation)
@@ -1650,7 +1731,7 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
     assertNotNull(lookupElement)
     val element = lookupElement.`as`(CommandCompletionLookupElement::class.java)
     assertNotNull(element)
-    assertNotNull(element?.preview)
+    assertNotNull(element?.preview(ActionContext.from(myFixture.editor, myFixture.file)))
     assertNotNull(lookup)
   }
 
@@ -1724,6 +1805,29 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
     myFixture.completeBasic()
   }
 
+  fun testNotNullInspection() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.enableInspections(NullableStuffInspection())
+    DataFlowInspectionTestCase.addJSpecifyNullMarked(myFixture)
+    DataFlowInspectionTestCase.addJSpecifyNonNull(myFixture)
+    myFixture.configureByText("package-info.java", """
+          @NullMarked
+          package org.example;
+          
+          import org.jspecify.annotations.NullMarked;
+      """.trimIndent())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+      package org.example;
+      import org.jspecify.annotations.NonNull;
+      class Main2 {
+          public static @NonNull..<caret> Integer useValue() {
+              return 1;
+          }
+      }""".trimIndent())
+    val elements = myFixture.completeBasic()
+    assertTrue(elements.any { element -> element.lookupString.contains("Remove annotation", ignoreCase = true) })
+  }
+
   fun testCompletionInsideLiteral() {
     Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
     myFixture.configureByText(JavaFileType.INSTANCE, """
@@ -1777,11 +1881,87 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
       element.lookupString.contains("Parameter info", ignoreCase = true) })
   }
 
+  fun testShowLiveTemplate() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+      class A {
+          void foo() {
+              .<caret>
+          }
+      }
+      """.trimIndent())
+    val elements = myFixture.completeBasic()
+    assertNotNull(elements.firstOrNull { element -> element.lookupString.contains("Live template", ignoreCase = true) })
+  }
+
+  fun testDynamicGroupToolInspection() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.enableInspections(MockDynamicGroupInspection(), MockDynamicGroupChildInspection())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+      class A { 
+        void foo() {
+          int badToken<caret> = 1;
+        } 
+      }
+      """.trimIndent())
+    myFixture.doHighlighting()
+    myFixture.type(".")
+    val elements = myFixture.completeBasic()
+    val command = elements.first { element ->
+      element.lookupString.contains("Replace bad token", ignoreCase = true) &&
+      element.`as`(CommandCompletionLookupElement::class.java) != null
+    }
+    selectItem(command)
+    myFixture.checkResult("""
+      class A { 
+        void foo() {
+          int goodToken = 1;
+        } 
+      }
+    """.trimIndent())
+  }
+
   private class TestHintManager : HintManagerImpl() {
     var called: Boolean = false
     override fun showInformationHint(editor: Editor, component: JComponent, position: Short, onHintHidden: Runnable?) {
       super.showInformationHint(editor, component, position, onHintHidden)
       called = true
     }
+  }
+
+  private class MockDynamicGroupInspection : LocalInspectionTool(), DynamicGroupTool {
+    override fun getShortName(): String = "MockDynamicGroupParent"
+    override fun getDisplayName(): String = "Mock dynamic group parent"
+    override fun getGroupDisplayName(): String = "Mock"
+
+    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+      return object : JavaElementVisitor() {
+        override fun visitLocalVariable(variable: PsiLocalVariable) {
+          val nameIdentifier = variable.nameIdentifier ?: return
+          if (nameIdentifier.text != "badToken") return
+          val fix = object : LocalQuickFix {
+            override fun getFamilyName(): String = "Replace bad token"
+            override fun applyFix(project: Project, descriptor: ProblemDescriptor) {
+              val identifier = descriptor.psiElement ?: return
+              val factory = JavaPsiFacade.getElementFactory(project)
+              identifier.replace(factory.createIdentifier("goodToken"))
+            }
+          }
+          val rawDescriptor = holder.manager.createProblemDescriptor(
+            nameIdentifier, "Bad token", fix, ProblemHighlightType.GENERIC_ERROR_OR_WARNING, isOnTheFly
+          ) as ProblemDescriptorBase
+          holder.registerProblem(ProblemDescriptorWithReporterName(rawDescriptor, "MockDynamicGroupChild"))
+        }
+      }
+    }
+
+    override fun getChildren(): List<LocalInspectionToolWrapper> =
+      listOf(LocalInspectionToolWrapper(MockDynamicGroupChildInspection()))
+  }
+
+  private class MockDynamicGroupChildInspection : LocalInspectionTool() {
+    override fun getShortName(): String = "MockDynamicGroupChild"
+    override fun getDisplayName(): String = "Mock dynamic group child"
+    override fun getGroupDisplayName(): String = "Mock"
   }
 }

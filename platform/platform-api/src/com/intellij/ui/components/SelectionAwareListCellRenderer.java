@@ -12,6 +12,10 @@ import javax.swing.ListCellRenderer;
 import java.awt.Component;
 import java.util.function.Function;
 
+/**
+ * @deprecated Use com.intellij.ui.dsl.listCellRenderer.BuilderKt.textListCellRenderer/listCellRenderer instead
+ */
+@Deprecated(forRemoval = true)
 @ApiStatus.Internal
 public class SelectionAwareListCellRenderer<T> implements ListCellRenderer<T> {
   private final Function<? super T, ? extends @NotNull JComponent> myFun;

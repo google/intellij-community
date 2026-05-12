@@ -30,9 +30,29 @@ public class KtParameterHintsProviderTestGenerated extends AbstractKtParameterHi
         KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
 
+    @TestMetadata("annotations.kt")
+    public void testAnnotations() throws Exception {
+        runTest("../../idea/tests/testData/codeInsight/hints/arguments/annotations.kt");
+    }
+
     @TestMetadata("blacklisted.kt")
     public void testBlacklisted() throws Exception {
         runTest("../../idea/tests/testData/codeInsight/hints/arguments/blacklisted.kt");
+    }
+
+    @TestMetadata("contextParameterAndExplicitContextArguments.kt")
+    public void testContextParameterAndExplicitContextArguments() throws Exception {
+        runTest("../../idea/tests/testData/codeInsight/hints/arguments/contextParameterAndExplicitContextArguments.kt");
+    }
+
+    @TestMetadata("contextParametersAndExplicitContextArguments.kt")
+    public void testContextParametersAndExplicitContextArguments() throws Exception {
+        runTest("../../idea/tests/testData/codeInsight/hints/arguments/contextParametersAndExplicitContextArguments.kt");
+    }
+
+    @TestMetadata("contextParametersInContext.kt")
+    public void testContextParametersInContext() throws Exception {
+        runTest("../../idea/tests/testData/codeInsight/hints/arguments/contextParametersInContext.kt");
     }
 
     @TestMetadata("contextParametersLambda.kt")

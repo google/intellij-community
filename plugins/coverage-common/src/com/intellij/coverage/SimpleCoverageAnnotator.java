@@ -9,7 +9,6 @@ import com.intellij.openapi.roots.TestSourcesFilter;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.rt.coverage.data.ClassData;
 import com.intellij.rt.coverage.data.LineCoverage;
@@ -22,6 +21,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -91,7 +91,7 @@ public abstract class SimpleCoverageAnnotator extends BaseCoverageAnnotator {
   /**
    * @deprecated SimpleCoverageAnnotator doesn't require normalized file paths any more
    * so now coverage report should work w/o usage of this method
-  */
+   */
   @Deprecated(forRemoval = true)
   public static String getFilePath(final String filePath) {
     return normalizeFilePath(filePath);
@@ -144,7 +144,7 @@ public abstract class SimpleCoverageAnnotator extends BaseCoverageAnnotator {
     }
     else {
       // file wasn't mentioned in coverage information
-      info = fillInfoForUncoveredFile(VfsUtilCore.virtualToIoFile(file));
+      info = fillInfoForUncoveredFile(file.toNioPath());
     }
 
     if (info != null) {
@@ -173,7 +173,7 @@ public abstract class SimpleCoverageAnnotator extends BaseCoverageAnnotator {
                                                             final @NotNull CoverageEngine coverageEngine,
                                                             Set<? super VirtualFile> visitedDirs,
                                                             final @NotNull Map<String, String> normalizedFiles2Files) {
-    if (ReadAction.compute(() -> !index.isInContent(dir) && !index.isInLibrary(dir))) {
+    if (ReadAction.computeBlocking(() -> !index.isInContent(dir) && !index.isInLibrary(dir))) {
       return null;
     }
 
@@ -181,16 +181,15 @@ public abstract class SimpleCoverageAnnotator extends BaseCoverageAnnotator {
       return null;
     }
 
-    if (!shouldCollectCoverageInsideLibraryDirs()) {
-      if (ReadAction.compute(() -> index.isInLibrary(dir))) {
-        return null;
-      }
+    if (!shouldCollectCoverageInsideLibraryDirs()
+        && ReadAction.computeBlocking(() -> index.isInLibrary(dir))) {
+      return null;
     }
     visitedDirs.add(dir);
 
     final String dirPath = normalizeFilePath(dir.getPath());
 
-    final boolean isInTestSrcContent = ReadAction.compute(() -> TestSourcesFilter.isTestSources(dir, getProject()));
+    boolean isInTestSrcContent = ReadAction.computeBlocking(() -> TestSourcesFilter.isTestSources(dir, getProject()));
     if (isInTestSrcContent) {
       myTestDirectories.add(dirPath);
     }
@@ -294,7 +293,8 @@ public abstract class SimpleCoverageAnnotator extends BaseCoverageAnnotator {
   }
 
   @Override
-  protected @Nullable Runnable createRenewRequest(final @NotNull CoverageSuitesBundle suite, final @NotNull CoverageDataManager dataManager) {
+  protected @Nullable Runnable createRenewRequest(final @NotNull CoverageSuitesBundle suite,
+                                                  final @NotNull CoverageDataManager dataManager) {
     final ProjectData data = suite.getCoverageData();
     if (data == null) {
       return null;
@@ -317,7 +317,7 @@ public abstract class SimpleCoverageAnnotator extends BaseCoverageAnnotator {
             myDirCoverageInfos.put(dirPath, info);
 
             try {
-              myDirCoverageInfos.put((new File(dirPath)).getCanonicalPath(), info);
+              myDirCoverageInfos.put(toRealPath(dirPath), info);
             }
             catch (IOException e) {
               //pass
@@ -329,7 +329,7 @@ public abstract class SimpleCoverageAnnotator extends BaseCoverageAnnotator {
             myTestDirCoverageInfos.put(dirPath, info);
 
             try {
-              myTestDirCoverageInfos.put((new File(dirPath)).getCanonicalPath(), info);
+              myTestDirCoverageInfos.put(toRealPath(dirPath), info);
             }
             catch (IOException e) {
               //pass
@@ -341,7 +341,7 @@ public abstract class SimpleCoverageAnnotator extends BaseCoverageAnnotator {
             myFileCoverageInfos.put(filePath, info);
 
             try {
-              myFileCoverageInfos.put((new File(filePath)).getCanonicalPath(), info);
+              myFileCoverageInfos.put(toRealPath(filePath), info);
             }
             catch (IOException e) {
               //pass
@@ -392,6 +392,10 @@ public abstract class SimpleCoverageAnnotator extends BaseCoverageAnnotator {
 
       dataManager.triggerPresentationUpdate();
     };
+  }
+
+  private static @NotNull String toRealPath(@NotNull String filePath) throws IOException {
+    return Path.of(filePath).toRealPath().toString();
   }
 
   @ApiStatus.Internal
@@ -459,8 +463,18 @@ public abstract class SimpleCoverageAnnotator extends BaseCoverageAnnotator {
     info.totalLineCount++;
   }
 
+  /**
+   * @deprecated Use {@link #fillInfoForUncoveredFile(Path)} instead.
+   */
+  @SuppressWarnings({"IO_FILE_USAGE"})
+  @Deprecated
   protected @Nullable FileCoverageInfo fillInfoForUncoveredFile(@NotNull File file) {
     return null;
+  }
+
+  @SuppressWarnings("IO_FILE_USAGE")
+  protected @Nullable FileCoverageInfo fillInfoForUncoveredFile(@NotNull Path file) {
+    return fillInfoForUncoveredFile(file.toFile());
   }
 
   protected interface CoverageAnnotatorRunner {

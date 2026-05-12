@@ -36,6 +36,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.service
@@ -66,6 +67,7 @@ import java.awt.event.ActionEvent
 import java.awt.event.ActionListener
 import java.lang.ref.Reference
 import java.lang.ref.WeakReference
+import java.util.function.BiConsumer
 import javax.swing.ListCellRenderer
 
 @ApiStatus.Internal
@@ -201,12 +203,8 @@ open class TextSearchContributor(val event: AnActionEvent) : WeightedSearchEvery
                   RegexpAction(regexp, registerShortcut, onChanged))
   }
 
-  override fun getDataForItem(element: SearchEverywhereItem, dataId: String): Any? {
-    if (CommonDataKeys.PSI_ELEMENT.`is`(dataId)) {
-      return element.usage.element
-    }
-
-    return null
+  override fun getDataProviders(): List<BiConsumer<SearchEverywhereItem, DataSink>> = super.getDataProviders() + BiConsumer { element, sink ->
+    sink.lazy(CommonDataKeys.PSI_ELEMENT) { element.usage.element }
   }
 
   private fun getInitialSelectedScope(scopeDescriptors: List<ScopeDescriptor>): ScopeDescriptor {

@@ -178,8 +178,8 @@ object IfThenTransformationUtils {
     }
 
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun conditionIsSenseless(data: IfThenTransformationData): Boolean = data.condition
         .diagnostics(KaDiagnosticCheckerFilter.ONLY_COMMON_CHECKERS)
         .map { it.diagnosticClass }

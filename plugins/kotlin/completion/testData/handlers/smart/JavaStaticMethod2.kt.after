@@ -7,5 +7,3 @@ fun bar(){
 
 // INVOCATION_COUNT: 2
 // ELEMENT_TEXT: Thread.currentThread
-
-// IGNORE_K2

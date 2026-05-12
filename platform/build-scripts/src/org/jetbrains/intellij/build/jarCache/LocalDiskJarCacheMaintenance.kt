@@ -3,6 +3,7 @@ package org.jetbrains.intellij.build.jarCache
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.jetbrains.annotations.ApiStatus
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.NoSuchFileException
@@ -129,7 +130,8 @@ internal suspend fun cleanupLocalDiskJarCache(
   }
 }
 
-internal fun purgeLegacyCacheIfRequired(
+@ApiStatus.Internal
+fun purgeLegacyCacheIfRequired(
   cacheDir: Path,
   versionedCacheDir: Path,
   legacyPurgeMarkerFile: Path,

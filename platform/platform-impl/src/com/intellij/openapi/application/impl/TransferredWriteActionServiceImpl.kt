@@ -2,12 +2,20 @@
 package com.intellij.openapi.application.impl
 
 import com.intellij.util.concurrency.TransferredWriteActionService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.invoke
 import org.jetbrains.annotations.ApiStatus
 
 @ApiStatus.Internal
 class TransferredWriteActionServiceImpl : TransferredWriteActionService {
   override fun runOnEdtWithTransferredWriteActionAndWait(action: Runnable) {
     InternalThreading.invokeAndWaitWithTransferredWriteAction {
+      action.run()
+    }
+  }
+
+  override fun <T> runOnBackgroundThreadWithTransferredWriteActionAndWait(action: Runnable) {
+    InternalThreading.executeOnPooledThreadWithTransferredWriteAction {
       action.run()
     }
   }

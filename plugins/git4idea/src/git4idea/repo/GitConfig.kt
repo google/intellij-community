@@ -5,6 +5,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vcs.VcsException
+import com.intellij.util.containers.nullize
 import git4idea.GitLocalBranch
 import git4idea.GitRemoteBranch
 import git4idea.branch.GitBranchUtil
@@ -14,16 +15,14 @@ import org.jetbrains.annotations.VisibleForTesting
 import java.nio.file.Path
 
 /**
- * Reads information from the `.git/config` file, and parses it to actual objects.
+ * Reads information from the git config command response and parses it to actual objects.
  *
- * Currently doesn't read all the information: just general information about remotes and branch tracking.
- *
- * TODO: note, that other git configuration files (such as ~/.gitconfig) are not handled yet.
+ * Currently, doesn't read all the information: just general information about remotes and branch tracking.
  */
 @ApiStatus.Internal
 class GitConfig private constructor(
   private val remotes: List<Remote>,
-  private val urls: List<Url>,
+  private val urlSubstitutions: List<UrlSubstitution>,
   private val trackedInfos: List<BranchConfig>,
   private val core: Core,
 ) {
@@ -33,16 +32,48 @@ class GitConfig private constructor(
    * Remote is returned with all transformations (such as `pushUrl, url.<base>.insteadOf`) already applied to it.
    * See [GitRemote] for details.
    *
-   * **Note:** remotes can be defined separately in `.git/remotes` directory, by creating a file for each remote with
+   * **Note:** remotes can be defined separately in `.git/remotes` directory (obsolete mechanism), by creating a file for each remote with
    * remote parameters written in the file. This method returns ONLY remotes defined in `.git/config`.
    * @return Git remotes defined in `.git/config`.
    */
   @VisibleForTesting
-  fun parseRemotes(): Set<GitRemote> =
-    remotes.asSequence()
-      .filter { remote -> remote.urls.isNotEmpty() }
-      .map { remote -> convertRemoteToGitRemote(urls, remote) }
-      .toSet()
+  fun parseRemotes(): Set<GitRemote> {
+    if (urlSubstitutions.isEmpty()) {
+      return mapConfiguredRemotes { remote ->
+        createGitRemote(remote, remote.urls, remote.pushUrls.nullize() ?: remote.urls)
+      }
+    }
+    val (substitutions, pushOnlySubstitutions) = urlSubstitutions.partition { !it.pushOnly }
+      .let { (fetch, pushOnly) -> fetch.convertToSortedList() to pushOnly.convertToSortedList() }
+
+    return mapConfiguredRemotes { remote ->
+      val urls = remote.urls.substitutePrefixes(substitutions)
+      val pushUrls = if (remote.pushUrls.isNotEmpty()) {
+        // for explicitly set pushUrls only insteadOf substitutions will be used
+        remote.pushUrls.substitutePrefixes(substitutions)
+      }
+      else if (pushOnlySubstitutions.isNotEmpty()) {
+        remote.urls.substitutePrefixes(pushOnlySubstitutions)
+      }
+      else urls
+      createGitRemote(remote, urls, pushUrls)
+    }
+  }
+
+  private fun createGitRemote(remote: Remote, urls: List<String>, pushUrls: List<String>): GitRemote =
+    GitRemote(remote.name, urls, pushUrls, remote.fetchSpecs, remote.pushSpec)
+
+  private fun mapConfiguredRemotes(transform: (Remote) -> GitRemote) =
+    remotes.asSequence().filter { it.urls.isNotEmpty() }.map(transform).toSet()
+
+  private fun List<UrlSubstitution>.convertToSortedList(): List<UrlSubstitution> =
+    asSequence().distinctBy { it.prefix }.sortedByDescending { it.prefix.length }.toList()
+
+  private fun List<String>.substitutePrefixes(substitutions: List<UrlSubstitution>) = map { url ->
+    substitutions.find { url.startsWith(it.prefix) }?.substitutePrefix(url) ?: url
+  }
+
+  private fun UrlSubstitution.substitutePrefix(url: String) = substitution + url.substring(prefix.length)
 
   /**
    * Create branch tracking information based on the information defined in `.git/config`.
@@ -63,11 +94,6 @@ class GitConfig private constructor(
     return core
   }
 
-  private class UrlsAndPushUrls(
-    val urls: List<String>,
-    val pushUrls: List<String>,
-  )
-
   private data class Remote(
     val name: String,
     val fetchSpecs: List<String>,
@@ -76,11 +102,11 @@ class GitConfig private constructor(
     val pushUrls: List<String>,
   )
 
-  private data class Url(
-    val name: String,
+  private data class UrlSubstitution(
+    val prefix: String,
     // null means no entry, i.e. nothing to substitute. Empty string means substituting everything
-    val insteadOf: String?,
-    val pushInsteadOf: String?,
+    val substitution: String,
+    val pushOnly: Boolean,
   )
 
   private data class BranchConfig(
@@ -103,81 +129,50 @@ class GitConfig private constructor(
     private const val BRANCH_INFO_SECTION = "branch"
     private const val CORE_SECTION = "core"
 
-    private fun convertRemoteToGitRemote(urls: List<Url>, remote: Remote): GitRemote {
-      val substitutedUrls: UrlsAndPushUrls = substituteUrls(urls, remote)
-      return GitRemote(remote.name, substitutedUrls.urls, substitutedUrls.pushUrls,
-                       remote.fetchSpecs, remote.pushSpec)
-    }
-
     /**
      * Creates an instance of GitConfig by reading information from the specified `.git/config` file.
      *
-     * If some section is invalid, it is skipped, and a warning is reported.
+     * If some section is invalid, it is skipped.
      */
     @JvmStatic
     @VisibleForTesting
     fun read(project: Project?, root: Path): GitConfig {
-      val configurations: Map<String, List<String>>
-      try {
-        configurations = GitConfigUtil.getValues(project, root, null)
+      val configurations: Map<String, List<String>> = try {
+        GitConfigUtil.getValues(project, root, null)
       }
       catch (_: VcsException) {
         return GitConfig(listOf(), listOf(), listOf(), Core(null))
       }
 
       val remotes = mutableListOf<Remote>()
-      val urls = mutableListOf<Url>()
+      val urls = mutableListOf<UrlSubstitution>()
       val trackedInfos = mutableListOf<BranchConfig>()
       val core = createCore(configurations)
 
-      val sections = parseKeysIntoSections(configurations)
+      val sectionVariables = configurations.keys.mapNotNull { parseSectionNameAndVariable(it) }.toSet()
 
-      for (section in sections) {
-        val sectionName = section.first
-        val sectionVariable = section.second
-
+      sectionVariables.forEach { (sectionName, sectionVariable) ->
         when (sectionName) {
-          SVN_REMOTE_SECTION, GIT_REMOTE_SECTION -> if (sectionVariable != null) {
-            remotes.add(createRemote(configurations, sectionName, sectionVariable))
-          }
-          URL_SECTION -> if (sectionVariable != null) {
-            urls.add(createUrl(configurations, sectionName, sectionVariable))
-          }
-          BRANCH_INFO_SECTION -> if (sectionVariable == null) {
-            LOG.debug(
-              String.format("Common branch option(s) defined .git/config. sectionName: %s%n section: %s", sectionName, section))
-          }
-          else {
-            trackedInfos.add(createBranchConfig(configurations, sectionName, sectionVariable))
-          }
+          SVN_REMOTE_SECTION, GIT_REMOTE_SECTION -> remotes.add(createRemote(configurations, sectionName, sectionVariable))
+          URL_SECTION -> urls.addAll(createUrl(configurations, sectionName, sectionVariable))
+          BRANCH_INFO_SECTION -> trackedInfos.add(createBranchConfig(configurations, sectionName, sectionVariable))
         }
       }
 
       return GitConfig(remotes, urls, trackedInfos, core)
     }
 
-    private fun parseKeysIntoSections(
-      configurations: Map<String, List<String>>,
-    ): Set<Pair<String, String?>> =
-      configurations.entries.mapNotNull { entry ->
-        val key: String = entry.key
-
-        val variableSeparatorIndex = key.lastIndexOf('.')
-        if (variableSeparatorIndex == -1) return@mapNotNull null
-
-        val section = key.take(variableSeparatorIndex)
-        val sectionNameSeparatorIndex = section.indexOf('.')
-
-        if (sectionNameSeparatorIndex == -1) {
-          section to null
-        }
-        else {
-          val sectionName = section.take(sectionNameSeparatorIndex)
-          val sectionVariable = section.substring(sectionNameSeparatorIndex + 1)
-
-          sectionName to sectionVariable
-        }
-      }.toSet()
+    private fun parseSectionNameAndVariable(key: String): Pair<String, String>? {
+      val firstDotIndex = key.indexOf('.')
+      if (firstDotIndex < 0) {
+        return null
+      }
+      val lastDotIndex = key.lastIndexOf('.')
+      if (firstDotIndex == lastDotIndex) {
+        return null
+      }
+      return key.substring(0, firstDotIndex) to key.substring(firstDotIndex + 1, lastDotIndex)
+    }
 
     private fun convertBranchConfig(
       branchConfig: BranchConfig,
@@ -228,84 +223,6 @@ class GitConfig private constructor(
       }
     }
 
-    /**
-     * Applies `url.<base>.insteadOf` and `url.<base>.pushInsteadOf` transformations to `url` and `pushUrl` of
-     * the given remote.
-     *
-     * The logic, is as follows:
-     *
-     *  * If remote.url starts with url.insteadOf, it it substituted.
-     *  * If remote.pushUrl starts with url.insteadOf, it is substituted.
-     *  * If remote.pushUrl starts with url.pushInsteadOf, it is not substituted.
-     *  * If remote.url starts with url.pushInsteadOf, but remote.pushUrl is given, additional push url is not added.
-     *
-     * TODO: if there are several matches in url sections, the longest should be applied. // currently only one is applied
-     *
-     * This is according to `man git-config ("url.<base>.insteadOf" and "url.<base>.pushInsteadOf" sections`,
-     * `man git-push ("URLS" section)` and the following discussions in the Git mailing list:
-     * [insteadOf override urls and pushUrls](http://article.gmane.org/gmane.comp.version-control.git/183587),
-     * [pushInsteadOf doesn't override explicit pushUrl](http://thread.gmane.org/gmane.comp.version-control.git/127910).
-     */
-    private fun substituteUrls(urlSections: List<Url>, remote: Remote): UrlsAndPushUrls {
-      val urls: MutableList<String> = ArrayList(remote.urls.size)
-      var pushUrls: MutableList<String> = mutableListOf()
-
-      // urls are substituted by insteadOf
-      // if there are no pushUrls, we create a pushUrl for pushInsteadOf substitutions
-      for (remoteUrl in remote.urls) {
-        var substituted = false
-        for (url in urlSections) {
-          val insteadOf = url.insteadOf
-          val pushInsteadOf = url.pushInsteadOf
-          // null means no entry, i.e. nothing to substitute. Empty string means substituting everything
-          if (insteadOf != null && remoteUrl.startsWith(insteadOf)) {
-            urls.add(substituteUrl(remoteUrl, url, insteadOf))
-            substituted = true
-            break
-          }
-          else if (pushInsteadOf != null && remoteUrl.startsWith(pushInsteadOf)) {
-            if (remote.pushUrls.isEmpty()) { // only if there are no explicit pushUrls
-              pushUrls.add(substituteUrl(remoteUrl, url, pushInsteadOf)) // pushUrl is different
-            }
-            urls.add(remoteUrl) // but url is left intact
-            substituted = true
-            break
-          }
-        }
-        if (!substituted) {
-          urls.add(remoteUrl)
-        }
-      }
-
-      // pushUrls are substituted only by insteadOf, not by pushInsteadOf
-      for (remotePushUrl in remote.pushUrls) {
-        var substituted = false
-        for (url in urlSections) {
-          val insteadOf = url.insteadOf
-          // null means no entry, i.e. nothing to substitute. Empty string means substituting everything
-          if (insteadOf != null && remotePushUrl.startsWith(insteadOf)) {
-            pushUrls.add(substituteUrl(remotePushUrl, url, insteadOf))
-            substituted = true
-            break
-          }
-        }
-        if (!substituted) {
-          pushUrls.add(remotePushUrl)
-        }
-      }
-
-      // if no pushUrls are explicitly defined yet via pushUrl or url.<base>.pushInsteadOf, they are the same as urls.
-      if (pushUrls.isEmpty()) {
-        pushUrls = urls.toMutableList()
-      }
-
-      return UrlsAndPushUrls(urls, pushUrls)
-    }
-
-    private fun substituteUrl(remoteUrl: String, url: Url, insteadOf: String): String {
-      return url.name + remoteUrl.substring(insteadOf.length)
-    }
-
     private fun createBranchConfig(
       configurations: Map<String, List<String>>,
       sectionName: String,
@@ -313,9 +230,9 @@ class GitConfig private constructor(
     ): BranchConfig {
       val sectionKey = "$sectionName.$branchName"
 
-      val remote: String? = getOneConfig(configurations, "$sectionKey.remote")
-      val merge: String? = getOneConfig(configurations, "$sectionKey.merge")
-      val rebase: String? = getOneConfig(configurations, "$sectionKey.rebase")
+      val remote = configurations["$sectionKey.remote"]?.lastOrNull()
+      val merge = configurations["$sectionKey.merge"]?.lastOrNull()
+      val rebase = configurations["$sectionKey.rebase"]?.lastOrNull()
 
       return BranchConfig(branchName, remote, merge, rebase)
     }
@@ -325,12 +242,12 @@ class GitConfig private constructor(
       sectionName: String,
       remoteName: String,
     ): Remote {
-      val sectionKey = sectionName + "." + remoteName
+      val sectionKey = "$sectionName.$remoteName"
 
-      val fetchSpecs = getAllConfigs(configurations, sectionKey + ".fetch")
-      val pushSpecs = getAllConfigs(configurations, sectionKey + ".push")
-      val urls = getAllConfigs(configurations, sectionKey + ".url")
-      val pushUrls = getAllConfigs(configurations, sectionKey + ".pushurl")
+      val fetchSpecs = configurations["$sectionKey.fetch"] ?: emptyList()
+      val pushSpecs = configurations["$sectionKey.push"] ?: emptyList()
+      val urls = configurations["$sectionKey.url"] ?: emptyList()
+      val pushUrls = configurations["$sectionKey.pushurl"] ?: emptyList()
 
       return Remote(remoteName, fetchSpecs, pushSpecs, urls, pushUrls)
     }
@@ -339,33 +256,20 @@ class GitConfig private constructor(
       configurations: Map<String, List<String>>,
       sectionName: String,
       url: String,
-    ): Url {
-      val sectionKey = sectionName + "." + url
+    ): List<UrlSubstitution> {
+      val sectionKey = "$sectionName.$url"
 
-      val insteadof: String? = getOneConfig(configurations, sectionKey + ".insteadof")
-      val pushInsteadof: String? = getOneConfig(configurations, sectionKey + ".pushinsteadof")
-
-      return Url(url, insteadof, pushInsteadof)
+      return buildList {
+        configurations["$sectionKey.insteadof"]?.forEach {
+          add(UrlSubstitution(it, url, false))
+        }
+        configurations["$sectionKey.pushinsteadof"]?.forEach {
+          add(UrlSubstitution(it, url, true))
+        }
+      }
     }
 
-    private fun createCore(
-      configurations: Map<String, List<String>>,
-    ): Core {
-      val hooksPath: String? = getOneConfig(configurations, CORE_SECTION + ".hookspath")
-
-      return Core(hooksPath)
-    }
-
-    private fun getAllConfigs(
-      configurations: Map<String, List<String>>,
-      sectionKey: String,
-    ): List<String> {
-      return configurations[sectionKey] ?: emptyList()
-    }
-
-    private fun getOneConfig(
-      configurations: Map<String, List<String>>,
-      key: String,
-    ): String? = configurations[key]?.lastOrNull()
+    private fun createCore(configurations: Map<String, List<String>>) =
+      Core(configurations["$CORE_SECTION.hookspath"]?.lastOrNull())
   }
 }

@@ -11,9 +11,9 @@ import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.util.Disposer
 import com.intellij.ui.CollectionListModel
 import com.intellij.ui.JBSplitter
-import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.components.JBList
+import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.NamedColorUtil
 import com.jetbrains.fus.reporting.model.metadata.EventGroupRemoteDescriptors
@@ -79,7 +79,7 @@ class EditEventsTestSchemePanel(private val project: Project,
     }
     add(splitter, BorderLayout.CENTER)
 
-    groupsList.cellRenderer = SimpleListCellRenderer.create("", GroupValidationTestRule::groupId)
+    groupsList.cellRenderer = textListCellRenderer("", GroupValidationTestRule::groupId)
     groupsList.addListSelectionListener { updateDetails() }
     if (!groupsModel.isEmpty) {
       groupsList.selectedIndex = 0

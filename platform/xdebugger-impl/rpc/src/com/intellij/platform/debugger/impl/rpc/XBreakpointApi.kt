@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.debugger.impl.rpc
 
 import com.intellij.ide.rpc.DocumentPatchVersion
@@ -13,6 +13,7 @@ import com.intellij.openapi.util.NlsSafe
 import com.intellij.platform.project.ProjectId
 import com.intellij.platform.rpc.RemoteApiProviderService
 import com.intellij.xdebugger.breakpoints.SuspendPolicy
+import com.intellij.xdebugger.breakpoints.XLineBreakpointVerticalPlacement
 import com.intellij.xdebugger.evaluation.EvaluationMode
 import fleet.rpc.RemoteApi
 import fleet.rpc.Rpc
@@ -53,6 +54,8 @@ interface XBreakpointApi : RemoteApi<Unit> {
   suspend fun setGroup(breakpointId: XBreakpointId, requestId: Long, group: String?)
 
   suspend fun setFileUrl(breakpointId: XBreakpointId, requestId: Long, fileUrl: String?)
+
+  suspend fun setPlacement(breakpointId: XBreakpointId, requestId: Long, placement: XLineBreakpointVerticalPlacement)
 
   /**
    * Returns `true` on success, `false` if the request should be retried later due to version mismatch.
@@ -108,16 +111,18 @@ data class XBreakpointDtoState(
   val timestamp: Long,
   val lineBreakpointInfo: XLineBreakpointInfo?,
   val requestId: Long,
+  val hasCustomCondition: Boolean,
 )
 
 @ApiStatus.Internal
 @Serializable
 data class XLineBreakpointInfo(
-    val isTemporary: Boolean,
-    val line: Int,
-    val fileUrl: String,
-    val highlightingRange: TextRangeDto?,
-    val file: VirtualFileId?,
+  val isTemporary: Boolean,
+  val line: Int,
+  val fileUrl: String,
+  val placement: XLineBreakpointVerticalPlacement,
+  val highlightingRange: TextRangeDto?,
+  val file: VirtualFileId?,
 )
 
 @ApiStatus.Internal
@@ -139,6 +144,7 @@ enum class XBreakpointTypeSerializableStandardPanels {
 @Serializable
 data class XLineBreakpointTypeInfo(
   val priority: Int,
+  val supportsInterLinePlacement: Boolean,
 )
 
 

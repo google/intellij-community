@@ -1,0 +1,42 @@
+### auto-generated section `build intellij.repository.search.completion` start
+load("@rules_jvm//:jvm.bzl", "jvm_library")
+
+jvm_library(
+  name = "completion",
+  module_name = "intellij.repository.search.completion",
+  visibility = ["//visibility:public"],
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
+  deps = [
+    "@lib//:kotlin-stdlib",
+    "//libraries/kotlinx/coroutines/core",
+    "//platform/util",
+    "//platform/util/base/multiplatform",
+    "//platform/extensions",
+    "//platform/eel",
+  ]
+)
+
+jvm_library(
+  name = "completion_test_lib",
+  testonly = True,
+  module_name = "intellij.repository.search.completion",
+  visibility = ["//visibility:public"],
+  srcs = glob([], allow_empty = True),
+  runtime_deps = [
+    ":completion",
+    "//libraries/kotlinx/coroutines/core:core_test_lib",
+    "//platform/util:util_test_lib",
+    "//platform/util/base/multiplatform:multiplatform_test_lib",
+    "//platform/extensions:extensions_test_lib",
+    "//platform/eel:eel_test_lib",
+  ]
+)
+### auto-generated section `build intellij.repository.search.completion` end
+
+### auto-generated section `iml intellij.repository.search.completion` start
+exports_files([
+  "intellij.repository.search.completion.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.repository.search.completion` end

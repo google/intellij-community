@@ -15,4 +15,5 @@ internal class KotlinSystemOutPostfixTemplate : StringBasedPostfixTemplate {
 
     override fun getTemplateString(element: PsiElement): String = "kotlin.io.println(\$expr$)\$END$"
     override fun getElementToRemove(expr: PsiElement): PsiElement = expr
+    override fun isApplicableForModCommand(): Boolean = true
 }

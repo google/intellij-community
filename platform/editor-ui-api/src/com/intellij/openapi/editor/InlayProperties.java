@@ -50,6 +50,10 @@ public final class InlayProperties {
    * For block inlays, this value impacts the inlay's visibility on the boundary offsets of collapsed fold regions.
    * If the value is {@code true}, the inlay will be visible at the trailing boundary,
    * and if the value is {@code false}, on the leading boundary.
+   * <p>
+   * For inline inlays at the same offset as a {@link CustomWrap},
+   * the inlay is displayed at the end of the visual line before the wrap if the property is {@code true},
+   * and at the beggining of the visual line introduced by the wrap if {@code false}.
    */
   public InlayProperties relatesToPrecedingText(boolean value) {
     myRelatesToPrecedingText = value;

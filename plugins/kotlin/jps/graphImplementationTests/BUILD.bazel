@@ -3,9 +3,11 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "graphImplementationTests",
+  module_name = "kotlin.jps.graphImplementationTests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
+    "@lib//:kotlin-stdlib",
     "//platform/util/trove",
     "//jps/jps-builders:build-tests",
     "//libraries/kotlin/reflect",
@@ -14,27 +16,30 @@ jvm_library(
 
 jvm_library(
   name = "graphImplementationTests_test_lib",
+  testonly = True,
   module_name = "kotlin.jps.graphImplementationTests",
   visibility = ["//visibility:public"],
   srcs = glob(["tests/**/*.kt", "tests/**/*.java", "tests/**/*.form"], allow_empty = True),
+  resources = glob(["testResources/**/*"]),
+  resource_strip_prefix = "testResources",
   deps = [
+    "@lib//:kotlin-stdlib",
     "//platform/util",
     "//platform/util:util_test_lib",
     "@lib//:kotlinc-kotlin-jps-plugin-classpath-bootstrap-for-tests",
     "@lib//:kotlinc-kotlin-jps-plugin-tests",
     "@lib//:kotlinc-kotlin-compiler-tests",
+    "@lib//:kotlinc-incremental-compilation-impl-tests",
     "//plugins/kotlin/tests-common:common-tests",
     "//plugins/kotlin/tests-common:common-tests_test_lib",
-    "//plugins/kotlin/base/test",
-    "//plugins/kotlin/base/test:test_test_lib",
+    "//plugins/kotlin/base/testFramework",
+    "//plugins/kotlin/base/testFramework:testFramework_test_lib",
     "//plugins/kotlin/test-framework",
     "//plugins/kotlin/test-framework:test-framework_test_lib",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
     "//plugins/kotlin/base/plugin",
     "//plugins/kotlin/base/plugin:plugin_test_lib",
-    "//plugins/kotlin/util/compiler-dependencies",
-    "//plugins/kotlin/util/compiler-dependencies:compiler-dependencies_test_lib",
     "@lib//:kotlinc-kotlin-compiler-common",
     "//plugins/devkit/jps-plugin:jps",
     "//plugins/devkit/jps-plugin:jps_test_lib",
@@ -56,6 +61,8 @@ jvm_library(
     "//RegExpSupport:regexp-tests_test_lib",
     "//platform/xdebugger-impl:debugger-impl-tests",
     "//platform/xdebugger-impl:debugger-impl-tests_test_lib",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework",
+    "//plugins/kotlin/base/pluginTestFramework:kotlin-base-plugin-testFramework_test_lib",
   ],
   runtime_deps = [
     ":graphImplementationTests",
@@ -63,6 +70,12 @@ jvm_library(
   ]
 )
 ### auto-generated section `build kotlin.jps.graphImplementationTests` end
+
+### auto-generated section `iml kotlin.jps.graphImplementationTests` start
+exports_files([
+  "kotlin.jps.graphImplementationTests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.jps.graphImplementationTests` end
 
 ### auto-generated section `test kotlin.jps.graphImplementationTests` start
 load("@community//build:tests-options.bzl", "jps_test")

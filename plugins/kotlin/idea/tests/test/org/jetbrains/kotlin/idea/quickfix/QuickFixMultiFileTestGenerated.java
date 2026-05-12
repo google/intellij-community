@@ -1425,6 +1425,11 @@ public abstract class QuickFixMultiFileTestGenerated extends AbstractK1QuickFixM
                 runTest("testData/quickfix/autoImports/noneApplicableFromInstanceButExtension.before.Main.kt");
             }
 
+            @TestMetadata("notAnAnnotationClass.before.Main.kt")
+            public void testNotAnAnnotationClass() throws Exception {
+                runTest("testData/quickfix/autoImports/notAnAnnotationClass.before.Main.kt");
+            }
+
             @TestMetadata("notExcludedClass.before.Main.kt")
             public void testNotExcludedClass() throws Exception {
                 runTest("testData/quickfix/autoImports/notExcludedClass.before.Main.kt");
@@ -2745,6 +2750,11 @@ public abstract class QuickFixMultiFileTestGenerated extends AbstractK1QuickFixM
                 runTest("testData/quickfix/deprecatedSymbolUsage/javaDeprecated.before.Main.kt");
             }
 
+            @TestMetadata("javaDeprecatedNamedArg.before.Main.kt")
+            public void testJavaDeprecatedNamedArg() throws Exception {
+                runTest("testData/quickfix/deprecatedSymbolUsage/javaDeprecatedNamedArg.before.Main.kt");
+            }
+
             @TestMetadata("toMethodFromCompanionObject.before.Main.kt")
             public void testToMethodFromCompanionObject() throws Exception {
                 runTest("testData/quickfix/deprecatedSymbolUsage/toMethodFromCompanionObject.before.Main.kt");
@@ -3475,25 +3485,48 @@ public abstract class QuickFixMultiFileTestGenerated extends AbstractK1QuickFixM
 
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("testData/quickfix/when")
-    public static class When extends AbstractK1QuickFixMultiFileTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K1;
+    public abstract static class When extends AbstractK1QuickFixMultiFileTest {
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("testData/quickfix/when/contextSensitiveResolution")
+        public static class ContextSensitiveResolution extends AbstractK1QuickFixMultiFileTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K1;
+            }
+
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTestWithExtraFile, this, testDataFilePath);
+            }
+
+            @TestMetadata("addRemainingBranchesEnumAnotherPackage.before.Main.kt")
+            public void testAddRemainingBranchesEnumAnotherPackage() throws Exception {
+                runTest("testData/quickfix/when/contextSensitiveResolution/addRemainingBranchesEnumAnotherPackage.before.Main.kt");
+            }
         }
 
-        private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTestWithExtraFile, this, testDataFilePath);
-        }
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("testData/quickfix/when")
+        public static class Uncategorized extends AbstractK1QuickFixMultiFileTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K1;
+            }
 
-        @TestMetadata("addRemainingBranchesAnotherPackage.before.Main.kt")
-        public void testAddRemainingBranchesAnotherPackage() throws Exception {
-            runTest("testData/quickfix/when/addRemainingBranchesAnotherPackage.before.Main.kt");
-        }
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTestWithExtraFile, this, testDataFilePath);
+            }
 
-        @TestMetadata("addRemainingBranchesAnotherPackageAll.before.Main.kt")
-        public void testAddRemainingBranchesAnotherPackageAll() throws Exception {
-            runTest("testData/quickfix/when/addRemainingBranchesAnotherPackageAll.before.Main.kt");
+            @TestMetadata("addRemainingBranchesAnotherPackage.before.Main.kt")
+            public void testAddRemainingBranchesAnotherPackage() throws Exception {
+                runTest("testData/quickfix/when/addRemainingBranchesAnotherPackage.before.Main.kt");
+            }
+
+            @TestMetadata("addRemainingBranchesAnotherPackageAll.before.Main.kt")
+            public void testAddRemainingBranchesAnotherPackageAll() throws Exception {
+                runTest("testData/quickfix/when/addRemainingBranchesAnotherPackageAll.before.Main.kt");
+            }
         }
     }
 

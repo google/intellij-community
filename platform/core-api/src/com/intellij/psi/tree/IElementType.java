@@ -125,6 +125,10 @@ public class IElementType {
     myLanguage = language == null ? Language.ANY : language;
     if (register) {
       synchronized (lock) {
+        if (size == Short.MAX_VALUE) {
+          throw TooManyElementTypesException.outOfShortRange();
+        }
+
         //noinspection AssignmentToStaticFieldFromInstanceMethod
         myIndex = size++;
 
@@ -312,12 +316,17 @@ public class IElementType {
     return type instanceof TombstoneElementType;
   }
 
-  private static class TooManyElementTypesException extends IllegalStateException implements ExceptionWithAttachments {
+  private static class TooManyElementTypesException extends RuntimeException implements ExceptionWithAttachments {
     private final Attachment[] myAttachments;
 
-    private TooManyElementTypesException(@NotNull String message, @NotNull Throwable cause, Attachment[] attachments) {
+    private TooManyElementTypesException(@NotNull String message, @Nullable Throwable cause, @NotNull Attachment @NotNull [] attachments) {
       super(message, cause);
       myAttachments = attachments;
+    }
+
+    private TooManyElementTypesException(@NotNull String message) {
+      super(message, null, false, false);
+      myAttachments = Attachment.EMPTY_ARRAY;
     }
 
     @Override
@@ -349,6 +358,10 @@ public class IElementType {
       Attachment[] attachments = {langDistributionAttachment, allElementTypesAttachment};
 
       return new TooManyElementTypesException(errorMessage, cause, attachments);
+    }
+
+    static TooManyElementTypesException outOfShortRange() {
+      return new TooManyElementTypesException("Too many element types registered. Out of (short) range.");
     }
   }
 }

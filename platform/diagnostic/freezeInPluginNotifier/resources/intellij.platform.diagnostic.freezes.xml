@@ -1,6 +1,6 @@
 <idea-plugin>
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
-    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
     <module name="intellij.libraries.kotlinx.serialization.core"/>
     <module name="intellij.libraries.kotlinx.serialization.json"/>
     <module name="intellij.platform.analysis"/>
@@ -8,11 +8,15 @@
     <module name="intellij.platform.core.impl"/>
     <module name="intellij.platform.core.ui"/>
     <module name="intellij.platform.diagnostic.freezeAnalyzer"/>
+    <module name="intellij.platform.editor.ui"/>
     <module name="intellij.platform.ide"/>
+    <module name="intellij.platform.ide.core"/>
     <module name="intellij.platform.ide.impl"/>
     <module name="intellij.platform.projectModel"/>
-    <!-- endregion -->
+    <module name="intellij.platform.statistics"/>
+    <module name="intellij.platform.threadDumpParser"/>
   </dependencies>
+  <!-- endregion -->
 
   <extensions defaultExtensionNs="com.intellij">
     <diagnostic.freezeNotifier implementation="com.intellij.platform.diagnostic.plugin.freeze.PluginFreezeNotifier"/>
@@ -24,6 +28,7 @@
     <registryKey key="ide.diagnostics.notification.freezes.in.bundled.plugins"
                  defaultValue="true"
                  description="Show notification about freezes in bundled plugins (in releases)"/>
+    <applicationSettings service="com.intellij.platform.diagnostic.plugin.freeze.PluginsFreezesService"/>
   </extensions>
 
   <actions>

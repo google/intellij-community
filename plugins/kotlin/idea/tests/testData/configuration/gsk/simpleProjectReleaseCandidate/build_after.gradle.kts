@@ -1,30 +1,27 @@
-import org.gradle.api.JavaVersion.VERSION_1_7
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
 plugins {
-    application
-    kotlin("jvm") version "1.5.20-RC"
+    id("java")
+    kotlin("jvm") version "2.3.20-RC"
 }
 
-application {
-    mainClassName = "samples.HelloWorld"
-}
+group = "org.example"
+version = "1.0-SNAPSHOT"
 
 repositories {
-    jcenter()
+    mavenCentral()
 }
 
 dependencies {
-    testCompile("junit:junit:4.12")
-    implementation(kotlin("stdlib-jdk8"))
+    testImplementation(platform("org.junit:junit-bom:6.0.0"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation(kotlin("test"))
 }
 
-// VERSION: 1.5.20-RC-release-26
-val compileKotlin: KotlinCompile by tasks
-compileKotlin.kotlinOptions {
-    jvmTarget = "1.8"
+tasks.test {
+    useJUnitPlatform()
 }
-val compileTestKotlin: KotlinCompile by tasks
-compileTestKotlin.kotlinOptions {
-    jvmTarget = "1.8"
+
+// VERSION: 2.3.20-RC-release-26
+kotlin {
+    jvmToolchain(8)
 }

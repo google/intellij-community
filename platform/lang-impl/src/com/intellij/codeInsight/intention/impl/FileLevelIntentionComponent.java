@@ -32,6 +32,7 @@ import com.intellij.ui.EditorNotificationPanel;
 import com.intellij.ui.LightColors;
 import com.intellij.ui.awt.RelativePoint;
 import com.intellij.util.concurrency.AppExecutorUtil;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -43,13 +44,15 @@ import java.awt.event.MouseEvent;
 import java.util.HashMap;
 import java.util.List;
 
+@ApiStatus.Internal
 public final class FileLevelIntentionComponent extends EditorNotificationPanel {
   public FileLevelIntentionComponent(@NlsContexts.Label String description,
                                      @NotNull HighlightSeverity severity,
                                      @Nullable GutterMark gutterMark,
                                      @Nullable List<? extends Pair<HighlightInfo.IntentionActionDescriptor, TextRange>> intentions,
                                      @NotNull PsiFile psiFile,
-                                     @NotNull Editor editor, @NlsContexts.Tooltip @Nullable String tooltip) {
+                                     @NotNull Editor editor,
+                                     @NlsContexts.Tooltip @Nullable String tooltip) {
     super(getColor(psiFile.getProject(), severity), getStatus(psiFile.getProject(), severity));
     Project project = psiFile.getProject();
     ShowIntentionsPass.IntentionsInfo info = new ShowIntentionsPass.IntentionsInfo();
@@ -103,10 +106,10 @@ public final class FileLevelIntentionComponent extends EditorNotificationPanel {
       }
     }
 
-    myLabel.setText(description);
-    myLabel.setToolTipText(tooltip);
+    myTextLabel.setText(description);
+    myTextLabel.setToolTipText(tooltip);
     if (gutterMark != null) {
-      myLabel.setIcon(gutterMark.getIcon());
+      myTextLabel.setIcon(gutterMark.getIcon());
     }
 
     if (intentions != null && !intentions.isEmpty()) {

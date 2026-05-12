@@ -37,7 +37,7 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
+
 import java.util.Locale;
 import java.util.ServiceLoader;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -102,10 +102,9 @@ public class BenchmarkTestInfoImpl implements BenchmarkTestInfo {
     try {
       TelemetryManager.Companion.resetGlobalSdk();
       var telemetryClazz = Class.forName("com.intellij.platform.diagnostic.telemetry.impl.TelemetryManagerImpl");
-      var instance = Arrays.stream(telemetryClazz.getDeclaredConstructors())
-        .filter((it) -> it.getParameterCount() > 0).findFirst()
-        .get()
-        .newInstance(coroutineScope, true);
+      var instance = telemetryClazz
+        .getDeclaredConstructor(CoroutineScope.class, boolean.class, boolean.class)
+        .newInstance(coroutineScope, true, false);
 
       TelemetryManager.Companion.forceSetTelemetryManager((TelemetryManager)instance);
     }
@@ -124,27 +123,37 @@ public class BenchmarkTestInfoImpl implements BenchmarkTestInfo {
       // remove content of the previous tests from the idea.log
       IJPerfBenchmarksMetricsPublisher.Companion.truncateTestLog();
 
-      try (Stream<Path> logDirChildren = Files.list(PathManager.getLogDir())) {
-        logDirChildren.filter(child -> {
-            String name = child.toString();
-            return name.contains("-metrics")
-                   || name.contains("-meters")
-                   || name.endsWith(".jfr");
-          })
-          .forEach(childToRemove -> {
-            try {
-              Files.deleteIfExists(childToRemove);
-            }
-            catch (IOException e) {
-              // ignore deletion errors for individual files
-            }
-          });
+      Path logDir = PathManager.getLogDir();
+      cleanupMetersDir(logDir);
+
+      Path telemetryDir = logDir.resolve("telemetry"); // new location
+      if (Files.exists(telemetryDir)) {
+        cleanupMetersDir(telemetryDir);
       }
     }
     catch (Exception e) {
       System.err.println(
         "Error during removing Telemetry files with meters before start of perf test. This might affect collected metrics value.");
       e.printStackTrace();
+    }
+  }
+
+  private static void cleanupMetersDir(Path logDir) throws IOException {
+    try (Stream<Path> logDirChildren = Files.list(logDir)) {
+      logDirChildren.filter(child -> {
+          String name = child.toString();
+          return name.contains("-metrics")
+                 || name.contains("-meters")
+                 || name.endsWith(".jfr");
+        })
+        .forEach(childToRemove -> {
+          try {
+            Files.deleteIfExists(childToRemove);
+          }
+          catch (IOException e) {
+            // ignore deletion errors for individual files
+          }
+        });
     }
   }
 
@@ -353,7 +362,7 @@ public class BenchmarkTestInfoImpl implements BenchmarkTestInfo {
     this.uniqueTestName = uniqueTestName;
 
     if (PlatformTestUtil.COVERAGE_ENABLED_BUILD) return;
-    System.out.printf("Starting benchmark test \"%s\" in mode: %s%n", uniqueTestName, iterationType);
+    LOG.info("Starting benchmark test \"%s\" in mode: %s%n".formatted(uniqueTestName, iterationType));
 
     int maxIterationsNumber;
     if (iterationType.equals(IterationMode.WARMUP)) {
@@ -370,7 +379,7 @@ public class BenchmarkTestInfoImpl implements BenchmarkTestInfo {
 
     try {
       TraceKt.use(tracer.spanBuilder(uniqueTestName).setAttribute("warmup", String.valueOf(iterationType.equals(IterationMode.WARMUP))),
-                  __ -> {
+                  _ -> {
                     try {
                       PlatformTestUtil.waitForAllBackgroundActivityToCalmDown();
 

@@ -27,7 +27,8 @@ import java.util.concurrent.CancellationException;
 final class GitRootChecker extends VcsRootChecker {
   @Override
   public boolean isRoot(@NotNull VirtualFile path) {
-    return path.findChild(GitUtil.DOT_GIT) != null && // fast check without refreshing the VFS
+    VirtualFile child = path.findChild(GitUtil.DOT_GIT);
+    return child != null && child.isValid() && // fast check without refreshing the VFS
            GitUtil.isGitRoot(path.toNioPath());
   }
 

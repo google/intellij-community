@@ -7,11 +7,15 @@
 // K2_ACTIONS_LIST: Create class 'AAA'
 // K2_ACTIONS_LIST: Create enum 'AAA'
 // K2_ACTIONS_LIST: Create interface 'AAA'
+// K2_ACTIONS_LIST: Create parameter 'AAA'
 // K2_ACTIONS_LIST: Remove braces from 'if' statement
+// K2_ACTIONS_LIST: Rename reference
 // K2_ACTIONS_LIST: Create function 'AAA'
 // K2_ACTIONS_LIST: Enable a trailing comma by default in the formatter
 // K2_ACTIONS_LIST: Replace 'when' with 'if'
 // ERROR: Unresolved reference: BBB
+// K2_ERROR: Unresolved reference 'AAA'.
+// K2_ERROR: Unresolved reference 'BBB'.
 // K2_AFTER_ERROR: Return type mismatch: expected 'I?', actual 'AAA?'.
 // K2_AFTER_ERROR: Unresolved reference 'BBB'.
 

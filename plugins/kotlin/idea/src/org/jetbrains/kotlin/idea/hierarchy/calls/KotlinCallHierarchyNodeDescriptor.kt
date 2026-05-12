@@ -5,7 +5,6 @@ import com.intellij.icons.AllIcons
 import com.intellij.ide.IdeBundle
 import com.intellij.ide.hierarchy.HierarchyNodeDescriptor
 import com.intellij.ide.hierarchy.call.CallHierarchyNodeDescriptor
-import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.roots.ui.util.CompositeAppearance
 import com.intellij.openapi.util.Comparing
 import com.intellij.openapi.util.Iconable
@@ -37,7 +36,6 @@ import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.KtPsiUtil
 import org.jetbrains.kotlin.renderer.DescriptorRenderer
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
-import java.awt.Font
 
 @K1Deprecation
 class KotlinCallHierarchyNodeDescriptor(
@@ -99,11 +97,7 @@ class KotlinCallHierarchyNodeDescriptor(
             elementIcon
         }
 
-        val mainTextAttributes: TextAttributes? = if (myColor != null) {
-            TextAttributes(myColor, null, null, null, Font.PLAIN)
-        } else {
-            null
-        }
+        val mainTextAttributes = textAttributesFor(targetElement)
 
         myHighlightedText = CompositeAppearance()
         myHighlightedText.ending.addText(elementText, mainTextAttributes)
@@ -117,7 +111,7 @@ class KotlinCallHierarchyNodeDescriptor(
         @NlsSafe
         val packageName = KtPsiUtil.getPackageName(targetElement as KtElement) ?: ""
 
-        myHighlightedText.ending.addText("  ($packageName)", getPackageNameAttributes())
+        myHighlightedText.ending.addText(" ($packageName)", getPackageNameAttributes())
         myName = myHighlightedText.text
 
         if (!(Comparing.equal(myHighlightedText, oldText) && Comparing.equal(icon, oldIcon))) {

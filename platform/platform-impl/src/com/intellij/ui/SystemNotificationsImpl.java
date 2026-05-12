@@ -1,20 +1,18 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui;
 
 import com.intellij.notification.impl.NotificationsConfigurationImpl;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.NullableLazyValue;
-import com.intellij.openapi.util.SystemInfo;
+import com.intellij.util.system.OS;
 import com.intellij.util.ui.GraphicsUtil;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import static com.intellij.openapi.util.NullableLazyValue.atomicLazyNullable;
 
-@ApiStatus.Internal
-public final class SystemNotificationsImpl extends SystemNotifications {
+final class SystemNotificationsImpl extends SystemNotifications {
   interface Notifier {
     void notify(@NotNull String name, @NotNull String title, @NotNull String description);
   }
@@ -24,7 +22,7 @@ public final class SystemNotificationsImpl extends SystemNotifications {
   @Override
   public void notify(@NotNull String notificationName, @NotNull String title, @NotNull String text) {
     if (NotificationsConfigurationImpl.getInstanceImpl().SYSTEM_NOTIFICATIONS && !ApplicationManager.getApplication().isActive()) {
-      Notifier notifier = myNotifier.getValue();
+      var notifier = myNotifier.getValue();
       if (notifier != null) {
         notifier.notify(notificationName, title, text);
       }
@@ -34,15 +32,11 @@ public final class SystemNotificationsImpl extends SystemNotifications {
   private static @Nullable Notifier getPlatformNotifier() {
     if (!GraphicsUtil.isRemoteEnvironment()) {
       try {
-        if (SystemInfo.isMac) {
-          return MacOsNotifications.getInstance();
-        }
-        else if (SystemInfo.isUnix) {
-          return LibNotifyWrapper.getInstance();
-        }
-        else if (SystemInfo.isWin10OrNewer) {
-          return SystemTrayNotifications.getWin10Instance();
-        }
+        return switch (OS.CURRENT) {
+          case Windows -> SystemTrayNotifications.getWin10Instance();
+          case macOS -> MacOsNotifications.getInstance();
+          default -> LibNotifyWrapper.getInstance();
+        };
       }
       catch (Throwable t) {
         Logger.getInstance(SystemNotificationsImpl.class).infoWithDebug(t);

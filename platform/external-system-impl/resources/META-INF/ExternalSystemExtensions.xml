@@ -150,6 +150,14 @@
     <recoveryAction implementation="com.intellij.openapi.externalSystem.service.project.manage.ExternalSystemRecoveryAction"/>
 
     <externalSystemRecoveryContributor implementation="com.intellij.openapi.externalSystem.service.project.manage.ExternalProjectDataRecoveryContributor$Factory"/>
+    <projectSettings service="com.intellij.openapi.externalSystem.service.project.manage.ExternalProjectsManagerImpl"/>
+    <projectSettings service="com.intellij.openapi.externalSystem.service.project.manage.SourceFolderManagerImpl"/>
+    <projectSettings service="com.intellij.openapi.project.ExternalStorageConfigurationManagerImpl"/>
+    <projectSettings service="com.intellij.openapi.externalSystem.autolink.UnlinkedProjectNotificationAware"/>
+    <projectSettings service="com.intellij.openapi.externalSystem.autolink.UnlinkedProjectSettings"/>
+    <projectSettings service="com.intellij.openapi.externalSystem.autoimport.AutoImportProjectTrackerSettings"/>
+    <projectSettings service="com.intellij.openapi.externalSystem.autoimport.AutoImportProjectTracker"/>
+    <projectSettings service="com.intellij.openapi.externalSystem.service.project.manage.ExternalProjectsDataStorage"/>
   </extensions>
   <applicationListeners>
     <listener class="com.intellij.openapi.externalSystem.service.project.trusted.ExternalSystemTrustedListener"

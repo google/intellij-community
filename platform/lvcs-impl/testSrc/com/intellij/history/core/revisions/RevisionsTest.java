@@ -16,7 +16,6 @@
 
 package com.intellij.history.core.revisions;
 
-import com.intellij.history.core.InMemoryLocalHistoryFacade;
 import com.intellij.history.core.LocalHistoryFacade;
 import com.intellij.history.core.LocalHistoryTestCase;
 import com.intellij.history.core.changes.ChangeSet;
@@ -44,7 +43,7 @@ public class RevisionsTest extends LocalHistoryTestCase {
   @Test
   public void testAfterRevisionForRootEntry() {
     RootEntry root = new RootEntry();
-    LocalHistoryFacade facade = new InMemoryLocalHistoryFacade();
+    LocalHistoryFacade facade = createInMemoryFacade();
 
     ChangeSet cs = addChangeSet(facade, createFile(root, "f1"));
     addChangeSet(facade, createFile(root, "f2"));

@@ -4,6 +4,7 @@ package org.jetbrains.jps.incremental.groovy;
 import com.intellij.openapi.application.ArchivedCompilationContextUtil;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -31,7 +32,18 @@ public final class GroovyRtJarPaths {
     File parentDir = jpsPluginClassesRoot.getParentFile();
     if (jpsPluginClassesRoot.isFile()) {
       String relevantJarsRoot = ArchivedCompilationContextUtil.getArchivedCompiledClassesLocation();
-      if (relevantJarsRoot != null && jpsPluginClassesRoot.getAbsolutePath().startsWith(relevantJarsRoot)) {
+
+      File jpsPluginClassesRootCanonical;
+      try {
+        jpsPluginClassesRootCanonical = jpsPluginClassesRoot.getCanonicalFile();
+      }
+      catch (IOException ignored) {
+        jpsPluginClassesRootCanonical = null;
+      }
+
+      if (relevantJarsRoot != null && (jpsPluginClassesRoot.getAbsolutePath().startsWith(relevantJarsRoot)
+                                       || (jpsPluginClassesRootCanonical != null
+                                           && jpsPluginClassesRootCanonical.getAbsolutePath().startsWith(relevantJarsRoot)))) {
         // running from archived compilation output
         Map<String, String> mapping = ArchivedCompilationContextUtil.getArchivedCompiledClassesMapping();
         if (mapping == null) {

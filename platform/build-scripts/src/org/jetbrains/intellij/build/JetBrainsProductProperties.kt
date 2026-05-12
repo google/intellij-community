@@ -19,7 +19,8 @@ import com.jetbrains.plugin.structure.intellij.problems.TemplateWordInPluginId
 import com.jetbrains.plugin.structure.intellij.problems.TemplateWordInPluginName
 import com.jetbrains.plugin.structure.intellij.verifiers.DEFAULT_ILLEGAL_PREFIXES
 import com.jetbrains.plugin.structure.intellij.verifiers.PRODUCT_ID_RESTRICTED_WORDS
-import org.jetbrains.intellij.build.SoftwareBillOfMaterials.Companion.Suppliers
+import com.intellij.platform.buildScripts.licenses.SoftwareBillOfMaterials
+import com.intellij.platform.buildScripts.licenses.SoftwareBillOfMaterials.Companion.Suppliers
 import org.jetbrains.intellij.build.impl.PlatformJarNames.PLATFORM_CORE_NIO_FS
 import org.jetbrains.jps.model.module.JpsModule
 import org.jetbrains.jps.util.JpsPathUtil
@@ -53,6 +54,13 @@ val knownMissingModuleDependencies: List<String> = listOf(
 abstract class JetBrainsProductProperties : ProductProperties() {
   init {
     scrambleMainJar = true
+    presignedNativeLibs = mapOf(
+      "pty4j" to "pty4j",
+      "jna" to "jna",
+      "native" to "native", // sqlite-native
+      "async-profiler" to "async-profiler",
+      "skiko-awt-runtime-all" to "skiko-awt-runtime-all",
+    )
     includeIntoSourcesArchiveFilter = BiPredicate(::isCommunityModule)
     sbomOptions.creator = "Organization: ${Suppliers.JETBRAINS}"
     sbomOptions.license = SoftwareBillOfMaterials.Options.DistributionLicense.JETBRAINS
@@ -93,8 +101,6 @@ private fun isIntentionallyIgnored(problem: PluginProblem, pluginId: String?): B
       // so it's ok to have preloading there
       pluginId == "com.intellij.monorepo.devkit"
     is NoDependencies ->
-      // FIXME PY-74322
-      pluginId == "com.intellij.python.frontend" ||
       // FIXME AE-121
       pluginId == "com.jetbrains.personalization"
     is InvalidPluginIDProblem ->

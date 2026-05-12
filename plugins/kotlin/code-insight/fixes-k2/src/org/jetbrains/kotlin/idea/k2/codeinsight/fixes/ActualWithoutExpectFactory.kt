@@ -61,6 +61,7 @@ import org.jetbrains.kotlin.psi.KtNamedDeclaration
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtPrimaryConstructor
 import org.jetbrains.kotlin.psi.KtProperty
+import org.jetbrains.kotlin.psi.KtTypeAlias
 import org.jetbrains.kotlin.psi.KtTypeParameterListOwner
 import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
 import org.jetbrains.kotlin.psi.psiUtil.findDescendantOfType
@@ -352,7 +353,6 @@ internal class CreateExpectedClassFix(
 
             generateClassWithMembers(
                 project = klass.project,
-                ktClassMember = null,
                 symbol = classSymbol,
                 targetClass = targetExpectedClass,
                 mode = MemberGenerateMode.EXPECT,
@@ -448,7 +448,7 @@ internal class CreateExpectedClassFix(
     }
 
     private fun KtDeclaration.canAddActualModifier() = when (this) {
-        is KtEnumEntry, is KtClassInitializer -> false
+        is KtEnumEntry, is KtClassInitializer, is KtTypeAlias -> false
         is KtParameter -> hasValOrVar()
         else -> true
     }

@@ -1,4 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.jps.entities.impl
 
 import com.intellij.platform.workspace.jps.entities.ExcludeUrlEntity
@@ -9,7 +11,15 @@ import com.intellij.platform.workspace.jps.entities.LibraryRoot
 import com.intellij.platform.workspace.jps.entities.LibraryTableId
 import com.intellij.platform.workspace.jps.entities.LibraryTypeId
 import com.intellij.platform.workspace.jps.entities.ModuleId
-import com.intellij.platform.workspace.storage.*
+import com.intellij.platform.workspace.storage.ConnectionId
+import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
+import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
+import com.intellij.platform.workspace.storage.MutableEntityStorage
+import com.intellij.platform.workspace.storage.SymbolicEntityId
+import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
+import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.EntityLink
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.SoftLinkable
@@ -17,12 +27,11 @@ import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
 import com.intellij.platform.workspace.storage.impl.containers.MutableWorkspaceList
 import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceList
-import com.intellij.platform.workspace.storage.impl.extractOneToManyChildren
 import com.intellij.platform.workspace.storage.impl.indices.WorkspaceMutableIndex
-import com.intellij.platform.workspace.storage.impl.updateOneToManyChildrenOfParent
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 
@@ -61,7 +70,8 @@ internal class LibraryEntityImpl(private val dataSource: LibraryEntityData) : Li
       return dataSource.roots
     }
   override val excludedRoots: List<ExcludeUrlEntity>
-    get() = snapshot.extractOneToManyChildren<ExcludeUrlEntity>(EXCLUDEDROOTS_CONNECTION_ID, this)!!.toList()
+    get() = (snapshot.instrumentation.getManyChildren(EXCLUDEDROOTS_CONNECTION_ID, this) as? Sequence<ExcludeUrlEntity>)?.toList() ?: error(
+      "Children excludedRoots not found for LibraryEntity")
 
   override val entitySource: EntitySource
     get() {
@@ -116,7 +126,7 @@ internal class LibraryEntityImpl(private val dataSource: LibraryEntityData) : Li
       }
 // Check initialization for list with ref type
       if (_diff != null) {
-        if (_diff.extractOneToManyChildren<WorkspaceEntityBase>(EXCLUDEDROOTS_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getManyChildrenBuilders(EXCLUDEDROOTS_CONNECTION_ID, this) == null) {
           error("Field LibraryEntity#excludedRoots should be initialized")
         }
       }
@@ -225,7 +235,6 @@ internal class LibraryEntityImpl(private val dataSource: LibraryEntityData) : Li
 // Getter of the list of non-abstract referenced types
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(EXCLUDEDROOTS_CONNECTION_ID, this)!!
             .toList() as List<ExcludeUrlEntityBuilder>) + (this.entityLinks[EntityLink(true,
                                                                                        EXCLUDEDROOTS_CONNECTION_ID)] as? List<ExcludeUrlEntityBuilder>
@@ -250,7 +259,7 @@ internal class LibraryEntityImpl(private val dataSource: LibraryEntityData) : Li
               _diff.addEntity(item_value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
             }
           }
-          _diff.updateOneToManyChildrenOfParent(EXCLUDEDROOTS_CONNECTION_ID, this, value)
+          _diff.instrumentation.replaceChildren(EXCLUDEDROOTS_CONNECTION_ID, this, value)
         }
         else {
           for (item_value in value) {
@@ -373,7 +382,6 @@ internal class LibraryEntityData : WorkspaceEntityData<LibraryEntity>(), SoftLin
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): LibraryEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {

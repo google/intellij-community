@@ -3,7 +3,7 @@ package org.jetbrains.kotlin.idea.base.plugin
 
 import org.jetbrains.annotations.NonNls
 
-const val USE_K1_PLUGIN_PROPERTY_NAME: @NonNls String = "idea.kotlin.plugin.use.k1"
+const val USE_K1_PLUGIN_PROPERTY_NAME: @NonNls String = "idea.kotlin.plugin.use.k1.obsolete"
 
 @Deprecated("Use USE_K1_PLUGIN_PROPERTY_NAME instead")
 const val USE_K2_PLUGIN_PROPERTY_NAME: @NonNls String = "idea.kotlin.plugin.use.k2"

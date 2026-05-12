@@ -19,10 +19,10 @@ import com.intellij.tasks.impl.TaskUtil;
 import com.intellij.tasks.ui.TaskDialogPanel;
 import com.intellij.ui.ComboboxSpeedSearch;
 import com.intellij.ui.IdeBorderFactory;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBRadioButton;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.ui.scale.JBUIScale;
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.uiDesigner.core.GridLayoutManager;
@@ -251,8 +251,8 @@ public class VcsOpenTaskPanel extends TaskDialogPanel {
         myCreateBranch.setSelected(myTaskManager.getState().createBranch && myBranchFrom.getItemCount() > 0);
         myUseBranch.setSelected(myTaskManager.getState().useBranch && myUseBranchCombo.getItemCount() > 0);
       }
-      myBranchFrom.setRenderer(SimpleListCellRenderer.create("", VcsTaskHandler.TaskInfo::getName));
-      myUseBranchCombo.setRenderer(SimpleListCellRenderer.create("", VcsTaskHandler.TaskInfo::getName));
+      myBranchFrom.setRenderer(BuilderKt.textListCellRenderer("", VcsTaskHandler.TaskInfo::getName));
+      myUseBranchCombo.setRenderer(BuilderKt.textListCellRenderer("", VcsTaskHandler.TaskInfo::getName));
       myBranchName.setText(branchName);
       ComboboxSpeedSearch.installOn(myBranchFrom);
       ComboboxSpeedSearch.installOn(myUseBranchCombo);

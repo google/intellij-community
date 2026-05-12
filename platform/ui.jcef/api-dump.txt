@@ -13,3 +13,5 @@ com.intellij.ui.jcef.JBCefOSRHandlerFactory
 - createComponent(Z):javax.swing.JComponent
 - createScreenBoundsProvider():com.intellij.util.Function
 - s:getInstance():com.intellij.ui.jcef.JBCefOSRHandlerFactory
+c:com.intellij.ui.jcef.utils.JBCefStreamResourceHandler
+- org.cef.handler.CefResourceHandlerAdapter

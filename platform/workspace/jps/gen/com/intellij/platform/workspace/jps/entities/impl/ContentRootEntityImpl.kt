@@ -1,4 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(EntityStorageInstrumentationApi::class)
+
 package com.intellij.platform.workspace.jps.entities.impl
 
 import com.intellij.platform.workspace.jps.entities.ContentRootEntity
@@ -8,20 +10,24 @@ import com.intellij.platform.workspace.jps.entities.ModuleEntity
 import com.intellij.platform.workspace.jps.entities.ModuleEntityBuilder
 import com.intellij.platform.workspace.jps.entities.SourceRootEntity
 import com.intellij.platform.workspace.jps.entities.SourceRootEntityBuilder
-import com.intellij.platform.workspace.storage.*
+import com.intellij.platform.workspace.storage.ConnectionId
+import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
+import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
+import com.intellij.platform.workspace.storage.MutableEntityStorage
+import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
+import com.intellij.platform.workspace.storage.WorkspaceEntityInternalApi
 import com.intellij.platform.workspace.storage.impl.EntityLink
 import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
 import com.intellij.platform.workspace.storage.impl.containers.MutableWorkspaceList
 import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceList
-import com.intellij.platform.workspace.storage.impl.extractOneToManyChildren
-import com.intellij.platform.workspace.storage.impl.extractOneToManyParent
-import com.intellij.platform.workspace.storage.impl.updateOneToManyChildrenOfParent
-import com.intellij.platform.workspace.storage.impl.updateOneToManyParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.instrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 
@@ -52,11 +58,14 @@ internal class ContentRootEntityImpl(private val dataSource: ContentRootEntityDa
       return dataSource.excludedPatterns
     }
   override val module: ModuleEntity
-    get() = snapshot.extractOneToManyParent(MODULE_CONNECTION_ID, this)!!
+    get() = snapshot.instrumentation.getParent(MODULE_CONNECTION_ID, this) as? ModuleEntity
+            ?: error("Parent module not found for ContentRootEntity")
   override val sourceRoots: List<SourceRootEntity>
-    get() = snapshot.extractOneToManyChildren<SourceRootEntity>(SOURCEROOTS_CONNECTION_ID, this)!!.toList()
+    get() = (snapshot.instrumentation.getManyChildren(SOURCEROOTS_CONNECTION_ID, this) as? Sequence<SourceRootEntity>)?.toList()
+            ?: error("Children sourceRoots not found for ContentRootEntity")
   override val excludedUrls: List<ExcludeUrlEntity>
-    get() = snapshot.extractOneToManyChildren<ExcludeUrlEntity>(EXCLUDEDURLS_CONNECTION_ID, this)!!.toList()
+    get() = (snapshot.instrumentation.getManyChildren(EXCLUDEDURLS_CONNECTION_ID, this) as? Sequence<ExcludeUrlEntity>)?.toList()
+            ?: error("Children excludedUrls not found for ContentRootEntity")
 
   override val entitySource: EntitySource
     get() {
@@ -107,7 +116,7 @@ internal class ContentRootEntityImpl(private val dataSource: ContentRootEntityDa
         error("Field ContentRootEntity#excludedPatterns should be initialized")
       }
       if (_diff != null) {
-        if (_diff.extractOneToManyParent<WorkspaceEntityBase>(MODULE_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getParentBuilder(MODULE_CONNECTION_ID, this) == null) {
           error("Field ContentRootEntity#module should be initialized")
         }
       }
@@ -118,7 +127,7 @@ internal class ContentRootEntityImpl(private val dataSource: ContentRootEntityDa
       }
 // Check initialization for list with ref type
       if (_diff != null) {
-        if (_diff.extractOneToManyChildren<WorkspaceEntityBase>(SOURCEROOTS_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getManyChildrenBuilders(SOURCEROOTS_CONNECTION_ID, this) == null) {
           error("Field ContentRootEntity#sourceRoots should be initialized")
         }
       }
@@ -129,7 +138,7 @@ internal class ContentRootEntityImpl(private val dataSource: ContentRootEntityDa
       }
 // Check initialization for list with ref type
       if (_diff != null) {
-        if (_diff.extractOneToManyChildren<WorkspaceEntityBase>(EXCLUDEDURLS_CONNECTION_ID, this) == null) {
+        if (_diff.instrumentation.getManyChildrenBuilders(EXCLUDEDURLS_CONNECTION_ID, this) == null) {
           error("Field ContentRootEntity#excludedUrls should be initialized")
         }
       }
@@ -203,12 +212,13 @@ internal class ContentRootEntityImpl(private val dataSource: ContentRootEntityDa
       get() {
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(MODULE_CONNECTION_ID, this) as? ModuleEntityBuilder)
-          ?: (this.entityLinks[EntityLink(false, MODULE_CONNECTION_ID)]!! as ModuleEntityBuilder)
+          ?: (this.entityLinks[EntityLink(false, MODULE_CONNECTION_ID)] as? ModuleEntityBuilder)
+          ?: error("module is null for ContentRootEntity")
         }
         else {
-          this.entityLinks[EntityLink(false, MODULE_CONNECTION_ID)]!! as ModuleEntityBuilder
+          (this.entityLinks[EntityLink(false, MODULE_CONNECTION_ID)] as? ModuleEntityBuilder)
+          ?: error("module is null for ContentRootEntity")
         }
       }
       set(value) {
@@ -224,7 +234,7 @@ internal class ContentRootEntityImpl(private val dataSource: ContentRootEntityDa
           _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
         }
         if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)) {
-          _diff.updateOneToManyParentOfChild(MODULE_CONNECTION_ID, this, value)
+          _diff.instrumentation.addChild(MODULE_CONNECTION_ID, value, this)
         }
         else {
 // Setting backref of the list
@@ -245,7 +255,6 @@ internal class ContentRootEntityImpl(private val dataSource: ContentRootEntityDa
 // Getter of the list of non-abstract referenced types
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(SOURCEROOTS_CONNECTION_ID, this)!!
             .toList() as List<SourceRootEntityBuilder>) + (this.entityLinks[EntityLink(true,
                                                                                        SOURCEROOTS_CONNECTION_ID)] as? List<SourceRootEntityBuilder>
@@ -270,7 +279,7 @@ internal class ContentRootEntityImpl(private val dataSource: ContentRootEntityDa
               _diff.addEntity(item_value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
             }
           }
-          _diff.updateOneToManyChildrenOfParent(SOURCEROOTS_CONNECTION_ID, this, value)
+          _diff.instrumentation.replaceChildren(SOURCEROOTS_CONNECTION_ID, this, value)
         }
         else {
           for (item_value in value) {
@@ -291,7 +300,6 @@ internal class ContentRootEntityImpl(private val dataSource: ContentRootEntityDa
 // Getter of the list of non-abstract referenced types
         val _diff = diff
         return if (_diff != null) {
-          @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(EXCLUDEDURLS_CONNECTION_ID, this)!!
             .toList() as List<ExcludeUrlEntityBuilder>) + (this.entityLinks[EntityLink(true,
                                                                                        EXCLUDEDURLS_CONNECTION_ID)] as? List<ExcludeUrlEntityBuilder>
@@ -316,7 +324,7 @@ internal class ContentRootEntityImpl(private val dataSource: ContentRootEntityDa
               _diff.addEntity(item_value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
             }
           }
-          _diff.updateOneToManyChildrenOfParent(EXCLUDEDURLS_CONNECTION_ID, this, value)
+          _diff.instrumentation.replaceChildren(EXCLUDEDURLS_CONNECTION_ID, this, value)
         }
         else {
           for (item_value in value) {
@@ -350,7 +358,6 @@ internal class ContentRootEntityData : WorkspaceEntityData<ContentRootEntity>() 
     return modifiable
   }
 
-  @OptIn(EntityStorageInstrumentationApi::class)
   override fun createEntity(snapshot: EntityStorageInstrumentation): ContentRootEntity {
     val entityId = createEntityId()
     return snapshot.initializeEntity(entityId) {

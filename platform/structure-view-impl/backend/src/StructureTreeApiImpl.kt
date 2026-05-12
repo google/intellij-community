@@ -32,6 +32,7 @@ import com.intellij.platform.structureView.backend.BackendStructureTreeService.C
 import com.intellij.platform.structureView.backend.BackendStructureTreeService.Companion.visit
 import com.intellij.platform.structureView.backend.BackendStructureTreeService.StructureViewEvent
 import com.intellij.platform.structureView.impl.DelegatingNodeProvider
+import com.intellij.platform.structureView.impl.ShowStructurePopupRequest
 import com.intellij.platform.structureView.impl.StructureTreeApi
 import com.intellij.platform.structureView.impl.dto.StructureViewDtoId
 import com.intellij.platform.structureView.impl.dto.StructureViewModelDto
@@ -39,6 +40,7 @@ import com.intellij.util.application
 import com.intellij.util.ui.tree.TreeUtil
 import fleet.rpc.remoteApiDescriptor
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
@@ -49,6 +51,10 @@ import kotlin.collections.get
 import kotlin.collections.plus
 
 internal class StructureTreeApiImpl : StructureTreeApi {
+  override suspend fun getShowPopupRequestFlow(): Flow<ShowStructurePopupRequest> {
+    return getStructureTreeService().getShowPopupRequestFlow()
+  }
+
   override suspend fun createStructureViewModel(
     id: StructureViewDtoId,
     fileEditorId: FileEditorId,
@@ -134,22 +140,24 @@ internal class StructureTreeApiImpl : StructureTreeApi {
 
     val elementValue = entry.nodeToId.entries.find { it.value == elementId }?.key ?: return false
 
-    val targetElement = entry.structureTreeModel.invoker.compute {
+    val (targetElement, treeNode) = entry.structureTreeModel.invoker.compute {
       var targetElement: StructureViewTreeElement? = null
+      var treeNode: AbstractTreeNode<*>? = null
 
-      val root = entry.structureTreeModel.root ?: return@compute null
+      val root = entry.structureTreeModel.root ?: return@compute null to null
       visit(root, entry.structureTreeModel, TreePath(root)) {
         val wrapper = TreeUtil.getUserObject(it.lastPathComponent) as? TreeElementWrapper
         val element = wrapper?.getValue() as? StructureViewTreeElement
         return@visit if (element?.value == elementValue) {
           targetElement = element
+          treeNode = wrapper
           true
         }
         else {
           false
         }
       }
-      targetElement
+      targetElement to treeNode
     }.asDeferred().await()
 
 
@@ -162,7 +170,7 @@ internal class StructureTreeApiImpl : StructureTreeApi {
         CommandProcessor.getInstance().executeCommand(entry.project, {
           if (targetElement.canNavigateToSource()) {
             targetElement.navigate(true)
-            entry.navigationCallback?.invoke(targetElement as AbstractTreeNode<*>)
+            treeNode?.let { entry.navigationCallback?.invoke(it) }
             succeeded = true
           }
           IdeDocumentHistory.getInstance(entry.project).includeCurrentCommandAsNavigation()

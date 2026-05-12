@@ -34,6 +34,6 @@ public final class JsonSchemaStatusWidgetFactory extends StatusBarEditorBasedWid
 
   @Override
   public @NotNull StatusBarWidget createWidget(@NotNull Project project, @NotNull CoroutineScope scope) {
-    return new JsonSchemaStatusWidget(project, scope);
+    return JsonSchemaStatusWidget.create(project, scope);
   }
 }

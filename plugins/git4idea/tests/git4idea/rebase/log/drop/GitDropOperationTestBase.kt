@@ -8,6 +8,7 @@ import git4idea.rebase.log.GitCommitEditingOperationResult.Complete.UndoPossibil
 import git4idea.rebase.log.GitCommitEditingOperationResult.Complete.UndoResult
 import git4idea.test.GitSingleRepoTest
 import git4idea.test.assertCommitted
+import kotlinx.coroutines.runBlocking
 
 internal abstract class GitDropOperationTestBase : GitSingleRepoTest() {
   protected abstract fun execute(commitsToDrop: List<VcsCommitMetadata>): GitCommitEditingOperationResult
@@ -81,7 +82,7 @@ internal abstract class GitDropOperationTestBase : GitSingleRepoTest() {
 
     val operationResult = execute(listOf(commitToDrop)) as Complete
 
-    assertTrue(operationResult.checkUndoPossibility() is UndoPossibility.Possible)
+    assertTrue(runBlocking { operationResult.checkUndoPossibility() } is UndoPossibility.Possible)
     val undoResult = operationResult.undo()
     assertTrue(undoResult is UndoResult.Success)
 

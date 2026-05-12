@@ -7,27 +7,51 @@ import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.pycharm.community.ide.impl.settings.PythonMainConfigurable
 import com.intellij.pycharm.community.ide.impl.settings.PythonToolsConfigurable
 
+/*
+ Similar setup but form applicationConfigurable we have in
+ [com.intellij.pycharm.community.ide.impl.PyCharmCorePluginConfigurator]
+
+ ProjectActivity.execute executes after the project is fully loaded, so when we open settings too early, we will see
+
+ Full list of settings in Pycharm group with weights and configurables ids:
+
+ Interpreter, weight=200 (set in XML) / projectConfigurable "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable"
+ TypeEngine, weight=190 (set in XML) / projectConfigurable "com.intellij.python.lsp.core.PyTypeEngineConfigurable"
+ Debugger, weight=80 (set here), width=119 (set in XML) / projectConfigurable "reference.idesettings.debugger.python"
+   - TypeRenderers / applicationConfigurable "debugger.dataViews.python.type.renderers"
+ Console weight=75 / projectConfigurable "pyconsole"
+   - Flask Console
+   - Python Console
+ Tools weight=72 / groupConfigurable "python.tools.group.settings"
+   - Pyright
+   - Ruff
+   - ty
+   - Black
+   - Integrated Tools
+ Tables, width=70 (set in PyCharmCorePluginConfigurator) / applicationConfigurable "DSTables"
+ Python Plots weight=60 (set in PyCharmCorePluginConfigurator) / applicationConfigurable "PyPlotsConfigurable"
+ Django, weight=50 (set here) / projectConfigurable "com.intellij.python.django.customization.DjangoModulesConfigurable"
+ Flask, weight=40 (set here) / projectConfigurable "com.intellij.python.pro.flask.configuration.FlaskConfigurable"
+ External Documentation (set in PyCharmCorePluginConfigurator) / applicationConfigurable "com.jetbrains.python.documentation.PythonDocumentationConfigurable"
+*/
 class PyCharmProjectConfigurableStartupActivity : ProjectActivity {
 
-  @Suppress("DialogTitleCapitalization")
+  // Only for projectConfigurable.
+  // applicationConfigurable is set up in [PyCharmCorePluginConfigurator].
   override suspend fun execute(project: Project) {
     for (ep in Configurable.PROJECT_CONFIGURABLE.getExtensions(project)) {
       when (ep.id) {
+        // Moving to 'Python' section.
         "reference.idesettings.debugger.python" -> {
           ep.groupId = PythonMainConfigurable.ID
+          @Suppress("DialogTitleCapitalization")
           ep.key = "configurable.PyDebuggerConfigurable.pycharm.display.name"
-          ep.bundle="messages.PyBundle"
+          ep.bundle = "messages.PyBundle"
           ep.groupWeight = 80
         }
         "pyconsole" -> {
           ep.groupId = PythonMainConfigurable.ID
           ep.groupWeight = 75
-        }
-        "PyPlotsConfigurable" -> {
-          ep.groupId = PythonMainConfigurable.ID
-          ep.key = "configurable.plots.pycharm.display.name"
-          ep.bundle="messages.PyBundle"
-          ep.groupWeight = 60
         }
         "com.intellij.python.django.customization.DjangoModulesConfigurable" -> {
           ep.groupId = PythonMainConfigurable.ID
@@ -37,10 +61,13 @@ class PyCharmProjectConfigurableStartupActivity : ProjectActivity {
           ep.groupId = PythonMainConfigurable.ID
           ep.groupWeight = 40
         }
+
+        // Moving to 'Python | Tools' section.
         "com.jetbrains.python.configuration.PyIntegratedToolsModulesConfigurable" -> {
           ep.groupId = PythonToolsConfigurable.ID
+          @Suppress("DialogTitleCapitalization")
           ep.key = "configurable.PyIntegratedToolsModulesConfigurable.pycharm.display.name"
-          ep.bundle="messages.PyBundle"
+          ep.bundle = "messages.PyBundle"
           ep.groupWeight = 20
         }
         "com.intellij.python.ty.TyConfigurable" -> {
@@ -52,10 +79,6 @@ class PyCharmProjectConfigurableStartupActivity : ProjectActivity {
           ep.groupWeight = 40
         }
         "com.intellij.python.pyright.PyrightConfigurable" -> {
-          ep.groupId = PythonToolsConfigurable.ID
-          ep.groupWeight = 40
-        }
-        "com.intellij.python.pyrefly.PyreflyConfigurable" -> {
           ep.groupId = PythonToolsConfigurable.ID
           ep.groupWeight = 40
         }

@@ -25,8 +25,8 @@ import com.intellij.diagnostic.hprof.parser.InstanceFieldEntry
 import com.intellij.diagnostic.hprof.parser.StaticFieldEntry
 import com.intellij.diagnostic.hprof.parser.Type
 import com.intellij.diagnostic.hprof.util.FileChannelBackedWriteBuffer
+import com.intellij.diagnostic.hprof.util.HProfReadBufferSlidingWindow
 import com.intellij.openapi.diagnostic.Logger
-import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 
 internal class CreateAuxiliaryFilesVisitor(
@@ -86,7 +86,7 @@ internal class CreateAuxiliaryFilesVisitor(
     offsets.close()
   }
 
-  override fun visitPrimitiveArrayDump(arrayObjectId: Long, stackTraceSerialNumber: Long, numberOfElements: Long, elementType: Type, primitiveArrayData: ByteBuffer) {
+  override fun visitPrimitiveArrayDump(arrayObjectId: Long, stackTraceSerialNumber: Long, numberOfElements: Long, elementType: Type, primitiveArrayData: HProfReadBufferSlidingWindow) {
     assert(arrayObjectId <= Int.MAX_VALUE)
     assert(offsets.position() / 4 == arrayObjectId.toInt())
 
@@ -96,9 +96,7 @@ internal class CreateAuxiliaryFilesVisitor(
 
     assert(numberOfElements <= Int.MAX_VALUE) // arrays in java don't support more than Int.MAX_VALUE elements
     aux.writeNonNegativeLEB128Int(numberOfElements.toInt())
-    primitiveArrayData.mark()
     aux.writeBytes(primitiveArrayData)
-    primitiveArrayData.reset()
   }
 
   override fun visitClassDump(classId: Long,
@@ -141,7 +139,7 @@ internal class CreateAuxiliaryFilesVisitor(
     }
   }
 
-  override fun visitInstanceDump(objectId: Long, stackTraceSerialNumber: Long, classObjectId: Long, bytes: ByteBuffer) {
+  override fun visitInstanceDump(objectId: Long, stackTraceSerialNumber: Long, classObjectId: Long, bytes: HProfReadBufferSlidingWindow) {
     assert(objectId <= Int.MAX_VALUE)
     assert(classObjectId <= Int.MAX_VALUE)
     assert(offsets.position() / 4 == objectId.toInt())
@@ -212,4 +210,3 @@ internal class CreateAuxiliaryFilesVisitor(
     this.writeNonNegativeLEB128Int(id)
   }
 }
-

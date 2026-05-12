@@ -65,6 +65,8 @@ public interface GridDataHookUp<Row, Column> extends MutationSupport<Row, Column
 
     void updateCountReceived(@NotNull GridRequestSource source, int updateCount);
 
+    default void dropModelDependentCache(@NotNull GridRequestSource source) {}
+
     //todo: implemented only for scripted hookup
     @ApiStatus.Experimental
     default void requestStarted(@NotNull GridRequestSource source) {}

@@ -5,7 +5,7 @@ import com.intellij.codeInsight.highlighting.HighlightUsagesHandlerBase
 import com.intellij.codeInsight.highlighting.HighlightUsagesHandlerFactoryBase
 import com.intellij.find.FindManager
 import com.intellij.find.findUsages.FindUsagesHandler
-import com.intellij.find.impl.FindManagerImpl
+import com.intellij.find.impl.FindManagerBase
 import com.intellij.lang.ASTNode
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.progress.ProgressIndicatorProvider
@@ -19,10 +19,14 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.elementType
 import com.intellij.util.Consumer
 import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.resolution.KaExplicitReceiverValue
+import org.jetbrains.kotlin.analysis.api.resolution.KaImplicitReceiverValue
 import org.jetbrains.kotlin.analysis.api.resolution.successfulFunctionCallOrNull
+import org.jetbrains.kotlin.analysis.api.symbols.KaReceiverParameterSymbol
 import org.jetbrains.kotlin.idea.codeinsight.utils.StandardKotlinNames
 import org.jetbrains.kotlin.idea.codeinsight.utils.doesBelongToLoop
 import org.jetbrains.kotlin.idea.codeinsight.utils.findRelevantLoopForExpression
+import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.idea.references.unwrappedTargets
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.CallableId
@@ -51,6 +55,7 @@ import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtPropertyAccessor
 import org.jetbrains.kotlin.psi.KtPsiUtil
 import org.jetbrains.kotlin.psi.KtReturnExpression
+import org.jetbrains.kotlin.psi.KtThisExpression
 import org.jetbrains.kotlin.psi.KtThrowExpression
 import org.jetbrains.kotlin.psi.KtTryExpression
 import org.jetbrains.kotlin.psi.KtValueArgument
@@ -359,7 +364,7 @@ abstract class AbstractKotlinHighlightExitPointsHandlerFactory : HighlightUsages
                         ?.let(::addOccurrence)
 
                     val handler: FindUsagesHandler? =
-                        (FindManager.getInstance(relevantFunction.project) as FindManagerImpl).findUsagesManager.getFindUsagesHandler(
+                        (FindManager.getInstance(relevantFunction.project) as FindManagerBase).findUsagesManager.getFindUsagesHandler(
                             target,
                             true
                         )
@@ -440,6 +445,8 @@ abstract class AbstractKotlinHighlightExitPointsHandlerFactory : HighlightUsages
         }
 
         override fun computeUsages(targets: List<PsiElement>) {
+            if (target is KtCallExpression && !target.hasNoExplicitReceiver()) return
+
             val (generatorCall, builderPoints) = findGeneratorCall(target) ?: return
             // Handles both trailing lambda syntax: sequence { } and parenthesized: sequence({ })
             val generatorLambda =
@@ -458,7 +465,9 @@ abstract class AbstractKotlinHighlightExitPointsHandlerFactory : HighlightUsages
                 override fun visitCallExpression(expression: KtCallExpression) {
                     super.visitCallExpression(expression)
                     // Check if this call belongs to our sequence (not nested)
-                    if (belongsToBuilder(expression, generatorLambda, builderPoints) && isBuilderPointCall(expression, builderPoints)) {
+                    if (belongsToBuilder(expression, generatorLambda, builderPoints)
+                        && isBuilderPointCall(expression, builderPoints)
+                        && expression.isCalledOnReceiverOf(generatorLambda)) {
                         expression.calleeExpression?.let { addOccurrence(it) }
                     }
                 }
@@ -479,8 +488,17 @@ abstract class AbstractKotlinHighlightExitPointsHandlerFactory : HighlightUsages
                 is KtLambdaArgument -> lambdaArg.parent as? KtCallExpression
                 is KtValueArgument -> (lambdaArg.parent as? KtValueArgumentList)?.parent as? KtCallExpression
                 else -> null
+            } ?: return@firstNotNullOfOrNull null
+
+            val builderPoints = findMatchingBuilderPoints(call) ?: return@firstNotNullOfOrNull null
+
+            // Only attach to this enclosing builder if the clicked call actually resolves
+            // to one of *its* exit points. Otherwise keep walking outward.
+            if (expression is KtCallExpression && isBuilderPointCall(expression, builderPoints)) {
+                call to builderPoints
+            } else {
+                null
             }
-            call?.let { findMatchingBuilderPoints(it)?.let { builderPoints -> call to builderPoints } }
         }
     }
 
@@ -537,10 +555,40 @@ abstract class AbstractKotlinHighlightExitPointsHandlerFactory : HighlightUsages
     private fun KtCallExpression.resolvesToCallableId(vararg expectedCallableIds: CallableId): Boolean {
         analyze(this) {
             val resolvedCall = resolveToCall()?.successfulFunctionCallOrNull() ?: return false
-            val symbol = resolvedCall.partiallyAppliedSymbol.signature.symbol
+            val symbol = resolvedCall.signature.symbol
             val callableId = symbol.callableId ?: return false
             return callableId in expectedCallableIds
         }
+    }
+
+    private fun KtCallExpression.hasNoExplicitReceiver(): Boolean = analyze(this) {
+        val call = resolveToCall()?.successfulFunctionCallOrNull() ?: return false
+        val receiver = call.extensionReceiver ?: call.dispatchReceiver
+        when (receiver) {
+            null -> true                          // top-level call, no receiver
+            is KaImplicitReceiverValue -> true    // `add(...)`
+            is KaExplicitReceiverValue ->         // `this.add(...)` / `this@label.add(...)`
+                receiver.expression is KtThisExpression
+            else -> false
+        }
+    }
+
+    private fun KtCallExpression.isCalledOnReceiverOf(builderLambda: KtLambdaExpression): Boolean = analyze(this) {
+        val call = resolveToCall()?.successfulFunctionCallOrNull() ?: return false
+        val receiver = call.extensionReceiver ?: call.dispatchReceiver
+        val builderLiteral = builderLambda.functionLiteral
+
+        val ownerPsi: PsiElement? = when (receiver) {
+            is KaImplicitReceiverValue -> {
+                (receiver.symbol as? KaReceiverParameterSymbol)?.containingSymbol?.psi
+            }
+            is KaExplicitReceiverValue -> {
+                val thisExpr = receiver.expression as? KtThisExpression ?: return false
+                thisExpr.instanceReference.mainReference.resolve()
+            }
+            else -> null
+        }
+        ownerPsi === builderLiteral
     }
 
     companion object {

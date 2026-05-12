@@ -15,9 +15,10 @@
  */
 package com.intellij.diagnostic.hprof.util
 
-import java.nio.ByteBuffer
+import org.jetbrains.annotations.ApiStatus
 import java.security.InvalidParameterException
 
+@ApiStatus.Internal
 abstract class HProfReadBuffer : AutoCloseable {
   var idSize: Int = 0
     set(value) {
@@ -30,9 +31,10 @@ abstract class HProfReadBuffer : AutoCloseable {
 
   abstract fun position(newPosition: Long)
   abstract fun isEof(): Boolean
+  abstract fun limit(): Long
   abstract fun position(): Long
   abstract fun get(bytes: ByteArray)
-  abstract fun getByteBuffer(size: Int): ByteBuffer
+  abstract fun getByteBuffer(size: Long): HProfReadBufferSlidingWindow
   abstract fun get(): Byte
   abstract fun getShort(): Short
   abstract fun getInt(): Int
@@ -63,5 +65,5 @@ abstract class HProfReadBuffer : AutoCloseable {
     return String(bytes)
   }
 
-  fun skip(n: Int): Unit = position(position() + n)
+  fun skip(n: Long): Unit = position(position() + n)
 }

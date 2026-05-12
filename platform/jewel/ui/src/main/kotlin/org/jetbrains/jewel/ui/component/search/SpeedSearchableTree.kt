@@ -1,4 +1,4 @@
-// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.jewel.ui.component.search
 
 import androidx.compose.runtime.Composable
@@ -17,9 +17,7 @@ import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.jewel.foundation.ExperimentalJewelApi
 import org.jetbrains.jewel.foundation.lazy.SelectableLazyItemScope
 import org.jetbrains.jewel.foundation.lazy.tree.DefaultTreeViewKeyActions
-import org.jetbrains.jewel.foundation.lazy.tree.DefaultTreeViewPointerEventAction
 import org.jetbrains.jewel.foundation.lazy.tree.KeyActions
-import org.jetbrains.jewel.foundation.lazy.tree.PointerEventActions
 import org.jetbrains.jewel.foundation.lazy.tree.Tree
 import org.jetbrains.jewel.foundation.lazy.tree.TreeState
 import org.jetbrains.jewel.foundation.lazy.tree.rememberTreeState
@@ -33,19 +31,52 @@ import org.jetbrains.jewel.ui.theme.treeStyle
 /**
  * Renders a lazy tree view with integrated speed search functionality.
  *
+ * This composable combines [LazyTree] with speed search capabilities, providing automatic text matching, navigation
+ * between matches, and intelligent scrolling behavior. It must be used within a [SpeedSearchScope] (typically provided
+ * by [org.jetbrains.jewel.ui.component.SpeedSearchArea]).
+ *
+ * **Key features:**
+ * - **Automatic matching**: Nodes are automatically matched against the search query based on their text content
+ * - **Smart navigation**: Arrow keys navigate between matching nodes when search is active
+ * - **Auto-scrolling**: Automatically scrolls to keep matching nodes visible
+ * - **Selection integration**: Integrates selection state with search results
+ * - **Performance optimized**: Uses a background dispatcher for search operations
+ *
+ * Example usage:
+ * ```kotlin
+ * SpeedSearchArea {
+ *     SpeedSearchableTree(
+ *         tree = myTree,
+ *         nodeText = { it.data.name },
+ *         modifier = Modifier.focusable(),
+ *     ) { element ->
+ *         var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+ *         SimpleListItem(
+ *             text = element.data.name.highlightTextSearch(),
+ *             selected = isSelected,
+ *             active = isActive,
+ *             onTextLayout = { textLayoutResult = it },
+ *             textModifier = Modifier.highlightSpeedSearchMatches(textLayoutResult),
+ *         )
+ *     }
+ * }
+ * ```
+ *
  * @param tree The tree structure to be rendered.
- * @param nodeText A function that extracts displayable text from tree elements for search matching.
+ * @param nodeText A function that extracts searchable text from a tree element, or `null` if the node should not be
+ *   matched.
  * @param modifier The [Modifier] to apply to the tree component.
  * @param treeState The state object that controls tree expansion and selection.
- * @param onElementClick Callback function triggered when a tree element is clicked.
- * @param onElementDoubleClick Callback function triggered when a tree element is double-clicked.
- * @param onSelectionChange Callback function triggered when the selection changes, providing the list of selected
- *   elements.
+ * @param onElementClick Called when a tree element is clicked.
+ * @param onElementDoubleClick Called when a tree element is double-clicked.
+ * @param onSelectionChange Called when the selection changes, providing the list of selected elements.
  * @param keyActions The key action handlers for keyboard navigation and interaction.
  * @param style The visual style configuration for the tree.
- * @param dispatcher The coroutine dispatcher used for background search operations.
- * @param nodeContent The composable function responsible for rendering the content of tree nodes.
- * @composable
+ * @param dispatcher The coroutine dispatcher used for background search operations. Defaults to [Dispatchers.Default].
+ * @param nodeContent The composable used to render each tree node.
+ * @see org.jetbrains.jewel.ui.component.SpeedSearchArea for the search container
+ * @see highlightTextSearch for highlighting search matches in text
+ * @see highlightSpeedSearchMatches for applying match highlight styles
  */
 @Composable
 @ExperimentalJewelApi
@@ -59,7 +90,6 @@ public fun <T> SpeedSearchScope.SpeedSearchableTree(
     onElementDoubleClick: (Tree.Element<T>) -> Unit = {},
     onSelectionChange: (List<Tree.Element<T>>) -> Unit = {},
     keyActions: KeyActions = DefaultTreeViewKeyActions(treeState),
-    pointerEventActions: PointerEventActions = DefaultTreeViewPointerEventAction(treeState),
     style: LazyTreeStyle = JewelTheme.treeStyle,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     nodeContent: @Composable (SelectableLazyItemScope.(Tree.Element<T>) -> Unit),
@@ -82,7 +112,6 @@ public fun <T> SpeedSearchScope.SpeedSearchableTree(
         onElementDoubleClick = onElementDoubleClick,
         onSelectionChange = onSelectionChange,
         keyActions = speedSearchKeyActions,
-        pointerEventActions = pointerEventActions,
         style = style,
         interactionSource = interactionSource,
     ) {

@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.internal.statistic
 
 import com.intellij.application.options.CodeStyle
@@ -19,7 +19,7 @@ import com.intellij.psi.codeStyle.JavaCodeStyleSettings
  * USE com.intellij.psi.codeStyle.GenerateJavaFormattingStyleCollector
  */
 public class JavaFormattingStyleCollector : ProjectUsagesCollector() {
-  private val GROUP = EventLogGroup("java.code.style", 3)
+  private val GROUP = EventLogGroup("java.code.style", 4)
 
   override fun getGroup(): EventLogGroup {
     return GROUP
@@ -258,11 +258,14 @@ public class JavaFormattingStyleCollector : ProjectUsagesCollector() {
     addMetricIfDiffersCustom(result, javaSettings, defaultJavaSettings, { s -> s.BLANK_LINES_BETWEEN_RECORD_COMPONENTS }, "JAVA_BLANK_LINES_BETWEEN_RECORD_COMPONENTS")
     addMetricIfDiffersCustom(result, javaSettings, defaultJavaSettings, { s -> s.CLASS_NAMES_IN_JAVADOC }, "JAVA_CLASS_NAMES_IN_JAVADOC")
     addMetricIfDiffersCustom(result, javaSettings, defaultJavaSettings, { s -> s.SPACE_BEFORE_COLON_IN_FOREACH }, "JAVA_SPACE_BEFORE_COLON_IN_FOREACH")
+    addMetricIfDiffersCustom(result, javaSettings, defaultJavaSettings, { s -> s.STRIP_WHITESPACE_FROM_BLANK_LINES_IN_TEXT_BLOCKS }, "JAVA_STRIP_WHITESPACE_FROM_BLANK_LINES_IN_TEXT_BLOCKS")
     addMetricIfDiffersCustom(result, javaSettings, defaultJavaSettings, { s -> s.SPACE_INSIDE_ONE_LINE_ENUM_BRACES }, "JAVA_SPACE_INSIDE_ONE_LINE_ENUM_BRACES")
     addMetricIfDiffersCustom(result, javaSettings, defaultJavaSettings, { s -> s.SPACES_INSIDE_BLOCK_BRACES_WHEN_BODY_IS_PRESENT }, "JAVA_SPACES_INSIDE_BLOCK_BRACES_WHEN_BODY_IS_PRESENT")
     addMetricIfDiffersCustom(result, javaSettings, defaultJavaSettings, { s -> s.NEW_LINE_WHEN_BODY_IS_PRESENTED }, "JAVA_NEW_LINE_WHEN_BODY_IS_PRESENTED")
     addMetricIfDiffersCustom(result, javaSettings, defaultJavaSettings, { s -> s.LAYOUT_STATIC_IMPORTS_SEPARATELY }, "JAVA_LAYOUT_STATIC_IMPORTS_SEPARATELY")
     addMetricIfDiffersCustom(result, javaSettings, defaultJavaSettings, { s -> s.LAYOUT_ON_DEMAND_IMPORT_FROM_SAME_PACKAGE_FIRST }, "JAVA_LAYOUT_ON_DEMAND_IMPORT_FROM_SAME_PACKAGE_FIRST")
+    addMetricIfDiffersCustom(result, javaSettings, defaultJavaSettings, { s -> s.PRESERVE_MODULE_IMPORTS }, "JAVA_PRESERVE_MODULE_IMPORTS")
+    addMetricIfDiffersCustom(result, javaSettings, defaultJavaSettings, { s -> s.DELETE_UNUSED_MODULE_IMPORTS }, "JAVA_DELETE_UNUSED_MODULE_IMPORTS")
     addMetricIfDiffersCustom(result, javaSettings, defaultJavaSettings, { s -> s.USE_FQ_CLASS_NAMES }, "JAVA_USE_FQ_CLASS_NAMES")
     addMetricIfDiffersCustom(result, javaSettings, defaultJavaSettings, { s -> s.USE_SINGLE_CLASS_IMPORTS }, "JAVA_USE_SINGLE_CLASS_IMPORTS")
     addMetricIfDiffersCustom(result, javaSettings, defaultJavaSettings, { s -> s.INSERT_INNER_CLASS_IMPORTS }, "JAVA_INSERT_INNER_CLASS_IMPORTS")
@@ -514,11 +517,14 @@ private val ALLOWED_NAMES = listOf(
   "JAVA_BLANK_LINES_BETWEEN_RECORD_COMPONENTS",
   "JAVA_CLASS_NAMES_IN_JAVADOC",
   "JAVA_SPACE_BEFORE_COLON_IN_FOREACH",
+  "JAVA_STRIP_WHITESPACE_FROM_BLANK_LINES_IN_TEXT_BLOCKS",
   "JAVA_SPACE_INSIDE_ONE_LINE_ENUM_BRACES",
   "JAVA_SPACES_INSIDE_BLOCK_BRACES_WHEN_BODY_IS_PRESENT",
   "JAVA_NEW_LINE_WHEN_BODY_IS_PRESENTED",
   "JAVA_LAYOUT_STATIC_IMPORTS_SEPARATELY",
   "JAVA_LAYOUT_ON_DEMAND_IMPORT_FROM_SAME_PACKAGE_FIRST",
+  "JAVA_PRESERVE_MODULE_IMPORTS",
+  "JAVA_DELETE_UNUSED_MODULE_IMPORTS",
   "JAVA_USE_FQ_CLASS_NAMES",
   "JAVA_USE_SINGLE_CLASS_IMPORTS",
   "JAVA_INSERT_INNER_CLASS_IMPORTS",

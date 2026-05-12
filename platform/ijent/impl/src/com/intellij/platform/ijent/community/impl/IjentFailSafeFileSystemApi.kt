@@ -8,6 +8,7 @@ import com.intellij.platform.eel.EelOsFamily
 import com.intellij.platform.eel.EelResult
 import com.intellij.platform.eel.EelUserPosixInfo
 import com.intellij.platform.eel.EelUserWindowsInfo
+import com.intellij.platform.eel.fs.EelFileInfo
 import com.intellij.platform.eel.fs.EelFileSystemApi
 import com.intellij.platform.eel.fs.EelFileSystemPosixApi
 import com.intellij.platform.eel.fs.EelOpenedFile
@@ -19,13 +20,14 @@ import com.intellij.platform.eel.fs.WalkDirectoryEntryResult
 import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.provider.toEelApi
 import com.intellij.platform.ijent.IjentApi
+import com.intellij.platform.ijent.IjentCallerContext
 import com.intellij.platform.ijent.IjentPosixApi
 import com.intellij.platform.ijent.IjentUnavailableException
 import com.intellij.platform.ijent.IjentWindowsApi
+import com.intellij.platform.ijent.community.impl.nio.computeCallerContext
 import com.intellij.platform.ijent.fs.IjentFileSystemApi
 import com.intellij.platform.ijent.fs.IjentFileSystemPosixApi
 import com.intellij.platform.ijent.fs.IjentFileSystemWindowsApi
-import com.intellij.util.ui.EDT
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -129,7 +131,7 @@ private class DelegateHolder<I : IjentApi, F : IjentFileSystemApi>(
     }
 }
 
-private fun checkEarlyAccess() {
+private suspend fun checkEarlyAccess() {
   val application = ApplicationManagerEx.getApplicationEx()
   if (application?.isUnitTestMode != false) {
     return
@@ -140,7 +142,8 @@ private fun checkEarlyAccess() {
     return
   }
 
-  if (!EDT.isCurrentThreadEdt()) {
+  val callerContext = IjentCallerContext.getSaved() ?: IjentCallerContext.computeCallerContext()
+  if (!callerContext.isDispatchThread) {
     return
   }
 
@@ -202,6 +205,9 @@ private class IjentFailSafeFileSystemPosixApiImpl(
     holder.withDelegateRetrying {
       streamingRead(path)
     }
+
+  override suspend fun prefetchDirectories(roots: Collection<EelPath>): Flow<Pair<EelPath, EelFileInfo>> =
+    holder.withDelegateRetrying { prefetchDirectories(roots) }
 
   override suspend fun listDirectory(
     path: EelPath,
@@ -278,9 +284,9 @@ private class IjentFailSafeFileSystemPosixApiImpl(
       openForReadingAndWriting(options)
     }
 
-  override suspend fun delete(path: EelPath, removeContent: Boolean): EelResult<Unit, EelFileSystemApi.DeleteError> =
+  override suspend fun delete(path: EelPath, recursive: Boolean): EelResult<Unit, EelFileSystemApi.DeleteError> =
     holder.withDelegateRetrying {
-      delete(path, removeContent)
+      delete(path, recursive)
     }
 
   override suspend fun copy(options: EelFileSystemApi.CopyOptions): EelResult<Unit, EelFileSystemApi.CopyError> =
@@ -330,6 +336,15 @@ private class IjentFailSafeFileSystemPosixApiImpl(
   override suspend fun createTemporaryFile(options: EelFileSystemApi.CreateTemporaryEntryOptions): EelResult<EelPath, EelFileSystemApi.CreateTemporaryEntryError> = holder.withDelegateRetrying {
     createTemporaryFile(options)
   }
+
+  override suspend fun watchChanges(): Flow<EelFileSystemApi.PathChange> =
+    holder.withDelegateRetrying { watchChanges() }
+
+  override suspend fun addWatchRoots(watchOptions: EelFileSystemApi.WatchOptions): Boolean =
+    holder.withDelegateRetrying { addWatchRoots(watchOptions) }
+
+  override suspend fun unwatch(unwatchOptions: EelFileSystemApi.UnwatchOptions): Boolean =
+    holder.withDelegateRetrying { unwatch(unwatchOptions) }
 }
 
 /**
@@ -370,6 +385,9 @@ private class IjentFailSafeFileSystemWindowsApiImpl(
     holder.withDelegateRetrying {
       streamingRead(path)
     }
+
+  override suspend fun prefetchDirectories(roots: Collection<EelPath>): Flow<Pair<EelPath, EelFileInfo>> =
+    holder.withDelegateRetrying { prefetchDirectories(roots) }
 
   override suspend fun listDirectory(
     path: EelPath,
@@ -457,9 +475,9 @@ private class IjentFailSafeFileSystemWindowsApiImpl(
       openForReadingAndWriting(options)
     }
 
-  override suspend fun delete(path: EelPath, removeContent: Boolean): EelResult<Unit, EelFileSystemApi.DeleteError> =
+  override suspend fun delete(path: EelPath, recursive: Boolean): EelResult<Unit, EelFileSystemApi.DeleteError> =
     holder.withDelegateRetrying {
-      delete(path, removeContent)
+      delete(path, recursive)
     }
 
   override suspend fun copy(options: EelFileSystemApi.CopyOptions): EelResult<Unit, EelFileSystemApi.CopyError> =
@@ -501,6 +519,15 @@ private class IjentFailSafeFileSystemWindowsApiImpl(
   override suspend fun createTemporaryFile(options: EelFileSystemApi.CreateTemporaryEntryOptions): EelResult<EelPath, EelFileSystemApi.CreateTemporaryEntryError> = holder.withDelegateRetrying {
     createTemporaryFile(options)
   }
+
+  override suspend fun watchChanges(): Flow<EelFileSystemApi.PathChange> =
+    holder.withDelegateRetrying { watchChanges() }
+
+  override suspend fun addWatchRoots(watchOptions: EelFileSystemApi.WatchOptions): Boolean =
+    holder.withDelegateRetrying { addWatchRoots(watchOptions) }
+
+  override suspend fun unwatch(unwatchOptions: EelFileSystemApi.UnwatchOptions): Boolean =
+    holder.withDelegateRetrying { unwatch(unwatchOptions) }
 }
 
 private val LOG = logger<IjentFailSafeFileSystemPosixApiImpl>()

@@ -2,7 +2,7 @@ override fun hashCode(): kotlin.Int {
 #if (!$superHasHashCode && $fields.size() == 1)
     #set($field = $fields.get(0))
     return #addFieldHashCode($field)##
-    #if (!$field.notNull) ?:0##
+    #if (!$field.notNull && $field.array) ?:0##
     #end
 #elseif ($fields.size() > 0)
     #set($resultName = $helper.getUniqueLocalVarName("result", $fields, $settings))
@@ -21,11 +21,11 @@ var $resultName ##
     = ##
         #if ($resultAssigned)
         31 * $resultName + ##
-            #if(!$field.notNull)(##
+            #if(!$field.notNull && $field.array)(##
             #end
         #end
         #addFieldHashCode($field)##
-        #if (!$field.notNull) ?: 0##
+        #if (!$field.notNull && $field.array) ?: 0##
             #if ($resultAssigned))##
             #end
         #end
@@ -81,6 +81,7 @@ return #addClassLiteral()##
 ##
 #macro(addFieldHashCode $field)
     #if ($field.notNull)#adjustHashCodeToArrays($field, ".")
-    #else #adjustHashCodeToArrays($field, "?.")
+    #elseif ($field.array)#adjustHashCodeToArrays($field, "?.")
+    #else ${field.name}.hashCode()##
     #end
 #end

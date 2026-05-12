@@ -146,7 +146,7 @@ open class InstalledPluginsTableModel @JvmOverloads constructor(
     }
     for (plugins in myMarketplacePluginComponentMap.values) {
       for (plugin in plugins) {
-        if (plugin.installedDescriptorForMarketplace != null) {
+        if (plugin.getInstalledDescriptorForMarketplace() != null) {
           plugin.updateEnabledState()
         }
       }

@@ -109,7 +109,11 @@ public final class SuspiciousPackagePrivateAccessInspection extends AbstractBase
     @Override
     public void processReference(@NotNull UElement sourceNode, @NotNull PsiModifierListOwner target, @Nullable UExpression qualifier) {
       PsiClass accessObjectType = getAccessObjectType(target, qualifier);
-      if (target instanceof PsiJvmMember) {
+      if (target instanceof PsiJvmMember &&
+          // For package-private members: skip super-references to avoid duplicate warnings
+          // already reported on the inheritance list (e.g. `object : Foo()` supertype).
+          // For protected members: super-access from a subclass is always legitimate.
+          !(sourceNode.getUastParent() instanceof USuperExpression)) {
         checkAccess(sourceNode, (PsiJvmMember)target, accessObjectType);
         if (!(target instanceof PsiClass)) {
           if (accessObjectType != null) {

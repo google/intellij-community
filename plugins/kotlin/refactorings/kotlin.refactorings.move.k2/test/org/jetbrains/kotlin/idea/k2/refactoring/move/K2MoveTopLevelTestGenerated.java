@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.k2.refactoring.move;
 
@@ -143,6 +143,11 @@ public class K2MoveTopLevelTestGenerated extends AbstractK2MoveTopLevelTest {
     @TestMetadata("kotlin/companionMemberRefFakeOverride/companionMemberRefFakeOverride.test")
     public void testKotlin_companionMemberRefFakeOverride_CompanionMemberRefFakeOverride() throws Exception {
         runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/companionMemberRefFakeOverride/companionMemberRefFakeOverride.test");
+    }
+
+    @TestMetadata("kotlin/companionMemberRefInMovedClass/companionMemberRefInMovedClass.test")
+    public void testKotlin_companionMemberRefInMovedClass_CompanionMemberRefInMovedClass() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/companionMemberRefInMovedClass/companionMemberRefInMovedClass.test");
     }
 
     @TestMetadata("kotlin/companionMemberRefWithJavaParent/companionMemberRefWithJavaParent.test")

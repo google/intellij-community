@@ -5,7 +5,9 @@ source.dockerfile;string.quoted.double.dockerfile: [38, 41], {.*"}
 source.dockerfile: [41, 51], { -exec rm }
 source.dockerfile;string.quoted.double.dockerfile: [51, 52], {"}
 source.dockerfile;string.quoted.double.dockerfile: [52, 55], {{}"}
-source.dockerfile: [55, 59], { \;
+source.dockerfile: [55, 56], { }
+source.dockerfile;constant.character.escaped.dockerfile: [56, 58], {\;}
+source.dockerfile: [58, 59], {
 }
 source.dockerfile: [59, 60], {
 }

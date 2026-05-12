@@ -6,7 +6,8 @@ import com.intellij.ide.PasteProvider;
 import com.intellij.lang.LanguageFormatting;
 import com.intellij.openapi.actionSystem.CustomizedDataContext;
 import com.intellij.openapi.actionSystem.DataContext;
-import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ex.ApplicationEx;
+import com.intellij.openapi.application.ex.ApplicationManagerEx;
 import com.intellij.openapi.command.impl.UndoManagerImpl;
 import com.intellij.openapi.command.undo.UndoManager;
 import com.intellij.openapi.editor.Caret;
@@ -14,6 +15,7 @@ import com.intellij.openapi.editor.CaretModel;
 import com.intellij.openapi.editor.CaretState;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.EditorBundle;
 import com.intellij.openapi.editor.EditorCopyPasteHelper.CopyPasteOptions;
 import com.intellij.openapi.editor.EditorModificationUtil;
 import com.intellij.openapi.editor.RangeMarker;
@@ -33,9 +35,9 @@ import com.intellij.openapi.editor.impl.EditorCopyPasteHelperImpl;
 import com.intellij.openapi.editor.impl.EditorCopyPasteHelperImpl.CopyPasteOptionsTransferableData;
 import com.intellij.openapi.extensions.ExtensionPointName;
 import com.intellij.openapi.ide.CopyPasteManager;
+import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -52,6 +54,7 @@ import java.awt.datatransfer.Transferable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static com.intellij.openapi.editor.impl.CopiedFromEmptySelectionPasteMode.AT_CARET;
 import static com.intellij.openapi.editor.impl.CopiedFromEmptySelectionPasteMode.ENTIRE_LINE_ABOVE_CARET;
@@ -253,14 +256,24 @@ public class PasteHandler extends EditorActionHandler implements EditorTextInser
     }
 
     final String _text = text;
-    final TextRange pastedRange = ApplicationManager.getApplication().runWriteAction((Computable<TextRange>)() -> {
-      if (!project.isDisposed()) {
-        ((UndoManagerImpl)UndoManager.getInstance(project)).addDocumentAsAffected(editor.getDocument());
+    ApplicationEx application = ApplicationManagerEx.getApplicationEx();
+    Ref<TextRange> pastedRangeRef = new Ref<>();
+    Consumer<ProgressIndicator> wa = _ -> {
+      if (!project.isDisposed() && UndoManager.getInstance(project) instanceof UndoManagerImpl undoManager) {
+        undoManager.addDocumentAsAffected(editor.getDocument());
       }
-      return isInsertingEntireLineAboveCaret ? EditorCopyPasteHelperImpl.insertEntireLineAboveCaret(editor, _text)
-                                             : EditorCopyPasteHelperImpl.insertStringAtCaret(editor, _text,
-                                                                                             pasteMode == TRIM_IF_MIDDLE_LINE);
-    });
+      pastedRangeRef.set(isInsertingEntireLineAboveCaret ? EditorCopyPasteHelperImpl.insertEntireLineAboveCaret(editor, _text)
+                                                         : EditorCopyPasteHelperImpl.insertStringAtCaret(editor, _text,
+                                                                                                         pasteMode == TRIM_IF_MIDDLE_LINE));
+    };
+    if (!application.runWriteActionWithCancellableProgressInDispatchThread(EditorBundle.message("performing.paste.indicator.title"),
+                                                                           project,
+                                                                           editor.getComponent(),
+                                                                           wa)) {
+      return;
+    }
+    final TextRange pastedRange = pastedRangeRef.get();
+    if (pastedRange == null) return;
     final RangeMarker bounds = document.createRangeMarker(pastedRange);
 
     // `skipIndentation` is additionally used as marker for changed pasted test
@@ -282,10 +295,15 @@ public class PasteHandler extends EditorActionHandler implements EditorTextInser
         && (indentOptions == CodeInsightSettings.INDENT_BLOCK || indentOptions == CodeInsightSettings.INDENT_EACH_LINE)
         ? CodeInsightSettings.NO_REFORMAT
         : indentOptions;
-      ApplicationManager.getApplication().runWriteAction(
-        () -> typingActionsExtension
-          .format(project, editor, howtoReformat, bounds.getStartOffset(), bounds.getEndOffset(), blockIndentAnchorColumn, true, true)
-      );
+      Consumer<ProgressIndicator> wa1 = _ -> {
+        typingActionsExtension.format(project, editor, howtoReformat,
+                                      bounds.getStartOffset(), bounds.getEndOffset(),
+                                      blockIndentAnchorColumn, true, true);
+      };
+      application.runWriteActionWithCancellableProgressInDispatchThread(EditorBundle.message("performing.paste.indicator.title"),
+                                                                        project,
+                                                                        editor.getComponent(),
+                                                                        wa1);
     }
 
     if (bounds.isValid()) {

@@ -6,7 +6,9 @@ import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.testFramework.IndexingTestUtil
 import com.intellij.testFramework.TestDataPath
+import com.intellij.testFramework.executeSomeCoroutineTasksAndDispatchAllInvocationEvents
 import com.jetbrains.python.PyQuickFixTestCase
 import com.jetbrains.python.inspections.unresolvedReference.PyUnresolvedReferencesInspection
 import com.jetbrains.python.module.PySourceRootDetectionService
@@ -17,6 +19,9 @@ class PyMarkDirectoryAsSourceRootQuickFixTest: PyQuickFixTestCase() {
   override fun setUp() {
     super.setUp()
     myFixture.copyDirectoryToProject("", "")
+    // cleanupSourceRoots in tearDown modifies source roots, triggering async reindexing
+    // that may not complete before the next test's checkHighlighting runs.
+    IndexingTestUtil.waitUntilIndexesAreReady(myFixture.project)
     Registry.get("python.source.root.suggest.quickfix.auto.apply").setValue(true)
     Registry.get("python.source.root.suggest.quickfix").setValue(true)
   }
@@ -68,7 +73,7 @@ class PyMarkDirectoryAsSourceRootQuickFixTest: PyQuickFixTestCase() {
 
   fun testUpdatesSourceRootsAutomatically() {
     testSourceRoot(expectedSourceRootPaths = emptySet())
-    openAndHighlightFile("mysrc/foo/abc_auto.py")
+    openFileAndWaitForAutoApply("mysrc/foo/abc_auto.py")
     testSourceRoot(expectedSourceRootPaths = setOf("/src/mysrc"))
     // quick fix is not expected because it will be already automatically applied
     findAndExecuteSourcesQuickFix(isQuickFixExpected = false)
@@ -77,7 +82,7 @@ class PyMarkDirectoryAsSourceRootQuickFixTest: PyQuickFixTestCase() {
 
   fun testDoesNotUpdateSourceRootsAutomaticallyIfWasHidden() {
     testSourceRoot(expectedSourceRootPaths = emptySet())
-    openAndHighlightFile("mysrc/foo/abc_auto.py")
+    openFileAndWaitForAutoApply("mysrc/foo/abc_auto.py")
     testSourceRoot(expectedSourceRootPaths = setOf("/src/mysrc"))
 
     // Now we remove detected source roots; they should not be added one more time automatically, only via quick fix
@@ -110,7 +115,7 @@ class PyMarkDirectoryAsSourceRootQuickFixTest: PyQuickFixTestCase() {
 
   fun testNoQuickFixBecauseResolvedToFolderWithInitPy() {
     testSourceRoot(expectedSourceRootPaths = emptySet())
-    openAndHighlightFile("mysrc/foo/abc_folder_with_init.py")
+    openFileAndWaitForAutoApply("mysrc/foo/abc_folder_with_init.py")
     testSourceRoot(expectedSourceRootPaths = setOf("/src/mysrc"))
     // quick fix is not expected because it will be already automatically applied
     findAndExecuteSourcesQuickFix(isQuickFixExpected = false)
@@ -128,6 +133,20 @@ class PyMarkDirectoryAsSourceRootQuickFixTest: PyQuickFixTestCase() {
   private fun openAndHighlightFile(pyFilePath: String) {
     myFixture.enableInspections(PyUnresolvedReferencesInspection::class.java)
     myFixture.configureByFile(pyFilePath)
+    myFixture.checkHighlighting(true, false, false)
+  }
+
+  /**
+   * Opens a file and triggers highlighting which fires async source root auto-apply,
+   * then waits for the coroutine to complete before verifying the highlighting is clean.
+   * See PY-88598.
+   */
+  private fun openFileAndWaitForAutoApply(pyFilePath: String) {
+    myFixture.enableInspections(PyUnresolvedReferencesInspection::class.java)
+    myFixture.configureByFile(pyFilePath)
+    myFixture.doHighlighting()
+    executeSomeCoroutineTasksAndDispatchAllInvocationEvents(myFixture.project)
+    IndexingTestUtil.waitUntilIndexesAreReady(myFixture.project)
     myFixture.checkHighlighting(true, false, false)
   }
 

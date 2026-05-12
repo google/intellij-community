@@ -7,6 +7,11 @@ import com.intellij.ide.IdeBundle;
 import com.intellij.ide.projectView.impl.ProjectViewTree;
 import com.intellij.ide.util.treeView.NodeDescriptor;
 import com.intellij.ide.util.treeView.SmartElementDescriptor;
+import com.intellij.navigation.ColoredItemPresentation;
+import com.intellij.navigation.ItemPresentation;
+import com.intellij.navigation.ItemPresentationProviders;
+import com.intellij.navigation.NavigationItem;
+import com.intellij.openapi.editor.colors.EditorColorsUtil;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ui.util.CompositeAppearance;
@@ -19,6 +24,7 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.Icon;
 import java.awt.Color;
+import java.awt.Font;
 
 public abstract class HierarchyNodeDescriptor extends SmartElementDescriptor {
   public static final HierarchyNodeDescriptor[] EMPTY_ARRAY = new HierarchyNodeDescriptor[0];
@@ -94,6 +100,30 @@ public abstract class HierarchyNodeDescriptor extends SmartElementDescriptor {
 
   protected static TextAttributes getPackageNameAttributes() {
     return getUsageCountPrefixAttributes();
+  }
+
+  protected final @Nullable TextAttributes textAttributesFor(@Nullable PsiElement element) {
+    return element instanceof NavigationItem item ? textAttributesForItem(item) : baseColorAttributes();
+  }
+
+  private @Nullable TextAttributes textAttributesForItem(@Nullable NavigationItem item) {
+    return item == null ? baseColorAttributes() : TextAttributes.merge(presentationAttributesFor(item), baseColorAttributes());
+  }
+
+  private static @Nullable TextAttributes presentationAttributesFor(@NotNull NavigationItem item) {
+    ItemPresentation presentation = item.getPresentation();
+    if (presentation == null) {
+      presentation = ItemPresentationProviders.getItemPresentation(item);
+    }
+    if (presentation instanceof ColoredItemPresentation coloredItemPresentation) {
+      return EditorColorsUtil.getGlobalOrDefaultColorScheme().getAttributes(coloredItemPresentation.getTextAttributesKey());
+    }
+    return null;
+  }
+
+  /// @return the text attributes that use this node descriptor color.
+  protected @Nullable TextAttributes baseColorAttributes() {
+    return myColor == null ? null : new TextAttributes(myColor, null, null, null, Font.PLAIN);
   }
 
   @Override

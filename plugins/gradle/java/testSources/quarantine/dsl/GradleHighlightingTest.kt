@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.quarantine.dsl
 
 import com.intellij.codeInspection.deadCode.UnusedDeclarationInspectionBase
@@ -10,7 +10,7 @@ import org.gradle.util.GradleVersion
 import org.jetbrains.plugins.gradle.testFramework.GradleCodeInsightTestCase
 import org.jetbrains.plugins.gradle.testFramework.GradleTestFixtureBuilder
 import org.jetbrains.plugins.gradle.testFramework.annotations.BaseGradleVersionSource
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatGradleIsAtLeast
+import org.jetbrains.plugins.gradle.testFramework.util.assertThatGradleIsAtLeast
 import org.jetbrains.plugins.gradle.testFramework.util.withBuildFile
 import org.jetbrains.plugins.gradle.testFramework.util.withSettingsFile
 import org.jetbrains.plugins.groovy.codeInspection.GroovyUnusedDeclarationInspection
@@ -270,7 +270,7 @@ class GradleHighlightingTest : GradleCodeInsightTestCase() {
   @ParameterizedTest
   @BaseGradleVersionSource
   fun `test deprecation of generated method with Closure instead of Action` (gradleVersion: GradleVersion) {
-    assumeThatGradleIsAtLeast(gradleVersion, "8.12") { "`tasks.create` is deprecated since 8.12" }
+    assertThatGradleIsAtLeast(gradleVersion, "8.12") { "`tasks.create` is deprecated since 8.12" }
     testEmptyProject(gradleVersion) {
       codeInsightFixture.enableInspections(GrDeprecatedAPIUsageInspection::class.java)
       testHighlighting("tasks.<warning descr=\"'create' is deprecated\">create</warning>(\"foo\", Copy) {}")

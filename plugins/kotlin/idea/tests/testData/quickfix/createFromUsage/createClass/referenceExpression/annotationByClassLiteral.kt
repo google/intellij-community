@@ -1,5 +1,8 @@
 // "Create annotation 'Foo'" "true"
- class Test{
+// K2_ERROR: Cannot infer type for type parameter 'T'. Specify it explicitly.
+// K2_ERROR: Unresolved reference 'Foo'.
+// K2_ERROR: Candidate 'val <T> KClass<T>.java: Class<T>' is inapplicable because of a receiver type mismatch.
+class Test{
     fun doSth(){
         <caret>Foo::class.java
     }

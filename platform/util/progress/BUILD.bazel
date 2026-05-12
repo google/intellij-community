@@ -25,6 +25,7 @@ jvm_library(
     "//libraries/guava",
     "//platform/util",
     "//platform/util/coroutines",
+    "//platform/util/multiplatform",
     "//libraries/fastutil",
     "//libraries/kotlinx/serialization/core",
     "//libraries/kotlinx/serialization/json",
@@ -33,6 +34,7 @@ jvm_library(
 
 jvm_library(
   name = "progress_test_lib",
+  testonly = True,
   module_name = "intellij.platform.util.progress",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -44,6 +46,7 @@ jvm_library(
     "//libraries/guava:guava_test_lib",
     "//platform/util:util_test_lib",
     "//platform/util/coroutines:coroutines_test_lib",
+    "//platform/util/multiplatform:multiplatform_test_lib",
     "//libraries/fastutil:fastutil_test_lib",
     "//libraries/kotlinx/serialization/core:core_test_lib",
     "//libraries/kotlinx/serialization/json:json_test_lib",
@@ -51,15 +54,23 @@ jvm_library(
 )
 ### auto-generated section `build intellij.platform.util.progress` end
 
+### auto-generated section `iml intellij.platform.util.progress` start
+exports_files([
+  "intellij.platform.util.progress.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.util.progress` end
+
 ### auto-generated section `build intellij.platform.util.progress.tests` start
 jvm_library(
   name = "progress-tests",
+  module_name = "intellij.platform.util.progress.tests",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "progress-tests_test_lib",
+  testonly = True,
   module_name = "intellij.platform.util.progress.tests",
   visibility = ["//visibility:public"],
   srcs = glob(["tests/**/*.kt", "tests/**/*.java", "tests/**/*.form"], allow_empty = True),
@@ -74,6 +85,8 @@ jvm_library(
     "//platform/testFramework/common:common_test_lib",
     "//platform/util",
     "//platform/util:util_test_lib",
+    "//platform/util/multiplatform",
+    "//platform/util/multiplatform:multiplatform_test_lib",
     "@lib//:junit4",
     "//platform/testFramework",
     "//platform/testFramework:testFramework_test_lib",
@@ -81,6 +94,12 @@ jvm_library(
   runtime_deps = [":progress-tests"]
 )
 ### auto-generated section `build intellij.platform.util.progress.tests` end
+
+### auto-generated section `iml intellij.platform.util.progress.tests` start
+exports_files([
+  "intellij.platform.util.progress.tests.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.util.progress.tests` end
 
 ### auto-generated section `test intellij.platform.util.progress.tests` start
 load("@community//build:tests-options.bzl", "jps_test")

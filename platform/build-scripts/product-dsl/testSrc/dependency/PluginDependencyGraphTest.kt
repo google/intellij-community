@@ -5,6 +5,7 @@ import com.intellij.platform.pluginGraph.ContentModuleName
 import com.intellij.platform.pluginGraph.PluginGraph
 import com.intellij.platform.pluginGraph.PluginId
 import com.intellij.platform.pluginGraph.TargetName
+import com.intellij.platform.pluginGraph.aliasNodeName
 import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleLoadingRuleValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -144,7 +145,7 @@ class PluginDependencyGraphTest {
       linkPluginMainTarget("plugin.b")
     }
 
-    val graphDeps = collectPluginGraphDeps(graph, libraryModuleFilter = { true })
+    val graphDeps = collectPluginGraphDeps(graph = graph, allRealProductNames = emptySet())
       .single { it.pluginContentModuleName == ContentModuleName("plugin.a") }
 
     assertThat(graphDeps.jpsPluginDependencies).containsExactly(PluginId("com.b"))
@@ -168,7 +169,7 @@ class PluginDependencyGraphTest {
       linkPluginMainTarget("plugin.b")
     }
 
-    val graphDeps = collectPluginGraphDeps(graph, libraryModuleFilter = { true })
+    val graphDeps = collectPluginGraphDeps(graph = graph, allRealProductNames = emptySet())
       .single { it.pluginContentModuleName == ContentModuleName("plugin.a") }
 
     val filtered = filterPluginDependencies(
@@ -234,6 +235,37 @@ class PluginDependencyGraphTest {
   }
 
   @Test
+  fun `pluginsById distinguishes alias nodes from placeholders`() {
+    val builder = PluginGraphBuilder()
+    val aliasId = PluginId("alias.c")
+    val pluginName = TargetName("plugin.a")
+    val pluginInfo = pluginInfo(
+      pluginId = "com.a",
+      pluginDependencies = setOf(aliasId),
+    )
+
+    builder.addPluginWithContent(pluginName, pluginInfo, emptySet())
+    builder.addPluginDependencyEdges(mapOf(pluginName to pluginInfo))
+    builder.addAliasPlugin(aliasId)
+
+    val graph = builder.build()
+
+    graph.query {
+      assertThat(hasAliasPlugin(aliasId)).isTrue()
+      assertThat(hasAliasPlugin(PluginId("alias.missing"))).isFalse()
+
+      val nodes = mutableListOf<Pair<String, Boolean>>()
+      pluginsById(aliasId) { plugin ->
+        nodes.add(plugin.name().value to plugin.isAlias)
+      }
+      assertThat(nodes).containsExactlyInAnyOrder(
+        aliasId.value to false,
+        aliasNodeName(aliasId).value to true,
+      )
+    }
+  }
+
+  @Test
   fun `discovered plugin content is added to graph`() {
     runBlocking(Dispatchers.Default) {
       val targetModule = TargetName("plugin.b")
@@ -276,6 +308,37 @@ class PluginDependencyGraphTest {
         val backedBy = mutableListOf<String>()
         module.backedBy { target -> backedBy.add(target.name()) }
         assertThat(backedBy).containsExactly("plugin.b.module")
+      }
+    }
+  }
+
+  @Test
+  fun `module set wrapper flag survives extraction merge`() {
+    runBlocking(Dispatchers.Default) {
+      val pluginModule = TargetName("intellij.moduleSet.plugin.recentFiles")
+      val info = pluginInfo(
+        pluginId = "com.intellij.moduleSet.recentFiles",
+        contentModules = listOf(ContentModuleInfo(ContentModuleName("intellij.platform.recentFiles.frontend"), ModuleLoadingRuleValue.OPTIONAL)),
+      )
+
+      val builder = PluginGraphBuilder()
+      builder.addPlugin(
+        name = pluginModule,
+        isTest = false,
+        pluginId = PluginId("com.intellij.moduleSet.recentFiles"),
+        isModuleSetWrapper = true,
+      )
+      builder.addPluginWithContent(pluginModule, info, emptySet())
+
+      val graph = builder.build()
+
+      graph.query {
+        val plugin = requireNotNull(plugin(pluginModule.value))
+        assertThat(plugin.isModuleSetWrapper).isTrue()
+
+        val contentNames = mutableListOf<String>()
+        plugin.containsContent { module, _ -> contentNames.add(module.name().value) }
+        assertThat(contentNames).containsExactly("intellij.platform.recentFiles.frontend")
       }
     }
   }

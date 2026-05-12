@@ -1,6 +1,6 @@
 ### auto-generated section `build intellij.platform.workspace.storage` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_storage",
@@ -13,24 +13,21 @@ create_kotlinc_options(
   x_explicit_api_mode = "strict"
 )
 
-resourcegroup(
-  name = "storage_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "storage",
   module_name = "intellij.platform.workspace.storage",
   visibility = ["//visibility:public"],
   srcs = glob(["gen/**/*.kt", "gen/**/*.java", "src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":storage_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_storage",
   deps = [
     "@lib//:kotlin-stdlib",
     "//libraries/guava",
     "//libraries/kotlin/reflect",
     "//platform/util",
+    "//platform/util/base/multiplatform",
+    "//platform/util/base",
     "//libraries/fastutil",
     "//libraries/caffeine",
     "//libraries/kryo5",
@@ -44,6 +41,7 @@ jvm_library(
 
 jvm_library(
   name = "storage_test_lib",
+  testonly = True,
   module_name = "intellij.platform.workspace.storage",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -53,6 +51,8 @@ jvm_library(
     "//libraries/guava:guava_test_lib",
     "//libraries/kotlin/reflect:reflect_test_lib",
     "//platform/util:util_test_lib",
+    "//platform/util/base/multiplatform:multiplatform_test_lib",
+    "//platform/util/base:base_test_lib",
     "@lib//:junit4",
     "//libraries/fastutil:fastutil_test_lib",
     "//libraries/caffeine:caffeine_test_lib",
@@ -63,3 +63,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.workspace.storage` end
+
+### auto-generated section `iml intellij.platform.workspace.storage` start
+exports_files([
+  "intellij.platform.workspace.storage.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.workspace.storage` end

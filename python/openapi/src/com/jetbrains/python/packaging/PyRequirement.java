@@ -19,6 +19,7 @@ import java.util.List;
  */
 public interface PyRequirement {
   @NotNull
+  @NlsSafe
   String getName();
 
   @NotNull

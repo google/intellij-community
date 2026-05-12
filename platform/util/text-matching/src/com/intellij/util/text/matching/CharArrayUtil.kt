@@ -22,12 +22,3 @@ internal fun indexOfAny(s: String, chars: CharArray, start: Int, end: Int): Int 
   }
   return -1
 }
-
-internal fun regionMatches(s1: CharSequence, start: Int, end: Int, s2: CharSequence): Boolean {
-  val len = s1.length
-  if (start < 0 || start + len > end) return false
-  for (i in 0 until len) {
-    if (s1[i] != s2[i + start]) return false
-  }
-  return true
-}

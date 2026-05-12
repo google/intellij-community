@@ -1,19 +1,15 @@
 ### auto-generated section `build intellij.platform.execution` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "execution_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "execution",
   module_name = "intellij.platform.execution",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":execution_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
+    "//platform/eel-nioFs",
     "@lib//:kotlin-stdlib",
     "//platform/core-api:core",
     "//platform/ide-core",
@@ -31,19 +27,23 @@ jvm_library(
     "//platform/analysis-api:analysis",
     "//libraries/kotlinx/coroutines/core",
     "//platform/util/coroutines",
+    "//platform/util/multiplatform",
+    "//platform/util/base",
     "//platform/kernel/shared:kernel",
     "//platform/eel",
-    "//platform/eel-provider",
+    "//fleet/rhizomedb",
   ]
 )
 
 jvm_library(
   name = "execution_test_lib",
+  testonly = True,
   module_name = "intellij.platform.execution",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = [
     ":execution",
+    "//platform/eel-nioFs:eel-nioFs_test_lib",
     "//platform/core-api:core_test_lib",
     "//platform/ide-core:ide-core_test_lib",
     "//platform/ide-core/plugins:plugins_test_lib",
@@ -61,9 +61,17 @@ jvm_library(
     "//platform/analysis-api:analysis_test_lib",
     "//libraries/kotlinx/coroutines/core:core_test_lib",
     "//platform/util/coroutines:coroutines_test_lib",
+    "//platform/util/multiplatform:multiplatform_test_lib",
+    "//platform/util/base:base_test_lib",
     "//platform/kernel/shared:kernel_test_lib",
     "//platform/eel:eel_test_lib",
-    "//platform/eel-provider:eel-provider_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.execution` end
+
+### auto-generated section `iml intellij.platform.execution` start
+exports_files([
+  "intellij.platform.execution.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.execution` end

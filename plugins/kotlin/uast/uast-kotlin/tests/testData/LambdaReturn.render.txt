@@ -31,7 +31,7 @@ public final class LambdaReturnKt {
             return it + b
         })
         var x: kotlin.jvm.functions.Function0<? extends kotlin.Unit> = {
-            return @org.jetbrains.annotations.NotNull var vardbcd0724: <ErrorType> = listOf(1, 2)
+            return @org.jetbrains.annotations.NotNull var vardbcd0724: java.util.List<? extends java.lang.Integer> = listOf(1, 2)
             @org.jetbrains.annotations.NotNull var a: int = vardbcd0724.UIdentifier (Identifier (component1))()
             @org.jetbrains.annotations.NotNull var b: int = vardbcd0724.UIdentifier (Identifier (component2))()
         }

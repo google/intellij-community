@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.tasks.impl` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "tasks-impl_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "tasks-impl",
   module_name = "intellij.platform.tasks.impl",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":tasks-impl_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/util/concurrency",
@@ -26,6 +21,7 @@ jvm_library(
     "@lib//:kotlin-stdlib",
     "//libraries/gson",
     "//platform/platform-impl:ide-impl",
+    "//platform/ide-core",
     "//platform/lang-impl",
     "//platform/forms_rt:java-guiForms-rt",
     "//platform/execution",
@@ -37,16 +33,19 @@ jvm_library(
     "//platform/util/jdom",
     "//libraries/kotlinx/coroutines/core",
     "//platform/util/text-matching",
+    "//platform/util:util-ui",
     "//platform/statistics",
     "//platform/bookmarks",
     "//platform/lang-api:lang",
     "//platform/xdebugger-impl/shared",
     "//platform/xdebugger-impl/ui",
+    "//libraries/fastutil",
   ]
 )
 
 jvm_library(
   name = "tasks-impl_test_lib",
+  testonly = True,
   module_name = "intellij.platform.tasks.impl",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -63,6 +62,7 @@ jvm_library(
     "//platform/vcs-api:vcs_test_lib",
     "//libraries/gson:gson_test_lib",
     "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/lang-impl:lang-impl_test_lib",
     "//platform/forms_rt:java-guiForms-rt_test_lib",
     "//platform/execution:execution_test_lib",
@@ -74,11 +74,19 @@ jvm_library(
     "//platform/util/jdom:jdom_test_lib",
     "//libraries/kotlinx/coroutines/core:core_test_lib",
     "//platform/util/text-matching:text-matching_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//platform/statistics:statistics_test_lib",
     "//platform/bookmarks:bookmarks_test_lib",
     "//platform/lang-api:lang_test_lib",
     "//platform/xdebugger-impl/shared:shared_test_lib",
     "//platform/xdebugger-impl/ui:ui_test_lib",
+    "//libraries/fastutil:fastutil_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.tasks.impl` end
+
+### auto-generated section `iml intellij.platform.tasks.impl` start
+exports_files([
+  "intellij.platform.tasks.impl.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.tasks.impl` end

@@ -254,7 +254,7 @@ public class JavaStackFrame extends XStackFrame implements JVMStackFrameInfoProv
     if (location != null && myDescriptor.getThisObject() == null) {
       ReferenceType type = location.declaringType();
       // preload fields
-      DebuggerUtilsAsync.allFields(type).thenAccept(__ -> {
+      DebuggerUtilsAsync.allFields(type).thenAccept(_ -> {
         StaticDescriptorImpl staticDescriptor = myNodeManager.getStaticDescriptor(myDescriptor, type);
         if (staticDescriptor.isExpandable()) {
           node.addChildren(

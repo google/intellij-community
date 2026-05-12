@@ -1,3 +1,8 @@
 <!--The code is shared with tests, it must not depend on anything-->
-<idea-plugin visibility="internal" package="com.intellij.platform.diagnostic.freezeAnalyzer">
+<idea-plugin visibility="internal">
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+  <dependencies>
+    <module name="intellij.platform.threadDumpParser"/>
+  </dependencies>
+  <!-- endregion -->
 </idea-plugin>

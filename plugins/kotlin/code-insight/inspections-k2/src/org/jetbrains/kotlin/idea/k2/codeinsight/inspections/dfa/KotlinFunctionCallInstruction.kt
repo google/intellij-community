@@ -106,8 +106,8 @@ class KotlinFunctionCallInstruction(
         return result.toTypedArray()
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun processContracts(
         interpreter: DataFlowInterpreter,
         stateBefore: DfaMemoryState,
@@ -145,8 +145,8 @@ class KotlinFunctionCallInstruction(
         return resultValue
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun KaContractBooleanExpression.toCondition(
         factory: DfaValueFactory,
         callDescriptor: KaFunctionCall<*>,
@@ -169,8 +169,8 @@ class KotlinFunctionCallInstruction(
         }
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     private fun KaContractParameterValue.findDfaValue(
         callDescriptor: KaFunctionCall<*>,
         arguments: DfaCallArguments

@@ -8,6 +8,7 @@ import io.netty.bootstrap.Bootstrap
 import org.jetbrains.annotations.ApiStatus
 import java.net.URLConnection
 
+@ApiStatus.NonExtendable
 abstract class BuiltInServerManager {
   companion object {
     @JvmStatic

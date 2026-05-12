@@ -7,7 +7,6 @@ import com.intellij.ide.plugins.PluginManagerCore;
 import com.intellij.idea.AppMode;
 import com.intellij.openapi.application.PluginPathManager;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.NioFiles;
 import com.intellij.openapi.util.io.OSAgnosticPathUtil;
 import com.intellij.openapi.util.registry.Registry;
@@ -47,7 +46,6 @@ import static com.intellij.platform.eel.provider.EelNioBridgeServiceKt.asEelPath
 import static com.intellij.platform.eel.provider.utils.EelPathUtils.transferLocalContentToRemote;
 import static org.jetbrains.plugins.terminal.LocalBlockTerminalRunner.BLOCK_TERMINAL_FISH_REGISTRY;
 import static org.jetbrains.plugins.terminal.LocalTerminalDirectRunner.LOGIN_CLI_OPTIONS;
-import static org.jetbrains.plugins.terminal.TerminalStartupKt.findEelDescriptor;
 
 @ApiStatus.Internal
 public final class LocalShellIntegrationInjector {
@@ -70,8 +68,10 @@ public final class LocalShellIntegrationInjector {
     String shellExe = ContainerUtil.getFirstItem(shellCommand);
     if (shellCommand == null || shellExe == null) return options;
 
+    EelDescriptor eelDescriptor = options.getEelDescriptorNotNull();
+
     List<String> arguments = new ArrayList<>(shellCommand.subList(1, shellCommand.size()));
-    Map<String, String> envs = ShellStartupOptionsKt.createEnvVariablesMap(options.getEnvVariables());
+    Map<String, String> envs = ShellStartupOptionsKt.createEnvVariablesMap(eelDescriptor.getOsFamily(), options.getEnvVariables());
     ShellIntegration integration = null;
 
     List<String> resultCommand = new ArrayList<>();
@@ -79,11 +79,11 @@ public final class LocalShellIntegrationInjector {
 
     String shellName = PathUtil.getFileName(shellExe);
     Path rcFile = findRCFile(shellName);
-    EelDescriptor eelDescriptor = findEelDescriptor(options.getWorkingDirectory(), shellCommand);
     String remoteRcFilePath = rcFile != null ? transferAndGetRemotePath(rcFile, eelDescriptor) : null;
     if (remoteRcFilePath != null) {
       boolean addBlocksIntegration = supportsBlocksShellIntegration(shellName, eelDescriptor);
-      if (ShellNameUtil.isBash(shellName) || (SystemInfo.isMac && shellName.equals(ShellNameUtil.SH_NAME))) {
+      if (ShellNameUtil.isBash(shellName)
+          || (eelDescriptor == LocalEelDescriptor.INSTANCE && OS.CURRENT == OS.macOS && shellName.equals(ShellNameUtil.SH_NAME))) {
         addBashRcFileArgument(envs, arguments, resultCommand, remoteRcFilePath);
         // remove --login to enable --rcfile sourcing
         boolean loginShell = arguments.removeAll(LOGIN_CLI_OPTIONS);

@@ -67,7 +67,7 @@ public class CachedValuesTest extends BasePlatformTestCase {
       calcCount.set(0);
       dependency.incModificationCount();
 
-      List<? extends Future<?>> jobs = IntStreamEx.range(0, 4).mapToObj(__ -> ApplicationManager.getApplication().executeOnPooledThread(() -> {
+      List<? extends Future<?>> jobs = IntStreamEx.range(0, 4).mapToObj(_ -> ApplicationManager.getApplication().executeOnPooledThread(() -> {
         for (int i = 0; i < 10; i++) {
           assertEquals("result", getCached.get());
         }
@@ -94,7 +94,7 @@ public class CachedValuesTest extends BasePlatformTestCase {
 
       List<? extends Future<?>> jobs = IntStreamEx
         .range(0, 8)
-        .mapToObj(__ -> ApplicationManager.getApplication().executeOnPooledThread(() -> assertEquals(getPsiModCount(), cv.getValue())))
+        .mapToObj(_ -> ApplicationManager.getApplication().executeOnPooledThread(() -> assertEquals(getPsiModCount(), cv.getValue())))
         .toList();
       for (Future<?> j : jobs) {
         j.get();

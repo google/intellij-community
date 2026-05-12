@@ -15,8 +15,8 @@ import com.intellij.codeInspection.ProblemsHolder;
 import com.intellij.codeInspection.ex.GlobalInspectionContextBase;
 import com.intellij.codeInspection.options.OptPane;
 import com.intellij.lang.annotation.HighlightSeverity;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.colors.EditorColorsUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.ProperTextRange;
 import com.intellij.openapi.util.TextRange;
@@ -26,6 +26,9 @@ import com.intellij.platform.diagnostic.telemetry.helpers.TraceKt;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.concurrency.ThreadingAssertions;
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
+import com.intellij.util.concurrency.annotations.RequiresReadLock;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
@@ -45,7 +48,7 @@ public final class HighlightVisitorBasedInspection extends GlobalSimpleInspectio
   @SuppressWarnings("WeakerAccess") // made public for serialization
   public boolean runAnnotators = true;
   @SuppressWarnings("WeakerAccess") // made public for serialization
-  public boolean runVisitors = false;
+  public boolean runVisitors;
 
   @Override
   public @NotNull OptPane getOptionsPane() {
@@ -107,6 +110,8 @@ public final class HighlightVisitorBasedInspection extends GlobalSimpleInspectio
     return getGeneralGroupName();
   }
 
+  @RequiresBackgroundThread
+  @RequiresReadLock
   public static @NotNull List<HighlightInfo> runAnnotatorsInGeneralHighlighting(@NotNull PsiFile psiFile,
                                                                                 boolean highlightErrorElements,
                                                                                 boolean runAnnotators,
@@ -119,6 +124,8 @@ public final class HighlightVisitorBasedInspection extends GlobalSimpleInspectio
 
   @ApiStatus.Experimental
   @ApiStatus.Internal
+  @RequiresBackgroundThread
+  @RequiresReadLock
   public static @NotNull List<HighlightInfo> runAnnotatorsInGeneralHighlighting(@NotNull PsiFile psiFile,
                                                                               int startOffset,
                                                                               int endOffset,
@@ -126,8 +133,8 @@ public final class HighlightVisitorBasedInspection extends GlobalSimpleInspectio
                                                                               boolean highlightErrorElements,
                                                                               boolean runAnnotators,
                                                                               boolean runVisitors) {
-    ApplicationManager.getApplication().assertIsNonDispatchThread();
-    ApplicationManager.getApplication().assertReadAccessAllowed();
+    ThreadingAssertions.assertBackgroundThread();
+    ThreadingAssertions.assertReadAccess();
     Project project = psiFile.getProject();
     Document document = PsiDocumentManager.getInstance(project).getDocument(psiFile);
     if (document == null) return Collections.emptyList();
@@ -136,39 +143,38 @@ public final class HighlightVisitorBasedInspection extends GlobalSimpleInspectio
     CodeInsightContext context = CodeInsightContextUtil.getCodeInsightContext(psiFile);
 
     DaemonProgressIndicator daemonProgressIndicator = GlobalInspectionContextBase.assertUnderDaemonProgress();
-    // in case the inspection is running in batch mode
-    HighlightingSessionImpl.getOrCreateHighlightingSession(psiFile, context, daemonProgressIndicator, visibleRange);
-
-    GeneralHighlightingPass ghp = new GeneralHighlightingPass(
-      psiFile, document, startOffset, endOffset, true, visibleRange, null, runAnnotators, runVisitors, highlightErrorElements,
-      HighlightInfoUpdater.EMPTY
-    );
-    ghp.setContext(context);
-
-    InjectedGeneralHighlightingPass ighp = new InjectedGeneralHighlightingPass(
-      psiFile, document, null, startOffset, endOffset, true, visibleRange, null, runAnnotators, runVisitors,
-      highlightErrorElements, HighlightInfoUpdater.EMPTY
-    );
-    ighp.setContext(context);
-
-    String fileName = psiFile.getName();
     List<HighlightInfo> result = new ArrayList<>();
-    IJTracer tracer = TelemetryManager.Companion.getTracer(HighlightVisitorScope);
+    // in case the inspection is running in batch mode
+    DaemonCodeAnalyzerEx.getInstanceEx(project).runInsideAdditionalHighlightingSession(psiFile, EditorColorsUtil.getGlobalOrDefaultColorScheme(), visibleRange, false, _-> {
+      GeneralHighlightingPass ghp = new GeneralHighlightingPass(
+        psiFile, document, startOffset, endOffset, true, visibleRange, null, runAnnotators, runVisitors, highlightErrorElements,
+        HighlightInfoUpdater.EMPTY
+      );
+      ghp.setContext(context);
 
-    for (TextEditorHighlightingPass pass : List.of(ghp, ighp)) {
-      TraceKt.use(tracer.spanBuilder(pass.getClass().getSimpleName()).setAttribute("file", fileName), __ -> {
-        pass.doCollectInformation(daemonProgressIndicator);
-        List<HighlightInfo> infos = pass.getInfos();
-        for (HighlightInfo info : infos) {
-          if (info == null) continue;
-          if (info.getSeverity().compareTo(HighlightSeverity.INFORMATION) > 0) {
-            result.add(info);
+      InjectedGeneralHighlightingPass ighp = new InjectedGeneralHighlightingPass(
+        psiFile, document, null, startOffset, endOffset, true, visibleRange, null, runAnnotators, runVisitors,
+        highlightErrorElements, HighlightInfoUpdater.EMPTY
+      );
+      ighp.setContext(context);
+
+      String fileName = psiFile.getName();
+      IJTracer tracer = TelemetryManager.Companion.getTracer(HighlightVisitorScope);
+
+      for (TextEditorHighlightingPass pass : List.of(ghp, ighp)) {
+        TraceKt.use(tracer.spanBuilder(pass.getClass().getSimpleName()).setAttribute("file", fileName), _ -> {
+          pass.doCollectInformation(daemonProgressIndicator);
+          List<HighlightInfo> infos = pass.getInfos();
+          for (HighlightInfo info : infos) {
+            if (info == null) continue;
+            if (info.getSeverity().compareTo(HighlightSeverity.INFORMATION) > 0) {
+              result.add(info);
+            }
           }
-        }
-        return null;
-      });
-    }
-
+          return null;
+        });
+      }
+    });
     return result;
   }
 }

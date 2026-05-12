@@ -6,6 +6,8 @@ jvm_library(
   module_name = "intellij.platform.credentialStore",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "//platform/util-ex",
     "//platform/util/base",
@@ -18,6 +20,7 @@ jvm_library(
 
 jvm_library(
   name = "credential-store_test_lib",
+  testonly = True,
   module_name = "intellij.platform.credentialStore",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -31,3 +34,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.credentialStore` end
+
+### auto-generated section `iml intellij.platform.credentialStore` start
+exports_files([
+  "intellij.platform.credentialStore.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.credentialStore` end

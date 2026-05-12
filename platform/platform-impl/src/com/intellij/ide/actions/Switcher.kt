@@ -728,7 +728,7 @@ object Switcher : BaseSwitcherAction(null) {
                     options = FileEditorOpenOptions(requestFocus = true, reuseOpen = true),
                   )
                   if (LightEdit.owns(project)) {
-                    LightEditFeatureUsagesUtil.logFileOpen(project, OpenPlace.RecentFiles)
+                    LightEditFeatureUsagesUtil.logFileOpen(project, file, OpenPlace.RecentFiles)
                   }
                   if (oldValue) {
                     settings.reuseNotModifiedTabs = true

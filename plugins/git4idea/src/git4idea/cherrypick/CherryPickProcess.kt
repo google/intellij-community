@@ -24,7 +24,7 @@ import git4idea.config.GitVcsApplicationSettings
 import git4idea.config.GitVcsSettings
 import git4idea.history.GitHistoryUtils
 import git4idea.i18n.GitBundle
-import git4idea.isCommitPublished
+import git4idea.isCommitPublishedBlocking
 import git4idea.repo.GitRepository
 import org.jetbrains.annotations.NonNls
 
@@ -146,7 +146,7 @@ internal class GitCherryPickProcess(
   }
 
   private fun shouldAddSuffix(repository: GitRepository, commit: Hash): Boolean =
-    GitVcsSettings.getInstance(project).shouldAddSuffixToCherryPicksOfPublishedCommits() && isCommitPublished(repository, commit)
+    GitVcsSettings.getInstance(project).shouldAddSuffixToCherryPicksOfPublishedCommits() && isCommitPublishedBlocking(repository, commit)
 
   companion object {
     private val LOG = thisLogger()

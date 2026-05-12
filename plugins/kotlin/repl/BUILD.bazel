@@ -1,6 +1,6 @@
 ### auto-generated section `build kotlin.repl` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_repl",
@@ -11,18 +11,13 @@ create_kotlinc_options(
   ]
 )
 
-resourcegroup(
-  name = "repl_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "repl",
   module_name = "kotlin.repl",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":repl_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_repl",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -52,10 +47,12 @@ jvm_library(
     "//plugins/kotlin/idea",
     "//platform/editor-ui-api:editor-ui",
     "//platform/platform-util-io:ide-util-io",
+    "//platform/ide-core",
     "//platform/lang-impl",
     "//java/java-psi-api:psi",
     "//java/compiler/openapi:java-compiler",
     "//java/execution/openapi:java-execution",
+    "//java/java-syntax:syntax",
     "//platform/core-ui",
     "//java/execution/impl",
     "//platform/execution-impl",
@@ -63,11 +60,14 @@ jvm_library(
     "//plugins/kotlin/base/scripting/scripting.k1",
     "//platform/execution",
     "//platform/lang-api:lang",
+    "//platform/util:util-ui",
+    "//plugins/kotlin/base/fe10/project-structure",
   ]
 )
 
 jvm_library(
   name = "repl_test_lib",
+  testonly = True,
   module_name = "kotlin.repl",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -94,10 +94,12 @@ jvm_library(
     "//plugins/kotlin/idea:idea_test_lib",
     "//platform/editor-ui-api:editor-ui_test_lib",
     "//platform/platform-util-io:ide-util-io_test_lib",
+    "//platform/ide-core:ide-core_test_lib",
     "//platform/lang-impl:lang-impl_test_lib",
     "//java/java-psi-api:psi_test_lib",
     "//java/compiler/openapi:java-compiler_test_lib",
     "//java/execution/openapi:java-execution_test_lib",
+    "//java/java-syntax:syntax_test_lib",
     "//platform/core-ui:core-ui_test_lib",
     "//java/execution/impl:impl_test_lib",
     "//platform/execution-impl:execution-impl_test_lib",
@@ -105,6 +107,14 @@ jvm_library(
     "//plugins/kotlin/base/scripting/scripting.k1:scripting.k1_test_lib",
     "//platform/execution:execution_test_lib",
     "//platform/lang-api:lang_test_lib",
+    "//platform/util:util-ui_test_lib",
+    "//plugins/kotlin/base/fe10/project-structure:project-structure_test_lib",
   ]
 )
 ### auto-generated section `build kotlin.repl` end
+
+### auto-generated section `iml kotlin.repl` start
+exports_files([
+  "kotlin.repl.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.repl` end

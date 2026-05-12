@@ -1,21 +1,18 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.workspaceModel.codegen.impl.writer.extensions
 
-import com.intellij.workspaceModel.codegen.deft.meta.*
-import com.intellij.workspaceModel.codegen.impl.writer.*
+import com.intellij.workspaceModel.codegen.deft.meta.ObjClass
+import com.intellij.workspaceModel.codegen.deft.meta.ObjProperty
+import com.intellij.workspaceModel.codegen.deft.meta.OwnProperty
+import com.intellij.workspaceModel.codegen.impl.writer.Internal
+import com.intellij.workspaceModel.codegen.impl.writer.K1Deprecation
+import com.intellij.workspaceModel.codegen.impl.writer.QualifiedName
 import com.intellij.workspaceModel.codegen.impl.writer.WorkspaceEntity
 import com.intellij.workspaceModel.codegen.impl.writer.WorkspaceEntityWithSymbolicId
-
-private val compatibilityModules = setOf(
-  "com.intellij.platform.workspace.jps.entities",
-  "com.intellij.java.workspace.entities",
-  "com.intellij.openapi.externalSystem.settings.workspaceModel",
-  "com.goide.vgo.project.workspaceModel.entities",
-  "org.jetbrains.kotlin.idea.workspaceModel"
-)
+import com.intellij.workspaceModel.codegen.impl.writer.fqn
 
 internal val ObjClass<*>.requiresCompatibility: Boolean
-  get() = module.name in compatibilityModules
+  get() = name in compatibilityEntities[module.name].orEmpty()
 
 internal val ObjClass<*>.javaFullName: QualifiedName
   get() = fqn(module.name, name)
@@ -57,7 +54,7 @@ internal val ObjClass<*>.allFields: List<OwnProperty<*, *>>
   get() {
     val fieldsByName = LinkedHashMap<String, OwnProperty<*, *>>()
     collectFields(this, fieldsByName, false)
-    return fieldsByName.values.toList() 
+    return fieldsByName.values.toList()
   }
 
 internal val ObjClass<*>.allFieldsWithComputable: List<OwnProperty<*, *>>
@@ -67,10 +64,15 @@ internal val ObjClass<*>.allFieldsWithComputable: List<OwnProperty<*, *>>
     return fieldsByName.values.toList()
   }
 
-internal val ObjClass<*>.additionalAnnotations: String
+internal val ObjClass<*>.additionalAnnotations: List<String>
   get() {
-    val hasInternalAnnotation = annotations.any { it.fqName == Internal.decoded }
-    return if (hasInternalAnnotation) "@${Internal}" else ""
+    return annotations.mapNotNull {
+      when (it.fqName) {
+        Internal.decoded -> "@${Internal}"
+        K1Deprecation.decoded -> "@${K1Deprecation}"
+        else -> null
+      }
+    }
   }
 
 private fun collectFields(objClass: ObjClass<*>, fieldsByName: MutableMap<String, OwnProperty<*, *>>, withComputable: Boolean) {
@@ -81,8 +83,8 @@ private fun collectFields(objClass: ObjClass<*>, fieldsByName: MutableMap<String
   }
   for (field in objClass.fields) {
     if (withComputable
-      || field.valueKind !is ObjProperty.ValueKind.Computable
-      || field.name == "symbolicId" // symbolicId is a computable field, but still we'd like to know it's type
+        || field.valueKind !is ObjProperty.ValueKind.Computable
+        || field.name == "symbolicId" // symbolicId is a computable field, but still we'd like to know it's type
     ) {
       fieldsByName.remove(field.name)
       fieldsByName[field.name] = field
@@ -93,3 +95,59 @@ private fun collectFields(objClass: ObjClass<*>, fieldsByName: MutableMap<String
 
 internal val ObjClass<*>.builderWithTypeParameter: Boolean
   get() = openness.extendable
+
+private val compatibilityEntities = mapOf(
+  "com.intellij.workspaceModel.test.api" to setOf("CompatibilityEntity"),
+  "com.intellij.platform.workspace.jps.entities" to setOf(
+    "ContentRootEntity",
+    "CustomSourceRootPropertiesEntity",
+    "ExcludeUrlEntity",
+    "ExcludeUrlOrderEntity",
+    "ExternalSystemModuleOptionsEntity",
+    "FacetEntity",
+    "FacetsOrderEntity",
+    "LibraryEntity",
+    "LibraryPropertiesEntity",
+    "ModuleCustomImlDataEntity",
+    "ModuleEntity",
+    "ModuleGroupPathEntity",
+    "ModuleSettingsFacetBridgeEntity",
+    "ProjectSettingsEntity",
+    "SdkEntity",
+    "SourceRootEntity",
+    "SourceRootOrderEntity",
+    "TestModulePropertiesEntity"
+  ),
+  "com.intellij.java.workspace.entities" to setOf(
+    "ArchivePackagingElementEntity",
+    "ArtifactEntity",
+    "ArtifactOutputPackagingElementEntity",
+    "ArtifactPropertiesEntity",
+    "ArtifactRootElementEntity",
+    "ArtifactsOrderEntity",
+    "CompositePackagingElementEntity",
+    "CustomPackagingElementEntity",
+    "DirectoryCopyPackagingElementEntity",
+    "DirectoryPackagingElementEntity",
+    "ExtractedDirectoryPackagingElementEntity",
+    "FileCopyPackagingElementEntity",
+    "FileOrDirectoryPackagingElementEntity",
+    "JavaModuleSettingsEntity",
+    "JavaProjectSettingsEntity",
+    "JavaResourceRootPropertiesEntity",
+    "JavaSourceRootPropertiesEntity",
+    "LibraryFilesPackagingElementEntity",
+    "ModuleOutputPackagingElementEntity",
+    "ModuleSourcePackagingElementEntity",
+    "ModuleTestOutputPackagingElementEntity",
+    "PackagingElementEntity"
+  ),
+  "com.intellij.openapi.externalSystem.settings.workspaceModel" to setOf(
+    "ExternalProjectsBuildClasspathEntity"
+  ),
+  "com.goide.vgo.project.workspaceModel.entities" to setOf(
+    "VgoDependencyEntity", "VgoModuleCacheDirectoryEntity", "VgoStandaloneModuleEntity", "VgoWorkspaceEntity", "VgoWorkspaceModuleEntity"
+  ),
+  "org.jetbrains.kotlin.idea.workspaceModel" to setOf(
+    "KotlinSettingsEntity"
+  ))

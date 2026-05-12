@@ -1,12 +1,14 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.agent.workbench.filewatch
 
-import io.methvin.watcher.DirectoryChangeEvent
-import io.methvin.watcher.DirectoryChangeListener
-import io.methvin.watcher.DirectoryWatcher
+import com.intellij.agent.workbench.filewatch.impl.DirectoryChangeEvent
+import com.intellij.agent.workbench.filewatch.impl.DirectoryChangeListener
+import com.intellij.agent.workbench.filewatch.impl.DirectoryWatcher
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import java.nio.file.Files
 import java.nio.file.Path
@@ -20,28 +22,47 @@ enum class AgentWorkbenchWatchEventType {
 }
 
 data class AgentWorkbenchWatchEvent(
-  val eventType: AgentWorkbenchWatchEventType,
-  val path: Path?,
-  val rootPath: Path?,
-  val isDirectory: Boolean,
-  val count: Int,
+  @JvmField val eventType: AgentWorkbenchWatchEventType,
+  @JvmField val path: Path?,
+  @JvmField val rootPath: Path?,
+  @JvmField val isDirectory: Boolean,
+  @JvmField val count: Int,
 )
 
-class AgentWorkbenchDirectoryWatcher(
+class AgentWorkbenchDirectoryWatcher private constructor(
   roots: Collection<Path>,
   scope: CoroutineScope,
-  private val onWatchEvent: (AgentWorkbenchWatchEvent) -> Unit,
-  private val onFailure: (Throwable) -> Unit = {},
+  private val onWatchEvent: suspend (AgentWorkbenchWatchEvent) -> Unit,
+  private val onFailure: suspend (Throwable) -> Unit = {},
+  private val watchLoopFactory: (List<Path>, DirectoryChangeListener) -> AgentWorkbenchWatchLoop,
+  @Suppress("unused") private val constructorMarker: Unit,
 ) : AutoCloseable {
+  private val roots = roots.toList()
   private val running = AtomicBoolean(true)
-  private val directoryWatcher: DirectoryWatcher?
+  @Volatile
+  private var watchLoop: AgentWorkbenchWatchLoop?
   private val watcherJob: Job?
 
+  constructor(
+    roots: Collection<Path>,
+    scope: CoroutineScope,
+    onWatchEvent: suspend (AgentWorkbenchWatchEvent) -> Unit,
+    onFailure: suspend (Throwable) -> Unit = {},
+  ) : this(roots, scope, onWatchEvent, onFailure, ::createDefaultWatchLoop, Unit)
+
+  internal constructor(
+    roots: Collection<Path>,
+    scope: CoroutineScope,
+    onWatchEvent: suspend (AgentWorkbenchWatchEvent) -> Unit,
+    onFailure: suspend (Throwable) -> Unit = {},
+    watchLoopFactory: (List<Path>, DirectoryChangeListener) -> AgentWorkbenchWatchLoop,
+  ) : this(roots, scope, onWatchEvent, onFailure, watchLoopFactory, Unit)
+
   init {
-    directoryWatcher = createDirectoryWatcher(roots)
-    watcherJob = if (directoryWatcher != null) {
+    watchLoop = createWatchLoop(roots)
+    watcherJob = if (watchLoop != null) {
       scope.launch(Dispatchers.IO) {
-        runWatchLoop(directoryWatcher)
+        runWatchLoops()
       }
     }
     else {
@@ -50,21 +71,32 @@ class AgentWorkbenchDirectoryWatcher(
   }
 
   val isActive: Boolean
-    get() = directoryWatcher != null
+    get() = watchLoop != null && watcherJob?.isActive == true
 
   override fun close() {
     if (!running.compareAndSet(true, false)) return
-    directoryWatcher?.let { watcher ->
+    watcherJob?.cancel()
+    watchLoop?.let { watcher ->
       runCatching {
         watcher.close()
+      }
+    }
+  }
+
+  @Suppress("unused")
+  suspend fun closeAndJoin() {
+    if (running.compareAndSet(true, false)) {
+      watcherJob?.cancel()
+      runCatching {
+        watchLoop?.close()
       }.onFailure { t ->
         onFailure(t)
       }
     }
-    watcherJob?.cancel()
+    watcherJob?.cancelAndJoin()
   }
 
-  private fun createDirectoryWatcher(roots: Collection<Path>): DirectoryWatcher? {
+  private fun createWatchLoop(roots: Collection<Path>): AgentWorkbenchWatchLoop? {
     val watchRoots = LinkedHashSet<Path>()
     for (root in roots) {
       val normalizedPath = normalizeWatchPath(root)
@@ -76,44 +108,91 @@ class AgentWorkbenchDirectoryWatcher(
       return null
     }
 
-    return DirectoryWatcher.builder()
-      .paths(ArrayList(watchRoots))
-      .listener(object : DirectoryChangeListener {
-        override fun onEvent(event: DirectoryChangeEvent) {
+    val listener = object : DirectoryChangeListener {
+      override suspend fun onEvent(event: DirectoryChangeEvent) {
+        if (running.get()) {
           onWatchEvent(event.toAgentWorkbenchWatchEvent())
         }
+      }
 
-        override fun onException(exception: Exception) {
-          onFailure(exception)
+      override suspend fun onException(e: Exception) {
+        if (running.get()) {
+          onFailure(e)
         }
-      })
-      .build()
+      }
+    }
+    return watchLoopFactory(ArrayList(watchRoots), listener)
   }
 
-  private fun runWatchLoop(watcher: DirectoryWatcher) {
-    try {
+  private suspend fun runWatchLoops() {
+    while (running.get()) {
+      val watcher = watchLoop ?: return
+      val shouldRestart = try {
+        watcher.watch()
+        false
+      }
+      catch (e: CancellationException) {
+        throw e
+      }
+      catch (t: Throwable) {
+        if (running.get()) {
+          onFailure(t)
+          true
+        }
+        else {
+          false
+        }
+      }
+      finally {
+        if (watchLoop === watcher) {
+          watchLoop = null
+        }
+        runCatching {
+          watcher.close()
+        }.onFailure { t ->
+          if (running.get()) {
+            onFailure(t)
+          }
+        }
+      }
+
+      if (!shouldRestart || !running.get()) {
+        return
+      }
+      watchLoop = createWatchLoop(roots)
+    }
+  }
+}
+
+interface AgentWorkbenchWatchLoop : AutoCloseable {
+  suspend fun watch()
+}
+
+private fun createDefaultWatchLoop(paths: List<Path>, listener: DirectoryChangeListener): AgentWorkbenchWatchLoop {
+  val watcher = DirectoryWatcher(paths, listener)
+  return object : AgentWorkbenchWatchLoop {
+    override suspend fun watch() {
       watcher.watch()
     }
-    catch (t: Throwable) {
-      if (running.get()) {
-        onFailure(t)
-      }
+
+    override fun close() {
+      watcher.close()
     }
   }
 }
 
 private fun DirectoryChangeEvent.toAgentWorkbenchWatchEvent(): AgentWorkbenchWatchEvent {
   return AgentWorkbenchWatchEvent(
-    eventType = when (eventType()) {
+    eventType = when (eventType) {
       DirectoryChangeEvent.EventType.CREATE -> AgentWorkbenchWatchEventType.CREATE
       DirectoryChangeEvent.EventType.MODIFY -> AgentWorkbenchWatchEventType.MODIFY
       DirectoryChangeEvent.EventType.DELETE -> AgentWorkbenchWatchEventType.DELETE
       DirectoryChangeEvent.EventType.OVERFLOW -> AgentWorkbenchWatchEventType.OVERFLOW
     },
-    path = path(),
-    rootPath = rootPath(),
+    path = path,
+    rootPath = rootPath,
     isDirectory = isDirectory,
-    count = count(),
+    count = count,
   )
 }
 

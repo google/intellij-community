@@ -11,7 +11,7 @@ import com.intellij.formatting.service.AsyncDocumentFormattingService;
 import com.intellij.formatting.service.AsyncFormattingRequest;
 import com.intellij.openapi.project.Project;
 import com.intellij.platform.eel.provider.utils.EelPathUtils;
-import com.intellij.platform.eel.provider.utils.EelPathUtils.FileTransferAttributesStrategy;
+import com.intellij.platform.eel.provider.utils.EelPathTransfer.FileTransferAttributesStrategy;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.codeStyle.CodeStyleSettings;
 import com.intellij.sh.ShFileType;

@@ -1,8 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.errorProcessing
 
-import com.jetbrains.python.packaging.PyExecutionException
-import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 
 /**
@@ -17,28 +15,6 @@ typealias PyResult<T> = com.jetbrains.python.Result<T, PyError>
 typealias PyExecResult<T> = com.jetbrains.python.Result<T, ExecError>
 
 inline fun <reified T : PyError> failure(pyError: T): com.jetbrains.python.Result.Failure<T> = com.jetbrains.python.Result.failure(pyError)
-
-
-@Deprecated("Migrate to native python result")
-fun <T> Result<T>.asPythonResult(): com.jetbrains.python.Result<T, PyError> =
-  com.jetbrains.python.Result.success(getOrElse {
-    return if (it is PyExecutionException) {
-      failure(it.pyError)
-    }
-    else {
-      failure(MessageError(it.localizedMessage))
-    }
-  }
-  )
-
-@ApiStatus.ScheduledForRemoval
-@Deprecated("Use python result, not kotlin result")
-fun <S> PyResult<S>.asKotlinResult(): Result<S> = when (this) {
-  is com.jetbrains.python.Result.Success -> {
-    Result.success(result)
-  }
-  is com.jetbrains.python.Result.Failure -> Result.failure(PyExecutionException(error))
-}
 
 /***
  * When returning error one level up, you must add description on what has happened, i.e:

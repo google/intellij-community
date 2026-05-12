@@ -10,6 +10,7 @@
     <postStartupActivity implementation="com.intellij.ide.bookmark.BookmarksStartupActivity"/>
     <selectInTarget implementation="com.intellij.ide.bookmark.ui.BookmarksSelectInTarget"/>
     <actionPromoter implementation="com.intellij.ide.bookmark.actions.NodeMoveActionPromoter"/>
+    <projectSettings service="com.intellij.ide.bookmark.ui.BookmarksViewStateComponent"/>
   </extensions>
   <actions>
     <group id="Bookmarks" popup="true">

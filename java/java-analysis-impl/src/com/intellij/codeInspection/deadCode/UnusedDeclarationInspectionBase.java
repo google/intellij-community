@@ -628,7 +628,7 @@ public class UnusedDeclarationInspectionBase extends GlobalInspectionTool {
     }
 
     private void addDelayedMethod(@NotNull RefMethod refMethod, @NotNull RefClass ownerClass) {
-      Set<RefMethod> methods = myClassIDtoMethods.computeIfAbsent(ownerClass, __ -> new HashSet<>());
+      Set<RefMethod> methods = myClassIDtoMethods.computeIfAbsent(ownerClass, _ -> new HashSet<>());
       methods.add(refMethod);
     }
 

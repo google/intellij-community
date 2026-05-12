@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.codeStyle;
 
 import com.intellij.application.options.CodeStyle;
@@ -147,6 +147,7 @@ public class JavaCodeStyleSettings extends CustomCodeStyleSettings implements Ja
 
   public int CLASS_NAMES_IN_JAVADOC = FULLY_QUALIFY_NAMES_IF_NOT_IMPORTED;
   public boolean SPACE_BEFORE_COLON_IN_FOREACH = true;
+  public boolean STRIP_WHITESPACE_FROM_BLANK_LINES_IN_TEXT_BLOCKS = false;
   public boolean SPACE_INSIDE_ONE_LINE_ENUM_BRACES = false;
   /**
    * "Java | Spaces | Within | Code Braces" option provides a way to regulate spaces in simple (one-line) code blocks with empty body

@@ -59,7 +59,7 @@ public class RunServiceInPlugin extends RunClassInPlugin {
       if (service == null) {
         throw new RuntimeException("Cannot find an instance of class " + myClazzName + " and cannot instantiate it with Project");
       }
-      TraceUtil.runWithSpanThrows(PerformanceTestSpan.TRACER.spanBuilder(SPAN_NAME), __ -> {
+      TraceUtil.runWithSpanThrows(PerformanceTestSpan.TRACER.spanBuilder(SPAN_NAME), _ -> {
           invokeMethod(project, aClass, service);
         });
     });

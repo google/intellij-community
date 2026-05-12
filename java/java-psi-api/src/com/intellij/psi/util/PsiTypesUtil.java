@@ -621,8 +621,13 @@ public final class PsiTypesUtil {
   }
 
   /**
-   * Checks if {@code type} mentions type parameters from the passed {@code Set}
-   * Implicit type arguments of types based on inner classes of generic outer classes are explicitly checked
+   * Checks whether {@code type} mentions at least one type parameter from {@code typeParameters}.
+   * The check traverses nested component/argument/bound types and also accounts for implicit type arguments
+   * of inner classes declared in generic outer classes.
+   *
+   * @param type type to inspect, {@code null} is treated as not mentioning any type parameter
+   * @param typeParameters type parameters to match
+   * @return {@code true} if {@code type} mentions any of {@code typeParameters}, {@code false} otherwise
    */
   public static boolean mentionsTypeParameters(@Nullable PsiType type, @NotNull Set<? extends PsiTypeParameter> typeParameters) {
     return mentionsTypeParametersOrUnboundedWildcard(type, typeParameters::contains);

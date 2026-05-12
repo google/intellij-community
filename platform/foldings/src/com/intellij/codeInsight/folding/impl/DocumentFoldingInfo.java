@@ -64,7 +64,7 @@ final class DocumentFoldingInfo implements CodeFoldingState {
   private final @NotNull List<SignatureInfo> myInfos = ContainerUtil.createLockFreeCopyOnWriteList();
   private final @NotNull List<RangeMarker> myRangeMarkers = ContainerUtil.createLockFreeCopyOnWriteList();
   /**
-   * null means {@link #computeExpandRanges()} was not called yet
+   * null means {@link #computeExpandRanges(boolean)} was not called yet
    */
   private volatile @Nullable @Unmodifiable List<FoldingInfo> myComputedInfos;
   private static final String DEFAULT_PLACEHOLDER = "...";
@@ -125,14 +125,15 @@ final class DocumentFoldingInfo implements CodeFoldingState {
 
   @RequiresBackgroundThread
   @RequiresReadLock
-  void computeExpandRanges() {
+  void computeExpandRanges(boolean shouldInitialize) {
     ThreadingAssertions.assertBackgroundThread();
     ThreadingAssertions.assertReadAccess();
 
     PsiManager psiManager;
     PsiFile psiFile;
     Document document;
-    if (myProject.isDisposed()
+    if (!shouldInitialize && myComputedInfos == null
+        || myProject.isDisposed()
         || (psiManager = PsiManager.getInstance(myProject)).isDisposed()
         || !myFile.isValid()
         || (psiFile = psiManager.findFile(myFile)) == null
@@ -180,7 +181,7 @@ final class DocumentFoldingInfo implements CodeFoldingState {
 
     List<FoldingInfo> computedInfos = myComputedInfos;
     if (computedInfos == null) {
-      throw new IllegalStateException("Must call computeExpandRanges() before calling applyFoldingExpandedState()");
+      throw new IllegalStateException("Must call CodeFoldingManager.updateFoldRegionsAsync before calling applyFoldingExpandedState()");
     }
     for (FoldingInfo foldingInfo : computedInfos) {
       TextRange range = foldingInfo.textRange();

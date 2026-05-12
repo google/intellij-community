@@ -185,7 +185,7 @@ public class WizardContext extends UserDataHolderBase {
   }
 
   public void requestSwitchTo(@NotNull String placeId) {
-    requestSwitchTo(placeId, __ -> {});
+    requestSwitchTo(placeId, _ -> {});
   }
 
   public void requestSwitchTo(@NotNull String placeId, @NotNull Consumer<? super Step> configure) {

@@ -72,8 +72,8 @@ public final class DomElementsProblemsHolderImpl implements DomElementsProblemsH
 
   public void addProblem(DomElementProblemDescriptor descriptor, Class<? extends DomElementsInspection<?>> inspection) {
     myCachedErrors
-      .computeIfAbsent(descriptor.getDomElement(), __ -> new ConcurrentHashMap<>())
-      .computeIfAbsent(inspection, __ -> new SmartList<>())
+      .computeIfAbsent(descriptor.getDomElement(), _ -> new ConcurrentHashMap<>())
+      .computeIfAbsent(inspection, _ -> new SmartList<>())
       .add(descriptor);
     myCachedChildrenErrors.clear();
   }
@@ -145,7 +145,7 @@ public final class DomElementsProblemsHolderImpl implements DomElementsProblemsH
     }
 
     for (Map.Entry<T, List<DomElementProblemDescriptor>> entry : toAdd.entrySet()) {
-      accumulator.computeIfAbsent(entry.getKey(), __ -> new SmartList<>()).addAll(entry.getValue());
+      accumulator.computeIfAbsent(entry.getKey(), _ -> new SmartList<>()).addAll(entry.getValue());
     }
   }
 

@@ -15,20 +15,16 @@ jvm_library(
     "//libraries/kotlinx/coroutines/core",
     "//libraries/kotlinx/coroutines/debug",
     "//platform/util/base/multiplatform",
-  ],
-  exports = ["//platform/util/base/multiplatform"]
+  ]
 )
 
 jvm_library(
   name = "base_test_lib",
+  testonly = True,
   module_name = "intellij.platform.util.base",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   kotlinc_opts = "@community//:k8",
-  exports = [
-    "//platform/util/base/multiplatform",
-    "//platform/util/base/multiplatform:multiplatform_test_lib",
-  ],
   runtime_deps = [
     ":base",
     "//platform/util-rt:util-rt_test_lib",
@@ -39,3 +35,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.util.base` end
+
+### auto-generated section `iml intellij.platform.util.base` start
+exports_files([
+  "intellij.platform.util.base.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.util.base` end

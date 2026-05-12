@@ -26,6 +26,7 @@
     <registryKey key="ide.smart.update" defaultValue="true"
                  description="Enables the 'Update and Build' action which allows to upgrade the IDE installation,
                  and to update and build the sources"/>
+    <projectSettings service="com.intellij.smartUpdate.SmartUpdate"/>
   </extensions>
 
   <actions resource-bundle="messages.SmartUpdateBundle">

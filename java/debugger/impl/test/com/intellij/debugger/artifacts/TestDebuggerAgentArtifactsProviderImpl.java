@@ -3,7 +3,7 @@ package com.intellij.debugger.artifacts;
 
 import com.intellij.debugger.testFramework.TestDebuggerAgentArtifactsProvider;
 import com.intellij.testFramework.common.BazelTestUtil;
-import org.jetbrains.intellij.bazelEnvironment.BazelLabel;
+import com.intellij.platform.bazel.runfiles.BazelLabel;
 
 import java.nio.file.Path;
 

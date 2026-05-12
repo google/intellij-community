@@ -71,6 +71,7 @@ kotlin {
     }
     api(project(":fleet.rhizomedb.transactor"))
     api(project(":fleet.rhizomedb.transactor.rebase"))
+    implementation(project(":fleet.rhizomedb"))
   }
   // KOTLIN__MARKER_END
 }

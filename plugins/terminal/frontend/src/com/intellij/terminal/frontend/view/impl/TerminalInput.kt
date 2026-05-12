@@ -9,8 +9,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
@@ -39,7 +37,6 @@ import java.awt.event.KeyEvent
 import java.nio.charset.StandardCharsets
 import kotlin.time.TimeMark
 
-@OptIn(ExperimentalCoroutinesApi::class)
 internal class TerminalInput(
   private val terminalSessionDeferred: Deferred<TerminalSession>,
   private val sessionModel: TerminalSessionModel,
@@ -63,7 +60,7 @@ internal class TerminalInput(
   )
 
   private val inputChannelDeferred: Deferred<SendChannel<TerminalInputEvent>> =
-    coroutineScope.async(Dispatchers.IO + CoroutineName("Get input channel")) {
+    coroutineScope.async(CoroutineName("Get input channel")) {
       terminalSessionDeferred.await().getInputChannel()
     }
 
@@ -113,14 +110,23 @@ internal class TerminalInput(
     }
   }
 
-  fun sendText(options: TerminalSendTextOptions) {
+  fun sendText(options: TerminalSendTextOptions): Boolean {
     var text = options.text
     if (text.isEmpty()) {
-      return
+      return false
     }
+    val terminalState = sessionModel.terminalState.value
+    if (options.requireBracketedPasteMode && !terminalState.isBracketedPasteMode) {
+      return false
+    }
+    val endBytes = if (options.sendEndKeyBeforeText) encodingManager.getCode(KeyEvent.VK_END, 0) ?: return false else null
+    if (endBytes != null) {
+      sendBytes(endBytes)
+    }
+
     text = sanitizeLineSeparators(text)
 
-    if (options.useBracketedPasteMode && sessionModel.terminalState.value.isBracketedPasteMode) {
+    if (options.useBracketedPasteMode && terminalState.isBracketedPasteMode) {
       text = "\u001b[200~$text\u001b[201~"
     }
 
@@ -129,6 +135,7 @@ internal class TerminalInput(
     }
 
     sendString(text)
+    return true
   }
 
   fun sendString(data: String) {
@@ -181,7 +188,7 @@ internal class TerminalInput(
     val event = TerminalResizeEvent(newSize)
     sendEvent(InputEventSubmission(event))
   }
-  
+
   fun sendLinkClicked(isInAlternateBuffer: Boolean, hyperlinkId: TerminalHyperlinkId, event: EditorMouseEvent) {
     sendEvent(InputEventSubmission(TerminalHyperlinkClickedEvent(isInAlternateBuffer, hyperlinkId, event)))
   }

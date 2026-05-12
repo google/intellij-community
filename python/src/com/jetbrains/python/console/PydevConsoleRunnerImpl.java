@@ -107,6 +107,7 @@ import com.jetbrains.python.run.PythonTracebackFilter;
 import com.jetbrains.python.run.target.HelpersAwareTargetEnvironmentRequest;
 import com.jetbrains.python.sdk.PythonEnvUtil;
 import com.jetbrains.python.sdk.flavors.PythonSdkFlavor;
+import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NonNls;
@@ -885,6 +886,7 @@ public class PydevConsoleRunnerImpl implements PydevConsoleRunner {
 
     class ConsoleSplitLineAction extends EditorAction {
 
+      @Language("devkit-action-id")
       private static final String CONSOLE_SPLIT_LINE_ACTION_ID = "Console.SplitLine";
 
       ConsoleSplitLineAction() {

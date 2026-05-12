@@ -1,14 +1,15 @@
 package com.intellij.lambda.testFramework.starter
 
 import com.intellij.ide.starter.ide.IDETestContext
-import com.intellij.ide.starter.ide.IdeProductProvider
+import com.intellij.ide.starter.models.IdeInfo
 import com.intellij.ide.starter.models.TestCase
 import com.intellij.ide.starter.project.NoProject
 import com.intellij.ide.starter.project.TestCaseTemplate
 import com.intellij.ide.starter.runner.IDERunContext
+import com.intellij.tools.ide.starter.product.idea.ultimate.IdeaUltimate
 
 data class IdeStartConfig(
-  val testCase: TestCase<*> = (object : TestCaseTemplate(IdeProductProvider.IU) {}).withProject(NoProject),
+  val testCase: TestCase<*> = (object : TestCaseTemplate(IdeInfo.IdeaUltimate) {}).withProject(NoProject),
   val configureTestContext: (IDETestContext.() -> Unit) = defaultTestContextConfig,
   val configureRunContext: (IDERunContext.() -> Unit) = defaultRunContextConfig,
 ) {

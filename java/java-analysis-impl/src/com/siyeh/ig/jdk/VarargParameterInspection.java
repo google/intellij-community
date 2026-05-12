@@ -46,6 +46,7 @@ import com.intellij.psi.PsiWhiteSpace;
 import com.intellij.psi.SyntaxTraverser;
 import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.psi.codeStyle.JavaCodeStyleManager;
+import com.intellij.psi.impl.light.LightElement;
 import com.intellij.psi.impl.source.javadoc.PsiDocMethodOrFieldRef;
 import com.intellij.psi.infos.MethodCandidateInfo;
 import com.intellij.psi.javadoc.PsiInlineDocTag;
@@ -230,7 +231,10 @@ public final class VarargParameterInspection extends BaseInspection {
           registerMethodError(method);
         }
         else {
-          registerErrorAtRange(method.getFirstChild(), method.getParameterList());
+          PsiParameterList list = method.getParameterList();
+          // Do not report for record compact constructors
+          if (list instanceof LightElement) return;
+          registerErrorAtRange(method.getFirstChild(), list);
         }
       }
     }

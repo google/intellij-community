@@ -1,26 +1,27 @@
-import org.gradle.api.JavaVersion.VERSION_1_7
-
 plugins {
-    application
-    kotlin("jvm") version "1.6.20"
+    id("java")
+    kotlin("jvm") version "2.3.20"
 }
 
-application {
-    mainClassName = "samples.HelloWorld"
-}
+group = "org.example"
+version = "1.0-SNAPSHOT"
 
 repositories {
-    jcenter()
+    mavenCentral()
 }
 
 dependencies {
-    testCompile("junit:junit:4.12")
-    implementation(kotlin("stdlib-jdk8"))
+    testImplementation(platform("org.junit:junit-bom:6.0.0"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation(kotlin("test"))
 }
 
-// VERSION: 1.6.20
+tasks.test {
+    useJUnitPlatform()
+}
+
+// VERSION: 2.3.20
 kotlin {
-    jvmToolchain {
-        (this as JavaToolchainSpec).languageVersion.set(JavaLanguageVersion.of(8))
-    }
+    jvmToolchain(8)
 }

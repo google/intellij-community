@@ -8,13 +8,13 @@ import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.util.NlsContexts
-import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.dsl.builder.Cell
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.selected
+import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import com.intellij.ui.layout.and
 import com.intellij.ui.layout.selectedValueIs
 import com.intellij.ui.scale.JBUIScale
@@ -44,7 +44,7 @@ class SmartUpdateDialog(private val project: Project) : DialogWrapper(project) {
         lateinit var combobox: Cell<ComboBox<SmartUpdateStep>>
         row {
           checkbox = checkBox(group.key)
-          combobox = comboBox(group.value, SimpleListCellRenderer.create("") { (it as? StepOption)?.optionName })
+          combobox = comboBox(group.value, textListCellRenderer("") { (it as? StepOption)?.optionName })
             .visible(group.value.size > 1)
         }
         for (step in group.value) {

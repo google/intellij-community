@@ -41,7 +41,11 @@ private val LOG = logger<CombinedDiffComponentProcessor>()
 
 @ApiStatus.Experimental
 interface CombinedDiffManager {
-  fun createProcessor(diffPlace: String? = null): CombinedDiffComponentProcessor
+  fun createProcessor(
+    diffPlace: String? = null,
+    contextActions: List<AnAction>? = null,
+    goToChangeToolbarActions: List<AnAction>? = null,
+  ): CombinedDiffComponentProcessor
 
   companion object {
     fun getInstance(project: Project): CombinedDiffManager = project.service()

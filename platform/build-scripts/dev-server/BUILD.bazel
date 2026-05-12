@@ -36,6 +36,7 @@ jvm_library(
 
 jvm_library(
   name = "buildScripts-devBuildServer_test_lib",
+  testonly = True,
   module_name = "intellij.platform.buildScripts.devBuildServer",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -64,3 +65,9 @@ jvm_library(
   ]
 )
 ### auto-generated section `build intellij.platform.buildScripts.devBuildServer` end
+
+### auto-generated section `iml intellij.platform.buildScripts.devBuildServer` start
+exports_files([
+  "intellij.platform.buildScripts.devBuildServer.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.buildScripts.devBuildServer` end

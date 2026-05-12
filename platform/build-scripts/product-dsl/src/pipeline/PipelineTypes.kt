@@ -81,7 +81,6 @@ internal data class GenerationModel(
   @JvmField val config: ModuleSetGenerationConfig,
   @JvmField val projectRoot: Path,
   @JvmField val outputProvider: ModuleOutputProvider,
-  @JvmField val isUltimateBuild: Boolean,
 
   // ============ Caches (created during model building) ============
 
@@ -94,8 +93,8 @@ internal data class GenerationModel(
   /** Deferred file updater for atomic writes */
   @JvmField val fileUpdater: DeferredFileUpdater,
 
-  /** XML writer policy (write/diff/skip based on generation mode) */
-  @JvmField val xmlWritePolicy: FileUpdateStrategy,
+  /** Generated artifact write policy (write/diff/skip based on generation mode) */
+  @JvmField val generatedArtifactWritePolicy: FileUpdateStrategy,
 
   /** Coroutine scope for async operations */
   @JvmField val scope: CoroutineScope,

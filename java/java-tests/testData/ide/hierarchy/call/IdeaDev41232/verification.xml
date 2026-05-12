@@ -1,4 +1,4 @@
-<node text="A.main()  ()" base="true">
-  <node text="B.xyzzy()  ()">
+<node text="main() (A)" base="true">
+  <node text="xyzzy() (B)">
   </node>
 </node>

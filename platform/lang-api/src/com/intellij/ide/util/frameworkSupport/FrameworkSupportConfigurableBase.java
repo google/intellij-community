@@ -7,7 +7,7 @@ import com.intellij.openapi.module.Module;
 import com.intellij.openapi.roots.ModifiableRootModel;
 import com.intellij.openapi.roots.libraries.Library;
 import com.intellij.openapi.util.NlsContexts;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.uiDesigner.core.GridLayoutManager;
 import com.intellij.uiDesigner.core.Spacer;
@@ -69,7 +69,7 @@ public class FrameworkSupportConfigurableBase extends FrameworkSupportConfigurab
       myDescriptionLabel.setLabelFor(myVersionComboBox);
     }
     myDescriptionLabel.setText(versionLabelText);
-    myVersionComboBox.setRenderer(SimpleListCellRenderer.create("", FrameworkVersion::getVersionName));
+    myVersionComboBox.setRenderer(BuilderKt.textListCellRenderer("", FrameworkVersion::getVersionName));
     updateAvailableVersions(versions);
     myVersionComboBox.addActionListener(new ActionListener() {
       @Override

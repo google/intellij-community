@@ -122,6 +122,9 @@ internal open class MonolithBreakpointProxy @Deprecated("Use breakpoint.asProxy(
     breakpoint.conditionExpression = condition
   }
 
+  override fun hasCustomCondition(): Boolean {
+    return XBreakpointUtil.hasCustomCondition(breakpoint)
+  }
 
   override fun getGeneralDescription(): String = XBreakpointUtil.getGeneralDescription(breakpoint)
 

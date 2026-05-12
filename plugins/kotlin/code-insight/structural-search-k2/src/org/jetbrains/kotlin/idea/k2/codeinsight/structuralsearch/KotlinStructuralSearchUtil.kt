@@ -6,10 +6,10 @@ import com.intellij.structuralsearch.impl.matcher.handlers.MatchingHandler
 import com.intellij.structuralsearch.impl.matcher.handlers.SubstitutionHandler
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.components.buildClassType
 import org.jetbrains.kotlin.analysis.api.components.containingDeclaration
 import org.jetbrains.kotlin.analysis.api.components.render
 import org.jetbrains.kotlin.analysis.api.components.resolveToCall
+import org.jetbrains.kotlin.analysis.api.components.typeCreator
 import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
 import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.KaClassTypeQualifierRenderer
 import org.jetbrains.kotlin.analysis.api.resolution.successfulFunctionCallOrNull
@@ -31,8 +31,8 @@ internal fun getCommentText(comment: PsiComment): String {
     }
 }
 
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class)
+context(_: KaSession)
 internal fun KaType.renderNames(): Array<String> = arrayOf(
     render(KaTypeRendererForSource.WITH_SHORT_NAMES.with {
         classIdRenderer = KaClassTypeQualifierRenderer.WITH_SHORT_NAMES
@@ -57,7 +57,8 @@ fun KtExpression.findDispatchReceiver(): KaType? {
     val fromKotlinPkg = classId.packageFqName.asString().startsWith("kotlin")
     val isFunctionCall = classId.relativeClassName.asString().startsWith("Function")
     if (fromKotlinPkg && isFunctionCall) return null // if function is function local return null
-    return buildClassType(containingClass)
+    @OptIn(KaExperimentalApi::class)
+    return typeCreator.classType(containingClass)
 }
 
 internal val KtQualifiedExpression.calleeName: String? get() = ((selectorExpression as? KtCallExpression)?.calleeExpression as? KtNameReferenceExpression)?.text

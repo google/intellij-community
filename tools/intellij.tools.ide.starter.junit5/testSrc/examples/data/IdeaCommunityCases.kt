@@ -1,10 +1,11 @@
 package examples.data
 
-import com.intellij.ide.starter.ide.IdeProductProvider
+import com.intellij.ide.starter.models.IdeInfo
 import com.intellij.ide.starter.project.GitHubProject
 import com.intellij.ide.starter.project.TestCaseTemplate
+import com.intellij.tools.ide.starter.product.idea.community.IdeaCommunity
 
-object IdeaCommunityCases : TestCaseTemplate(IdeProductProvider.IC) {
+object IdeaCommunityCases : TestCaseTemplate(IdeInfo.IdeaCommunity) {
 
   val GradleJitPackSimple = withProject(
     GitHubProject.fromGithub(

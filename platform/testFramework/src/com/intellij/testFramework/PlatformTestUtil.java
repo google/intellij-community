@@ -53,6 +53,7 @@ import com.intellij.openapi.extensions.ProjectExtensionPointName;
 import com.intellij.openapi.extensions.impl.ExtensionPointImpl;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.impl.LoadTextUtil;
+import com.intellij.openapi.fileTypes.BinaryFileTypeDecompilers;
 import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.fileTypes.FileTypeRegistry;
 import com.intellij.openapi.fileTypes.FileTypes;
@@ -76,13 +77,14 @@ import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileFilter;
 import com.intellij.openapi.vfs.ex.temp.TempFileSystem;
+import com.intellij.openapi.vfs.newvfs.ManagingFS;
 import com.intellij.platform.testFramework.core.FileComparisonFailedError;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.PsiRecursiveElementWalkingVisitor;
 import com.intellij.psi.PsiReference;
-import com.intellij.psi.impl.DocumentCommitThread;
 import com.intellij.psi.impl.source.resolve.reference.impl.PsiMultiReference;
+import com.intellij.testFramework.common.TestApplicationKt;
 import com.intellij.testFramework.fixtures.IdeaTestExecutionPolicy;
 import com.intellij.ui.ClientProperty;
 import com.intellij.ui.tree.AsyncTreeModel;
@@ -424,7 +426,7 @@ public final class PlatformTestUtil {
 
   public static void waitForCallback(@NotNull ActionCallback callback) {
     var future = new CompletableFuture<>();
-    callback.doWhenDone(() -> future.complete(null)).doWhenRejected(__ -> future.complete(null));
+    callback.doWhenDone(() -> future.complete(null)).doWhenRejected(_ -> future.complete(null));
     waitForFuture(future);
   }
 
@@ -532,7 +534,7 @@ public final class PlatformTestUtil {
         var laterInvoked = new AtomicBoolean();
         app.invokeLater(() -> laterInvoked.set(true));
         dispatchAllInvocationEventsInIdeEventQueue();
-        waitForAllDocumentsCommitted(10, TimeUnit.SECONDS);
+        TestApplicationKt.waitForAllDocumentsCommitted(10, TimeUnit.SECONDS);
         assertTrue(laterInvoked.get());
 
         TimeoutUtil.sleep(sleptAlready ? 10 : delay);
@@ -896,6 +898,8 @@ public final class PlatformTestUtil {
     @Nullable Function<VirtualFile, String> fileNameMapper
   ) throws IOException {
     FileDocumentManager.getInstance().saveAllDocuments();
+    //Async Iops, if any in progress, may ruin the comparison -- flush them:
+    flushAllPendingVFSUpdates();
 
     var childrenAfter = dirExpected.getChildren();
     shallowCompare(dirExpected, childrenAfter);
@@ -934,8 +938,22 @@ public final class PlatformTestUtil {
   }
 
   public static void assertFilesEqual(@NotNull VirtualFile fileExpected, @NotNull VirtualFile fileActual) throws IOException {
-    var actual = fileText(fileActual);
-    var expected = fileText(fileExpected);
+    var actual = BinaryFileTypeDecompilers.getInstance().allowDecompilerSlowOperation(() -> {
+      try {
+        return fileText(fileActual);
+      }
+      catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
+    var expected = BinaryFileTypeDecompilers.getInstance().allowDecompilerSlowOperation(() -> {
+      try {
+        return fileText(fileExpected);
+      }
+      catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
     if (expected == null || actual == null) {
       assertArrayEquals(fileExpected.getPath(), fileExpected.contentsToByteArray(), fileActual.contentsToByteArray());
     }
@@ -944,6 +962,23 @@ public final class PlatformTestUtil {
         "Text mismatch in the file " + fileExpected.getName(), expected, actual,
         fileActual.getUserData(VfsTestUtil.TEST_DATA_FILE_PATH));
     }
+  }
+
+  /**
+   * Flushes IO operations pending in VFS, if any.
+   * Use before transition from VFS to File/Path, or before launching an external process that uses the file(s) modified via VFS.
+   */
+  public static void flushAllPendingVFSUpdates() throws IOException {
+    ManagingFS.getInstance().flushPendingUpdates();
+  }
+
+  /**
+   * Flushes IO operations pending in VFS (if any) for the given file.
+   * Use before transition from VFS to File/Path, or before launching an external process that uses the file previously modified
+   * via VFS.
+   */
+  public static void flushPendingVFSUpdatesFor(@NotNull VirtualFile file) throws IOException {
+    ManagingFS.getInstance().flushPendingUpdates(file);
   }
 
   private static String fileText(@NotNull VirtualFile file) throws IOException {
@@ -1463,15 +1498,5 @@ public final class PlatformTestUtil {
         "; FJP configured parallelism=" + ForkJoinPool.getCommonPoolParallelism() +
         "; FJP actual common pool parallelism=" + ForkJoinPool.commonPool().getParallelism());
     }
-  }
-
-  @TestOnly
-  public static void waitForAllDocumentsCommitted(long timeout, @NotNull TimeUnit timeUnit) {
-    var documentCommitThread = DocumentCommitThread.getInstance();
-    TestOnlyThreading.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack(() -> {
-      documentCommitThread.waitForAllCommits(timeout, timeUnit);
-    });
-    // some callbacks on document commit might require EDT. So we forcibly dispatch pending events to run these callbacks
-    dispatchAllInvocationEventsInIdeEventQueue();
   }
 }

@@ -109,45 +109,11 @@ abstract class VisualFormattingLayerService {
 }
 
 @ApiStatus.Internal
-sealed class VisualFormattingLayerElement {
-
-  abstract fun applyToEditor(editor: Editor)
-
-  data class InlineInlay(val offset: Int, val length: Int) : VisualFormattingLayerElement() {
-    override fun applyToEditor(editor: Editor) {
-      editor.inlayModel
-        .addInlineElement(
-          offset,
-          false,
-          // Visual formatting inlays should always be displayed as part of the preceding whitespace
-          Integer.MAX_VALUE,
-          InlayPresentation(editor, length)
-        )
-    }
-  }
-
-  data class BlockInlay(val offset: Int, val lines: Int) : VisualFormattingLayerElement() {
-    override fun applyToEditor(editor: Editor) {
-      editor.inlayModel
-        .addBlockElement(
-          offset,
-          true,
-          true,
-          0,
-          InlayPresentation(editor, lines, vertical = true)
-        )
-    }
-  }
-
-  data class Folding(val offset: Int, val length: Int) : VisualFormattingLayerElement() {
-    override fun applyToEditor(editor: Editor) {
-      (editor.foldingModel as? FoldingModelEx)
-        ?.createFoldRegion(offset, offset + length, "", null, true)
-        ?.apply {
-          putUserData(visualFormattingElementKey, true)
-        }
-    }
-  }
+sealed interface VisualFormattingLayerElement {
+  data class InlineInlay(val offset: Int, val length: Int) : VisualFormattingLayerElement
+  data class BlockInlay(val offset: Int, val lines: Int) : VisualFormattingLayerElement
+  data class Folding(val offset: Int, val length: Int) : VisualFormattingLayerElement
+  data class Wrap(val offset: Int, val indent: Int) : VisualFormattingLayerElement
 }
 
 @ApiStatus.Internal

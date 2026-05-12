@@ -1,6 +1,7 @@
 package com.intellij.lambda.testFramework.utils
 
 import com.intellij.ide.starter.driver.driver.remoteDev.RemDevDriverRunner
+import com.intellij.ide.starter.driver.driver.remoteDev.RemoteDevBackgroundRun
 import com.intellij.ide.starter.driver.engine.LocalDriverRunner
 import com.intellij.ide.starter.ide.IDERemDevTestContext
 import com.intellij.ide.starter.ide.IDETestContext
@@ -9,6 +10,8 @@ import com.intellij.ide.starter.project.NoProject
 import com.intellij.ide.starter.runner.IDERunContext
 import com.intellij.ide.starter.runner.events.IdeAfterLaunchEvent
 import com.intellij.lambda.testFramework.testApi.waitForProject
+import com.intellij.lambda.testFramework.utils.LambdaTestPluginHolder.LoadingInSplitMode.All
+import com.intellij.lambda.testFramework.utils.LambdaTestPluginHolder.LoadingInSplitMode.OnlyFrontend
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.remoteDev.tests.LambdaTestsConstants
 import com.intellij.remoteDev.tests.impl.LambdaTestHost.Companion.TEST_MODULE_ID_PROPERTY_NAME
@@ -57,8 +60,8 @@ internal fun IDETestContext.runIdeWithLambda(
                                                     launchName,
                                                     expectedKill,
                                                     expectedExitCode,
-                                                    collectNativeThreads,
-                                                    configure)
+                                                    collectNativeThreads = collectNativeThreads,
+                                                    configure = configure)
   monolithRdSession.awaitSessionReady()
   return IdeWithLambda(backgroundRun, monolithRdSession, null)
 }
@@ -72,7 +75,8 @@ internal fun IDERemDevTestContext.runIdeWithLambda(
   configure: IDERunContext.() -> Unit = {},
 ): IdeWithLambda {
   val driverRunner = RemDevDriverRunner()
-  LambdaTestPluginHolder.additionalPluginDirNames().forEach { addCustomFrontendPlugin(it) }
+  LambdaTestPluginHolder.additionalPluginDirNames(OnlyFrontend, All)
+    .forEach { addCustomFrontendPlugin(it) }
   val backendRdSession = setUpRdTestSession(BACKEND)
   val frontendRdSession = frontendIDEContext.setUpRdTestSession(FRONTEND)
 
@@ -84,11 +88,17 @@ internal fun IDERemDevTestContext.runIdeWithLambda(
                                                     launchName,
                                                     expectedKill,
                                                     expectedExitCode,
-                                                    collectNativeThreads,
-                                                    configure)
+                                                    collectNativeThreads = collectNativeThreads,
+                                                    pauseOnIndexing = null,
+                                                    configure = configure)
   listOf(backendRdSession, frontendRdSession)
     .forEach { it.awaitSessionReady(if (this.frontendIDEContext.ide.vmOptions.hasHeadlessMode()) 15.seconds else 30.seconds) }
-  return IdeWithLambda(backgroundRun, rdSession = frontendRdSession, backendRdSession = backendRdSession).also {
+  return IdeWithLambda(backgroundRun,
+                       rdSession = frontendRdSession,
+                       backendIdeWithLambda = if (backgroundRun is RemoteDevBackgroundRun)
+                         IdeWithLambda(backgroundRun.backendRun, backendRdSession, null)
+                       else null
+  ).also {
     if (testCase.projectInfo != NoProject) {
       @Suppress("RAW_RUN_BLOCKING")
       runBlocking {
@@ -112,8 +122,12 @@ private fun LambdaRdTestSession.awaitSessionReady(timeout: Duration = 15.seconds
 
 private fun IDETestContext.setUpRdTestSession(lambdaRdIdeType: LambdaRdIdeType): LambdaRdTestSession {
   val testProtocolLifetimeDef = EternalLifetime.createNested()
-  EventsBus.subscribe("testProtocolLifetimeDef-${lambdaRdIdeType.name}") { _: IdeAfterLaunchEvent ->
-    testProtocolLifetimeDef.terminate()
+  val eventSubscriber = "testProtocolLifetimeDef-${lambdaRdIdeType.name}"
+  EventsBus.subscribe(eventSubscriber) { event: IdeAfterLaunchEvent ->
+    if (event.runContext.testContext === this) {
+      testProtocolLifetimeDef.terminate()
+      EventsBus.unsubscribe<IdeAfterLaunchEvent>(eventSubscriber)
+    }
   }
 
   val scheduler = SynchronousScheduler

@@ -15,8 +15,8 @@ internal object TypeTextProvider {
     /**
      * Creates lookup element's type text, based on provided classifier symbol.
      */
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     fun getTypeTextForClassifier(symbol: KaClassifierSymbol): String? = when (symbol) {
         is KaTypeAliasSymbol -> symbol.expandedType.renderVerbose()
         else -> null
@@ -33,8 +33,8 @@ internal object TypeTextProvider {
      * ```
      * a lookup element `foo()` is suggested and its type text should be `Unit`.
      */
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     fun getTypeTextForCallable(
         signature: KaCallableSignature<*>,
         treatAsFunctionCall: Boolean

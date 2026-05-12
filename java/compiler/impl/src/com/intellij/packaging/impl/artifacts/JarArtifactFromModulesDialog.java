@@ -15,7 +15,8 @@ import com.intellij.packaging.impl.elements.ManifestFileUtil;
 import com.intellij.ui.ComboboxSpeedSearch;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.IdeBorderFactory;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.LcrJavaHelper;
+import com.intellij.ui.dsl.listCellRenderer.RendererPresentation;
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.uiDesigner.core.GridLayoutManager;
 import com.intellij.uiDesigner.core.Spacer;
@@ -241,10 +242,10 @@ public class JarArtifactFromModulesDialog extends DialogWrapper {
     for (Module module : modules) {
       myModuleComboBox.addItem(module);
     }
-    myModuleComboBox.setRenderer(SimpleListCellRenderer.create((label, value, index) -> {
-      label.setIcon(value != null ? ModuleType.get(value).getIcon() : null);
-      label.setText(value != null ? value.getName() : JavaCompilerBundle.message("all.modules"));
-    }));
+    myModuleComboBox.setRenderer(LcrJavaHelper.create(
+      JavaCompilerBundle.message("all.modules"),
+      value -> new RendererPresentation(ModuleType.get(value).getIcon(), value.getName())
+    ));
     ComboboxSpeedSearch search = new ComboboxSpeedSearch(myModuleComboBox, null) {
       @Override
       protected String getElementText(Object element) {

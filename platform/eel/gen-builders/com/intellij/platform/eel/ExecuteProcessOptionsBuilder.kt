@@ -14,11 +14,9 @@ import org.jetbrains.annotations.ApiStatus
 @ApiStatus.Experimental
 class ExecuteProcessOptionsBuilder(
   /**
-   * An **absolute** path to the executable.
-   * TODO Or do relative paths also work?
+   * Either an *absolute* path to the executable file or a binary name.
    *
-   * All argument, all paths, should be valid for the remote machine. F.i., if the IDE runs on Windows, but IJent runs on Linux,
-   * [ExecuteProcessOptions.workingDirectory] is the path on the Linux host. There's no automatic path mapping in this interface.
+   * When it's a binary name, the corresponginf executable is searched in the environment variable `PATH`.
    */
   private var exe: String,
 ) {
@@ -54,11 +52,9 @@ class ExecuteProcessOptionsBuilder(
   }
 
   /**
-   * An **absolute** path to the executable.
-   * TODO Or do relative paths also work?
+   * Either an *absolute* path to the executable file or a binary name.
    *
-   * All argument, all paths, should be valid for the remote machine. F.i., if the IDE runs on Windows, but IJent runs on Linux,
-   * [ExecuteProcessOptions.workingDirectory] is the path on the Linux host. There's no automatic path mapping in this interface.
+   * When it's a binary name, the corresponginf executable is searched in the environment variable `PATH`.
    */
   @ApiStatus.Experimental
   fun exe(arg: String): ExecuteProcessOptionsBuilder = apply {

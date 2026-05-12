@@ -78,13 +78,17 @@ import java.util.stream.Stream;
 
 @ApiStatus.NonExtendable
 public class AnnotationUtil {
-  public static final String NULLABLE = "org.jetbrains.annotations.Nullable";
-  public static final String UNKNOWN_NULLABILITY = "org.jetbrains.annotations.UnknownNullability";
-  public static final String NOT_NULL = "org.jetbrains.annotations.NotNull";
-  public static final String NOT_NULL_BY_DEFAULT = "org.jetbrains.annotations.NotNullByDefault";
+  public static final @NlsSafe String NULLABLE = "org.jetbrains.annotations.Nullable";
+  public static final @NlsSafe String NULLABLE_SHORT = "Nullable";
+  public static final @NlsSafe String UNKNOWN_NULLABILITY = "org.jetbrains.annotations.UnknownNullability";
+  public static final @NlsSafe String NOT_NULL = "org.jetbrains.annotations.NotNull";
+  public static final @NlsSafe String NOT_NULL_SHORT = "NotNull";
+  public static final @NlsSafe String NOT_NULL_BY_DEFAULT = "org.jetbrains.annotations.NotNullByDefault";
 
   public static final String J_SPECIFY_NON_NULL = "org.jspecify.annotations.NonNull";
   public static final String J_SPECIFY_NULLABLE = "org.jspecify.annotations.Nullable";
+  public static final String J_SPECIFY_NULL_MARKED = "org.jspecify.annotations.NullMarked";
+  public static final String J_SPECIFY_NULL_UNMARKED = "org.jspecify.annotations.NullUnmarked";
 
   public static final String NON_NLS = "org.jetbrains.annotations.NonNls";
   public static final String NLS = "org.jetbrains.annotations.Nls";
@@ -778,16 +782,6 @@ public class AnnotationUtil {
   @ApiStatus.ScheduledForRemoval
   public static boolean isAnnotated(@NotNull PsiModifierListOwner listOwner, @NotNull String annotationFQN, boolean checkHierarchy) {
     return isAnnotated(listOwner, annotationFQN, flags(checkHierarchy, true, true));
-  }
-
-  /** @deprecated use {@link #isAnnotated(PsiModifierListOwner, String, int)} */
-  @Deprecated
-  @ApiStatus.ScheduledForRemoval
-  public static boolean isAnnotated(@NotNull PsiModifierListOwner listOwner,
-                                    @NotNull String annotationFQN,
-                                    boolean checkHierarchy,
-                                    boolean skipExternal) {
-    return isAnnotated(listOwner, annotationFQN, flags(checkHierarchy, skipExternal, skipExternal));
   }
 
   @Flags

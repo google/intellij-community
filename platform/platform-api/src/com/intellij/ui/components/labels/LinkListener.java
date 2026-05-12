@@ -18,7 +18,7 @@ package com.intellij.ui.components.labels;
 
 public interface LinkListener<T> {
 
-  LinkListener NULL = (__, ___) -> { };
+  LinkListener NULL = (_, _) -> { };
 
   void linkSelected(LinkLabel<T> aSource, T aLinkData);
 

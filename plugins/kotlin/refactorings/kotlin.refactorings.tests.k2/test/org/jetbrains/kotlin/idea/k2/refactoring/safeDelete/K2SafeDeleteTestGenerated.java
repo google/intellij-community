@@ -72,6 +72,16 @@ public abstract class K2SafeDeleteTestGenerated extends AbstractK2SafeDeleteTest
             runTest("../../idea/tests/testData/refactoring/safeDelete/deleteClass/kotlinClass/interface2.kt");
         }
 
+        @TestMetadata("lastEnumEntry1.kt")
+        public void testLastEnumEntry1() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteClass/kotlinClass/lastEnumEntry1.kt");
+        }
+
+        @TestMetadata("lastEnumEntry2.kt")
+        public void testLastEnumEntry2() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteClass/kotlinClass/lastEnumEntry2.kt");
+        }
+
         @TestMetadata("localClass1.kt")
         public void testLocalClass1() throws Exception {
             runTest("../../idea/tests/testData/refactoring/safeDelete/deleteClass/kotlinClass/localClass1.kt");
@@ -100,6 +110,25 @@ public abstract class K2SafeDeleteTestGenerated extends AbstractK2SafeDeleteTest
         @TestMetadata("unsafeImport.kt")
         public void testUnsafeImport() throws Exception {
             runTest("../../idea/tests/testData/refactoring/safeDelete/deleteClass/kotlinClass/unsafeImport.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../idea/tests/testData/refactoring/safeDelete/deleteClass/kotlinClassWithJava")
+    public static class KotlinClassWithJava extends AbstractK2SafeDeleteTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doClassTestWithJava, this, testDataFilePath);
+        }
+
+        @TestMetadata("classWithDelegationCalls.kt")
+        public void testClassWithDelegationCalls() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteClass/kotlinClassWithJava/classWithDelegationCalls.kt");
         }
     }
 
@@ -538,6 +567,80 @@ public abstract class K2SafeDeleteTestGenerated extends AbstractK2SafeDeleteTest
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../idea/tests/testData/refactoring/safeDelete/deleteProperty/kotlinPropertyWithJava")
+    public static class KotlinPropertyWithJava extends AbstractK2SafeDeleteTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doPropertyTestWithJava, this, testDataFilePath);
+        }
+
+        @TestMetadata("implement1.kt")
+        public void testImplement1() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteProperty/kotlinPropertyWithJava/implement1.kt");
+        }
+
+        @TestMetadata("implement2.kt")
+        public void testImplement2() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteProperty/kotlinPropertyWithJava/implement2.kt");
+        }
+
+        @TestMetadata("implement3.kt")
+        public void testImplement3() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteProperty/kotlinPropertyWithJava/implement3.kt");
+        }
+
+        @TestMetadata("implement4.kt")
+        public void testImplement4() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteProperty/kotlinPropertyWithJava/implement4.kt");
+        }
+
+        @TestMetadata("override1.kt")
+        public void testOverride1() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteProperty/kotlinPropertyWithJava/override1.kt");
+        }
+
+        @TestMetadata("override2.kt")
+        public void testOverride2() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteProperty/kotlinPropertyWithJava/override2.kt");
+        }
+
+        @TestMetadata("override3.kt")
+        public void testOverride3() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteProperty/kotlinPropertyWithJava/override3.kt");
+        }
+
+        @TestMetadata("override4.kt")
+        public void testOverride4() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteProperty/kotlinPropertyWithJava/override4.kt");
+        }
+
+        @TestMetadata("overrideAndImplement1.kt")
+        public void testOverrideAndImplement1() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteProperty/kotlinPropertyWithJava/overrideAndImplement1.kt");
+        }
+
+        @TestMetadata("overrideAndImplement2.kt")
+        public void testOverrideAndImplement2() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteProperty/kotlinPropertyWithJava/overrideAndImplement2.kt");
+        }
+
+        @TestMetadata("propertyExt.kt")
+        public void testPropertyExt() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteProperty/kotlinPropertyWithJava/propertyExt.kt");
+        }
+
+        @TestMetadata("usageInOverrideToDelete.kt")
+        public void testUsageInOverrideToDelete() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteProperty/kotlinPropertyWithJava/usageInOverrideToDelete.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/refactoring/safeDelete/deleteProperty/javaPropertyWithKotlin")
     public static class JavaPropertyWithKotlin extends AbstractK2SafeDeleteTest {
         @java.lang.Override
@@ -824,6 +927,26 @@ public abstract class K2SafeDeleteTestGenerated extends AbstractK2SafeDeleteTest
         @TestMetadata("defaultParam2.kt")
         public void testDefaultParam2() throws Exception {
             runTest("../../idea/tests/testData/refactoring/safeDelete/deleteValueParameter/kotlinValueParameter/defaultParam2.kt");
+        }
+
+        @TestMetadata("defaultParamWithNextArgs.kt")
+        public void testDefaultParamWithNextArgs() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteValueParameter/kotlinValueParameter/defaultParamWithNextArgs.kt");
+        }
+
+        @TestMetadata("defaultParamWithNextVarArgs.kt")
+        public void testDefaultParamWithNextVarArgs() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteValueParameter/kotlinValueParameter/defaultParamWithNextVarArgs.kt");
+        }
+
+        @TestMetadata("defaultParamWithTrailingLambda.kt")
+        public void testDefaultParamWithTrailingLambda() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteValueParameter/kotlinValueParameter/defaultParamWithTrailingLambda.kt");
+        }
+
+        @TestMetadata("defaultVarargsParam.kt")
+        public void testDefaultVarargsParam() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteValueParameter/kotlinValueParameter/defaultVarargsParam.kt");
         }
 
         @TestMetadata("enumConstructor.kt")
@@ -1119,6 +1242,11 @@ public abstract class K2SafeDeleteTestGenerated extends AbstractK2SafeDeleteTest
         @TestMetadata("usedContextParametersInFunctionInvoke.kt")
         public void testUsedContextParametersInFunctionInvoke() throws Exception {
             runTest("../../idea/tests/testData/refactoring/safeDelete/deleteValueParameter/kotlinValueParameter/usedContextParametersInFunctionInvoke.kt");
+        }
+
+        @TestMetadata("usedContextParametersInImplicitInvoke.kt")
+        public void testUsedContextParametersInImplicitInvoke() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/safeDelete/deleteValueParameter/kotlinValueParameter/usedContextParametersInImplicitInvoke.kt");
         }
 
         @TestMetadata("usedContextParametersInNestedFunction.kt")

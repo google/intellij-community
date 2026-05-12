@@ -150,7 +150,7 @@ public class InferNullityAnnotationsAction extends BaseAnalysisAction {
     if (!modulesWithoutAnnotations.isEmpty()) {
       addAnnotationsDependency(project, modulesWithoutAnnotations, defaultNullable,
                                JavaBundle.message("action.title.infer.nullity.annotations"))
-        .onSuccess(__ -> {
+        .onSuccess(_ -> {
           restartAnalysis(project, scope);
         });
       return;

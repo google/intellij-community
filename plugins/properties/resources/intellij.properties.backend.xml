@@ -102,6 +102,14 @@
                      enabledByDefault="true" level="WEAK WARNING" cleanupTool="true"
                      implementationClass="com.intellij.lang.properties.codeInspection.WrongPropertyKeyValueDelimiterInspection"/>
 
+    <localInspection language="Properties" shortName="IncompleteProperty"
+                     bundle="messages.PropertiesBundle" key="incomplete.property.inspection.display.name"
+                     groupKey="properties.files.inspection.group.display.name"
+                     enabledByDefault="true" level="ERROR"
+                     implementationClass="com.intellij.lang.properties.codeInspection.IncompletePropertyInspection"/>
+
+    <gotoRelatedProvider implementation="com.intellij.lang.properties.navigation.GotoRelatedPropertyDeclarationsProvider"/>
+
     <idIndexer filetype="Properties" implementationClass="com.intellij.lang.properties.idCache.PropertiesIdIndexer"/>
     <todoIndexer filetype="Properties" implementationClass="com.intellij.lang.properties.idCache.PropertiesTodoIndexer"/>
 
@@ -161,10 +169,18 @@
     <codeInsight.completion.command.factory language="Properties" implementationClass="com.intellij.lang.properties.command.completion.PropertiesCommandCompletionFactory" />
     <codeInsight.completion.command.provider language="Properties" implementationClass="com.intellij.codeInsight.completion.command.commands.DirectIntentionCommandProvider" order="last"/>
     <codeInsight.completion.command.provider language="Properties" implementationClass="com.intellij.lang.properties.command.completion.PropertiesRenameActionCommandProvider" order="last"/>
-    <codeInsight.completion.command.provider language="Properties" implementationClass="com.intellij.lang.properties.command.completion.PropertiesShowUsagesActionCompletionCommandProvider" order="last"/>
+    <codeInsight.completion.command.provider language="Properties" implementationClass="com.intellij.lang.properties.command.completion.PropertiesGoToDeclarationOrUsagesActionCompletionCommandProvider" order="last"/>
     <codeInsight.completion.command.provider language="Properties" implementationClass="com.intellij.lang.properties.command.completion.PropertiesFormatCodeCompletionCommandProvider" order="last"/>
+    <codeInsight.completion.command.provider language="Properties" implementationClass="com.intellij.lang.properties.command.completion.PropertiesMovePropertyUpCommandProvider" order="last"/>
+    <codeInsight.completion.command.provider language="Properties" implementationClass="com.intellij.lang.properties.command.completion.PropertiesMovePropertyDownCommandProvider" order="last"/>
+    <codeInsight.completion.command.provider language="Properties" implementationClass="com.intellij.lang.properties.command.completion.PropertiesCommentCommandProvider" order="last"/>
+    <codeInsight.completion.command.provider language="Properties" implementationClass="com.intellij.codeInsight.completion.command.commands.UncommentLineCompletionCommandProvider" order="last"/>
 
+    <statementUpDownMover implementation="com.intellij.lang.properties.editor.PropertiesStatementUpDownMover"/>
+    <applicationSettings service="com.intellij.lang.properties.refactoring.PropertiesRefactoringSettings"/>
+    <applicationSettings service="com.intellij.lang.properties.LastSelectedPropertiesFileStore"/>
   </extensions>
+
   <projectListeners>
     <listener class="com.intellij.lang.properties.Native2AsciiListener" topic="com.intellij.openapi.vfs.encoding.EncodingManagerListener"/>
   </projectListeners>

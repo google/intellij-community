@@ -18,9 +18,7 @@ import org.jetbrains.kotlin.idea.test.addDependency
 import org.jetbrains.kotlin.idea.test.addEmptyClassesRoot
 
 /**
- * This test covers the case where [FirIdeModuleStateModificationService] publishes global modification events, which is the default
- * behavior. The alternative behavior with module-specific modification events is covered by
- * [KotlinModuleSpecificModuleStateModificationTest].
+ * Tests that [FirIdeModuleStateModificationService] publishes global modification events for project structure changes.
  *
  * The global modification event tracker will ensure that no [KotlinModificationEventKind.MODULE_STATE_MODIFICATION] is published, since
  * it's not an allowed event.

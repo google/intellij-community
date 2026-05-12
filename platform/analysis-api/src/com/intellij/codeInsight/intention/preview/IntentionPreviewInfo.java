@@ -5,9 +5,11 @@ import com.intellij.analysis.AnalysisBundle;
 import com.intellij.codeInspection.ProblemDescriptor;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.colors.TextAttributesKey;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsSafe;
+import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.HtmlBuilder;
 import com.intellij.openapi.util.text.HtmlChunk;
@@ -19,6 +21,7 @@ import com.intellij.psi.PsiNamedElement;
 import com.intellij.ui.DeferredIcon;
 import com.intellij.util.IconUtil;
 import com.intellij.util.containers.ContainerUtil;
+import com.intellij.util.ui.Html;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
@@ -95,6 +98,104 @@ public interface IntentionPreviewInfo {
      */
     public @NotNull List<@NotNull CustomDiff> getDiffs() {
       return myDiffs;
+    }
+  }
+
+  final class ModernDiff implements IntentionPreviewInfo {
+    private final @NotNull List<@NotNull DiffInfo> myDiffs;
+    private final @Nullable String myHighlightingMessage;
+    private final @Nullable String myInspectionTitle;
+    private final @Nullable String myCurrentContextDisplayName;
+
+    public ModernDiff(@NotNull List<@NotNull DiffInfo> diffs,
+                      @Nullable String highlightingMessage,
+                      @Nullable String inspectionTitle,
+                      @Nullable String currentContextDisplayName) {
+      myDiffs = diffs;
+      myHighlightingMessage = highlightingMessage;
+      myInspectionTitle = inspectionTitle;
+      myCurrentContextDisplayName = currentContextDisplayName;
+    }
+
+    public ModernDiff(@NotNull List<@NotNull DiffInfo> diffs) {
+      this(diffs, null, null, null);
+    }
+
+    public @NotNull List<@NotNull DiffInfo> getDiffs() {
+      return myDiffs;
+    }
+
+    public @Nullable @NlsSafe String getHighlightingHtml() {
+      return myHighlightingMessage;
+    }
+
+    public @Nullable String getInspectionTitle() {
+      return myInspectionTitle;
+    }
+
+    public @Nullable String getCurrentContextDisplayName() {
+      return myCurrentContextDisplayName;
+    }
+
+    public static final class DiffInfo {
+      private final @NotNull String myOriginalText;
+      private final @NotNull List<Pair<TextRange, TextAttributesKey>> myOriginalHighlighters;
+      private final @NotNull String myModifiedText;
+      private final @NotNull List<Pair<TextRange, TextAttributesKey>> myModifiedHighlighters;
+      private final @Nullable String myFileName;
+      private final @Nullable String myFilePath;
+      private final @NotNull FileType myFileType;
+      private final int myStartLineIndex;
+
+      public DiffInfo(@NotNull String originalText,
+                      @NotNull List<Pair<TextRange, TextAttributesKey>> originalHighlighters,
+                      @NotNull String modifiedText,
+                      @NotNull List<Pair<TextRange, TextAttributesKey>> modifiedHighlighters,
+                      @Nullable String fileName,
+                      @Nullable String filePath,
+                      @NotNull FileType fileType,
+                      int startLineIndex) {
+        myOriginalText = originalText;
+        myOriginalHighlighters = originalHighlighters;
+        myModifiedText = modifiedText;
+        myModifiedHighlighters = modifiedHighlighters;
+        myFileName = fileName;
+        myFilePath = filePath;
+        myFileType = fileType;
+        myStartLineIndex = startLineIndex;
+      }
+
+      public @NotNull String getOriginalText() {
+        return myOriginalText;
+      }
+
+      public @NotNull String getModifiedText() {
+        return myModifiedText;
+      }
+
+      public @Nullable String getFileName() {
+        return myFileName;
+      }
+
+      public @Nullable String getFilePath() {
+        return myFilePath;
+      }
+
+      public @NotNull FileType getFileType() {
+        return myFileType;
+      }
+
+      public int getStartLineIndex() {
+        return myStartLineIndex;
+      }
+
+      public @NotNull List<Pair<TextRange, TextAttributesKey>> getOriginalHighlighters() {
+        return myOriginalHighlighters;
+      }
+
+      public @NotNull List<Pair<TextRange, TextAttributesKey>> getModifiedHighlighters() {
+        return myModifiedHighlighters;
+      }
     }
   }
   

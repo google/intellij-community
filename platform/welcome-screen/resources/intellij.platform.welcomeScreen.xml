@@ -10,7 +10,7 @@
   <!-- endregion -->
 
   <extensionPoints>
-    <extensionPoint name="welcomeScreenProjectProvider" interface="com.intellij.openapi.wm.ex.WelcomeScreenProjectProvider"/>
+    <extensionPoint name="welcomeScreenProjectProvider" interface="com.intellij.openapi.wm.ex.WelcomeScreenProjectProvider" dynamic="true"/>
     <extensionPoint name="noProjectStateHandler" interface="com.intellij.openapi.wm.ex.NoProjectStateHandler"/>
   </extensionPoints>
 </idea-plugin>

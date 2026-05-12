@@ -65,9 +65,9 @@ public class ComboBoxWithWidePopup<E> extends JComboBox<E> {
     return super.getPreferredSize().width;
   }
 
+  @ApiStatus.Internal
   public class AdjustingListCellRenderer implements ListCellRenderer<E> {
 
-    @ApiStatus.Internal
     public final ListCellRenderer<? super E> delegate;
 
     AdjustingListCellRenderer(ListCellRenderer<? super E> delegate) {

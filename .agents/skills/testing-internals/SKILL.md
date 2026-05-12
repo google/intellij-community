@@ -16,7 +16,7 @@ tests.cmd → Bazel → IdeaUltimateRunTestsBuildTarget → TestingTasksImpl →
 
 Key components:
 - **tests.cmd**: Shell script that invokes Bazel with test parameters
-- **Bazel target**: `//build:idea_ultimate_run_tests_build_target`
+- **Bazel target**: `//build:local_idea_ultimate_run_tests_build_target`
 - **TestingOptions**: Parses `-Dintellij.build.test.*` system properties
 - **TestingTasksImpl**: Orchestrates classpath assembly and JVM setup
 - **JUnit runners**: Execute tests in a forked JVM process
@@ -50,7 +50,8 @@ Key components:
 **Solution:** Increase heap size:
 ```bash
 ./tests.cmd \
-  -Dintellij.build.test.patterns=MyTest \
+  --module <module> \
+  --test MyTest \
   -Dintellij.build.test.jvm.memory.options=-Xmx8g
 ```
 
@@ -92,7 +93,8 @@ Key components:
 Enable debug mode to attach a debugger:
 ```bash
 ./tests.cmd \
-  -Dintellij.build.test.patterns=MyTest \
+  --module <module> \
+  --test MyTest \
   -Dintellij.build.test.debug.enabled=true \
   -Dintellij.build.test.debug.port=5005 \
   -Dintellij.build.test.debug.suspend=true
@@ -119,20 +121,20 @@ Then attach debugger to port 5005.
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  1. COMMAND LINE                                                            │
-│     ./tests.cmd -Dintellij.build.test.patterns=MyTest                       │
+│     ./tests.cmd --module <module> --test MyTest                             │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  2. SHELL SCRIPT                                                            │
 │     tests.cmd → community/build/run_build_target.sh                         │
-│     Converts args to --jvm_flag=<arg> format                                │
+│     Maps --module/--test to -D properties, wraps as --jvm_flag=<arg>        │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  3. BAZEL                                                                   │
-│     bazel run //build:idea_ultimate_run_tests_build_target                  │
+│     bazel run //build:local_idea_ultimate_run_tests_build_target            │
 │     (defined in build/BUILD.bazel)                                          │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -169,11 +171,10 @@ Then attach debugger to port 5005.
                     ▼                               ▼
 ┌───────────────────────────────────┐ ┌───────────────────────────────────────┐
 │  8a. JUNIT 5 TESTS                │ │  8b. JUNIT 3/4 TESTS (Legacy)         │
-│  JUnit5TeamCityRunnerFor-         │ │  JUnit5TeamCityRunnerFor-             │
-│  TestsOnClasspath.main()          │ │  TestAllSuite.main()                  │
-│  - Uses JUnit Platform Launcher   │ │  - Wraps legacy tests in JUnit 5     │
-│  - ClassNameFilter                │ │  - BootstrapTests.suite()             │
-│  - PostDiscoveryFilter            │ │  - TestAll.run()                      │
+│  JUnit5TeamCityRunner.main()      │ │  JUnit5TeamCityRunner.main()          │
+│  - Uses JUnit Platform Launcher   │ │  - Uses JUnit Platform Launcher       │
+│  - ClassNameFilter                │ │  - ClassNameFilter                    │
+│  - PostDiscoveryFilter            │ │  - PostDiscoveryFilter                │
 └───────────────────────────────────┘ └───────────────────────────────────────┘
                     │                               │
                     └───────────────┬───────────────┘
@@ -217,7 +218,6 @@ Then attach debugger to port 5005.
 
 | Class | Purpose |
 |-------|---------|
-| `JUnit5TeamCityRunnerForTestsOnClasspath` | Runs JUnit 5 tests, uses `Launcher` API |
 | `JUnit5TeamCityRunner` | Runs JUnit 3/4 tests using the JUnit Vintage test engine, or JUnit5 tests using the JUnit Jupiter test engine |
 | `TCExecutionListener` | Reports test results to TeamCity via service messages |
 
@@ -227,7 +227,6 @@ Then attach debugger to port 5005.
 |-------|---------|
 | `TestCaseLoader` | Discovers and filters test classes |
 | `TestAll` | JUnit 3 test suite, collects all tests |
-| `BootstrapTests` | Bootstrap suite for JUnit 3/4 tests |
 | `TestClassesFilter` | Pattern/group-based test filtering |
 
 #### Bucketing & Distribution
@@ -237,7 +236,6 @@ Then attach debugger to port 5005.
 | `BucketingScheme` | Interface for test distribution |
 | `HashingBucketingScheme` | Default: hash-based distribution |
 | `TestsDurationBucketingScheme` | Duration-aware distribution |
-| `NastradamusBucketingScheme` | AI-powered test distribution |
 
 ## Test Module Hierarchy
 
@@ -251,7 +249,7 @@ Then attach debugger to port 5005.
 | RubyMine | `RubyRunTestsBuildTarget` | `intellij.idea.ultimate.tests.main` | `ruby/build/src/` |
 | CLion | `CLionRunTestsBuildTarget` | `intellij.idea.ultimate.tests.main` | `CIDR/clion-build/src/` |
 
-**Note:** Product entry points (RustRover, RubyMine, CLion) inherit `intellij.idea.ultimate.tests.main` as the default, but to run product-specific tests, use the dedicated test module with `-Dintellij.build.test.main.module`. See [TESTING.md](../testing/SKILL.md#known-test-modules-by-product) for the correct module per product.
+**Note:** Product entry points (RustRover, RubyMine, CLion) inherit `intellij.idea.ultimate.tests.main` as the default, but to run product-specific tests, use the dedicated test module via `--module`. See [TESTING.md](../testing/SKILL.md#known-test-modules-by-product) for the correct module per product.
 
 ### CI-Defined Test Modules
 
@@ -308,7 +306,6 @@ testGroups          // -Dintellij.build.test.groups=<group>
 
 // Test execution
 mainModule          // -Dintellij.build.test.main.module=<module>
-bootstrapSuite      // -Dintellij.build.test.bootstrap.suite=<class>
 attemptCount        // -Dintellij.build.test.attempt.count=<n>
 
 // JVM configuration
@@ -335,15 +332,16 @@ The test target is defined in `build/BUILD.bazel`:
 
 ```python
 java_binary(
-  name = "idea_ultimate_run_tests_build_target",
+  name = "local_idea_ultimate_run_tests_build_target",
   runtime_deps = [":build"],
   main_class = "IdeaUltimateRunTestsBuildTarget",
-  data = ALL_ULTIMATE_TARGETS,
+  data = ALL_ULTIMATE_TARGETS + [BAZEL_TARGETS_JSON_ULTIMATE],
   jvm_flags = [
     "-Dintellij.build.console.exporter.to.temp.file=true",
     "-Dintellij.build.console.messages.verbose=false",
     "-Dintellij.build.clean.output.root=false",      # Reuse compiled classes
     "-Dintellij.build.use.compiled.classes=true",    # Skip recompilation
+    "-Dintellij.build.bazel.targets.json.file=$(rlocationpath %s)" % BAZEL_TARGETS_JSON_ULTIMATE,
   ],
   add_opens = INTELLIJ_ADD_OPENS,
 )
@@ -359,8 +357,6 @@ java_binary(
 "idea.config.path"   → tempDir/config
 "idea.system.path"   → tempDir/system
 "java.io.tmpdir"     → tempDir
-"classpath.file"     → path to file with test classpath
-"bootstrap.testcases" → "com.intellij.AllTests" (or custom suite)
 
 // JVM options:
 "-XX:+HeapDumpOnOutOfMemoryError"
@@ -378,7 +374,7 @@ There are two mechanisms for passing JVM arguments to the test JVM process:
 For JVM memory settings like heap size, use the dedicated property:
 
 ```bash
-./tests.cmd -Dintellij.build.test.jvm.memory.options="-Xmx4g -Xms2g"
+./tests.cmd --module <module> --test <pattern> -Dintellij.build.test.jvm.memory.options="-Xmx4g -Xms2g"
 ```
 
 Multiple options are space-separated within quotes. These options are added to the beginning of the JVM arguments via `VmOptionsGenerator.generate()`.
@@ -401,7 +397,7 @@ jvmArgs.addAll(
 To pass arbitrary system properties to the test JVM, use the `pass.` prefix. The prefix is stripped before passing to the test process:
 
 ```bash
-./tests.cmd -Dpass.my.custom.property=value -Dpass.some.flag=true
+./tests.cmd --module <module> --test <pattern> -Dpass.my.custom.property=value -Dpass.some.flag=true
 ```
 
 Results in test JVM receiving:
@@ -424,7 +420,8 @@ This is a TeamCity convention for passing properties to nested processes.
 
 ```bash
 ./tests.cmd \
-  -Dintellij.build.test.patterns=MyTest \
+  --module <module> \
+  --test MyTest \
   -Dintellij.build.test.jvm.memory.options="-Xmx4g" \
   -Dpass.my.test.flag=enabled \
   -Dpass.debug.level=verbose

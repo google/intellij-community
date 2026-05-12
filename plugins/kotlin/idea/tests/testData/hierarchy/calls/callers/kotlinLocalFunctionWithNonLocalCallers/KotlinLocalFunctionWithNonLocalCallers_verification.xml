@@ -1,5 +1,5 @@
-<node text="test1.foo()  ()" base="true">
-  <node text="test1()  ()">
-    <node text="test()  ()"/>
+<node text="test1.foo() ()" base="true">
+  <node text="test1() ()">
+    <node text="test() ()"/>
   </node>
 </node>

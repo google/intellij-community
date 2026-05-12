@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInspection;
 
 import com.intellij.codeInspection.options.OptPane;
@@ -8,10 +8,11 @@ import com.intellij.modcommand.PsiUpdateModCommandQuickFix;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
-import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.pom.java.JavaFeature;
 import com.intellij.profile.codeInspection.InspectionProjectProfileManager;
+import com.intellij.psi.ElementManipulators;
 import com.intellij.psi.JavaElementVisitor;
+import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiComment;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiElementVisitor;
@@ -133,28 +134,10 @@ public final class TextBlockMigrationInspection extends AbstractBaseJavaLocalIns
     private static void replaceWithTextBlock(@NotNull PsiExpression toReplace, PsiExpression @NotNull [] operands) {
       String[] lines = getContentLines(operands);
       if (lines == null) return;
-      CommentTracker tracker = new CommentTracker();
-      tracker.replaceAndRestoreComments(toReplace, getTextBlock(lines));
-    }
-
-    private static @NotNull String getTextBlock(String @NotNull [] lines) {
-      lines = PsiLiteralUtil.escapeTextBlockCharacters(StringUtil.join(lines), true, true, false).split("(?<=\n)");
-      int indent = PsiLiteralUtil.getTextBlockIndent(lines, true, true);
-      if (indent != 0 && lines.length > 0 && !lines[lines.length - 1].endsWith("\n")) {
-        // append \ + newline at the end of the last line, so we can use closing """ to indent
-        lines[lines.length - 1] += "\\\n";
-      }
-      for (int i = 0; i < lines.length - 1; i++) {
-        String line = lines[i];
-        if (line.endsWith("\\\n") && lines[i + 1].equals("\n")) {
-          lines[i] = line.substring(0, line.length() - 2); // normalize strings with leading newlines
-        }
-      }
-      String content = StringUtil.join(lines);
-      if (content.endsWith(" ")) {
-        content = content.substring(0, content.length() - 1) + "\\s";
-      }
-      return "\"\"\"\n" + content + "\"\"\"";
+      String content = String.join("", lines);
+      PsiExpression emptyTextBlock = JavaPsiFacade.getElementFactory(toReplace.getProject()).createExpressionFromText("\"\"\"\n\"\"\"", null);
+      PsiElement inDocument = new CommentTracker().replaceAndRestoreComments(toReplace, emptyTextBlock);
+      ElementManipulators.getManipulator(inDocument).handleContentChange(inDocument, content);
     }
 
     private static String @Nullable [] getContentLines(PsiExpression @NotNull [] operands) {

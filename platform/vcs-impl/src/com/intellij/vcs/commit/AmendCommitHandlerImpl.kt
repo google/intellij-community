@@ -31,7 +31,7 @@ open class AmendCommitHandlerImpl(private val workflowHandler: AbstractCommitWor
 
   private val workflow get() = workflowHandler.workflow
   protected val commitContext: CommitContext get() = workflow.commitContext
-  protected val project: Project get() = workflow.project
+  override val project: Project get() = workflow.project
 
   private val vcsManager = ProjectLevelVcsManager.getInstance(project)
 
@@ -69,10 +69,10 @@ open class AmendCommitHandlerImpl(private val workflowHandler: AbstractCommitWor
   override fun addAmendCommitModeListener(listener: AmendCommitModeListener, parent: Disposable) =
     amendCommitEventDispatcher.addListener(listener, parent)
 
-  override suspend fun getAmendSpecificCommitTargets(limit: Int): List<CommitToAmend.Specific> {
+  override suspend fun getAmendSpecificCommitTargets(): List<CommitToAmend.Resolved> {
     val singleRoot = getSingleRoot()
     val amendAware = singleRoot?.vcs?.checkinEnvironment as? AmendCommitAware
-    return amendAware?.getAmendSpecificCommitTargets(singleRoot.path, limit) ?: emptyList()
+    return amendAware?.getAmendSpecificCommitTargets(singleRoot.path) ?: emptyList()
   }
 
   private fun setAmendMessage() {

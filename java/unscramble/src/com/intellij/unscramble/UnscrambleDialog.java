@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.unscramble;
 
 import com.intellij.execution.ui.RunContentDescriptor;
@@ -19,10 +19,9 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vcs.ProjectLevelVcsManager;
 import com.intellij.openapi.vcs.configurable.VcsContentAnnotationConfigurable;
 import com.intellij.threadDumpParser.ThreadDumpParser;
-import com.intellij.threadDumpParser.ThreadState;
 import com.intellij.ui.GuiUtils;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.TextFieldWithHistory;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.uiDesigner.core.GridLayoutManager;
 import com.intellij.util.ArrayUtil;
@@ -385,7 +384,7 @@ public class UnscrambleDialog extends DialogWrapper {
     for (UnscrambleSupport unscrambleSupport : UnscrambleSupport.EP_NAME.getExtensionList()) {
       myUnscrambleChooser.addItem(unscrambleSupport);
     }
-    myUnscrambleChooser.setRenderer(SimpleListCellRenderer.create(
+    myUnscrambleChooser.setRenderer(BuilderKt.textListCellRenderer(
       JavaBundle.message("unscramble.no.unscrambler.item"), UnscrambleSupport::getPresentableName));
   }
 
@@ -470,8 +469,11 @@ public class UnscrambleDialog extends DialogWrapper {
     String unscrambledTrace =
       unscrambleSupport == null ? textToUnscramble : unscrambleSupport.unscramble(project, textToUnscramble, logName, settings);
     if (unscrambledTrace == null) return null;
-    List<ThreadState> threadStates = ThreadDumpParser.parse(unscrambledTrace);
-    return UnscrambleUtils.addConsole(project, threadStates, unscrambledTrace);
+    ThreadDumpState threadDumpState = JcmdJsonThreadDumpParserKt.parseJcmdJsonThreadDump(unscrambledTrace);
+    if (threadDumpState == null) {
+      threadDumpState = IntelliJThreadDumpParserKt.parseIntelliJThreadDump(unscrambledTrace);
+    }
+    return UnscrambleUtils.addConsole(project, threadDumpState, unscrambledTrace);
   }
 
   @Override

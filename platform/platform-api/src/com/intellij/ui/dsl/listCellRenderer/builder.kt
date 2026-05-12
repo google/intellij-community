@@ -1,24 +1,26 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui.dsl.listCellRenderer
 
+import com.intellij.util.ui.UIUtil
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
+import javax.swing.ComboBoxEditor
 import javax.swing.ListCellRenderer
 
 @DslMarker
 internal annotation class LcrDslMarker
 
 /**
- * Builds [ListCellRenderer], which can contains several cells with texts, icons and other entities placed in one row.
+ * Builds [ListCellRenderer], which can contain several cells with texts, icons and other entities placed in one row.
  * Covers the most common kinds of renderers and provides all necessary functionality:
  *
  * * Rectangular selection and correct insets for old UI
  * * Rounded selection (including multi-selection), correct insets and height for new UI
- * * Uses correct colors for text in selected/unselected state
- * * Uses gray text and icons in disabled state
- * * Colored text has different color in selected state
+ * * Uses correct colors for text in the selected / unselected state
+ * * Uses gray text and icons in the disabled state
+ * * A dedicated color is used for the selected state, even for colored text
  * * Supports IDE scaling and compact mode
- * * Provides accessibility details for rows: by default, it is concatenation of accessible names of all visible cells
+ * * Provides accessibility details for rows: by default, it is a concatenation of accessible names of all visible cells
  * * Supports `Copy` feature for selected item(-s)
  * * Supports `Search` feature in the settings dialog (can be used from search everywhere as well)
  *
@@ -28,7 +30,6 @@ fun <T> listCellRenderer(init: LcrRow<T>.() -> Unit): ListCellRenderer<T> {
   return UiDslRendererProvider.getInstance().getLcrRenderer(init)
 }
 
-@ApiStatus.Internal
 fun <T> listCellRenderer(nullValue: @Nls String, init: LcrRow<T>.() -> Unit): ListCellRenderer<T?> {
   return listCellRenderer {
     if (value == null) {
@@ -49,7 +50,9 @@ fun <T> textListCellRenderer(textExtractor: (T) -> @Nls String?): ListCellRender
   }
 }
 
-@ApiStatus.Internal
+/**
+ * Simplified version of [listCellRenderer] with one text cell and null value support
+ */
 fun <T> textListCellRenderer(nullValue: @Nls String, textExtractor: (T) -> @Nls String?): ListCellRenderer<T?> {
   return listCellRenderer {
     val value = value
@@ -57,7 +60,9 @@ fun <T> textListCellRenderer(nullValue: @Nls String, textExtractor: (T) -> @Nls 
       text(nullValue)
     }
     else {
-      text(textExtractor(value) ?: nullValue)
+      textExtractor(value)?.let {
+        text(it)
+      }
     }
   }
 }
@@ -74,5 +79,20 @@ fun <T> groupedTextListCellRenderer(textExtractor: (T) -> @Nls String?, separato
         text = it
       }
     }
+  }
+}
+
+/**
+ * A replacement for [com.intellij.ui.EditorComboBoxRenderer] with rounded selection support.
+ */
+@ApiStatus.Internal
+fun <T> comboBoxEditorRenderer(comboBoxEditor: ComboBoxEditor): ListCellRenderer<T> {
+  return listCellRenderer {
+    comboBoxEditor.editorComponent.font?.let {
+      font = it
+    }
+
+    @Suppress("HardCodedStringLiteral")
+    text(UIUtil.htmlInjectionGuard(value)?.toString() ?: "")
   }
 }

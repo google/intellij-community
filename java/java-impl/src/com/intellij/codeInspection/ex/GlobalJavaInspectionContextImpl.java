@@ -246,7 +246,7 @@ public final class GlobalJavaInspectionContextImpl extends GlobalJavaInspectionC
   }
 
   private static <T> void enqueueRequestImpl(RefElement refElement, Map<SmartPsiElementPointer<?>, List<T>> requestMap, T processor) {
-    List<T> requests = requestMap.computeIfAbsent(refElement.getPointer(), __ -> new ArrayList<>());
+    List<T> requests = requestMap.computeIfAbsent(refElement.getPointer(), _ -> new ArrayList<>());
     requests.add(processor);
   }
 

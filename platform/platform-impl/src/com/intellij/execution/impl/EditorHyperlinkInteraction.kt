@@ -1,6 +1,9 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.impl
 
+
+import com.intellij.execution.impl.EditorHyperlinkUsageCollector.HyperlinkFollowedPlace
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.event.EditorMouseEvent
@@ -9,10 +12,11 @@ import com.intellij.openapi.editor.ex.RangeHighlighterEx
 import com.intellij.openapi.editor.markup.EffectType
 import com.intellij.openapi.editor.markup.RangeHighlighter
 import com.intellij.openapi.editor.markup.TextAttributes
+import com.intellij.platform.eel.isMac
+import com.intellij.platform.eel.provider.localEel
 import com.intellij.ui.ColorUtil
 import com.intellij.ui.JBColor
 import com.intellij.util.concurrency.annotations.RequiresEdt
-import com.intellij.util.system.OS
 import java.awt.Cursor
 import java.awt.Font
 import java.awt.event.KeyAdapter
@@ -21,9 +25,10 @@ import java.awt.event.KeyEvent
 internal class EditorHyperlinkInteraction(
   private val editor: EditorEx,
   private val effectSupplier: EditorHyperlinkEffectSupplier,
+  parentDisposable: Disposable,
 ) {
 
-  private val hintManager: InvisibleHyperlinkHintManager = InvisibleHyperlinkHintManager(editor)
+  private val hintManager: InvisibleHyperlinkHintManager = InvisibleHyperlinkHintManager(editor, parentDisposable)
   private var followedLinkWrapper: ChangedAttrsLinkWrapper? = null
   private var hoveredLinkWrapper: ChangedAttrsLinkWrapper? = null
 
@@ -53,11 +58,15 @@ internal class EditorHyperlinkInteraction(
   @RequiresEdt(generateAssertion = false)
   fun followLink(link: RangeHighlighterEx, event: EditorMouseEvent, action: () -> Unit) {
     if (effectSupplier.isInvisibleLink(link) && !event.isCtrlPressed) {
-      hintManager.showHint(event.offset, action)
+      hintManager.showHint(link, event, action)
     }
     else {
       action()
       onLinkFollowed(link)
+      if (effectSupplier.isInvisibleLink(link)) {
+        EditorHyperlinkUsageCollector.logInvisibleHyperlinkFollowed(HyperlinkFollowedPlace.EDITOR_LINK_CTRL_CLICKED)
+      }
+      event.consume()
     }
   }
 
@@ -83,6 +92,7 @@ internal class EditorHyperlinkInteraction(
 
   @RequiresEdt(generateAssertion = false)
   fun linkHovered(link: RangeHighlighter?, e: EditorMouseEvent) {
+    hintManager.onHoveredLinkChange(link, e)
     if (hintManager.isInsideHint(e)) {
       linkHovered(null, false)
     }
@@ -167,10 +177,10 @@ private fun defaultFollowedHyperlinkAttributes(): TextAttributes =
   EditorColorsManager.getInstance().getGlobalScheme().getAttributes(CodeInsightColors.FOLLOWED_HYPERLINK_ATTRIBUTES)
 
 private val EditorMouseEvent.isCtrlPressed: Boolean
-  get() = if (OS.CURRENT == OS.macOS) mouseEvent.isMetaDown else mouseEvent.isControlDown
+  get() = if (localEel.platform.isMac) mouseEvent.isMetaDown else mouseEvent.isControlDown
 
 private val KeyEvent.isCtrlOnly: Boolean
-  get() = when (OS.CURRENT) {
-    OS.macOS -> keyCode == KeyEvent.VK_META
-    else -> keyCode == KeyEvent.VK_CONTROL
+  get() {
+    val ctrlModifier = if (localEel.platform.isMac) KeyEvent.VK_META else KeyEvent.VK_CONTROL
+    return keyCode == ctrlModifier
   }

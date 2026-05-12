@@ -400,12 +400,18 @@ public class JBList<E> extends JList<E> implements ComponentWithEmptyText, Compo
     return increment;
   }
 
+  /**
+   * @deprecated Use setCellRenderer and com.intellij.ui.dsl.listCellRenderer.BuilderKt.listCellRenderer instead
+   */
+  @Deprecated(forRemoval = true)
   @SuppressWarnings("LambdaUnfriendlyMethodOverload")
   public void installCellRenderer(@NotNull Function<? super E, ? extends @NotNull JComponent> fun) {
     setCellRenderer(new SelectionAwareListCellRenderer<>(fun));
   }
 
-  /** @deprecated use {@link #installCellRenderer(Function)} instead */
+  /**
+   * @deprecated Use setCellRenderer and com.intellij.ui.dsl.listCellRenderer.BuilderKt.listCellRenderer instead
+   */
   @Deprecated(forRemoval = true)
   @SuppressWarnings({"LambdaUnfriendlyMethodOverload", "UnnecessaryFullyQualifiedName", "UsagesOfObsoleteApi"})
   public void installCellRenderer(@NotNull com.intellij.util.NotNullFunction<? super E, ? extends JComponent> fun) {

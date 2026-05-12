@@ -8,9 +8,9 @@ public interface TestDialog {
   TestDialog DEFAULT = message -> {
     throw new RuntimeException(message);
   };
-  TestDialog YES = __ -> Messages.YES;
-  TestDialog OK = __ -> Messages.OK;
-  TestDialog NO = __ -> Messages.NO;
+  TestDialog YES = _ -> Messages.YES;
+  TestDialog OK = _ -> Messages.OK;
+  TestDialog NO = _ -> Messages.NO;
 
   int show(@NotNull String message);
 

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceGetOrSet")
 
 package com.intellij.execution.impl
@@ -6,7 +6,6 @@ package com.intellij.execution.impl
 import com.google.common.base.CharMatcher
 import com.intellij.codeInsight.folding.impl.FoldingUtil
 import com.intellij.codeInsight.navigation.IncrementalSearchHandler
-import com.intellij.codeInsight.template.impl.editorActions.TypedActionHandlerBase
 import com.intellij.codeWithMe.ClientId
 import com.intellij.codeWithMe.ClientId.Companion.currentOrNull
 import com.intellij.codeWithMe.ClientId.Companion.isCurrentlyUnderLocalId
@@ -24,7 +23,6 @@ import com.intellij.execution.filters.HyperlinkInfoBase
 import com.intellij.execution.filters.HyperlinkWithPopupMenuInfo
 import com.intellij.execution.filters.InputFilter
 import com.intellij.execution.impl.ConsoleState.NotStartedStated
-import com.intellij.execution.impl.ConsoleViewImpl.Companion.CONSOLE_VIEW_IN_EDITOR_VIEW
 import com.intellij.execution.process.ProcessHandler
 import com.intellij.execution.ui.ConsoleView
 import com.intellij.execution.ui.ConsoleViewContentType
@@ -71,7 +69,6 @@ import com.intellij.openapi.editor.VisualPosition
 import com.intellij.openapi.editor.actionSystem.EditorActionHandler
 import com.intellij.openapi.editor.actionSystem.EditorActionManager
 import com.intellij.openapi.editor.actionSystem.TypedAction
-import com.intellij.openapi.editor.actionSystem.TypedActionHandler
 import com.intellij.openapi.editor.actions.ScrollToTheEndToolbarAction
 import com.intellij.openapi.editor.actions.ToggleUseSoftWrapsToolbarAction
 import com.intellij.openapi.editor.colors.EditorColorsListener
@@ -105,8 +102,6 @@ import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.toolWindow.InternalDecoratorImpl.Companion.componentWithEditorBackgroundAdded
 import com.intellij.toolWindow.InternalDecoratorImpl.Companion.componentWithEditorBackgroundRemoved
 import com.intellij.ui.AncestorListenerAdapter
-import com.intellij.ui.IdeBorderFactory
-import com.intellij.ui.SideBorder
 import com.intellij.ui.awt.RelativePoint
 import com.intellij.util.Alarm
 import com.intellij.util.ArrayUtil
@@ -444,7 +439,6 @@ open class ConsoleViewImpl protected constructor(
     ThreadingAssertions.assertEventDispatchThread()
     val editor = createConsoleEditor()
     registerConsoleEditorActions(editor)
-    editor.scrollPane.border = IdeBorderFactory.createBorder(SideBorder.LEFT)
     val mouseListener: MouseAdapter = object : MouseAdapter() {
       override fun mousePressed(e: MouseEvent) {
         updateStickToEndState(editor, true)
@@ -576,7 +570,7 @@ open class ConsoleViewImpl protected constructor(
     else {
       for (pair in result) {
         if (pair.first != null) {
-          print(pair.first, (if (pair.second == null) contentType else pair.second)!!, null)
+          print(pair.first, (pair.second ?: contentType), null)
         }
       }
     }
@@ -958,6 +952,10 @@ open class ConsoleViewImpl protected constructor(
               object : FlushRunnable(true) {
                 public override fun doRun() {
                   if (heavyUpdateTicket != currentValue) {
+                    val fragment = StringUtil.shortenTextWithEllipsis(
+                      documentCopy.text.trim().replace("\n", " \\n "),
+                      20, 5, true)
+                    LOG.debug("Heavy console filter: outdated, skipping application for '$fragment'")
                     return
                   }
 
@@ -1633,6 +1631,12 @@ open class ConsoleViewImpl protected constructor(
   val text: String
     get() = editor!!.document.text
 
+  @TestOnly
+  @ApiStatus.Internal
+  fun initPredefinedFiltersForTests() {
+    updatePredefinedFiltersLater()
+  }
+
   companion object {
     private const val CONSOLE_VIEW_POPUP_MENU: @NonNls String = "ConsoleView.PopupMenu"
     private val LOG = logger<ConsoleViewImpl>()
@@ -1658,7 +1662,7 @@ private fun initTypedHandler() {
   EditorActionManager.getInstance()
   val typedAction = TypedAction.getInstance()
   @Suppress("DEPRECATION")
-  typedAction.setupHandler(MyTypedHandler(typedAction.handler))
+  typedAction.setupHandler(ConsoleViewTypedHandler(typedAction.handler))
   ourTypedHandlerInitialized = true
 }
 
@@ -1689,16 +1693,4 @@ private fun moveScrollRemoveSelection(editor: Editor, offset: Int) {
   editor.caretModel.moveToOffset(offset)
   editor.scrollingModel.scrollToCaret(ScrollType.RELATIVE)
   editor.selectionModel.removeSelection()
-}
-
-private class MyTypedHandler(originalAction: TypedActionHandler) : TypedActionHandlerBase(originalAction) {
-  override fun execute(editor: Editor, charTyped: Char, dataContext: DataContext) {
-    val consoleView = editor.getUserData(CONSOLE_VIEW_IN_EDITOR_VIEW)
-    if (consoleView == null || !consoleView.state.isRunning || consoleView.isViewer) {
-      myOriginalHandler?.execute(editor, charTyped, dataContext)
-      return
-    }
-    val text = charTyped.toString()
-    consoleView.type(editor, text)
-  }
 }

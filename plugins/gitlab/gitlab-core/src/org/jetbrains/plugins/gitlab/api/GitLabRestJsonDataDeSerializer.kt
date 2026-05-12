@@ -3,7 +3,6 @@ package org.jetbrains.plugins.gitlab.api
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect
 import com.fasterxml.jackson.annotation.JsonInclude
-import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.MapperFeature
@@ -29,7 +28,6 @@ object GitLabRestJsonDataDeSerializer : JsonDataSerializer, JsonDataDeserializer
       .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
       .configure(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE, true)
       .configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false)
-      .configure(JsonParser.Feature.AUTO_CLOSE_SOURCE, false)
       .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
       .serializationInclusion(JsonInclude.Include.NON_NULL)
       .visibility(VisibilityChecker.Std(JsonAutoDetect.Visibility.NONE,

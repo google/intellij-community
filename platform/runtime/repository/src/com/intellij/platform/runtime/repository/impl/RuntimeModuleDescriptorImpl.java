@@ -8,31 +8,23 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
 class RuntimeModuleDescriptorImpl implements RuntimeModuleDescriptor {
-  private final RuntimeModuleId myId;
+  private final RuntimeModuleHeaderImpl myHeader;
   private final List<RuntimeModuleDescriptor> myDependencies;
-  private final Path myBasePath;
-  private final List<String> myResourcePaths;
-  private volatile @Nullable List<ResourceRoot> myResourceRoots;
 
-  RuntimeModuleDescriptorImpl(@NotNull RuntimeModuleId moduleId, @NotNull Path basePath, @NotNull List<String> resourcePaths,
-                              @NotNull List<RuntimeModuleDescriptor> dependencies) {
-    myId = moduleId;
-    myBasePath = basePath;
-    myResourcePaths = resourcePaths;
+  RuntimeModuleDescriptorImpl(@NotNull RuntimeModuleHeaderImpl header, @NotNull List<RuntimeModuleDescriptor> dependencies) {
+    myHeader = header;
     myDependencies = dependencies;
   }
 
   @Override
   public @NotNull RuntimeModuleId getModuleId() {
-    return myId;
+    return myHeader.getModuleId();
   }
 
   @Override
@@ -40,12 +32,12 @@ class RuntimeModuleDescriptorImpl implements RuntimeModuleDescriptor {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
 
-    return myId.equals(((RuntimeModuleDescriptorImpl)o).myId);
+    return myHeader.equals(((RuntimeModuleDescriptorImpl)o).myHeader);
   }
 
   @Override
   public int hashCode() {
-    return myId.hashCode();
+    return myHeader.hashCode();
   }
 
   @Override
@@ -55,34 +47,12 @@ class RuntimeModuleDescriptorImpl implements RuntimeModuleDescriptor {
 
   @Override
   public @NotNull List<Path> getResourceRootPaths() {
-    List<Path> paths = new ArrayList<>();
-    for (ResourceRoot root : resolveResourceRoots()) {
-      paths.add(root.getRootPath());
-    }
-    return paths;
+    return myHeader.getOwnClasspath();
   }
 
   @Override
   public @Nullable InputStream readFile(@NotNull String relativePath) throws IOException {
-    for (ResourceRoot root : resolveResourceRoots()) {
-      InputStream inputStream = root.openFile(relativePath);
-      if (inputStream != null) {
-        return inputStream;
-      }
-    }
-    return null;
-  }
-
-  private @NotNull List<? extends ResourceRoot> resolveResourceRoots() {
-    List<ResourceRoot> resourceRoots = myResourceRoots;
-    if (resourceRoots == null) {
-      resourceRoots = new ArrayList<>(myResourcePaths.size());
-      for (String path : myResourcePaths) {
-        resourceRoots.add(createResourceRoot(myBasePath, path));
-      }
-      myResourceRoots = resourceRoots;
-    }
-    return resourceRoots;
+    return myHeader.readFile(relativePath);
   }
 
   @Override
@@ -101,31 +71,8 @@ class RuntimeModuleDescriptorImpl implements RuntimeModuleDescriptor {
     }
   }
 
-  private static ResourceRoot createResourceRoot(Path baseDir, String relativePath) {
-    Path root = convertToAbsolute(baseDir, relativePath);
-    if (Files.isRegularFile(root)) {
-      return new JarResourceRoot(root);
-    }
-    return new DirectoryResourceRoot(root);
-  }
-
-  private static Path convertToAbsolute(Path baseDir, String relativePath) {
-    if (relativePath.startsWith("$")) {
-      return ResourcePathMacros.resolve(relativePath, baseDir);
-    }
-    Path root = baseDir;
-    while (relativePath.startsWith("../")) {
-      relativePath = relativePath.substring(3);
-      root = root.getParent();
-    }
-    if (!relativePath.isEmpty()) {
-      root = root.resolve(relativePath);
-    }
-    return root;
-  }
-
   @Override
   public String toString() {
-    return "RuntimeModuleDescriptor{id=" + myId + '}';
+    return "RuntimeModuleDescriptor{id=" + getModuleId() + '}';
   }
 }

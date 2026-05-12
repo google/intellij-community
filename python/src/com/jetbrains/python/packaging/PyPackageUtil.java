@@ -48,6 +48,7 @@ import com.jetbrains.python.run.PythonInterpreterTargetEnvironmentFactory;
 import com.jetbrains.python.sdk.CredentialsTypeExChecker;
 import com.jetbrains.python.sdk.PySdkExtKt;
 import com.jetbrains.python.sdk.PythonSdkAdditionalData;
+import com.jetbrains.python.sdk.SdkExtKt;
 import com.jetbrains.python.sdk.flavors.conda.CondaEnvSdkFlavor;
 import com.jetbrains.python.sdk.legacy.PythonSdkUtil;
 import com.jetbrains.python.target.PyTargetAwareAdditionalData;
@@ -211,7 +212,7 @@ public final class PyPackageUtil {
   /**
    * @param newUi                set only for new toolwindow
    * @param calledFromInspection when so, we can't change anything, and if sdk lacks of additional data we do not add it.
-   *                             See {@link PySdkExtKt#getOrCreateAdditionalData(Sdk)}
+   *                             See {@link SdkExtKt#getOrCreateAdditionalData(Sdk)}
    */
   public static boolean packageManagementEnabled(@Nullable Sdk sdk, boolean newUi, boolean calledFromInspection) {
     if (sdk == null) {
@@ -221,10 +222,10 @@ public final class PyPackageUtil {
     var data = calledFromInspection
                ? (ObjectUtils.tryCast(sdk.getSdkAdditionalData(), PythonSdkAdditionalData.class))
                : PySdkExtKt.getOrCreateAdditionalData(sdk);
-    if (!newUi
-        && data != null
+    if (!calledFromInspection
+        && !newUi
         && data.getFlavor() instanceof CondaEnvSdkFlavor
-        && PySdkExtKt.getTargetEnvConfiguration(sdk) != null) {
+        && SdkExtKt.getTargetEnvConfiguration(sdk) != null) {
       LOG.warn("Remote Conda package manager is disabled");
       return false;
     }
@@ -308,7 +309,7 @@ public final class PyPackageUtil {
 
   private static @NotNull Set<VirtualFile> getPackagingAwareSdkRoots(@NotNull Sdk sdk) {
     final Set<VirtualFile> result = Sets.newHashSet(sdk.getRootProvider().getFiles(OrderRootType.CLASSES));
-    var targetAdditionalData = PySdkExtKt.getTargetAdditionalData(sdk);
+    var targetAdditionalData = SdkExtKt.getTargetAdditionalData(sdk);
     if (targetAdditionalData != null) {
       // For targets that support VFS we are interested not only in local dirs, but also for VFS on target
       // When user changes something on WSL FS for example, we still need to trigger path updates

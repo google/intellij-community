@@ -11,12 +11,14 @@ create_kotlinc_options(
 
 jvm_library(
   name = "test",
+  module_name = "fleet.util.codepoints.test",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True)
 )
 
 jvm_library(
   name = "test_test_lib",
+  testonly = True,
   module_name = "fleet.util.codepoints.test",
   visibility = ["//visibility:public"],
   srcs = glob(["srcCommonTest/**/*.kt", "srcCommonTest/**/*.java", "srcCommonTest/**/*.form"], allow_empty = True),
@@ -31,6 +33,12 @@ jvm_library(
   runtime_deps = [":test"]
 )
 ### auto-generated section `build fleet.util.codepoints.test` end
+
+### auto-generated section `iml fleet.util.codepoints.test` start
+exports_files([
+  "fleet.util.codepoints.test.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml fleet.util.codepoints.test` end
 
 ### auto-generated section `test fleet.util.codepoints.test` start
 load("@community//build:tests-options.bzl", "jps_test")

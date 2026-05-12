@@ -21,9 +21,9 @@ import com.intellij.openapi.vfs.JarFileSystem;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.ListUtil;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.ToolbarDecorator;
 import com.intellij.ui.components.JBList;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.ArrayUtil;
 import com.jetbrains.python.PyBundle;
 import com.jetbrains.python.codeInsight.typing.PyBundledStubs;
@@ -107,7 +107,7 @@ public class PythonPathEditor extends SdkPathEditor {
 
   @Override
   protected ListCellRenderer<VirtualFile> createListCellRenderer(JBList<VirtualFile> list) {
-    return SimpleListCellRenderer.create("", value -> {
+    return BuilderKt.textListCellRenderer("", value -> {
       String suffix = myPathListModel.getPresentationSuffix(value);
       if (!suffix.isEmpty()) suffix = "  " + suffix;
       return getPresentablePath(value) + suffix;

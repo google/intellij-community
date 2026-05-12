@@ -1,9 +1,10 @@
-// PROBLEM: 'minus' call removes Path elements
-// FIX: Convert Path to explicit Collection
+// PROBLEM: 'minus' call iterates over the argument instead of removing it as a single element
+// FIX: Convert argument to explicit Collection
 // PRIORITY: LOW
 // IGNORE_K1
 // WITH_STDLIB
-package java.nio.file
+// RUNTIME_WITH_FULL_JDK
+import java.nio.file.Path
 
 class Path {
     fun toSet(): Set<Path> = TODO()

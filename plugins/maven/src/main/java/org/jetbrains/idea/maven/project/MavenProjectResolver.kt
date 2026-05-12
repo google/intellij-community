@@ -5,7 +5,6 @@ import com.intellij.build.events.MessageEvent
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.progress.checkCanceled
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.Pair
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VirtualFile
@@ -195,14 +194,16 @@ class MavenProjectResolver(private val myProject: Project) {
     }
     notifySyncForProblem(problems)
     val projectsWithUnresolvedPlugins = ConcurrentLinkedQueue<MavenProject>()
+    val resolvedProjects = ConcurrentLinkedQueue<MavenProject>()
 
     coroutineScope {
       results.forEach {
         launch {
-          collectProjectWithUnresolvedPlugins(it, effectiveRepositoryPath, embedder, tree, projectsWithUnresolvedPlugins)
+          collectProjectWithUnresolvedPlugins(it, effectiveRepositoryPath, embedder, tree, projectsWithUnresolvedPlugins, resolvedProjects)
         }
       }
     }
+    tree.fireProjectsResolved(resolvedProjects.toList())
 
     // reconnect modules
     results.forEach { aggregator ->
@@ -422,6 +423,7 @@ class MavenProjectResolver(private val myProject: Project) {
     embedder: MavenEmbedderWrapper,
     tree: MavenProjectsTree,
     projectsWithUnresolvedPlugins: ConcurrentLinkedQueue<MavenProject>,
+    resolvedProjects: ConcurrentLinkedQueue<MavenProject>,
   ) {
     val file = result.file
     if (file == null) {
@@ -453,7 +455,6 @@ class MavenProjectResolver(private val myProject: Project) {
       MavenLog.LOG.warn("Maven project not found for $file")
       return
     }
-    val snapshot = mavenProject.snapshot
     val keepPreviousResolutionResults = MavenUtil.shouldKeepPreviousResolutionResults(result.readingProblems)
     val keepPreviousArtifacts = keepPreviousResolutionResults || result.dependencyResolutionSkipped
 
@@ -483,10 +484,8 @@ class MavenProjectResolver(private val myProject: Project) {
     for (contributor in EP_NAME.extensionList) {
       contributor.onMavenProjectResolved(myProject, mavenProject, embedder)
     }
-    // project may be modified by MavenImporters, so we need to collect the changes after them:
-    val changes = mavenProject.getChangesSinceSnapshot(snapshot)
     mavenProject.problems // need for fill problem cache
-    tree.fireProjectResolved(Pair.create(mavenProject, changes))
+    resolvedProjects.add(mavenProject)
     if (!mavenProject.hasReadingErrors()) {
       projectsWithUnresolvedPlugins.add(mavenProject)
     }

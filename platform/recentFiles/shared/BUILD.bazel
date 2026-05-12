@@ -1,18 +1,13 @@
 ### auto-generated section `build intellij.platform.recentFiles` start
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
-
-resourcegroup(
-  name = "recentFiles_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "recentFiles",
   module_name = "intellij.platform.recentFiles",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  resources = [":recentFiles_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/core-api:core",
@@ -30,11 +25,13 @@ jvm_library(
     "//platform/platform-impl:ide-impl",
     "//platform/analysis-api:analysis",
     "//platform/ide-core-impl",
+    "//fleet/rhizomedb",
   ]
 )
 
 jvm_library(
   name = "recentFiles_test_lib",
+  testonly = True,
   module_name = "intellij.platform.recentFiles",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -54,6 +51,13 @@ jvm_library(
     "//platform/platform-impl:ide-impl_test_lib",
     "//platform/analysis-api:analysis_test_lib",
     "//platform/ide-core-impl:ide-core-impl_test_lib",
+    "//fleet/rhizomedb:rhizomedb_test_lib",
   ]
 )
 ### auto-generated section `build intellij.platform.recentFiles` end
+
+### auto-generated section `iml intellij.platform.recentFiles` start
+exports_files([
+  "intellij.platform.recentFiles.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.platform.recentFiles` end

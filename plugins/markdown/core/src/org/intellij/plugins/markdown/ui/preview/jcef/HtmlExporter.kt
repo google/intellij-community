@@ -74,16 +74,11 @@ internal class HtmlExporter(
 
   private fun appendInlineStylesContent(styles: Elements) {
     val inlinedStyles = styles.mapNotNull {
-      val content = getStyleContent(it) ?: return@mapNotNull null
+      val content = getStyleContent(it)?.takeUnless { c -> c.isBlank() } ?: return@mapNotNull null
       Element("style").text(content)
     }
     styles.remove()
-
-    inlinedStyles.forEach {
-      if (it.hasText()) {
-        document.head().appendChild(it)
-      }
-    }
+    inlinedStyles.forEach { document.head().appendChild(it) }
   }
 
   private fun getStyleContent(linkElement: Element): String? {

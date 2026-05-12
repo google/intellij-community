@@ -13,6 +13,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.jetbrains.intellij.build.productLayout.TestFailureLogger
 import org.jetbrains.intellij.build.productLayout.config.ContentModuleSuppression
 import org.jetbrains.intellij.build.productLayout.config.SuppressionConfig
+import org.jetbrains.intellij.build.productLayout.generator.computeExistingDependencyHandling
 import org.jetbrains.intellij.build.productLayout.model.ErrorSink
 import org.jetbrains.intellij.build.productLayout.model.error.DslTestPluginDependencyError
 import org.jetbrains.intellij.build.productLayout.model.error.ErrorCategory
@@ -23,6 +24,7 @@ import org.jetbrains.intellij.build.productLayout.stats.SuppressionUsage
 import org.jetbrains.intellij.build.productLayout.validator.rule.createResolutionQuery
 import org.jetbrains.intellij.build.productLayout.validator.rule.existsAnywhere
 import org.jetbrains.intellij.build.productLayout.validator.rule.forProductionPlugin
+import org.jetbrains.intellij.build.productLayout.xml.extractDependenciesEntries
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.io.TempDir
@@ -192,6 +194,43 @@ class PluginDependencyGeneratorTest {
         .describedAs("Should have at most one diff for shared content module (was duplicated before fix)")
         .hasSizeLessThanOrEqualTo(1)
     }
+  }
+
+  @Test
+  fun `update suppressions ignores manual plugin xml dependencies outside generated region`() {
+    val content = """
+      <idea-plugin>
+        <dependencies>
+          <plugin id="manual.plugin"/>
+          <module name="manual.module"/>
+          <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+          <plugin id="generated.plugin"/>
+          <module name="generated.module"/>
+          <!-- endregion -->
+        </dependencies>
+      </idea-plugin>
+    """.trimIndent()
+
+    val entries = extractDependenciesEntries(content)!!
+    val moduleHandling = computeExistingDependencyHandling(
+      updateSuppressions = true,
+      existingXmlDeps = entries.moduleNames.mapTo(HashSet(), ::ContentModuleName),
+      jpsDeps = emptySet(),
+      suppressedDeps = emptySet(),
+      xmlOnlySuppressionCandidateDeps = entries.managedModuleNames.mapTo(HashSet(), ::ContentModuleName),
+    )
+    val pluginHandling = computeExistingDependencyHandling(
+      updateSuppressions = true,
+      existingXmlDeps = entries.pluginIds.mapTo(HashSet(), ::PluginId),
+      jpsDeps = emptySet(),
+      suppressedDeps = emptySet(),
+      xmlOnlySuppressionCandidateDeps = entries.managedPluginIds.mapTo(HashSet(), ::PluginId),
+    )
+
+    assertThat(moduleHandling.effectiveSuppressedDeps)
+      .containsExactly(ContentModuleName("generated.module"))
+    assertThat(pluginHandling.effectiveSuppressedDeps)
+      .containsExactly(PluginId("generated.plugin"))
   }
 
   // --- ON_DEMAND deps with productAllowedMissing test ---
@@ -536,7 +575,7 @@ class PluginDependencyGeneratorTest {
       )
 
       // Call the REAL function (graph is the source of truth for descriptor existence)
-      val descriptorCache = ModuleDescriptorCache(jps.outputProvider, this)
+      val descriptorCache = ModuleDescriptorCache(jps.outputProvider)
       val graph = pluginGraphWithDescriptors(descriptorCache) {
         moduleWithScopedDeps("intellij.python.processOutput.impl", "intellij.platform.jewel.intUi.standalone" to "COMPILE")
         product("TestProduct") { }
@@ -596,7 +635,7 @@ class PluginDependencyGeneratorTest {
         }
       )
 
-      val descriptorCache = ModuleDescriptorCache(jps.outputProvider, this)
+      val descriptorCache = ModuleDescriptorCache(jps.outputProvider)
       val graph = pluginGraphWithDescriptors(descriptorCache) {
         moduleWithScopedDeps("intellij.consumer.module", "intellij.platform.testFramework.junit5.wsl" to "COMPILE")
         product("TestProduct") { }
@@ -662,7 +701,7 @@ class PluginDependencyGeneratorTest {
         }
       )
 
-      val descriptorCache = ModuleDescriptorCache(jps.outputProvider, this)
+      val descriptorCache = ModuleDescriptorCache(jps.outputProvider)
       val graph = pluginGraphWithDescriptors(descriptorCache) {
         moduleWithScopedDeps("intellij.consumer.module", "intellij.platform.testFramework.junit5.wsl" to "COMPILE")
         product("TestProduct") { }
@@ -728,7 +767,7 @@ class PluginDependencyGeneratorTest {
       )
 
       coroutineScope {
-        val descriptorCache = ModuleDescriptorCache(jps.outputProvider, this)
+        val descriptorCache = ModuleDescriptorCache(jps.outputProvider)
         val graph = pluginGraphWithDescriptors(descriptorCache) {
           target("intellij.foo")
           target("intellij.bar")
@@ -789,7 +828,7 @@ class PluginDependencyGeneratorTest {
         }
       )
 
-      val descriptorCache = ModuleDescriptorCache(jps.outputProvider, this)
+      val descriptorCache = ModuleDescriptorCache(jps.outputProvider)
       val graph = pluginGraphWithDescriptors(descriptorCache) {
         plugin("intellij.dep.plugin") {
           content("intellij.dep.with.descriptor")
@@ -859,7 +898,7 @@ class PluginDependencyGeneratorTest {
         }
       )
 
-      val descriptorCache = ModuleDescriptorCache(jps.outputProvider, this)
+      val descriptorCache = ModuleDescriptorCache(jps.outputProvider)
       val graph = pluginGraphWithDescriptors(descriptorCache) {
         moduleWithScopedDeps("intellij.test.module", "intellij.dep.with.descriptor" to "COMPILE")
         moduleWithScopedDeps("intellij.dep.with.descriptor")
@@ -919,7 +958,7 @@ class PluginDependencyGeneratorTest {
         }
       )
 
-      val descriptorCache = ModuleDescriptorCache(jps.outputProvider, this)
+      val descriptorCache = ModuleDescriptorCache(jps.outputProvider)
       val graph = pluginGraphWithDescriptors(descriptorCache) {
         plugin("intellij.java.plugin") {
           content("intellij.java.impl")
@@ -984,7 +1023,7 @@ class PluginDependencyGeneratorTest {
         }
       )
 
-      val descriptorCache = ModuleDescriptorCache(jps.outputProvider, this)
+      val descriptorCache = ModuleDescriptorCache(jps.outputProvider)
       val graph = pluginGraphWithDescriptors(descriptorCache) {
         plugin("intellij.java.plugin") {
           content("intellij.java.impl")
@@ -1053,7 +1092,7 @@ class PluginDependencyGeneratorTest {
         }
       )
 
-      val descriptorCache = ModuleDescriptorCache(jps.outputProvider, this)
+      val descriptorCache = ModuleDescriptorCache(jps.outputProvider)
       val graph = pluginGraphWithDescriptors(descriptorCache) {
         moduleWithScopedDeps("intellij.test.module", "intellij.libraries.junit4" to "COMPILE")
         moduleWithScopedDeps("intellij.libraries.junit4")
@@ -1114,7 +1153,7 @@ class PluginDependencyGeneratorTest {
       )
 
       val errorSink = ErrorSink()
-      val descriptorCache = ModuleDescriptorCache(jps.outputProvider, this)
+      val descriptorCache = ModuleDescriptorCache(jps.outputProvider)
       val graph = pluginGraphWithDescriptors(descriptorCache) {
         moduleWithScopedDeps("intellij.test.module", "intellij.libraries.junit4" to "COMPILE")
         product("TestProduct") { }
@@ -1175,7 +1214,7 @@ class PluginDependencyGeneratorTest {
         }
       )
 
-      val descriptorCache = ModuleDescriptorCache(jps.outputProvider, this)
+      val descriptorCache = ModuleDescriptorCache(jps.outputProvider)
       val graph = pluginGraphWithDescriptors(descriptorCache) {
         moduleWithScopedDeps("intellij.content.module", "intellij.dep.resolvable" to "COMPILE")
         product("TestProduct") { }
@@ -1234,7 +1273,7 @@ class PluginDependencyGeneratorTest {
         }
       )
 
-      val descriptorCache = ModuleDescriptorCache(jps.outputProvider, this)
+      val descriptorCache = ModuleDescriptorCache(jps.outputProvider)
       val graph = pluginGraphWithDescriptors(descriptorCache) {
         product("TestProduct") { bundlesPlugin("intellij.owner.plugin") }
         plugin("intellij.owner.plugin") { content("intellij.owner.module") }
@@ -1295,7 +1334,7 @@ class PluginDependencyGeneratorTest {
         additionalBundledPluginTargetNames = listOf(TargetName("intellij.owner.plugin")),
       )
 
-      val descriptorCache = ModuleDescriptorCache(jps.outputProvider, this)
+      val descriptorCache = ModuleDescriptorCache(jps.outputProvider)
       val graph = pluginGraphWithDescriptors(descriptorCache) {
         product("TestProduct") { }
         plugin("intellij.owner.plugin") { content("intellij.owner.module") }
@@ -1355,7 +1394,7 @@ class PluginDependencyGeneratorTest {
         }
       )
 
-      val descriptorCache = ModuleDescriptorCache(jps.outputProvider, this)
+      val descriptorCache = ModuleDescriptorCache(jps.outputProvider)
       val graph = pluginGraphWithDescriptors(descriptorCache) {
         product("TestProduct") { bundlesTestPlugin("intellij.owner.plugin") }
         testPlugin("intellij.owner.plugin") { content("intellij.owner.module") }
@@ -1420,7 +1459,7 @@ class PluginDependencyGeneratorTest {
         }
       )
 
-      val descriptorCache = ModuleDescriptorCache(jps.outputProvider, this)
+      val descriptorCache = ModuleDescriptorCache(jps.outputProvider)
       val graph = pluginGraphWithDescriptors(descriptorCache) {
         product("TestProduct") { }
         testPlugin("intellij.owner.plugin") { content("intellij.owner.module") }
@@ -1495,7 +1534,7 @@ class PluginDependencyGeneratorTest {
       )
 
       // Call the REAL function (graph is the source of truth for descriptor existence)
-      val descriptorCache = ModuleDescriptorCache(jps.outputProvider, this)
+      val descriptorCache = ModuleDescriptorCache(jps.outputProvider)
       val graph = pluginGraphWithDescriptors(descriptorCache) {
         moduleWithScopedDeps(
           "intellij.content.module",
@@ -1607,7 +1646,173 @@ class PluginDependencyGeneratorTest {
       if (pluginXmlDiff != null) {
         assertThat(pluginXmlDiff.expectedContent)
           .describedAs("Plugin XML should skip globally embedded module dependency")
-        .doesNotContain("""<module name="intellij.platform.core"/>""")
+          .doesNotContain("""<module name="intellij.platform.core"/>""")
+      }
+    }
+  }
+
+  @Test
+  fun `plugin dependency embedded only in subset of products is kept`(@TempDir tempDir: Path) {
+    runBlocking(Dispatchers.Default) {
+      val setup = pluginTestSetup(tempDir) {
+        contentModule("intellij.platform.frontend.split") {
+          descriptor = """<idea-plugin package="com.intellij.frontend.split"/>"""
+        }
+
+        contentModule("intellij.my.content") {
+          descriptor = """<idea-plugin package="com.intellij.content"/>"""
+          jpsDependency("intellij.platform.frontend.split")
+        }
+
+        plugin("intellij.my.plugin") {
+          content("intellij.my.content")
+        }
+
+        product("Idea") {
+          bundlesPlugin("intellij.my.plugin")
+        }
+
+        product("JetBrainsClient") {
+          bundlesPlugin("intellij.my.plugin")
+          moduleSet("client.set") {
+            module("intellij.platform.frontend.split", com.intellij.platform.pluginSystem.parser.impl.elements.ModuleLoadingRuleValue.EMBEDDED)
+          }
+        }
+      }
+
+      setup.generateDependencies(listOf("intellij.my.plugin"))
+
+      val diffs = setup.strategy.getDiffs()
+      val pluginXmlDiff = diffs.find { it.path.toString().contains("intellij.my.plugin") && it.path.toString().endsWith("plugin.xml") }
+
+      if (pluginXmlDiff != null) {
+        assertThat(pluginXmlDiff.expectedContent)
+          .describedAs("Dependency must be kept when target is not globally embedded")
+          .contains("""<module name="intellij.platform.frontend.split"/>""")
+      }
+    }
+  }
+
+  @Test
+  fun `plugin dependency embedded in all bundled products is skipped`(@TempDir tempDir: Path) {
+    runBlocking(Dispatchers.Default) {
+      val setup = pluginTestSetup(tempDir) {
+        contentModule("intellij.platform.frontend.split") {
+          descriptor = """<idea-plugin package="com.intellij.frontend.split"/>"""
+        }
+
+        contentModule("intellij.my.content") {
+          descriptor = """<idea-plugin package="com.intellij.content"/>"""
+          jpsDependency("intellij.platform.frontend.split")
+        }
+
+        plugin("intellij.my.plugin") {
+          content("intellij.my.content")
+        }
+
+        product("Idea") {
+          // Plugin is not bundled in Idea.
+        }
+
+        product("JetBrainsClient") {
+          bundlesPlugin("intellij.my.plugin")
+          moduleSet("client.set") {
+            module("intellij.platform.frontend.split", com.intellij.platform.pluginSystem.parser.impl.elements.ModuleLoadingRuleValue.EMBEDDED)
+          }
+        }
+      }
+
+      setup.generateDependencies(listOf("intellij.my.plugin"))
+
+      val diffs = setup.strategy.getDiffs()
+      val pluginXmlDiff = diffs.find { it.path.toString().contains("intellij.my.plugin") && it.path.toString().endsWith("plugin.xml") }
+
+      if (pluginXmlDiff != null) {
+        assertThat(pluginXmlDiff.expectedContent)
+          .describedAs("Dependency should be skipped when embedded in all products where plugin is bundled")
+          .doesNotContain("""<module name="intellij.platform.frontend.split"/>""")
+      }
+    }
+  }
+
+  @Test
+  fun `plugin dependency is kept when only bundled owner plugin provides target`(@TempDir tempDir: Path) {
+    runBlocking(Dispatchers.Default) {
+      val setup = pluginTestSetup(tempDir) {
+        contentModule("intellij.platform.ide.impl") {
+          descriptor = """<idea-plugin package="com.intellij.ide.impl"/>"""
+        }
+
+        contentModule("intellij.my.content") {
+          descriptor = """<idea-plugin package="com.intellij.content"/>"""
+          jpsDependency("intellij.platform.ide.impl")
+        }
+
+        plugin("intellij.platform.owner") {
+          content("intellij.platform.ide.impl", com.intellij.platform.pluginSystem.parser.impl.elements.ModuleLoadingRuleValue.EMBEDDED)
+        }
+
+        plugin("intellij.my.plugin") {
+          content("intellij.my.content")
+        }
+
+        product("CodeServer") {
+          bundlesPlugin("intellij.my.plugin")
+        }
+
+        product("Idea") {
+          bundlesPlugin("intellij.my.plugin")
+          bundlesPlugin("intellij.platform.owner")
+        }
+      }
+
+      setup.generateDependencies(listOf("intellij.my.plugin", "intellij.platform.owner"))
+
+      val diffs = setup.strategy.getDiffs()
+      val pluginXmlDiff = diffs.find { it.path.toString().contains("intellij.my.plugin") && it.path.toString().endsWith("plugin.xml") }
+
+      if (pluginXmlDiff != null) {
+        assertThat(pluginXmlDiff.expectedContent)
+          .describedAs("Bundled plugin content alone does not make the target globally embedded")
+          .contains("""<module name="intellij.platform.ide.impl"/>""")
+      }
+    }
+  }
+
+  @Test
+  fun `plugin dependency on globally embedded module is skipped for non-bundled plugin`(@TempDir tempDir: Path) {
+    runBlocking(Dispatchers.Default) {
+      val setup = pluginTestSetup(tempDir) {
+        contentModule("intellij.platform.core") {
+          descriptor = """<idea-plugin package="com.intellij.core"/>"""
+        }
+
+        contentModule("intellij.my.content") {
+          descriptor = """<idea-plugin package="com.intellij.content"/>"""
+          jpsDependency("intellij.platform.core")
+        }
+
+        plugin("intellij.my.plugin") {
+          content("intellij.my.content")
+        }
+
+        // Plugin intentionally remains non-bundled.
+        product("TestProduct") {
+          moduleSet("essential") {
+            module("intellij.platform.core", com.intellij.platform.pluginSystem.parser.impl.elements.ModuleLoadingRuleValue.EMBEDDED)
+          }
+        }
+      }
+
+      setup.generateDependencies(listOf("intellij.my.plugin"))
+
+      val diffs = setup.strategy.getDiffs()
+      val pluginXmlDiff = diffs.find { it.path.toString().contains("intellij.my.plugin") && it.path.toString().endsWith("plugin.xml") }
+
+      if (pluginXmlDiff != null) {
+        assertThat(pluginXmlDiff.expectedContent)
+          .describedAs("Non-bundled plugin should skip globally embedded dependency")
+          .doesNotContain("""<module name="intellij.platform.core"/>""")
       }
     }
   }
@@ -1652,7 +1857,7 @@ class PluginDependencyGeneratorTest {
       if (pluginXmlDiff != null) {
         assertThat(pluginXmlDiff.expectedContent)
           .describedAs("Module in another plugin is NOT globally embedded, should be kept")
-        .contains("""<module name="intellij.vcs.core"/>""")
+          .contains("""<module name="intellij.vcs.core"/>""")
       }
     }
   }
@@ -1692,7 +1897,7 @@ class PluginDependencyGeneratorTest {
       if (pluginXmlDiff != null) {
         assertThat(pluginXmlDiff.expectedContent)
           .describedAs("Module with REQUIRED loading is NOT globally embedded, should be kept")
-        .contains("""<module name="intellij.platform.optional"/>""")
+          .contains("""<module name="intellij.platform.optional"/>""")
       }
     }
   }
@@ -1719,7 +1924,7 @@ class PluginDependencyGeneratorTest {
       }
 
       coroutineScope {
-        val descriptorCache = ModuleDescriptorCache(setup.jps.outputProvider, this)
+        val descriptorCache = ModuleDescriptorCache(setup.jps.outputProvider)
         val info = descriptorCache.getOrAnalyze("intellij.regexp")
 
         assertThat(info).isNotNull()
@@ -1746,17 +1951,15 @@ class PluginDependencyGeneratorTest {
         }
       }
 
-      coroutineScope {
-        val descriptorCache = ModuleDescriptorCache(setup.jps.outputProvider, this)
-        val info = descriptorCache.getOrAnalyze("intellij.nonstandard")
+      val descriptorCache = ModuleDescriptorCache(setup.jps.outputProvider)
+      val info = descriptorCache.getOrAnalyze("intellij.nonstandard")
 
-        assertThat(info).isNotNull()
-        assertThat(info!!.suppressibleError)
-          .describedAs("<dependencies> root should trigger NON_STANDARD_DESCRIPTOR_ROOT")
-          .isNotNull()
-        assertThat(info.suppressibleError!!.category)
-          .isEqualTo(ErrorCategory.NON_STANDARD_DESCRIPTOR_ROOT)
-      }
+      assertThat(info).isNotNull()
+      assertThat(info!!.suppressibleError)
+        .describedAs("<dependencies> root should trigger NON_STANDARD_DESCRIPTOR_ROOT")
+        .isNotNull()
+      assertThat(info.suppressibleError!!.category)
+        .isEqualTo(ErrorCategory.NON_STANDARD_DESCRIPTOR_ROOT)
     }
   }
 
@@ -1778,18 +1981,16 @@ class PluginDependencyGeneratorTest {
         }
       }
 
-      coroutineScope {
-        val descriptorCache = ModuleDescriptorCache(setup.jps.outputProvider, this)
-        val info = descriptorCache.getOrAnalyze("intellij.standard")
+      val descriptorCache = ModuleDescriptorCache(setup.jps.outputProvider)
+      val info = descriptorCache.getOrAnalyze("intellij.standard")
 
-        assertThat(info).isNotNull()
-        assertThat(info!!.suppressibleError)
-          .describedAs("Standard <idea-plugin> with <dependencies> should NOT trigger error")
-          .isNull()
-        // Parser should have extracted dependencies
-        assertThat(info.existingModuleDependencies).contains("intellij.platform.ide")
-        assertThat(info.existingPluginDependencies).contains("com.intellij.copyright")
-      }
+      assertThat(info).isNotNull()
+      assertThat(info!!.suppressibleError)
+        .describedAs("Standard <idea-plugin> with <dependencies> should NOT trigger error")
+        .isNull()
+      // Parser should have extracted dependencies
+      assertThat(info.existingModuleDependencies).contains("intellij.platform.ide")
+      assertThat(info.existingPluginDependencies).contains("com.intellij.copyright")
     }
   }
 }

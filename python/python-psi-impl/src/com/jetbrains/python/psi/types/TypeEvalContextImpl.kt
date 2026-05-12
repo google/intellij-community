@@ -3,10 +3,10 @@ package com.jetbrains.python.psi.types
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.module.ModuleUtilCore
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.util.RecursionManager
-import com.intellij.openapi.util.Ref
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
@@ -27,6 +27,7 @@ import com.jetbrains.python.psi.types.engine.PyTypeEngine
 import com.jetbrains.python.psi.types.engine.PyTypeEngineProvider
 import com.jetbrains.python.pyi.PyiLanguageDialect
 import org.jetbrains.annotations.ApiStatus
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
 import kotlin.concurrent.Volatile
 
@@ -44,21 +45,19 @@ open class TypeEvalContextImpl internal constructor(
 
   private val myProcessingContext = ThreadLocal.withInitial { ProcessingContext() }
 
-  private var typeEngine: PyTypeEngine? = null
+  @ApiStatus.Internal
+  val typeEngine: PyTypeEngine? = constraints.myOrigin?.let {
+    ModuleUtilCore.findModuleForFile(it) }?.let { module ->
+    PyTypeEngineProvider.createTypeResolver(module)
+  }
   protected val myEvaluated: MutableMap<PyTypedElement?, PyType?> = getConcurrentMapForCaching()
   protected val myEvaluatedReturn: MutableMap<PyCallable?, PyType?> = getConcurrentMapForCaching()
-  protected val contextTypeCache: ConcurrentMap<Pair<PyExpression?, Any?>, PyType> = getConcurrentMapForCaching()
+  protected val contextTypeCache: ConcurrentMap<Pair<Any, Any>, PyType> = getConcurrentMapForCaching()
 
-  internal constructor(allowDataFlow: Boolean, allowStubToAST: Boolean, allowCallContext: Boolean, origin: PsiFile?) : this(
-    TypeEvalConstraints(allowDataFlow, allowStubToAST, allowCallContext, origin)
+  internal constructor(allowDataFlow: Boolean, allowStubToAST: Boolean, allowCallContext: Boolean, isExternal: Boolean, origin: PsiFile?) : this(
+    TypeEvalConstraints(allowDataFlow, allowStubToAST, allowCallContext, isExternal, origin)
   )
 
-  init {
-    val origin = constraints.myOrigin
-    if (origin != null) {
-      typeEngine = PyTypeEngineProvider.createTypeResolver(origin.project)
-    }
-  }
 
   override fun toString(): String {
     return "TypeEvalContext(${constraints.myAllowDataFlow}, ${constraints.myAllowStubToAST}, ${constraints.myOrigin})"
@@ -79,6 +78,9 @@ open class TypeEvalContextImpl internal constructor(
   override fun maySwitchToAST(element: PsiElement): Boolean {
     return constraints.myAllowStubToAST && !element.inPyiFile() || inOrigin(element)
   }
+
+  @ApiStatus.Internal
+  override fun isExternal(): Boolean = constraints.myIsExternal
 
   override fun withTracing(): TypeEvalContext {
     if (myTrace == null) {
@@ -115,12 +117,8 @@ open class TypeEvalContextImpl internal constructor(
 
   @ApiStatus.Internal
   override fun <R> assumeType(element: PyTypedElement, type: PyType?, func: (TypeEvalContext?) -> R): R? {
-    if (!Registry.Companion.`is`("python.use.better.control.flow.type.inference")) {
+    if (!Registry.`is`("python.use.better.control.flow.type.inference")) {
       return func(this)
-    }
-    if (getKnownType(element) != null) {
-      // Temporary solution, as overwriting known type might introduce inconsistencies with its dependencies.
-      return null
     }
     val context = AssumptionContext(this, element, type)
     return try {
@@ -136,14 +134,9 @@ open class TypeEvalContextImpl internal constructor(
     return this is AssumptionContext
   }
 
-  @ApiStatus.Internal
-  override fun isKnown(element: PyTypedElement): Boolean {
-    return getKnownType(element) != null
-  }
-
   override fun getKnownType(element: PyTypedElement): PyType? {
     if (element is PyInstantTypeProvider) {
-      return element.getType(this, getKey())
+      return element.getType(this, KeyImpl)
     }
     return myEvaluated[element]?.also {
       assertValid(it, element)
@@ -163,6 +156,7 @@ open class TypeEvalContextImpl internal constructor(
       constraints.myAllowDataFlow,
       constraints.myAllowStubToAST,
       constraints.myAllowCallContext,
+      constraints.myIsExternal,
       origin,
     )
     return project.service<TypeEvalContextCache>()
@@ -173,7 +167,7 @@ open class TypeEvalContextImpl internal constructor(
    * If true the element's type will be calculated and stored in the long-life context bounded to the PyLibraryModificationTracker.
    */
   protected open fun canDelegateToLibraryContext(element: PyTypedElement): Boolean {
-    return Registry.Companion.`is`("python.use.separated.libraries.type.cache") && element.isLibraryElement()
+    return Registry.`is`("python.use.separated.libraries.type.cache") && element.isLibraryElement()
   }
 
   override fun getType(element: PyTypedElement): PyType? {
@@ -188,26 +182,25 @@ open class TypeEvalContextImpl internal constructor(
     }
 
     return RecursionManager.doPreventingRecursion(element to this, false) {
-      val type: PyType?
-      if (typeEngine != null && typeEngine!!.isSupportedForResolve(element)) {
-        val startTime = System.currentTimeMillis()
-        type = Ref.deref(typeEngine!!.resolveType(element, this is LibraryTypeEvalContext))
-        val duration = System.currentTimeMillis() - startTime
-        PyTypeEvaluationStatisticsService.getInstance().logHybridTypeEngineTime(duration)
+      val engine = typeEngine
+      val type = if (engine != null && engine.isSupportedForResolve(element)) {
+        PyTypeEvaluationAggregatesCollector.recordHybridTypeEngineTime(engine) {
+          val isUserInitiated = constraints.myAllowStubToAST && constraints.myAllowDataFlow
+          engine.resolveType(element, this is LibraryTypeEvalContext, isUserInitiated)?.get()
+        }
       }
       else {
-        val startTime = System.currentTimeMillis()
-        type = element.getType(this, getKey())
-        val duration = System.currentTimeMillis() - startTime
-        PyTypeEvaluationStatisticsService.getInstance().logJBTypeEngineTime(duration)
+        PyTypeEvaluationAggregatesCollector.recordPyCharmTypeEngineTime {
+          element.getType(this, KeyImpl)
+        }
       }
 
       assertValid(type, element)
+      PyAnyType.validate(type)
       myEvaluated[element] = type ?: PyNullType
       type
-    }
+    } ?: PyAnyType.unknown
   }
-
 
   override fun getReturnType(callable: PyCallable): PyType? {
     if (canDelegateToLibraryContext(callable)) {
@@ -220,8 +213,9 @@ open class TypeEvalContextImpl internal constructor(
       return if (knownReturnType is PyNullType) null else knownReturnType
     }
     return RecursionManager.doPreventingRecursion(callable to this, false) {
-      val type = callable.getReturnType(this, getKey())
+      val type = callable.getReturnType(this, KeyImpl)
       assertValid(type, callable)
+      PyAnyType.validate(type)
       myEvaluatedReturn[callable] = type ?: PyNullType
       type
     }
@@ -242,11 +236,11 @@ open class TypeEvalContextImpl internal constructor(
 
   override val origin: PsiFile? = constraints.myOrigin
 
-  override val usesExternalTypeProvider: Boolean
+  override val usesExternalTypeEngine: Boolean
     get() = typeEngine != null
 
   @ApiStatus.Internal
-  override fun getContextTypeCache(): MutableMap<Pair<PyExpression?, Any?>, PyType?> {
+  override fun getContextTypeCache(): MutableMap<Pair<Any, Any>, PyType?> {
     return contextTypeCache
   }
 
@@ -296,6 +290,9 @@ open class TypeEvalContextImpl internal constructor(
 
   class AssumptionContext(val myParent: TypeEvalContextImpl, element: PyTypedElement, type: PyType?) :
     TypeEvalContextImpl(myParent.constraints) {
+    
+    val myInstructionCache: MutableMap<List<Any>, PyType> = ConcurrentHashMap()
+    
     init {
       myEvaluated[element] = type ?: PyNullType
     }
@@ -324,6 +321,27 @@ open class TypeEvalContextImpl internal constructor(
       // Otherwise, it can be equal to other AssumptionContext with same constraints
       return this === other
     }
+    
+    fun getKnownTypeForInstruction(anchor: PyExpression, deducedType: PyType, num: Int): PyType? {
+      if (myParent is AssumptionContext) {
+        return myParent.getKnownTypeForInstruction(anchor, deducedType, num)
+      }
+      return myInstructionCache.get(listOf(anchor, deducedType, num))
+    }
+    
+    fun setKnownTypeForInstruction(anchor: PyExpression, deducedType: PyType, num: Int, type: PyType) {
+      if (myParent is AssumptionContext) {
+        myParent.setKnownTypeForInstruction(anchor, deducedType, num, type)
+      }
+      else {
+        myInstructionCache.put(listOf(anchor, deducedType, num), type)
+      }
+    }
+
+    @ApiStatus.Internal
+    override fun getContextTypeCache(): MutableMap<Pair<Any, Any>, PyType?> {
+      return myParent.getContextTypeCache()
+    }
   }
 
   private class LibraryTypeEvalContext(constraints: TypeEvalConstraints) : TypeEvalContextImpl(constraints) {
@@ -334,7 +352,7 @@ open class TypeEvalContextImpl internal constructor(
   }
 
   class OptimizedTypeEvalContext(allowDataFlow: Boolean, allowStubToAST: Boolean, allowCallContext: Boolean, origin: PsiFile?) :
-    TypeEvalContextImpl(allowDataFlow, allowStubToAST, allowCallContext, origin) {
+    TypeEvalContextImpl(allowDataFlow, allowStubToAST, allowCallContext, false, origin) {
     @Volatile
     private var codeInsightFallback: TypeEvalContext? = null
 
@@ -396,7 +414,7 @@ open class TypeEvalContextImpl internal constructor(
       // Just in case, set it to a reasonable value
       // `Runtime.availableProcessors` shouldn't be called here, as that is a potentially expensive operation
       val concurrencyLevel = 4
-      if (Registry.Companion.`is`("python.typing.weak.keys.type.eval.context")) {
+      if (Registry.`is`("python.typing.weak.keys.type.eval.context")) {
         return CollectionFactory.createConcurrentWeakKeySoftValueMap(
           10,
           0.75f,
@@ -404,7 +422,7 @@ open class TypeEvalContextImpl internal constructor(
           HashingStrategy.canonical<T>()
         )
       }
-      else if (Registry.Companion.`is`("python.typing.soft.keys.type.eval.context")) {
+      else if (Registry.`is`("python.typing.soft.keys.type.eval.context")) {
         return CollectionFactory.createConcurrentSoftKeySoftValueMap(10, 0.75f, concurrencyLevel)
       }
       else {

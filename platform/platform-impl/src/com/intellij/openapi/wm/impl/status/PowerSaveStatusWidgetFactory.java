@@ -74,7 +74,7 @@ final class PowerSaveStatusWidgetFactory implements StatusBarWidgetFactory {
 
     @Override
     public @NotNull Consumer<MouseEvent> getClickConsumer() {
-      return __ -> PowerSaveMode.setEnabled(!PowerSaveMode.isEnabled());
+      return _ -> PowerSaveMode.setEnabled(!PowerSaveMode.isEnabled());
     }
 
     @Override

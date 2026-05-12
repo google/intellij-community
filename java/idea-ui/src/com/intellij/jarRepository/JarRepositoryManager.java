@@ -705,7 +705,7 @@ public final class JarRepositoryManager {
             FileUtil.copy(repoFile, toFile);
           }
         }
-        else if (!targetRepositoryMachine.ownsPath(Path.of(each.getFile().getPath()))) {
+        else if (!EelProviderUtil.ownsPath(targetRepositoryMachine, Path.of(each.getFile().getPath()))) {
           // if .m2 is located remotely, then we need to copy the files to the remote location
           String suffix = repoFile.getAbsolutePath().substring(repositoryPath.length());
           String actualPath = repositoryPath + suffix;

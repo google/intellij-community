@@ -13,6 +13,8 @@ internal class KotlinNotPostfixTemplate : NotPostfixTemplate {
         /* selector = */ allExpressions(ValuedFilter, NotExpressionFilter, ExpressionTypeFilter { it.isBooleanType && !it.isMarkedNullable }),
         /* provider = */ provider
     )
+
+    override fun isApplicableForModCommand(): Boolean = true
 }
 
 private object NotExpressionFilter : (KtExpression) -> Boolean {

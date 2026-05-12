@@ -44,7 +44,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.junit.Test;
 
-import java.io.File;
+import java.nio.file.Path;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
@@ -77,8 +77,7 @@ public class PythonSkeletonsTest extends PyEnvTestCase {
           final VirtualFile virtualFile = builtins.getVirtualFile();
           assertNotNull(virtualFile);
           assertTrue(virtualFile.isInLocalFileSystem());
-          final String path = virtualFile.getPath();
-          final PySkeletonHeader header = PySkeletonHeader.readSkeletonHeader(new File(path));
+          final PySkeletonHeader header = PySkeletonHeader.readSkeletonHeader(virtualFile.toNioPath());
           assertNotNull(header);
           final int version = header.getVersion();
           assertTrue("Header version must be > 0, currently it is " + version, version > 0);

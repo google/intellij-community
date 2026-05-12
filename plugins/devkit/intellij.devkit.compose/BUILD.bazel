@@ -1,6 +1,6 @@
 ### auto-generated section `build intellij.devkit.compose` start
 load("//build:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_library", "resourcegroup")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom_compose",
@@ -11,18 +11,13 @@ create_kotlinc_options(
   plugin_options = ["plugin:androidx.compose.compiler.plugins.kotlin:generateFunctionKeyMetaAnnotations=true"]
 )
 
-resourcegroup(
-  name = "compose_resources",
-  srcs = glob(["resources/**/*"]),
-  strip_prefix = "resources"
-)
-
 jvm_library(
   name = "compose",
   module_name = "intellij.devkit.compose",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
-  resources = [":compose_resources"],
+  resources = glob(["resources/**/*"]),
+  resource_strip_prefix = "resources",
   kotlinc_opts = ":custom_compose",
   deps = [
     "@lib//:kotlin-stdlib",
@@ -31,6 +26,7 @@ jvm_library(
     "//platform/ide-core",
     "//platform/progress/shared:ide-progress",
     "//platform/core-api:core",
+    "//platform/lang-api:lang",
     "//xml/xml-psi-api:psi",
     "//xml/impl",
     "//platform/core-ui",
@@ -61,6 +57,7 @@ jvm_library(
     "//platform/platform-util-io:ide-util-io",
     "//platform/execution-impl",
     "//platform/util/jdom",
+    "//platform/util:util-ui",
     "//platform/external-system-impl:externalSystem-impl",
     "//plugins/gradle",
   ],
@@ -69,6 +66,7 @@ jvm_library(
 
 jvm_library(
   name = "compose_test_lib",
+  testonly = True,
   module_name = "intellij.devkit.compose",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
@@ -80,6 +78,7 @@ jvm_library(
     "//platform/ide-core:ide-core_test_lib",
     "//platform/progress/shared:ide-progress_test_lib",
     "//platform/core-api:core_test_lib",
+    "//platform/lang-api:lang_test_lib",
     "//xml/xml-psi-api:psi_test_lib",
     "//xml/impl:impl_test_lib",
     "//platform/core-ui:core-ui_test_lib",
@@ -110,9 +109,16 @@ jvm_library(
     "//platform/platform-util-io:ide-util-io_test_lib",
     "//platform/execution-impl:execution-impl_test_lib",
     "//platform/util/jdom:jdom_test_lib",
+    "//platform/util:util-ui_test_lib",
     "//platform/external-system-impl:externalSystem-impl_test_lib",
     "//plugins/gradle:gradle_test_lib",
   ],
   plugins = ["@lib//:compose-plugin"]
 )
 ### auto-generated section `build intellij.devkit.compose` end
+
+### auto-generated section `iml intellij.devkit.compose` start
+exports_files([
+  "intellij.devkit.compose.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml intellij.devkit.compose` end

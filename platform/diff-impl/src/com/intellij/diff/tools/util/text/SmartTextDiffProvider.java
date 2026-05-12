@@ -68,6 +68,18 @@ public class SmartTextDiffProvider extends TwosideTextDiffProviderBase implement
                                      ignorePolicies);
   }
 
+  @ApiStatus.Internal
+  public static @NotNull TwosideTextDiffProvider.NoIgnore createNoIgnore(@Nullable Project project,
+                                                                         @NotNull DiffContent content1,
+                                                                         @NotNull DiffContent content2,
+                                                                         @NotNull TextDiffSettings settings,
+                                                                         @NotNull Runnable rediff,
+                                                                         @NotNull Disposable disposable) {
+    DiffIgnoredRangeProvider ignoredRangeProvider = getIgnoredRangeProvider(project, content1, content2);
+    DiffLangSpecificProvider diffAdjuster = DiffLangSpecificProvider.findApplicable(content1, content2);
+    return new SmartTextDiffProvider.NoIgnore(project, content1, content2, settings, rediff, disposable, ignoredRangeProvider, diffAdjuster);
+  }
+
   public static @NotNull TwosideTextDiffProvider.NoIgnore createNoIgnore(@Nullable Project project,
                                                                           @NotNull ContentDiffRequest request,
                                                                           @NotNull TextDiffSettings settings,

@@ -261,14 +261,14 @@ fun registerAlreadyDeclaredConflict(candidateSymbol: KaDeclarationSymbol, result
     result += BasicUnresolvableCollisionUsageInfo(candidate, candidate, message)
 }
 
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class)
+context(_: KaSession)
 private fun areSameSignatures(candidateSymbol: KaFunctionSymbol, symbol: KaFunctionSymbol) : Boolean {
     return areSameSignatures(candidateSymbol.receiverType, symbol.receiverType, candidateSymbol.valueParameters.map { it.returnType }, symbol.valueParameters.map { it.returnType }, candidateSymbol.contextReceivers, symbol.contextReceivers)
 }
 
-context(_: KaSession)
 @OptIn(KaExperimentalApi::class)
+context(_: KaSession)
 private fun areSameSignatures(candidateSymbol: KaPropertySymbol, symbol: KaFunctionSymbol) : Boolean {
     val type = candidateSymbol.returnType
     if (type is KaFunctionType &&
@@ -278,8 +278,8 @@ private fun areSameSignatures(candidateSymbol: KaPropertySymbol, symbol: KaFunct
     return false
 }
 
-context(_: KaSession)
 @KaExperimentalApi
+context(_: KaSession)
 fun areSameSignatures(
     receiverType1: KaType?,
     receiverType2: KaType?,

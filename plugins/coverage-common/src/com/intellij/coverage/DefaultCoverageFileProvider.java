@@ -18,38 +18,58 @@ package com.intellij.coverage;
 import org.jetbrains.annotations.ApiStatus;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 /**
  * @author Eugene Zhuravlev
  */
-public final class DefaultCoverageFileProvider implements CoverageFileProvider{
+public final class DefaultCoverageFileProvider implements CoverageFileProvider {
   @ApiStatus.Internal
   public static final String DEFAULT_LOCAL_PROVIDER_KEY = DefaultCoverageFileProvider.class.getName();
 
-  private final File myFile;
+  private final Path myFile;
   private final String mySourceProvider;
 
   public DefaultCoverageFileProvider(String path) {
-    this(new File(path), DEFAULT_LOCAL_PROVIDER_KEY);
+    this(Path.of(path), DEFAULT_LOCAL_PROVIDER_KEY);
   }
 
-  public DefaultCoverageFileProvider(File file) {
+  public DefaultCoverageFileProvider(Path file) {
     this(file, DEFAULT_LOCAL_PROVIDER_KEY);
   }
 
+  /**
+   * @deprecated Use {@link #DefaultCoverageFileProvider(Path)} instead.
+   */
+  @SuppressWarnings("IO_FILE_USAGE")
+  @Deprecated
+  public DefaultCoverageFileProvider(File file) {
+    this(file.toPath(), DEFAULT_LOCAL_PROVIDER_KEY);
+  }
+
+  /**
+   * @deprecated Use {@link #DefaultCoverageFileProvider(Path, String)} instead.
+   */
+  @SuppressWarnings("IO_FILE_USAGE")
+  @Deprecated
   public DefaultCoverageFileProvider(File file, String sourceProvider) {
+    this(file.toPath(), sourceProvider);
+  }
+
+  public DefaultCoverageFileProvider(Path file, String sourceProvider) {
     myFile = file;
     mySourceProvider = sourceProvider;
   }
 
   @Override
   public String getCoverageDataFilePath() {
-    return myFile.getPath();
+    return myFile.toString();
   }
 
   @Override
   public boolean ensureFileExists() {
-    return myFile.exists();
+    return Files.exists(myFile);
   }
 
   public String getSourceProvider() {

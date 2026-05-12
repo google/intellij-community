@@ -8,12 +8,14 @@ import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.JDOMExternalizable;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.io.FileUtil;
+import com.intellij.openapi.util.io.NioFiles;
 import com.intellij.rt.coverage.data.ProjectData;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
 
 /**
  * Represents coverage data collected by {@link CoverageRunner}.
@@ -63,7 +65,7 @@ public interface CoverageSuite extends JDOMExternalizable {
   void setCoverageData(final ProjectData projectData);
 
   /**
-   * Reinit coverage data cache with {@link CoverageRunner#loadCoverageDataWithReporting(File, CoverageSuite)}.
+   * Reinit coverage data cache with {@link CoverageRunner#loadCoverageDataWithReporting(Path, CoverageSuite)}.
    */
   @ApiStatus.Internal
   default void restoreCoverageData() {
@@ -89,9 +91,11 @@ public interface CoverageSuite extends JDOMExternalizable {
         return;
       }
     }
-    File file = new File(fileName);
-    if (file.exists()) {
-      FileUtil.delete(file);
+    Path file = Path.of(fileName);
+    try {
+      NioFiles.deleteRecursively(file);
+    }
+    catch (IOException ignored) {
     }
     getCoverageEngine().deleteAssociatedTraces(this);
   }

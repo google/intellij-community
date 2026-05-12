@@ -3,7 +3,7 @@ package com.intellij.codeInspection.i18n
 
 import com.intellij.codeInsight.assertFolded
 import com.intellij.openapi.roots.ModuleRootModificationUtil
-import com.intellij.testFramework.IdeaTestUtil
+import com.intellij.pom.java.LanguageLevel
 import com.intellij.testFramework.builders.JavaModuleFixtureBuilder
 import com.intellij.testFramework.fixtures.DefaultLightProjectDescriptor
 import com.intellij.testFramework.fixtures.JavaCodeInsightFixtureTestCase
@@ -18,7 +18,7 @@ class PropertyKeyFoldingTest : JavaCodeInsightFixtureTestCase() {
 
   override fun tuneFixture(moduleBuilder: JavaModuleFixtureBuilder<*>) {
     super.tuneFixture(moduleBuilder)
-    moduleBuilder.addJdk(IdeaTestUtil.getMockJdk18Path().path)
+    moduleBuilder.addJdkVersion(LanguageLevel.JDK_1_8)
     moduleBuilder.addLibrary("util-rt", PathUtil.getJarPathForClass(com.intellij.BundleBase::class.java))
   }
 

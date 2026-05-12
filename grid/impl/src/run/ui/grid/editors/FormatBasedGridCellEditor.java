@@ -5,7 +5,10 @@ import com.intellij.codeInsight.daemon.impl.BackgroundUpdateHighlightersUtil;
 import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.codeInsight.daemon.impl.HighlightInfoType;
 import com.intellij.database.DataGridBundle;
+import com.intellij.database.datagrid.ActualGridCellRequest;
 import com.intellij.database.datagrid.DataGrid;
+import com.intellij.database.datagrid.GridCellRequest;
+import com.intellij.database.datagrid.GridCellRequestKt;
 import com.intellij.database.datagrid.GridColumn;
 import com.intellij.database.datagrid.GridRow;
 import com.intellij.database.datagrid.ModelIndex;
@@ -59,17 +62,13 @@ import java.util.Objects;
 public class FormatBasedGridCellEditor extends GridCellEditor.Adapter implements GridCellEditor.EditorBased {
   private final Formatter myFormat;
   private final ValueParser myValueParser;
-  protected final ModelIndex<GridColumn> myColumn;
-  protected final ModelIndex<GridRow> myRow;
   private final ReservedCellValue myNullValue;
   private final GridCellEditorTextField myTextField;
-  private final DataGrid myGrid;
+  private final ActualGridCellRequest<GridRow, GridColumn> myOriginalRequest;
 
   public FormatBasedGridCellEditor(@NotNull Project project,
-                                   @NotNull DataGrid grid,
+                                   @NotNull GridCellRequest<GridRow, GridColumn> request,
                                    @NotNull Formatter format,
-                                   @NotNull ModelIndex<GridColumn> column,
-                                   @NotNull ModelIndex<GridRow> row,
                                    @Nullable ReservedCellValue nullValue,
                                    @Nullable EventObject initiator,
                                    @Nullable TextCompletionProvider provider,
@@ -77,13 +76,11 @@ public class FormatBasedGridCellEditor extends GridCellEditor.Adapter implements
                                    @NotNull ValueFormatter valueFormatter,
                                    boolean multiline) {
     myFormat = format;
-    myColumn = column;
-    myRow = row;
+    myOriginalRequest = GridCellRequestKt.actual(request);
     myNullValue = nullValue;
-    myGrid = grid;
     myValueParser = valueParser;
 
-    myTextField = new GridCellEditorTextField(project, grid, row, column, multiline, initiator, provider, true, valueFormatter);
+    myTextField = new GridCellEditorTextField(project, request, multiline, initiator, provider, true, valueFormatter);
     myTextField.getDocument().addDocumentListener(new DocumentListener() {
       @Override
       public void documentChanged(@NotNull DocumentEvent e) {
@@ -171,8 +168,24 @@ public class FormatBasedGridCellEditor extends GridCellEditor.Adapter implements
     return myNullValue;
   }
 
+  @NotNull
   protected final DataGrid getGrid() {
-    return myGrid;
+    return (DataGrid)myOriginalRequest.getGrid();
+  }
+
+  @NotNull
+  protected final ModelIndex<GridColumn> getColumnIdx() {
+    return myOriginalRequest.getColumnIdx();
+  }
+
+  @Nullable
+  protected final GridColumn getColumn() {
+    return myOriginalRequest.getColumn();
+  }
+
+  @Nullable
+  protected final ActualGridCellRequest<GridRow, GridColumn> getOriginalCellRequest() {
+    return myOriginalRequest;
   }
 
   protected final Formatter getFormat() {
@@ -189,16 +202,14 @@ public class FormatBasedGridCellEditor extends GridCellEditor.Adapter implements
 
 
     public BoundedFormatBasedGridCellEditor(Project project,
-                                            @NotNull DataGrid grid,
+                                            @NotNull GridCellRequest<GridRow, GridColumn> request,
                                             @NotNull Formatter format,
                                             @Nullable ReservedCellValue nullValue,
                                             EventObject initiator,
-                                            @NotNull ModelIndex<GridRow> row,
-                                            @NotNull ModelIndex<GridColumn> columnModelIndex,
                                             @Nullable TextCompletionProvider provider,
                                             @NotNull ValueParser valueParser,
                                             @NotNull ValueFormatter valueFormatter) {
-      super(project, grid, format, columnModelIndex, row, nullValue, initiator, provider, valueParser, valueFormatter, false);
+      super(project, request, format, nullValue, initiator, provider, valueParser, valueFormatter, false);
     }
 
     @Override
@@ -270,18 +281,16 @@ public class FormatBasedGridCellEditor extends GridCellEditor.Adapter implements
     private T myPopupComponent;
 
     public WithBrowseButton(@NotNull Project project,
-                            @NotNull DataGrid grid,
+                            @NotNull GridCellRequest<GridRow, GridColumn> request,
                             @NotNull Formatter format,
                             @Nullable ReservedCellValue nullValue,
                             EventObject initiator,
-                            @NotNull ModelIndex<GridRow> row,
-                            @NotNull ModelIndex<GridColumn> columnModelIndex,
                             @NotNull Class<V> clazz,
                             @Nullable TextCompletionProvider provider,
                             @NotNull ValueParser valueParser,
                             @NotNull ValueFormatter valueFormatter,
                             @NotNull GridCellEditorFactory factory) {
-      super(project, grid, format, nullValue, initiator, row, columnModelIndex, provider, valueParser, valueFormatter);
+      super(project, request, format, nullValue, initiator, provider, valueParser, valueFormatter);
       myClazz = clazz;
       myFactory = factory;
 
@@ -341,6 +350,7 @@ public class FormatBasedGridCellEditor extends GridCellEditor.Adapter implements
 
     @Override
     public final void actionPerformed(ActionEvent e) {
+      if (!myComponent.isShowing()) return;
       if (myPopup != null) {
         closePopup();
       }
@@ -387,14 +397,15 @@ public class FormatBasedGridCellEditor extends GridCellEditor.Adapter implements
 
     @Override
     protected String getInfinityString(@NotNull V internalValue) {
-      BoundaryValueResolver resolver = GridCellEditorHelper.get(getGrid()).getResolver(getGrid(), myColumn);
+      BoundaryValueResolver resolver = GridCellEditorHelper.get(getGrid()).getResolver(getGrid(), getColumnIdx());
       return resolver.getInfinityString(internalValue);
     }
 
     @Override
     protected void beforeStopEditing(@NotNull V internalValue) {
       Object object = convertInternalValue(internalValue);
-      getTextField().setText(myFactory.getValueFormatter(getGrid(), myRow, myColumn, object), getGrid(), myRow, myColumn);
+      GridCellRequest<GridRow, GridColumn> request = GridCellRequestKt.overrideValue(getOriginalCellRequest(), object);
+      getTextField().setText(myFactory.getValueFormatter(request), request);
     }
 
     @Override

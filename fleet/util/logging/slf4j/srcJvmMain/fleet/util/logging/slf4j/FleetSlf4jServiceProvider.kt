@@ -9,9 +9,13 @@ import java.util.ServiceLoader
 
 class FleetSlf4jServiceProvider : SLF4JServiceProvider {
   companion object {
-    var delegate: SLF4JServiceProvider? = ServiceLoader.load(FleetSlf4jServiceProvider::class.java.module.layer,
-                                                             SLF4JServiceProvider::class.java)
-      .firstOrNull { it !is FleetSlf4jServiceProvider }
+    var delegate: SLF4JServiceProvider? =
+      (
+        FleetSlf4jServiceProvider::class.java.module.layer
+          ?.let { ServiceLoader.load(it, SLF4JServiceProvider::class.java) }
+        ?: ServiceLoader.load(SLF4JServiceProvider::class.java)
+      )
+        .firstOrNull { it !is FleetSlf4jServiceProvider }
   }
 
   override fun getLoggerFactory(): ILoggerFactory {

@@ -105,6 +105,7 @@ com.intellij.xdebugger.XDebugSession
 - a:reportMessage(java.lang.String,com.intellij.openapi.ui.MessageType,javax.swing.event.HyperlinkListener):V
 - a:resume():V
 - a:runToPosition(com.intellij.xdebugger.XSourcePosition,Z):V
+- runWhenUiReady(java.util.function.Consumer):V
 - a:sessionResumed():V
 - a:setBreakpointInvalid(com.intellij.xdebugger.breakpoints.XLineBreakpoint,java.lang.String):V
 - a:setBreakpointMuted(Z):V
@@ -299,6 +300,7 @@ a:com.intellij.xdebugger.breakpoints.XBreakpointType
 - getSuspendNoneIcon():javax.swing.Icon
 - getTitle():java.lang.String
 - getVisibleStandardPanels():java.util.EnumSet
+- hasCustomCondition(com.intellij.xdebugger.breakpoints.XBreakpoint):Z
 - isAddBreakpointButtonVisible():Z
 - isSuspendThreadSupported():Z
 - shouldShowInBreakpointsDialog(com.intellij.openapi.project.Project):Z
@@ -545,7 +547,7 @@ com.intellij.xdebugger.frame.XFullValueEvaluator$XFullValueEvaluationCallback
 - com.intellij.xdebugger.Obsolescent
 - com.intellij.xdebugger.frame.XValueCallback
 - evaluated(java.lang.String):V
-- a:evaluated(java.lang.String,java.awt.Font):V
+- evaluated(java.lang.String,java.awt.Font):V
 a:com.intellij.xdebugger.frame.XInlineDebuggerDataCallback
 - <init>():V
 - a:computed(com.intellij.xdebugger.XSourcePosition):V
@@ -638,8 +640,7 @@ a:com.intellij.xdebugger.frame.XValueModifier
 - <init>():V
 - calculateInitialValueEditorText(com.intellij.xdebugger.frame.XValueModifier$XInitialValueCallback):V
 - getInitialValueEditorText():java.lang.String
-- setValue(com.intellij.xdebugger.XExpression,com.intellij.xdebugger.frame.XValueModifier$XModificationCallback):V
-- setValue(java.lang.String,com.intellij.xdebugger.frame.XValueModifier$XModificationCallback):V
+- a:setValue(com.intellij.xdebugger.XExpression,com.intellij.xdebugger.frame.XValueModifier$XModificationCallback):V
 com.intellij.xdebugger.frame.XValueModifier$XInitialValueCallback
 - a:setValue(java.lang.String):V
 com.intellij.xdebugger.frame.XValueModifier$XModificationCallback

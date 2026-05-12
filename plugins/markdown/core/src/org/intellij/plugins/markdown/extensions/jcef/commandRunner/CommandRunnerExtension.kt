@@ -25,8 +25,11 @@ import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.diagnostic.ControlFlowException
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.BaseProjectDirectories
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.LocalFileSystem
+import org.jetbrains.annotations.ApiStatus
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.AppUIUtil
 import org.intellij.plugins.markdown.MarkdownBundle
@@ -108,8 +111,8 @@ internal class CommandRunnerExtension(
     try {
       val project = panel.project
       val file = panel.virtualFile
-      if (project != null && file != null && file.parent != null
-          && matches(project, file.parent.canonicalPath, true, rawCodeLine.trim(), allowRunConfigurations)
+      if (project != null && file != null
+          && matches(project, getMarkdownCommandWorkingDirectory(project, file), true, rawCodeLine.trim(), allowRunConfigurations)
       ) {
         val hash = MarkdownUtil.md5(rawCodeLine, "")
         hash2Cmd[hash] = rawCodeLine
@@ -183,7 +186,7 @@ internal class CommandRunnerExtension(
     val project = panel.project
     val virtualFile = panel.virtualFile
     if (project != null && virtualFile != null) {
-      execute(project, virtualFile.parent.canonicalPath, true, command, executor, RunnerPlace.PREVIEW)
+      execute(project, getMarkdownCommandWorkingDirectory(project, virtualFile), true, command, executor, RunnerPlace.PREVIEW)
     }
   }
 
@@ -196,7 +199,7 @@ internal class CommandRunnerExtension(
       TrustedProjectUtil.executeIfTrusted(project) {
         RUNNER_EXECUTED.log(project,  RunnerPlace.PREVIEW, RunnerType.BLOCK, runner.javaClass)
         invokeLater {
-          runner.run(command, project, virtualFile.parent.canonicalPath, executor)
+          runner.run(command, project, getMarkdownCommandWorkingDirectory(project, virtualFile), executor)
         }
       }
     }
@@ -366,4 +369,15 @@ enum class RunnerPlace {
 
 enum class RunnerType {
   BLOCK, LINE
+}
+
+@ApiStatus.Internal
+fun getMarkdownCommandWorkingDirectory(project: Project, virtualFile: VirtualFile?): String? {
+  return if (Registry.`is`("markdown.command.runner.use.file.directory")) {
+    virtualFile?.parent?.canonicalPath
+  }
+  else {
+    virtualFile?.let { BaseProjectDirectories.getInstance(project).getBaseDirectoryFor(it) }?.canonicalPath
+    ?: virtualFile?.parent?.canonicalPath
+  }
 }

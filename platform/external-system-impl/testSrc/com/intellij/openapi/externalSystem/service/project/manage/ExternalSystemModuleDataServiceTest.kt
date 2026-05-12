@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.externalSystem.service.project.manage
 
+import com.intellij.openapi.application.writeAction
 import com.intellij.openapi.externalSystem.ExternalSystemManager
 import com.intellij.openapi.externalSystem.model.DataNode
 import com.intellij.openapi.externalSystem.model.ProjectKeys
@@ -48,6 +49,8 @@ class ExternalSystemModuleDataServiceTest : ExternalSystemModuleDataServiceTestC
     for (moduleName in moduleNames) {
       assertModuleOptions(modelsProvider, moduleName, systemId, projectPath, "$projectPath/$moduleName", moduleName)
     }
+
+    writeAction { modelsProvider.commit() }
   }
 
   @Test
@@ -91,6 +94,8 @@ class ExternalSystemModuleDataServiceTest : ExternalSystemModuleDataServiceTestC
     importModuleData(modelsProvider, projectData, emptyList())
 
     assertModules(modelsProvider, emptyList())
+
+    writeAction { modelsProvider.commit() }
   }
 
   @Test

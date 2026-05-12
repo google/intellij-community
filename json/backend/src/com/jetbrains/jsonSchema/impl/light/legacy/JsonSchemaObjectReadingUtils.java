@@ -272,7 +272,7 @@ public final class JsonSchemaObjectReadingUtils {
     try {
       return Integer.parseInt(s);
     }
-    catch (Exception __) {
+    catch (Exception _) {
       return null;
     }
   }

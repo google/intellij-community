@@ -100,7 +100,11 @@ import com.intellij.vcsUtil.FilesProgress;
 import com.intellij.vcsUtil.VcsImplUtil;
 import com.intellij.vcsUtil.VcsUtil;
 import io.opentelemetry.api.trace.Tracer;
+import kotlin.Unit;
+import kotlin.coroutines.EmptyCoroutineContext;
 import kotlinx.coroutines.CoroutineScope;
+import kotlinx.coroutines.CoroutineStart;
+import kotlinx.coroutines.Deferred;
 import org.jdom.Element;
 import org.jdom.Parent;
 import org.jetbrains.annotations.ApiStatus;
@@ -152,6 +156,7 @@ import static com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager.SHEL
 import static com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager.getToolWindowFor;
 import static com.intellij.platform.diagnostic.telemetry.helpers.TraceUtil.computeWithSpanThrows;
 import static com.intellij.platform.diagnostic.telemetry.helpers.TraceUtil.runWithSpanThrows;
+import static kotlinx.coroutines.BuildersKt.async;
 
 @Service(Service.Level.PROJECT)
 @State(name = "ShelveChangesManager", storages = @Storage(StoragePathMacros.WORKSPACE_FILE))
@@ -174,6 +179,7 @@ public final class ShelveChangesManager implements PersistentStateComponent<Elem
   private @NotNull SchemeManager<ShelvedChangeList> schemeManager;
   private ScheduledFuture<?> myCleaningFuture;
   private @Nullable Set<VirtualFile> myShelvingFiles;
+  private final @NotNull Deferred<Unit> deferredInit;
 
   ShelveChangesManager(@NotNull Project project, @NotNull CoroutineScope coroutineScope) {
     myPathMacroSubstitutor = PathMacroManager.getInstance(project);
@@ -189,6 +195,20 @@ public final class ShelveChangesManager implements PersistentStateComponent<Elem
       public void dispose() {
         stopCleanScheduler();
       }
+    });
+    deferredInit = async(coroutineScope, EmptyCoroutineContext.INSTANCE, CoroutineStart.DEFAULT, (scope, continuation) -> {
+      try {
+        schemeManager.loadSchemes();
+        //workaround for ignoring not valid patches, because readScheme doesn't support nullable value as it should be
+        filterNonValidShelvedChangeLists();
+        markDeletedSystemUnshelved();
+        cleanDeletedOlderOneWeek();
+        notifyStateChanged();
+      }
+      catch (Exception e) {
+        LOG.error("Couldn't read shelf information", e);
+      }
+      return Unit.INSTANCE;
     });
   }
 
@@ -239,18 +259,11 @@ public final class ShelveChangesManager implements PersistentStateComponent<Elem
               }, null, customPath != null ? Paths.get(customPath) : null);
   }
 
-  void projectOpened() {
-    try {
-      schemeManager.loadSchemes();
-      //workaround for ignoring not valid patches, because readScheme doesn't support nullable value as it should be
-      filterNonValidShelvedChangeLists();
-      markDeletedSystemUnshelved();
-      cleanDeletedOlderOneWeek();
-      notifyStateChanged();
-    }
-    catch (Exception e) {
-      LOG.error("Couldn't read shelf information", e);
-    }
+  @ApiStatus.Internal
+  @VisibleForTesting
+  public Deferred<Unit> scheduleShelvesLoading() {
+    deferredInit.start();
+    return deferredInit;
   }
 
   private void filterNonValidShelvedChangeLists() {
@@ -437,7 +450,7 @@ public final class ShelveChangesManager implements PersistentStateComponent<Elem
     LOG.debug("Shelving of " + changes.size() + " changes...");
 
     try {
-      return computeWithSpanThrows(myTracer.spanBuilder(Shelve.TotalShelving.getName()).setAttribute("changesSize", changes.size()), __ -> {
+      return computeWithSpanThrows(myTracer.spanBuilder(Shelve.TotalShelving.getName()).setAttribute("changesSize", changes.size()), _ -> {
         Path schemePatchDir = generateUniqueSchemePatchDir(commitMessage, true);
         List<Change> textChanges = new ArrayList<>();
         final List<ShelvedBinaryFile> binaryFiles = new ArrayList<>();
@@ -498,27 +511,27 @@ public final class ShelveChangesManager implements PersistentStateComponent<Elem
         runWithSpanThrows(myTracer.spanBuilder(Shelve.BatchShelving.getName()).setAttribute("batch", finalBatchIndex), ignored -> {
           try {
             if (baseContentsPreloadSize > 0) {
-              TraceKt.use(myTracer.spanBuilder(Shelve.PreloadingBaseRevisions.getName()).setAttribute("changesSize", list.size()), __ -> {
+              TraceKt.use(myTracer.spanBuilder(Shelve.PreloadingBaseRevisions.getName()).setAttribute("changesSize", list.size()), _ -> {
                 preloadBaseRevisions(list);
                 return null;
               });
             }
 
             ProgressManager.checkCanceled();
-            runWithSpanThrows(myTracer.spanBuilder(Shelve.BuildingPatches.getName()), __ -> {
+            runWithSpanThrows(myTracer.spanBuilder(Shelve.BuildingPatches.getName()), _ -> {
               patches.addAll(IdeaTextPatchBuilder
                                .buildPatch(myProject, list, ProjectKt.getStateStore(myProject).getProjectBasePath(), false,
                                            honorExcludedFromCommit));
             });
             ProgressManager.checkCanceled();
 
-            CommitContext commitContext = TraceKt.use(myTracer.spanBuilder(Shelve.StoringBaseRevision.getName()), __ -> {
+            CommitContext commitContext = TraceKt.use(myTracer.spanBuilder(Shelve.StoringBaseRevision.getName()), _ -> {
               CommitContext context = new CommitContext();
               baseRevisionsOfDvcsIntoContext(list, context);
               return context;
             });
 
-            runWithSpanThrows(myTracer.spanBuilder(Shelve.StoringPathFile.getName()), __ -> {
+            runWithSpanThrows(myTracer.spanBuilder(Shelve.StoringPathFile.getName()), _ -> {
               savePatchFile(myProject, patchFile, patches, null, commitContext);
             });
           }
@@ -564,7 +577,7 @@ public final class ShelveChangesManager implements PersistentStateComponent<Elem
   private void rollbackChangesAfterShelve(@NotNull Collection<? extends Change> changes, boolean honorExcludedFromCommit) {
     final String operationName = UIUtil.removeMnemonic(RollbackChangesDialog.operationNameByChanges(myProject, changes));
     boolean modalContext = ApplicationManager.getApplication().isDispatchThread() && LaterInvocator.isInModalContext();
-    TraceKt.use(myTracer.spanBuilder(Shelve.RollbackAfterShelve.getName()), __ -> {
+    TraceKt.use(myTracer.spanBuilder(Shelve.RollbackAfterShelve.getName()), _ -> {
       new RollbackWorker(myProject, operationName, modalContext)
         .doRollback(changes, true, null, VcsBundle.message("activity.name.shelve"), VcsActivity.Shelve, honorExcludedFromCommit);
       return null;

@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.dsl.notations
 
 import org.gradle.util.GradleVersion
@@ -6,7 +6,7 @@ import org.jetbrains.plugins.gradle.codeInspection.GradleIncorrectDependencyNota
 import org.jetbrains.plugins.gradle.testFramework.GradleCodeInsightTestCase
 import org.jetbrains.plugins.gradle.testFramework.annotations.AllGradleVersionsSource
 import org.jetbrains.plugins.gradle.testFramework.annotations.BaseGradleVersionSource
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatGradleIsOlderThan
+import org.jetbrains.plugins.gradle.tooling.annotation.TargetVersions
 import org.junit.jupiter.params.ParameterizedTest
 
 class GradleDependencyNotationTest : GradleCodeInsightTestCase() {
@@ -58,13 +58,12 @@ class GradleDependencyNotationTest : GradleCodeInsightTestCase() {
 
   @ParameterizedTest
   @AllGradleVersionsSource
+  @TargetVersions(
+    "<9.0",
+    reason = "ClientModule dependencies were a legacy precursor to ComponentMetadataRules, " +
+             "and have since been replaced and removed in Gradle 9.0. See gradle/pull/32743 for more information. "
+  )
   fun testRecognizeDependency(gradleVersion: GradleVersion) {
-    assumeThatGradleIsOlderThan(gradleVersion, "9.0") {
-      """
-      ClientModule dependencies were a legacy precursor to ComponentMetadataRules, and have since been replaced and removed in Gradle 9.0.
-      See gradle/pull/32743 for more information. 
-      """.trimIndent()
-    }
     testJavaProject(gradleVersion) {
       codeInsightFixture.enableInspections(GradleIncorrectDependencyNotationArgumentInspection::class.java)
       testHighlighting("dependencies { implementation(module('org.apache.groovy:groovy:4.0.0')) }")

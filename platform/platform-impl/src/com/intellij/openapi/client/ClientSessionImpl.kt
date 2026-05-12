@@ -24,7 +24,6 @@ import com.intellij.openapi.project.impl.projectMethodType
 import com.intellij.platform.kernel.util.kernelCoroutineContext
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.serviceContainer.ComponentManagerImpl
-import com.intellij.serviceContainer.executeRegisterTaskForOldContent
 import com.intellij.serviceContainer.findConstructorOrNull
 import com.intellij.util.SystemProperties
 import com.intellij.util.messages.MessageBus
@@ -33,7 +32,6 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.plus
 import org.jetbrains.annotations.ApiStatus
 import java.lang.invoke.MethodHandles
@@ -98,15 +96,12 @@ abstract class ClientSessionImpl(
    * only per-client services are supported (no components, extensions, listeners)
    */
   final override fun registerComponents(
-    modules: List<IdeaPluginDescriptorImpl>,
+    descriptors: Sequence<IdeaPluginDescriptorImpl>,
     app: Application?,
     listenerCallbacks: MutableList<ExtensionPointDeferredListenersNotification>?
   ) {
-    for (rootModule in modules) {
-      registerServices(getContainerDescriptor(rootModule).services, rootModule)
-      executeRegisterTaskForOldContent(rootModule) { module ->
-        registerServices(getContainerDescriptor(module).services, module)
-      }
+    for (module in descriptors) {
+      registerServices(getContainerDescriptor(module).services, module)
     }
   }
 

@@ -30,6 +30,8 @@ import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtConstructor
 import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.psi.KtDeclarationWithBody
+import org.jetbrains.kotlin.psi.KtDestructuringDeclaration
+import org.jetbrains.kotlin.psi.KtDestructuringDeclarationEntry
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtEnumEntry
@@ -79,7 +81,7 @@ val KtClassOrObject.classIdIfNonLocal: ClassId?
     get() {
         if (KtPsiUtil.isLocal(this)) return null
         val packageName = containingKtFile.packageFqName
-        val classesNames = parentsOfType<KtDeclaration>().map { it.name }.toList().asReversed()
+        val classesNames = parentsOfType<KtDeclaration>().filterNot { it is KtScript }.map { it.name }.toList().asReversed()
         if (classesNames.any { it == null }) return null
         return ClassId(packageName, FqName(classesNames.joinToString(separator = ".")), /*local=*/false)
     }
@@ -439,3 +441,6 @@ fun KtSimpleNameExpression.canBeUsedInImport(): Boolean {
 fun PsiElement.isAssignmentLHS(): Boolean = parents(withSelf = false).any {
     KtPsiUtil.isAssignment(it) && (it as KtBinaryExpression).left == this
 }
+
+fun KtDestructuringDeclarationEntry.isNameBased(): Boolean = ownValOrVarKeyword != null &&
+        (parent as? KtDestructuringDeclaration)?.hasSquareBrackets() == false

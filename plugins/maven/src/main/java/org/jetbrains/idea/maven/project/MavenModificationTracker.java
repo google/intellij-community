@@ -26,41 +26,43 @@ import java.util.List;
  */
 public class MavenModificationTracker extends SimpleModificationTracker {
   public MavenModificationTracker(MavenProjectsManager manager) {
-    manager.addProjectsTreeListener(new MavenProjectsTree.Listener() {
-      @Override
-      public void profilesChanged() {
-        incModificationCount();
-      }
+    manager.getProject().getMessageBus().connect(manager).subscribe(
+      MavenProjectsTree.Listener.TOPIC,
+      new MavenProjectsTree.Listener() {
+        @Override
+        public void profilesChanged() {
+          incModificationCount();
+        }
 
-      @Override
-      public void projectsIgnoredStateChanged(List<MavenProject> ignored, List<MavenProject> unignored, boolean fromImport) {
-        incModificationCount();
-      }
+        @Override
+        public void projectsIgnoredStateChanged(List<MavenProject> ignored, List<MavenProject> unignored, boolean fromImport) {
+          incModificationCount();
+        }
 
-      @Override
-      public void projectsUpdated(List<? extends Pair<MavenProject, MavenProjectChanges>> updated, List<MavenProject> deleted) {
-        incModificationCount();
-      }
+        @Override
+        public void projectsUpdated(List<? extends Pair<MavenProject, MavenProjectChanges>> updated, List<MavenProject> deleted) {
+          incModificationCount();
+        }
 
-      @Override
-      public void projectResolved(@NotNull Pair<MavenProject, MavenProjectChanges> projectWithChanges) {
-        incModificationCount();
-      }
+        @Override
+        public void projectsResolved(@NotNull List<MavenProject> projects) {
+          incModificationCount();
+        }
 
-      @Override
-      public void pluginsResolved(@NotNull MavenProject project) {
-        incModificationCount();
-      }
+        @Override
+        public void pluginsResolved(@NotNull List<MavenProject> projects) {
+          incModificationCount();
+        }
 
-      @Override
-      public void foldersResolved(@NotNull Pair<MavenProject, MavenProjectChanges> projectWithChanges) {
-        incModificationCount();
-      }
+        @Override
+        public void foldersResolved(@NotNull Pair<MavenProject, MavenProjectChanges> projectWithChanges) {
+          incModificationCount();
+        }
 
-      @Override
-      public void artifactsDownloaded(@NotNull MavenProject project) {
-        incModificationCount();
-      }
-    });
+        @Override
+        public void artifactsDownloaded(@NotNull MavenProject project) {
+          incModificationCount();
+        }
+      });
   }
 }

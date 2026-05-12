@@ -2,6 +2,7 @@
   <extensionPoints>
     <!--suppress PluginXmlValidity -->
     <extensionPoint qualifiedName="com.intellij.java.definitions" interface="com.intellij.codeInsight.definition.AbstractBasicJavaDefinitionService" dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.threadDumpItemFactory" interface="com.intellij.unscramble.ThreadDumpItemFactory" dynamic="true"/>
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
@@ -44,7 +45,8 @@
     <editorActionHandler action="EditorLineStartWithSelection" implementationClass="com.intellij.codeInsight.editorActions.JavadocLineStartWithSelectionHandler"/>
 
     <enterHandlerDelegate implementation="com.intellij.codeInsight.editorActions.JavaEnterInTextBlockHandler"/>
-    <enterHandlerDelegate implementation="com.intellij.codeInsight.editorActions.JavaEnterAfterUnmatchedBraceHandler" order="before afterUnmatchedBrace"/>
+    <enterHandlerDelegate implementation="com.intellij.codeInsight.editorActions.JavaEnterAfterUnmatchedBraceHandler"
+                          order="before afterUnmatchedBrace" id="JavaEnterAfterUnmatchedBraceHandler"/>
 
     <notificationGroup id="Analyze thread dump" displayType="TOOL_WINDOW" toolWindowId="Run" isLogByDefault="false"
                        hideFromSettings="true"/>
@@ -65,6 +67,8 @@
 
     <applicationService serviceInterface="com.intellij.codeInsight.folding.JavaCodeFoldingSettings"
                         serviceImplementation="com.intellij.codeInsight.folding.impl.JavaCodeFoldingSettingsImpl"/>
+
+    <rdct.remoteSettingProvider implementation="com.intellij.codeInsight.folding.impl.JavaCodeFoldingRemoteSettingProvider"/>
 
     <statementUpDownMover implementation="com.intellij.codeInsight.editorActions.moveUpDown.JavaDeclarationMover" id="declaration"
                           order="before xml"/>
@@ -99,5 +103,8 @@
 
     <completion.frontendFriendlyInsertHandler target="com.intellij.codeInsight.completion.FrontendFriendlyOverridableSpaceInsertHandler"/>
 
+    <registryKey key="java.folding.split.frontend.backend" defaultValue="true"
+                 description="Split Java code folding between frontend (syntax-based) and backend (resolve-based) builders"/>
+    <applicationSettings service="com.intellij.codeInsight.folding.impl.JavaCodeFoldingSettingsImpl"/>
   </extensions>
 </idea-plugin>

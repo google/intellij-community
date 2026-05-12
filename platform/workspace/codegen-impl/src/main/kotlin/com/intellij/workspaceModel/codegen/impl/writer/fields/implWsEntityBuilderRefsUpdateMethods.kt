@@ -10,6 +10,7 @@ data class RefMethods(
   val getter: QualifiedName,
   val getterBuilder: String,
   val setter: QualifiedName,
+  val many: Boolean = false
 )
 
 fun ObjProperty<*, *>.refNames(): RefMethods {
@@ -17,7 +18,7 @@ fun ObjProperty<*, *>.refNames(): RefMethods {
   return when (valueType) {
     is ValueType.ObjRef -> constructCode(valueType)
     is ValueType.Optional -> constructCode((this.valueType as ValueType.Optional<*>).type)
-    is ValueType.List<*> -> RefMethods(EntityStorage.extractOneToManyChildren, "getManyChildrenBuilders", EntityStorage.updateOneToManyChildrenOfParent)
+    is ValueType.List<*> -> RefMethods(Instrumentation.getManyChildrenBuilders, "getManyChildrenBuilders", Instrumentation.replaceChildren, true)
     else -> error("Call this on ref field")
   }
 }
@@ -26,36 +27,13 @@ private fun ObjProperty<*, *>.constructCode(type: ValueType<*>): RefMethods {
   type as ValueType.ObjRef<*>
 
   return if (type.child) {
-    if (type.target.openness.extendable) {
-      RefMethods(EntityStorage.extractOneToAbstractOneChild, "getOneChildBuilder", EntityStorage.updateOneToAbstractOneChildOfParent)
-    }
-    else {
-      RefMethods(EntityStorage.extractOneToOneChild, "getOneChildBuilder", EntityStorage.updateOneToOneChildOfParent)
-    }
+    RefMethods(Instrumentation.getOneChild, "getOneChildBuilder", Instrumentation.replaceChildren, true)
   }
   else {
-    var valueType = referencedField.valueType
-    if (valueType is ValueType.Optional<*>) {
-      valueType = valueType.type
+    val valueType = referencedField.valueType.let { if (it is ValueType.Optional<*>) it.type else it }
+    if (valueType !is ValueType.List<*> && valueType !is ValueType.ObjRef<*>) {
+      error("Unsupported reference type")
     }
-    when (valueType) {
-      is ValueType.List<*> -> {
-        if (receiver.openness.extendable) {
-          RefMethods(EntityStorage.extractOneToAbstractManyParent, "getParentBuilder", EntityStorage.updateOneToAbstractManyParentOfChild)
-        }
-        else {
-          RefMethods(EntityStorage.extractOneToManyParent, "getParentBuilder", EntityStorage.updateOneToManyParentOfChild)
-        }
-      }
-      is ValueType.ObjRef<*> -> {
-        if (receiver.openness.extendable) {
-          RefMethods(EntityStorage.extractOneToAbstractOneParent, "getParentBuilder", EntityStorage.updateOneToAbstractOneParentOfChild)
-        }
-        else {
-          RefMethods(EntityStorage.extractOneToOneParent, "getParentBuilder", EntityStorage.updateOneToOneParentOfChild)
-        }
-      }
-      else -> error("Unsupported reference type")
-    }
+    RefMethods(Instrumentation.getParent, "getParentBuilder", Instrumentation.addChild)
   }
 }

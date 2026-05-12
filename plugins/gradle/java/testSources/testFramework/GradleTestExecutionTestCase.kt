@@ -1,10 +1,10 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.testFramework
 
 import org.gradle.util.GradleVersion
 import org.jetbrains.plugins.gradle.frameworkSupport.buildscript.isJunit5Supported
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatJunit5IsSupported
-import org.jetbrains.plugins.gradle.testFramework.util.assumeThatSpockIsSupported
+import org.jetbrains.plugins.gradle.testFramework.util.assertThatJunit5IsSupported
+import org.jetbrains.plugins.gradle.testFramework.util.assertThatSpockIsSupported
 import org.jetbrains.plugins.gradle.testFramework.util.withBuildFile
 import org.jetbrains.plugins.gradle.testFramework.util.withSettingsFile
 
@@ -31,7 +31,7 @@ abstract class GradleTestExecutionTestCase : GradleTestExecutionBaseTestCase() {
   fun isOpentest4jSupportedByGradleJunit4Integration(): Boolean = isGradleAtLeast("8.4")
 
   fun testJunitPlatformProject(gradleVersion: GradleVersion, action: () -> Unit) {
-    assumeThatJunit5IsSupported(gradleVersion)
+    assertThatJunit5IsSupported(gradleVersion)
     testJavaProject(gradleVersion, action)
   }
 
@@ -48,12 +48,12 @@ abstract class GradleTestExecutionTestCase : GradleTestExecutionBaseTestCase() {
   }
 
   fun testJunit5AssertJProject(gradleVersion: GradleVersion, action: () -> Unit) {
-    assumeThatJunit5IsSupported(gradleVersion)
+    assertThatJunit5IsSupported(gradleVersion)
     test(gradleVersion, JAVA_JUNIT5_ASSERTJ_FIXTURE, action)
   }
 
   fun testSpockProject(gradleVersion: GradleVersion, action: () -> Unit) {
-    assumeThatSpockIsSupported(gradleVersion)
+    assertThatSpockIsSupported(gradleVersion)
     test(gradleVersion, GROOVY_SPOCK_FIXTURE, action)
   }
 

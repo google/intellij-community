@@ -134,7 +134,7 @@ public class CustomRegExpFakeInspection extends LocalInspectionTool {
   public @NotNull JComponent createOptionsPanel() {
     final MyListModel model = new MyListModel();
     final JButton button = new JButton(RegExpBundle.message("edit.metadata.button"));
-    button.addActionListener(__ -> performEditMetaData(button));
+    button.addActionListener(_ -> performEditMetaData(button));
 
     final JList<InspectionPattern> list = new JBList<>(model);
     list.setVisibleRowCount(3);

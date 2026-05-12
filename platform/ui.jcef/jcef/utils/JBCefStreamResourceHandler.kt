@@ -5,7 +5,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.Disposer
 import org.cef.callback.CefCallback
-import org.cef.handler.CefResourceHandler
+import org.cef.handler.CefResourceHandlerAdapter
 import org.cef.misc.IntRef
 import org.cef.misc.StringRef
 import org.cef.network.CefRequest
@@ -29,7 +29,7 @@ open class JBCefStreamResourceHandler(
   private val myMimeType: String,
   parent: Disposable,
   private val headers: Map<String, String> = mapOf(),
-) : CefResourceHandler, Disposable {
+) : CefResourceHandlerAdapter(), Disposable {
   init {
     Disposer.register(parent, this)
   }

@@ -44,8 +44,8 @@ import org.jetbrains.kotlin.psi.KtTypeReference
 import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
 
 object AddAnnotationUseSiteTargetUtils {
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     fun KtAnnotationEntry.getApplicableUseSiteTargets(): List<AnnotationUseSiteTarget> {
         val symbol = typeReference?.type?.expandedSymbol
         val applicableTargets = symbol?.annotationApplicableTargets?.toSet().orEmpty()

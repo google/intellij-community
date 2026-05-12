@@ -96,8 +96,8 @@ internal object AddMemberToSupertypeFixFactory {
     return classSymbols.mapNotNull { createMemberData(it, memberElement) }
   }
 
-  context(_: KaSession)
   @OptIn(KaExperimentalApi::class)
+  context(_: KaSession)
   private fun createMemberData(classSymbol: KaClassSymbol, memberElement: KtCallableDeclaration): MemberData? {
     val project = memberElement.project
     val callableSymbol = memberElement.symbol
@@ -127,8 +127,8 @@ internal object AddMemberToSupertypeFixFactory {
     return MemberData(signaturePreview, sourceCode, targetClass)
   }
 
-  context(_: KaSession)
   @OptIn(KaExperimentalApi::class)
+  context(_: KaSession)
   private fun KaDeclarationRenderer.render(targetClassSymbol: KaClassSymbol) = with {
     modifiersRenderer = modifiersRenderer.with {
       modalityProvider = object : KaRendererModalityModifierProvider {

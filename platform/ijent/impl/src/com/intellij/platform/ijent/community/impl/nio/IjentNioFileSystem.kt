@@ -1,9 +1,12 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.ijent.community.impl.nio
 
+import com.intellij.platform.eel.EelDescriptor
+import com.intellij.platform.eel.EelOsFamily
 import com.intellij.platform.eel.directorySeparators
 import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.path.EelPathException
+import com.intellij.platform.eel.provider.EelDescriptorOwner
 import com.intellij.platform.ijent.fs.IjentFileSystemApi
 import com.intellij.platform.ijent.fs.IjentFileSystemPosixApi
 import com.intellij.platform.ijent.fs.IjentFileSystemWindowsApi
@@ -11,6 +14,7 @@ import org.jetbrains.annotations.ApiStatus
 import java.net.URI
 import java.nio.file.FileStore
 import java.nio.file.FileSystem
+import java.nio.file.FileSystemNotFoundException
 import java.nio.file.PathMatcher
 import java.nio.file.WatchService
 import java.nio.file.attribute.UserPrincipalLookupService
@@ -18,7 +22,10 @@ import java.nio.file.attribute.UserPrincipalLookupService
 class IjentNioFileSystem internal constructor(
   private val fsProvider: IjentNioFileSystemProvider,
   internal val uri: URI,
-) : FileSystem() {
+) : FileSystem(), EelDescriptorOwner {
+
+  override val eelDescriptor: EelDescriptor = ijentFs.descriptor
+
   override fun close() {
     fsProvider.close(uri)
   }
@@ -27,9 +34,10 @@ class IjentNioFileSystem internal constructor(
 
   val ijentFs: IjentFileSystemApi
     @ApiStatus.Internal
+    @Throws(FileSystemNotFoundException::class)
     get() =
       fsProvider.ijentFsApi(uri)
-      ?: throw java.nio.file.FileSystemException("`$uri` was removed from IJent FS providers")
+      ?: throw FileSystemNotFoundException("`$uri` was removed from IJent FS providers")
 
   override fun isOpen(): Boolean =
     fsProvider.ijentFsApi(uri) != null
@@ -37,9 +45,9 @@ class IjentNioFileSystem internal constructor(
   override fun isReadOnly(): Boolean = false
 
   override fun getSeparator(): String =
-    when (ijentFs) {
-      is IjentFileSystemPosixApi -> "/"
-      is IjentFileSystemWindowsApi -> "\\"
+    when (eelDescriptor.osFamily) {
+      EelOsFamily.Posix -> "/"
+      EelOsFamily.Windows -> "\\"
     }
 
   override fun getRootDirectories(): Iterable<IjentNioPath> =
@@ -56,10 +64,10 @@ class IjentNioFileSystem internal constructor(
   }
 
   override fun supportedFileAttributeViews(): Set<String> =
-    when (ijentFs) {
-      is IjentFileSystemWindowsApi ->
+    when (eelDescriptor.osFamily) {
+      EelOsFamily.Windows ->
         setOf("basic", "dos", "acl", "owner", "user")
-      is IjentFileSystemPosixApi ->
+      EelOsFamily.Posix ->
         setOf(
           "basic", "posix", "unix", "owner",
           "user",  // TODO Works only on BSD/macOS.
@@ -68,10 +76,10 @@ class IjentNioFileSystem internal constructor(
 
   override fun getPath(first: String, vararg more: String): IjentNioPath {
     return try {
-      more.fold(EelPath.parse(first, ijentFs.descriptor)) { path, newPart -> path.resolve(newPart) }.toNioPath()
+      more.fold(EelPath.parse(first, eelDescriptor)) { path, newPart -> path.resolve(newPart) }.toNioPath()
     }
     catch (_: EelPathException) {
-      RelativeIjentNioPath(first.split(*ijentFs.descriptor.osFamily.directorySeparators) + more, this)
+      RelativeIjentNioPath(first.split(*eelDescriptor.osFamily.directorySeparators) + more, this)
     }
   }
 
@@ -83,9 +91,8 @@ class IjentNioFileSystem internal constructor(
     TODO("Not yet implemented")
   }
 
-  override fun newWatchService(): WatchService {
-    TODO("Not yet implemented")
-  }
+  override fun newWatchService(): WatchService =
+    IjentNioWatchService(ijentFs, this)
 
   override fun equals(other: Any?): Boolean =
     other is IjentNioFileSystem && other.uri == uri && other.fsProvider == fsProvider

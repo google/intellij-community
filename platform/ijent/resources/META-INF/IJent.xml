@@ -5,8 +5,6 @@
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
-    <eelProvider implementation="com.intellij.platform.ijent.community.impl.nio.IjentEelDescriptorProvider" order="first"/>
-
     <applicationService
       serviceInterface="com.intellij.platform.ijent.spi.IjentSessionProvider" open="true"
       serviceImplementation="com.intellij.platform.ijent.spi.DefaultIjentSessionProvider"/>
@@ -14,6 +12,8 @@
     <applicationService
       serviceInterface="com.intellij.platform.ijent.IjentExecFileProvider" open="true"
       serviceImplementation="com.intellij.platform.ijent.DefaultIjentExecFileProvider"/>
+
+    <registryKey defaultValue="true" description="Make ijent nio operations cancellable" key="ijent.nio.cancellable.read"/>
 
   </extensions>
 </idea-plugin>

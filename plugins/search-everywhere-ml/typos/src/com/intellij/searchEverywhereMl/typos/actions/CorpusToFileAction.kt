@@ -9,7 +9,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiManager
 import com.intellij.psi.codeStyle.CodeStyleManager
-import com.intellij.searchEverywhereMl.typos.models.CorpusBuilder
+import com.intellij.searchEverywhereMl.typos.models.ActionsLanguageModel
 import com.intellij.testFramework.LightVirtualFile
 import com.intellij.util.DocumentUtil
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -17,7 +17,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 internal class CorpusToFileAction : AnAction() {
 
   override fun update(e: AnActionEvent) {
-    e.presentation.isEnabled = CorpusBuilder.getInstance()?.deferredCorpus?.isCompleted ?: false
+    e.presentation.isEnabled = ActionsLanguageModel.getInstance()?.deferredSharedIndex?.isCompleted ?: false
   }
 
   override fun getActionUpdateThread(): ActionUpdateThread {
@@ -28,9 +28,10 @@ internal class CorpusToFileAction : AnAction() {
   override fun actionPerformed(e: AnActionEvent) {
     val project = e.project ?: return
 
-    val corpusSentences = CorpusBuilder.getInstance()!!
-      .deferredCorpus.getCompleted()
-      .joinToString(separator = "\n") { it.joinToString(" ") }
+    val corpusSentences = ActionsLanguageModel.getInstance()!!
+      .deferredSharedIndex.getCompleted()
+      .sentenceTexts()
+      .joinToString(separator = "\n")
 
     val virtualFile = writeToFile(project, corpusSentences)
     FileEditorManager.getInstance(project).openFile(virtualFile, true)

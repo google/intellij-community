@@ -5,6 +5,7 @@ import com.intellij.concurrency.IntelliJContextElement
 import com.intellij.concurrency.currentThreadContext
 import com.intellij.diagnostic.StartUpMeasurer
 import com.intellij.ide.impl.ProjectUtil
+import com.intellij.idea.AppMode
 import com.intellij.internal.statistic.eventLog.EventLogGroup
 import com.intellij.internal.statistic.eventLog.events.BooleanEventField
 import com.intellij.internal.statistic.eventLog.events.EnumEventField
@@ -20,7 +21,6 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.editor.impl.DocumentMarkupModel
 import com.intellij.openapi.editor.impl.zombie.SpawnRecipe
-import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.Project
@@ -28,24 +28,29 @@ import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.FileIdAdapter
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.ex.WelcomeScreenProjectProvider
+import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjectHotStartUpMeasurer.EmptyProjectMarker
 import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjectHotStartUpMeasurer.MarkupType
-import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjectHotStartUpMeasurer.getStartUpContextElementIntoIdeStarter
+import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjectHotStartUpMeasurer.isRemDevTestWorkaround
+import com.intellij.platform.ide.productMode.IdeProductMode
+import com.intellij.util.PlatformUtils
 import com.intellij.util.containers.ComparatorUtil
 import com.intellij.util.containers.ContainerUtil
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet
 import it.unimi.dsi.fastutil.ints.IntSet
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.newSingleThreadContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.TestOnly
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
@@ -58,6 +63,7 @@ private var statsIsWritten = false
 object FUSProjectHotStartUpMeasurer {
   private val channel = Channel<Event>(Int.MAX_VALUE)
   private val counter = AtomicInteger(0)
+  private val handlingStarted = AtomicBoolean(false)
 
   private data class ProjectId(val projectOrder: Int) {
     constructor() : this(counter.incrementAndGet())
@@ -167,8 +173,21 @@ object FUSProjectHotStartUpMeasurer {
     channel.trySend(Event.SplashBecameVisibleEvent())
   }
 
+  fun isReopenStatEnabled(): Boolean {
+    if (AppMode.isMonolith()) return true
+    if (isRemDevTestWorkaround()) return true
+    return false
+  }
+
+  /**
+   * See IJPL-206077 and IJPL-200676
+   * For now this collector works in rem dev only for a client in integration tests;
+   * only one project marker - [EmptyProjectMarker] is used in that case.
+   */
+  private fun isRemDevTestWorkaround(): Boolean = PlatformUtils.isJetBrainsClient() && ApplicationManagerEx.isInIntegrationTest()
+
   fun getStartUpContextElementIntoIdeStarter(close: Boolean): CoroutineContext.Element? {
-    if (close) {
+    if (close || !isReopenStatEnabled()) {
       statsIsWritten = true
       channel.close()
       return null
@@ -200,6 +219,24 @@ object FUSProjectHotStartUpMeasurer {
   @Internal
   fun getContextElementWithEmptyProjectElementToPass(): CoroutineContext {
     return MyMarker + EmptyProjectMarker
+  }
+
+  /**
+   * For IJPL-206077 reopening projects in rem dev mode doesn't get marker from IdeStarter
+   * and uses this method as `I swear it's the project reopening part`. Passing that marker would be a cleaner solution,
+   * but it's still not implemented.
+   *
+   * The difference with [getStartUpContextElementIntoIdeStarter] is that this method doesn't notify about beginning of starting an IDE
+   *
+   * @see isRemDevTestWorkaround
+   */
+  fun getContextElementForRemDevWorkaround(): CoroutineContext {
+    return if (isRemDevTestWorkaround()) {
+      MyMarker
+    }
+    else {
+      EmptyCoroutineContext
+    }
   }
 
   private fun reportViolation(violation: Violation) {
@@ -237,6 +274,9 @@ object FUSProjectHotStartUpMeasurer {
   /**
    * Invokes [block] in coroutine context with project marker used in later reporting;
    * reports the existence of project settings to filter cases of importing which may need more resources.
+   *
+   * When invoked from the frontend, default [EmptyProjectMarker] would be used (see [getContextElementWithEmptyProjectElementToPass]),
+   * because there we can't distinguish between projects for editors, so only default one should be used for consistency. See IJPL-206077
    */
   suspend fun <T> withProjectContextElement(projectFile: Path, block: suspend () -> T): T {
     if (!currentThreadContext().isProperContext()) {
@@ -251,7 +291,13 @@ object FUSProjectHotStartUpMeasurer {
       reportWelcomeScreenShown()
     }
 
-    val projectId = ProjectId()
+    val projectId = if (IdeProductMode.isFrontend) {
+      EmptyProjectMarker.id
+    }
+    else {
+      ProjectId()
+    }
+
     val hasSettings = ProjectUtil.isValidProjectPath(projectFile)
     channel.trySend(Event.ProjectPathReportEvent(projectId, hasSettings))
     return withContext(MyProjectMarker(projectId)) {
@@ -343,15 +389,10 @@ object FUSProjectHotStartUpMeasurer {
       thisLogger().error("The editor is not loaded yet")
     }
 
-    val cachedDocument = FileDocumentManager.getInstance().getCachedDocument(file)
-    if (cachedDocument == null) {
-      thisLogger().error("No cached document for ${file.path}")
-    }
-    else {
-      val markupModel = DocumentMarkupModel.forDocument(cachedDocument, project, false)
-      if (markupModel == null) {
-        thisLogger().error("No markup model for ${file.path} when the editor is opened")
-      }
+    val document = textEditor.editor.document
+    val markupModel = DocumentMarkupModel.forDocument(document, project, false)
+    if (markupModel == null) {
+      thisLogger().error("No markup model for ${file.path} when the editor is opened")
     }
   }
 
@@ -404,17 +445,21 @@ object FUSProjectHotStartUpMeasurer {
     return duration
   }
 
-  @OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
   suspend fun startWritingStatistics() {
-    val counterContext = newSingleThreadContext("HandlingStartupEventsContext")
-    try {
-      withContext(counterContext) {
-        handleStatisticEvents()
+    // ensures that handling is started only once
+    if (!handlingStarted.compareAndSet(false, true)) return
+
+    withContext(Dispatchers.IO) {
+      try {
+        //ensures non-thread-safe structures work correctly on different threads
+        Mutex().withLock {
+          doHandleStatisticEvents()
+        }
       }
-    }
-    finally {
-      channel.cancel()
-      statsIsWritten = true
+      finally {
+        statsIsWritten = true
+        channel.close()
+      }
     }
   }
 
@@ -436,8 +481,9 @@ object FUSProjectHotStartUpMeasurer {
     }
   }
 
-  // Runs on a single thread, see `startWritingStatistics`
-  private suspend fun handleStatisticEvents() {
+  // Is supposed to be invoked from [startWritingStatistics] only.
+  // Runs under mutex lock to ensure safe usage of non-thread-safe maps
+  private suspend fun doHandleStatisticEvents() {
     val markupResurrectedFileIds = MarkupResurrectedFileIds()
     var ideStarterStartedEvent: Event.IdeStarterStartedEvent? = null
     var splashBecameVisibleEvent: Event.SplashBecameVisibleEvent? = null

@@ -1,14 +1,10 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:ApiStatus.Experimental
-
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.syntax
 
 import com.intellij.platform.syntax.impl.util.BitSet
 import com.intellij.util.fastutil.ints.IntArrayList
-import org.jetbrains.annotations.ApiStatus
 import kotlin.jvm.JvmName
 
-@ApiStatus.Experimental
 fun Collection<SyntaxElementType>.asSyntaxElementTypeSet(): SyntaxElementTypeSet {
   if (this is SyntaxElementTypeSet) return this
 
@@ -26,16 +22,13 @@ fun Collection<SyntaxElementType>.asSyntaxElementTypeSet(): SyntaxElementTypeSet
   return SyntaxElementTypeSet(bitSet, distinctElementTypes.toTypedArray())
 }
 
-@ApiStatus.Experimental
 fun syntaxElementTypeSetOf(vararg tokens: SyntaxElementType): SyntaxElementTypeSet =
   setOf(*tokens).asSyntaxElementTypeSet()
 
 private val emptySet = SyntaxElementTypeSet(BitSet(IntArrayList()), emptyArray())
 
-@ApiStatus.Experimental
 fun emptySyntaxElementTypeSet(): SyntaxElementTypeSet = emptySet
 
-@ApiStatus.Experimental
 class SyntaxElementTypeSet internal constructor(
   private val bitSet: BitSet,
   private val tokens: Array<SyntaxElementType>,

@@ -11,20 +11,37 @@ import com.intellij.openapi.actionSystem.ToggleAction;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsActions;
+import com.intellij.openapi.wm.ToolWindow;
+import com.intellij.openapi.wm.ToolWindowId;
+import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.openapi.wm.ex.ToolWindowManagerListener;
 import com.intellij.psi.PsiElement;
+import com.intellij.ui.content.Content;
+import com.intellij.util.concurrency.ThreadingAssertions;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.Icon;
 import javax.swing.JPanel;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
 public abstract class CallHierarchyBrowserBase extends HierarchyBrowserBaseEx {
   public CallHierarchyBrowserBase(@NotNull Project project, @NotNull PsiElement method) {
     super(project, method);
+  }
+
+  @Override
+  public void setContent(@NotNull Content content) {
+    super.setContent(content);
+
+    myProject.getMessageBus().connect(content).subscribe(
+      ToolWindowManagerListener.TOPIC,
+      new MyCallHierarchyBrowserListener());
   }
 
   @Override
@@ -116,5 +133,65 @@ public abstract class CallHierarchyBrowserBase extends HierarchyBrowserBaseEx {
   public static @NotNull @Nls String getCallerType() {
     //noinspection UnresolvedPropertyKey
     return IdeBundle.message("title.hierarchy.callers.of");
+  }
+
+  private class MyCallHierarchyBrowserListener implements ToolWindowManagerListener {
+    private boolean myLastVisible = true;
+    private @Nullable HierarchyTreeStructure mySavedTreeStructure;
+    private @Nullable List<Object> mySavedPathsToExpand;
+    private @Nullable List<Object> mySavedSelectionPaths;
+
+    @Override
+    public void stateChanged(@NotNull ToolWindowManager toolWindowManager) {
+      ToolWindow window = toolWindowManager.getToolWindow(ToolWindowId.HIERARCHY);
+      if (window == null || window.isDisposed()) return;
+
+      boolean visible = window.isVisible();
+      if (visible == myLastVisible) return;
+      myLastVisible = visible;
+
+      if (visible) {
+        onToolWindowShown();
+      }
+      else {
+        onToolWindowHidden();
+      }
+    }
+
+    private void onToolWindowHidden() {
+      ThreadingAssertions.assertEventDispatchThread();
+      if (isDisposed()) return;
+
+      mySavedTreeStructure = getCurrentTreeStructure();
+
+      List<Object> pathsToExpand = new ArrayList<>();
+      List<Object> selectionPaths = new ArrayList<>();
+      saveCurrentTreeState(pathsToExpand, selectionPaths);
+      mySavedPathsToExpand = pathsToExpand;
+      mySavedSelectionPaths = selectionPaths;
+
+      disposeAllSheets();
+    }
+
+    private void onToolWindowShown() {
+      ThreadingAssertions.assertEventDispatchThread();
+      if (isDisposed()) return;
+
+      @Nls String currentViewType = getCurrentViewType();
+      if (currentViewType == null || !isValidBase()) return;
+
+      HierarchyTreeStructure savedStructure = mySavedTreeStructure;
+      List<Object> pathsToExpand = mySavedPathsToExpand;
+      List<Object> selectionPaths = mySavedSelectionPaths;
+      mySavedTreeStructure = null;
+      mySavedPathsToExpand = null;
+      mySavedSelectionPaths = null;
+
+      changeViewWithStructure(currentViewType, false, savedStructure);
+
+      if (pathsToExpand != null && selectionPaths != null) {
+        restoreTreeState(pathsToExpand, selectionPaths);
+      }
+    }
   }
 }

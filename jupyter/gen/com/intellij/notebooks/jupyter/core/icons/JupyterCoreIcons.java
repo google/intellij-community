@@ -33,6 +33,8 @@ public final class JupyterCoreIcons {
   /** 16x16 */ public static final @NotNull Icon JupyterToolWindow = load("icons/org.jetbrains.plugins.notebooks.jupyter/expui/jupyterToolWindow.svg", -1976160305, 2);
   /** 20x20 */ public static final @NotNull Icon JupyterToolWindow_20x20 = load("icons/org.jetbrains.plugins.notebooks.jupyter/expui/jupyterToolWindow@20x20.svg", -1897933817, 2);
   /** 16x16 */ public static final @NotNull Icon Kernel = load("icons/org.jetbrains.plugins.notebooks.jupyter/expui/kernel.svg", "icons/org.jetbrains.plugins.notebooks.jupyter/kernel.svg", 512280260, 2);
+  /** 16x16 */ public static final @NotNull Icon KernelError = load("icons/org.jetbrains.plugins.notebooks.jupyter/expui/kernelError.svg", -1295526548, 2);
+  /** 16x16 */ public static final @NotNull Icon KernelWarning = load("icons/org.jetbrains.plugins.notebooks.jupyter/expui/kernelWarning.svg", 627231369, 2);
   /** 16x16 */ public static final @NotNull Icon MarkdownCell = load("icons/org.jetbrains.plugins.notebooks.jupyter/expui/markdownCell.svg", "icons/org.jetbrains.plugins.notebooks.jupyter/markdownCell.svg", -1009176863, 0);
   /** 16x16 */ public static final @NotNull Icon MergeCellAbove = load("icons/org.jetbrains.plugins.notebooks.jupyter/expui/mergeCellAbove.svg", "icons/org.jetbrains.plugins.notebooks.jupyter/mergeCellAbove.svg", 27241797, 2);
   /** 16x16 */ public static final @NotNull Icon MergeCellBelow = load("icons/org.jetbrains.plugins.notebooks.jupyter/expui/mergeCellBelow.svg", "icons/org.jetbrains.plugins.notebooks.jupyter/mergeCellBelow.svg", 1778850568, 2);

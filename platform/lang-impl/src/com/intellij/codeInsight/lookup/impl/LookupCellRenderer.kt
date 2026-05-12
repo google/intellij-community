@@ -350,8 +350,6 @@ class LookupCellRenderer(
       }
     }
 
-    AccessibleContextUtil.setCombinedName(panel, nameComponent, "", tailComponent, " - ", typeLabel)
-    AccessibleContextUtil.setCombinedDescription(panel, nameComponent, "", tailComponent, " - ", typeLabel)
     return panel
   }
 
@@ -732,6 +730,16 @@ class LookupCellRenderer(
           g.dispose()
         }
       }
+    }
+
+    override fun getAccessibleContext(): AccessibleContext {
+      if (accessibleContext == null) {
+        accessibleContext = object : AccessibleJPanel() {
+          override fun getAccessibleName(): String? = AccessibleContextUtil.getCombinedName(" ", *components)
+          override fun getAccessibleDescription(): String? = AccessibleContextUtil.getCombinedDescription(" ", *components)
+        }
+      }
+      return accessibleContext
     }
   }
 

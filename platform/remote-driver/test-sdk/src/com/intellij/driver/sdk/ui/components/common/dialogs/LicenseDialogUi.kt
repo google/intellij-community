@@ -41,6 +41,14 @@ class LicenseDialogUi(data: ComponentData) : DialogUiComponent(data) {
   val closeButton = x { byVisibleText("Close") }
   val optionsButton = x { byAccessibleName("Options") }
 
+  // Non-commercial use
+  val nonCommercialUseButton = button { byAccessibleName("Non-commercial use") }
+  val logInForNonCommercialUseButton = button { byAccessibleName("Log In for Non-Commercial Use") }
+  val agreeWithNonCommercialUseCheckBox = x { byAccessibleName("I agree with non-commercial use ") }
+  val startNonCommercialUseButton = button { byAccessibleName("Start Non-Commercial Use") }
+  val forNonCommercialUseOnlyLabel = x { byAccessibleName("For non-commercial use only") }
+  val nonCommercialDescriptionLabel = x { contains(byVisibleText("Develop for non-commercial purposes only")) }
+
   val exitButton: UiComponent = x { byAccessibleName("Quit ${driver.fullProductName}") }
 }
 
@@ -76,12 +84,14 @@ class EducationalLicenseExpirationDialogUi(data: ComponentData) : UiComponent(da
 }
 
 fun LicenseDialogUi.exitConfirmationDialog(action: ExitConfirmationDialogUi.() -> Unit) {
-  x(ExitConfirmationDialogUi::class.java) { byTitle("Confirm Exit") }.action()
+  val title = if (isRemDevMode) "Stop the IDE Backend or Keep It Running"
+  else "Confirm Exit"
+  x(ExitConfirmationDialogUi::class.java) { byTitle(title) }.action()
 }
 
 class ExitConfirmationDialogUi(data: ComponentData) : DialogUiComponent(data) {
-  val exitConfirmButton: UiComponent = x { byAccessibleName("Exit") }
-  val backToActivationButton: UiComponent = x { byAccessibleName("Back to Activation") }
+  val exitConfirmButton: UiComponent = x { byAccessibleName(if (isRemDevMode) "Close and Stop" else "Exit") }
+  val backToActivationButton: UiComponent = x { byAccessibleName(if (isRemDevMode) "Cancel" else "Back to Activation") }
 }
 
 fun LicenseDialogUi.removeLicenseConfirmationDialog(action: RemoveLicenseConfirmationDialogUi.() -> Unit) {

@@ -37,8 +37,8 @@ internal open class ClassifierImportCandidatesProvider(
         is KaClassSymbol -> this
     }
 
-    context(_: KaSession)
     @OptIn(KaExperimentalApi::class)
+    context(_: KaSession)
     override fun collectCandidates(
         name: Name,
         indexProvider: KtSymbolFromIndexProvider,
@@ -62,7 +62,7 @@ internal class AnnotationImportCandidatesProvider(
 ) : ClassifierImportCandidatesProvider(importContext) {
 
     init {
-        requireIsInstance<ImportPositionType.Annotation>(importContext.positionType)
+        require(importContext.positionType is ImportPositionType.Annotation)
     }
 
     override fun acceptsKotlinClass(kotlinClass: KtClassLikeDeclaration): Boolean {
@@ -88,7 +88,7 @@ internal class ConstructorReferenceImportCandidatesProvider(
 ) : ClassifierImportCandidatesProvider(importContext) {
 
     init {
-        requireIsInstance<ImportPositionType.CallableReference>(importContext.positionType)
+        require(importContext.positionType is ImportPositionType.CallableReference)
     }
 
     override fun acceptsKotlinClass(kotlinClass: KtClassLikeDeclaration): Boolean {

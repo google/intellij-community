@@ -17,6 +17,7 @@ import com.jetbrains.python.errorProcessing.PyExecResult
 import com.jetbrains.python.errorProcessing.PyResult
 import com.jetbrains.python.onFailure
 import com.jetbrains.python.packaging.PyPackageName
+import com.jetbrains.python.packaging.PyPIPackageUtil
 import com.jetbrains.python.packaging.common.PythonOutdatedPackage
 import com.jetbrains.python.packaging.common.PythonPackage
 import com.jetbrains.python.packaging.management.PyWorkspaceMember
@@ -50,9 +51,10 @@ private class UvLowLevelImpl<P : PathHolder>(private val cwd: Path, private val 
       val initArgs = mutableListOf("init")
       addPythonArg(initArgs)
       initArgs.add("--bare")
-      if (cwd.name.isNotBlank()) {
+      val projectName = PyPackageName.normalizeProjectName(cwd.name)
+      if (projectName.isNotBlank()) {
         initArgs.add("--name")
-        initArgs.add(cwd.name)
+        initArgs.add(projectName)
       }
       initArgs.add("--no-project")
       uvCli.runUv(cwd, null, true, *initArgs.toTypedArray()).getOr { return it }
@@ -162,13 +164,6 @@ private class UvLowLevelImpl<P : PathHolder>(private val cwd: Path, private val 
     }
   }
 
-  override suspend fun listTopLevelPackages(): PyResult<List<PythonPackage>> {
-    val out = uvCli.runUv(cwd, venvPath, false, "tree", "--depth=1", "--locked")
-      .getOr { return it }
-
-    return PyExecResult.success(UvOutputParser.parseUvPackageList(out))
-  }
-
   override suspend fun listPackageRequirements(name: PythonPackage): PyResult<List<PyPackageName>> {
     val out = uvCli.runUv(cwd, venvPath, false, "pip", "show", name.name)
       .getOr { return it }
@@ -176,15 +171,8 @@ private class UvLowLevelImpl<P : PathHolder>(private val cwd: Path, private val 
     return PyExecResult.success(UvOutputParser.parseUvPackageRequirements(out))
   }
 
-  override suspend fun listPackageRequirementsTree(name: PythonPackage): PyResult<String> {
-    val out = uvCli.runUv(cwd, venvPath, false, "tree", "--package", name.name, "--locked")
-      .getOr { return it }
-
-    return PyExecResult.success(out)
-  }
-
   override suspend fun listProjectStructureTree(): PyResult<String> {
-    val out = uvCli.runUv(cwd, venvPath, false, "tree", "--locked")
+    val out = uvCli.runUv(cwd, venvPath, false, "tree", "--frozen", "--no-dedupe")
       .getOr { return it }
 
     return PyExecResult.success(out)
@@ -198,9 +186,9 @@ private class UvLowLevelImpl<P : PathHolder>(private val cwd: Path, private val 
   }
 
   override suspend fun installPackage(name: PythonPackageInstallRequest, options: List<String>): PyResult<Unit> {
-    uvCli.runUv(cwd, venvPath, true, "pip", "install", *name.formatPackageName(), *options.toTypedArray())
-      .getOr { return it }
-
+    for (args in partitionPackagesBySource(name, options)) {
+      uvCli.runUv(cwd, venvPath, true, "pip", "install", *args).getOr { return it }
+    }
     return PyExecResult.success(Unit)
   }
 
@@ -212,8 +200,15 @@ private class UvLowLevelImpl<P : PathHolder>(private val cwd: Path, private val 
     return PyExecResult.success(Unit)
   }
 
-  override suspend fun addDependency(pyPackages: PythonPackageInstallRequest, options: List<String>): PyResult<Unit> {
-    uvCli.runUv(cwd, venvPath, true, "add", *pyPackages.formatPackageName(), *options.toTypedArray())
+  override suspend fun addDependency(pyPackages: PythonPackageInstallRequest, options: List<String>, workspaceMember: PyWorkspaceMember?): PyResult<Unit> {
+    val args = mutableListOf("add")
+    if (workspaceMember != null) {
+      args.add("--package")
+      args.add(workspaceMember.name)
+    }
+    args.addAll(pyPackages.formatPackageName())
+    args.addAll(options)
+    uvCli.runUv(cwd, venvPath, true, *args.toTypedArray())
       .getOr { return it }
 
     return PyExecResult.success(Unit)
@@ -272,7 +267,7 @@ private class UvLowLevelImpl<P : PathHolder>(private val cwd: Path, private val 
   }
 
   fun constructSyncArgs(inexact: Boolean): MutableList<String> {
-    val args = mutableListOf("sync", "--check")
+    val args = mutableListOf("sync", "--check", "--all-packages")
 
     if (inexact) {
       args += "--inexact"
@@ -286,8 +281,34 @@ private class UvLowLevelImpl<P : PathHolder>(private val cwd: Path, private val 
     is PythonPackageInstallRequest.ByLocation -> error("UV does not support installing from location uri")
   }
 
+  private fun partitionPackagesBySource(installRequest: PythonPackageInstallRequest, options: List<String>): List<Array<String>> {
+    if (installRequest !is PythonPackageInstallRequest.ByRepositoryPythonPackageSpecifications) {
+      return listOf(arrayOf(*installRequest.formatPackageName(), *options.toTypedArray()))
+    }
+
+    val (pypiSpecs, nonPypi) = installRequest.specifications.partition {
+      val url = it.repository.urlForInstallation?.toString()
+      url == null || url == PyPIPackageUtil.PYPI_LIST_URL
+    }
+
+    val result = mutableListOf<Array<String>>()
+    if (pypiSpecs.isNotEmpty()) {
+      result.add((options + pypiSpecs.map { it.nameWithVersionsSpec }).toTypedArray())
+    }
+
+    nonPypi
+      .groupBy { it.repository.urlForInstallation?.toString() }
+      .forEach { (url, specs) ->
+        if (url == null || specs.isEmpty()) return@forEach
+        val names = specs.map { it.nameWithVersionsSpec }
+        result.add((options + listOf("--index-url", url) + names).toTypedArray())
+      }
+
+    return result
+  }
+
   override suspend fun sync(): PyResult<String> {
-    return uvCli.runUv(cwd, venvPath, true, "sync", "--all-packages", "--inexact")
+    return uvCli.runUv(cwd, venvPath, true, "sync", "--all-packages")
   }
 
   override suspend fun lock(): PyResult<String> {

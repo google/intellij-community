@@ -105,7 +105,7 @@ class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
   @Test
   fun testDoNotImportSameRootProjectTwice() = runBlocking {
     val listener = MyLoggingListener()
-    tree.addListener(listener, getTestRootDisposable())
+    project.messageBus.connect(getTestRootDisposable()).subscribe(MavenProjectsTree.Listener.TOPIC, listener)
     val m1 = createModulePom("m1",
                              """
                              <groupId>test</groupId>
@@ -307,7 +307,7 @@ class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
                        </modules>
                        """.trimIndent())
     val listener = MyLoggingListener()
-    tree.addListener(listener, getTestRootDisposable())
+    project.messageBus.connect(getTestRootDisposable()).subscribe(MavenProjectsTree.Listener.TOPIC, listener)
     update(projectPom)
     roots = tree.rootProjects
     assertEquals(2, roots.size)
@@ -380,7 +380,7 @@ class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
                                       <version>1</version>
                                       """.trimIndent())
     val l = MyLoggingListener()
-    tree.addListener(l, getTestRootDisposable())
+    project.messageBus.connect(getTestRootDisposable()).subscribe(MavenProjectsTree.Listener.TOPIC, l)
     updateAll(projectPom)
     assertEquals(log().add("updated", "project", "m").add("deleted"), l.log)
     l.log.clear()
@@ -409,7 +409,7 @@ class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
                                       <version>1</version>
                                       """.trimIndent())
     val l = MyLoggingListener()
-    tree.addListener(l, getTestRootDisposable())
+    project.messageBus.connect(getTestRootDisposable()).subscribe(MavenProjectsTree.Listener.TOPIC, l)
     update(projectPom)
     assertEquals(log().add("updated", "project", "m").add("deleted"), l.log)
     l.log.clear()
@@ -589,7 +589,7 @@ class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
   @Test
   fun testSendingNotificationAfterProjectIsAddedInToHierarchy() = runBlocking {
     val listener = MyLoggingListener()
-    tree.addListener(listener, getTestRootDisposable())
+    project.messageBus.connect(getTestRootDisposable()).subscribe(MavenProjectsTree.Listener.TOPIC, listener)
     createProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>m1</artifactId>
@@ -609,7 +609,7 @@ class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
                        """.trimIndent())
     updateAll(projectPom)
     val listener = MyLoggingListener()
-    tree.addListener(listener, getTestRootDisposable())
+    project.messageBus.connect(getTestRootDisposable()).subscribe(MavenProjectsTree.Listener.TOPIC, listener)
     val mavenProject = tree.findProject(projectPom)!!
     resolve(project, mavenProject, mavenGeneralSettings)
     assertEquals(log().add("resolved", "project"), listener.log)
@@ -1384,7 +1384,7 @@ class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
                       """.trimIndent())
     updateAll(projectPom)
     val listener = MyLoggingListener()
-    tree.addListener(listener, getTestRootDisposable())
+    project.messageBus.connect(getTestRootDisposable()).subscribe(MavenProjectsTree.Listener.TOPIC, listener)
     deleteProject(m1)
     assertEquals(log().add("updated").add("deleted", "m2", "m1"), listener.log)
   }
@@ -1422,7 +1422,7 @@ class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
     assertEquals(1, tree.getModules(roots[0]).size)
     assertEquals(1, tree.getModules(tree.getModules(roots[0])[0]).size)
     val listener = MyLoggingListener()
-    tree.addListener(listener, getTestRootDisposable())
+    project.messageBus.connect(getTestRootDisposable()).subscribe(MavenProjectsTree.Listener.TOPIC, listener)
     deleteProject(m1)
     roots = tree.rootProjects
     assertEquals(2, roots.size)
@@ -1509,7 +1509,7 @@ class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
                                        <version>1</version>
                                        """.trimIndent())
     val l = MyLoggingListener()
-    tree.addListener(l, getTestRootDisposable())
+    project.messageBus.connect(getTestRootDisposable()).subscribe(MavenProjectsTree.Listener.TOPIC, l)
     tree.addManagedFilesWithProfiles(listOf(projectPom), MavenExplicitProfiles.NONE)
     tree.updateAll(false, mavenGeneralSettings, mavenEmbedderWrappers, rawProgressReporter)
     assertEquals(log().add("updated", "parent", "m1", "m2").add("deleted"), l.log)

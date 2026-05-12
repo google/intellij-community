@@ -51,7 +51,7 @@ class UrlPathReferenceUnifiedPomTarget internal constructor(
     get() {
       return resolvedTargets
         .mapNotNullTo(HashSet()) { it.resolveToPsiElement() }
-        .singleOrNull()?.navigationElement
+        .singleOrNull()
         ?.let { nav ->
           nav as? NavigatablePsiElement ?: run {
             if (ApplicationManager.getApplication().run { isInternal || isUnitTestMode }) {

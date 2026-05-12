@@ -4,7 +4,7 @@ package com.jetbrains.env
 import com.intellij.testFramework.ProjectRule
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.jetbrains.env.python.PySDKRule
-import com.jetbrains.python.sdk.sdkSeemsValid
+import com.jetbrains.python.sdk.isSdkSeemsValid
 import org.junit.Assert
 import org.junit.Test
 import kotlin.time.Duration.Companion.minutes
@@ -25,7 +25,7 @@ abstract class PySdkFlavorTestBase {
   fun testValid(): Unit =  timeoutRunBlocking(2.minutes) {
     sdkRule.sdk.getPythonBinaryPath(projectRule.project).getOrThrow()
     repeat(1000) {
-      Assert.assertTrue(sdkRule.sdk.sdkSeemsValid)
+      Assert.assertTrue(sdkRule.sdk.isSdkSeemsValid)
     }
   }
 }

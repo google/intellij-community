@@ -39,7 +39,7 @@ internal class MavenHighlightingUpdater(
       }
     }, this)
 
-    projectsManager.addProjectsTreeListener(object : MavenProjectsTree.Listener {
+    project.messageBus.connect(this).subscribe(MavenProjectsTree.Listener.TOPIC, object : MavenProjectsTree.Listener {
       override fun projectsUpdated(updated: List<Pair<MavenProject, MavenProjectChanges>>,
                                    deleted: List<MavenProject>) {
         for (each in updated) {
@@ -47,12 +47,16 @@ internal class MavenHighlightingUpdater(
         }
       }
 
-      override fun projectResolved(projectWithChanges: Pair<MavenProject, MavenProjectChanges>) {
-        schedule(projectWithChanges.first)
+      override fun projectsResolved(projects: List<MavenProject>) {
+        for (project in projects) {
+          schedule(project)
+        }
       }
 
-      override fun pluginsResolved(mavenProject: MavenProject) {
-        schedule(mavenProject)
+      override fun pluginsResolved(projects: List<MavenProject>) {
+        for (project in projects) {
+          schedule(project)
+        }
       }
 
       override fun foldersResolved(projectWithChanges: Pair<MavenProject, MavenProjectChanges>) {

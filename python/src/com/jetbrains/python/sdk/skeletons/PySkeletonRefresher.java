@@ -131,7 +131,7 @@ public class PySkeletonRefresher {
     final String builtinsFileName = PySkeletonUtil.getBuiltinsFileName(mySdk);
     final File builtinsFile = new File(skeletonsPath, builtinsFileName);
 
-    final PySkeletonHeader oldHeader = PySkeletonHeader.readSkeletonHeader(builtinsFile);
+    final PySkeletonHeader oldHeader = PySkeletonHeader.readSkeletonHeader(builtinsFile.toPath());
     final boolean oldOrNonExisting = oldHeader == null || oldHeader.getVersion() == 0;
 
     if (preGeneratedSkeletons != null && oldOrNonExisting) {
@@ -273,7 +273,7 @@ public class PySkeletonRefresher {
         if (PySkeletonUtil.getBuiltinsFileName(mySdk).equals(itemName)) {
           continue;
         }
-        final PySkeletonHeader header = PySkeletonHeader.readSkeletonHeader(item);
+        final PySkeletonHeader header = PySkeletonHeader.readSkeletonHeader(item.toPath());
         String binaryFile = null;
         boolean canLive = header != null;
         if (canLive) {

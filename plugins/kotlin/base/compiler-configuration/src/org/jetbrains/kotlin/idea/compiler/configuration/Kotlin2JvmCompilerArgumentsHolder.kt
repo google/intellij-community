@@ -14,7 +14,7 @@ import org.jetbrains.kotlin.config.SettingConstants.KOTLIN_TO_JVM_COMPILER_ARGUM
 @Service(Service.Level.PROJECT)
 @State(name = KOTLIN_TO_JVM_COMPILER_ARGUMENTS_SECTION, storages = [(Storage(SettingConstants.KOTLIN_COMPILER_SETTINGS_FILE))])
 class Kotlin2JvmCompilerArgumentsHolder(project: Project) : BaseKotlinCompilerSettings<K2JVMCompilerArguments>(project) {
-    override fun createSettings() = K2JVMCompilerArguments()
+    override fun createSettings(): K2JVMCompilerArguments = K2JVMCompilerArguments()
 
     override fun validateNewSettings(settings: K2JVMCompilerArguments) {
         validateInheritedFieldsUnchanged(settings)

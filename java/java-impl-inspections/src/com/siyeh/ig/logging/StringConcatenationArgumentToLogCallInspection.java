@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.siyeh.ig.logging;
 
 import com.intellij.codeInspection.LocalQuickFix;
@@ -44,7 +44,6 @@ import com.siyeh.ig.psiutils.CommentTracker;
 import com.siyeh.ig.psiutils.ExpressionUtils;
 import com.siyeh.ig.psiutils.TypeUtils;
 import one.util.streamex.EntryStream;
-import one.util.streamex.StreamEx;
 import org.jdom.Element;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NonNls;
@@ -400,12 +399,17 @@ public final class StringConcatenationArgumentToLogCallInspection extends BaseIn
         logText.delete(0, logText.length());
         return;
       }
-      String delimiters = "\n" + " ".repeat(indent);
-
-      String preparedText = StreamEx.of(logText.toString().split("\n", -1))
-        .map(line -> line.endsWith(" ") ? line.substring(0, line.length() - 1) + "\\s" : line)
-        .joining(delimiters, delimiters, "");
-      preparedText = PsiLiteralUtil.escapeTextBlockCharacters(preparedText, true, true, false);
+      String indentPrefix = " ".repeat(indent);
+      String escapedText = PsiLiteralUtil.escapeTextBlockCharacters(logText.toString(), false, true, true);
+      String[] lines = escapedText.split("\n", -1);
+      StringBuilder preparedText = new StringBuilder();
+      for (String line : lines) {
+        preparedText.append('\n');
+        if (!line.isEmpty()) preparedText.append(indentPrefix).append(line);
+      }
+      if (lines.length > 0 && lines[lines.length - 1].isEmpty()) {
+        preparedText.append(indentPrefix);
+      }
       methodCall.append("\"\"\"")
         .append(preparedText)
         .append("\"\"\"");

@@ -1,6 +1,8 @@
 // Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInspection;
 
+import com.intellij.psi.PsiElement;
+
 /**
  * Defines type used to determine highlighting of {@link ProblemDescriptor}.
  * Please use {@link #GENERIC_ERROR_OR_WARNING}, otherwise user's settings would be ignored.
@@ -71,7 +73,9 @@ public enum ProblemHighlightType {
 
   /**
    * Marks places which were not checked during local analysis e.g., because of performance considerations. 
-   * These places won't be anyhow highlighted in the editor though Redundant suppression inspection would skip reporting. 
+   * These places won't be anyhow highlighted in the editor though Redundant suppression inspection would skip reporting.
+   * 
+   * @see ProblemsHolder#registerPossibleProblem(PsiElement) for more details.
    */
   POSSIBLE_PROBLEM
 }

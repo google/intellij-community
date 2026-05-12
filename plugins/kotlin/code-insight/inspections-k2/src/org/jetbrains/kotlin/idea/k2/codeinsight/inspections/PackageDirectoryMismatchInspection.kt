@@ -8,10 +8,13 @@ import com.intellij.codeInspection.ProblemDescriptor
 import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.lang.injection.InjectedLanguageManager
 import com.intellij.openapi.application.runWriteAction
+import com.intellij.openapi.components.serviceOrNull
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.SingleFileSourcesTracker
 import com.intellij.openapi.ui.Messages
+import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiManager
+import com.intellij.psi.PsiNameIdentifierOwner
 import com.intellij.refactoring.PackageWrapper
 import com.intellij.refactoring.move.moveClassesOrPackages.AutocreatingSingleSourceRootMoveDestination
 import com.intellij.refactoring.move.moveFilesOrDirectories.MoveFilesOrDirectoriesUtil
@@ -69,7 +72,12 @@ class PackageDirectoryMismatchInspection : AbstractKotlinInspection() {
                 fixes += ChangePackageFix("'${fqNameWithImplicitPrefix.asString()}'", fqNameWithImplicitPrefix)
             }
 
-            val element = if (directive.textLength != 0) directive else file
+            val element = if (directive.textLength != 0) {
+                directive
+            } else {
+                EmptyPackageHighlightingFallback.getOrCreateInstance().getElementToHighlight(directive)
+            }
+
             holder.registerProblem(
                 element,
               KotlinBundle.message("text.package.directive.dont.match.file.location"),
@@ -136,6 +144,39 @@ class PackageDirectoryMismatchInspection : AbstractKotlinInspection() {
             val packageDirective = file.packageDirective ?: return IntentionPreviewInfo.EMPTY
             packageDirective.fqName = packageFqName
             return IntentionPreviewInfo.DIFF
+        }
+    }
+
+    /**
+     * Picks the PSI element to anchor the "package directive doesn't match directory" problem on
+     * when the package directive itself is empty (missing or commented out).
+     *
+     * Note: We cannot reliably register this service in the main part of Kotlin IntelliJ Plugin for now,
+     * because it might conflict with other places of registration.
+     * Instead, we expect that this service might not be registered, and the default implementation will be created
+     * by [getOrCreateInstance].
+     */
+    internal interface EmptyPackageHighlightingFallback {
+        fun getElementToHighlight(directive: KtPackageDirective): PsiElement
+
+        companion object {
+            @JvmStatic
+            fun getOrCreateInstance(): EmptyPackageHighlightingFallback = serviceOrNull() ?: WholeFile()
+        }
+
+        class WholeFile : EmptyPackageHighlightingFallback {
+            override fun getElementToHighlight(directive: KtPackageDirective): PsiElement =
+                directive.containingKtFile
+        }
+
+        class FirstDeclarationName : EmptyPackageHighlightingFallback {
+            override fun getElementToHighlight(directive: KtPackageDirective): PsiElement {
+                val file = directive.containingKtFile
+
+                val firstNamedDeclaration = file.declarations.filterIsInstance<PsiNameIdentifierOwner>().firstOrNull()
+
+                return firstNamedDeclaration?.nameIdentifier ?: file
+            }
         }
     }
 }

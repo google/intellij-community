@@ -204,7 +204,6 @@ private val foldedElementsPresentations = hashMapOf(
   MarkdownElementTypes.UNORDERED_LIST to MarkdownBundle.message("markdown.folding.unordered.list.name"),
   MarkdownElementTypes.BLOCK_QUOTE to MarkdownBundle.message("markdown.folding.block.quote.name"),
   MarkdownElementTypes.TABLE to MarkdownBundle.message("markdown.folding.table.name"),
-  MarkdownElementTypes.CODE_FENCE to MarkdownBundle.message("markdown.folding.code.fence.name"),
   MarkdownElementTypes.FRONT_MATTER_HEADER to MarkdownBundle.message("markdown.folding.front.matter.name")
 )
 

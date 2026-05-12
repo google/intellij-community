@@ -13,6 +13,7 @@
     <applicationService serviceImplementation="org.jetbrains.kotlin.onboarding.gradle.BuildProcessSatisfactionSurveyStore"/>
     <feedback.idleFeedbackSurvey implementation="org.jetbrains.kotlin.onboarding.gradle.BuildProcessSatisfactionSurvey"/>
     <externalSystemTaskNotificationListener implementation="org.jetbrains.kotlin.onboarding.gradle.BuildProcessSatisfactionExternalSystemListener"/>
+    <applicationSettings service="org.jetbrains.kotlin.onboarding.gradle.BuildProcessSatisfactionSurveyStore"/>
   </extensions>
   <actions>
     <group id="BuildProcessSatisfaction" internal="true">

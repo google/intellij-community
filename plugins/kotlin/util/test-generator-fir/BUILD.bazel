@@ -3,6 +3,7 @@ load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 jvm_library(
   name = "test-generator-fir",
+  module_name = "kotlin.util.test-generator-fir",
   visibility = ["//visibility:public"],
   srcs = glob([], allow_empty = True),
   runtime_deps = ["//plugins/kotlin/copyright/fir-tests:kotlin-copyright-tests"]
@@ -10,6 +11,7 @@ jvm_library(
 
 jvm_library(
   name = "test-generator-fir_test_lib",
+  testonly = True,
   module_name = "kotlin.util.test-generator-fir",
   visibility = ["//visibility:public"],
   srcs = glob(["test/**/*.kt", "test/**/*.java", "test/**/*.form"], allow_empty = True),
@@ -136,10 +138,22 @@ jvm_library(
     "//plugins/kotlin/refactorings/kotlin.refactorings.move.k2:kotlin-refactorings-move-tests_test_lib",
     "//plugins/kotlin/refactorings/rename.k2:kotlin-refactorings-rename-tests",
     "//plugins/kotlin/refactorings/rename.k2:kotlin-refactorings-rename-tests_test_lib",
+    "//plugins/kotlin/base/scripting/scripting.k2:kotlin-base-scripting-tests",
+    "//plugins/kotlin/base/scripting/scripting.k2:kotlin-base-scripting-tests_test_lib",
+    "//plugins/kotlin/jvm/k2:kotlin-jvm",
+    "//plugins/kotlin/jvm/k2:kotlin-jvm_test_lib",
+    "//plugins/kotlin/jvm/k2:kotlin-jvm-tests",
+    "//plugins/kotlin/jvm/k2:kotlin-jvm-tests_test_lib",
   ],
   runtime_deps = [":test-generator-fir"]
 )
 ### auto-generated section `build kotlin.util.test-generator-fir` end
+
+### auto-generated section `iml kotlin.util.test-generator-fir` start
+exports_files([
+  "kotlin.util.test-generator-fir.iml",
+], visibility = ["//visibility:public"])
+### auto-generated section `iml kotlin.util.test-generator-fir` end
 
 ### auto-generated section `test kotlin.util.test-generator-fir` start
 load("@community//build:tests-options.bzl", "jps_test")
