@@ -1,5 +1,5 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:Suppress("ReplaceGetOrSet")
+@file:Suppress("ReplaceGetOrSet", "DestructuringForParameter")
 
 package org.jetbrains.intellij.build.impl
 
@@ -16,7 +16,6 @@ import org.jetbrains.intellij.build.classPath.DescriptorSearchScope
 import org.jetbrains.intellij.build.classPath.XIncludeElementResolverImpl
 import org.jetbrains.intellij.build.classPath.resolveAndEmbedContentModuleDescriptor
 import org.jetbrains.intellij.build.classPath.resolveIncludes
-import org.jetbrains.intellij.build.isOptionalLoadingRule
 import org.jetbrains.intellij.build.productLayout.LIB_MODULE_PREFIX
 import org.jetbrains.intellij.build.productLayout.buildProductContentXml
 import org.jetbrains.jps.model.java.JavaSourceRootType
@@ -37,11 +36,13 @@ internal suspend fun processAndGetProductPluginContentModules(
   val element: Element
   val moduleToSetChainMapping: Map<String, List<String>>?
   val moduleToIncludeDependenciesMapping: Map<String, Boolean>?
+  val descriptorResolverModules: Collection<String>
   val programmaticModulesSpec = context.productProperties.getProductContentDescriptor()
   if (programmaticModulesSpec == null) {
     element = JDOMUtil.load(file)
     moduleToSetChainMapping = null
     moduleToIncludeDependenciesMapping = null
+    descriptorResolverModules = includedPlatformModulesPartialList
   }
   else {
     val buildResult = buildProductContentXml(
@@ -58,6 +59,14 @@ internal suspend fun processAndGetProductPluginContentModules(
     element = JDOMUtil.load(buildResult.xml)
     moduleToSetChainMapping = buildResult.moduleToSetChainMapping.mapKeys { it.key.value }
     moduleToIncludeDependenciesMapping = buildResult.moduleToIncludeDependenciesMapping.mapKeys { it.key.value }
+    descriptorResolverModules = LinkedHashSet<String>().apply {
+      addAll(includedPlatformModulesPartialList)
+      for ((_, modules) in buildResult.contentBlocks) {
+        for ((name) in modules) {
+          add(name.name)
+        }
+      }
+    }
   }
 
   // Scrambling isn’t an issue: the scrambler can modify XML.
@@ -66,7 +75,7 @@ internal suspend fun processAndGetProductPluginContentModules(
   // We must resolve includes to collect all content modules, since the <content> tag may
   // be specified in an included file. This is done not only for performance but for correctness.
   val xIncludeResolver = XIncludeElementResolverImpl(
-    searchPath = listOf(DescriptorSearchScope(includedPlatformModulesPartialList, descriptorCache)),
+    searchPath = listOf(DescriptorSearchScope(descriptorResolverModules, descriptorCache)),
     context = context,
   )
   resolveIncludes(element = element, elementResolver = xIncludeResolver)
@@ -202,6 +211,7 @@ private val excludedFromScrambling = hashSetOf(
   "fleet.protocol",
   "intellij.platform.lsp",
   "intellij.platform.lsp.impl",
+  "intellij.platform.lsp.impl.structureView",
   "intellij.platform.webide",
   "intellij.platform.webide.impl",
   "intellij.rml.dfa",
@@ -240,3 +250,5 @@ internal fun isModuleCloseSource(moduleName: String, context: CompilationContext
 }
 
 internal fun contentModuleNameToDescriptorFileName(moduleName: String): String = "${moduleName.replace('/', '.')}.xml"
+
+internal fun isOptionalLoadingRule(loadingRule: String?): Boolean = loadingRule != "required" && loadingRule != "embedded"

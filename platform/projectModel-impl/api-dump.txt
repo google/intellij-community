@@ -110,6 +110,7 @@ f:com.intellij.ide.projectView.impl.ProjectRootsUtil
 - s:isSourceRoot(com.intellij.psi.PsiDirectory):Z
 c:com.intellij.openapi.components.PathMacroManager
 - com.intellij.openapi.components.PathMacroSubstitutor
+- sf:Companion:com.intellij.openapi.components.PathMacroManager$Companion
 - <init>(com.intellij.openapi.application.PathMacros):V
 - collapsePath(java.lang.String,Z):java.lang.String
 - collapsePaths(org.jdom.Element,Z):V
@@ -123,6 +124,10 @@ c:com.intellij.openapi.components.PathMacroManager
 - f:getMacroFilter():com.intellij.openapi.application.PathMacroFilter
 - f:getReplacePathMap():com.intellij.application.options.ReplacePathToMacroMap
 - psf:pathsEqual(java.lang.String,java.lang.String):Z
+f:com.intellij.openapi.components.PathMacroManager$Companion
+- f:collapsePaths(org.jdom.Element,Z,com.intellij.application.options.ReplacePathToMacroMap):V
+- f:getInstance(com.intellij.openapi.components.ComponentManager):com.intellij.openapi.components.PathMacroManager
+- f:getInstance(com.intellij.openapi.module.Module):com.intellij.openapi.components.PathMacroManager
 com.intellij.openapi.components.PathMacroSubstitutor
 - collapsePath(java.lang.String):java.lang.String
 - a:collapsePath(java.lang.String,Z):java.lang.String
@@ -143,7 +148,6 @@ f:com.intellij.openapi.components.impl.ModulePathMacroManager
 f:com.intellij.openapi.components.impl.ProjectPathMacroManager
 - com.intellij.openapi.components.PathMacroManager
 - <init>(com.intellij.openapi.project.Project):V
-- sf:createInstance(kotlin.jvm.functions.Function0,kotlin.jvm.functions.Function0,kotlin.jvm.functions.Function0):com.intellij.openapi.components.impl.ProjectPathMacroManager
 - getExpandMacroMap():com.intellij.openapi.components.ExpandMacroToPathMap
 com.intellij.openapi.components.impl.stores.IProjectStore
 - sf:COMPONENT_STORE_LOADING_ENABLED:com.intellij.openapi.util.Key
@@ -317,15 +321,6 @@ a:com.intellij.openapi.roots.ModuleRootManagerEx
 - <init>():V
 - s:getInstanceEx(com.intellij.openapi.module.Module):com.intellij.openapi.roots.ModuleRootManagerEx
 - a:getModificationCountForTests():J
-com.intellij.openapi.roots.SingleFileSourcesTracker
-- sf:Companion:com.intellij.openapi.roots.SingleFileSourcesTracker$Companion
-- s:getInstance(com.intellij.openapi.project.Project):com.intellij.openapi.roots.SingleFileSourcesTracker
-- a:getPackageNameForSingleFileSource(com.intellij.openapi.vfs.VirtualFile):java.lang.String
-- a:getSourceDirectoryIfExists(com.intellij.openapi.vfs.VirtualFile):com.intellij.openapi.vfs.VirtualFile
-- a:isSingleFileSource(com.intellij.openapi.vfs.VirtualFile):Z
-- a:isSourceDirectoryInModule(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.module.Module):Z
-f:com.intellij.openapi.roots.SingleFileSourcesTracker$Companion
-- f:getInstance(com.intellij.openapi.project.Project):com.intellij.openapi.roots.SingleFileSourcesTracker
 a:com.intellij.openapi.roots.TestModuleProperties
 - s:getInstance(com.intellij.openapi.module.Module):com.intellij.openapi.roots.TestModuleProperties
 - a:getProductionModule():com.intellij.openapi.module.Module
@@ -335,7 +330,6 @@ com.intellij.openapi.roots.impl.DirectoryIndexExcludePolicy
 - getExcludeRootsForModule(com.intellij.openapi.roots.ModuleRootModel):com.intellij.openapi.vfs.pointers.VirtualFilePointer[]
 - getExcludeSdkRootsStrategy():com.intellij.util.Function
 - getExcludeUrlsForProject():java.lang.String[]
-- s:getExtensions(com.intellij.openapi.extensions.AreaInstance):com.intellij.openapi.roots.impl.DirectoryIndexExcludePolicy[]
 f:com.intellij.openapi.roots.impl.ModifiableModelCommitter
 - s:multiCommit(java.util.Collection,com.intellij.openapi.module.ModifiableModuleModel):V
 - s:multiCommit(com.intellij.openapi.roots.ModifiableRootModel[],com.intellij.openapi.module.ModifiableModuleModel):V

@@ -43,6 +43,7 @@ import com.intellij.util.containers.ConcurrentLongObjectMap;
 import com.intellij.util.containers.Java11Shim;
 import com.intellij.util.ui.EDT;
 import io.opentelemetry.api.trace.Span;
+import kotlinx.coroutines.Job;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.ApiStatus.Obsolete;
 import org.jetbrains.annotations.NotNull;
@@ -182,7 +183,8 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
 
   @Override
   protected void doCheckCanceled() throws ProcessCanceledException {
-    if (isInNonCancelableSection()) {
+    Job job = Cancellation.currentJob();
+    if (Cancellation.isInNonCancelableSection(job)) {
       try {
         CheckCanceledBehavior behavior = ourCheckCanceledBehavior;
         if (behavior != CheckCanceledBehavior.NONE) {
@@ -197,7 +199,7 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
     }
 
     try {
-      Cancellation.ensureActive();
+      Cancellation.ensureActive(job);
     }
     catch (ProcessCanceledException e) {
       fireCanceledByJobEvent();
@@ -756,6 +758,7 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
     }, progress);
   }
 
+  @SuppressWarnings("UseRunReadActionBlockingShortcut")
   @Override
   public boolean runInReadActionWithWriteActionPriority(@NotNull Runnable action, @Nullable ProgressIndicator indicator) {
     ApplicationManager.getApplication().runReadAction(action);
@@ -866,7 +869,7 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
   }
 
   @ApiStatus.Internal
-  public final void updateShouldCheckCanceled() {
+  protected final void updateShouldCheckCanceled() {
     synchronized (threadsUnderIndicator) {
       boolean hasCanceledIndicator = !threadsUnderCanceledIndicator.isEmpty();
       ourCheckCanceledBehavior = !hasCheckCanceledHooks() && !hasCanceledIndicator ? CheckCanceledBehavior.NONE :
@@ -1178,9 +1181,12 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
    * A utility method for diagnosing state of progress indicator in monitoring facilities, like JStack
    */
   @ApiStatus.Internal
-  public String getProgressStateRepresentation() {
+  public @Nullable String getProgressStateRepresentation() {
     synchronized (threadsUnderIndicator) {
       StringBuilder result = new StringBuilder();
+      if (threadsUnderIndicator.isEmpty()) {
+        return null;
+      }
       for (Map.Entry<ProgressIndicator, Set<Thread>> entry : threadsUnderIndicator.entrySet()) {
         ProgressIndicator indicator = entry.getKey();
         Set<Thread> threads = entry.getValue();

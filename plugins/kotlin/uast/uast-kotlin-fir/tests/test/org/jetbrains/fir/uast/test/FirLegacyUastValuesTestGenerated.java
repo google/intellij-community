@@ -3,7 +3,6 @@
 package org.jetbrains.fir.uast.test;
 
 import com.intellij.testFramework.TestDataPath;
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode;
 import org.jetbrains.kotlin.idea.base.test.TestRoot;
 import org.jetbrains.kotlin.idea.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils;
@@ -20,12 +19,6 @@ import org.junit.runner.RunWith;
 @RunWith(JUnit3RunnerWithInners.class)
 @TestMetadata("../../uast-kotlin/tests/testData")
 public class FirLegacyUastValuesTestGenerated extends AbstractFirLegacyUastValuesTest {
-    @java.lang.Override
-    @org.jetbrains.annotations.NotNull
-    public final KotlinPluginMode getPluginMode() {
-        return KotlinPluginMode.K2;
-    }
-
     private void runTest(String testDataFilePath) throws Exception {
         KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
@@ -113,6 +106,16 @@ public class FirLegacyUastValuesTestGenerated extends AbstractFirLegacyUastValue
     @TestMetadata("Constructors.kt")
     public void testConstructors() throws Exception {
         runTest("../../uast-kotlin/tests/testData/Constructors.kt");
+    }
+
+    @TestMetadata("ContextProperties.kt")
+    public void testContextProperties() throws Exception {
+        runTest("../../uast-kotlin/tests/testData/ContextProperties.kt");
+    }
+
+    @TestMetadata("Contexts.kt")
+    public void testContexts() throws Exception {
+        runTest("../../uast-kotlin/tests/testData/Contexts.kt");
     }
 
     @TestMetadata("CycleInTypeParameters.kt")
@@ -220,6 +223,11 @@ public class FirLegacyUastValuesTestGenerated extends AbstractFirLegacyUastValue
         runTest("../../uast-kotlin/tests/testData/Lambdas.kt");
     }
 
+    @TestMetadata("LocalContextFunction.kt")
+    public void testLocalContextFunction() throws Exception {
+        runTest("../../uast-kotlin/tests/testData/LocalContextFunction.kt");
+    }
+
     @TestMetadata("LocalDeclarations.kt")
     public void testLocalDeclarations() throws Exception {
         runTest("../../uast-kotlin/tests/testData/LocalDeclarations.kt");
@@ -248,6 +256,11 @@ public class FirLegacyUastValuesTestGenerated extends AbstractFirLegacyUastValue
     @TestMetadata("NonTrivialIdentifiers.kt")
     public void testNonTrivialIdentifiers() throws Exception {
         runTest("../../uast-kotlin/tests/testData/NonTrivialIdentifiers.kt");
+    }
+
+    @TestMetadata("ObjectExpressionExplicitTypeReference.kt")
+    public void testObjectExpressionExplicitTypeReference() throws Exception {
+        runTest("../../uast-kotlin/tests/testData/ObjectExpressionExplicitTypeReference.kt");
     }
 
     @TestMetadata("ObjectExpressionMultipleInterfaces.kt")

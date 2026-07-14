@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.psi;
 
 import com.intellij.psi.PsiElement;
@@ -85,10 +85,12 @@ public interface PyCallExpression extends PyAstCallExpression, PyCallSiteExpress
   }
 
   /**
-   * Resolves the callee to possible functions.
+   * Resolves the callee to the individual callable signatures it may denote: a union of callables yields one element per
+   * member, and an overloaded callable is unfolded into its overloads. The union/intersection structure of the callee
+   * type is not preserved here; resolution that keeps it lives in the PSI implementation's {@code getCalleeType}.
    *
    * @param resolveContext resolve context
-   * @return objects which contains callable, modifier, implicit offset and "implicitly resolved" flag.
+   * @return the resolved callee callable types.
    */
   @NotNull
   List<@NotNull PyCallableType> multiResolveCallee(@NotNull PyResolveContext resolveContext);
@@ -104,7 +106,7 @@ public interface PyCallExpression extends PyAstCallExpression, PyCallSiteExpress
   List<@NotNull PyArgumentsMapping> multiMapArguments(@NotNull PyResolveContext resolveContext);
 
   class PyArgumentsMapping {
-    private final @NotNull PyCallSiteExpression myCallSiteExpression;
+    private final @NotNull PyCallSiteOwner myCallSiteOwner;
     private final @Nullable PyCallableType myCallableType;
     private final @NotNull List<PyCallableParameter> myImplicitParameters;
     private final @NotNull Map<PyExpression, PyCallableParameter> myMappedParameters;
@@ -115,7 +117,7 @@ public interface PyCallExpression extends PyAstCallExpression, PyCallSiteExpress
     private final @NotNull List<PyCallableParameter> myParametersMappedToVariadicKeywordArguments;
     private final @NotNull Map<PyExpression, PyCallableParameter> myMappedTupleParameters;
 
-    public PyArgumentsMapping(@NotNull PyCallSiteExpression callSiteExpression,
+    public PyArgumentsMapping(@NotNull PyCallSiteOwner callSiteOwner,
                               @Nullable PyCallableType callableType,
                               @NotNull List<PyCallableParameter> implicitParameters,
                               @NotNull Map<PyExpression, PyCallableParameter> mappedParameters,
@@ -125,7 +127,7 @@ public interface PyCallExpression extends PyAstCallExpression, PyCallSiteExpress
                               @NotNull List<PyCallableParameter> parametersMappedToVariadicPositionalArguments,
                               @NotNull List<PyCallableParameter> parametersMappedToVariadicKeywordArguments,
                               @NotNull Map<PyExpression, PyCallableParameter> tupleMappedParameters) {
-      myCallSiteExpression = callSiteExpression;
+      myCallSiteOwner = callSiteOwner;
       myCallableType = callableType;
       myImplicitParameters = implicitParameters;
       myMappedParameters = mappedParameters;
@@ -137,7 +139,7 @@ public interface PyCallExpression extends PyAstCallExpression, PyCallSiteExpress
       myMappedTupleParameters = tupleMappedParameters;
     }
 
-    public static @NotNull PyArgumentsMapping empty(@NotNull PyCallSiteExpression callSiteExpression) {
+    public static @NotNull PyArgumentsMapping empty(@NotNull PyCallSiteOwner callSiteExpression) {
       return new PyCallExpression.PyArgumentsMapping(callSiteExpression,
                                                      null,
                                                      Collections.emptyList(),
@@ -150,8 +152,16 @@ public interface PyCallExpression extends PyAstCallExpression, PyCallSiteExpress
                                                      Collections.emptyMap());
     }
 
-    public @NotNull PyCallSiteExpression getCallSiteExpression() {
-      return myCallSiteExpression;
+    public @NotNull PyCallSiteOwner getCallSiteOwner() {
+      return myCallSiteOwner;
+    }
+
+    /**
+     * @deprecated use `getCallSiteOwner` instead
+     */
+    @Deprecated(forRemoval = true)
+    public @NotNull PyCallSiteOwner getCallSiteExpression() {
+      return getCallSiteOwner();
     }
 
     public @Nullable PyCallableType getCallableType() {

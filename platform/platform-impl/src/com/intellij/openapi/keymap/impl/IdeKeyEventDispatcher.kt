@@ -4,7 +4,10 @@
 package com.intellij.openapi.keymap.impl
 
 import com.intellij.diagnostic.EventWatcher
+import com.intellij.diagnostic.IdePerformanceListener
 import com.intellij.diagnostic.LoadingState
+import com.intellij.diagnostic.LocksActionsDumper
+import com.intellij.ide.AppLifecycleListener
 import com.intellij.ide.DataManager
 import com.intellij.ide.IdeBundle
 import com.intellij.ide.IdeEventQueue
@@ -59,6 +62,7 @@ import com.intellij.ui.ComponentWithMnemonics
 import com.intellij.ui.KeyStrokeAdapter
 import com.intellij.ui.speedSearch.SpeedSearchSupply
 import com.intellij.util.ReflectionUtil
+import com.intellij.util.concurrency.ThreadingAssertions
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.text.matching.KeyboardLayoutUtil
 import com.intellij.util.ui.MacUIUtil
@@ -81,7 +85,9 @@ import java.awt.KeyboardFocusManager
 import java.awt.event.ActionEvent
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
+import java.nio.file.Path
 import java.util.Collections
+import java.util.concurrent.atomic.AtomicReference
 import java.util.function.Supplier
 import javax.swing.JComponent
 import javax.swing.JDialog
@@ -157,8 +163,18 @@ class IdeKeyEventDispatcher(private val queue: IdeEventQueue?) {
           }
         }
     }
+    LocksActionsDumper.setLocksAndActionsDumper {
+      val currentOffenders = actionLockOffenders.get().getOffendersString()
+      if (currentOffenders == null) {
+        return@setLocksAndActionsDumper null
+      }
+      """UI is currently processing actions. The following actions require locks:
+        |${currentOffenders}
+      """.trimMargin()
+    }
   }
 
+  @ApiStatus.Internal
   companion object {
     /**
      * @return `true` if and only if the `component` represents modal context.
@@ -568,11 +584,13 @@ class IdeKeyEventDispatcher(private val queue: IdeEventQueue?) {
 
     fireBeforeShortcutTriggered(shortcut, actions, context)
 
-    val chosen = runInReadActionConditionally(actions) {
-      Utils.runUpdateSessionForInputEvent(
-        actions, e, wrappedContext, place, processor, presentationFactory
-      ) { rearranged, updater, events ->
-        doUpdateActionsInner(rearranged, updater, events, dumb, wouldBeEnabledIfNotDumb)
+    val chosen = recordActionOffenders(actions).use {
+      runInReadActionConditionally(actions) {
+        Utils.runUpdateSessionForInputEvent(
+          actions, e, wrappedContext, place, processor, presentationFactory
+        ) { rearranged, updater, events ->
+          doUpdateActionsInner(rearranged, updater, events, dumb, wouldBeEnabledIfNotDumb)
+        }
       }
     }
     val doPerform = chosen != null && !this@IdeKeyEventDispatcher.context.secondStrokeActions.contains(chosen.action)
@@ -956,6 +974,50 @@ private fun getMenuActionsHolder(component: Component): JRootPane? {
   }
   else {
     return SwingUtilities.getRootPane(component)
+  }
+}
+
+private val actionLockOffenders: AtomicReference<List<AnAction>?> = AtomicReference()
+
+private fun List<AnAction>?.getOffendersString(): String? {
+  return if (this.isNullOrEmpty()) {
+    null
+  }
+  else this.mapNotNull { it::class.qualifiedName }.joinToString("\n")
+}
+
+@ApiStatus.Internal
+class LockOffendersListenerInitializer: AppLifecycleListener {
+  override fun appStarted() {
+    ApplicationManager.getApplication().messageBus.connect()
+      .subscribe(IdePerformanceListener.TOPIC, LockOffendersPerformanceListener)
+  }
+}
+
+private object LockOffendersPerformanceListener: IdePerformanceListener {
+  @Volatile
+  var capturedOffenders: List<AnAction>? = null
+
+  override fun uiFreezeStarted(reportDir: Path) {
+    capturedOffenders = actionLockOffenders.get()
+  }
+
+  override fun uiFreezeFinished(durationMs: Long, reportDir: Path?) {
+    val resultingOffenders = capturedOffenders.getOffendersString()
+    capturedOffenders = null
+    if (resultingOffenders != null) {
+      LOG.warn("UI freeze was caused by the RW lock acquisition for update of the following action:\n$resultingOffenders")
+    }
+  }
+}
+
+private fun recordActionOffenders(actions: List<AnAction>) : AutoCloseable {
+  val offendingActions = actions.filter(Utils::isLockRequired)
+  ThreadingAssertions.assertEventDispatchThread()
+  val oldOffenders = actionLockOffenders.getAndSet(offendingActions)
+  return AutoCloseable {
+    val existingOffenders = actionLockOffenders.getAndSet(oldOffenders)
+    require(existingOffenders == offendingActions) { "Offenders should not change during action execution" }
   }
 }
 

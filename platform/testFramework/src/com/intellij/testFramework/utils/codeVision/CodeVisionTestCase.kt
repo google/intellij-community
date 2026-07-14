@@ -7,7 +7,10 @@ import com.intellij.codeInsight.codeVision.settings.CodeVisionSettings
 import com.intellij.codeInsight.codeVision.ui.model.CodeVisionListData
 import com.intellij.codeInsight.codeVision.ui.renderers.CodeVisionInlayRenderer
 import com.intellij.codeInsight.hints.InlayDumpUtil
+import com.intellij.openapi.Disposable
+import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.TestModeFlags
 import com.intellij.testFramework.utils.inlays.InlayHintsProviderTestCase
 
@@ -15,6 +18,28 @@ abstract class CodeVisionTestCase : InlayHintsProviderTestCase() {
 
   companion object {
     const val AUTHOR_HINT: String = "John Smith +2"
+
+    @JvmStatic
+    fun waitForCodeVisionSync(editor: Editor, host: CodeVisionHost, disposable: Disposable) {
+      val done = host.calculateCodeVisionSync(editor, disposable)
+      PlatformTestUtil.waitForFuture(done)
+    }
+
+    @JvmStatic
+    fun dumpCodeVisionHints(sourceText: String, editor: Editor, onlyCodeVisionHintsAllowed: Boolean): String {
+      return InlayDumpUtil.dumpInlays(
+        sourceText, editor,
+        filter = {
+          val rendererSupported = it.renderer is CodeVisionInlayRenderer
+          if (onlyCodeVisionHintsAllowed && !rendererSupported) error("renderer not supported")
+          rendererSupported
+        },
+        renderer = { _, inlay ->
+          inlay.getUserData(CodeVisionListData.KEY)!!
+            .visibleLens
+            .joinToString(prefix = "[", postfix = "]", separator = "   ") { it.longPresentation }
+        })
+    }
   }
 
   protected open val onlyCodeVisionHintsAllowed: Boolean
@@ -63,7 +88,7 @@ abstract class CodeVisionTestCase : InlayHintsProviderTestCase() {
     }
     myFixture.doHighlighting()
 
-    codeVisionHost.calculateCodeVisionSync(editor, testRootDisposable)
+    waitForCodeVisionSync(editor, codeVisionHost, testRootDisposable)
 
     val actualText = dumpCodeVisionHints(sourceText)
     assertEquals(expectedText, actualText)
@@ -74,15 +99,6 @@ abstract class CodeVisionTestCase : InlayHintsProviderTestCase() {
   }
 
   private fun dumpCodeVisionHints(sourceText: String): String {
-    return InlayDumpUtil.dumpInlays(
-      sourceText, myFixture.editor,
-      filter = {
-        val rendererSupported = it.renderer is CodeVisionInlayRenderer
-        if (onlyCodeVisionHintsAllowed && !rendererSupported) error("renderer not supported")
-        rendererSupported
-      },
-      renderer = { _, inlay ->
-        inlay.getUserData(CodeVisionListData.KEY)!!.visibleLens.joinToString(prefix = "[", postfix = "]", separator = "   ") { it.longPresentation }
-      })
+    return dumpCodeVisionHints(sourceText, myFixture.editor, onlyCodeVisionHintsAllowed)
   }
 }

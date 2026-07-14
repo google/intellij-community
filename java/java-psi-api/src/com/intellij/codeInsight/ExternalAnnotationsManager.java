@@ -2,6 +2,7 @@
 package com.intellij.codeInsight;
 
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiAnnotation;
 import com.intellij.psi.PsiClass;
@@ -10,6 +11,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiModifierListOwner;
 import com.intellij.psi.PsiNameValuePair;
 import com.intellij.util.containers.ContainerUtil;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -19,6 +21,7 @@ import java.util.List;
 
 public abstract class ExternalAnnotationsManager {
   public static final String ANNOTATIONS_XML = "annotations.xml";
+  protected static final Key<Boolean> EXTERNAL_ANNO_MARKER = Key.create("EXTERNAL_ANNO_MARKER");
 
   /**
    * Describes where to place the new annotation
@@ -45,14 +48,45 @@ public abstract class ExternalAnnotationsManager {
     NOWHERE
   }
 
+  @Contract(pure = true)
   public static ExternalAnnotationsManager getInstance(@NotNull Project project) {
     return project.getService(ExternalAnnotationsManager.class);
   }
 
   public abstract boolean hasAnnotationRootsForFile(@NotNull VirtualFile file);
 
-  public abstract boolean isExternalAnnotation(@NotNull PsiAnnotation annotation);
+  /**
+   * @param annotation annotation to check
+   * @return true if the annotation is an external annotation
+   */
+  public static boolean isExternal(@NotNull PsiAnnotation annotation) {
+    return annotation.getUserData(EXTERNAL_ANNO_MARKER) != null;
+  }
 
+  /**
+   * @deprecated use static method {@link #isExternal(PsiAnnotation)}.
+   */
+  @Deprecated
+  public boolean isExternalAnnotation(@NotNull PsiAnnotation annotation) {
+    return isExternal(annotation);
+  }
+
+  /**
+   * Returns an external annotation with fully qualified name of {@code annotationFQN}
+   * associated with {@code listOwner}.
+   * <p>
+   * If the same annotation is applied several times (repeatable annotation, or annotations
+   * from several external annotations roots), then only one of them is returned
+   * (there's no guarantee, which one).
+   * <p>
+   * This method does not return type annotations.
+   *
+   * @param listOwner API element to return external annotations of
+   * @param annotationFQN fully qualified name of the annotation to search for
+   * @return external annotation of the {@code listOwner}; null if there is no annotation with a given qualified name.
+   * @see #findExternalTypeAnnotations(PsiModifierListOwner, String) 
+   * @see #isNonCodeTypeAnnotation(PsiAnnotation)
+   */
   public abstract @Nullable PsiAnnotation findExternalAnnotation(@NotNull PsiModifierListOwner listOwner, @NotNull String annotationFQN);
 
   /**
@@ -61,10 +95,14 @@ public abstract class ExternalAnnotationsManager {
    * <p>
    * Multiple results may be returned for repeatable annotations and annotations
    * from several external annotations roots.
+   * <p>
+   * This method does not return type annotations.
    *
    * @param listOwner API element to return external annotations of
    * @param annotationFQN fully qualified name of the annotation to search for
    * @return external annotations of the {@code listOwner}
+   * @see #findExternalTypeAnnotations(PsiModifierListOwner, String)
+   * @see #isNonCodeTypeAnnotation(PsiAnnotation)  
    */
   public abstract @NotNull List<PsiAnnotation> findExternalAnnotations(@NotNull PsiModifierListOwner listOwner, @NotNull String annotationFQN);
 
@@ -91,6 +129,15 @@ public abstract class ExternalAnnotationsManager {
   // Method used in Kotlin plugin
   public abstract boolean isExternalAnnotationWritable(@NotNull PsiModifierListOwner listOwner, @NotNull String annotationFQN);
 
+  /**
+   * Returns external annotations associated with {@code listOwner}.
+   * <p>
+   * This method does not return type annotations.
+   *
+   * @param listOwner API element to return external annotations of
+   * @return external annotations of the {@code listOwner}
+   * @see #findExternalTypeAnnotations(PsiModifierListOwner, String)
+   */
   public abstract @NotNull PsiAnnotation @NotNull [] findExternalAnnotations(@NotNull PsiModifierListOwner listOwner);
 
   /**
@@ -100,6 +147,18 @@ public abstract class ExternalAnnotationsManager {
    */
   public @NotNull PsiAnnotation @NotNull [] findExternalTypeAnnotations(@NotNull PsiModifierListOwner parent, @NotNull String typePath) {
     return PsiAnnotation.EMPTY_ARRAY;
+  }
+
+  /**
+   * @param parent a type owner (field, method, or parameter)
+   * @param typePath a type path. See {@code ExternalTypeAnnotationContainer} for syntax
+   * @param annotationFQN the fully-qualified name of wanted annotation
+   * @return external type annotation having a given qualified name for a given type path; null if there's no such annotation.
+   */
+  public @Nullable PsiAnnotation findExternalTypeAnnotation(@NotNull PsiModifierListOwner parent, 
+                                                            @NotNull String typePath, 
+                                                            @NotNull String annotationFQN) {
+    return null;
   }
 
   /**
@@ -176,4 +235,25 @@ public abstract class ExternalAnnotationsManager {
    *         {@code false} otherwise
    */
   public abstract boolean hasConfiguredAnnotationRoot(@NotNull PsiModifierListOwner owner);
+
+  /**
+   * @param annotation annotation to check
+   * @return true if a given non-code annotation should be considered as a type annotation
+   * (i.e., rendered in UI as such, etc.)
+   */
+  public static boolean isNonCodeTypeAnnotation(@NotNull PsiAnnotation annotation) {
+    String qualifiedName = annotation.getQualifiedName();
+    if (qualifiedName == null) return false;
+
+    boolean typeAnno = isNonCodeTypeAnnotation(qualifiedName);
+    return typeAnno && (isExternal(annotation) || InferredAnnotationsManager.isInferredAnnotation(annotation));
+  }
+
+  protected static boolean isNonCodeTypeAnnotation(@NotNull String qualifiedName) {
+    return qualifiedName.equals(AnnotationUtil.NOT_NULL) ||
+           qualifiedName.equals(AnnotationUtil.NULLABLE) ||
+           qualifiedName.equals(AnnotationUtil.UNKNOWN_NULLABILITY) ||
+           qualifiedName.equals("org.jetbrains.annotations.Unmodifiable") ||
+           qualifiedName.equals("org.jetbrains.annotations.UnmodifiableView");
+  }
 }

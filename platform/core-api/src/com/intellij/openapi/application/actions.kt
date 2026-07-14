@@ -39,7 +39,8 @@ fun <T> runReadAction(runnable: () -> T): T = runReadActionBlocking(runnable)
  * @see NonBlockingReadAction.executeSynchronously() for synchronous execution in background threads
  * @see readAction for suspend contexts
  */
-@RequiresBlockingContext
+@RequiresBlockingContext(replaceWith = ReplaceWith(expression = "readActionBlocking(runnable)",
+                                                   imports = ["com.intellij.openapi.application.readActionBlocking"]))
 fun <T> runReadActionBlocking(runnable: () -> T): T {
   val application = ApplicationManager.getApplication()
   if (application.isReadAllowedButNotWrite()) {
@@ -59,9 +60,19 @@ fun <T> invokeAndWaitIfNeeded(modalityState: ModalityState? = null, runnable: ()
   }
   else {
     var resultRef: T? = null
-    app.invokeAndWait({ resultRef = runnable() }, modalityState ?: ModalityState.defaultModalityState())
-    @Suppress("UNCHECKED_CAST")
-    return resultRef as T
+    var exception: Throwable? = null
+    app.invokeAndWait({ try {
+        resultRef = runnable()
+      } catch (e: Throwable) {
+        exception = e
+      }
+    }, modalityState ?: ModalityState.defaultModalityState())
+    if (exception != null) {
+      throw exception
+    } else {
+      @Suppress("UNCHECKED_CAST")
+      return resultRef as T
+    }
   }
 }
 

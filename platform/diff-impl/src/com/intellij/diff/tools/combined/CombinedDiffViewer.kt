@@ -25,7 +25,7 @@ import com.intellij.openapi.actionSystem.ShortcutSet
 import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.application.EDT
-import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.application.runReadActionBlocking
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.LogicalPosition
@@ -42,7 +42,6 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.removeUserData
 import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.platform.util.coroutines.childScope
-import com.intellij.pom.Navigatable
 import com.intellij.ui.JBColor
 import com.intellij.ui.ListenerUtil
 import com.intellij.ui.components.JBLayeredPane
@@ -161,6 +160,11 @@ class CombinedDiffViewer(
 
   private val combinedEditorSettingsAction =
     CombinedEditorSettingsActionGroup(TextDiffViewerUtil.getTextSettings(context), ::foldingModels, ::editors)
+
+  init {
+    val gutterActionGroup = TextDiffViewerUtil.createEditorGutterActionGroup(combinedEditorSettingsAction)
+    TextDiffViewerUtil.installGutterPopup(editors, gutterActionGroup)
+  }
 
   private val visibleBlocksUpdateQueue =
     MergingUpdateQueue("CombinedDiffViewer.visibleBlocksUpdateQueue", 100, true, null, this, null, Alarm.ThreadToUse.SWING_THREAD)
@@ -287,7 +291,7 @@ class CombinedDiffViewer(
     val diffViewer = getCurrentDiffViewer()
     sink[CommonDataKeys.PROJECT] = project
     sink[DiffDataKeys.PREV_NEXT_DIFFERENCE_ITERABLE] = currentDiffIterable
-    sink[DiffDataKeys.NAVIGATABLE] = ReadAction.compute<Navigatable, Exception> { (diffViewer as? DiffViewerEx)?.navigatable }
+    sink[DiffDataKeys.NAVIGATABLE] = runReadActionBlocking { (diffViewer as? DiffViewerEx)?.navigatable }
     sink[DiffDataKeys.DIFF_VIEWER] = diffViewer
     sink[COMBINED_DIFF_VIEWER] = this
     sink[DiffDataKeys.CURRENT_EDITOR] = diffViewer?.currentEditor
@@ -570,8 +574,9 @@ class CombinedDiffViewer(
   }
 
   internal fun contentChanged() {
-    combinedEditorSettingsAction.installGutterPopup()
     combinedEditorSettingsAction.applyDefaults()
+    val gutterActionGroup = TextDiffViewerUtil.createEditorGutterActionGroup(combinedEditorSettingsAction)
+    TextDiffViewerUtil.installGutterPopup(editors, gutterActionGroup)
     updateSearch() //as a possible optimization, this should be done after all requests were loaded
   }
 

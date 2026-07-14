@@ -25,6 +25,7 @@ import com.intellij.openapi.fileTypes.PlainSyntaxHighlighter;
 import com.intellij.openapi.fileTypes.SyntaxHighlighter;
 import com.intellij.openapi.fileTypes.SyntaxHighlighterFactory;
 import com.intellij.openapi.fileTypes.impl.AbstractFileType;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.Key;
@@ -116,8 +117,8 @@ public abstract class FindManagerBase extends FindManager {
   @Override
   public @NotNull FindResult findString(@NotNull CharSequence text, int offset, @NotNull FindModel model, @Nullable VirtualFile file) {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("offset="+offset);
-      LOG.debug("textlength="+text.length());
+      LOG.debug("offset=" + offset);
+      LOG.debug("textlength=" + text.length());
       LOG.debug(model.toString());
     }
 
@@ -130,7 +131,9 @@ public abstract class FindManagerBase extends FindManager {
                                     @Nullable VirtualFile file,
                                     @Nullable Predicate<? super FindResult> filter) {
     final char[] textArray = CharArrayUtil.fromSequenceWithoutCopying(text);
-    while(true) {
+    while (true) {
+      ProgressManager.checkCanceled();
+
       FindResult result = doFindString(text, textArray, offset, model, file);
       if (filter == null || filter.test(result)) {
         if (!model.isWholeWordsOnly() || !result.isStringFound() || isWholeWord(text, result.getStartOffset(), result.getEndOffset())) {
@@ -170,7 +173,7 @@ public abstract class FindManagerBase extends FindManager {
       index = res < 0 ? -1 : res;
     }
     else {
-      index = offset == 0 ? -1 : searcher.scan(text, textArray, 0, offset-1);
+      index = offset == 0 ? -1 : searcher.scan(text, textArray, 0, offset - 1);
     }
     if (index < 0) {
       return NOT_FOUND_RESULT;
@@ -333,7 +336,13 @@ public abstract class FindManagerBase extends FindManager {
     boolean scanningForward = model.isForward();
     FindResultImpl prevFindResult = NOT_FOUND_RESULT;
 
+    int j = 0;
     while ((tokenType = lexer.getTokenType()) != null) {
+      j++;
+      if (j % 1000 == 0) {
+        ProgressManager.checkCanceled();
+      }
+
       if (lexer.getState() == 0) lastGoodOffset = lexer.getTokenStart();
 
       final TextAttributesKey[] keys = currentThreadData.highlighter.getTokenHighlights(tokenType);
@@ -357,6 +366,11 @@ public abstract class FindManagerBase extends FindManager {
         final int tokenContentStart = start;
 
         while (true) {
+          j++;
+          if (j % 1000 == 0) {
+            ProgressManager.checkCanceled();
+          }
+
           FindResultImpl findResult = null;
 
           if (currentThreadData.searcher != null) {
@@ -364,8 +378,9 @@ public abstract class FindManagerBase extends FindManager {
 
             if (matchStart != -1 && matchStart >= start) {
               final int matchEnd = matchStart + model.getStringToFind().length();
-              if (matchStart >= offset || !scanningForward)
+              if (matchStart >= offset || !scanningForward) {
                 findResult = new FindResultImpl(matchStart, matchEnd);
+              }
               else {
                 start = matchEnd;
                 continue;
@@ -427,7 +442,7 @@ public abstract class FindManagerBase extends FindManager {
   private static TokenSet addTokenTypesForLanguage(FindModel model, Language lang, TokenSet tokensOfInterest) {
     ParserDefinition definition = LanguageParserDefinitions.INSTANCE.forLanguage(lang);
     if (definition != null) {
-      tokensOfInterest = TokenSet.orSet(tokensOfInterest, model.isInCommentsOnly() ? definition.getCommentTokens(): TokenSet.EMPTY);
+      tokensOfInterest = TokenSet.orSet(tokensOfInterest, model.isInCommentsOnly() ? definition.getCommentTokens() : TokenSet.EMPTY);
       tokensOfInterest = TokenSet.orSet(tokensOfInterest, model.isInStringLiteralsOnly() ? definition.getStringLiteralElements() : TokenSet.EMPTY);
     }
     return tokensOfInterest;
@@ -514,7 +529,7 @@ public abstract class FindManagerBase extends FindManager {
     }
     else {
       int start = -1;
-      while(matcher.find() && matcher.end() < startOffset) {
+      while (matcher.find() && matcher.end() < startOffset) {
         start = matcher.start();
       }
       if (start < 0) {

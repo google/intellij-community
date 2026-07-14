@@ -9,8 +9,8 @@
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="25" />
-            <stringArg name="apiVersion" arg="2.3" />
-            <stringArg name="languageVersion" arg="2.3" />
+            <stringArg name="apiVersion" arg="2.4" />
+            <stringArg name="languageVersion" arg="2.4" />
           </stringArguments>
           <arrayArguments>
             <arrayArg name="pluginClasspaths">
@@ -35,8 +35,8 @@
     <orderEntry type="module" module-name="intellij.platform.util.zip" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.collections.immutable" />
     <orderEntry type="module" module-name="intellij.libraries.fastutil" />
-    <orderEntry type="library" name="opentelemetry" level="project" />
-    <orderEntry type="library" name="opentelemetry-semconv" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.opentelemetry" />
+    <orderEntry type="module" module-name="intellij.libraries.opentelemetry.semconv" />
     <orderEntry type="module" module-name="intellij.libraries.jackson.jr.objects" />
     <orderEntry type="module" module-name="intellij.libraries.jackson" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.coroutines.core" />
@@ -53,13 +53,13 @@
     <orderEntry type="module" module-name="intellij.platform.testExtensions" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.assertj.core" scope="TEST" />
     <orderEntry type="library" scope="TEST" name="memoryfilesystem" level="project" />
-    <orderEntry type="library" scope="TEST" name="JUnit5" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.junit5" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.buildScripts.downloader" />
     <orderEntry type="library" name="jetbrains-annotations" level="project" />
     <orderEntry type="module" module-name="intellij.platform.util.base" />
     <orderEntry type="module" module-name="intellij.libraries.hash4j" />
-    <orderEntry type="library" name="tcServiceMessages" level="project" />
-    <orderEntry type="library" name="opentelemetry-extension-kotlin" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.teamcity.service.messages" />
+    <orderEntry type="module" module-name="intellij.libraries.opentelemetry.extension.kotlin" />
     <orderEntry type="module" module-name="intellij.idea.community.build.zip" />
   </component>
 </module>

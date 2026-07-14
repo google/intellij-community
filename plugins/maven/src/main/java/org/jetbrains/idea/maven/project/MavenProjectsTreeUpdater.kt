@@ -11,6 +11,7 @@ import com.intellij.platform.util.progress.RawProgressReporter
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.idea.maven.model.MavenConstants
+import org.jetbrains.idea.maven.model.MavenExplicitProfiles
 import org.jetbrains.idea.maven.project.MavenProjectChangesBuilder.Companion.merged
 import org.jetbrains.idea.maven.telemetry.tracer
 import org.jetbrains.idea.maven.utils.MavenLog
@@ -23,6 +24,7 @@ internal class MavenProjectsTreeUpdater(
   private val tree: MavenProjectsTree,
   private val updateContext: MavenProjectsTreeUpdateContext,
   private val reader: MavenProjectReader,
+  private val explicitProfiles: MavenExplicitProfiles,
   private val process: RawProgressReporter?,
   private val updateModules: Boolean,
 ) {
@@ -70,7 +72,7 @@ internal class MavenProjectsTreeUpdater(
       val readerResult = tracer.spanBuilder("readPom").useWithScope {
         reader.readProjectAsync(mavenProject.file)
       }
-      val readChanges = mavenProject.updateFromReaderResult(readerResult, MavenSettingsCache.getInstance(tree.project).getEffectiveUserLocalRepo(), true)
+      val readChanges = mavenProject.updateFromReaderResult(readerResult, MavenSettingsCache.getInstance(tree.project).getEffectiveUserLocalRepo(), true, explicitProfiles)
 
       tree.putVirtualFileToProjectMapping(mavenProject, oldProjectId)
 
@@ -105,7 +107,7 @@ internal class MavenProjectsTreeUpdater(
       val userSettingsTimestamp = getFileTimestamp(userSettingsFile)
       val globalSettingsTimestamp = getFileTimestamp(globalSettingsFile)
 
-      val profilesHashCode = reader.explicitProfiles.hashCode()
+      val profilesHashCode = explicitProfiles.hashCode()
       MavenProjectTimestamp(pomTimestamp,
                             parentTimestamp,
                             profilesTimestamp,
@@ -120,16 +122,8 @@ internal class MavenProjectsTreeUpdater(
   private fun handleRemovedModules(mavenProject: MavenProject, prevModules: List<MavenProject>, existingModuleFiles: List<VirtualFile>) {
     val removedModules = prevModules.filter { !existingModuleFiles.contains(it.file) }
     for (module in removedModules) {
-      val moduleFile = module.file
-      if (tree.isManagedFile(moduleFile)) {
-        if (tree.reconnectRoot(module)) {
-          updateContext.updated(module, MavenProjectChanges.NONE)
-        }
-      }
-      else {
-        tree.removeModule(mavenProject, module)
-        tree.doDelete(mavenProject, module, updateContext)
-      }
+      tree.removeModule(mavenProject, module)
+      tree.doDelete(mavenProject, module, updateContext)
     }
   }
 

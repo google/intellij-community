@@ -6,6 +6,7 @@ import com.intellij.psi.impl.cache.impl.BaseFilterLexer;
 import com.intellij.psi.impl.cache.impl.OccurrenceConsumer;
 import com.intellij.psi.impl.cache.impl.todo.LexerBasedTodoIndexer;
 import com.intellij.psi.search.UsageSearchContext;
+import com.intellij.psi.tree.IElementType;
 import org.jetbrains.annotations.NotNull;
 
 public class MarkdownTodoIndexer extends LexerBasedTodoIndexer {
@@ -14,7 +15,9 @@ public class MarkdownTodoIndexer extends LexerBasedTodoIndexer {
     return new BaseFilterLexer(new MarkdownHighlightingLexer(), consumer) {
       @Override
       public void advance() {
-        if (MarkdownIndexPatternBuilder.COMMENT_TOKEN_SET.contains(myDelegate.getTokenType())) {
+        IElementType tokenType = myDelegate.getTokenType();
+        if (MarkdownIndexPatternBuilder.COMMENT_TOKEN_SET.contains(tokenType)
+            || MarkdownIndexPatternBuilder.HTML_COMMENT_TOKENS.getValue().contains(tokenType)) {
           scanWordsInToken(UsageSearchContext.IN_COMMENTS, false, false);
           advanceTodoItemCountsInToken();
         }

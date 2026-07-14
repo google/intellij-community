@@ -1,9 +1,10 @@
+import builtins
 import datetime
 from _io import _BufferedReaderStream
 from collections.abc import Iterable, Iterator, Mapping
 from socket import SocketIO
 from typing import Any, Literal, NamedTuple, TypedDict, overload, type_check_only
-from typing_extensions import NotRequired, override
+from typing_extensions import NotRequired
 
 from docker._types import ContainerWeightDevice, WaitContainerResponse
 from docker.transport.sshconn import SSHSocket
@@ -38,6 +39,7 @@ class Container(Model):
     def health(self) -> str: ...
     @property
     def ports(self) -> dict[str, list[dict[str, str]] | None]: ...
+
     @overload
     def attach(
         self,
@@ -72,6 +74,7 @@ class Container(Model):
     def attach(
         self, *, stdout: bool = True, stderr: bool = True, stream: Literal[True], logs: bool = False, demux: Literal[True]
     ) -> CancellableStream[tuple[bytes | None, bytes | None]]: ...
+
     def attach_socket(self, **kwargs) -> SocketIO | _BufferedReaderStream | SSHSocket: ...
     def commit(self, repository: str | None = None, tag: str | None = None, **kwargs) -> Image: ...
     def diff(self) -> list[dict[str, int | str]]: ...
@@ -96,6 +99,7 @@ class Container(Model):
         self, path: str, chunk_size: int | None = 2097152, encode_stream: bool = False
     ) -> tuple[Iterator[bytes], dict[str, Any] | None]: ...
     def kill(self, signal: str | int | None = None) -> None: ...
+
     @overload
     def logs(
         self,
@@ -122,6 +126,7 @@ class Container(Model):
         follow: bool | None = None,
         until: datetime.datetime | float | None = None,
     ) -> bytes: ...
+
     def pause(self) -> None: ...
     def put_archive(self, path: str, data) -> bool: ...
     def remove(self, *, v: bool = False, link: bool = False, force: bool = False) -> None: ...
@@ -154,20 +159,21 @@ class Container(Model):
 
 class ContainerCollection(Collection[Container]):
     model: type[Container]
+
     @overload
     def run(
         self,
         image: str | Image,
-        command: str | list[str] | None = None,
+        command: str | builtins.list[str] | None = None,
         stdout: bool = True,
         stderr: bool = False,
         remove: bool = False,
         *,
         auto_remove: bool = False,
-        blkio_weight_device: list[ContainerWeightDevice] | None = None,
+        blkio_weight_device: builtins.list[ContainerWeightDevice] | None = None,
         blkio_weight: int | None = None,
-        cap_add: list[str] | None = None,
-        cap_drop: list[str] | None = None,
+        cap_add: builtins.list[str] | None = None,
+        cap_drop: builtins.list[str] | None = None,
         cgroup_parent: str | None = None,
         cgroupns: Literal["private", "host"] | None = None,
         cpu_count: int | None = None,
@@ -180,19 +186,19 @@ class ContainerCollection(Collection[Container]):
         cpuset_cpus: str | None = None,
         cpuset_mems: str | None = None,
         detach: Literal[False] = False,
-        device_cgroup_rules: list[str] | None = None,
-        device_read_bps: list[Mapping[str, str | int]] | None = None,
-        device_read_iops: list[Mapping[str, str | int]] | None = None,
-        device_write_bps: list[Mapping[str, str | int]] | None = None,
-        device_write_iops: list[Mapping[str, str | int]] | None = None,
-        devices: list[str] | None = None,
-        device_requests: list[DeviceRequest] | None = None,
-        dns: list[str] | None = None,
-        dns_opt: list[str] | None = None,
-        dns_search: list[str] | None = None,
-        domainname: str | list[str] | None = None,
-        entrypoint: str | list[str] | None = None,
-        environment: dict[str, str] | list[str] | None = None,
+        device_cgroup_rules: builtins.list[str] | None = None,
+        device_read_bps: builtins.list[Mapping[str, str | int]] | None = None,
+        device_read_iops: builtins.list[Mapping[str, str | int]] | None = None,
+        device_write_bps: builtins.list[Mapping[str, str | int]] | None = None,
+        device_write_iops: builtins.list[Mapping[str, str | int]] | None = None,
+        devices: builtins.list[str] | None = None,
+        device_requests: builtins.list[DeviceRequest] | None = None,
+        dns: builtins.list[str] | None = None,
+        dns_opt: builtins.list[str] | None = None,
+        dns_search: builtins.list[str] | None = None,
+        domainname: str | builtins.list[str] | None = None,
+        entrypoint: str | builtins.list[str] | None = None,
+        environment: dict[str, str] | builtins.list[str] | None = None,
         extra_hosts: dict[str, str] | None = None,
         group_add: Iterable[str | int] | None = None,
         healthcheck: dict[str, Any] | None = None,
@@ -202,7 +208,7 @@ class ContainerCollection(Collection[Container]):
         ipc_mode: str | None = None,
         isolation: str | None = None,
         kernel_memory: str | int | None = None,
-        labels: dict[str, str] | list[str] | None = None,
+        labels: dict[str, str] | builtins.list[str] | None = None,
         links: dict[str, str] | dict[str, None] | dict[str, str | None] | Iterable[tuple[str, str | None]] | None = None,
         log_config: LogConfig | None = None,
         lxc_conf: dict[str, str] | None = None,
@@ -211,7 +217,7 @@ class ContainerCollection(Collection[Container]):
         mem_reservation: str | int | None = None,
         mem_swappiness: int | None = None,
         memswap_limit: str | int | None = None,
-        mounts: list[Mount] | None = None,
+        mounts: builtins.list[Mount] | None = None,
         name: str | None = None,
         nano_cpus: int | None = None,
         network: str | None = None,
@@ -223,13 +229,13 @@ class ContainerCollection(Collection[Container]):
         pid_mode: str | None = None,
         pids_limit: int | None = None,
         platform: str | None = None,
-        ports: Mapping[str, int | list[int] | tuple[str, int] | None] | None = None,
+        ports: Mapping[str, int | builtins.list[int] | tuple[str, int] | None] | None = None,
         privileged: bool = False,
         publish_all_ports: bool = False,
         read_only: bool | None = None,
         restart_policy: _RestartPolicy | None = None,
         runtime: str | None = None,
-        security_opt: list[str] | None = None,
+        security_opt: builtins.list[str] | None = None,
         shm_size: str | int | None = None,
         stdin_open: bool = False,
         stop_signal: str | None = None,
@@ -238,31 +244,31 @@ class ContainerCollection(Collection[Container]):
         sysctls: dict[str, str] | None = None,
         tmpfs: dict[str, str] | None = None,
         tty: bool = False,
-        ulimits: list[Ulimit] | None = None,
+        ulimits: builtins.list[Ulimit] | None = None,
         use_config_proxy: bool | None = None,
         user: str | int | None = None,
         userns_mode: str | None = None,
         uts_mode: str | None = None,
         version: str | None = None,
         volume_driver: str | None = None,
-        volumes: dict[str, dict[str, str]] | list[str] | None = None,
-        volumes_from: list[str] | None = None,
+        volumes: dict[str, dict[str, str]] | builtins.list[str] | None = None,
+        volumes_from: builtins.list[str] | None = None,
         working_dir: str | None = None,
     ) -> bytes: ...  # TODO: This should return a stream, if `stream` is True
     @overload
     def run(
         self,
         image: str | Image,
-        command: str | list[str] | None = None,
+        command: str | builtins.list[str] | None = None,
         stdout: bool = True,
         stderr: bool = False,
         remove: bool = False,
         *,
         auto_remove: bool = False,
-        blkio_weight_device: list[ContainerWeightDevice] | None = None,
+        blkio_weight_device: builtins.list[ContainerWeightDevice] | None = None,
         blkio_weight: int | None = None,
-        cap_add: list[str] | None = None,
-        cap_drop: list[str] | None = None,
+        cap_add: builtins.list[str] | None = None,
+        cap_drop: builtins.list[str] | None = None,
         cgroup_parent: str | None = None,
         cgroupns: Literal["private", "host"] | None = None,
         cpu_count: int | None = None,
@@ -275,19 +281,19 @@ class ContainerCollection(Collection[Container]):
         cpuset_cpus: str | None = None,
         cpuset_mems: str | None = None,
         detach: Literal[True],
-        device_cgroup_rules: list[str] | None = None,
-        device_read_bps: list[Mapping[str, str | int]] | None = None,
-        device_read_iops: list[Mapping[str, str | int]] | None = None,
-        device_write_bps: list[Mapping[str, str | int]] | None = None,
-        device_write_iops: list[Mapping[str, str | int]] | None = None,
-        devices: list[str] | None = None,
-        device_requests: list[DeviceRequest] | None = None,
-        dns: list[str] | None = None,
-        dns_opt: list[str] | None = None,
-        dns_search: list[str] | None = None,
-        domainname: str | list[str] | None = None,
-        entrypoint: str | list[str] | None = None,
-        environment: dict[str, str] | list[str] | None = None,
+        device_cgroup_rules: builtins.list[str] | None = None,
+        device_read_bps: builtins.list[Mapping[str, str | int]] | None = None,
+        device_read_iops: builtins.list[Mapping[str, str | int]] | None = None,
+        device_write_bps: builtins.list[Mapping[str, str | int]] | None = None,
+        device_write_iops: builtins.list[Mapping[str, str | int]] | None = None,
+        devices: builtins.list[str] | None = None,
+        device_requests: builtins.list[DeviceRequest] | None = None,
+        dns: builtins.list[str] | None = None,
+        dns_opt: builtins.list[str] | None = None,
+        dns_search: builtins.list[str] | None = None,
+        domainname: str | builtins.list[str] | None = None,
+        entrypoint: str | builtins.list[str] | None = None,
+        environment: dict[str, str] | builtins.list[str] | None = None,
         extra_hosts: dict[str, str] | None = None,
         group_add: Iterable[str | int] | None = None,
         healthcheck: dict[str, Any] | None = None,
@@ -297,7 +303,7 @@ class ContainerCollection(Collection[Container]):
         ipc_mode: str | None = None,
         isolation: str | None = None,
         kernel_memory: str | int | None = None,
-        labels: dict[str, str] | list[str] | None = None,
+        labels: dict[str, str] | builtins.list[str] | None = None,
         links: dict[str, str] | dict[str, None] | dict[str, str | None] | Iterable[tuple[str, str | None]] | None = None,
         log_config: LogConfig | None = None,
         lxc_conf: dict[str, str] | None = None,
@@ -306,7 +312,7 @@ class ContainerCollection(Collection[Container]):
         mem_reservation: str | int | None = None,
         mem_swappiness: int | None = None,
         memswap_limit: str | int | None = None,
-        mounts: list[Mount] | None = None,
+        mounts: builtins.list[Mount] | None = None,
         name: str | None = None,
         nano_cpus: int | None = None,
         network: str | None = None,
@@ -318,13 +324,13 @@ class ContainerCollection(Collection[Container]):
         pid_mode: str | None = None,
         pids_limit: int | None = None,
         platform: str | None = None,
-        ports: Mapping[str, int | list[int] | tuple[str, int] | None] | None = None,
+        ports: Mapping[str, int | builtins.list[int] | tuple[str, int] | None] | None = None,
         privileged: bool = False,
         publish_all_ports: bool = False,
         read_only: bool | None = None,
         restart_policy: _RestartPolicy | None = None,
         runtime: str | None = None,
-        security_opt: list[str] | None = None,
+        security_opt: builtins.list[str] | None = None,
         shm_size: str | int | None = None,
         stdin_open: bool = False,
         stop_signal: str | None = None,
@@ -333,28 +339,28 @@ class ContainerCollection(Collection[Container]):
         sysctls: dict[str, str] | None = None,
         tmpfs: dict[str, str] | None = None,
         tty: bool = False,
-        ulimits: list[Ulimit] | None = None,
+        ulimits: builtins.list[Ulimit] | None = None,
         use_config_proxy: bool | None = None,
         user: str | int | None = None,
         userns_mode: str | None = None,
         uts_mode: str | None = None,
         version: str | None = None,
         volume_driver: str | None = None,
-        volumes: dict[str, dict[str, str]] | list[str] | None = None,
-        volumes_from: list[str] | None = None,
+        volumes: dict[str, dict[str, str]] | builtins.list[str] | None = None,
+        volumes_from: builtins.list[str] | None = None,
         working_dir: str | None = None,
     ) -> Container: ...
-    @override
+
     def create(  # type: ignore[override]
         self,
         image: str | Image,
-        command: str | list[str] | None = None,
+        command: str | builtins.list[str] | None = None,
         *,
         auto_remove: bool = False,
-        blkio_weight_device: list[ContainerWeightDevice] | None = None,
+        blkio_weight_device: builtins.list[ContainerWeightDevice] | None = None,
         blkio_weight: int | None = None,
-        cap_add: list[str] | None = None,
-        cap_drop: list[str] | None = None,
+        cap_add: builtins.list[str] | None = None,
+        cap_drop: builtins.list[str] | None = None,
         cgroup_parent: str | None = None,
         cgroupns: Literal["private", "host"] | None = None,
         cpu_count: int | None = None,
@@ -367,19 +373,19 @@ class ContainerCollection(Collection[Container]):
         cpuset_cpus: str | None = None,
         cpuset_mems: str | None = None,
         detach: bool = False,
-        device_cgroup_rules: list[str] | None = None,
-        device_read_bps: list[Mapping[str, str | int]] | None = None,
-        device_read_iops: list[Mapping[str, str | int]] | None = None,
-        device_write_bps: list[Mapping[str, str | int]] | None = None,
-        device_write_iops: list[Mapping[str, str | int]] | None = None,
-        devices: list[str] | None = None,
-        device_requests: list[DeviceRequest] | None = None,
-        dns: list[str] | None = None,
-        dns_opt: list[str] | None = None,
-        dns_search: list[str] | None = None,
-        domainname: str | list[str] | None = None,
-        entrypoint: str | list[str] | None = None,
-        environment: dict[str, str] | list[str] | None = None,
+        device_cgroup_rules: builtins.list[str] | None = None,
+        device_read_bps: builtins.list[Mapping[str, str | int]] | None = None,
+        device_read_iops: builtins.list[Mapping[str, str | int]] | None = None,
+        device_write_bps: builtins.list[Mapping[str, str | int]] | None = None,
+        device_write_iops: builtins.list[Mapping[str, str | int]] | None = None,
+        devices: builtins.list[str] | None = None,
+        device_requests: builtins.list[DeviceRequest] | None = None,
+        dns: builtins.list[str] | None = None,
+        dns_opt: builtins.list[str] | None = None,
+        dns_search: builtins.list[str] | None = None,
+        domainname: str | builtins.list[str] | None = None,
+        entrypoint: str | builtins.list[str] | None = None,
+        environment: dict[str, str] | builtins.list[str] | None = None,
         extra_hosts: dict[str, str] | None = None,
         group_add: Iterable[str | int] | None = None,
         healthcheck: dict[str, Any] | None = None,
@@ -389,7 +395,7 @@ class ContainerCollection(Collection[Container]):
         ipc_mode: str | None = None,
         isolation: str | None = None,
         kernel_memory: str | int | None = None,
-        labels: dict[str, str] | list[str] | None = None,
+        labels: dict[str, str] | builtins.list[str] | None = None,
         links: dict[str, str] | dict[str, None] | dict[str, str | None] | Iterable[tuple[str, str | None]] | None = None,
         log_config: LogConfig | None = None,
         lxc_conf: dict[str, str] | None = None,
@@ -398,7 +404,7 @@ class ContainerCollection(Collection[Container]):
         mem_reservation: str | int | None = None,
         mem_swappiness: int | None = None,
         memswap_limit: str | int | None = None,
-        mounts: list[Mount] | None = None,
+        mounts: builtins.list[Mount] | None = None,
         name: str | None = None,
         nano_cpus: int | None = None,
         network: str | None = None,
@@ -410,13 +416,13 @@ class ContainerCollection(Collection[Container]):
         pid_mode: str | None = None,
         pids_limit: int | None = None,
         platform: str | None = None,
-        ports: Mapping[str, int | list[int] | tuple[str, int] | None] | None = None,
+        ports: Mapping[str, int | builtins.list[int] | tuple[str, int] | None] | None = None,
         privileged: bool = False,
         publish_all_ports: bool = False,
         read_only: bool | None = None,
         restart_policy: _RestartPolicy | None = None,
         runtime: str | None = None,
-        security_opt: list[str] | None = None,
+        security_opt: builtins.list[str] | None = None,
         shm_size: str | int | None = None,
         stdin_open: bool = False,
         stop_signal: str | None = None,
@@ -425,29 +431,28 @@ class ContainerCollection(Collection[Container]):
         sysctls: dict[str, str] | None = None,
         tmpfs: dict[str, str] | None = None,
         tty: bool = False,
-        ulimits: list[Ulimit] | None = None,
+        ulimits: builtins.list[Ulimit] | None = None,
         use_config_proxy: bool | None = None,
         user: str | int | None = None,
         userns_mode: str | None = None,
         uts_mode: str | None = None,
         version: str | None = None,
         volume_driver: str | None = None,
-        volumes: dict[str, dict[str, str]] | list[str] | None = None,
-        volumes_from: list[str] | None = None,
+        volumes: dict[str, dict[str, str]] | builtins.list[str] | None = None,
+        volumes_from: builtins.list[str] | None = None,
         working_dir: str | None = None,
     ) -> Container: ...
-    @override
     def get(self, container_id: str) -> Container: ...
     def list(
         self,
         all: bool = False,
         before: str | None = None,
-        filters: dict[str, str | list[str] | bool] | None = None,
+        filters: dict[str, str | builtins.list[str] | bool] | None = None,
         limit: int = -1,
         since: str | None = None,
         sparse: bool = False,
         ignore_removed: bool = False,
-    ) -> list[Container]: ...
+    ) -> builtins.list[Container]: ...
     def prune(self, filters: dict[str, Any] | None = None) -> dict[str, Any]: ...
 
 RUN_CREATE_KWARGS: list[str]

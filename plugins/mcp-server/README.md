@@ -30,6 +30,7 @@ IntelliJ plugin). If you want a one-page summary, jump to the [cheat sheet](#16-
 15. [Advanced](#15-advanced)
 16. [Cheat sheet / checklist](#16-cheat-sheet--checklist)
 17. [Implementation details](#17-implementation-details)
+18. [Built-in IDE diagnostics tool](#18-built-in-ide-diagnostics-tool)
 
 Sections 1–16 are the **user guide** — everything you need to write a tool. Section 17 is **implementation details** for readers who want to
 understand how the framework turns a Kotlin method into an MCP tool, or who plan to extend the framework itself.
@@ -173,7 +174,7 @@ idiomatic; the framework trims leading margins (`|`) consistently.
 )
 suspend fun lint_files(
   @McpDescription("List of project-relative file paths to analyze. Duplicate paths are ignored after normalization.")
-  file_paths: List<String>,
+  files: List<String>,
   /* … */
 ): LintFilesResult
 ```
@@ -363,7 +364,7 @@ From [`AnalysisToolset.kt:463-472`](src/com/intellij/mcpserver/toolsets/general/
 A mutating tool that has no meaningful result can just return `Unit`:
 
 ```kotlin
-suspend fun replace_text_in_file(/* … */) {
+suspend fun create_new_file(/* … */) {
   /* perform mutation */
 }
 ```
@@ -428,15 +429,11 @@ catch (e: Throwable) { /* log, maybe mcpFail */
 }
 ```
 
-Inside tight loops use cooperative checks from [`TextToolset.kt:86`](src/com/intellij/mcpserver/toolsets/general/TextToolset.kt):
+Recursive or tight loops should use cooperative checks, as in [`fs.util.kt:233-234`](src/com/intellij/mcpserver/util/fs.util.kt):
 
 ```kotlin
-while (true) {
-  Cancellation.checkCancelled()
-  val occurrenceStart = text.indexOf(oldText, currentStartIndex, !caseSensitive)
-  if (occurrenceStart < 0) break
-  /* … */
-}
+if (maxDepth <= 0) return
+currentCoroutineContext().ensureActive()
 ```
 
 ### 6.3 Structured errors for machine consumers
@@ -535,19 +532,16 @@ platform can interrupt between phases.
 Document mutations that the user should be able to undo must run inside a write command:
 
 ```kotlin
-writeCommandAction(project, commandName = FindBundle.message("find.replace.text.dialog.title")) {
-  for (marker in rangeMarkers.reversed()) {
-    if (!marker.isValid) continue
-    val textRange = marker.textRange
-    document.replaceString(textRange.startOffset, textRange.endOffset, newText)
-    marker.dispose()
+writeCommandAction(project, commandName) {
+  val psiDocumentManager = PsiDocumentManager.getInstance(project)
+  for (document in documents) {
+    psiDocumentManager.commitDocument(document)
   }
-  FileDocumentManager.getInstance().saveDocument(document)
 }
 ```
 
-From [`TextToolset.kt:100-108`](src/com/intellij/mcpserver/toolsets/general/TextToolset.kt). The command name appears in the undo history.
-For project-model mutations that are not user-visible, use `writeAction`; for writes outside the EDT, use `backgroundWriteAction`; for
+From [`FormattingToolset.kt:66-71`](src/com/intellij/mcpserver/toolsets/general/FormattingToolset.kt). The command name appears in the undo history.
+For project-model mutations that are not user-visible, use `edtWriteAction`; for writes outside the EDT, use `backgroundWriteAction`; for
 read-then-edit flows use `readAndEdtWriteAction { …; value(…) }`.
 
 ### 8.4 `withContext(Dispatchers.IO)` / `Dispatchers.EDT`
@@ -560,27 +554,6 @@ val file = withContext(Dispatchers.IO) { resolveReadFile(project, file_path) }
 ```
 
 From [`ReadToolset.kt:98`](src/com/intellij/mcpserver/toolsets/general/ReadToolset.kt).
-
-### 8.5 `RangeMarker` across read + write phases
-
-When you compute offsets inside a read action and mutate in a write action, the document may change between the two. [
-`RangeMarker`](https://plugins.jetbrains.com/docs/intellij/documents.html#working-with-text) bridges them:
-
-```kotlin
-val (document, rangeMarkers) = readAction {
-  Cancellation.ensureActive()
-  val rangeMarkers = mutableListOf<RangeMarker>()
-  val document = FileDocumentManager.getInstance().getDocument(file)
-    ?: mcpFail("Could not get document for $file")
-  /* …build markers… */
-  val rangeMarker = document.createRangeMarker(occurrenceStart, occurrenceStart + oldText.length, true)
-  rangeMarkers.add(rangeMarker)
-  document to rangeMarkers.toList()
-}
-```
-
-From [`TextToolset.kt:66-93`](src/com/intellij/mcpserver/toolsets/general/TextToolset.kt). Mutate in reverse order (
-`rangeMarkers.reversed()`) so earlier offsets remain valid; always call `marker.dispose()` when you're done with each marker.
 
 ---
 
@@ -652,7 +625,7 @@ Trimmed from [`AnalysisToolset.kt:141-271`](src/com/intellij/mcpserver/toolsets/
 ### 9.4 Cooperative cancellation
 
 Inside tight loops call `Cancellation.checkCancelled()` or `currentCoroutineContext().ensureActive()` so the client can cancel and timeouts
-fire promptly — see the `while` loop in [`TextToolset.kt:85-93`](src/com/intellij/mcpserver/toolsets/general/TextToolset.kt).
+fire promptly — see the indexed filename processing in [`SearchToolset.kt:346-348`](src/com/intellij/mcpserver/toolsets/general/SearchToolset.kt).
 
 ---
 
@@ -670,12 +643,12 @@ Accepts project-relative paths, `..`, absolute paths, `file://` / `jar://` / `jr
 When `throwWhenOutside = true` (the default), paths that escape the project root trigger an `McpExpectedError`. Usage:
 
 ```kotlin
-val resolvedPath = project.resolveInProject(pathInProject)
-val file: VirtualFile = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(resolvedPath)
-  ?: mcpFail("file not found: $pathInProject")
+val sourcePath = project.resolveInProject(operation.path)
+val sourceFile = findFile(localFileSystem, sourcePath, operation.path)
+if (sourceFile.isDirectory) mcpFail("Path is not a file: ${operation.path}")
 ```
 
-From [`TextToolset.kt:63-65`](src/com/intellij/mcpserver/toolsets/general/TextToolset.kt).
+From [`PatchToolset.kt:104-106`](src/com/intellij/mcpserver/toolsets/general/PatchToolset.kt).
 
 ### 10.2 `VirtualFile` resolution
 
@@ -758,7 +731,7 @@ registered in [`plugin.xml:61-64`](resources/META-INF/plugin.xml).
 ### 13.1 Tool names
 
 - The Kotlin method name becomes the wire name. Override via `@McpTool(name="...")` only when unavoidable.
-- Prefer snake_case verbs for new tools: `build_project`, `get_symbol_info`, `replace_text_in_file`.
+- Prefer snake_case verbs for new tools: `build_project`, `get_symbol_info`, `apply_patch`.
 - Add `@file:Suppress("FunctionName")` at the top of the file (see [
   `ReadToolset.kt:1`](src/com/intellij/mcpserver/toolsets/general/ReadToolset.kt)) so Kotlin style warnings don't fire.
 
@@ -1068,7 +1041,7 @@ is captured automatically.
 ### 17.5 Project resolution
 
 Tool-call project resolution is performed in [`McpSessionHandler.kt`](src/com/intellij/mcpserver/impl/McpSessionHandler.kt) through
-[`McpProjectLocationInputs.kt`](src/com/intellij/mcpserver/impl/McpProjectLocationInputs.kt). The logic has two modes:
+[`McpSessionProjectResolverImpl.kt`](src/com/intellij/mcpserver/impl/McpSessionProjectResolverImpl.kt). The logic has two modes:
 
 1. Strict mode: if the tool call contains an explicit `projectPath` argument, MCP matches only by that value.
    If it doesn't resolve to an open project, the call fails immediately with `noSuitableProjectError`.
@@ -1104,3 +1077,32 @@ Implementation details:
 - `hasMcpServerRuntimeOverrides()` is a quick probe used by settings UI to hide / disable controls that the system property already dictates.
 
 These overrides are **not a public API** — they are JetBrains-internal knobs for evaluation and should not be depended on by downstream plugins.
+
+---
+
+## 18. Built-in IDE diagnostics tool
+
+The built-in `get_ide_diagnostics` tool captures cheap diagnostics from the running IDE process: IDE/project identity, JVM uptime, process CPU
+load, memory, garbage collector counters, thread-state summary, CPU-ranked threads, and optionally the raw IntelliJ thread/coroutine dump.
+
+The toolset is disabled by default because it exposes process-wide diagnostic details. Start the IDE with:
+
+```bash
+-Didea.diagnostics.mcp.enabled=true
+```
+
+Tool parameters:
+
+| Parameter            | Default | Meaning                                                                                  |
+|----------------------|---------|------------------------------------------------------------------------------------------|
+| `sampleMillis`       | `1000`  | CPU sampling window in milliseconds. Values are clamped to `0..30000`; use `0` for a snapshot. |
+| `topThreadCount`     | `25`    | Maximum CPU-ranked threads to return. Values are clamped to `1..200`.                    |
+| `includeRawDump`     | `true`  | Include the raw IntelliJ thread dump text.                                                |
+| `maxDumpChars`       | `200000`| Maximum raw dump characters. Values are clamped to `0..2000000`.                         |
+| `stripCoroutineDump` | `true`  | Strip coroutine dump frames with little diagnostic value.                                  |
+
+Use this tool for quick answers to "what is this IDE doing right now?" questions: high CPU, blocked threads, thread-state spikes, or a raw
+dump that should be attached to a performance investigation. Thread states are JVM `Thread.State` values: `RUNNABLE` includes Java execution
+and native calls, so use `topCpuThreads[].cpuDeltaNanos` together with `isInNative`, `nativeFrame`, and `nativeOperationHint` before treating a
+thread as CPU-bound. It is not a replacement for JFR, async-profiler, or a long-running profiler recording. Per-thread CPU data is based on
+`ThreadMXBean` CPU-time deltas sampled inside the IDE process, and raw dumps are truncated when they exceed `maxDumpChars`.

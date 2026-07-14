@@ -6,7 +6,6 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.AccessToken;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.EditorLockFreeTyping;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
@@ -18,7 +17,6 @@ import com.intellij.openapi.vfs.SavingRequestor;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.FileViewProvider;
 import com.intellij.util.Processor;
-import com.intellij.util.concurrency.annotations.RequiresBlockingContext;
 import com.intellij.util.concurrency.annotations.RequiresReadLock;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.ApiStatus.Internal;
@@ -35,19 +33,18 @@ import java.util.function.Predicate;
  * Manages the saving of changes to disk.
  */
 public abstract class FileDocumentManager implements SavingRequestor {
-  @RequiresBlockingContext
   public static @NotNull FileDocumentManager getInstance() {
     return ApplicationManager.getApplication().getService(FileDocumentManager.class);
   }
 
   /**
-   * Returns the document for the specified virtual file.<p/>
+   * Returns the document for the specified virtual file.
    * <p>
-   * Documents are cached on weak or strong references, depending on the nature of the virtual file. If the document
+   * Documents are cached on weak references for real virtual files, or on strong references for light virtual files. If the document
    * for the given virtual file is not yet cached, the file's contents are read from VFS and loaded into heap memory.
    * An appropriate encoding is used. All line separators are converted to {@code \n}.<p/>
    * <p>
-   * Should be invoked in a read action.
+   * Should be invoked in a read action or (experimental) {@link com.intellij.psi.util.PsiVersioningService#freezePsiVersion  versioned environment}.
    *
    * @param file the file for which the document is requested.
    * @return the document, or null if the file represents a directory, or is binary without an associated decompiler,
@@ -55,14 +52,13 @@ public abstract class FileDocumentManager implements SavingRequestor {
    * @see VirtualFile#contentsToByteArray()
    * @see Application#runReadAction(Computable)
    */
-  @RequiresReadLock
+  @RequiresReadLock(generateAssertion = false)
   public abstract @Nullable Document getDocument(@NotNull VirtualFile file);
 
   @Internal
   @ApiStatus.Experimental
-  @RequiresReadLock(generateAssertion = false) // assert for real file
+  @RequiresReadLock
   public @Nullable Document getDocument(@NotNull VirtualFile file, @NotNull Project preferredProject) {
-    EditorLockFreeTyping.assertReadAccess(file);
     try (AccessToken ignored = ProjectLocator.withPreferredProject(file, preferredProject)) {
       return getDocument(file);
     }
@@ -226,6 +222,17 @@ public abstract class FileDocumentManager implements SavingRequestor {
   @Internal
   public @Nullable FileViewProvider findCachedPsiInAnyProject(@NotNull VirtualFile file) {
     return null;
+  }
+
+  /**
+   * Determines if the specified virtual file can have an associated document.
+   *
+   * @param virtualFile the virtual file to check. Must not be null.
+   * @return true if the file can have an associated document, false otherwise.
+   */
+  @Internal
+  public boolean canHaveDocument(@NotNull VirtualFile virtualFile) {
+    return getDocument(virtualFile) != null;
   }
 
   /**

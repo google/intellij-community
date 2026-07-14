@@ -152,9 +152,6 @@ public final class DvcsUtil {
     if (hash.length() < VcsLogUtil.SHORT_HASH_LENGTH) {
       LOG.debug("Unexpectedly short hash: [" + hash + "]");
     }
-    if (hash.length() > VcsLogUtil.FULL_HASH_LENGTH) {
-      LOG.debug("Unexpectedly long hash: [" + hash + "]");
-    }
     return VcsLogUtil.getShortHash(hash);
   }
 
@@ -467,7 +464,7 @@ public final class DvcsUtil {
       return root;
     }
 
-    Set<VirtualFile> modulesVcsRoots = ReadAction.compute(() -> findVcsRootForModuleLibrary(project, file));
+    Set<VirtualFile> modulesVcsRoots = ReadAction.computeBlocking(() -> findVcsRootForModuleLibrary(project, file));
     if (modulesVcsRoots.isEmpty()) {
       LOG.debug("No library roots");
       return null;

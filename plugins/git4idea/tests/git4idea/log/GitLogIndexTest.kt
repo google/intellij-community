@@ -34,6 +34,7 @@ import git4idea.test.last
 import git4idea.test.makeCommit
 import git4idea.test.modify
 import git4idea.test.mv
+import git4idea.test.runUnderProgress
 import git4idea.test.setupDefaultUsername
 import git4idea.test.setupUsername
 import git4idea.test.tac
@@ -237,7 +238,9 @@ abstract class GitLogIndexTest(val useSqlite: Boolean) : GitSingleRepoTest() {
       }
       master {
         //cherry-pick with default user
-        GitCherryPicker(project).cherryPick(readDetails(hashToPick))
+        runUnderProgress {
+          GitCherryPicker(project).cherryPick(readDetails(hashToPick))
+        }
       }
     }
 

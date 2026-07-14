@@ -26,17 +26,23 @@ class ExecuteProcessOptionsBuilder(
 
   private var interactionOptions: EelExecApi.InteractionOptions? = null
 
-  private var ptyOrStdErrSettings: EelExecApi.PtyOrStdErrSettings? = interactionOptions
+  private var ptyOrStdErrSettings: EelExecApi.InteractionOptions? = interactionOptions
 
   private var scope: CoroutineScope? = null
 
   private var workingDirectory: EelPath? = null
 
+  /**
+   * Command-line arguments passed to the process, not including the executable itself.
+   */
   @ApiStatus.Experimental
   fun args(arg: List<String>): ExecuteProcessOptionsBuilder = apply {
     this.args = arg
   }
 
+  /**
+   * Command-line arguments passed to the process, not including the executable itself.
+   */
   fun args(vararg arg: String): ExecuteProcessOptionsBuilder = apply {
     this.args = listOf(*arg)
   }
@@ -75,7 +81,7 @@ class ExecuteProcessOptionsBuilder(
 
   @Deprecated("Switch to interactionOptions", replaceWith = ReplaceWith("interactionOptions"))
   @ApiStatus.Internal
-  fun ptyOrStdErrSettings(arg: EelExecApi.PtyOrStdErrSettings?): ExecuteProcessOptionsBuilder = apply {
+  fun ptyOrStdErrSettings(arg: EelExecApi.InteractionOptions?): ExecuteProcessOptionsBuilder = apply {
     this.ptyOrStdErrSettings = arg
   }
 
@@ -113,7 +119,7 @@ internal class ExecuteProcessOptionsImpl(
   override val env: Map<String, String>,
   override val exe: String,
   override val interactionOptions: EelExecApi.InteractionOptions?,
-  override val ptyOrStdErrSettings: EelExecApi.PtyOrStdErrSettings?,
+  override val ptyOrStdErrSettings: EelExecApi.InteractionOptions?,
   override val scope: CoroutineScope?,
   override val workingDirectory: EelPath?,
 ) : ExecuteProcessOptions

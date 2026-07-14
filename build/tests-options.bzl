@@ -48,6 +48,7 @@ PKGS = [
 
 ADD_OPENS_FLAGS = ["--add-opens=" + pkg + "=ALL-UNNAMED" for pkg in PKGS]
 
+# Mirrors COMMON_VM_OPTIONS in VmOptionsGenerator.kt
 JAVA_TEST_FLAGS = [
     "-Didea.classpath.index.enabled=false",
     "-Djava.awt.headless=true",
@@ -56,22 +57,23 @@ JAVA_TEST_FLAGS = [
     "-Djava.system.class.loader=com.intellij.util.lang.PathClassLoader",
     "-Didea.reset.classpath.from.manifest=true",
     "-Dintellij.build.use.compiled.classes=false",
+    "-Djava.util.zip.use.nio.for.zip.file.access=true",
+    "-ea",
 ]
 
 JAVA_TEST_ARGS = [
 ]
 
 TEST_FRAMEWORK_DEPS = [
-  # TODO Review this list, most likely only tools-testsBootstrap is required
-  # junit stuff should be propagated via runtime deps of testsBootstrap
+    # TODO Review this list, most likely only tools-testsBootstrap is required
+    # junit stuff should be propagated via runtime deps of testsBootstrap
+    "@community//platform/testFramework/bootstrap:tools-testsBootstrap",
+    "@community//platform/util:util-tests_test_lib",
 
-  "@community//platform/testFramework/bootstrap:tools-testsBootstrap",
-  "@community//platform/util:util-tests_test_lib",
-
-  # Provide test engines to run actual tests
-  # Junit 3/4 is also run by junit5 via junit vintage
-  "@community//libraries/junit5-vintage",
-  "@lib//:junit5Launcher",
+    # Provide test engines to run actual tests
+    # Junit 3/4 is also run by junit5 via junit vintage
+    "@community//libraries/junit5-vintage",
+    "@community//libraries/junit5-launcher",
 ]
 
 # needed to avoid runtime duplications in jps_test of community/platform/util/BUILD.bazel
@@ -155,5 +157,5 @@ def jps_test(name, jvm_flags = [], runtime_deps = [], args = [], data = [], tags
         data = all_data,
         env = all_env,
         use_testrunner = False,
-        **kwargs,
+        **kwargs
     )

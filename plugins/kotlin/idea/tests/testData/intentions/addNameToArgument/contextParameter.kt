@@ -3,8 +3,8 @@
 // INTENTION_TEXT: "Add 'x =' to argument"
 // AFTER-WARNING: Parameter 'a' is never used
 // AFTER-WARNING: Parameter 'x' is never used
-// IGNORE_K1
-// K2_ERROR: Argument already passed for this parameter.
+// K2_ERROR: ARGUMENT_PASSED_TWICE
+
 
 context(x: String)
 fun foo(a: String): String = x + a

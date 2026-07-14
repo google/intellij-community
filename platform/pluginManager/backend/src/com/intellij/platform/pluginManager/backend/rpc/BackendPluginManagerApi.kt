@@ -5,6 +5,7 @@ import com.intellij.ide.plugins.CustomPluginRepositoryService
 import com.intellij.ide.plugins.PluginEnabler
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.ide.plugins.api.PluginDto
+import com.intellij.ide.plugins.marketplace.ApplyPluginsStateResult
 import com.intellij.ide.plugins.marketplace.CheckErrorsResult
 import com.intellij.ide.plugins.marketplace.IdeCompatibleUpdate
 import com.intellij.ide.plugins.marketplace.InitSessionResult
@@ -14,23 +15,17 @@ import com.intellij.ide.plugins.marketplace.PluginSearchResult
 import com.intellij.ide.plugins.marketplace.SetEnabledStateResult
 import com.intellij.ide.plugins.newui.DefaultUiPluginManagerController
 import com.intellij.ide.plugins.newui.PluginInstallationState
-import com.intellij.ide.plugins.newui.PluginManagerSessionService
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.updateSettings.impl.UpdateSettings
-import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.platform.pluginManager.shared.rpc.PluginManagerApi
 import com.intellij.platform.project.ProjectId
 import com.intellij.platform.project.findProjectOrNull
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 
 @ApiStatus.Internal
-@IntellijInternalApi
 class BackendPluginManagerApi : PluginManagerApi {
   override suspend fun getPlugins(): List<PluginDto> {
     return DefaultUiPluginManagerController.getPlugins().map { PluginDto.fromModel(it) }
@@ -50,10 +45,6 @@ class BackendPluginManagerApi : PluginManagerApi {
 
   override suspend fun getInstalledPlugins(): List<PluginDto> {
     return DefaultUiPluginManagerController.getInstalledPlugins().map { PluginDto.fromModel(it, true) }
-  }
-
-  override suspend fun getUpdates(): List<PluginDto> {
-    return DefaultUiPluginManagerController.getUpdates().map { PluginDto.fromModel(it) }
   }
 
   override suspend fun setEnabledState(sessionId: String, pluginIds: List<PluginId>, enable: Boolean) {
@@ -160,6 +151,10 @@ class BackendPluginManagerApi : PluginManagerApi {
     }
   }
 
+  override suspend fun disablePluginsWithDependencies(pluginIds: List<PluginId>, projectId: ProjectId?): ApplyPluginsStateResult {
+    return DefaultUiPluginManagerController.disablePluginsWithDependencies(pluginIds, projectId?.findProjectOrNull())
+  }
+
   override suspend fun markPluginsAsDisabled(pluginIds: List<PluginId>) {
     PluginEnabler.HEADLESS.disableById(pluginIds.toSet())
   }
@@ -208,43 +203,6 @@ class BackendPluginManagerApi : PluginManagerApi {
 
   override suspend fun getLastCompatiblePluginUpdate(allIds: Set<PluginId>, throwExceptions: Boolean, buildNumber: String?): List<IdeCompatibleUpdate> {
     return DefaultUiPluginManagerController.getLastCompatiblePluginUpdate(allIds, throwExceptions, buildNumber)
-  }
-
-  override suspend fun isNeedUpdate(pluginId: PluginId): Boolean {
-    return DefaultUiPluginManagerController.isNeedUpdate(pluginId)
-  }
-
-  override suspend fun subscribeToUpdatesCount(sessionId: String): Flow<Int?> {
-    return channelFlow {
-      DefaultUiPluginManagerController.connectToUpdateServiceWithCounter(sessionId) {
-        trySend(it)
-      }
-      awaitClose()
-    }
-  }
-
-  override suspend fun subscribeToPluginUpdates(sessionId: String): Flow<List<PluginDto>> {
-    return channelFlow {
-      val session = PluginManagerSessionService.getInstance().getSession(sessionId)
-      session?.updateService?.calculateUpdates { result ->
-        val pluginDtos = result?.map { PluginDto.fromModel(it) } ?: emptyList()
-        trySend(pluginDtos)
-      }
-      awaitClose()
-    }
-  }
-
-  override suspend fun recalculatePluginUpdates(sessionId: String) {
-    PluginManagerSessionService.getInstance().getSession(sessionId)?.updateService?.recalculateUpdates()
-  }
-
-  override suspend fun disposeUpdaterService(sessionId: String) {
-    PluginManagerSessionService.getInstance().getSession(sessionId)?.updateService?.dispose()
-  }
-
-
-  override suspend fun notifyUpdateFinished(sessionId: String) {
-    PluginManagerSessionService.getInstance().getSession(sessionId)?.updateService?.finishUpdate()
   }
 
   override suspend fun checkPluginCanBeDownloaded(plugin: PluginDto): Boolean {

@@ -25,8 +25,8 @@ object CommunityProductFragments {
     alias("com.intellij.modules.all")
     alias("com.intellij.modules.jsp.base")
 
-    // Optional plugin support (with fallback)
-    deprecatedInclude("intellij.platform.remoteServers.impl", "intellij.platform.remoteServers.impl.xml", optional = true)
+    // Optional plugin support
+    embeddedModule("intellij.platform.remoteServers.impl")
     deprecatedInclude("intellij.uiDesigner", "META-INF/DesignerCorePlugin.xml", optional = true)
 
     // Extensions block (UTM tracking, new UI onboarding)
@@ -42,7 +42,7 @@ object CommunityProductFragments {
    * - Optional remote servers support
    * - PyCharm-specific extensions and actions (via pycharm-core.xml)
    *
-   * Use this fragment for products that include PyCharm functionality (PyCharm Community, PyCharm Professional, DataSpell).
+   * Use this fragment for products that include PyCharm functionality (PyCharm Community, PyCharm Professional).
    * Note: The extensions and actions blocks remain in pycharm-core.xml as they cannot be represented in the product content DSL.
    */
   fun pycharmCoreFragment(): ProductModulesContentSpec = productModules {
@@ -53,7 +53,7 @@ object CommunityProductFragments {
     alias("com.intellij.modules.pycharm")
 
     // Optional remote servers support
-    deprecatedInclude("intellij.platform.remoteServers.impl", "intellij.platform.remoteServers.impl.xml", optional = true)
+    embeddedModule("intellij.platform.remoteServers.impl")
 
     // Extensions and actions block (PyCharm-specific customization)
     deprecatedInclude("intellij.pycharm.community", "META-INF/pycharm-core.xml")

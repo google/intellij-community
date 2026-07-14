@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.devkit.workspaceModel
 
+import com.intellij.configurationStore.StoreReloadManager
 import com.intellij.copyright.CopyrightManager
 import com.intellij.copyright.IdeCopyrightManager
 import com.intellij.devkit.workspaceModel.WorkspaceModelGenerator.Companion.RIDER_MODULES_PREFIX
@@ -10,7 +11,7 @@ import com.intellij.ide.impl.OpenProjectTask
 import com.intellij.java.workspace.entities.JavaSourceRootPropertiesEntity
 import com.intellij.java.workspace.entities.javaSourceRoots
 import com.intellij.openapi.application.readAction
-import com.intellij.openapi.application.writeAction
+import com.intellij.openapi.application.edtWriteAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.IntelliJProjectUtil
 import com.intellij.openapi.project.Project
@@ -113,7 +114,7 @@ abstract class AbstractAllIntellijEntitiesGenerationTest {
     CodeGeneratorVersions.checkImplInImpl = false
 
     val jdk = IdeaTestUtil.getMockJdk21()
-    writeAction {
+    edtWriteAction {
       ProjectJdkTable.getInstance().addJdk(jdk, disposable.get())
     }
 
@@ -139,7 +140,7 @@ abstract class AbstractAllIntellijEntitiesGenerationTest {
     LibrariesRequiredForWorkspace.workspaceJpsEntities.add(model)
     LibrariesRequiredForWorkspace.jetbrainsAnnotations.add(model)
 
-    writeAction {
+    edtWriteAction {
       model.sdk = jdk
       model.commit()
     }
@@ -222,7 +223,7 @@ abstract class AbstractAllIntellijEntitiesGenerationTest {
     val ultimateSourceRootPath =
       VirtualFileManager.getInstance().refreshAndFindFileByNioPath(Path.of(ultimateSourceRoot.url.presentableUrl))!!
 
-    writeAction {
+    edtWriteAction {
       VfsUtil.copyDirectory(this, ultimateSourceRootPath, actualSrcRoot, null)
     }
 
@@ -233,7 +234,7 @@ abstract class AbstractAllIntellijEntitiesGenerationTest {
 
     val testProjectModule = project.modules[0]
     if (libraries.isNotEmpty()) {
-      writeAction {
+      edtWriteAction {
         ModuleRootModificationUtil.updateModel(testProjectModule) { model ->
           for (library in libraries) {
             library.add(model)
@@ -268,7 +269,7 @@ abstract class AbstractAllIntellijEntitiesGenerationTest {
     EditorConfigCodeStyleSettingsModifier.Handler.setEnabledInTests(true)
     Utils.isEnabledInTests = true
 
-    writeAction {
+    edtWriteAction {
       // .idea/codeStyles contains default code style that is used for parameters not defined in editorconfig
       val ultimateRoot = VfsUtil.findFile(Path.of(IdeaTestExecutionPolicy.getHomePathWithPolicy()), true)!!
       VfsUtil.copyDirectory(this, ultimateRoot.findDirectory(".idea/codeStyles")!!, projectRoot.findOrCreateDirectory(".idea/codeStyles"), null)
@@ -278,6 +279,8 @@ abstract class AbstractAllIntellijEntitiesGenerationTest {
       val editorconfigFile = projectRoot.findOrCreateChildData(this@AbstractAllIntellijEntitiesGenerationTest, ".editorconfig")
       VfsUtil.saveText(editorconfigFile, mergedEditorconfigContent)
     }
+    // wait until copied .idea/codeStyles are reloaded
+    StoreReloadManager.getInstance(project).reloadChangedStorageFiles()
   }
 
   private suspend fun updateIntellijWorkspaceCode(
@@ -286,7 +289,7 @@ abstract class AbstractAllIntellijEntitiesGenerationTest {
     newSrcRoot: VirtualFile,
     newGenRoot: VirtualFile,
   ): Boolean {
-    return writeAction {
+    return edtWriteAction {
       var storageChanged = false
 
       val ultimateGenSourceRoot = findGenSourceRoot(ultimateSourceRoot)
@@ -323,7 +326,11 @@ abstract class AbstractAllIntellijEntitiesGenerationTest {
 
     //transition from VFS to Path API: need to force VFS to flush pending updates
     PlatformTestUtil.flushAllPendingVFSUpdates()
-    val filePathFilter: (String) -> Boolean = { it.endsWith(".kt") && !it.endsWith("GradleJvmSupportDefaultData.kt") }
+    val filePathFilter: (String) -> Boolean = {
+      it.endsWith(".kt") &&
+      !it.endsWith("GradleJvmSupportDefaultData.kt") &&
+      "lang/typescript/tsc/gen" !in it
+    }
     if (genIsInsideSrc) {
       Path.of(newSrcRoot.presentableUrl)
         .assertMatches(directoryContentOf(dir = ultimateSrcPath), filePathFilter = filePathFilter, ignoreEmptyDirectories = true)

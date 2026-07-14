@@ -2,16 +2,14 @@
 package org.jetbrains.kotlin.idea.fir.quickfix
 
 import com.intellij.codeInsight.intention.impl.preview.IntentionPreviewPopupUpdateProcessor.Companion.getPreviewText
-import com.intellij.openapi.application.readAction
 import com.intellij.codeInspection.LocalInspectionTool
+import com.intellij.openapi.application.readAction
 import kotlinx.coroutines.runBlocking
 import org.intellij.lang.annotations.Language
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode
-import org.jetbrains.kotlin.idea.k2.codeinsight.inspections.ConvertToStringTemplateInspection
+import org.jetbrains.kotlin.idea.codeInsight.inspections.ConvertToStringTemplateInspection
 import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCase
 
 class KotlinQuickFixIntentionPreviewTest : KotlinLightCodeInsightFixtureTestCase() {
-    override val pluginMode: KotlinPluginMode = KotlinPluginMode.K2
 
     fun testIntentionPreview() {
         doTest("""
@@ -45,7 +43,7 @@ class KotlinQuickFixIntentionPreviewTest : KotlinLightCodeInsightFixtureTestCase
 
     fun testDestructuringDeclaration() {
         @Suppress("UNCHECKED_CAST")
-        val inspectionClass = Class.forName("org.jetbrains.kotlin.idea.k2.codeinsight.inspections.DestructureInspection")
+        val inspectionClass = Class.forName("org.jetbrains.kotlin.idea.codeInsight.inspections.DestructuringDeclarationInspection")
                 as Class<out LocalInspectionTool>
         myFixture.enableInspections(inspectionClass)
         doTest(

@@ -4,17 +4,16 @@ package com.intellij.execution.target
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.Platform
 import com.intellij.execution.target.local.toLocalPtyOptions
-import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.components.BaseState
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.platform.eel.EelApi
@@ -36,6 +35,7 @@ import com.intellij.platform.eel.provider.asNioPath
 import com.intellij.platform.eel.provider.getEelDescriptor
 import com.intellij.platform.eel.provider.toEelApi
 import com.intellij.platform.eel.provider.utils.EelPathTransfer
+import com.intellij.platform.eel.provider.utils.EelFileTransferAttributesStrategy
 import com.intellij.platform.eel.provider.utils.asEelChannel
 import com.intellij.platform.eel.provider.utils.consumeAsEelChannel
 import com.intellij.platform.eel.provider.utils.copy
@@ -231,7 +231,7 @@ class EelTargetEnvironment(override val request: EelTargetEnvironmentRequest) : 
       }
       acceptors.add(acceptor)
 
-      @OptIn(DelicateCoroutinesApi::class, IntellijInternalApi::class)
+      @OptIn(DelicateCoroutinesApi::class)
       forwardingScope.launch(blockingDispatcher) {
         try {
           for (connection in acceptor.incomingConnections) {
@@ -270,7 +270,7 @@ class EelTargetEnvironment(override val request: EelTargetEnvironmentRequest) : 
     override val localRoot: Path,
     override val targetRoot: String,
   ) : UploadableVolume, DownloadableVolume {
-    private fun targetRootPath(): Path {
+    fun targetRootPath(): Path {
       return eel.fs.getPath(targetRoot).asNioPath()
     }
 
@@ -285,11 +285,11 @@ class EelTargetEnvironment(override val request: EelTargetEnvironmentRequest) : 
       }
       // TODO: generalize com.intellij.execution.wsl.ijent.nio.IjentWslNioFileSystemProvider.copy
       EelPathTransfer.walkingTransfer(from,
-                                   to,
-                                   removeSource = false,
-                                   EelPathTransfer.FileTransferAttributesStrategy.Copy,
-                                   absoluteSymlinkHandler = null,
-                                   filter = filter)
+                                      to,
+                                      removeSource = false,
+                                      EelFileTransferAttributesStrategy.Copy,
+                                      absoluteSymlinkHandler = null,
+                                      filter = filter)
     }
 
     override fun download(relativePath: String, progressIndicator: ProgressIndicator) {
@@ -303,11 +303,11 @@ class EelTargetEnvironment(override val request: EelTargetEnvironmentRequest) : 
       }
       // TODO: generalize com.intellij.execution.wsl.ijent.nio.IjentWslNioFileSystemProvider.copy
       EelPathTransfer.walkingTransfer(from,
-                                   to,
-                                   removeSource = false,
-                                   EelPathTransfer.FileTransferAttributesStrategy.Copy,
-                                   absoluteSymlinkHandler = null,
-                                   filter = null)
+                                      to,
+                                      removeSource = false,
+                                      EelFileTransferAttributesStrategy.Copy,
+                                      absoluteSymlinkHandler = null,
+                                      filter = null)
     }
 
     override fun resolveTargetPath(relativePath: String): String {

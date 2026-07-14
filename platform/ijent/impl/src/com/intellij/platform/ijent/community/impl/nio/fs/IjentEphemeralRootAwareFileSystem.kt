@@ -9,6 +9,9 @@ import com.intellij.platform.core.nio.fs.MultiRoutingFsPath
 import com.intellij.platform.core.nio.fs.RoutingAwareFileSystemProvider
 import com.intellij.platform.eel.EelDescriptor
 import com.intellij.platform.eel.EelOsFamily
+import com.intellij.platform.eel.channels.EelDelicateApi
+import com.intellij.platform.eel.provider.utils.impl.ijentToLocal
+import com.intellij.platform.eel.provider.utils.impl.localToIjent
 import com.intellij.platform.eel.provider.EelDescriptorOwner
 import com.intellij.platform.eel.provider.getEelDescriptor
 import com.intellij.platform.eel.provider.utils.EelPathTransfer
@@ -62,10 +65,9 @@ class IjentEphemeralRootAwarePath(
   val rootPath: Path,
   val originalPath: IjentNioPath,
 ) : Path, BasicFileAttributesHolder2.Impl(originalPath.getCachedFileAttributesAndWrapToDosAttributesAdapterIfNeeded()) {
-  override fun getFileSystem(): FileSystem =
-    fileSystem
+  override fun getFileSystem(): FileSystem = fileSystem
 
-  val actualPath = EelPathUtils.getActualPath(originalPath)
+  val actualPath: Path = EelPathUtils.getActualPath(originalPath)
 
   override fun invalidate() {
     originalPath.invalidate()
@@ -117,12 +119,16 @@ class IjentEphemeralRootAwarePath(
 
   override fun resolve(other: Path): Path {
     val other = other.unwrap()
-    return IjentEphemeralRootAwarePath(fileSystem, rootPath, originalPath.resolve(if (other is IjentEphemeralRootAwarePath) other.originalPath else other))
+    return IjentEphemeralRootAwarePath(fileSystem,
+                                       rootPath,
+                                       originalPath.resolve(if (other is IjentEphemeralRootAwarePath) other.originalPath else other))
   }
 
   override fun relativize(other: Path): Path {
     val other = other.unwrap()
-    return IjentEphemeralRootAwarePath(fileSystem, rootPath, originalPath.relativize(if (other is IjentEphemeralRootAwarePath) other.originalPath else other))
+    return IjentEphemeralRootAwarePath(fileSystem,
+                                       rootPath,
+                                       originalPath.relativize(if (other is IjentEphemeralRootAwarePath) other.originalPath else other))
   }
 
   override fun toUri(): URI {
@@ -184,11 +190,13 @@ class IjentEphemeralRootAwarePath(
     return result
   }
 
+  @OptIn(EelDelicateApi::class)
   override fun toString(): String {
     return if (isAbsolute) {
       when (fileSystem.eelDescriptor.osFamily) {
         EelOsFamily.Posix -> {
-          rootPath.resolve(originalPath.pathString.removePrefix("/").replace("\\", fileSystem.separator)).pathString
+          val other = ijentToLocal(originalPath.pathString.removePrefix("/").replace("\\", fileSystem.separator))
+          rootPath.resolve(other).pathString
         }
         EelOsFamily.Windows -> {
           WindowsPathUtils.resolveEelPathOntoRoot(rootPath, (originalPath as AbsoluteIjentNioPath).eelPath).pathString
@@ -197,7 +205,7 @@ class IjentEphemeralRootAwarePath(
 
     }
     else {
-      originalPath.toString()
+      ijentToLocal(originalPath.toString())
     }
   }
 }
@@ -227,18 +235,17 @@ class IjentEphemeralRootAwareFileSystemProvider(
   private val ijentFsProvider: FileSystemProvider,
   private val originalFsProvider: FileSystemProvider,
   private val useRootDirectoriesFromOriginalFs: Boolean,
-  private val eelDescriptor: EelDescriptor
-) : DelegatingFileSystemProvider<IjentEphemeralRootAwareFileSystemProvider, IjentEphemeralRootAwareFileSystem>(), RoutingAwareFileSystemProvider {
+  private val eelDescriptor: EelDescriptor,
+) : DelegatingFileSystemProvider<IjentEphemeralRootAwareFileSystemProvider, IjentEphemeralRootAwareFileSystem>(),
+    RoutingAwareFileSystemProvider {
   private val originalFs = originalFsProvider.getFileSystem(URI("file:/"))
 
   override fun wrapDelegateFileSystem(delegateFs: FileSystem): IjentEphemeralRootAwareFileSystem {
-    return IjentEphemeralRootAwareFileSystem(
-      rootAwareFileSystemProvider = this,
-      ijentFs = delegateFs,
-      originalFs = originalFs,
-      useRootDirectoriesFromOriginalFs = useRootDirectoriesFromOriginalFs,
-      eelDescriptor = eelDescriptor
-    )
+    return IjentEphemeralRootAwareFileSystem(rootAwareFileSystemProvider = this,
+                                             ijentFs = delegateFs,
+                                             originalFs = originalFs,
+                                             useRootDirectoriesFromOriginalFs = useRootDirectoriesFromOriginalFs,
+                                             eelDescriptor = eelDescriptor)
   }
 
   override fun getScheme(): String? {
@@ -263,7 +270,10 @@ class IjentEphemeralRootAwareFileSystemProvider(
       super.copy(source, target, *options)
     }
     else {
-      EelPathTransfer.walkingTransfer(source.toOriginalPath(), target.toOriginalPath(), removeSource = false, copyAttributes = StandardCopyOption.COPY_ATTRIBUTES in options)
+      EelPathTransfer.walkingTransfer(source.toOriginalPath(),
+                                      target.toOriginalPath(),
+                                      removeSource = false,
+                                      copyAttributes = StandardCopyOption.COPY_ATTRIBUTES in options)
     }
   }
 
@@ -272,7 +282,10 @@ class IjentEphemeralRootAwareFileSystemProvider(
       super.move(source, target, *options)
     }
     else {
-      EelPathTransfer.walkingTransfer(source.toOriginalPath(), target.toOriginalPath(), removeSource = true, copyAttributes = StandardCopyOption.COPY_ATTRIBUTES in options)
+      EelPathTransfer.walkingTransfer(source.toOriginalPath(),
+                                      target.toOriginalPath(),
+                                      removeSource = true,
+                                      copyAttributes = StandardCopyOption.COPY_ATTRIBUTES in options)
     }
   }
 
@@ -293,18 +306,14 @@ class IjentEphemeralRootAwareFileSystemProvider(
   override fun isSameFile(path: Path, path2: Path): Boolean {
     if (path !is IjentEphemeralRootAwarePath) {
       if (path2 !is IjentEphemeralRootAwarePath) {
-        throw ProviderMismatchException(
-          "Neither $path (${path::class}) nor $path2 (${path2::class}) are ${IjentEphemeralRootAwarePath::class.java.name}"
-        )
+        throw ProviderMismatchException("Neither $path (${path::class}) nor $path2 (${path2::class}) are ${IjentEphemeralRootAwarePath::class.java.name}")
       }
       return isSameFile(path2, path)
     }
 
     if (path2 !is IjentEphemeralRootAwarePath) {
-      return if (path.actualPath.fileSystem.provider() == path2.fileSystem.provider())
-        Files.isSameFile(path.actualPath, path2)
-      else
-        false
+      return if (path.actualPath.fileSystem.provider() == path2.fileSystem.provider()) Files.isSameFile(path.actualPath, path2)
+      else false
     }
 
     if (path.actualPath == path.originalPath && path2.actualPath == path2.originalPath) {
@@ -342,7 +351,7 @@ class IjentEphemeralRootAwareFileSystem(
   private val ijentFs: FileSystem,
   internal val originalFs: FileSystem,
   private val useRootDirectoriesFromOriginalFs: Boolean,
-  override val eelDescriptor: EelDescriptor
+  override val eelDescriptor: EelDescriptor,
 ) : DelegatingFileSystem<IjentEphemeralRootAwareFileSystemProvider>(), EelDescriptorOwner {
   private val root: Path = rootAwareFileSystemProvider.root
   private val invariantSeparatorRootPathString = root.invariantSeparatorsPathString.removeSuffix("/")
@@ -354,7 +363,8 @@ class IjentEphemeralRootAwareFileSystem(
   override fun getRootDirectories(): Iterable<Path?> {
     return if (useRootDirectoriesFromOriginalFs) {
       originalFs.rootDirectories
-    } else {
+    }
+    else {
       ijentFs.rootDirectories.map { rootAwareFileSystemProvider.wrapDelegatePath(it) }
     }
   }
@@ -367,8 +377,8 @@ class IjentEphemeralRootAwareFileSystem(
     if (isPathUnderRoot(first)) {
       val parts = more.flatMap { it.split(root.fileSystem.separator) }.filter(String::isNotEmpty).toTypedArray()
       val relativized = relativizeToRoot(first, parts, eelDescriptor)
-      val ijentNioPath = ijentFs.getPath(relativized.first(), *relativized.drop(1).toTypedArray()) as IjentNioPath
-      return IjentEphemeralRootAwarePath(this,root, ijentNioPath)
+      val ijentNioPath = ijentFs.getPath(localToIjent(relativized.first ()), *relativized.drop(1).map { localToIjent(it) }.toTypedArray()) as IjentNioPath
+      return IjentEphemeralRootAwarePath(this, root, ijentNioPath)
     }
 
     val delegateFs = getDelegate(first)
@@ -403,10 +413,7 @@ class IjentEphemeralRootAwareFileSystem(
   override fun equals(other: Any?): Boolean {
     if (this === other) return true
     if (other !is IjentEphemeralRootAwareFileSystem) return false
-    return eelDescriptor == other.eelDescriptor
-           && ijentFs == other.ijentFs
-           && originalFs == other.originalFs
-           && useRootDirectoriesFromOriginalFs == other.useRootDirectoriesFromOriginalFs
+    return eelDescriptor == other.eelDescriptor && ijentFs == other.ijentFs && originalFs == other.originalFs && useRootDirectoriesFromOriginalFs == other.useRootDirectoriesFromOriginalFs
   }
 
   private fun isPathUnderRoot(path: String): Boolean {

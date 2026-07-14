@@ -540,10 +540,12 @@ final class KeywordCompletionItemProvider extends JavaModCompletionItemProvider 
            expressionPosition) && primitivesAreExpected(myPosition)) {
         for (String primitiveType : PsiTypes.primitiveTypeNames()) {
           addKeyword(createKeyword(primitiveType).withObject(Objects.requireNonNull(PsiTypes.primitiveTypeByName(primitiveType)))
-                       .withAdditionalUpdater((completionStart, updater, insertionContext) -> {
+                       .withAdditionalUpdater((_, updater, insertionContext) -> {
                          if (insertionContext.insertionCharacter() == '[') {
                            // Opening bracket will be added automatically.
-                           updater.getDocument().insertString(updater.getCaretOffset(), "]");
+                           int offset = updater.getCaretOffset();
+                           updater.getDocument().insertString(offset, "]");
+                           updater.registerTabOut(TextRange.create(offset, offset), offset + 1);
                          }
                        }));
         }
@@ -668,7 +670,7 @@ final class KeywordCompletionItemProvider extends JavaModCompletionItemProvider 
         .withPresentation(
           new ModCompletionItemPresentation(MarkupText.builder().append(keyword, STRONG).append(" " + className, NORMAL).build())
             .withMainIcon(() -> CreateClassKind.valueOf(keyword.toUpperCase(Locale.ROOT)).getKindIcon()))
-        .withAdditionalUpdater((start, updater) -> {
+        .withAdditionalUpdater((_, updater) -> {
           Document document = updater.getDocument();
           int offset = updater.getCaretOffset();
           String suffix = " ";
@@ -839,7 +841,9 @@ final class KeywordCompletionItemProvider extends JavaModCompletionItemProvider 
             PsiMethod method = PsiTreeUtil.getParentOfType(myPosition, PsiMethod.class, false, PsiClass.class);
             assert method != null;
             boolean hasParams = superConstructorHasParameters(method);
-            addKeyword(superItem.withAdditionalUpdater(getParenthesisUpdater(hasParams)));
+            addKeyword(superItem
+                         .withInsertCharacterSuppressed('(')
+                         .withAdditionalUpdater(getParenthesisUpdater(hasParams)));
             return;
           }
 
@@ -1461,12 +1465,13 @@ final class KeywordCompletionItemProvider extends JavaModCompletionItemProvider 
       int offset = updater.getCaretOffset();
       Document document = updater.getDocument();
       if (character == '(' || character == '\t') {
-        tryEatChar(updater, '(');
-        if (!hasParams) {
-          tryEatChar(updater, ')');
-          tryEatChar(updater, ';');
+        if (tryEatChar(updater, '(')) {
+          if (!hasParams) {
+            tryEatChar(updater, ')');
+            tryEatChar(updater, ';');
+          }
+          return;
         }
-        return;
       }
       document.insertString(offset, "();");
       if (hasParams) {
@@ -1481,14 +1486,16 @@ final class KeywordCompletionItemProvider extends JavaModCompletionItemProvider 
     };
   }
 
-  private static void tryEatChar(ModPsiUpdater updater, char c) {
+  private static boolean tryEatChar(ModPsiUpdater updater, char c) {
     int curOffset = updater.getCaretOffset();
     CharSequence sequence = updater.getDocument().getCharsSequence();
     int nextOffset = skipSpaces(curOffset, sequence);
-    char maybeRightParen = nextOffset == sequence.length() ? '\0' : sequence.charAt(nextOffset);
-    if (maybeRightParen == c) {
+    char charCandidate = nextOffset == sequence.length() ? '\0' : sequence.charAt(nextOffset);
+    if (charCandidate == c) {
       updater.moveCaretTo(nextOffset + 1);
+      return true;
     }
+    return false;
   }
 
   private static int skipSpaces(int offset, CharSequence sequence) {

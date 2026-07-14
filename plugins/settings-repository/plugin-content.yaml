@@ -1,8 +1,3 @@
-- name: lib/apache.sshd.osgi.jar
-  library: apache.sshd.osgi
-  files:
-  - name: $MAVEN_REPOSITORY$/org/apache/sshd/sshd-osgi/2/sshd-osgi-2.jar
-  reason: <- intellij.settingsRepository
 - name: lib/eclipse.jgit.ssh.apache.agent.jar
   library: eclipse.jgit.ssh.apache.agent
   module: intellij.settingsRepository
@@ -13,6 +8,12 @@
   module: intellij.settingsRepository
   files:
   - name: $MAVEN_REPOSITORY$/org/eclipse/jgit/org.eclipse.jgit.ssh.apache/6/org.eclipse.jgit.ssh.apache-6.jar
+- name: lib/intellij.libraries.sshd.osgi.jar
+  contentModules:
+  - name: intellij.libraries.sshd.osgi
+    libraries:
+      apache.sshd.osgi:
+      - name: $MAVEN_REPOSITORY$/org/apache/sshd/sshd-osgi/2/sshd-osgi-2.jar
 - name: lib/jetbrains.intellij.deps.eclipse.jgit.jar
   library: jetbrains.intellij.deps.eclipse.jgit
   files:

@@ -36,6 +36,7 @@ import com.intellij.terminal.frontend.view.completion.ShellDataGeneratorsExecuto
 import com.intellij.terminal.frontend.view.completion.ShellRuntimeContextProviderReworkedImpl
 import com.intellij.terminal.frontend.view.completion.TerminalCommandCompletionTypingListener
 import com.intellij.terminal.frontend.view.hyperlinks.FrontendTerminalHyperlinkFacade
+import com.intellij.terminal.frontend.view.hyperlinks.installHyperlinksProcessing
 import com.intellij.terminal.frontend.view.typeahead.TerminalTypeAhead
 import com.intellij.terminal.frontend.view.typeahead.TerminalTypeAheadOutputModelController
 import com.intellij.terminal.frontend.view.typeahead.TerminalTypeAheadOutputModelControllerV1
@@ -79,17 +80,15 @@ import org.jetbrains.plugins.terminal.block.reworked.TerminalAiInlineCompletion
 import org.jetbrains.plugins.terminal.block.reworked.TerminalSessionModel
 import org.jetbrains.plugins.terminal.block.reworked.TerminalSessionModelImpl
 import org.jetbrains.plugins.terminal.block.reworked.lang.TerminalOutputPsiFile
-import org.jetbrains.plugins.terminal.block.reworked.session.rpc.TerminalSessionId
 import org.jetbrains.plugins.terminal.block.ui.TerminalUiUtils
 import org.jetbrains.plugins.terminal.block.ui.addToLayer
 import org.jetbrains.plugins.terminal.block.ui.calculateTerminalSize
-import org.jetbrains.plugins.terminal.block.ui.isTerminalOutputScrollChangingActionInProgress
-import org.jetbrains.plugins.terminal.block.util.TerminalDataContextUtils
 import org.jetbrains.plugins.terminal.fus.TerminalStartupFusInfo
+import org.jetbrains.plugins.terminal.hyperlinks.TerminalHyperlinkId
 import org.jetbrains.plugins.terminal.hyperlinks.TerminalSourceNavigationInfo
+import org.jetbrains.plugins.terminal.hyperlinks.session.TerminalHyperlinksSessionId
 import org.jetbrains.plugins.terminal.session.TerminalGridSize
 import org.jetbrains.plugins.terminal.session.TerminalStartupOptions
-import org.jetbrains.plugins.terminal.session.impl.TerminalHyperlinkId
 import org.jetbrains.plugins.terminal.session.impl.TerminalSession
 import org.jetbrains.plugins.terminal.util.getNow
 import org.jetbrains.plugins.terminal.view.TerminalContentChangeEvent
@@ -144,10 +143,8 @@ class TerminalViewImpl(
 
   @VisibleForTesting
   val outputEditor: EditorEx
-  private val outputHyperlinkFacade: FrontendTerminalHyperlinkFacade
   private val alternateBufferEditor: EditorEx
 
-  private val alternateBufferHyperlinkFacade: FrontendTerminalHyperlinkFacade
   private val scrollingModel: TerminalOutputScrollingModel
   private var isAlternateScreenBuffer = false
 
@@ -188,9 +185,10 @@ class TerminalViewImpl(
   override val startupOptionsDeferred: CompletableDeferred<TerminalStartupOptions> =
     CompletableDeferred(coroutineScope.coroutineContext.job)
 
-  init {
-    val hyperlinkScope = coroutineScope.childScope("TerminalViewImpl hyperlink facades")
+  private var outputBufferHyperlinksFacade: FrontendTerminalHyperlinkFacade? = null
+  private var alternateBufferHyperlinksFacade: FrontendTerminalHyperlinkFacade? = null
 
+  init {
     sessionModel = TerminalSessionModelImpl()
     encodingManager = TerminalKeyEncodingManager(sessionModel, coroutineScope.childScope("TerminalKeyEncodingManager"))
 
@@ -206,8 +204,14 @@ class TerminalViewImpl(
     // Usually, the cursor is painted or output received first in the output editor
     // because it is shown by default on a new session opening.
     // But in the case of session restoration in RemDev, there can be an alternate buffer.
-    val fusCursorPaintingListener = startupFusInfo?.let { TerminalFusCursorPainterListener(it) }
-    val fusFirstOutputListener = startupFusInfo?.let { TerminalFusFirstOutputListener(it) }
+    val fusCursorPaintingListener = if (startupFusInfo?.triggerTime != null) {
+      TerminalFusCursorPainterListener(startupFusInfo.triggerTime!!, startupFusInfo.way)
+    }
+    else null
+    val fusFirstOutputListener = if (startupFusInfo?.triggerTime != null) {
+      TerminalFusFirstOutputListener(startupFusInfo.triggerTime!!, startupFusInfo.way)
+    }
+    else null
 
     alternateBufferEditor = TerminalEditorFactory.createAlternateBufferEditor(
       project,
@@ -248,14 +252,6 @@ class TerminalViewImpl(
       fusFirstOutputListener,
       alternateBufferKeyEventsHandler,
       alternateBufferMouseEventsHandler,
-    )
-
-    alternateBufferHyperlinkFacade = FrontendTerminalHyperlinkFacade(
-      isInAlternateBuffer = true,
-      editor = alternateBufferEditor,
-      outputModel = alternateBufferModel,
-      terminalInput = terminalInput,
-      coroutineScope = hyperlinkScope,
     )
 
     outputEditor = TerminalEditorFactory.createOutputEditor(project, settings, coroutineScope.childScope("TerminalOutputEditor"))
@@ -322,20 +318,10 @@ class TerminalViewImpl(
 
     terminalSearchController = TerminalSearchController(project)
 
-    outputHyperlinkFacade = FrontendTerminalHyperlinkFacade(
-      isInAlternateBuffer = false,
-      editor = outputEditor,
-      outputModel = outputModel,
-      terminalInput = terminalInput,
-      coroutineScope = hyperlinkScope,
-    )
-
     controller = TerminalSessionController(
       sessionModel,
       outputModelController,
-      outputHyperlinkFacade,
       alternateBufferModelController,
-      alternateBufferHyperlinkFacade,
       startupOptionsDeferred,
       settings,
       coroutineScope.childScope("TerminalSessionController")
@@ -372,6 +358,27 @@ class TerminalViewImpl(
       terminalView = this,
       coroutineScope.childScope("Terminal VFS refresh on command finish")
     )
+
+    // Configure hyperlinks' processing
+    coroutineScope.launch {
+      val eelDescriptor = sessionDeferred.await().eelDescriptor
+      outputBufferHyperlinksFacade = installHyperlinksProcessing(
+        project = project,
+        outputModel = outputModel,
+        editor = outputEditor,
+        sessionModel = sessionModel,
+        eelDescriptor = eelDescriptor,
+        coroutineScope = coroutineScope.childScope("Output Buffer Hyperlinks")
+      )
+      alternateBufferHyperlinksFacade = installHyperlinksProcessing(
+        project = project,
+        outputModel = alternateBufferModel,
+        editor = alternateBufferEditor,
+        sessionModel = sessionModel,
+        eelDescriptor = eelDescriptor,
+        coroutineScope = coroutineScope.childScope("Alternate Buffer Hyperlinks")
+      )
+    }
 
     shellIntegrationFeaturesInitJob = coroutineScope.launch(
       Dispatchers.EDT +
@@ -573,13 +580,7 @@ class TerminalViewImpl(
     // Document modifications can change the scroll position.
     // Mark them with the corresponding flag to indicate that this change is not caused by the explicit user action.
     model.addListener(parentDisposable, object : TerminalOutputModelListener {
-      override fun beforeContentChanged(model: TerminalOutputModel) {
-        editor.isTerminalOutputScrollChangingActionInProgress = true
-      }
-
       override fun afterContentChanged(event: TerminalContentChangeEvent) {
-        editor.isTerminalOutputScrollChangingActionInProgress = false
-
         // Repaint the whole screen to update all changed highlightings.
         repaintEditorScreen(editor)
 
@@ -781,10 +782,6 @@ class TerminalViewImpl(
       sink[TerminalInput.DATA_KEY] = terminalInput
       sink[TerminalOutputModel.DATA_KEY] = outputModels.active.value
       sink[TerminalSearchController.KEY] = terminalSearchController
-      sink[TerminalSessionId.KEY] = null // TODO: session ID is required for hyperlinks - need to be reworked.
-      sink[TerminalDataContextUtils.IS_ALTERNATE_BUFFER_DATA_KEY] = isAlternateScreenBuffer
-      val hyperlinkFacade = if (isAlternateScreenBuffer) alternateBufferHyperlinkFacade else outputHyperlinkFacade
-      sink[TerminalHyperlinkId.KEY] = hyperlinkFacade.getHoveredHyperlinkId()
       sink.setNull(PlatformDataKeys.COPY_PROVIDER)
 
       // Add selection text to the data context, so features like Search Everywhere and Find in Files
@@ -794,6 +791,11 @@ class TerminalViewImpl(
         val selectionText = outputModels.active.value.getText(selection.startOffset, selection.endOffset).toString()
         sink[PlatformDataKeys.PREDEFINED_TEXT] = selectionText
       }
+
+      // Hyperlinks data
+      val hyperlinksFacade = if (isAlternateScreenBuffer) alternateBufferHyperlinksFacade else outputBufferHyperlinksFacade
+      sink[TerminalHyperlinksSessionId.DATA_KEY] = hyperlinksFacade?.sessionIdDeferred?.getNow()
+      sink[TerminalHyperlinkId.KEY] = hyperlinksFacade?.getHoveredHyperlinkId()
     }
 
     fun setTerminalContent(editor: Editor) {

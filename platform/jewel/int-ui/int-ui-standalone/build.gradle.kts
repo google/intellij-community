@@ -1,4 +1,4 @@
-import io.gitlab.arturbosch.detekt.Detekt
+import dev.detekt.gradle.Detekt
 import org.jetbrains.jewel.buildlogic.metalava.GenerateMetalavaApiTask
 import org.jetbrains.jewel.buildlogic.theme.IntelliJThemeGeneratorTask
 import org.jmailen.gradle.kotlinter.tasks.LintTask
@@ -13,6 +13,9 @@ plugins {
 
 dependencies {
     api(projects.ui)
+    api(project(":jb-icons-api"))
+    api(project(":jb-icons-api-rendering"))
+    api(project(":jb-icons-impl"))
     implementation(libs.jbr.api)
     implementation(libs.jna.core)
 }

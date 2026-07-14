@@ -52,17 +52,6 @@ class ClassLoaderConfigurator(
     }
   }
 
-  fun configureDescriptorDynamic(subDescriptor: ContentModuleDescriptor): Boolean {
-    val mainDescriptor = subDescriptor.getMainDescriptor()
-    val pluginId = mainDescriptor.pluginId
-    assert(pluginId == subDescriptor.pluginId) { "pluginId '$pluginId' != moduleDescriptor.pluginId '${subDescriptor.pluginId}'"}
-    // class cast fails in case IU is running from sources, IDEA-318252
-    (mainDescriptor.pluginClassLoader as? PluginClassLoader)?.let {
-      mainToClassPath.put(pluginId, MainPluginDescriptorClassPathInfo(classLoader = it))
-    }
-    return configureModule(subDescriptor)
-  }
-
   fun configure() {
     for (module in pluginSet.getModulesOrderedForClassLoaderConfiguration()) {
       configureModule(module)
@@ -86,6 +75,12 @@ class ClassLoaderConfigurator(
         return configureContentModule(module)
       }
     }
+  }
+
+  fun keepClassLoaderOf(plugin: PluginMainDescriptor) { // FIXME this doesn't look right, but it'll do for now
+    val classloader = plugin.pluginClassLoader as? PluginClassLoader
+                      ?: return
+    mainToClassPath.putIfAbsent(plugin.pluginId, MainPluginDescriptorClassPathInfo(classloader))
   }
 
   private fun configureContentModule(module: ContentModuleDescriptor): Boolean {
@@ -179,12 +174,11 @@ class ClassLoaderConfigurator(
           contributeDependencies(pluginSet.getSortedDependencies(module))
         }
       }
-      if (!PluginManagerCore.fallbackToOldPluginSetResolution()) {
-        // new resolver does not automatically treat "depends" sub-descriptor's dependencies as dependencies of the main module
-        for (descriptor in sequence { yieldAllDependsSubDescriptors(module) }) {
-          if (!descriptor.isEnabled) continue
-          contributeDependencies(pluginSet.getSortedDependencies(descriptor))
+      for (descriptor in sequence { yieldAllDependsSubDescriptors(module) }) {
+        if (!descriptor.isEnabled) {
+          continue
         }
+        contributeDependencies(pluginSet.getSortedDependencies(descriptor))
       }
     }
     val dependencies = (mutableDependenciesList ?: dependenciesList)
@@ -435,8 +429,7 @@ private fun getDependencyPackagePrefixes(descriptor: PluginMainDescriptor, plugi
   val result = ArrayList<String>(dependencies.size)
   for (item in dependencies) {
     val packagePrefix = (pluginSet.findEnabledModule(item) ?: continue).packagePrefix
-    // intellij.platform.commercial.verifier is injected
-    if (packagePrefix != null && item.name != "intellij.platform.commercial.verifier") {
+    if (packagePrefix != null) {
       result.add("$packagePrefix.")
     }
   }

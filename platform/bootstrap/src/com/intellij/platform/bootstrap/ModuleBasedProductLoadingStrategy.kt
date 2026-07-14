@@ -19,13 +19,11 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.platform.runtime.product.ProductMode
 import com.intellij.platform.runtime.product.serialization.ProductModulesSerialization
-import com.intellij.platform.runtime.repository.RuntimeModuleDescriptor
 import com.intellij.platform.runtime.repository.RuntimeModuleId
 import com.intellij.platform.runtime.repository.RuntimeModuleLoadingRule
 import com.intellij.platform.runtime.repository.RuntimeModuleRepository
-import com.intellij.platform.runtime.repository.serialization.RawRuntimePluginHeader
+import com.intellij.platform.runtime.repository.RuntimePluginHeader
 import com.intellij.util.PlatformUtils
-import com.intellij.util.SystemProperties
 import com.intellij.util.lang.PathClassLoader
 import com.intellij.util.lang.ZipEntryResolverPool
 import kotlinx.coroutines.CompletableDeferred
@@ -34,77 +32,73 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.name
 
 internal class ModuleBasedProductLoadingStrategy(internal val moduleRepository: RuntimeModuleRepository) : ProductLoadingStrategy() {
-  private val currentMode by lazy {
-    val currentModeId = System.getProperty(PLATFORM_PRODUCT_MODE_PROPERTY, ProductMode.MONOLITH.id)
-    val currentMode = ProductMode.findById(currentModeId)
-    if (currentMode == null) {
-      error("Unknown mode '$currentModeId' specified in '$PLATFORM_PRODUCT_MODE_PROPERTY' system property")
-    }
-    currentMode
-  }
-  
+  private val currentMode: MutableStateFlow<String> by lazy { MutableStateFlow(computeInitialModeId()) }
+
+  override val currentModeId: String
+    get() = currentMode.value
+
+  override val currentModeIdFlow: StateFlow<String>
+    get() = currentMode
+
   private val productModules by lazy {
     val rootModuleId = System.getProperty(PLATFORM_ROOT_MODULE_PROPERTY)
     if (rootModuleId == null) {
       error("'$PLATFORM_ROOT_MODULE_PROPERTY' system property is not specified")
     }
 
-    val rootModule = moduleRepository.getModule(RuntimeModuleId.legacyJpsModule(rootModuleId))
+    val rootModule = moduleRepository.findModuleHeader(RuntimeModuleId.legacyJpsModule(rootModuleId))
+    if (rootModule == null) {
+      error("Root module '$rootModuleId' is not found in the module repository")
+    }
     val productModulesPath = "META-INF/$rootModuleId/product-modules.xml"
     val moduleGroupStream = rootModule.readFile(productModulesPath)
     if (moduleGroupStream == null) {
       error("$productModulesPath is not found in '$rootModuleId' module")
     }
-    ProductModulesSerialization.loadProductModules(moduleGroupStream, productModulesPath, currentMode, moduleRepository)
+    ProductModulesSerialization.loadProductModules(moduleGroupStream, productModulesPath, moduleRepository)
   }
 
-  private val useMainModuleGroup
-    get() = SystemProperties.getBooleanProperty("intellij.platform.module.based.loader.use.main.module.group", false)
+  private fun computeInitialModeId(): String {
+    val initialModeId = System.getProperty(PLATFORM_PRODUCT_MODE_PROPERTY, ProductMode.MONOLITH.id)
+    if (ProductMode.findById(initialModeId) == null) {
+      error("Unknown mode '$initialModeId' specified in '$PLATFORM_PRODUCT_MODE_PROPERTY' system property")
+    }
+    return initialModeId
+  }
 
-  override val currentModeId: String
-    get() = currentMode.id
+  override fun advanceToLightWithRdConnectionMode(): Boolean {
+    return currentMode.compareAndSet(ProductMode.LIGHT.id, ProductMode.LIGHT_WITH_RD_CONNECTION.id)
+  }
+
+  override fun advanceToFrontendMode(): Boolean {
+    return currentMode.compareAndSet(ProductMode.LIGHT_WITH_RD_CONNECTION.id, ProductMode.FRONTEND.id)
+  }
 
   override fun addMainModuleGroupToClassPath(bootstrapClassLoader: ClassLoader) {
-    fun collectDependencies(module: RuntimeModuleDescriptor, result: MutableSet<RuntimeModuleDescriptor>) {
-      if (result.add(module)) {
-        module.dependencies.forEach { collectDependencies(it, result) }
-      }
-    }
-    
     val logger = logger<ModuleBasedProductLoadingStrategy>()
     val tracing = logger.isTraceEnabled
-    val mainGroupClassPath =
-      if (useMainModuleGroup) {
-        val embeddedModulesWithDependencies = LinkedHashSet<RuntimeModuleDescriptor>()
-        for (module in productModules.mainModuleGroup.includedModules) {
-          if (module.loadingRule == RuntimeModuleLoadingRule.EMBEDDED) {
-            collectDependencies(module.moduleDescriptor, embeddedModulesWithDependencies)
-          }
-        }
-        embeddedModulesWithDependencies.flatMapTo(LinkedHashSet()) { it.resourceRootPaths }
+
+    val corePluginDescriptorModule = System.getProperty(PLATFORM_CORE_PLUGIN_DESCRIPTOR_MODULE_PROPERTY, "intellij.frontend.split.customization")
+    val corePluginHeader = moduleRepository.findBundledPluginHeader(RuntimeModuleId.legacyJpsModule(corePluginDescriptorModule))
+    if (corePluginHeader == null) {
+      error("The core plugin header is not found in $moduleRepository by module $corePluginDescriptorModule")
+    }
+    val mainGroupClassPath = corePluginHeader.includedModules.filter { it.loadingRule == RuntimeModuleLoadingRule.EMBEDDED }.flatMapTo(LinkedHashSet()) { module ->
+      val classpath = moduleRepository.findModuleHeader(module.moduleId)?.ownClasspath ?: emptyList()
+      if (tracing) {
+        classpath.forEach { logger.trace("Classpath for core plugin: adding $it from module '${module.moduleId.displayName}'") }
       }
-      else {
-        val corePluginDescriptorModule = System.getProperty(PLATFORM_CORE_PLUGIN_DESCRIPTOR_MODULE_PROPERTY, "intellij.frontend.split.customization")
-        val corePluginHeader = moduleRepository.findBundledPluginHeader(RuntimeModuleId.legacyJpsModule(corePluginDescriptorModule))
-        if (corePluginHeader == null) {
-          error("The core plugin header is not found in $moduleRepository by module $corePluginDescriptorModule")
-        }
-        corePluginHeader.includedModules.filter { it.loadingRule == RuntimeModuleLoadingRule.EMBEDDED }.flatMapTo(LinkedHashSet()) { module ->
-          val classpath = moduleRepository.findHeader(module.moduleId)?.ownClasspath ?: emptyList()
-          if (tracing) {
-            classpath.forEach { logger.trace("Classpath for core plugin: adding $it from module '${module.moduleId.presentableName}'") }
-          }
-          classpath
-        }
-      }
+      classpath
+    }
 
     val classPath = (bootstrapClassLoader as PathClassLoader).classPath
-    logger.info("${if (useMainModuleGroup) "Use product-modules" else "Use the plugin header"} to load the core plugin")
     logger.info("New classpath roots:\n${(mainGroupClassPath - classPath.files.toSet()).joinToString("\n")}")
     classPath.addFiles(mainGroupClassPath)
   }
@@ -124,7 +118,6 @@ internal class ModuleBasedProductLoadingStrategy(internal val moduleRepository: 
     val classpathPathResolver = ClassPathXmlPathResolver(
       classLoader = mainClassLoader,
       isRunningFromSourcesWithoutDevBuild = false,
-      isOptionalProductModule = { moduleId -> this@ModuleBasedProductLoadingStrategy.isOptionalProductModule(moduleId) },
     )
     val useCoreClassLoader = platformPrefix.startsWith("CodeServer") || java.lang.Boolean.getBoolean("idea.force.use.core.classloader")
     val corePlugin = scope.async(Dispatchers.IO) {
@@ -137,7 +130,7 @@ internal class ModuleBasedProductLoadingStrategy(internal val moduleRepository: 
         pathResolver = classpathPathResolver,
         useCoreClassLoader = useCoreClassLoader,
         classLoader = mainClassLoader,
-        jarFileForModule = { moduleId, _ -> findProductContentModuleClassesRoot(moduleId) },
+        jarFileForModule = { moduleId, moduleDir -> findProductContentModuleClassesRoot(moduleId, moduleDir) },
         pool = zipPool,
       )
     }
@@ -162,7 +155,7 @@ internal class ModuleBasedProductLoadingStrategy(internal val moduleRepository: 
     val bundled = productModules.bundledPluginDescriptorModules.mapNotNull { pluginDescriptorModuleId ->
       val pluginHeader = moduleRepository.findBundledPluginHeader(pluginDescriptorModuleId)
       if (pluginHeader == null) {
-        logger<ModuleBasedProductLoadingStrategy>().error("Plugin header for module '${pluginDescriptorModuleId.presentableName}' is not found in the runtime module repository")
+        logger<ModuleBasedProductLoadingStrategy>().error("Plugin header for module '${pluginDescriptorModuleId.displayName}' is not found in the runtime module repository")
         return@mapNotNull null
       }
       scope.async {
@@ -173,7 +166,7 @@ internal class ModuleBasedProductLoadingStrategy(internal val moduleRepository: 
   }
 
   private fun loadBundledPluginFromPluginHeader(
-    pluginHeader: RawRuntimePluginHeader,
+    pluginHeader: RuntimePluginHeader,
     bundledPluginsDir: Path,
     zipPool: ZipEntryResolverPool,
     loadingContext: PluginDescriptorLoadingContext,
@@ -183,21 +176,21 @@ internal class ModuleBasedProductLoadingStrategy(internal val moduleRepository: 
     val traceLogging = logger.isTraceEnabled
     for (includedModule in pluginHeader.includedModules) {
       if (includedModule.loadingRule == RuntimeModuleLoadingRule.EMBEDDED) {
-        val header = moduleRepository.findHeader(includedModule.moduleId)
+        val header = moduleRepository.findModuleHeader(includedModule.moduleId)
         if (header == null) {
           logger.error("Module '${includedModule.moduleId}' included as embedded in the header of plugin '${pluginHeader.pluginId}' is not found in the module repository")
           continue
         }
         if (traceLogging) {
           for (path in header.ownClasspath) {
-            logger.info("Classpath for '${pluginHeader.pluginId}': adding $path from module '${includedModule.moduleId.presentableName}'")
+            logger.info("Classpath for '${pluginHeader.pluginId}': adding $path from module '${includedModule.moduleId.displayName}'")
           }
         }
         pluginDescriptorClasspathSet.addAll(header.ownClasspath)
       }
     }
     val pluginDescriptorClasspath = pluginDescriptorClasspathSet.toList()
-    val pluginDescriptorModuleHeader = moduleRepository.findHeader(pluginHeader.pluginDescriptorModuleId)
+    val pluginDescriptorModuleHeader = moduleRepository.findModuleHeader(pluginHeader.pluginDescriptorModuleId)
     if (pluginDescriptorModuleHeader == null) {
       logger.error("Plugin descriptor module for '${pluginHeader.pluginDescriptorModuleId}' is not found in the module repository")
       return null
@@ -218,7 +211,7 @@ internal class ModuleBasedProductLoadingStrategy(internal val moduleRepository: 
         val modulesWithPackagePrefix = descriptor.contentModules.asSequence().filter { it.packagePrefix != null }.mapTo(HashSet()) { it.moduleId.name }
         (pluginDescriptorClasspath +
         pluginHeader.includedModules.asSequence().filter { it.loadingRule != RuntimeModuleLoadingRule.EMBEDDED && it.moduleId.name in modulesWithPackagePrefix }.flatMap {
-          moduleRepository.findHeader(it.moduleId)?.ownClasspath?.asSequence() ?: emptySequence()
+          moduleRepository.findModuleHeader(it.moduleId)?.ownClasspath?.asSequence() ?: emptySequence()
         }).distinct()
       }
       else {
@@ -232,7 +225,7 @@ internal class ModuleBasedProductLoadingStrategy(internal val moduleRepository: 
     classpathRoot: Path,
     bundledPluginsDir: Path,
     pluginDescriptorClasspath: List<Path>,
-    pluginHeader: RawRuntimePluginHeader,
+    pluginHeader: RuntimePluginHeader,
     zipFilePool: ZipEntryResolverPool,
     loadingContext: PluginDescriptorLoadingContext,
   ): PluginMainDescriptor? {
@@ -291,13 +284,13 @@ internal class ModuleBasedProductLoadingStrategy(internal val moduleRepository: 
    * Since JARs of plugin's modules may be located in different directories (until IJPL-220139 is fixed), the code tries to determine the
    * plugin directory by JARs located in standard locations (lib/ or lib/modules).
    */
-  private fun determinePluginDirectory(classpathRoot: Path, bundledPluginsDir: Path, pluginHeader: RawRuntimePluginHeader): Path? {
+  private fun determinePluginDirectory(classpathRoot: Path, bundledPluginsDir: Path, pluginHeader: RuntimePluginHeader): Path? {
     val grandparent = classpathRoot.parent.parent
     if (grandparent.parent == bundledPluginsDir) return grandparent
     return pluginHeader.includedModules
       .asSequence()
       .flatMap { included ->
-        moduleRepository.findHeader(included.moduleId)?.ownClasspath?.asSequence() ?: emptySequence()
+        moduleRepository.findModuleHeader(included.moduleId)?.ownClasspath?.asSequence() ?: emptySequence()
       }
       .map { jarFile ->
         val parent = jarFile.parent
@@ -307,24 +300,12 @@ internal class ModuleBasedProductLoadingStrategy(internal val moduleRepository: 
       .find { it.parent == bundledPluginsDir }
   }
 
-  override fun isOptionalProductModule(moduleId: String): Boolean {
-    if (!useMainModuleGroup) return false
-
-    val optionalModuleIds = productModules.mainModuleGroup.optionalModuleIds
-    return optionalModuleIds.contains(RuntimeModuleId.contentModule(moduleId, PluginModuleId.JETBRAINS_NAMESPACE)) ||
-           optionalModuleIds.contains(RuntimeModuleId.legacyJpsModule(moduleId))
-  }
-
   override fun findProductContentModuleClassesRoot(moduleId: PluginModuleId, moduleDir: Path): Path? {
-    return findProductContentModuleClassesRoot(moduleId)
-  }
-
-  private fun findProductContentModuleClassesRoot(moduleId: PluginModuleId): Path? {
-    var resolvedModule = moduleRepository.resolveModule(RuntimeModuleId.contentModule(moduleId.name, moduleId.namespace)).resolvedModule
+    var resolvedModule = moduleRepository.findModuleHeader(RuntimeModuleId.contentModule(moduleId.name, moduleId.namespace))
     if (resolvedModule == null && moduleId.namespace == PluginModuleId.JETBRAINS_NAMESPACE) {
       /* until IJPL-241655 is implemented, we may not detect proper namespace for some modules, e.g. `intellij.cwm.connection.frontend.split`,
          so try searching with a different namespace */
-      resolvedModule = moduleRepository.resolveModule(RuntimeModuleId.legacyJpsModule(moduleId.name)).resolvedModule
+      resolvedModule = moduleRepository.findModuleHeader(RuntimeModuleId.legacyJpsModule(moduleId.name))
     }
     if (resolvedModule == null) {
       // https://youtrack.jetbrains.com/issue/CPP-38280
@@ -333,13 +314,17 @@ internal class ModuleBasedProductLoadingStrategy(internal val moduleRepository: 
       return null
     }
 
-    val paths = resolvedModule.resourceRootPaths
+    val paths = resolvedModule.ownClasspath
     val singlePath = paths.singleOrNull()
-    if (singlePath == null) {
-      error("Content modules are supposed to have only one resource root, but $moduleId have multiple: $paths")
+    if (singlePath != null) {
+      return singlePath
     }
 
-    return singlePath
+    val defaultPath = moduleDir.resolve("${moduleId.name}.jar")
+    if (defaultPath in paths) {
+      return defaultPath
+    }
+    error("Cannot determine the main classes root for $moduleId among $paths")
   }
 }
 

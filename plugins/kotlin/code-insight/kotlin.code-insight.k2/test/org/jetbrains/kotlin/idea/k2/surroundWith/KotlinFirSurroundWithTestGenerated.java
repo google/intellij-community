@@ -3,7 +3,6 @@
 package org.jetbrains.kotlin.idea.k2.surroundWith;
 
 import com.intellij.testFramework.TestDataPath;
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode;
 import org.jetbrains.kotlin.idea.base.test.TestRoot;
 import org.jetbrains.kotlin.idea.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils;
@@ -28,12 +27,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/if/moveDeclarationsOut/class")
             public static class Class extends AbstractKotlinFirSurroundWithTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTestWithIfSurrounder, this, testDataFilePath);
                 }
@@ -52,12 +45,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/if/moveDeclarationsOut/function")
             public static class Function extends AbstractKotlinFirSurroundWithTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTestWithIfSurrounder, this, testDataFilePath);
                 }
@@ -81,12 +68,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/if/moveDeclarationsOut/object")
             public static class Object extends AbstractKotlinFirSurroundWithTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTestWithIfSurrounder, this, testDataFilePath);
                 }
@@ -100,12 +81,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/if/moveDeclarationsOut/order")
             public static class Order extends AbstractKotlinFirSurroundWithTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTestWithIfSurrounder, this, testDataFilePath);
                 }
@@ -129,12 +104,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/if/moveDeclarationsOut/val")
             public static class Val extends AbstractKotlinFirSurroundWithTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTestWithIfSurrounder, this, testDataFilePath);
                 }
@@ -171,12 +140,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
                 @RunWith(JUnit3RunnerWithInners.class)
                 @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/if/moveDeclarationsOut/var/defaultValue")
                 public static class DefaultValue extends AbstractKotlinFirSurroundWithTest {
-                    @java.lang.Override
-                    @org.jetbrains.annotations.NotNull
-                    public final KotlinPluginMode getPluginMode() {
-                        return KotlinPluginMode.K2;
-                    }
-
                     private void runTest(String testDataFilePath) throws Exception {
                         KotlinTestUtils.runTest(this::doTestWithIfSurrounder, this, testDataFilePath);
                     }
@@ -200,12 +163,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
                 @RunWith(JUnit3RunnerWithInners.class)
                 @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/if/moveDeclarationsOut/var")
                 public static class Uncategorized extends AbstractKotlinFirSurroundWithTest {
-                    @java.lang.Override
-                    @org.jetbrains.annotations.NotNull
-                    public final KotlinPluginMode getPluginMode() {
-                        return KotlinPluginMode.K2;
-                    }
-
                     private void runTest(String testDataFilePath) throws Exception {
                         KotlinTestUtils.runTest(this::doTestWithIfSurrounder, this, testDataFilePath);
                     }
@@ -231,12 +188,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/if")
         public static class Uncategorized extends AbstractKotlinFirSurroundWithTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTestWithIfSurrounder, this, testDataFilePath);
             }
@@ -249,6 +200,11 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
             @TestMetadata("emptyLine.kt")
             public void testEmptyLine() throws Exception {
                 runTest("../../idea/tests/testData/codeInsight/surroundWith/if/emptyLine.kt");
+            }
+
+            @TestMetadata("multilineCallAfterCaret.kt")
+            public void testMultilineCallAfterCaret() throws Exception {
+                runTest("../../idea/tests/testData/codeInsight/surroundWith/if/multilineCallAfterCaret.kt");
             }
 
             @TestMetadata("severalStatements.kt")
@@ -281,12 +237,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/ifElse")
     public static class IfElse extends AbstractKotlinFirSurroundWithTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithIfElseSurrounder, this, testDataFilePath);
         }
@@ -335,12 +285,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/ifElseExpression")
     public static class IfElseExpression extends AbstractKotlinFirSurroundWithTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithIfElseExpressionSurrounder, this, testDataFilePath);
         }
@@ -364,12 +308,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/ifElseExpressionBraces")
     public static class IfElseExpressionBraces extends AbstractKotlinFirSurroundWithTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithIfElseExpressionBracesSurrounder, this, testDataFilePath);
         }
@@ -388,12 +326,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/not")
     public static class Not extends AbstractKotlinFirSurroundWithTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithNotSurrounder, this, testDataFilePath);
         }
@@ -445,12 +377,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/parentheses/notApplicable")
         public static class NotApplicable extends AbstractKotlinFirSurroundWithTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTestWithParenthesesSurrounder, this, testDataFilePath);
             }
@@ -504,12 +430,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/parentheses")
         public static class Uncategorized extends AbstractKotlinFirSurroundWithTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTestWithParenthesesSurrounder, this, testDataFilePath);
             }
@@ -524,6 +444,11 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
                 runTest("../../idea/tests/testData/codeInsight/surroundWith/parentheses/inIf.kt");
             }
 
+            @TestMetadata("multilineCallAfterCaret.kt")
+            public void testMultilineCallAfterCaret() throws Exception {
+                runTest("../../idea/tests/testData/codeInsight/surroundWith/parentheses/multilineCallAfterCaret.kt");
+            }
+
             @TestMetadata("partOfExpr.kt")
             public void testPartOfExpr() throws Exception {
                 runTest("../../idea/tests/testData/codeInsight/surroundWith/parentheses/partOfExpr.kt");
@@ -534,12 +459,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/stringTemplate")
     public static class StringTemplate extends AbstractKotlinFirSurroundWithTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithStringTemplateSurrounder, this, testDataFilePath);
         }
@@ -568,12 +487,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/when")
     public static class When extends AbstractKotlinFirSurroundWithTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithWhenSurrounder, this, testDataFilePath);
         }
@@ -597,12 +510,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/tryCatch")
     public static class TryCatch extends AbstractKotlinFirSurroundWithTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithTryCatchSurrounder, this, testDataFilePath);
         }
@@ -636,12 +543,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/tryCatchExpression")
     public static class TryCatchExpression extends AbstractKotlinFirSurroundWithTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithTryCatchExpressionSurrounder, this, testDataFilePath);
         }
@@ -660,12 +561,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/tryCatchFinally")
     public static class TryCatchFinally extends AbstractKotlinFirSurroundWithTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithTryCatchFinallySurrounder, this, testDataFilePath);
         }
@@ -689,12 +584,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/tryCatchFinallyExpression")
     public static class TryCatchFinallyExpression extends AbstractKotlinFirSurroundWithTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithTryCatchFinallyExpressionSurrounder, this, testDataFilePath);
         }
@@ -713,12 +602,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/tryFinally")
     public static class TryFinally extends AbstractKotlinFirSurroundWithTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithTryFinallySurrounder, this, testDataFilePath);
         }
@@ -757,12 +640,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/tryFinallyExpression")
     public static class TryFinallyExpression extends AbstractKotlinFirSurroundWithTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithTryFinallyExpressionSurrounder, this, testDataFilePath);
         }
@@ -786,12 +663,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/functionLiteral")
     public static class FunctionLiteral extends AbstractKotlinFirSurroundWithTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithFunctionLiteralSurrounder, this, testDataFilePath);
         }
@@ -830,12 +701,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/withIfExpression")
     public static class WithIfExpression extends AbstractKotlinFirSurroundWithTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithSurroundWithIfExpression, this, testDataFilePath);
         }
@@ -859,12 +724,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/withIfElseExpression")
     public static class WithIfElseExpression extends AbstractKotlinFirSurroundWithTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithSurroundWithIfElseExpression, this, testDataFilePath);
         }
@@ -888,12 +747,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/while")
     public static class While extends AbstractKotlinFirSurroundWithTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithWhileSurrounder, this, testDataFilePath);
         }
@@ -937,12 +790,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/doWhile")
     public static class DoWhile extends AbstractKotlinFirSurroundWithTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithDoWhileSurrounder, this, testDataFilePath);
         }
@@ -986,12 +833,6 @@ public abstract class KotlinFirSurroundWithTestGenerated extends AbstractKotlinF
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/codeInsight/surroundWith/for")
     public static class For extends AbstractKotlinFirSurroundWithTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithForSurrounder, this, testDataFilePath);
         }

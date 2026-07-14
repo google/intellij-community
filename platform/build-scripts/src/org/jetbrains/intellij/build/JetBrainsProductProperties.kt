@@ -1,6 +1,8 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build
 
+import com.intellij.platform.buildScripts.licenses.SoftwareBillOfMaterials
+import com.intellij.platform.buildScripts.licenses.SoftwareBillOfMaterials.Companion.Suppliers
 import com.intellij.platform.ijent.community.buildConstants.IJENT_BOOT_CLASSPATH_MODULE
 import com.jetbrains.plugin.structure.base.plugin.PluginCreationResult
 import com.jetbrains.plugin.structure.base.plugin.PluginCreationSuccess
@@ -19,8 +21,6 @@ import com.jetbrains.plugin.structure.intellij.problems.TemplateWordInPluginId
 import com.jetbrains.plugin.structure.intellij.problems.TemplateWordInPluginName
 import com.jetbrains.plugin.structure.intellij.verifiers.DEFAULT_ILLEGAL_PREFIXES
 import com.jetbrains.plugin.structure.intellij.verifiers.PRODUCT_ID_RESTRICTED_WORDS
-import com.intellij.platform.buildScripts.licenses.SoftwareBillOfMaterials
-import com.intellij.platform.buildScripts.licenses.SoftwareBillOfMaterials.Companion.Suppliers
 import org.jetbrains.intellij.build.impl.PlatformJarNames.PLATFORM_CORE_NIO_FS
 import org.jetbrains.jps.model.module.JpsModule
 import org.jetbrains.jps.util.JpsPathUtil
@@ -34,17 +34,14 @@ fun isCommunityModule(module: JpsModule, context: BuildContext): Boolean {
 }
 
 val knownMissingModuleDependencies: List<String> = listOf(
-  // todo not included into any plugin - investigate why and fix
-  "intellij.javaee.jpa",
   "intellij.rider.plugins.fsharp",
   // conditional xi-include
   "kotlin.base.scripting.k1",
   "kotlin.plugin.k2",
   "kotlin-ultimate.common-native",
   "kotlin-ultimate.native-debugger",
-  // todo special module (make it not special)
-  "intellij.platform.commercial.verifier",
   // included using `withModule`
+  "intellij.libraries.groovy",
   "intellij.python.frontend",
 )
 
@@ -52,6 +49,14 @@ val knownMissingModuleDependencies: List<String> = listOf(
  * Describes a distribution of an IntelliJ-based IDE hosted in the IntelliJ repository.
  */
 abstract class JetBrainsProductProperties : ProductProperties() {
+  private companion object {
+    val ALLOWED_PLUGIN_VENDORS: Set<String> = setOf(
+      "JetBrains", "JetBrains s.r.o.",
+      "JetBrains, Google",
+      "JetBrains Experimental", "JetBrains-Experimental",
+    )
+  }
+
   init {
     scrambleMainJar = true
     presignedNativeLibs = mapOf(
@@ -74,8 +79,13 @@ abstract class JetBrainsProductProperties : ProductProperties() {
         isIntentionallyIgnored(it, pluginId) || isApplicableToThirdPartyPluginsOnly(it)
       })
       if (result is PluginCreationSuccess) {
-        if (result.plugin.vendor?.contains("JetBrains") != true) {
-          add(InvalidPluginDescriptorError("${result.plugin.pluginId} is published not by JetBrains: ${result.plugin.vendor}"))
+        if (!ALLOWED_PLUGIN_VENDORS.contains(result.plugin.vendor)) {
+          add(
+            InvalidPluginDescriptorError(
+              "${result.plugin.pluginId} is published not by JetBrains: ${result.plugin.vendor}.\n" +
+              "Please use one of the following vendors:\n" + ALLOWED_PLUGIN_VENDORS.joinToString("\n")
+            )
+          )
         }
       }
     }
@@ -114,7 +124,8 @@ private fun isIntentionallyIgnored(problem: PluginProblem, pluginId: String?): B
       pluginId == "com.jetbrains.php.joomla" || // Joomla!
       pluginId == "com.intellij.zh" || // Chinese (Simplified) Language Pack / 中文语言包
       pluginId == "com.intellij.ko" || // Korean Language Pack / 한국어 언어 팩
-      pluginId == "com.intellij.ja" // Japanese Language Pack / 日本語言語パック
+      pluginId == "com.intellij.ja" || // Japanese Language Pack / 日本語言語パック
+      pluginId == "com.intellij.clion.west" // CLion Integration for Zephyr® Project
     /**
      * According to https://plugins.jetbrains.com/docs/marketplace/add-required-parameters.html:
      * > Please make sure the `release-version` and the `version` parameters match.

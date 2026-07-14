@@ -248,7 +248,7 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup,
   private Object[] modalEntitiesWhenShown;
   private Project myProject;
   private boolean myCancelOnClickOutside;
-  private final List<JBPopupListener> myListeners = new CopyOnWriteArrayList<>();
+  private final List<JBPopupListener> myListeners = ContainerUtil.createLockFreeCopyOnWriteList();
   private boolean myUseDimServiceForXYLocation;
   private MouseChecker myCancelOnMouseOutCallback;
   private Canceller myMouseOutCanceller;
@@ -1036,7 +1036,7 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup,
     }
     Dimension size = getStoredSize();
     if (size != null) return size;
-    return myComponent.getPreferredSize();
+    return myContent.getPreferredSize();
   }
 
   @Override

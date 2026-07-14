@@ -59,12 +59,14 @@ class MacCustomizerBuilder @PublishedApi internal constructor(private val projec
    * Path to an .icns file containing product bundle icons, relative to [projectHome].
    * Specify as a relative string path (e.g., "build/resources/icon.icns").
    */
+  @Deprecated("Use ProductProperties.imagesDirectoryPath instead")
   var icnsPath: String? = null
 
   /**
    * Path to an .icns file for EAP builds, relative to [projectHome].
    * If null, [icnsPath] will be used.
    */
+  @Deprecated("Use ProductProperties.imagesDirectoryPath instead")
   var icnsPathForEAP: String? = null
 
   /**
@@ -88,12 +90,14 @@ class MacCustomizerBuilder @PublishedApi internal constructor(private val projec
   /**
    * Path to the .dmg background image (in the TIFF format), relative to [projectHome].
    */
+  @Deprecated("Use ProductProperties.imagesDirectoryPath instead")
   var dmgImagePath: String? = null
 
   /**
    * Path to the .dmg background image (in the TIFF format) for EAP builds, relative to [projectHome].
    * If null, [dmgImagePath] will be used.
    */
+  @Deprecated("Use ProductProperties.imagesDirectoryPath instead")
   var dmgImagePathForEAP: String? = null
 
   /**
@@ -221,14 +225,18 @@ class MacCustomizerBuilder @PublishedApi internal constructor(private val projec
     private val projectHome: Path,
   ) : MacDistributionCustomizer() {
     init {
+      @Suppress("DEPRECATION")
       builder.icnsPath?.let { icnsPath = projectHome.resolve(it) }
+      @Suppress("DEPRECATION")
       builder.icnsPathForEAP?.let { icnsPathForEAP = projectHome.resolve(it) }
       @Suppress("DEPRECATION")
       builder.icnsPathForAlternativeIcon?.let { icnsPathForAlternativeIcon = projectHome.resolve(it) }
       @Suppress("DEPRECATION")
       builder.icnsPathForAlternativeIconForEAP?.let { icnsPathForAlternativeIconForEAP = projectHome.resolve(it) }
       builder.bundleIdentifier?.let { bundleIdentifier = it }
+      @Suppress("DEPRECATION")
       builder.dmgImagePath?.let { dmgImagePath = projectHome.resolve(it) }
+      @Suppress("DEPRECATION")
       builder.dmgImagePathForEAP?.let { dmgImagePathForEAP = projectHome.resolve(it) }
       minOSXVersion = builder.minOSXVersion
       additionalDocTypes = builder.additionalDocTypes
@@ -271,46 +279,6 @@ class MacCustomizerBuilder @PublishedApi internal constructor(private val projec
   }
 }
 
-/**
- * Creates a [MacDistributionCustomizer] with open source build defaults using a builder DSL.
- *
- * Example usage:
- * ```kotlin
- * communityMacCustomizer(projectHome) {
- *   // override or extend the defaults
- *   urlSchemes += "myscheme"
- * }
- * ```
- */
-inline fun communityMacCustomizer(
-  projectHome: Path,
-  configure: MacCustomizerBuilder.() -> Unit = {}
-): MacDistributionCustomizer = macCustomizer(projectHome) {
-  icnsPath = "build/conf/ideaCE/mac/images/idea.icns"
-  icnsPathForEAP = "build/conf/ideaCE/mac/images/communityEAP.icns"
-  urlSchemes = listOf("idea")
-  associateIpr = true
-  fileAssociations = FileAssociation.from("java", "groovy", "kt", "kts")
-  bundleIdentifier = "com.jetbrains.intellij.ce"
-  dmgImagePath = "build/conf/ideaCE/mac/images/dmg_background.tiff"
-
-  rootDirectoryName { appInfo, _ ->
-    if (appInfo.isEAP) {
-      "IntelliJ IDEA ${appInfo.majorVersion}.${appInfo.minorVersionMainPart} CE EAP.app"
-    }
-    else {
-      "IntelliJ IDEA CE.app"
-    }
-  }
-
-  executableFilePatterns { base, _, _, _ ->
-    val kotlinExecutables = org.jetbrains.intellij.build.kotlin.KotlinBinaries.kotlinCompilerExecutables
-    (base + kotlinExecutables).filterNot { it == "plugins/**/*.sh" }
-  }
-
-  configure()
-}
-
 open class MacDistributionCustomizer {
   companion object {
     /**
@@ -324,11 +292,13 @@ open class MacDistributionCustomizer {
    *
    * Reference: [Apple Icon Image Format](https://en.wikipedia.org/wiki/Apple_Icon_Image_format).
    */
+  @Deprecated("Use ProductProperties.imagesDirectoryPath instead")
   var icnsPath: Path? = null
 
   /**
    * Path to an .icns file for EAP builds (if `null`, [icnsPath] will be used).
    */
+  @Deprecated("Use ProductProperties.imagesDirectoryPath instead")
   var icnsPathForEAP: Path? = null
 
   /**
@@ -360,6 +330,7 @@ open class MacDistributionCustomizer {
   /**
    * Path to an image which will be injected into the .dmg file.
    */
+  @Deprecated("Use ProductProperties.imagesDirectoryPath instead")
   var dmgImagePath: Path? = null
 
   /**
@@ -418,6 +389,7 @@ open class MacDistributionCustomizer {
   /**
    * Path to an image which will be injected into .dmg file for EAP builds (if `null` dmgImagePath will be used).
    */
+  @Deprecated("Use ProductProperties.imagesDirectoryPath instead")
   var dmgImagePathForEAP: Path? = null
 
   /**

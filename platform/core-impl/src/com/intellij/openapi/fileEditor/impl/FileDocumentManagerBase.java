@@ -2,12 +2,12 @@
 package com.intellij.openapi.fileEditor.impl;
 
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.EditorLockFreeTyping;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.editor.ex.DocumentEx;
-import com.intellij.openapi.editor.impl.DocumentImpl;
 import com.intellij.openapi.editor.impl.FrozenDocument;
+import com.intellij.openapi.editor.impl.RMTreeReference;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileTypes.BinaryFileTypeDecompilers;
 import com.intellij.openapi.fileTypes.FileType;
@@ -17,14 +17,15 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.encoding.EncodingManager;
 import com.intellij.openapi.vfs.limits.FileSizeLimit;
 import com.intellij.psi.FileViewProvider;
+import com.intellij.psi.impl.source.tree.mvcc.InternalPsiVersioning;
 import com.intellij.testFramework.LightVirtualFile;
 import com.intellij.util.FileContentUtilCore;
-import com.intellij.util.concurrency.annotations.RequiresReadLock;
 import com.intellij.util.containers.CollectionFactory;
 import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 
 import java.nio.charset.Charset;
 import java.util.List;
@@ -33,6 +34,8 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 public abstract class FileDocumentManagerBase extends FileDocumentManager {
+  private static final Logger LOG = Logger.getInstance(FileDocumentManagerBase.class);
+
   public static final Key<Document> HARD_REF_TO_DOCUMENT_KEY = Key.create("HARD_REF_TO_DOCUMENT_KEY");
   public static final Key<Boolean> TRACK_NON_PHYSICAL = Key.create("TRACK_NON_PHYSICAL");
 
@@ -40,6 +43,7 @@ public abstract class FileDocumentManagerBase extends FileDocumentManager {
   private static final Key<Boolean> BIG_FILE_PREVIEW = Key.create("BIG_FILE_PREVIEW");
   private static final Object lock = new Object();
   private final Map<VirtualFile, Document> myDocumentCache = CollectionFactory.createConcurrentWeakValueMap();
+  private static final Map<Document, Boolean> nonPhysicalFilesDocumentsCache = CollectionFactory.createConcurrentWeakMap();
 
   @ApiStatus.Experimental
   public static boolean isTrackable(@NotNull VirtualFile file) {
@@ -48,12 +52,25 @@ public abstract class FileDocumentManagerBase extends FileDocumentManager {
   }
 
   @Override
-  @RequiresReadLock(generateAssertion = false) // assert for real file
   public final @Nullable Document getDocument(@NotNull VirtualFile file) {
-    EditorLockFreeTyping.assertReadAccess(file);
+    InternalPsiVersioning.assertReadAccessOrVersionedEnvironment();
+    return getDocumentWithoutReadAccessAssert(file);
+  }
+
+  @ApiStatus.Internal
+  public final @Nullable Document getDocumentForLightVirtualFile(@NotNull LightVirtualFile file) {
+    return getDocumentWithoutReadAccessAssert(file);
+  }
+
+  private @Nullable Document getDocumentWithoutReadAccessAssert(@NotNull VirtualFile file) {
     DocumentEx document = (DocumentEx)getCachedDocument(file);
     if (document != null) {
       return document;
+    }
+
+    if (InternalPsiVersioning.isInsideVersioningButNotLocks()) {
+      assertDocumentInitializedIfVersionedEnvironment(file);
+      return null;
     }
 
     if (!file.isValid() || file.isDirectory() || isBinaryWithoutDecompiler(file)) {
@@ -96,6 +113,13 @@ public abstract class FileDocumentManagerBase extends FileDocumentManager {
     fileContentLoaded(file, document);
 
     return document;
+  }
+
+  @ApiStatus.Internal
+  public static void assertDocumentInitializedIfVersionedEnvironment(@NotNull VirtualFile file) {
+    throw new IllegalStateException("Attempt to interact with uninitialized document " + file + " in versioned environment.\n" +
+              "It is assumed that versioned environment is used after the initialization process of the editor, and there are enough hard references to document at this point.\n" +
+              "To fix this error, ensure that you are not interacting with a document before it is fully loaded.");
   }
 
   private static void fireFileBindingChanged(Document document, @Nullable VirtualFile oldFile, @Nullable VirtualFile newFile) {
@@ -149,25 +173,17 @@ public abstract class FileDocumentManagerBase extends FileDocumentManager {
       oldFile = document.getUserData(FILE_KEY);
       document.putUserData(FILE_KEY, virtualFile);
       virtualFile.putUserData(HARD_REF_TO_DOCUMENT_KEY, document);
+      // Do not keep the same file bound both through HARD_REF_TO_DOCUMENT_KEY and myDocumentCache.
+      FileDocumentManager manager = getInstance();
+      if (manager instanceof FileDocumentManagerBase) {
+        ((FileDocumentManagerBase)manager).myDocumentCache.remove(virtualFile);
+      }
+      nonPhysicalFilesDocumentsCache.put(document, Boolean.TRUE);
     }
 
     if (fireBindingChangedEvent) {
       fireFileBindingChanged(document, oldFile, virtualFile);
     }
-  }
-
-  /**
-   * Rebinds a document to a different virtualFile instance. This can be helpful in case when a virtual file has become invalid
-   * and then a new virtualFile appeared at the same path.
-   */
-  @ApiStatus.Internal
-  public static void rebindDocument(@NotNull Document document, @NotNull VirtualFile oldFile, @NotNull VirtualFile newFile) {
-    synchronized (lock) {
-      oldFile.putUserData(HARD_REF_TO_DOCUMENT_KEY, null);
-      document.putUserData(FILE_KEY, newFile);
-      newFile.putUserData(HARD_REF_TO_DOCUMENT_KEY, document);
-    }
-    fireFileBindingChanged(document, oldFile, newFile);
   }
 
   @Override
@@ -196,9 +212,10 @@ public abstract class FileDocumentManagerBase extends FileDocumentManager {
   @ApiStatus.Internal
   protected void unbindFileFromDocument(@NotNull VirtualFile file, @NotNull Document document) {
     myDocumentCache.remove(file);
+    nonPhysicalFilesDocumentsCache.remove(document);
     file.putUserData(HARD_REF_TO_DOCUMENT_KEY, null);
     document.putUserData(FILE_KEY, null);
-    DocumentImpl.processQueue(); // document maybe stuck in RangeMarkerTree queue
+    RMTreeReference.processQueue(); // document maybe stuck in RangeMarkerTree queue
     fireFileBindingChanged(document, file, null);
   }
 
@@ -206,6 +223,25 @@ public abstract class FileDocumentManagerBase extends FileDocumentManager {
   public static boolean isBinaryWithoutDecompiler(@NotNull VirtualFile file) {
     FileType type = file.getFileType();
     return type.isBinary() && BinaryFileTypeDecompilers.getInstance().forFileType(type) == null;
+  }
+
+  /**
+   * Cheap predicate that mirrors the conditions under which {@link #getDocument(VirtualFile)} would return a non-null document,
+   * but without forcing content load (which may trigger expensive operations such as decompilation).
+   * <p>
+   * Useful for callers that only need to know whether a document could exist for the file (e.g. file editor provider resolution).
+   */
+  @Override
+  @ApiStatus.Internal
+  public boolean canHaveDocument(@NotNull VirtualFile file) {
+    if (getCachedDocument(file) != null) {
+      return true;
+    }
+    if (BinaryFileTypeDecompilers.getInstance().hasDecompiler(file)) {
+      boolean tooLarge = FileSizeLimit.isTooLargeForContentLoading(file.getLength(), file.getExtension());
+      return !tooLarge;
+    }
+    return getDocument(file) != null;
   }
 
   @ApiStatus.Internal
@@ -237,5 +273,15 @@ public abstract class FileDocumentManagerBase extends FileDocumentManager {
   @ApiStatus.Internal
   public void forEachCachedDocument(@NotNull Consumer<? super @NotNull Document> consumer) {
     myDocumentCache.values().forEach(consumer);
+    nonPhysicalFilesDocumentsCache.keySet().forEach(consumer);
+  }
+
+  @TestOnly
+  @ApiStatus.Internal
+  public @Nullable Document getDocumentFromCacheInTests(@NotNull VirtualFile virtualFile) {
+    if (!ApplicationManager.getApplication().isUnitTestMode()) {
+      throw new IllegalStateException("This method is only for unit tests");
+    }
+    return getDocumentFromCache(virtualFile);
   }
 }

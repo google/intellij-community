@@ -1,6 +1,8 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.packaging.pythonPackageManager
 
+import com.jetbrains.python.allure.Subsystems
+import com.jetbrains.python.allure.Layers
 import com.intellij.openapi.projectRoots.Sdk
 import com.jetbrains.env.EnvTestTagsRequired
 import com.jetbrains.env.PyEnvTestCase
@@ -10,7 +12,7 @@ import com.jetbrains.python.packaging.common.PythonRepositoryPackageSpecificatio
 import com.jetbrains.python.packaging.management.PythonPackageManager
 import com.jetbrains.python.packaging.management.toInstallRequest
 import com.jetbrains.python.packaging.pip.PipManagementInstaller
-import com.jetbrains.python.packaging.repository.PyPIPackageRepository
+import com.jetbrains.python.packaging.repository.PyPiPackageRepository
 import com.jetbrains.python.psi.LanguageLevel
 import com.jetbrains.python.statistics.version
 import kotlinx.coroutines.runBlocking
@@ -18,8 +20,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 
+@Subsystems.PackagingRequirements
+@Layers.Functional
 class PythonPackageManagerManagementInstallationTest : PyEnvTestCase() {
-  private val PKG_TO_INSTALL = PythonRepositoryPackageSpecification(PyPIPackageRepository, "pytest")
+  private val PKG_TO_INSTALL = PythonRepositoryPackageSpecification(PyPiPackageRepository, "pytest")
 
 
   @EnvTestTagsRequired(tags = ["python3.8"])

@@ -6,6 +6,7 @@ import com.intellij.execution.console.LanguageConsoleImpl;
 import com.intellij.execution.filters.OpenFileHyperlinkInfo;
 import com.intellij.execution.impl.ConsoleViewUtil;
 import com.intellij.execution.process.ProcessHandler;
+import com.intellij.execution.process.ProcessOutputType;
 import com.intellij.execution.process.ProcessOutputTypes;
 import com.intellij.execution.target.TargetEnvironment;
 import com.intellij.execution.ui.ConsoleViewContentType;
@@ -78,6 +79,7 @@ import com.jetbrains.python.psi.impl.PythonLanguageLevelPusher;
 import com.jetbrains.python.sdk.PySdkUtil;
 import com.jetbrains.python.sdk.flavors.PythonSdkFlavor;
 import com.jetbrains.python.testing.PyTestsSharedKt;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.TestOnly;
@@ -96,7 +98,7 @@ import java.util.function.Function;
 
 import static com.jetbrains.python.console.PydevConsoleRunner.CONSOLE_COMMUNICATION_KEY;
 
-public class PythonConsoleView extends LanguageConsoleImpl implements ObservableConsoleView, PyCodeExecutor, PyTargetedCodeExecutor {
+public final class PythonConsoleView extends LanguageConsoleImpl implements ObservableConsoleView, PyCodeExecutor, PyTargetedCodeExecutor {
   public static final Key<Boolean> CONSOLE_KEY = new Key<>("PYDEV_CONSOLE_KEY");
   private static final Key<Map<Integer, Integer>> COUNTER_LINE_NUMBER = new Key<>("PYDEV_COUNTER_LINE_NUMBER");
   private static final Logger LOG = Logger.getInstance(PythonConsoleView.class);
@@ -201,7 +203,7 @@ public class PythonConsoleView extends LanguageConsoleImpl implements Observable
   }
 
   public void addCommandQueuePanelListener(final ConsoleCommunication communication) {
-    ApplicationManager.getApplication().getService(CommandQueueForPythonConsoleService.class)
+    getProject().getService(CommandQueueForPythonConsoleService.class)
       .addListener(communication, new CommandQueueListener() {
         @Override
         public void removeCommand(ConsoleCommunication.@NotNull ConsoleCodeFragment command) {
@@ -472,7 +474,7 @@ public class PythonConsoleView extends LanguageConsoleImpl implements Observable
     if (attributes == ProcessOutputTypes.STDERR) {
       outputType = ConsoleViewContentType.ERROR_OUTPUT;
     }
-    else if (attributes == ProcessOutputTypes.SYSTEM) {
+    else if (ProcessOutputType.isSystem(attributes)) {
       outputType = ConsoleViewContentType.SYSTEM_OUTPUT;
     }
     else {
@@ -527,6 +529,7 @@ public class PythonConsoleView extends LanguageConsoleImpl implements Observable
   }
 
   @Override
+  @ApiStatus.Internal
   public void executeCode(@NotNull Function<TargetEnvironment, String> code) {
     myInitialized.doWhenDone(
       () -> {
@@ -645,7 +648,7 @@ public class PythonConsoleView extends LanguageConsoleImpl implements Observable
       ApplicationManager.getApplication().invokeLater(() -> Disposer.dispose(myCommandQueue));
     }
     if (removeCommand) {
-      ApplicationManager.getApplication().getService(CommandQueueForPythonConsoleService.class)
+      getProject().getService(CommandQueueForPythonConsoleService.class)
         .removeCommand(myRunner.getPydevConsoleCommunication(), true);
     }
   }
@@ -707,10 +710,11 @@ public class PythonConsoleView extends LanguageConsoleImpl implements Observable
   public void dispose() {
     super.dispose();
 
-    if (!getProject().isDisposed()) {
+    Project project = getProject();
+    if (!project.isDisposed()) {
       ConsoleCommunication communication = getFile().getCopyableUserData(CONSOLE_COMMUNICATION_KEY);
       if (communication != null) {
-        ApplicationManager.getApplication().getService(CommandQueueForPythonConsoleService.class).removeListener(communication);
+        project.getService(CommandQueueForPythonConsoleService.class).removeListener(communication);
       }
     }
 

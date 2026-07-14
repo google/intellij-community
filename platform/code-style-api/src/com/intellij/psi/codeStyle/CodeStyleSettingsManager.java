@@ -35,9 +35,11 @@ public class CodeStyleSettingsManager implements PersistentStateComponentWithMod
   private static final Logger LOG = Logger.getInstance(CodeStyleSettingsManager.class);
 
   /**
-   * @deprecated Use {@link #setMainProjectCodeStyle(CodeStyleSettings)} or {@link #getMainProjectCodeStyle()} instead
+   * Use {@link #setMainProjectCodeStyle(CodeStyleSettings)} or {@link #getMainProjectCodeStyle()} instead
    */
-  @Deprecated(forRemoval = true) public volatile @Nullable CodeStyleSettings PER_PROJECT_SETTINGS;
+  @ApiStatus.Internal
+  // public for DefaultJDOMExternalizer
+  public volatile @Nullable CodeStyleSettings PER_PROJECT_SETTINGS;
 
   public volatile boolean USE_PER_PROJECT_SETTINGS;
   public volatile String PREFERRED_PROJECT_CODE_STYLE;

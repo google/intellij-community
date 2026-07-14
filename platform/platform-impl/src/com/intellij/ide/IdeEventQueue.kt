@@ -6,6 +6,7 @@ import com.intellij.codeWithMe.ClientId
 import com.intellij.codeWithMe.ClientId.Companion.currentOrNull
 import com.intellij.codeWithMe.ClientId.Companion.withExplicitClientId
 import com.intellij.concurrency.ContextAwareRunnable
+import com.intellij.concurrency.ExternalIntelliJContextElement
 import com.intellij.concurrency.captureThreadContext
 import com.intellij.concurrency.currentThreadContext
 import com.intellij.concurrency.installThreadContext
@@ -38,12 +39,11 @@ import com.intellij.openapi.diagnostic.ControlFlowException
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.editor.impl.ad.isRhizomeAdRebornEnabled
-import com.intellij.openapi.editor.impl.ad.util.ThreadLocalRhizomeDB
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.keymap.impl.IdeKeyEventDispatcher
 import com.intellij.openapi.keymap.impl.IdeMouseEventDispatcher
 import com.intellij.openapi.keymap.impl.KeyState
+import com.intellij.openapi.keymap.impl.ui.ShortcutTextField
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.ui.JBPopupMenu
 import com.intellij.openapi.util.Disposer
@@ -118,6 +118,8 @@ import javax.swing.JTree
 import javax.swing.MenuSelectionManager
 import javax.swing.SwingUtilities
 import javax.swing.plaf.basic.ComboPopup
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.cancellation.CancellationException
 
 @Suppress("FunctionName")
@@ -262,7 +264,8 @@ class IdeEventQueue private constructor() : EventQueue() {
   fun addDispatcher(dispatcher: NonLockedEventDispatcher, parent: Disposable?) {
     addProcessor(dispatcher, parent, nonLockingDispatchers)
   }
-
+  
+  @ApiStatus.ScheduledForRemoval
   @Deprecated("Use version for NonLockedEventDispatcher")
   fun addDispatcher(dispatcher: EventDispatcher, scope: CoroutineScope) {
     dispatchers.add(dispatcher)
@@ -751,7 +754,8 @@ class IdeEventQueue private constructor() : EventQueue() {
   }
 
   fun pumpEventsForHierarchy(modalComponent: Component, exitCondition: Future<*>, eventConsumer: Consumer<AWTEvent>) {
-    resetThreadContext {
+    val externalContext = currentThreadContext().fold<CoroutineContext>(EmptyCoroutineContext) { acc, elem -> acc + (elem as? ExternalIntelliJContextElement ?: EmptyCoroutineContext) }
+    installThreadContext(externalContext, true) {
       EDT.assertIsEdt()
       Logs.LOG.debug { "pumpEventsForHierarchy($modalComponent, $exitCondition)" }
 
@@ -1107,8 +1111,6 @@ internal fun performActivity(e: AWTEvent, runnable: () -> Unit) {
     }
   }
 
-  setImplicitThreadLocalRhizomeIfEnabled()
-
   if (transactionGuard == null) {
     runnable()
   }
@@ -1303,6 +1305,12 @@ private class WindowsAltSuppressor : IdeEventQueue.NonLockedEventDispatcher {
       return false
     }
 
+    if (isShortcutTextFieldEvent(ke)) {
+      waitingForAltRelease = false
+      altPressedOnly = false
+      return false
+    }
+
     val component = ke.component
     var dispatch = true
     if (ke.id == KeyEvent.KEY_PRESSED) {
@@ -1340,6 +1348,10 @@ private class WindowsAltSuppressor : IdeEventQueue.NonLockedEventDispatcher {
   }
 }
 
+private fun isShortcutTextFieldEvent(event: KeyEvent): Boolean {
+  return event.source is ShortcutTextField || KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner is ShortcutTextField
+}
+
 @Internal
 interface ClientIdAwareEvent {
   val clientId: ClientId?
@@ -1368,19 +1380,6 @@ private fun abracadabraDaberBoreh(eventQueue: IdeEventQueue) {
     .findConstructor(aClass, MethodType.methodType(Void.TYPE, EventQueue::class.java))
   val postEventQueue = constructor.invoke(eventQueue)
   AppContext.getAppContext().put("PostEventQueue", postEventQueue)
-}
-
-private fun setImplicitThreadLocalRhizomeIfEnabled() {
-  if (isRhizomeAdRebornEnabled) {
-    // It is a workaround on tricky `updateDbInTheEventDispatchThread()` where
-    // the thread local DB is reset by `fleet.kernel.DbSource.ContextElement.restoreThreadContext`
-    try {
-      ThreadLocalRhizomeDB.setThreadLocalDb(ThreadLocalRhizomeDB.lastKnownDb())
-    }
-    catch (e: Exception) {
-      Logs.LOG.error(e)
-    }
-  }
 }
 
 /**

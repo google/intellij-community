@@ -68,8 +68,6 @@ import com.siyeh.ig.psiutils.MethodCallUtils;
 import com.siyeh.ig.psiutils.VariableAccessUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginModeProvider;
-
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -100,7 +98,7 @@ import static org.jetbrains.kotlin.nj2k.NullabilityUtilsKt.isUsedInAutoUnboxingC
  *  convert to Kotlin
  */
 @SuppressWarnings("DuplicatedCode")
-class J2KNullityInferrer {
+public class J2KNullityInferrer {
     private static final int MAX_PASSES = 10;
     private int numAnnotationsAdded;
 
@@ -129,7 +127,7 @@ class J2KNullityInferrer {
         return notNullTypes;
     }
 
-    Set<PsiType> getNullableTypes() {
+    public Set<PsiType> getNullableTypes() {
         return nullableTypes;
     }
 
@@ -475,11 +473,27 @@ class J2KNullityInferrer {
     }
 
     private class NullityInferrerVisitor extends JavaRecursiveElementWalkingVisitor {
+        private void applyExtensionNullability(
+                @NotNull PsiModifierListOwner owner,
+                @NotNull org.jetbrains.kotlin.j2k.Nullability nullability
+        ) {
+            if (nullability == org.jetbrains.kotlin.j2k.Nullability.Nullable) {
+                registerNullableAnnotation(owner);
+            } else if (nullability == org.jetbrains.kotlin.j2k.Nullability.NotNull) {
+                registerNotNullAnnotation(owner);
+            }
+        }
 
         @Override
         public void visitMethod(@NotNull PsiMethod method) {
             super.visitMethod(method);
             if (method.isConstructor() || method.getReturnType() instanceof PsiPrimitiveType) {
+                return;
+            }
+
+            org.jetbrains.kotlin.j2k.Nullability extensionNullability = J2KNullabilityInferenceExtension.getNullability(method);
+            if (extensionNullability != null) {
+                applyExtensionNullability(method, extensionNullability);
                 return;
             }
 
@@ -520,7 +534,6 @@ class J2KNullityInferrer {
         }
 
         private void unifyNullabilityOfMethodReturnTypeAndReturnedExpressions(@NotNull PsiMethod method) {
-            if (KotlinPluginModeProvider.Companion.isK1Mode()) return;
 
             PsiReturnStatement[] statements = PsiUtil.findReturnStatements(method);
             if (statements.length == 0) {
@@ -589,11 +602,7 @@ class J2KNullityInferrer {
         }
 
         private void inferNullabilityFromVariableReferences(@NotNull PsiVariable variable) {
-            if (KotlinPluginModeProvider.Companion.isK1Mode()) {
-                // Try not to break K1 nullability inference
-                return;
-            }
-
+            
             final Collection<PsiReference> references = variableReferences.get(variable);
             for (final PsiReference reference : references) {
                 final PsiElement element = reference.getElement();
@@ -609,8 +618,6 @@ class J2KNullityInferrer {
         }
 
         private void propagateNullabilityFromVariable(PsiVariable variable) {
-            if (KotlinPluginModeProvider.Companion.isK1Mode()) return;
-
             PsiType variableType = variable.getType();
             Collection<PsiExpression> rightHandSides = variableAssignmentRightHandSides.get(variable);
             for (PsiExpression expr : rightHandSides) {
@@ -691,6 +698,12 @@ class J2KNullityInferrer {
                 return;
             }
 
+            org.jetbrains.kotlin.j2k.Nullability extensionNullability = J2KNullabilityInferenceExtension.getNullability(parameter);
+            if (extensionNullability != null) {
+                applyExtensionNullability(parameter, extensionNullability);
+                return;
+            }
+
             final PsiElement grandParent = parameter.getDeclarationScope();
             if (grandParent instanceof PsiMethod method) {
                 if (method.getBody() != null) {
@@ -734,8 +747,6 @@ class J2KNullityInferrer {
         }
 
         private void propagateRawNullabilityToIterableComponentType(@NotNull PsiForeachStatement foreachStatement) {
-            if (KotlinPluginModeProvider.Companion.isK1Mode()) return;
-
             PsiType parameterType = foreachStatement.getIterationParameter().getType();
             if (!isNullable(parameterType) && !isNotNull(parameterType)) return;
 
@@ -912,8 +923,6 @@ class J2KNullityInferrer {
          * Updates nullability of the target type and its type arguments recursively from the origin type.
          */
         private void propagateGenericNullability(PsiType originType, PsiType targetType, boolean updateRawType) {
-            if (KotlinPluginModeProvider.Companion.isK1Mode()) return;
-
             if (updateRawType) {
                 if (isNotNull(originType)) {
                     registerNotNullType(targetType);
@@ -950,6 +959,12 @@ class J2KNullityInferrer {
             PsiType fieldType = field.getType();
             if (fieldType instanceof PsiPrimitiveType) return;
 
+            org.jetbrains.kotlin.j2k.Nullability extensionNullability = J2KNullabilityInferenceExtension.getNullability(field);
+            if (extensionNullability != null) {
+                applyExtensionNullability(field, extensionNullability);
+                return;
+            }
+
             if (!hasRawNullability(fieldType)) {
                 registerAnnotationByNullAssignmentStatus(field);
             }
@@ -960,7 +975,7 @@ class J2KNullityInferrer {
 
         @Override
         public void visitReferenceElement(@NotNull PsiJavaCodeReferenceElement reference) {
-            if (KotlinPluginModeProvider.Companion.isK1Mode()) return;
+            
 
             // Update the nullability of type arguments in constructor calls
             PsiElement target = reference.resolve();
@@ -975,7 +990,7 @@ class J2KNullityInferrer {
         // If type parameters come from Kotlin, we propagate their nullability to the type arguments
         // TODO support not only raw but generic propagation
         private void updateNullabilityOfTypeArguments(PsiTypeParameter[] typeParameters, PsiType[] typeArguments) {
-            if (KotlinPluginModeProvider.Companion.isK1Mode()) return;
+            
             if (typeParameters.length != typeArguments.length) return;
 
             for (int i = 0; i < typeParameters.length; i++) {
@@ -992,7 +1007,7 @@ class J2KNullityInferrer {
 
         @Override
         public void visitMethodCallExpression(@NotNull PsiMethodCallExpression expression) {
-            if (KotlinPluginModeProvider.Companion.isK1Mode()) return;
+            
             super.visitMethodCallExpression(expression);
 
             PsiMethod method = expression.resolveMethod();
@@ -1016,7 +1031,7 @@ class J2KNullityInferrer {
 
         @Override
         public void visitNewExpression(@NotNull PsiNewExpression expression) {
-            if (KotlinPluginModeProvider.Companion.isK1Mode()) return;
+            
             super.visitNewExpression(expression);
 
             // Update array initializer component type nullability

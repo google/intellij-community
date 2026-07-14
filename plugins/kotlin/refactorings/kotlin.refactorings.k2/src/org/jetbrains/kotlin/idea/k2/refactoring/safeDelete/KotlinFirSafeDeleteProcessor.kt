@@ -28,8 +28,8 @@ import com.intellij.util.containers.map2Array
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
-import org.jetbrains.kotlin.analysis.api.resolution.KaImplicitReceiverValue
 import org.jetbrains.kotlin.analysis.api.resolution.KaFunctionCall
+import org.jetbrains.kotlin.analysis.api.resolution.KaImplicitReceiverValue
 import org.jetbrains.kotlin.analysis.api.resolution.KaSimpleFunctionCall
 import org.jetbrains.kotlin.analysis.api.resolution.successfulCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
@@ -230,10 +230,24 @@ class KotlinFirSafeDeleteProcessor : SafeDeleteProcessorDelegateBase() {
                     return@Processor isInside(place)
                 })) {
                 additionalElementsToDelete.add(overriddenFunction)
-                result.add(SafeDeleteReferenceSimpleDeleteUsageInfo(overriddenFunction, element, true))
+                result.add(createParameterAwareDeleteUsageInfo(overriddenFunction, element))
             }
             else {
                 JavaSafeDeleteDelegate.EP.forLanguage(overriddenFunction.language)?.createCleanupOverriding(overriddenFunction, allElementsToDelete, result)
+            }
+        }
+    }
+
+    private fun createParameterAwareDeleteUsageInfo(elementToDelete: PsiElement, referencedElement: PsiElement): SafeDeleteReferenceSimpleDeleteUsageInfo {
+        if (elementToDelete !is KtParameter) {
+            return SafeDeleteReferenceSimpleDeleteUsageInfo(elementToDelete, referencedElement, true)
+        }
+
+        return object : SafeDeleteReferenceSimpleDeleteUsageInfo(elementToDelete, referencedElement, true) {
+            override fun deleteElement() {
+                val parameter = element as? KtParameter ?: return
+                deleteSeparatingComma(parameter)
+                parameter.delete()
             }
         }
     }

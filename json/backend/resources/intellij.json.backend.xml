@@ -1,9 +1,11 @@
 <idea-plugin visibility="public">
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
+    <module name="intellij.json"/>
     <module name="intellij.platform.backend"/>
     <module name="intellij.spellchecker"/>
-    <module name="intellij.json"/>
   </dependencies>
+  <!-- endregion -->
   
   <actions resource-bundle="messages.JsonBundle">
     <action id="JsonCopyPointer" class="com.intellij.json.editor.JsonCopyPointerAction">
@@ -25,6 +27,15 @@
 
     <registryKey key="json.schema.object.v2.enable.nested.remote.schema.resolve" defaultValue="false" description="Try loading remote schema parts on the fly"/>
     <registryKey key="json.schema.object.v2" defaultValue="true" description="Use lightweight implementation of JsonSchemaObject"/>
+    <registryKey key="json.schema.use.networknt.validation" defaultValue="true" description="Use networknt validator as primary JSON Schema validation engine"/>
+
+    <registryKey key="json.schema.networknt.remote.allow.in.tests" defaultValue="false" description="Allow remote schema downloads in unit test mode (blocked by default to prevent accidental HTTP traffic)"/>
+    <registryKey key="json.schema.networknt.show.source.prefix" defaultValue="false" description="Prepend '[networknt] ' prefix to all validation errors produced by the networknt library (demo/diagnostic aid)"/>
+    <registryKey key="json.schema.networknt.resolve.remote.refs" defaultValue="true" description="Resolve remote HTTP $ref URLs during networknt validation. When false, all remote $refs return null immediately (no cache lookup, no async fetch). Useful for benchmarking local-only validation overhead."/>
+    <registryKey key="json.schema.networknt.raw.error.cap" defaultValue="500"
+                 description="Threshold for raw networknt errors before composition branch pruning kicks in. Not a cap on final displayed errors — all errors below this threshold are fully mapped."/>
+    <registryKey key="json.schema.networknt.max.branch.subvalidations" defaultValue="32"
+                 description="Cap on per-slot branch sub-validations performed by the multi-value JsonPropertyAdapter pass (e.g. JS ternaries). Coverage is per-slot, not Cartesian; raise if real configurations exhaust the cap."/>
     <registryKey key="remote.schema.cache.validity.duration" defaultValue="1"
                  description="The time period (in minutes) a file is being kept in cache for. Applicable to references that contain remote URLs."/>
 
@@ -32,13 +43,13 @@
     <outerLanguageRangePatcher language="JSON" implementationClass="com.intellij.psi.templateLanguages.DefaultOuterLanguagePatcher"/>
     <statusBarWidgetFactory id="JSONSchemaSelector" implementation="com.jetbrains.jsonSchema.widget.JsonSchemaStatusWidgetFactory"
                             order="after CodeStyleStatusBarWidget, before ReadOnlyAttribute"/>
+    <editorNotificationProvider implementation="com.jetbrains.jsonSchema.remote.JsonSchemaCatalogNotificationProvider"/>
     <fileBasedIndex implementation="com.jetbrains.jsonSchema.impl.JsonSchemaFileValuesIndex" />
 
     <!-- Codeinsight -->
     <breadcrumbsInfoProvider implementation="com.intellij.json.breadcrumbs.JsonBreadcrumbsProvider"/>
     <qualifiedNameProvider implementation="com.intellij.json.navigation.JsonQualifiedNameProvider"/>
     <completion.contributor language="JSON" id="JsonCompletionContributor" order="last" implementationClass="com.intellij.json.codeinsight.JsonCompletionContributor"/>
-    <lang.psiStructureViewFactory language="JSON" implementationClass="com.intellij.json.structureView.JsonStructureViewBuilderFactory"/>
     <lang.namesValidator language="JSON" implementationClass="com.intellij.json.JsonNamesValidator"/>
     <lang.surroundDescriptor language="JSON" implementationClass="com.intellij.json.surroundWith.JsonSurroundDescriptor"/>
     <lang.findUsagesProvider language="JSON" implementationClass="com.intellij.json.findUsages.JsonFindUsagesProvider"/>
@@ -122,6 +133,7 @@
     <pluginSuggestionProvider implementation="com.jetbrains.jsonSchema.wiremock.WireMockSuggestionProvider"/>
     <statistics.counterUsagesCollector implementationClass="com.jetbrains.jsonSchema.fus.JsonFeatureUsageCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.jetbrains.jsonSchema.fus.JsonHttpFileLoadingUsageCollector"/>
+    <statistics.counterUsagesCollector implementationClass="com.jetbrains.jsonSchema.fus.JsonSchemaCatalogNotificationUsageCollector"/>
     <statistics.validation.customValidationRule implementation="com.jetbrains.jsonSchema.fus.JsonSchemaIdValidationRule"/>
     <projectSettings service="com.jetbrains.jsonSchema.JsonSchemaCatalogProjectConfiguration"/>
     <projectSettings service="com.jetbrains.jsonSchema.JsonSchemaMappingsProjectConfiguration"/>
@@ -130,6 +142,7 @@
   <extensions defaultExtensionNs="JavaScript">
     <JsonSchema.ProviderFactory implementation="com.jetbrains.jsonSchema.extension.JsonSchemaUserDefinedProviderFactory"/>
     <JsonSchema.ProviderFactory implementation="com.jetbrains.jsonSchema.extension.JsonSchemaProjectSelfProviderFactory"/>
+    <JsonSchema.ProviderFactory implementation="com.jetbrains.jsonSchema.extension.JsonSchemaCatalogImplicitProviderFactory" order="last"/>
   </extensions>
 
   <extensions defaultExtensionNs="com.intellij.json">

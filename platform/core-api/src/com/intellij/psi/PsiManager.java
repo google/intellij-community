@@ -9,7 +9,6 @@ import com.intellij.openapi.util.UserDataHolderBase;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.util.PsiModificationTracker;
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
-import com.intellij.util.concurrency.annotations.RequiresBlockingContext;
 import com.intellij.util.concurrency.annotations.RequiresReadLock;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -25,7 +24,6 @@ public abstract class PsiManager extends UserDataHolderBase {
    * @param project the project for which the PSI manager is requested.
    * @return the PSI manager instance.
    */
-  @RequiresBlockingContext
   public static @NotNull PsiManager getInstance(@NotNull Project project) {
     return project.getService(PsiManager.class);
   }
@@ -163,6 +161,7 @@ public abstract class PsiManager extends UserDataHolderBase {
    * batch operation.
    * @deprecated Use {@link #runInBatchFilesMode(Computable)}
    */
+  @ApiStatus.ScheduledForRemoval
   @Deprecated
   public abstract void startBatchFilesProcessingMode();
 
@@ -172,6 +171,7 @@ public abstract class PsiManager extends UserDataHolderBase {
    * batch operation.
    * @deprecated Use {@link #runInBatchFilesMode(Computable)}
    */
+  @ApiStatus.ScheduledForRemoval
   @Deprecated
   public abstract void finishBatchFilesProcessingMode();
 

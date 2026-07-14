@@ -2,59 +2,31 @@
 
 package org.jetbrains.intellij.build.productLayout
 
-import com.intellij.platform.pluginGraph.PluginId
 import com.intellij.platform.pluginGraph.TargetName
-import kotlinx.serialization.Serializable
 
 private const val MODULE_SET_PLUGIN_MODULE_PREFIX: String = "intellij.moduleSet.plugin."
-private const val MODULE_SET_PLUGIN_ID_PREFIX: String = "com.intellij.moduleSet."
 
-/**
- * Marks a module set as being materialized as a standalone bundled plugin.
- *
- * The plugin module name is always derived from the module set name to keep JPS target identity stable.
- */
-@Serializable
-data class ModuleSetPluginSpec(
-  /** Optional plugin ID override. If omitted, a deterministic ID is generated from module set name. */
-  val pluginIdOverride: PluginId? = null,
-  /** Whether this generated wrapper should be added to intellij.moduleSet.plugin.main for flat-classpath launches. */
-  @JvmField val addToMainModule: Boolean = true,
+private val HAND_WRITTEN_MODULE_SET_PLUGIN_MODULES: Set<String> = setOf(
+  "intellij.grid.core.plugin",
+  "intellij.java.aetherDependencyResolver.plugin",
+  "intellij.libraries.misc.plugin",
+  "intellij.platform.bookmarks.plugin",
+  "intellij.platform.execution.serviceView.plugin",
+  "intellij.platform.navbar.plugin",
+  "intellij.platform.problemView.plugin",
+  "intellij.platform.recentFiles.plugin",
+  "intellij.platform.structuralSearch.plugin",
+  "intellij.platform.structureView.plugin",
+  "intellij.platform.ssh.plugin",
+  "intellij.platform.todo.plugin",
+  "intellij.platform.vcs.plugin",
+  "intellij.platform.vcs.split.plugin",
 )
 
 fun moduleSetPluginModuleName(moduleSetName: String): TargetName {
   return TargetName(MODULE_SET_PLUGIN_MODULE_PREFIX + moduleSetName)
 }
 
-fun defaultModuleSetPluginId(moduleSetName: String): PluginId {
-  return PluginId(MODULE_SET_PLUGIN_ID_PREFIX + moduleSetName)
-}
-
-fun resolveModuleSetPluginId(moduleSet: ModuleSet): PluginId {
-  val spec = requireNotNull(moduleSet.pluginSpec) {
-    "Module set '${moduleSet.name}' is not pluginized"
-  }
-  return spec.pluginIdOverride ?: defaultModuleSetPluginId(moduleSet.name)
-}
-
-fun collectPluginizedModuleSets(moduleSets: List<ModuleSet>): List<ModuleSet> {
-  val result = ArrayList<ModuleSet>()
-  val visited = HashSet<String>()
-
-  fun visit(moduleSet: ModuleSet) {
-    if (!visited.add(moduleSet.name)) {
-      return
-    }
-    if (moduleSet.pluginSpec != null) {
-      result.add(moduleSet)
-    }
-    for (nestedSet in moduleSet.nestedSets) {
-      visit(nestedSet)
-    }
-  }
-
-  for (moduleSet in moduleSets) {
-    visit(moduleSet)
-  }
-  return result
+fun isModuleSetPluginModuleName(moduleName: String): Boolean {
+  return moduleName.startsWith(MODULE_SET_PLUGIN_MODULE_PREFIX) || moduleName in HAND_WRITTEN_MODULE_SET_PLUGIN_MODULES
 }

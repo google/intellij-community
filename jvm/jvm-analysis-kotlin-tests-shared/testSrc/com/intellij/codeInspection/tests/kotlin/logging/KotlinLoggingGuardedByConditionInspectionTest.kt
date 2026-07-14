@@ -3,13 +3,9 @@ package com.intellij.codeInspection.tests.kotlin.logging
 import com.intellij.analysis.JvmAnalysisBundle
 import com.intellij.jvm.analysis.internal.testFramework.logging.LoggingGuardedByConditionInspectionTestBase
 import com.intellij.jvm.analysis.testFramework.JvmLanguage
-import org.jetbrains.kotlin.idea.test.ExpectedPluginModeProvider
-import org.jetbrains.kotlin.idea.test.setUpWithKotlinPlugin
 
-abstract class KotlinLoggingGuardedByConditionInspectionTest : LoggingGuardedByConditionInspectionTestBase(), ExpectedPluginModeProvider {
-  override fun setUp() {
-    setUpWithKotlinPlugin(testRootDisposable) { super.setUp() }
-  }
+abstract class KotlinLoggingGuardedByConditionInspectionTest : LoggingGuardedByConditionInspectionTestBase() {
+  
 
   fun `test slf4j`() {
     myFixture.testHighlighting(JvmLanguage.KOTLIN, """
@@ -98,7 +94,7 @@ abstract class KotlinLoggingGuardedByConditionInspectionTest : LoggingGuardedByC
           fun n(arg: String) {
               if (LOG.<warning descr="Logging call guarded by log condition">isDebugEnabled</warning>) {
                   LOG.debug("test1" + arg)
-                  arg.<warning descr="[REDUNDANT_CALL_OF_CONVERSION_METHOD] Redundant call of conversion method.">toString()</warning>
+                  arg.<warning descr="[REDUNDANT_CALL_OF_CONVERSION_METHOD]">toString()</warning>
               }
           }
       
@@ -118,7 +114,7 @@ abstract class KotlinLoggingGuardedByConditionInspectionTest : LoggingGuardedByC
           fun n(arg: String) {
               if (LOG.isDebugEnabled) {
                   LOG.debug("test1" + arg)
-                  arg.<warning descr="[REDUNDANT_CALL_OF_CONVERSION_METHOD] Redundant call of conversion method.">toString()</warning>
+                  arg.<warning descr="[REDUNDANT_CALL_OF_CONVERSION_METHOD]">toString()</warning>
               }
           }
       

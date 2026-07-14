@@ -7,6 +7,8 @@ import com.intellij.codeInspection.util.InspectionMessage;
 import com.intellij.lang.ASTNode;
 import com.intellij.modcommand.ModPsiUpdater;
 import com.intellij.modcommand.PsiUpdateModCommandQuickFix;
+import com.intellij.openapi.module.Module;
+import com.intellij.openapi.module.ModuleUtilCore;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Condition;
 import com.intellij.openapi.util.NlsSafe;
@@ -26,6 +28,7 @@ import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.python.PyNames;
 import com.jetbrains.python.PyPsiBundle;
 import com.jetbrains.python.PyTokenTypes;
+import com.jetbrains.python.PythonUiService;
 import com.jetbrains.python.codeInsight.imports.AddImportHelper;
 import com.jetbrains.python.codeInsight.typing.PyTypingTypeProvider;
 import com.jetbrains.python.inspections.quickfix.CompatibilityPrintCallQuickFix;
@@ -50,6 +53,7 @@ import com.jetbrains.python.psi.PyBinaryExpression;
 import com.jetbrains.python.psi.PyBreakStatement;
 import com.jetbrains.python.psi.PyCallExpression;
 import com.jetbrains.python.psi.PyClass;
+import com.jetbrains.python.psi.PyComprehensionElement;
 import com.jetbrains.python.psi.PyComprehensionForComponent;
 import com.jetbrains.python.psi.PyContinueStatement;
 import com.jetbrains.python.psi.PyDecorator;
@@ -68,6 +72,7 @@ import com.jetbrains.python.psi.PyForStatement;
 import com.jetbrains.python.psi.PyFormattedStringElement;
 import com.jetbrains.python.psi.PyFunction;
 import com.jetbrains.python.psi.PyIfStatement;
+import com.jetbrains.python.psi.PyFromImportStatement;
 import com.jetbrains.python.psi.PyImportElement;
 import com.jetbrains.python.psi.PyImportStatement;
 import com.jetbrains.python.psi.PyKeywordArgument;
@@ -175,6 +180,13 @@ public abstract class PyCompatibilityVisitor extends PyElementVisitor {
   public void visitPyImportStatement(@NotNull PyImportStatement node) {
     super.visitPyImportStatement(node);
 
+    if (node.isLazy()) {
+      registerForAllMatchingVersions(level -> level.isOlderThan(LanguageLevel.PYTHON315),
+                                     PyPsiBundle.message("INSP.compatibility.feature.support.lazy.imports"),
+                                     node.getFirstChild(),
+                                     LocalQuickFix.notNullElements(createInterpreterSettingsQuickFix(node)));
+    }
+
     final PyIfStatement ifParent = PsiTreeUtil.getParentOfType(node, PyIfStatement.class);
     if (ifParent != null) return;
 
@@ -252,6 +264,13 @@ public abstract class PyCompatibilityVisitor extends PyElementVisitor {
       }
     }
 
+    // PEP 798: unpacking in comprehensions/generator expressions, e.g. [*it for it in its]
+    if (isComprehensionResultExpression(node)) {
+      registerForAllMatchingVersions(level -> level.isOlderThan(LanguageLevel.PYTHON315) && registerForLanguageLevel(level),
+                                     PyPsiBundle.message("INSP.compatibility.feature.support.unpacking.in.comprehensions"),
+                                     node);
+    }
+
     PsiElement parent = node.getParent();
     if (parent instanceof PyAnnotation && PyStarAnnotatorVisitor.isVariadicArg(parent.getParent())) {
       registerForAllMatchingVersions(level -> level.isOlderThan(LanguageLevel.PYTHON311) &&
@@ -265,9 +284,21 @@ public abstract class PyCompatibilityVisitor extends PyElementVisitor {
   public void visitPyDoubleStarExpression(@NotNull PyDoubleStarExpression node) {
     super.visitPyDoubleStarExpression(node);
 
+    // PEP 798: double-star unpacking in dict comprehensions, e.g. {**d for d in dicts}
+    if (isComprehensionResultExpression(node)) {
+      registerForAllMatchingVersions(level -> level.isOlderThan(LanguageLevel.PYTHON315) && registerForLanguageLevel(level),
+                                     PyPsiBundle.message("INSP.compatibility.feature.support.unpacking.in.comprehensions"),
+                                     node);
+      return;
+    }
+
     registerForAllMatchingVersions(level -> level.isOlderThan(LanguageLevel.PYTHON35) && registerForLanguageLevel(level),
                                    PyPsiBundle.message("INSP.compatibility.feature.support.starred.expressions.in.dicts"),
                                    node);
+  }
+
+  private static boolean isComprehensionResultExpression(@NotNull PyExpression node) {
+    return node.getParent() instanceof PyComprehensionElement comprehension && comprehension.getResultExpression() == node;
   }
 
   @Override
@@ -639,6 +670,11 @@ public abstract class PyCompatibilityVisitor extends PyElementVisitor {
     registerForAllMatchingVersions(levelPredicate, suffix, node, node.getTextRange(), true, fixes);
   }
 
+  private static @Nullable LocalQuickFix createInterpreterSettingsQuickFix(@NotNull PsiElement element) {
+    final Module module = ModuleUtilCore.findModuleForPsiElement(element);
+    return PythonUiService.getInstance().createInterpreterSettingsQuickFix(module);
+  }
+
   @Override
   public void visitPyNonlocalStatement(final @NotNull PyNonlocalStatement node) {
     registerForAllMatchingVersions(level -> level.isPython2() && registerForLanguageLevel(level),
@@ -876,6 +912,17 @@ public abstract class PyCompatibilityVisitor extends PyElementVisitor {
     registerForAllMatchingVersions(level -> level.isOlderThan(LanguageLevel.PYTHON310),
                                    PyPsiBundle.message("INSP.compatibility.feature.support.match.statements"),
                                    matchStatement.getFirstChild());
+  }
+
+  @Override
+  public void visitPyFromImportStatement(@NotNull PyFromImportStatement node) {
+    super.visitPyFromImportStatement(node);
+    if (node.isLazy()) {
+      registerForAllMatchingVersions(level -> level.isOlderThan(LanguageLevel.PYTHON315),
+                                     PyPsiBundle.message("INSP.compatibility.feature.support.lazy.imports"),
+                                     node.getFirstChild(),
+                                     LocalQuickFix.notNullElements(createInterpreterSettingsQuickFix(node)));
+    }
   }
 
   @Override

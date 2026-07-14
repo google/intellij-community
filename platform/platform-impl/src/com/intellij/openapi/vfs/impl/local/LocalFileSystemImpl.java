@@ -3,6 +3,7 @@ package com.intellij.openapi.vfs.impl.local;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.Pair;
@@ -16,6 +17,8 @@ import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFilePointerCapableFileSystem;
 import com.intellij.openapi.vfs.impl.SymlinksCapableFileSystem;
+import com.intellij.openapi.vfs.impl.local.windows.WindowsBufferedDirectoryIterator;
+import com.intellij.openapi.vfs.impl.local.windows.WindowsBufferedDirectoryStream;
 import com.intellij.openapi.vfs.newvfs.FileNavigator;
 import com.intellij.openapi.vfs.newvfs.ManagingFS;
 import com.intellij.openapi.vfs.newvfs.NewVirtualFile;
@@ -43,9 +46,12 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -119,8 +125,15 @@ public class LocalFileSystemImpl
       AppExecutorUtil.getAppScheduledExecutorService().scheduleWithFixedDelay(
         () -> {
           var application = ApplicationManager.getApplication();
-          if (application != null && !application.isDisposed()) {
-            storeRefreshStatusToFiles();
+          try {
+            if (application != null && !application.isDisposed()) {
+              ReadAction.runBlocking(() -> {
+                storeRefreshStatusToFiles();
+              });
+            }
+          }
+          catch (Throwable e) {
+            LOG.warn("Exception while marking changed files dirty", e);
           }
         },
         STATUS_UPDATE_PERIOD, STATUS_UPDATE_PERIOD, MILLISECONDS
@@ -132,7 +145,7 @@ public class LocalFileSystemImpl
   }
 
   public void onDisconnecting() {
-    // on VFS reconnect, we must clear roots manager
+    // upon re-establishing the VFS connection, we must clear watch roots
     myWatchRootsManager.clear();
   }
 
@@ -149,10 +162,22 @@ public class LocalFileSystemImpl
   private void storeRefreshStatusToFiles() {
     if (myWatcher.isOperational()) {
       var dirtyPaths = myWatcher.getDirtyPaths();
-      var marked = markPathsDirty(dirtyPaths.dirtyPaths) |
-                   markFlatDirsDirty(dirtyPaths.dirtyDirectories) |
-                   markRecursiveDirsDirty(dirtyPaths.dirtyPathsRecursive);
-      if (marked) {
+      //TODO RC: this method is sometimes called without RA => it makes some VFS intermediate states visible -- e.g.
+      //         the state there file is already marked as removed, but is not yet removed from it's parent.children
+      //         list => causes FileDeletedException during path resolution.
+      //         We should either:
+      //         a) wrap _all_ the calls in RA -- carries an additional overhead
+      //         b) or deal with intermediate states without failing: e.g., FileNavigator.retryUpToN() is an attempt
+      //            in that direction, and it works, at least partially: most (but not all) of the reports in Diogen
+      //            now are from _successful_ retries, i.e. the issue was hidden from the client. But .retryUpToN()
+      //            is still not 100% a solution.
+      //         I'm yet undecided which approach is the optimal choice...
+      var somethingWasMarkedDirty = (
+        markPathsDirty(dirtyPaths.dirtyPaths) |
+        markFlatDirsDirty(dirtyPaths.dirtyDirectories) |
+        markRecursiveDirsDirty(dirtyPaths.dirtyPathsRecursive)
+      );
+      if (somethingWasMarkedDirty) {
         statusRefreshed();
       }
     }
@@ -207,7 +232,14 @@ public class LocalFileSystemImpl
     return marked;
   }
 
-  public void markSuspiciousFilesDirty(@NotNull List<? extends VirtualFile> files) {
+  /// If [#myWatcher] is operational => the method marks dirty the dirty files detected by [#myWatcher],
+  /// plus `myWatcher.manualWatchRoots` (monitored roots that are un-watchable), recursively.
+  /// If [#myWatcher] is !operational (i.e. [#myWatcher] roots can't be trusted) => the method fallbacks
+  /// to using `fallbackCandidateRootsToRefresh`, i.e. marks them dirty, recursively
+  /// TODO RC: the semantics seems quite tangled to me: the `fallbackCandidateRootsToRefresh` passed in are plainly ignored if
+  ///          FileWatcher is operational -- not something a caller would expect. Looks like this is actually a private
+  ///          API, exclusively for RefreshSession, there such semantics has sense.
+  public void markSuspiciousFilesDirty(@NotNull List<? extends VirtualFile> fallbackCandidateRootsToRefresh) {
     storeRefreshStatusToFiles();
 
     if (myWatcher.isOperational()) {
@@ -219,9 +251,9 @@ public class LocalFileSystemImpl
       }
     }
     else {
-      for (var file : files) {
-        if (file.getFileSystem() == this) {
-          ((NewVirtualFile)file).markDirtyRecursively();
+      for (var root : fallbackCandidateRootsToRefresh) {
+        if (root.getFileSystem() == this) {
+          ((NewVirtualFile)root).markDirtyRecursively();
         }
       }
     }
@@ -254,15 +286,18 @@ public class LocalFileSystemImpl
     LOG.assertTrue(nonNullWatchRequestsToRemove.size() == watchRequestsToRemove.size(), "watch requests collection should not contain `null` elements");
 
     if ((recursiveRootsToAdd != null || flatRootsToAdd != null) && WATCH_ROOTS_LOG.isTraceEnabled()) {
-      WATCH_ROOTS_LOG.trace(new Exception("LocalFileSystemImpl#replaceWatchedRoots:" +
-                                          "\n  recursive: " + (recursiveRootsToAdd != null ? recursiveRootsToAdd : "[]") +
-                                          "\n  flat: " + (flatRootsToAdd != null ? flatRootsToAdd : "[]")));
+      WATCH_ROOTS_LOG.trace(new Exception(
+        "LocalFileSystemImpl#replaceWatchedRoots:" +
+        "\n  recursive: " + (recursiveRootsToAdd != null ? recursiveRootsToAdd : "[]") +
+        "\n  flat: " + (flatRootsToAdd != null ? flatRootsToAdd : "[]")
+      ));
     }
 
     return myWatchRootsManager.replaceWatchedRoots(
       nonNullWatchRequestsToRemove,
       requireNonNullElse(recursiveRootsToAdd, List.of()),
-      requireNonNullElse(flatRootsToAdd, List.of()));
+      requireNonNullElse(flatRootsToAdd, List.of())
+    );
   }
 
   @Override
@@ -315,12 +350,11 @@ public class LocalFileSystemImpl
   }
 
   @Override
-  public boolean isSymlinksSupported() {
+  public boolean areSymlinksSupported() {
     return true;
   }
 
   @Override
-  @ApiStatus.Internal
   public final void symlinkUpdated(
     int fileId,
     @Nullable VirtualFile parent,
@@ -334,7 +368,6 @@ public class LocalFileSystemImpl
   }
 
   @Override
-  @ApiStatus.Internal
   public final void symlinkRemoved(int fileId) {
     myWatchRootsManager.removeSymlink(fileId);
   }
@@ -402,7 +435,18 @@ public class LocalFileSystemImpl
     if (!dir.isDirectory()) {
       return ArrayUtil.EMPTY_STRING_ARRAY;
     }
-    try (var dirStream = Files.newDirectoryStream(Path.of(toIoPath(dir)))) {
+    var nioPath = Path.of(toIoPath(dir));
+    if (PlatformNioHelper.useWindowsBufferedDirectoryStream(nioPath)) {
+      try (var dirStream = new WindowsBufferedDirectoryStream(nioPath)) {
+        return StreamSupport.stream(dirStream.spliterator(), false)
+          .map(it -> it.getFirst().getFileName().toString())
+          .toArray(String[]::new);
+      }
+      catch (AccessDeniedException | NoSuchFileException e) { LOG.debug(e); }
+      catch (IOException | RuntimeException e) { LOG.warn(e); }
+      return ArrayUtil.EMPTY_STRING_ARRAY;
+    }
+    try (var dirStream = Files.newDirectoryStream(nioPath)) {
       return StreamSupport.stream(dirStream.spliterator(), false)
         .map(it -> it.getFileName().toString())
         .toArray(String[]::new);

@@ -20,8 +20,9 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.application.runReadActionBlocking
 import com.intellij.openapi.components.service
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.diagnostic.rethrowControlFlowException
+import com.intellij.openapi.externalSystem.service.project.manage.ProjectDataImportListener
 import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleManager
@@ -77,6 +78,7 @@ import org.jetbrains.kotlin.utils.addToStdlib.UnsafeCastFunction
 import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 import java.io.IOException
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.LongAdder
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
@@ -90,6 +92,7 @@ class KotlinCompilerReferenceIndexService(private val project: Project, private 
     private var storage: KotlinCompilerReferenceIndexStorage? = null
     private var activeBuildCount = 0
     private val compilationCounter = LongAdder()
+    private val btaWatcherInstalled = AtomicBoolean(false)
     private val projectFileIndex = ProjectRootManager.getInstance(project).fileIndex
     private val supportedFileTypes: Set<FileType> = setOf(KotlinFileType.INSTANCE, JavaFileType.INSTANCE)
     private val currentBuilderId by lazy { KotlinCompilerReferenceIndexStorage.getBuilderId(project) }
@@ -162,14 +165,35 @@ class KotlinCompilerReferenceIndexService(private val project: Project, private 
         })
 
         // TODO KTIJ-37446 Make Kotlin Compiler Reference Index JPS-agnostic
-        if (BtaFileWatcher.isApplicable(project)) {
-            BtaFileWatcher(project).watchIn(coroutineScope) { updatedModules ->
-                executeOnBuildThread {
-                    onExternalCompilationDetected(updatedModules)
-                }
+        // eager attempt covers reopened projects
+        installBtaFileWatcherIfApplicable()
+        // for first-time project `GradleSettings.linkedProjectsSettings` is still empty,
+        // so we retry once Gradle import registers linked projects
+        connection.subscribe(ProjectDataImportListener.TOPIC, object : ProjectDataImportListener {
+            override fun onImportFinished(projectPath: String?) {
+                installBtaFileWatcherIfApplicable()
+            }
+        })
+    }
+
+    /**
+     * Installs the BTA file watcher if / when it is applicable for this project; idempotent
+     */
+    @ApiStatus.Internal
+    fun installBtaFileWatcherIfApplicable() {
+        if (!BtaFileWatcher.isApplicable(project)) return
+        if (!btaWatcherInstalled.compareAndSet(false, true)) return
+        BtaFileWatcher(project).watchIn(coroutineScope) { updatedModules ->
+            executeOnBuildThread {
+                onExternalCompilationDetected(updatedModules)
             }
         }
     }
+
+    @get:TestOnly
+    @get:ApiStatus.Internal
+    val isBtaFileWatcherInstalled: Boolean
+        get() = btaWatcherInstalled.get()
 
     private fun onExternalCompilationDetected(compiledModules: Collection<Module>) {
         val allModules = if (!initialized) allModules() else null
@@ -285,7 +309,7 @@ class KotlinCompilerReferenceIndexService(private val project: Project, private 
         return try {
             incrementalStorage.refreshModules(updatedModules)
         } catch (e: Throwable) {
-            if (Logger.shouldRethrow(e)) throw e
+            rethrowControlFlowException(e)
             LOG.error("an exception during incremental KCRI storage refresh", e)
             false
         }
@@ -301,7 +325,7 @@ class KotlinCompilerReferenceIndexService(private val project: Project, private 
     private fun <T> runActionSafe(actionName: String, action: () -> T): T? = try {
         action()
     } catch (e: Throwable) {
-        if (Logger.shouldRethrow(e)) throw e
+        rethrowControlFlowException(e)
 
         try {
             LOG.error("an exception during $actionName calculation", e)
@@ -477,7 +501,7 @@ class KotlinCompilerReferenceIndexService(private val project: Project, private 
         return !isInsideLibraryScope() &&
                 storage != null &&
                 isEnabled(project) &&
-                runReadAction { element.containingFile }
+                runReadActionBlocking { element.containingFile }
                     ?.let(InjectedLanguageManager.getInstance(project)::isInjectedFragment)
                     ?.not() == true
     }

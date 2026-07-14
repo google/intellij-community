@@ -21,6 +21,7 @@ import org.jetbrains.intellij.build.productLayout.xml.buildModuleAliasesXml
 import org.jetbrains.intellij.build.productLayout.xml.generateXIncludes
 import org.jetbrains.intellij.build.productLayout.xml.includesPlatformLangPlugin
 import org.jetbrains.intellij.build.productLayout.xml.withEditorFold
+import org.jetbrains.intellij.build.productLayout.discovery.TEST_PRODUCT_CLASS_NAME
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.invariantSeparatorsPathString
@@ -48,7 +49,7 @@ internal fun appendDefaultProductPluginMetadata(sb: StringBuilder, spec: Product
  * Generates an XML file for a module set.
  * Used to maintain backward compatibility with XML-based module set loading.
  * 
- * For non-pluginized module sets, XML files contain inlined module definitions - all direct
+ * Module set XML files contain inlined module definitions - all direct
  * modules and nested module sets are expanded into `<module>` elements. The `inlineModuleSets`
  * parameter (used in product XML generation) only affects whether PRODUCT XMLs reference
  * these files via xi:include or inline them directly.
@@ -129,6 +130,7 @@ internal fun generateProductXml(
 internal fun generateTestPluginXml(
   spec: TestPluginSpec,
   productPropertiesClass: String,
+  productName: String,
   projectRoot: Path,
   moduleDependencies: List<ContentModuleName>,
   pluginDependencies: List<PluginId>,
@@ -137,7 +139,18 @@ internal fun generateTestPluginXml(
 ): TestPluginFileResult {
   val pluginXmlPath = projectRoot.resolve(spec.pluginXmlPath)
   val sortedContentSpec = sortTestPluginContentSpec(spec.spec)
-  val sortedModuleDependencies = moduleDependencies.sortedBy { it.value }
+  val contentModules = buildContentBlocksAndChainMapping(sortedContentSpec, collectModuleSetAliases = false)
+    .contentBlocks
+    .asSequence()
+    .flatMap { it.modules }
+    .mapTo(HashSet()) { ContentModuleName(it.moduleId.name) }
+  // Prepend the explicit platformModule (loading directive) before planner-computed module deps.
+  val externalModuleDependencies = moduleDependencies.filterNot { it in contentModules }
+  val allModuleDependencies = if (spec.platformModule != null)
+    listOf(ContentModuleName(spec.platformModule)) + externalModuleDependencies
+  else
+    externalModuleDependencies
+  val sortedModuleDependencies = allModuleDependencies.sortedBy { it.value }
   val sortedPluginDependencies = pluginDependencies.sortedBy { it.value }
 
   val moduleCommentProvider: (ContentModuleName, List<String>?) -> String? = { moduleName, moduleSetChain ->
@@ -163,7 +176,7 @@ internal fun generateTestPluginXml(
     headerBuilder = { sb ->
       sb.append("<!-- DO NOT EDIT: This file is auto-generated from Kotlin code -->\n")
       sb.append("<!-- To regenerate, run 'Generate Product Layouts' or directly UltimateGenerator.main() -->\n")
-      sb.append("<!-- Source: $productPropertiesClass.getProductContentDescriptor() -->\n")
+      sb.append("<!-- Source: ${testPluginSourceComment(productPropertiesClass, productName, spec)} -->\n")
     },
     metadataBuilder = { sb ->
       sb.append("  <id>${spec.pluginId.value}</id>\n")
@@ -199,6 +212,16 @@ internal fun generateTestPluginXml(
   )
 }
 
+private fun testPluginSourceComment(productPropertiesClass: String, productName: String, spec: TestPluginSpec): String {
+  val productSource = if (productPropertiesClass == TEST_PRODUCT_CLASS_NAME) {
+    "platform/buildScripts/src/productLayout/UltimateModuleSets.kt: UltimateModuleSets.getTestProductSpecs()[\"$productName\"]"
+  }
+  else {
+    "$productPropertiesClass.getProductContentDescriptor()"
+  }
+  return "$productSource, testPlugin(pluginId = \"${spec.pluginId.value}\")"
+}
+
 private fun sortTestPluginContentSpec(spec: ProductModulesContentSpec): ProductModulesContentSpec {
   if (spec.moduleSets.isEmpty() && spec.additionalModules.isEmpty()) return spec
 
@@ -207,7 +230,7 @@ private fun sortTestPluginContentSpec(spec: ProductModulesContentSpec): ProductM
       moduleSetWithOverrides.copy(moduleSet = sortModuleSet(moduleSetWithOverrides.moduleSet))
     }
     .sortedBy { it.moduleSet.name }
-  val sortedAdditionalModules = spec.additionalModules.sortedBy { it.name.value }
+  val sortedAdditionalModules = spec.additionalModules.sortedBy { it.moduleId.name }
 
   return ProductModulesContentSpec(
     productModuleAliases = spec.productModuleAliases,
@@ -224,7 +247,7 @@ private fun sortTestPluginContentSpec(spec: ProductModulesContentSpec): ProductM
 }
 
 private fun sortModuleSet(moduleSet: ModuleSet): ModuleSet {
-  val sortedModules = moduleSet.modules.sortedBy { it.name.value }
+  val sortedModules = moduleSet.modules.sortedBy { it.moduleId.name }
   val sortedNestedSets = moduleSet.nestedSets
     .map { sortModuleSet(it) }
     .sortedBy { it.name }
@@ -287,8 +310,7 @@ fun buildProductContentXml(
     }
 
     // Generate module sets as xi:includes or inline content blocks
-    val hasRenderableModuleSets = spec.moduleSets.any { it.moduleSet.pluginSpec == null }
-    if (hasRenderableModuleSets) {
+    if (spec.moduleSets.isNotEmpty()) {
       if (inlineModuleSets) {
         // Generate single content block with all module sets inlined
         append("  <content namespace=\"$JETBRAINS_NAMESPACE\">\n")
@@ -296,7 +318,8 @@ fun buildProductContentXml(
           if (block.source == ADDITIONAL_MODULES_BLOCK) continue // Skip additional modules, handle separately
           withEditorFold(this, "    ", block.source) {
             for (module in block.modules) {
-              val comment = moduleCommentProvider?.invoke(module.name, moduleToSetChainMapping[module.name])
+              val moduleName = module.contentName()
+              val comment = moduleCommentProvider?.invoke(moduleName, moduleToSetChainMapping[moduleName])
               appendModuleLine(module, "    ", comment)
             }
           }
@@ -310,7 +333,7 @@ fun buildProductContentXml(
       else {
         // Build set of module set names that are referenced at top-level WITH overrides
         // These cannot be brought in via `xi:include` from parent sets (would lose overrides)
-        val moduleSetsForProductContent = spec.moduleSets.filter { it.moduleSet.pluginSpec == null }
+        val moduleSetsForProductContent = spec.moduleSets
 
         val overriddenModuleSetNames = moduleSetsForProductContent
           .filter { it.hasOverrides }
@@ -338,7 +361,8 @@ fun buildProductContentXml(
         blockSource = additionalBlock.source,
         modules = additionalBlock.modules,
         commentProvider = if (moduleCommentProvider == null) null else { module ->
-          moduleCommentProvider(module.name, moduleToSetChainMapping[module.name])
+          val moduleName = module.contentName()
+          moduleCommentProvider(moduleName, moduleToSetChainMapping[moduleName])
         },
       )
     }

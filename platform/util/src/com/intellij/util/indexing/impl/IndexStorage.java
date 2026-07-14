@@ -4,6 +4,7 @@ package com.intellij.util.indexing.impl;
 
 import com.intellij.util.indexing.StorageException;
 import com.intellij.util.indexing.ValueContainer;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.ApiStatus.Internal;
 import org.jetbrains.annotations.NotNull;
 
@@ -34,6 +35,7 @@ public interface IndexStorage<Key, Value> extends Flushable, Closeable {
    * This method forces to return a copy of underlying container, otherwise it is impossible to guarantee thread-safety -- which is
    * why it was deprecated.
    */
+  @ApiStatus.ScheduledForRemoval
   @Deprecated
   default @NotNull ValueContainer<Value> read(Key key) throws StorageException {
     //it is ineffective, which is one of the reasons why this method is deprecated
@@ -82,6 +84,7 @@ public interface IndexStorage<Key, Value> extends Flushable, Closeable {
 
   /**
    * Drops (some of) cached data, without touching data that is modified and needs to be persisted.
+   * The method doesn't persist anything -- this is {@linkplain #flush()} is for -- it just makes cache use less memory.
    * TODO RC: clearCaches() is an ambiguous name, this method is better called 'trimCaches()'
    */
   void clearCaches();

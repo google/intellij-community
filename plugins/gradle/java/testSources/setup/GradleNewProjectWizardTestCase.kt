@@ -19,18 +19,18 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ui.configuration.DefaultModulesProvider
 import com.intellij.openapi.roots.ui.configuration.actions.NewModuleAction
 import com.intellij.openapi.util.Disposer
+import com.intellij.platform.externalSystem.testFramework.ExternalSystemTestObservation.awaitOpenProjectActivity
+import com.intellij.platform.externalSystem.testFramework.ExternalSystemTestObservation.awaitProjectActivity
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.junit5.RegistryKey
 import com.intellij.testFramework.junit5.SystemProperty
 import com.intellij.testFramework.junit5.TestDisposable
-import com.intellij.testFramework.utils.vfs.getDirectory
 import com.intellij.ui.UIBundle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.plugins.gradle.properties.GradleDaemonJvmPropertiesFile
 import org.jetbrains.plugins.gradle.testFramework.GradleTestCase
 import org.jetbrains.plugins.gradle.testFramework.util.ExternalSystemExecutionTracer
-import org.jetbrains.plugins.gradle.testFramework.util.ProjectInfo
 import org.jetbrains.plugins.gradle.util.toJvmCriteria
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Assumptions
@@ -64,12 +64,14 @@ abstract class GradleNewProjectWizardTestCase : GradleTestCase() {
     configure: NewProjectWizardStep.() -> Unit,
   ): Project {
     val wizard = createAndConfigureWizard(group = group, project = null, configure = configure)
-    return awaitOpenProjectConfiguration(numProjectSyncs) {
-      val project = createProjectFromWizardImpl(wizard = wizard, projectFile = Path.of(wizard.newProjectFilePath), projectToClose = null)
-      withContext(Dispatchers.EDT) {
-        PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
+    return withAllowedProjectSyncs(numProjectSyncs) {
+      awaitOpenProjectActivity {
+        val project = createProjectFromWizardImpl(wizard = wizard, projectFile = Path.of(wizard.newProjectFilePath), projectToClose = null)
+        withContext(Dispatchers.EDT) {
+          PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
+        }
+        project!!
       }
-      project!!
     }
   }
 
@@ -80,11 +82,13 @@ abstract class GradleNewProjectWizardTestCase : GradleTestCase() {
     configure: NewProjectWizardStep.() -> Unit,
   ): Module? {
     val wizard = createAndConfigureWizard(group, project, configure)
-    return awaitProjectConfiguration(project, numProjectSyncs) {
-      withContext(Dispatchers.EDT) {
-        val module = NewModuleAction().createModuleFromWizard(project, null, wizard)
-        PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
-        module
+    return withAllowedProjectSyncs(numProjectSyncs) {
+      awaitProjectActivity(project) {
+        withContext(Dispatchers.EDT) {
+          val module = NewModuleAction().createModuleFromWizard(project, null, wizard)
+          PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
+          module
+        }
       }
     }
   }
@@ -126,23 +130,6 @@ abstract class GradleNewProjectWizardTestCase : GradleTestCase() {
       "$currentStepObject is not validated"
     }
     return this
-  }
-
-  override fun assertProjectState(project: Project, vararg projectsInfo: ProjectInfo) {
-    for (projectInfo in projectsInfo) {
-      assertBuildFiles(projectInfo)
-    }
-    super.assertProjectState(project, *projectsInfo)
-  }
-
-  fun assertBuildFiles(projectInfo: ProjectInfo) {
-    for (compositeInfo in projectInfo.composites) {
-      assertBuildFiles(compositeInfo)
-    }
-    for (moduleInfo in projectInfo.modules) {
-      val moduleRoot = testRoot.getDirectory(moduleInfo.relativePath)
-      moduleInfo.filesConfiguration.assertContentsAreEqual(moduleRoot)
-    }
   }
 
   fun assertDaemonJvmProperties(project: Project) {

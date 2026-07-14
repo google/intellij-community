@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.terminal.startup
 
 import com.intellij.execution.wsl.WslPath
@@ -17,10 +17,12 @@ import com.intellij.platform.eel.provider.LocalEelDescriptor
 import com.intellij.platform.eel.provider.asEelPath
 import com.intellij.util.PathUtil
 import com.intellij.util.asSafely
+import org.jetbrains.annotations.ApiStatus
 import java.nio.file.InvalidPathException
 import java.nio.file.Path
 
-internal class TerminalLocalPathTranslator(private val descriptor: EelDescriptor) {
+@ApiStatus.Internal
+class TerminalLocalPathTranslator(private val descriptor: EelDescriptor) {
 
   /**
    * Translates new path entries to the format understood by the remote.
@@ -103,19 +105,25 @@ internal class TerminalLocalPathTranslator(private val descriptor: EelDescriptor
       LOG.debug { "Failed to translate not absolute $absolutePath, skipping" }
       return null
     }
-    try {
-      return absolutePath.asEelPath(descriptor)
+    val eelPath = try {
+      absolutePath.asEelPath()
     }
-    catch (e: Exception) {
-      translateWindowsDrivePathToMountedWslPath(absolutePath)?.let {
-        return toEelPathOrNull(it)
-      }
-      translateWslUncPathWithSamePrefix(absolutePath.toString())?.let {
-        return toEelPathOrNull(it)
-      }
-      LOG.debug(e) { "Failed to translate $absolutePath to EelPath ($descriptor), skipping" }
-      return null
+    catch (_: EelPathException) {
+      null
     }
+    if (eelPath != null && eelPath.descriptor == this.descriptor) {
+      return eelPath
+    }
+
+    // Try to cover some WSL path cases
+    translateWindowsDrivePathToMountedWslPath(absolutePath)?.let {
+      return toEelPathOrNull(it)
+    }
+    translateWslUncPathWithSamePrefix(absolutePath.toString())?.let {
+      return toEelPathOrNull(it)
+    }
+    LOG.debug { "Failed to translate $absolutePath to EelPath ($descriptor), skipping" }
+    return null
   }
 
   private fun toEelPathOrNull(remotePathString: String): EelPath? {
@@ -172,7 +180,7 @@ internal class TerminalLocalPathTranslator(private val descriptor: EelDescriptor
       val newPathString = eelRootPath.wslRoot + winPathString.substring(path.wslRoot.length)
       try {
         val newPath = Path.of(newPathString)
-        return newPath.asEelPath(descriptor).toString()
+        return newPath.asEelPath().toString()
       }
       catch (e: Exception) {
         LOG.debug(e) { "Failed to translate $newPathString after changing wsl prefix" }

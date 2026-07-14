@@ -37,6 +37,7 @@ import com.intellij.codeInspection.actions.CleanupInspectionIntention;
 import com.intellij.codeInspection.ex.InspectionToolWrapper;
 import com.intellij.facet.Facet;
 import com.intellij.facet.FacetManager;
+import com.intellij.facet.FacetRootsProvider;
 import com.intellij.find.FindManager;
 import com.intellij.find.actions.SearchTarget2UsageTarget;
 import com.intellij.find.findUsages.FindUsagesHandler;
@@ -101,8 +102,6 @@ import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.fileEditor.TextEditor;
-import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx;
-import com.intellij.openapi.fileEditor.impl.EditorHistoryManager;
 import com.intellij.openapi.fileEditor.impl.text.TextEditorProvider;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeManager;
@@ -233,6 +232,7 @@ import org.jetbrains.annotations.TestOnly;
 import org.jetbrains.annotations.Unmodifiable;
 
 import java.io.File;
+import java.time.Duration;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.ref.Reference;
@@ -1146,7 +1146,7 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
   }
 
   @Override
-  public @NotNull Collection<UsageInfo> testFindUsages(String @NotNull ... fileNames) {
+  public @NotNull @Unmodifiable Collection<UsageInfo> testFindUsages(String @NotNull ... fileNames) {
     assertInitialized();
     if (fileNames.length > 0) {
       configureByFiles(fileNames);
@@ -1536,6 +1536,14 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
 
     for (Module module : ModuleManager.getInstance(getProject()).getModules()) {
       ModuleRootManager.getInstance(module).orderEntries().getAllLibrariesAndSdkClassesRoots(); // instantiate all VFPs
+      // Facets may create virtual file pointers lazily on first root access (e.g. WebRoot/ConfigFile pointers).
+      // Materialize them now so they belong to the tracker baseline instead of being reported as leaks: facets of
+      // a reused light project are not disposed per-test (see LightPlatformTestCase project reuse).
+      for (Facet<?> facet : FacetManager.getInstance(module).getAllFacets()) {
+        if (facet instanceof FacetRootsProvider) {
+          ((FacetRootsProvider)facet).getFacetRoots();
+        }
+      }
     }
     if (shouldTrackVirtualFilePointers()) {
       myVirtualFilePointerTracker = new VirtualFilePointerTracker();
@@ -1630,9 +1638,7 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
     }
 
     LookupManager.hideActiveLookup(project);
-    PsiDocumentManager.getInstance(project).commitAllDocuments();
-    FileEditorManagerEx.getInstanceEx(project).closeAllFiles();
-    EditorHistoryManager.getInstance(project).removeAllFiles();
+    EditorTestUtil.closeAllFilesAndClearEditorHistory(project);
   }
 
   private PsiFile @NotNull [] configureByFilesInner(String @NotNull ... filePaths) {
@@ -2074,13 +2080,20 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
   }
 
   public @NotNull String getFoldingDescription(boolean withCollapseStatus, boolean withCaretLocation) {
+    return getFoldingDescription(withCollapseStatus, withCaretLocation, null);
+  }
+
+  /**
+   * @param timeout timeout for building foldings, or {@code null} to use the default timeout
+   */
+  public @NotNull String getFoldingDescription(boolean withCollapseStatus, boolean withCaretLocation, @Nullable Duration timeout) {
     Editor topEditor = getHostEditor();
     return EdtTestUtil.runInEdtAndGet(() -> {
       IdeaTestExecutionPolicy policy = IdeaTestExecutionPolicy.current();
       if (policy != null) {
         policy.waitForHighlighting(getProject(), topEditor);
       }
-      EditorTestUtil.buildInitialFoldingsInBackground(topEditor);
+      EditorTestUtil.buildInitialFoldingsInBackground(topEditor, timeout);
       return getFoldingData(topEditor, withCollapseStatus, withCaretLocation);
     });
   }
@@ -2141,6 +2154,13 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
   private void testFoldingRegions(@NotNull String verificationFileName,
                                   @Nullable String destinationFileName,
                                   boolean doCheckCollapseStatus) {
+    testFoldingRegions(verificationFileName, destinationFileName, doCheckCollapseStatus, null);
+  }
+
+  private void testFoldingRegions(@NotNull String verificationFileName,
+                                  @Nullable String destinationFileName,
+                                  boolean doCheckCollapseStatus,
+                                  @Nullable Duration timeout) {
     String expectedContent;
     File verificationFile;
     try {
@@ -2180,7 +2200,7 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
       }
     }
     boolean wasCaretTagFoundInTestFile = ReadAction.compute(() -> editor.getCaretModel().getOffset() != 0);
-    String actual = getFoldingDescription(doCheckCollapseStatus, wasCaretTagFoundInTestFile);
+    final String actual = getFoldingDescription(doCheckCollapseStatus, wasCaretTagFoundInTestFile, timeout);
     if (!expectedContent.equals(actual)) {
       throw new FileComparisonFailedError(verificationFile.getName(), expectedContent, actual, verificationFile.getPath());
     }
@@ -2199,6 +2219,13 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
   @Override
   public void testFoldingWithCollapseStatus(@NotNull String verificationFileName, @Nullable String destinationFileName) {
     testFoldingRegions(verificationFileName, destinationFileName, true);
+  }
+
+  /**
+   * @param timeout timeout for building foldings, or {@code null} to use the default timeout
+   */
+  public void testFoldingWithCollapseStatus(@NotNull String verificationFileName, @Nullable String destinationFileName, @NotNull Duration timeout) {
+    testFoldingRegions(verificationFileName, destinationFileName, true, timeout);
   }
 
   @Override

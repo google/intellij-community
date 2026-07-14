@@ -4,28 +4,28 @@ package com.jetbrains.python.packaging.pip
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
-import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.diagnostic.debug
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
+import com.jetbrains.python.Result
 import com.jetbrains.python.errorProcessing.PyResult
 import com.jetbrains.python.getOrNull
-import com.jetbrains.python.onFailure
-import com.jetbrains.python.packaging.cache.PythonSimpleRepositoryCache
+import com.jetbrains.python.mapError
+import com.jetbrains.python.packaging.cache.PythonSimpleRepositoryCacheService
 import com.jetbrains.python.packaging.common.PythonPackageDetails
-import com.jetbrains.python.packaging.repository.PyPIPackageRepository
+import com.jetbrains.python.packaging.management.PythonRepositoryManager.PythonRepositoryIOError
+import com.jetbrains.python.packaging.repository.PyPiPackageRepository
 import com.jetbrains.python.packaging.repository.PyPackageRepositories
 import com.jetbrains.python.packaging.repository.PyPackageRepository
 import com.jetbrains.python.packaging.repository.PythonRepositoryManagerBase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.jetbrains.annotations.ApiStatus
-import java.io.IOException
 import java.time.Duration
 
-@ApiStatus.Internal
 @Service(Service.Level.PROJECT)
 internal class PipRepositoryManager(override val project: Project) : PythonRepositoryManagerBase() {
   override val repositories: List<PyPackageRepository>
-    get() = listOf(PyPIPackageRepository) + service<PythonSimpleRepositoryCache>().repositories
+    get() = listOf(PyPiPackageRepository) + service<PythonSimpleRepositoryCacheService>().repositories
 
   private val packageDetailsCache = Caffeine.newBuilder()
     .maximumSize(200)
@@ -41,35 +41,53 @@ internal class PipRepositoryManager(override val project: Project) : PythonRepos
 
 
   override suspend fun getPackageDetails(packageName: String, repository: PyPackageRepository?) = withContext(Dispatchers.IO) {
-    packageDetailsCache.get(packageName to (repository ?: PyPIPackageRepository))
+    packageDetailsCache.get(packageName to (repository ?: PyPiPackageRepository))
   }
 
-  @Throws(IOException::class)
-  override suspend fun initCaches() {
-    service<PypiPackageCache>().reloadCache().onFailure {
-      thisLogger().warn("Failed to load PyPI packages cache", it)
-    }.orThrow()
+  override suspend fun initCaches(): Result<Unit, PythonRepositoryIOError> {
+    service<PyPiPackageCache>()
+      .reloadCache()
+      .mapError { PythonRepositoryIOError(it.message) }
+      .getOr {
+        return it
+      }
 
     val repositoryService = service<PyPackageRepositories>()
-    val repositoryCache = service<PythonSimpleRepositoryCache>()
+    val repositoryCache = service<PythonSimpleRepositoryCacheService>()
+
     if (repositoryService.repositories.isNotEmpty() && repositoryCache.isEmpty()) {
-      repositoryCache.refresh()
+      repositoryCache
+        .reloadAll()
+        .mapError { PythonRepositoryIOError(it.message) }
+        .getOr { return it }
     }
-    thisLogger().debug("Pip repository cache initialized with ${service<PypiPackageCache>().packages.size} packages" +
-                       "and ${repositoryCache.repositories.size} repositories")
+
+    logger.debug {
+      "Pip repository cache initialized with ${service<PyPiPackageCache>().size} packages" +
+      "and ${repositoryCache.repositories.size} repositories"
+    }
+
+    return Result.Success(Unit)
   }
 
-  @Throws(IOException::class)
-  override suspend fun refreshCaches() {
-    service<PypiPackageCache>().reloadCache(force = true).orThrow()
-    service<PythonSimpleRepositoryCache>().refresh()
+  override suspend fun refreshCaches(): Result<Unit, PythonRepositoryIOError> {
+    service<PyPiPackageCache>()
+      .reloadCache(force = true)
+      .mapError { PythonRepositoryIOError(it.message) }
+      .getOr { return it }
+
+    return refreshAddedCaches()
   }
+
+  suspend fun refreshAddedCaches(): Result<Unit, PythonRepositoryIOError> =
+    service<PythonSimpleRepositoryCacheService>().reloadAll()
 
   override suspend fun getVersions(packageName: String, repository: PyPackageRepository?): List<String>? {
     return getPackageDetails(packageName, repository).getOrNull()?.availableVersions
   }
 
   companion object {
+    private val logger = logger<PipRepositoryManager>()
     fun getInstance(project: Project): PipRepositoryManager = project.service()
   }
 }

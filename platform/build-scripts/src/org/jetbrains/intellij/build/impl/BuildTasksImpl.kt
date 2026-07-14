@@ -1,8 +1,9 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:Suppress("ReplacePutWithAssignment")
+@file:Suppress("ReplacePutWithAssignment", "DestructuringForParameter")
 
 package org.jetbrains.intellij.build.impl
 
+import com.intellij.openapi.util.io.NioFiles
 import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.platform.buildData.productInfo.ProductInfoLaunchData
 import com.intellij.util.containers.CollectionFactory
@@ -12,10 +13,8 @@ import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.trace.Span
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -48,8 +47,10 @@ import org.jetbrains.intellij.build.classPath.PluginBuildDescriptor
 import org.jetbrains.intellij.build.executeStep
 import org.jetbrains.intellij.build.findFileInModuleSources
 import org.jetbrains.intellij.build.findProductModulesFile
-import org.jetbrains.intellij.build.impl.maven.MavenArtifactData
-import org.jetbrains.intellij.build.impl.maven.MavenArtifactsBuilder
+import org.jetbrains.intellij.build.impl.moduleRepository.MODULE_DESCRIPTORS_COMPACT_PATH
+import org.jetbrains.intellij.build.impl.moduleRepository.MODULE_DESCRIPTORS_JAR_PATH
+import org.jetbrains.intellij.build.impl.moduleRepository.RUNTIME_REPOSITORY_MODULES_DIR_NAME
+import org.jetbrains.intellij.build.impl.moduleRepository.generateCrossPlatformRepository
 import org.jetbrains.intellij.build.impl.plugins.buildNonBundledPlugins
 import org.jetbrains.intellij.build.impl.plugins.buildPlugins
 import org.jetbrains.intellij.build.impl.productInfo.PRODUCT_INFO_FILE_NAME
@@ -103,7 +104,12 @@ suspend fun buildNonBundledPlugins(mainPluginModules: List<String>, context: Bui
   val platformLayout = createPlatformLayout(context)
   val distState = DistributionBuilderState(platformLayout = platformLayout, pluginsToPublish = pluginsToPublishEffective, context = context)
 
-  val searchableOptionSet = buildSearchableOptions(context.createProductRunner(mainPluginModules + dependencyModules), context)
+  val searchableOptionSet = if (context.isStepSkipped(BuildOptions.SEARCHABLE_OPTIONS_INDEX_STEP)) {
+    null
+  }
+  else {
+    buildSearchableOptions(context.createProductRunner(mainPluginModules + dependencyModules), context)
+  }
 
   buildNonBundledPlugins(
     pluginsToPublish = pluginsToPublish,
@@ -539,67 +545,7 @@ suspend fun buildDistributions(context: BuildContext): Unit = block("build distr
   }
 }
 
-private fun CoroutineScope.createMavenArtifactJob(platformLayout: PlatformLayout, context: BuildContext): Job? {
-  val mavenArtifacts = context.productProperties.mavenArtifacts
-  if (!mavenArtifacts.forIdeModules &&
-      mavenArtifacts.additionalModules.isEmpty() &&
-      mavenArtifacts.squashedModules.isEmpty() &&
-      mavenArtifacts.proprietaryModules.isEmpty()) {
-    return null
-  }
-
-  return createSkippableJob(spanBuilder("generate maven artifacts"), BuildOptions.MAVEN_ARTIFACTS_STEP, context) {
-    val platformModules = HashSet<String>()
-    if (mavenArtifacts.forIdeModules) {
-      platformLayout.includedModules.mapTo(platformModules) { it.moduleName }
-      platformModules.addAll(getToolModules())
-      val enabledPluginModules = context.getBundledPluginModules()
-      platformModules.addAll(enabledPluginModules)
-      val pluginLayouts = getPluginLayoutsByJpsModuleNames(modules = enabledPluginModules, productLayout = context.productProperties.productLayout)
-      val contentModuleFilter = context.getContentModuleFilter()
-      for (plugin in pluginLayouts) {
-        plugin.includedModules.mapTo(platformModules) { it.moduleName }
-        val mainModule = context.outputProvider.findRequiredModule(plugin.mainModule)
-        platformModules.addAll((context as BuildContextImpl).jarPackagerDependencyHelper.readPluginIncompleteContentFromDescriptor(mainModule, contentModuleFilter))
-      }
-    }
-
-    val mavenArtifactsBuilder = MavenArtifactsBuilder(context)
-    val builtArtifacts = LinkedHashMap<MavenArtifactData, List<Path>>()
-    if (!platformModules.isEmpty()) {
-      mavenArtifactsBuilder.generateMavenArtifacts(
-        moduleNamesToPublish = platformModules,
-        outputDir = "maven-artifacts",
-        builtArtifacts = builtArtifacts,
-        ignoreNonMavenizable = true,
-      )
-    }
-    if (!mavenArtifacts.additionalModules.isEmpty()) {
-      mavenArtifactsBuilder.generateMavenArtifacts(
-        moduleNamesToPublish = mavenArtifacts.additionalModules,
-        moduleNamesToSquashAndPublish = mavenArtifacts.squashedModules,
-        builtArtifacts = builtArtifacts,
-        outputDir = "maven-artifacts"
-      )
-    }
-    if (!mavenArtifacts.proprietaryModules.isEmpty()) {
-      mavenArtifactsBuilder.generateMavenArtifacts(
-        moduleNamesToPublish = mavenArtifacts.proprietaryModules,
-        builtArtifacts = builtArtifacts,
-        outputDir = "proprietary-maven-artifacts"
-      )
-    }
-    for (spec in mavenArtifacts.aggregatorPomArtifacts) {
-      mavenArtifactsBuilder.generateAggregatorPom(
-        spec = spec,
-        outputDir = "maven-artifacts",
-        builtArtifacts = builtArtifacts,
-      )
-    }
-    mavenArtifactsBuilder.validate(builtArtifacts)
-  }
-}
-
+@Suppress("DEPRECATION")
 private suspend fun checkProductProperties(context: BuildContext) {
   checkProductLayout(context)
 
@@ -1269,6 +1215,12 @@ internal fun copyDistFiles(newDir: Path, os: OsFamily, arch: JvmArchitecture, li
     Files.createDirectories(targetFile.parent)
     if (item.content is LocalDistFileContent) {
       Files.copy(item.content.file, targetFile, StandardCopyOption.REPLACE_EXISTING)
+      // Files.copy does not preserve attributes, so re-apply the executable bit requested by the DistFile.
+      // The dev build runs binaries straight from this directory, and the Linux/macOS packagers derive the
+      // archive's executable flag from the on-disk POSIX permissions of these files.
+      if (item.content.isExecutable && os != OsFamily.WINDOWS) {
+        NioFiles.setExecutable(targetFile)
+      }
     }
     else {
       Files.write(targetFile, (item.content as InMemoryDistFileContent).data)

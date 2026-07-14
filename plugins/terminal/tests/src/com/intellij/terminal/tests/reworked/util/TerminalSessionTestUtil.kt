@@ -8,8 +8,6 @@ import com.intellij.platform.eel.provider.LocalEelDescriptor
 import com.intellij.terminal.frontend.session.TerminalSessionsManager
 import com.intellij.terminal.frontend.session.createTerminalSession
 import com.intellij.terminal.frontend.session.startTerminalProcess
-import com.intellij.terminal.tests.reworked.util.TerminalSessionTestUtil.createShellCommand
-import com.intellij.util.EnvironmentUtil
 import com.intellij.util.PathUtil
 import com.intellij.util.asDisposable
 import com.jediterm.core.util.TermSize
@@ -74,7 +72,7 @@ internal object TerminalSessionTestUtil {
     TerminalTestUtil.setTerminalEngineForTest(TerminalEngine.REWORKED, coroutineScope.asDisposable())
 
     val allOptions = options.builder()
-      .envVariables(options.envVariables + mapOf(EnvironmentUtil.DISABLE_OMZ_AUTO_UPDATE to "true", "HISTFILE" to "/dev/null"))
+      .envVariables(options.envVariables + mapOf("DISABLE_AUTO_UPDATE" to "true", "HISTFILE" to "/dev/null"))
       .initialTermSize(options.initialTermSize ?: TermSize(80, 24))
       .build()
 
@@ -84,8 +82,8 @@ internal object TerminalSessionTestUtil {
       TestTerminalSessionResult(session, ttyConnector)
     }
     else {
-      val manager = TerminalSessionsManager.getInstance()
-      val sessionStartResult = manager.startSession(allOptions, project, coroutineScope)
+      val manager = TerminalSessionsManager.getInstance(project)
+      val sessionStartResult = manager.startSession(allOptions, coroutineScope)
       val session = manager.getSession(sessionStartResult.sessionId)!!
       TestTerminalSessionResult(session, sessionStartResult.ttyConnector)
     }
@@ -155,7 +153,7 @@ internal object TerminalSessionTestUtil {
       descriptor.osFamily.isWindows && descriptor != LocalEelDescriptor,
       "Remote Windows may not support shell integration (latest ConPTY is required)"
     )
-    val javaProcess = shellEelProcess.process
+    val javaProcess = shellEelProcess.ptyProcess
     if (javaProcess is WinPtyProcess || javaProcess is CygwinPtyProcess) {
       Assert.fail("Shell integration on Windows requires ConPTY, but ${javaProcess::class.java} was supplied")
     }

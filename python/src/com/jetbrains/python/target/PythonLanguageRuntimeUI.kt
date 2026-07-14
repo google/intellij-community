@@ -19,21 +19,20 @@ import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.ui.launchOnShow
 import com.jetbrains.python.PyBundle.message
 import com.jetbrains.python.TraceContext
-import com.jetbrains.python.errorProcessing.ErrorSink
 import com.jetbrains.python.errorProcessing.emit
 import com.jetbrains.python.newProjectWizard.projectPath.ProjectPathFlows
 import com.jetbrains.python.onFailure
 import com.jetbrains.python.sdk.ModuleOrProject
 import com.jetbrains.python.sdk.add.collector.PythonNewInterpreterAddedCollector
-import com.jetbrains.python.sdk.add.v2.FileSystem
 import com.jetbrains.python.sdk.add.v2.PathHolder
 import com.jetbrains.python.sdk.add.v2.PythonAddCustomInterpreter
 import com.jetbrains.python.sdk.add.v2.PythonInterpreterSelectionMode
 import com.jetbrains.python.sdk.add.v2.PythonLocalAddInterpreterModel
+import com.jetbrains.python.sdk.add.v2.TargetFileSystem
 import com.jetbrains.python.sdk.configurePythonSdk
 import com.jetbrains.python.sdk.runWithSdkConfigurationLock
-import com.jetbrains.python.sdk.service.PySdkService.Companion.pySdkService
-import com.jetbrains.python.util.ShowingMessageErrorSync
+import com.jetbrains.python.errorProcessing.ErrorSink
+import com.jetbrains.python.errorProcessing.withProject
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
@@ -41,7 +40,7 @@ import java.awt.Dimension
 import java.nio.file.Path
 import java.util.function.Supplier
 
-class PythonLanguageRuntimeUI(
+internal class PythonLanguageRuntimeUI(
   val project: Project,
   val config: PythonLanguageRuntimeConfiguration,
   val targetSupplier: Supplier<TargetEnvironmentConfiguration>,
@@ -52,13 +51,13 @@ class PythonLanguageRuntimeUI(
 
   private lateinit var mainPanel: PythonAddCustomInterpreter<PathHolder.Target>
   private var validationErrors: Collection<ValidationInfo> = emptyList()
-  private val errorSink: ErrorSink = ShowingMessageErrorSync
+  private val errorSink: ErrorSink = ErrorSink()
 
   override fun createPanel(): DialogPanel {
     val targetEnvironmentConfiguration = targetSupplier.get()
     val model = PythonLocalAddInterpreterModel(
       ProjectPathFlows.create(Path.of(project.basePath!!)),
-      FileSystem.Target(
+      TargetFileSystem(
         targetEnvironmentConfiguration = targetEnvironmentConfiguration,
         pythonLanguageRuntimeConfiguration = config,
       )
@@ -68,7 +67,7 @@ class PythonLanguageRuntimeUI(
     mainPanel = PythonAddCustomInterpreter(
       model = model,
       module = module,
-      errorSink = ShowingMessageErrorSync.withProject(project),
+      errorSink = ErrorSink().withProject(project),
       limitExistingEnvironments = false,
       bestGuessCreateSdkInfo = CompletableDeferred(value = null)
     )
@@ -120,7 +119,6 @@ class PythonLanguageRuntimeUI(
           errorSink.emit(it)
         }.successOrNull?.also {
           configurePythonSdk(project, module, it)
-          project.pySdkService.persistSdk(it)
           PythonNewInterpreterAddedCollector.logPythonNewInterpreterAdded(it, false)
         }
       }

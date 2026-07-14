@@ -9,9 +9,12 @@ import com.intellij.openapi.actionSystem.ex.CustomComponentAction
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupListener
 import com.intellij.openapi.ui.popup.LightweightWindowEvent
+import com.intellij.util.ui.accessibility.ScreenReader
 import java.awt.event.ActionEvent
 import javax.swing.JComponent
+import org.jetbrains.annotations.ApiStatus
 
+@ApiStatus.Internal
 abstract class SplitButtonAction : AnAction(), CustomComponentAction {
 
   @Suppress("DuplicatedCode") // SplitButtonAction
@@ -34,6 +37,9 @@ abstract class SplitButtonAction : AnAction(), CustomComponentAction {
           model.isPopupShown = false
         }
       })
+      if (ScreenReader.isActive()) {
+        popup.setRequestFocus(true)
+      }
       popup.showUnderneathOf(combo)
     }
     return ToolbarSplitButton(model)

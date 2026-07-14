@@ -1,8 +1,9 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:ApiStatus.Internal
+
 package com.intellij.codeInsight.hints.presentation
 
 import com.intellij.codeInsight.hints.InlayPresentationFactory
-import com.intellij.ide.ui.UISettings
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.ui.scale.JBUIScale
@@ -170,10 +171,10 @@ class ScaleAwareIconPresentation(val icon: Icon,
   private val scaledIcon by valueOf<Icon, IconParameters> { (fontSize, scale) ->
     IconUtil.scaleByFont(icon = icon, ancestor = editor.component, fontSize = fontSize / scale)
   }.withState {
-    IconParameters(editor.colorsScheme.editorFontSize2D - fontShift)
+    IconParameters(editor.colorsScheme.editorFontSize2D - JBUIScale.scale(fontShift))
   }
 
-  private data class IconParameters(val font: Float, val scale: Float = UISettings.getInstance().currentIdeScale)
+  private data class IconParameters(val font: Float, val scale: Float = JBUIScale.scale(1.0f))
 }
 
 private class StateDependantValue<TData : Any, TState : Any>(

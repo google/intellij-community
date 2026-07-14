@@ -55,6 +55,7 @@ import org.jetbrains.kotlin.idea.completion.handlers.WithTailInsertHandler
 import org.jetbrains.kotlin.idea.completion.handlers.createKeywordConstructLookupElement
 import org.jetbrains.kotlin.lexer.KtKeywordToken
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken
+import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.lexer.KtTokens.ABSTRACT_KEYWORD
 import org.jetbrains.kotlin.lexer.KtTokens.ACTUAL_KEYWORD
 import org.jetbrains.kotlin.lexer.KtTokens.ALL_KEYWORD
@@ -121,12 +122,14 @@ import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtClassBody
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtCodeFragment
+import org.jetbrains.kotlin.psi.KtCompanionBlock
 import org.jetbrains.kotlin.psi.KtConstantExpression
 import org.jetbrains.kotlin.psi.KtConstructorCalleeExpression
 import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.psi.KtDeclarationWithInitializer
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtEnumEntry
+import org.jetbrains.kotlin.psi.KtExperimentalApi
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtExpressionWithLabel
 import org.jetbrains.kotlin.psi.KtFile
@@ -206,9 +209,14 @@ class KeywordCompletion() {
             WHEN_KEYWORD,
         )
 
-        private fun getCompoundKeywords(token: KtKeywordToken, languageVersionSettings: LanguageVersionSettings): Set<KtKeywordToken>? =
-            mapOf<KtKeywordToken, Set<KtKeywordToken>>(
-                COMPANION_KEYWORD to setOf(OBJECT_KEYWORD),
+        private fun getCompoundKeywords(token: KtKeywordToken, languageVersionSettings: LanguageVersionSettings): Set<KtKeywordToken?>? =
+            mapOf<KtKeywordToken, Set<KtKeywordToken?>>(
+                COMPANION_KEYWORD to buildSet {
+                    add(OBJECT_KEYWORD)
+                    if (languageVersionSettings.supportsFeature(LanguageFeature.CompanionBlocksAndExtensions)) {
+                        add(null)
+                    }
+                },
                 DATA_KEYWORD to setOfNotNull(
                     CLASS_KEYWORD,
                     OBJECT_KEYWORD.takeIf { languageVersionSettings.supportsFeature(LanguageFeature.DataObjects) },
@@ -270,7 +278,7 @@ class KeywordCompletion() {
         }
     }
 
-    private fun KtKeywordToken.getNextPossibleKeywords(position: PsiElement): Set<KtKeywordToken>? {
+    private fun KtKeywordToken.getNextPossibleKeywords(position: PsiElement): Set<KtKeywordToken?>? {
         return when {
             this == SUSPEND_KEYWORD && position.isInsideKtTypeReference -> null
             else -> getCompoundKeywords(this, position.languageVersionSettings)
@@ -328,7 +336,14 @@ class KeywordCompletion() {
                 if (prev in INCOMPATIBLE_KEYWORDS_AROUND_SEALED) return
             }
 
-            val nextIsNotYetPresent = keywordToken.getNextPossibleKeywords(position)?.none { it.value == next } == true
+            if (keywordToken == COMPANION_KEYWORD) {
+                // Companion object should only be suggested inside class bodies
+                val containingKtElement = position.parentOfType<KtElement>() ?: return
+                val containingClassBody = containingKtElement as? KtClassBody ?: containingKtElement.parent as? KtClassBody ?: return
+                if (containingClassBody.allCompanionObjects.isNotEmpty()) return
+            }
+
+            val nextIsNotYetPresent = keywordToken.getNextPossibleKeywords(position)?.none { it?.value == next } == true
             if (nextIsNotYetPresent && keywordToken.avoidSuggestingWith(nextKeyword)) return
 
             if (nextIsNotYetPresent)
@@ -743,6 +758,11 @@ class KeywordCompletion() {
                         is KtObjectDeclaration -> if (ownerDeclaration.isObjectLiteral()) OBJECT_LITERAL else OBJECT
 
                         else -> return keywordTokenType != CONST_KEYWORD
+                    }
+
+                    if (keywordTokenType == KtTokens.INTERNAL_KEYWORD && parentTarget == INTERFACE) {
+                        @OptIn(KtExperimentalApi::class)
+                        return parentParent?.parent is KtCompanionBlock
                     }
 
                     if (!isPossibleParentTarget(keywordTokenType, parentTarget, languageVersionSettings)) return false

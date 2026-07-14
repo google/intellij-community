@@ -7,10 +7,10 @@ import com.intellij.polySymbols.PolySymbolProperty
 import com.intellij.polySymbols.js.JS_PROPERTIES
 import com.intellij.polySymbols.js.JS_STRING_LITERALS
 import com.intellij.polySymbols.query.PolySymbolScope
-import com.intellij.polySymbols.search.PsiSourcedPolySymbol
+import com.intellij.polySymbols.search.PsiLinkedPolySymbol
 import org.jetbrains.annotations.ApiStatus
 
-interface WebTypesSymbol : PsiSourcedPolySymbol, PolySymbolScope {
+interface WebTypesSymbol : PsiLinkedPolySymbol, PolySymbolScope {
 
   val location: Location?
 
@@ -36,7 +36,8 @@ interface WebTypesSymbol : PsiSourcedPolySymbol, PolySymbolScope {
 
     fun findFile(): VirtualFile? =
       context.firstNotNullOfOrNull {
-        it.parent?.findFileByRelativePath(fileName)
+        if (!it.isValid) null
+        else it.parent?.findFileByRelativePath(fileName)
       }
 
   }

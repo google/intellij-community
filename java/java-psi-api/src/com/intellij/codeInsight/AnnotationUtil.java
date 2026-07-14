@@ -400,8 +400,14 @@ public class AnnotationUtil {
 
     if (BitUtil.isSet(flags, CHECK_EXTERNAL)) {
       Project project = listOwner.getProject();
-      if (ExternalAnnotationsManager.getInstance(project).findExternalAnnotation(listOwner, annotationFQN) != null) {
+      ExternalAnnotationsManager manager = ExternalAnnotationsManager.getInstance(project);
+      if (manager.findExternalAnnotation(listOwner, annotationFQN) != null) {
         return true;
+      }
+      if (BitUtil.isSet(flags, CHECK_TYPE)) {
+        if (manager.findExternalTypeAnnotation(listOwner, "", annotationFQN) != null) {
+          return true;
+        }
       }
     }
 
@@ -509,12 +515,27 @@ public class AnnotationUtil {
     return null;
   }
 
+  /**
+   * @param owner owner to find annotations for
+   * @param inHierarchy if true, the annotations from super-classes, super-methods and the corresponding parameters of super-methods will be returned as well.
+   * @param visited set of already visited owners; use null for fresh run
+   * @return explicit, external, and inferred annotations for a given owner, optionally annotations from the super-elements.
+   * External type annotations for variable type or method return type are not returned.
+   */
   public static PsiAnnotation @NotNull [] getAllAnnotations(@NotNull PsiModifierListOwner owner,
                                                             boolean inHierarchy,
                                                             @Nullable Set<? super PsiModifierListOwner> visited) {
     return getAllAnnotations(owner, inHierarchy, visited, true);
   }
 
+  /**
+   * @param owner owner to find annotations for
+   * @param inHierarchy if true, the annotations from super-classes, super-methods and the corresponding parameters of super-methods will be returned as well.
+   * @param visited set of already visited owners; use null for fresh run
+   * @param withInferred if true, inferred annotations will be returned.
+   * @return explicit and external annotations for a given owner, optionally including inferred annotations and annotations from the super-elements.
+   * External type annotations for variable type or method return type are not returned.
+   */
   public static PsiAnnotation @NotNull [] getAllAnnotations(@NotNull PsiModifierListOwner owner,
                                                             boolean inHierarchy,
                                                             @Nullable Set<? super PsiModifierListOwner> visited, boolean withInferred) {
@@ -604,11 +625,11 @@ public class AnnotationUtil {
   }
 
   public static boolean isInferredAnnotation(@NotNull PsiAnnotation annotation) {
-    return InferredAnnotationsManager.getInstance(annotation.getProject()).isInferredAnnotation(annotation);
+    return InferredAnnotationsManager.isInferredAnnotation(annotation);
   }
 
   public static boolean isExternalAnnotation(@NotNull PsiAnnotation annotation) {
-    return ExternalAnnotationsManager.getInstance(annotation.getProject()).isExternalAnnotation(annotation);
+    return ExternalAnnotationsManager.isExternal(annotation);
   }
 
   public static @Nullable @NlsSafe String getStringAttributeValue(@NotNull PsiAnnotation anno, final @Nullable String attributeName) {

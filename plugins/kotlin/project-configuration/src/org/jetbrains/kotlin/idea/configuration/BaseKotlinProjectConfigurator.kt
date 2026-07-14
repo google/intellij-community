@@ -5,6 +5,7 @@ import com.intellij.ide.actions.OpenFileAction
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.application.readAndEdtWriteAction
 import com.intellij.openapi.application.runReadAction
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.modules
@@ -17,6 +18,7 @@ import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.VisibleForTesting
 import org.jetbrains.kotlin.idea.base.projectStructure.ModuleSourceRootGroup
 import org.jetbrains.kotlin.idea.base.projectStructure.ModuleSourceRootMap
+import org.jetbrains.kotlin.idea.base.projectStructure.allModules
 import org.jetbrains.kotlin.idea.compiler.configuration.IdeKotlinVersion
 import org.jetbrains.kotlin.idea.framework.ui.ConfigureDialogWithModulesAndVersion
 import org.jetbrains.kotlin.idea.projectConfiguration.KotlinProjectConfigurationBundle
@@ -81,10 +83,10 @@ abstract class BaseKotlinProjectConfigurator : KotlinProjectConfigurator {
         val result = resultBuilder.build()
         val error = result.error
         if (error == null) {
-            val configurationService = KotlinProjectConfigurationService.getInstance(project)
-            configurationService.queueSyncIfPossible()
+            FileDocumentManager.getInstance().saveAllDocuments()
+            KotlinProjectConfigurationService.getInstance(project).queueSyncIfPossible()
 
-            val changes = readAction { result.changedFiles.calculateChanges() }
+            val changes = readAction { result.changedFiles.collectChangedFiles() }
             notificationHolder
                 .showAutoConfiguredNotification(module.name, changes)
 
@@ -241,15 +243,12 @@ abstract class BaseKotlinProjectConfigurator : KotlinProjectConfigurator {
                         val resultBuilder = configureAction()
                         val configurationResult = resultBuilder.build()
                         if (configurationResult.error == null) {
-                            // have to make an actual snapshot of modules to avoid concurrent modification
-                            val configuredModules =
-                                configurationResult.configuredModules.toCollection(linkedSetOf())
-
                             // attempt to configure compiler plugin during the same step as kotlin configuration
                             // when module dependency is known
-                            configuredModules.forEach { module ->
-                                configureCompilerPluginsForModule(module, resultBuilder)
-                            }
+                            configureCompilerPluginsForModules(
+                                postConfigurationModules(project, modules),
+                                resultBuilder
+                            )
                         }
                         addUndoConfigurationListener(
                             project,
@@ -286,10 +285,7 @@ abstract class BaseKotlinProjectConfigurator : KotlinProjectConfigurator {
     }
 
     private fun Collection<Module>.configuratorsByModule(): List<Pair<Module, List<KotlinProjectPostConfigurator>>>? {
-        val project = firstOrNull()?.project ?: return null
-        val effectiveModules =
-            effectiveModules(project, this)?.takeUnless { it.isEmpty() } ?: return null
-        val configuratorsByModule = effectiveModules.mapNotNull { module ->
+        val configuratorsByModule = this.mapNotNull { module ->
             val configuratorsByModules =
                 KotlinProjectPostConfigurator.EP_NAME.extensionList
                     .filter {
@@ -304,8 +300,17 @@ abstract class BaseKotlinProjectConfigurator : KotlinProjectConfigurator {
         return configuratorsByModule.takeIf { it.isNotEmpty() }
     }
 
-    protected fun configureCompilerPluginsForModule(module: Module, resultBuilder: ConfigurationResultBuilder) {
-        val configuratorsByModule = listOf(module).configuratorsByModule() ?: return
+    private fun postConfigurationModules(
+        project: Project,
+        requestedModules: Collection<Module>
+    ): Collection<Module> {
+        val moduleSourceRootMap = ModuleSourceRootMap(project)
+        return requestedModules
+            .flatMapTo(linkedSetOf()) { moduleSourceRootMap.getWholeModuleGroup(it).allModules() }
+    }
+
+    private fun configureCompilerPluginsForModules(modules: Collection<Module>, resultBuilder: ConfigurationResultBuilder) {
+        val configuratorsByModule = modules.configuratorsByModule() ?: return
 
         configuratorsByModule.forEach { (module, configuratorsByModules) ->
             configuratorsByModules.forEach { it.configureModule(module, resultBuilder) }

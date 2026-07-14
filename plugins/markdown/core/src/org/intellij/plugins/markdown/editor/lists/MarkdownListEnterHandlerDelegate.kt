@@ -6,9 +6,11 @@ import com.intellij.codeInsight.editorActions.enter.EnterHandlerDelegate
 import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.application.runWriteAction
+import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorModificationUtil
 import com.intellij.openapi.editor.actionSystem.EditorActionHandler
+import com.intellij.openapi.editor.actions.SplitLineAction
 import com.intellij.openapi.util.Ref
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
@@ -72,6 +74,10 @@ internal class MarkdownListEnterHandlerDelegate: EnterHandlerDelegate {
       return EnterHandlerDelegate.Result.Continue
     }
 
+    if (DataManager.getInstance().loadFromDataContext(dataContext, SplitLineAction.SPLIT_LINE_KEY) == true) {
+      return EnterHandlerDelegate.Result.Continue
+    }
+
     if (DataManager.getInstance().loadFromDataContext(dataContext, AutoHardWrapHandler.AUTO_WRAP_LINE_IN_PROGRESS_KEY) == true) {
       editor.putUserData(AutoHardWrapHandler.AUTO_WRAP_LINE_IN_PROGRESS_KEY, true)
       return EnterHandlerDelegate.Result.Continue
@@ -97,6 +103,9 @@ internal class MarkdownListEnterHandlerDelegate: EnterHandlerDelegate {
       handleEmptyItem(item, editor, file, originalHandler, dataContext)
       caretOffset.set(editor.caretModel.offset)
       return EnterHandlerDelegate.Result.Stop
+    }
+    if (isAtMarkdownHardLineBreak(caretOffset.get(), document)) {
+      return EnterHandlerDelegate.Result.Continue
     }
 
     val blockQuote = MarkdownPsiUtil.findNonWhiteSpacePrevSibling(file, caretOffset.get())?.parentOfType<MarkdownBlockQuote>()
@@ -127,6 +136,16 @@ internal class MarkdownListEnterHandlerDelegate: EnterHandlerDelegate {
     val element = file.findElementAt(caretOffset - 1) ?: return false
     val fence = element.parentOfType<MarkdownCodeFence>(withSelf = true)
     return fence != null
+  }
+
+  private fun isAtMarkdownHardLineBreak(offset: Int, document: Document): Boolean {
+    val line = document.getLineNumber(offset)
+    if (offset != document.getLineEndOffset(line)) {
+      return false
+    }
+    val lineStart = document.getLineStartOffset(line)
+    val chars = document.charsSequence
+    return offset - 2 >= lineStart && chars[offset - 1] == ' ' && chars[offset - 2] == ' '
   }
 
   private fun handleEmptyItem(item: MarkdownListItem, editor: Editor, file: PsiFile, originalHandler: EditorActionHandler?, dataContext: DataContext) {

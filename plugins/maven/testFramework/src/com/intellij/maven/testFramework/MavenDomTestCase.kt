@@ -54,7 +54,6 @@ import org.jetbrains.idea.maven.dom.inspections.MavenModelInspection
 import org.jetbrains.idea.maven.dom.model.MavenDomProjectModel
 import org.jetbrains.idea.maven.dom.references.MavenPsiElementWrapper
 import org.jetbrains.idea.maven.model.MavenRepoArtifactInfo
-import org.jetbrains.idea.maven.onlinecompletion.model.MavenRepositoryArtifactInfo
 import org.jetbrains.idea.maven.utils.MavenLog
 import org.junit.ComparisonFailure
 import java.nio.file.Path
@@ -363,8 +362,9 @@ abstract class MavenDomTestCase : MavenMultiVersionImportingTestCase() {
     vararg expected: String?,
   ) {
     val actual = getCompletionVariants(f, lookupElementStringFunction)
-    assertNotEmpty(actual)
-    assertUnorderedElementsAreEqual(actual!!.toList(), expected.toList())
+    val expectedList = expected.toList()
+    assertNotNull("Expected $expectedList but got null", actual)
+    assertUnorderedElementsAreEqual(actual!!.toList(), expectedList)
   }
 
   protected suspend fun assertCompletionVariantsInclude(

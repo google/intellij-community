@@ -1,21 +1,29 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.testFramework.plugins
 
+import com.intellij.openapi.diagnostic.debug
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleLoadingRuleValue
 import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleVisibilityValue
 import com.intellij.platform.pluginSystem.parser.impl.elements.xmlValue
 import com.intellij.util.io.DirectoryContentBuilder
+import com.intellij.util.io.createDirectories
 import com.intellij.util.io.directoryContent
 import com.intellij.util.io.jarFile
+import com.intellij.util.io.sanitizeFileName
 import com.intellij.util.io.zipFile
 import java.nio.file.FileSystems
 import java.nio.file.Path
+import kotlin.io.path.isDirectory
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
+import kotlin.io.path.notExists
+
+private val LOG get() = logger<PluginPackagingConfig>()
 
 open class PluginPackagingConfig {
   open val ContentModuleSpec.descriptorFilename: String get() {
-    return "${moduleId.replace('/', '.')}.xml"
+    return "${moduleName.replace('/', '.')}.xml"
   }
 
   open val ContentModuleSpec.embedToPluginXml: Boolean get() {
@@ -23,7 +31,7 @@ open class PluginPackagingConfig {
   }
 
   open val ContentModuleSpec.jarFilename: String get() {
-    return "${moduleId.replace('/', '.')}.jar"
+    return "${moduleName.replace('/', '.')}.jar"
   }
 
   open val ContentModuleSpec.packageToMainJar: Boolean get() {
@@ -82,19 +90,22 @@ fun PluginSpec.buildXml(config: PluginPackagingConfig = PluginPackagingConfig())
       appendLine("""<incompatible-with>${plugin}</incompatible-with>""")
     }
     if (content.isNotEmpty()) {
-      val attributes = if (namespace != null) """ namespace="$namespace"""" else ""
-      appendLine("<content$attributes>")
-      for (module in content) {
-        val loadingAttribute = module.loadingRule.takeIf { it != ModuleLoadingRuleValue.OPTIONAL }?.let { "loading=\"${it.xmlValue}\" " }.orEmpty() +
-                               module.requiredIfAvailable?.let { "required-if-available=\"$it\" " }.orEmpty()
-        val tag = """module name="${module.moduleId}" $loadingAttribute"""
-        if (module.embedToPluginXml) {
-          appendLine("<$tag><![CDATA[${module.spec.buildXml(config)}]]></module>")
-        } else {
-          appendLine("<$tag/>")
+      content.groupBy { it.namespace }.forEach { (namespace, contentModuleSpecs) ->
+        val attributes = if (namespace != null) """ namespace="$namespace"""" else ""
+
+        appendLine("<content$attributes>")
+        for (module in contentModuleSpecs) {
+          val loadingAttribute = module.loadingRule.takeIf { it != ModuleLoadingRuleValue.OPTIONAL }?.let { "loading=\"${it.xmlValue}\" " }.orEmpty() +
+                                 module.requiredIfAvailable?.let { "required-if-available=\"$it\" " }.orEmpty()
+          val tag = """module name="${module.moduleName}" $loadingAttribute"""
+          if (module.embedToPluginXml) {
+            appendLine("<$tag><![CDATA[${module.spec.buildXml(config)}]]></module>")
+          } else {
+            appendLine("<$tag/>")
+          }
         }
+        appendLine("</content>")
       }
-      appendLine("</content>")
     }
     if (resourceBundle != null) appendLine("""<resource-bundle>$resourceBundle</resource-bundle>""")
     if (actions != null) appendLine("<actions>\n$actions\n</actions>")
@@ -112,17 +123,22 @@ fun PluginSpec.buildXml(config: PluginPackagingConfig = PluginPackagingConfig())
   }
 }
 
-fun PluginSpec.buildDir(path: Path, config: PluginPackagingConfig = PluginPackagingConfig()): Unit = with(config) {
-  directoryContent {
-    if (isSingleJar) {
-      buildMainDir(this, config)
-    } else {
-      buildDir(this@directoryContent, config)
-    }
-  }.generate(path)
+fun PluginSpec.installAt(pluginsDir: Path, config: PluginPackagingConfig = PluginPackagingConfig()): Path = with(config) {
+  pluginsDir.createDirectories()
+  if (isSingleJar) {
+    val jarPath = findInexistentPath(pluginsDir, sanitizeFileName(id!!), ".jar")
+    buildMainJar(jarPath, config)
+    return jarPath
+  } else {
+    val dirPath = findInexistentPath(pluginsDir, sanitizeFileName(id!!), "")
+    directoryContent {
+      buildMultiJarDir(this@directoryContent, config)
+    }.generate(dirPath)
+    return dirPath
+  }
 }
 
-private fun PluginSpec.buildDir(
+private fun PluginSpec.buildMultiJarDir(
   builder: DirectoryContentBuilder,
   config: PluginPackagingConfig,
 ) = with(config) {
@@ -141,7 +157,7 @@ private fun PluginSpec.buildDir(
   }
 }
 
-fun PluginSpec.buildDistribution(dir: Path, config: PluginPackagingConfig = PluginPackagingConfig()): Path = with(config) {
+fun PluginSpec.buildDistributionArchive(dir: Path, config: PluginPackagingConfig = PluginPackagingConfig()): Path = with(config) {
   val archiveName = name ?: id ?: error("neither name or id specified")
   if (isSingleJar) {
     val path = dir.resolve("$archiveName.jar")
@@ -164,7 +180,7 @@ fun PluginSpec.buildZip(path: Path, config: PluginPackagingConfig = PluginPackag
   zipFile {
     val rootDir = name ?: id ?: error("neither name or id specified")
     dir(rootDir) {
-      buildDir(this, config)
+      buildMultiJarDir(this, config)
     }
   }.generate(path)
 }
@@ -190,13 +206,15 @@ private fun ContentModuleSpec.buildContentDir(dir: DirectoryContentBuilder, conf
 
 private fun PluginSpec.buildClasses(dir: DirectoryContentBuilder) {
   for ((classFqn, classLoader) in classFiles) {
+    LOG.debug { "packing $classFqn"}
     val url = (classLoader ?: this::class.java.classLoader).getResource(classFqn.replace('.', '/') + ".class")
               ?: error("$classFqn not found")
     dir.dirsFile(classFqn.replace('.', '/') + ".class", url.readBytes())
   }
   for ((pkg, classLoader) in packageClassFiles) {
+    LOG.debug { "packing classes from $pkg package" }
     for (url in (classLoader ?: this::class.java.classLoader).getResources(pkg.replace('.', '/'))) {
-      require(url.toString().endsWith('/')) { url }
+      LOG.debug { "resources url: $url" }
       val packageEntries: List<String> = if (url.protocol.contains("jar")) {
         FileSystems.newFileSystem(url.toURI(), mutableMapOf<String, Any>()).use { jarFs ->
           val pkgPath = jarFs.getPath(pkg.replace('.', '/'))
@@ -205,7 +223,9 @@ private fun PluginSpec.buildClasses(dir: DirectoryContentBuilder) {
       } else {
         url.readText().splitToSequence("\n").filter { !it.isBlank() }.toList()
       }
+      LOG.debug { "package contains ${packageEntries.size} entries" }
       for (entry in packageEntries) {
+        LOG.debug { "packing $entry" }
         if (entry.endsWith(".class")) {
           val bytes = this::class.java.classLoader.getResource("${pkg.replace('.', '/')}/$entry")!!.readBytes()
           dir.dirsFile(pkg.replace('.', '/') + "/$entry", bytes)
@@ -252,4 +272,10 @@ private fun PluginSpec.sequencePluginDependenciesRecursive(): Sequence<DependsSp
       }
     }
   }
+}
+
+private fun findInexistentPath(directory: Path, prefix: String, suffix: String): Path {
+  require(directory.isDirectory())
+  val candidates = sequenceOf(prefix + suffix) + generateSequence(1) { it + 1 }.map { "$prefix-$it$suffix" }
+  return candidates.firstNotNullOf { filename -> directory.resolve(filename).takeIf { it.notExists() } }
 }

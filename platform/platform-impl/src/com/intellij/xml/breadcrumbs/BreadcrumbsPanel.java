@@ -6,6 +6,7 @@ import com.intellij.codeWithMe.ClientId;
 import com.intellij.ide.ui.UISettings;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.CoroutinesKt;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.WriteIntentReadAction;
@@ -41,9 +42,12 @@ import com.intellij.util.concurrency.NonUrgentExecutor;
 import com.intellij.util.ui.MouseEventAdapter;
 import com.intellij.util.ui.StartupUiUtil;
 import com.intellij.util.ui.UIUtil;
-import com.intellij.util.ui.update.MergingUpdateQueue;
-import com.intellij.util.ui.update.UiNotifyConnector;
+import com.intellij.util.ui.update.DebouncedUpdates;
 import com.intellij.util.ui.update.Update;
+import com.intellij.util.ui.update.UpdateQueue;
+import kotlin.Unit;
+import kotlinx.coroutines.Dispatchers;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -73,7 +77,7 @@ public abstract class BreadcrumbsPanel extends JComponent implements Disposable 
   protected Editor myEditor;
   private Collection<RangeHighlighter> myHighlighed;
   protected boolean myUserCaretChange = true;
-  private final MergingUpdateQueue myQueue = new MergingUpdateQueue("Breadcrumbs.Queue", 200, true, breadcrumbs);
+  private final UpdateQueue<Unit> myQueue;
 
   private final List<BreadcrumbListener> myBreadcrumbListeners = new ArrayList<>();
 
@@ -120,18 +124,18 @@ public abstract class BreadcrumbsPanel extends JComponent implements Disposable 
       pane.getHorizontalScrollBar().setEnabled(false);
       setLayout(new BorderLayout());
       add(BorderLayout.CENTER, pane);
-
-      Disposer.register(this, UiNotifyConnector.installOn(breadcrumbs, myQueue));
     }
-
-    Disposer.register(this, myQueue);
 
     BreadcrumbsProvider.EP_NAME.addChangeListener(() -> updateCrumbsSync(), this);
     BreadcrumbsPresentationProvider.EP_NAME.addChangeListener(() -> updateCrumbsSync(), this);
 
-    if (ApplicationManager.getApplication().isHeadlessEnvironment()) {
-      myQueue.setPassThrough(true);
-    }
+    int delayMillis = ApplicationManager.getApplication().isHeadlessEnvironment() ? 0 : 200;
+
+    myQueue = DebouncedUpdates.<Unit>forComponent(editor.getComponent(), "Breadcrumbs.Queue", delayMillis)
+      .withContext(CoroutinesKt.getEDT(Dispatchers.INSTANCE))
+      .restartTimerOnAdd(true)
+      .runLatest(ignored -> updateCrumbsAsync())
+      .cancelOnDispose(this);
 
     queueUpdate();
   }
@@ -231,8 +235,7 @@ public abstract class BreadcrumbsPanel extends JComponent implements Disposable 
   }
 
   public void queueUpdate() {
-    myQueue.cancelAllUpdates();
-    myQueue.queue(myUpdate);
+    myQueue.queue(Unit.INSTANCE);
   }
 
   public void addBreadcrumbListener(BreadcrumbListener listener, Disposable parentDisposable) {
@@ -291,6 +294,7 @@ public abstract class BreadcrumbsPanel extends JComponent implements Disposable 
     }
   }
 
+  @ApiStatus.Internal
   protected @Nullable CrumbHighlightInfo getHighlightInfo(Crumb crumb) {
     if (crumb instanceof NavigatableCrumb) {
       final TextRange range = ((NavigatableCrumb)crumb).getHighlightRange();
@@ -301,6 +305,7 @@ public abstract class BreadcrumbsPanel extends JComponent implements Disposable 
     return null;
   }
 
+  @ApiStatus.Internal
   protected static final class CrumbHighlightInfo {
     public final @NotNull TextRange range;
     public final @Nullable CrumbPresentation presentation;

@@ -5,7 +5,7 @@ import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationListener
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.application.EDT
-import com.intellij.openapi.application.writeAction
+import com.intellij.openapi.application.edtWriteAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.event.DocumentEvent
@@ -30,7 +30,7 @@ import com.jetbrains.python.sdk.findAmongRoots
 import com.jetbrains.python.sdk.pythonSdk
 import com.jetbrains.python.sdk.skeleton.PySkeletonUtil
 import com.jetbrains.python.statistics.PipfileWatcherIdsHolder.Companion.RUN_PIPENV_LOCK_SUGGESTION
-import com.jetbrains.python.util.ShowingMessageErrorSync
+import com.jetbrains.python.errorProcessing.ErrorSink
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.file.Path
@@ -92,7 +92,7 @@ internal class PipEnvPipFileWatcher : EditorFactoryListener {
         notification.expire()
         module.putUserData(notificationActive, null)
         PyPackageCoroutine.launch(module.project) {
-          writeAction {
+          edtWriteAction {
             FileDocumentManager.getInstance().saveAllDocuments()
           }
           when (event.description) {
@@ -115,7 +115,7 @@ internal class PipEnvPipFileWatcher : EditorFactoryListener {
       withBackgroundProgress(module.project, description) {
         val sdk = module.pythonSdk ?: return@withBackgroundProgress
         runPipEnv(sdk.associatedModulePath?.let { Path.of(it) }, *args.toTypedArray()).onFailure {
-          ShowingMessageErrorSync.emit(it, module.project)
+          ErrorSink().emit(it, module.project)
         }
 
         withContext(Dispatchers.IO) {

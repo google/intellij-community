@@ -10,6 +10,7 @@ import com.intellij.diagnostic.report.MemoryReportReason
 import com.intellij.ide.plugins.IdeaPluginDescriptor
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.PathManager
+import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Attachment
 import com.intellij.openapi.diagnostic.ErrorReportSubmitter
@@ -25,14 +26,15 @@ import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.isRegularFile
 
-internal open class HeapDumpAnalysisSupport {
+@Service
+internal class HeapDumpAnalysisSupport {
   companion object {
     fun getInstance(): HeapDumpAnalysisSupport = service<HeapDumpAnalysisSupport>()
   }
 
-  open fun getPrivacyPolicyUrl(): String = "https://www.jetbrains.com/company/privacy.html"
+  fun getPrivacyPolicyUrl(): String = "https://www.jetbrains.com/company/privacy.html"
 
-  open fun uploadReport(reportText: String, heapReportProperties: HeapReportProperties, parentComponent: Component) {
+  fun uploadReport(reportText: String, heapReportProperties: HeapReportProperties, parentComponent: Component) {
     val text = getHeapDumpReportText(reportText, heapReportProperties)
     val attachment = Attachment("report.txt", text).apply { isIncluded = true }
     attachment.isIncluded = true
@@ -44,25 +46,26 @@ internal open class HeapDumpAnalysisSupport {
    * Checks if there's already a snapshot saved for analysis after restart and notifies the user if needed.
    * Returns true if there's a pending snapshot and a new one shouldn't be saved.
    */
-  open fun checkPendingSnapshot(): Boolean = false
+  fun checkPendingSnapshot(): Boolean = false
 
   /**
    * Saves the given snapshot for analysis after restart.
    */
-  open fun saveSnapshotForAnalysis(hprofPath: Path, reportProperties: HeapReportProperties) {
+  fun saveSnapshotForAnalysis(hprofPath: Path, reportProperties: HeapReportProperties) {
     val jsonPath = Path.of(PathManager.getSystemPath(), "pending-snapshot.json")
     JsonWriter(jsonPath.bufferedWriter()).use {
       it.beginObject()
       it.name("path").value(hprofPath.toString())
       it.name("reason").value(reportProperties.reason.toString())
       it.name("liveStats").value(reportProperties.liveStats)
+      it.name("heapStats").value(reportProperties.heapStats)
       it.endObject()
     }
   }
 
-  open fun analysisFailed(heapProperties: HeapReportProperties) { }
+  fun analysisFailed(heapProperties: HeapReportProperties) { }
 
-  open fun analysisComplete(heapProperties: HeapReportProperties) { }
+  fun analysisComplete(heapProperties: HeapReportProperties) { }
 }
 
 internal class AnalyzePendingSnapshotActivity: ProjectActivity {
@@ -80,6 +83,7 @@ internal class AnalyzePendingSnapshotActivity: ProjectActivity {
 
     var path: String? = null
     var liveStats: String? = null
+    var heapStats: String? = null
     var reason: MemoryReportReason? = null
     try {
       val reader = JsonReader(jsonPath.bufferedReader())
@@ -90,6 +94,7 @@ internal class AnalyzePendingSnapshotActivity: ProjectActivity {
             "path" -> path = it.nextString()
             "reason" -> reason = MemoryReportReason.valueOf(it.nextString())
             "liveStats" -> liveStats = it.nextString()
+            "heapStats" -> heapStats = it.nextString()
           }
         }
         it.endObject()
@@ -102,7 +107,7 @@ internal class AnalyzePendingSnapshotActivity: ProjectActivity {
     path?.let {
       val hprofPath = Path.of(it)
       if (hprofPath.exists()) {
-        val heapProperties = HeapReportProperties(reason ?: MemoryReportReason.None, liveStats ?: "")
+        val heapProperties = HeapReportProperties(reason ?: MemoryReportReason.None, liveStats ?: "", heapStats ?: "")
         AnalysisRunnable(hprofPath, heapProperties, false).run()
       }
     }

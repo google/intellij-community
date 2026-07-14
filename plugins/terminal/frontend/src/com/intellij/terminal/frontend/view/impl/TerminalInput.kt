@@ -3,7 +3,6 @@ package com.intellij.terminal.frontend.view.impl
 import com.intellij.openapi.actionSystem.DataKey
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.trace
-import com.intellij.openapi.editor.event.EditorMouseEvent
 import com.intellij.openapi.util.Key
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineName
@@ -20,13 +19,12 @@ import org.jetbrains.plugins.terminal.block.ui.sanitizeLineSeparators
 import org.jetbrains.plugins.terminal.fus.BatchLatencyReporter
 import org.jetbrains.plugins.terminal.fus.ReworkedTerminalUsageCollector
 import org.jetbrains.plugins.terminal.fus.TerminalStartupFusInfo
+import org.jetbrains.plugins.terminal.fus.TerminalTabOpeningWay
 import org.jetbrains.plugins.terminal.fus.percentile
 import org.jetbrains.plugins.terminal.fus.secondLargest
 import org.jetbrains.plugins.terminal.fus.totalDuration
 import org.jetbrains.plugins.terminal.session.TerminalGridSize
 import org.jetbrains.plugins.terminal.session.impl.TerminalClearBufferEvent
-import org.jetbrains.plugins.terminal.session.impl.TerminalHyperlinkClickedEvent
-import org.jetbrains.plugins.terminal.session.impl.TerminalHyperlinkId
 import org.jetbrains.plugins.terminal.session.impl.TerminalInputEvent
 import org.jetbrains.plugins.terminal.session.impl.TerminalResizeEvent
 import org.jetbrains.plugins.terminal.session.impl.TerminalSession
@@ -76,10 +74,10 @@ internal class TerminalInput(
     val job = coroutineScope.launch {
       val targetChannel = inputChannelDeferred.await()
 
-      if (startupFusInfo != null) {
+      if (startupFusInfo?.triggerTime != null) {
         // Report it only after receiving the input channel.
         // Only now we can consider that the shell is fully started, se we can send the input to it.
-        reportShellStartingLatency(startupFusInfo)
+        reportShellStartingLatency(startupFusInfo.triggerTime!!, startupFusInfo.way)
       }
 
       try {
@@ -189,10 +187,6 @@ internal class TerminalInput(
     sendEvent(InputEventSubmission(event))
   }
 
-  fun sendLinkClicked(isInAlternateBuffer: Boolean, hyperlinkId: TerminalHyperlinkId, event: EditorMouseEvent) {
-    sendEvent(InputEventSubmission(TerminalHyperlinkClickedEvent(isInAlternateBuffer, hyperlinkId, event)))
-  }
-
   private fun sendEvent(event: InputEventSubmission) {
     LOG.trace { "Input event received: ${event.event}" }
 
@@ -206,9 +200,9 @@ internal class TerminalInput(
     }
   }
 
-  private fun reportShellStartingLatency(startupFusInfo: TerminalStartupFusInfo) {
-    val latency = startupFusInfo.triggerTime.elapsedNow()
-    ReworkedTerminalUsageCollector.logStartupShellStartingLatency(startupFusInfo.way, latency)
+  private fun reportShellStartingLatency(triggerTime: TimeMark, openingWay: TerminalTabOpeningWay) {
+    val latency = triggerTime.elapsedNow()
+    ReworkedTerminalUsageCollector.logStartupShellStartingLatency(openingWay, latency)
     LOG.info("Reworked terminal startup shell starting latency: ${latency.inWholeMilliseconds} ms")
   }
 

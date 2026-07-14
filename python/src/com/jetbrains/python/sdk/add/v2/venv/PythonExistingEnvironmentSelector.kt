@@ -16,7 +16,6 @@ import com.jetbrains.python.sdk.add.v2.PythonExistingEnvironmentConfigurator
 import com.jetbrains.python.sdk.add.v2.PythonInterpreterComboBox
 import com.jetbrains.python.sdk.add.v2.PythonInterpreterCreationTargets
 import com.jetbrains.python.sdk.add.v2.ValidatedPath
-import com.jetbrains.python.sdk.add.v2.existingSdks
 import com.jetbrains.python.sdk.add.v2.mapDistinctSortedForExistingEnvironment
 import com.jetbrains.python.sdk.add.v2.pythonInterpreterComboBox
 import com.jetbrains.python.sdk.add.v2.setupSdk
@@ -25,7 +24,7 @@ import com.jetbrains.python.statistics.InterpreterCreationMode
 import com.jetbrains.python.statistics.InterpreterType
 import kotlinx.coroutines.CoroutineScope
 
-class PythonExistingEnvironmentSelector<P : PathHolder>(model: PythonAddInterpreterModel<P>, private val module: Module?) :
+internal class PythonExistingEnvironmentSelector<P : PathHolder>(model: PythonAddInterpreterModel<P>, private val module: Module?) :
   PythonExistingEnvironmentConfigurator<P>(model) {
   private lateinit var comboBox: PythonInterpreterComboBox<P>
   override val toolExecutable: ObservableProperty<ValidatedPath.Executable<P>?>? = null
@@ -39,6 +38,8 @@ class PythonExistingEnvironmentSelector<P : PathHolder>(model: PythonAddInterpre
         selectedSdkProperty = model.state.selectedInterpreter,
         validationRequestor = validationRequestor,
         onPathSelected = model::addManuallyAddedPythonNotNecessarilySystem,
+        // Existing < 3.8 interpreters stay usable, but the IDE no longer provides pip/setuptools for them.
+        additionalValidation = { unsupportedPythonManagementWarning(it) },
       )
     }
   }

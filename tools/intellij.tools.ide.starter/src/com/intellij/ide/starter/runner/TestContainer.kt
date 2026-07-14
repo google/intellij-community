@@ -14,6 +14,8 @@ import com.intellij.ide.starter.project.NoProject
 import com.intellij.ide.starter.runner.events.TestContextInitializationStartedEvent
 import com.intellij.ide.starter.telemetry.computeWithSpan
 import com.intellij.ide.starter.utils.PortUtil
+import com.intellij.openapi.util.SystemInfoRt
+import com.intellij.platform.testFramework.teamCity.TeamCityReporter.SyntheticTestKind
 import com.intellij.tools.ide.starter.bus.EventsBus
 import com.intellij.tools.ide.util.common.logOutput
 import kotlinx.coroutines.Dispatchers
@@ -128,6 +130,7 @@ interface TestContainer {
       IDEDataPaths.createPaths<IDEDataPaths>(testName, testDirectory, useInMemoryFileSystem)
     },
   ): IDETestContext {
+    checkTestNameLength(testName)
     EventsBus.postAndWaitProcessing(TestContextInitializationStartedEvent())
     logOutput("Resolving IDE build for $testName...")
     val (buildNumber, ide) = @Suppress("SSBasedInspection")
@@ -137,7 +140,10 @@ interface TestContainer {
       }
     })
 
-    require(ide.productCode == testCase.ideInfo.productCode) { "Product code ${ide.productCode} must be the same as ${testCase.ideInfo.productCode}. IDE: $ide . TestCase: $testCase" }
+    require(ide.productCode == testCase.ideInfo.productCode ||
+            // some 253 versions(e.g. 253.28294.334) of IC are actually IU, seems like it is due to single distributive (SID-119)
+            (ide.productCode == "IU" && testCase.ideInfo.productCode == "IC" && ide.isMajorBuildVersionAtLeast(253))
+    ) { "Product code ${ide.productCode} must be the same as ${testCase.ideInfo.productCode}. IDE: $ide . TestCase: $testCase" }
 
     val testDirectory = run {
       val commonPath = (GlobalPaths.instance.testsDirectory / "${testCase.ideInfo.productCode}-$buildNumber") / testName
@@ -167,5 +173,17 @@ interface TestContainer {
     EventsBus.postAndWaitProcessing(TestContextInitializedEvent(this, preparedContext))
 
     return preparedContext
+  }
+
+  private fun checkTestNameLength(testName: String) {
+    val testNameLengthLimit = 100
+    if (testName.length > testNameLengthLimit && (SystemInfoRt.isWindows || !CIServer.instance.isBuildRunningOnCI)) {
+      CIServer.instance.reportTestFailure(
+        testName = "Test name exceeds $testNameLengthLimit characters: $testName",
+        message = "Test name '$testName' is ${testName.length} characters long, which exceeds the $testNameLengthLimit-character limit.",
+        details = "Long test names may cause path length issues on windows (https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation)",
+        kind = SyntheticTestKind.TEST_INFRA_EXCEPTION,
+      )
+    }
   }
 }

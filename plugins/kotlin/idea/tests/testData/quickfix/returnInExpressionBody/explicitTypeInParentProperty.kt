@@ -1,6 +1,6 @@
 // "Specify 'Int' type for enclosing property 'Derived.explicitPropertyReturnType'" "true"
-// K2_ERROR: Return type mismatch: expected 'Nothing', actual 'Int'.
-// K2_ERROR: Returns are prohibited in functions with expression body and without explicit return type. Use block body '{...}' or add an explicit return type.
+// K2_ERROR: RETURN_IN_FUNCTION_WITH_EXPRESSION_BODY_AND_IMPLICIT_TYPE
+// K2_ERROR: RETURN_TYPE_MISMATCH
 
 interface Base {
     val explicitPropertyReturnType: Int
@@ -12,6 +12,6 @@ class Derived : Base {
         get() = retu<caret>rn 1
 }
 
-// IGNORE_K1
+
 
 // FUS_K2_QUICKFIX_NAME: org.jetbrains.kotlin.idea.k2.codeinsight.fixes.ChangeTypeQuickFixFactories$UpdateTypeQuickFix

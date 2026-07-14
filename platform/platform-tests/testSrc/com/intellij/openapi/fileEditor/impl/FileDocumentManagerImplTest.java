@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.fileEditor.impl;
 
 import com.intellij.ide.actionsOnSave.impl.ActionsOnSaveManager;
@@ -18,9 +18,12 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.ThrowableComputable;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.io.IoTestUtil;
+import com.intellij.openapi.vfs.DeprecatedVirtualFileSystem;
 import com.intellij.openapi.vfs.LocalFileSystem;
+import com.intellij.openapi.vfs.NonPhysicalFileSystem;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileSystem;
 import com.intellij.openapi.vfs.newvfs.events.VFileContentChangeEvent;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
@@ -37,12 +40,14 @@ import com.intellij.util.ref.GCUtil;
 import com.intellij.util.ref.GCWatcher;
 import com.intellij.util.ui.UIUtil;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.junit.Assert;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.ref.WeakReference;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -139,6 +144,31 @@ public class FileDocumentManagerImplTest extends HeavyPlatformTestCase {
 
     document = myDocumentManager.getDocument(file);
     assertTrue(idCode != System.identityHashCode(document));
+  }
+
+  public void testHardRegisteredNonPhysicalDocumentRemovedFromWeakCache() {
+    VirtualFile file = new NonLightNonPhysicalVirtualFile("nonPhysical.txt", "test");
+    Document document = myDocumentManager.getDocument(file);
+    assertNotNull(
+      "The test file should have a document before hard registration",
+      document
+    );
+    assertNotNull(
+      "Non-LightVirtualFile documents start in myDocumentCache",
+      myDocumentManager.getDocumentFromCacheInTests(file)
+    );
+
+    FileDocumentManagerBase.registerDocument(document, file);
+
+    assertSame(
+      "Cached document lookup should keep working via HARD_REF_TO_DOCUMENT_KEY",
+      document,
+      myDocumentManager.getCachedDocument(file)
+    );
+    assertNull(
+      "Hard-bound documents must not leave a strong file key in myDocumentCache",
+      myDocumentManager.getDocumentFromCacheInTests(file)
+    );
   }
 
   public void testGetUnsavedDocuments_NoDocuments() {
@@ -804,6 +834,39 @@ public class FileDocumentManagerImplTest extends HeavyPlatformTestCase {
     return allFiles;
   }
 
+  private static final VirtualFileSystem NON_LIGHT_NON_PHYSICAL_FILE_SYSTEM = new TestNonPhysicalFileSystem();
+
+  private static final class NonLightNonPhysicalVirtualFile extends MockVirtualFile {
+    private NonLightNonPhysicalVirtualFile(@NotNull String name, @NotNull String text) {
+      super(name, text);
+    }
+
+    @Override
+    public @NotNull VirtualFileSystem getFileSystem() {
+      return NON_LIGHT_NON_PHYSICAL_FILE_SYSTEM;
+    }
+  }
+
+  private static final class TestNonPhysicalFileSystem extends DeprecatedVirtualFileSystem implements NonPhysicalFileSystem {
+    @Override
+    public @NotNull String getProtocol() {
+      return "non-light-non-physical";
+    }
+
+    @Override
+    public @Nullable VirtualFile findFileByPath(@NotNull String path) {
+      return null;
+    }
+
+    @Override
+    public void refresh(boolean asynchronous) { }
+
+    @Override
+    public @Nullable VirtualFile refreshAndFindFileByPath(@NotNull String path) {
+      return null;
+    }
+  }
+
   public void testDocumentModificationStampMustChangeBeforeFileDeletion() {
     File ioFile = IoTestUtil.createTestFile("test.txt", "<html>some text</html>");
     VirtualFile myVirtualFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(ioFile);
@@ -819,5 +882,32 @@ public class FileDocumentManagerImplTest extends HeavyPlatformTestCase {
     UIUtil.dispatchAllInvocationEvents();
     assertTrue(document.getModificationStamp() != stampBefore);
     assertTrue(document.getModificationSequence() > sequenceBefore);
+  }
+
+  public void testLightFileDocumentCaching() {
+    var lightFile = new LightVirtualFile("testFile.txt", "test");
+    assertNull("File is not expected to have a document", myDocumentManager.getCachedDocument(lightFile));
+    var lightFileDocument = myDocumentManager.getDocument(lightFile);
+    assertNotNull("Document should be created for the light file", lightFileDocument);
+    var lightFileDocumentRef = new WeakReference<>(lightFileDocument);
+    assertTrue("Document is expected to be in the cached docs", isDocumentCached(lightFileDocument));
+    //noinspection UnusedAssignment
+    lightFile = null;
+    GCUtil.tryGcSoftlyReachableObjects();
+    assertTrue("Document is expected to be in the cached docs", isDocumentCached(lightFileDocument));
+    //noinspection UnusedAssignment
+    lightFileDocument = null;
+    GCUtil.tryGcSoftlyReachableObjects();
+    assertNull("Document is expected to be GCed at this point", lightFileDocumentRef.get());
+  }
+
+  private boolean isDocumentCached(@NotNull Document document) {
+    var result = new boolean[1];
+    myDocumentManager.forEachCachedDocument(doc -> {
+      if (doc == document) {
+        result[0] = true;
+      }
+    });
+    return result[0];
   }
 }

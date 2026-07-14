@@ -40,11 +40,11 @@ final class ExcludeRootsCache {
   private static final class CachedUrls {
     private final long myModificationCount;
     private final String[] myUrls;
+
     private CachedUrls(long count, String[] urls) {
       myModificationCount = count;
       myUrls = urls;
     }
-
   }
 
   private final ConcurrentMap<Project, CachedUrls> myCache = new ConcurrentHashMap<>();
@@ -86,16 +86,17 @@ final class ExcludeRootsCache {
         var result = new TreeSet<>(OSAgnosticPathUtil.COMPARATOR);
         // WSM contributors
         var collector = new ExcludedRootsCollector(result);
-        for (var contributor : WorkspaceFileIndexImpl.EP_NAME.getExtensionList()) {
+        WorkspaceFileIndexImpl.EP_NAME.forEachExtensionSafe(contributor -> {
           switch (contributor.getStorageKind()) {
             case MAIN -> collectExcludedRootsFromContributor(contributor, wsm.getCurrentSnapshot(), collector);
             case UNLOADED -> collectExcludedRootsFromContributor(contributor, wsm.getCurrentSnapshotOfUnloadedEntities(), collector);
           }
-        }
+        });
         // legacy extensions
         for (var policy : DirectoryIndexExcludePolicy.EP_NAME.getExtensions(project)) {
           ContainerUtil.addAll(result, policy.getExcludeUrlsForProject());
           for (var module : ModuleManager.getInstance(project).getModules()) {
+            @SuppressWarnings("removal")
             var additionalModuleExcludedRoots = policy.getExcludeRootsForModule(ModuleRootManager.getInstance(module));
             result.addAll(ContainerUtil.map(additionalModuleExcludedRoots, VirtualFilePointer::getUrl));
           }

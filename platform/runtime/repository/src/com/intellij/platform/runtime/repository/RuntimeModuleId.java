@@ -16,11 +16,13 @@ public final class RuntimeModuleId {
   @ApiStatus.Internal
   public static final String TESTS_NAME_SUFFIX = ".tests";
   @ApiStatus.Internal
-  public static final String LEGACY_JPS_MODULE_NAMESPACE = "$legacy_jps_module";
+  public static final String LEGACY_JPS_MODULE_NAMESPACE_SUFFIX = "$legacy_jps_module";
   @ApiStatus.Internal
-  public static final String LEGACY_JPS_MODULE_TESTS_NAMESPACE = "$legacy_jps_module_tests";
+  public static final String LEGACY_JPS_MODULE_TESTS_NAMESPACE_SUFFIX = "$legacy_jps_module_tests";
   @ApiStatus.Internal
-  public static final String LEGACY_JPS_LIBRARY_NAMESPACE = "$legacy_jps_library";
+  public static final String LEGACY_JPS_LIBRARY_NAMESPACE_SUFFIX = "$legacy_jps_library";
+  @ApiStatus.Internal
+  public static final String PLUGIN_DESCRIPTOR_MODULE_NAMESPACE = "$plugin_descriptor_module";
   private final String myName;
   private final String myNamespace;
 
@@ -40,8 +42,8 @@ public final class RuntimeModuleId {
   /**
    * Returns a human-readable name of the module. It can be used for debugging and logging purposes only.
    */
-  public @NotNull String getPresentableName() {
-    return myNamespace.equals(DEFAULT_NAMESPACE) ? myName : myNamespace + ":" + myName;
+  public @NotNull String getDisplayName() {
+    return myNamespace.equals(DEFAULT_NAMESPACE) ? myName : myName + " (namespace=" + myNamespace + ")";
   }
 
   /**
@@ -60,23 +62,34 @@ public final class RuntimeModuleId {
     return new RuntimeModuleId(moduleName, namespace);
   }
 
+  /**
+   * Creates ID for a runtime module corresponding to a plugin descriptor for the plugin with the given {@code pluginId}.
+   * It's used to represent a dependency on a plugin (or a plugin alias) coming from XML configuration files.
+   */
+  @ApiStatus.Internal
+  public static @NotNull RuntimeModuleId pluginDescriptorModule(@NotNull String pluginId) {
+    return new RuntimeModuleId(pluginId, PLUGIN_DESCRIPTOR_MODULE_NAMESPACE);
+  }
+
   @ApiStatus.Internal
   public static @NotNull RuntimeModuleId legacyJpsModule(@NotNull String moduleName) {
-    return new RuntimeModuleId(moduleName, LEGACY_JPS_MODULE_NAMESPACE);
+    return new RuntimeModuleId(moduleName, LEGACY_JPS_MODULE_NAMESPACE_SUFFIX);
   }
 
   /**
    * Creates ID of a runtime module corresponding to the test part of module {@code moduleName} in intellij project configuration.
+   * @deprecated use {@link #legacyJpsModule} or {@link #contentModule} instead
    */
+  @Deprecated(forRemoval = true)
   public static @NotNull RuntimeModuleId moduleTests(@NotNull String moduleName) {
-    return new RuntimeModuleId(moduleName, LEGACY_JPS_MODULE_TESTS_NAMESPACE);
+    return new RuntimeModuleId(moduleName, LEGACY_JPS_MODULE_TESTS_NAMESPACE_SUFFIX);
   }
 
   /**
    * Creates ID of a runtime module corresponding to the project-level library {@code libraryName} in intellij project configuration.
    */
   public static @NotNull RuntimeModuleId projectLibrary(@NotNull String libraryName) {
-    return new RuntimeModuleId(libraryName, LEGACY_JPS_LIBRARY_NAMESPACE);
+    return new RuntimeModuleId(libraryName, LEGACY_JPS_LIBRARY_NAMESPACE_SUFFIX);
   }
 
   @Override
@@ -99,7 +112,7 @@ public final class RuntimeModuleId {
   //<editor-fold desc="deprecated methods" defaultstate="collapsed">
   /**
    * @deprecated there is no standard string representation of a runtime module ID.
-   * Use {@link #getPresentableName()} for presentation purposes, in other cases use {@link #getNamespace()} and {@link #getName()}.
+   * Use {@link #getDisplayName()} for presentation purposes, in other cases use {@link #getNamespace()} and {@link #getName()}.
    */
   @Deprecated(forRemoval = true)
   public @NotNull String getStringId() {

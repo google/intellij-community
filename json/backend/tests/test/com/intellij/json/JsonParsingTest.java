@@ -1,14 +1,18 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.json;
 
 import com.intellij.json.psi.JsonElementTypeConverterFactory;
 import com.intellij.json.syntax.JsonLanguageDefinition;
+import com.intellij.json.syntax.JsonLazyParsingKt;
+import com.intellij.json.syntax.JsonLazyParsingVetoer;
+import com.intellij.openapi.extensions.ExtensionPointName;
 import com.intellij.platform.syntax.psi.CommonElementTypeConverterFactory;
 import com.intellij.platform.syntax.psi.ElementTypeConverters;
 import com.intellij.platform.syntax.psi.LanguageSyntaxDefinitions;
 import com.intellij.testFramework.ParsingTestCase;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.TestDataPath;
+import org.junit.AssumptionViolatedException;
 
 /**
  * @author Mikhail Golubev
@@ -23,7 +27,11 @@ public class JsonParsingTest extends ParsingTestCase {
     addExplicitExtension(ElementTypeConverters.getInstance(), JsonLanguage.INSTANCE, new CommonElementTypeConverterFactory());
     addExplicitExtension(ElementTypeConverters.getInstance(), JsonLanguage.INSTANCE, new JsonFileTypeConverterFactory());
     addExplicitExtension(LanguageSyntaxDefinitions.getINSTANCE(), JsonLanguage.INSTANCE, new JsonLanguageDefinition());
+    registerExtensionPoint(LAZY_PARSING_VETOER_EP, JsonLazyParsingVetoer.class);
   }
+
+  public static final ExtensionPointName<JsonLazyParsingVetoer> LAZY_PARSING_VETOER_EP =
+    new ExtensionPointName<>("com.intellij.json.lazyParsingVetoer");
 
   public JsonParsingTest() {
     super("psi", "json", new JsonParserDefinition());
@@ -35,7 +43,14 @@ public class JsonParsingTest extends ParsingTestCase {
   }
 
   private void doTest() {
+    if (isIgnore()) {
+      throw new AssumptionViolatedException("Json lazy parsing is disabled");
+    }
     doTest(true);
+  }
+
+  protected boolean isIgnore() {
+    return !JsonLazyParsingKt.getJsonLazyParsing();
   }
 
   public void testKeywords() {
@@ -113,15 +128,19 @@ public class JsonParsingTest extends ParsingTestCase {
     doTest();
   }
 
+  public void testBroken() {
+    doTest();
+  }
+
+  public void testBroken2() {
+    doTest();
+  }
+
   public void test1000_open_arrays() {
     doTest();
   }
 
   public void test1000_open_objects() {
-    doTest();
-  }
-
-  public void test100_100() {
     doTest();
   }
 

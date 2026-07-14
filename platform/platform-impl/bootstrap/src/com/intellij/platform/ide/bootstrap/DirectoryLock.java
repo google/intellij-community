@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.ide.bootstrap;
 
 import com.intellij.execution.process.ProcessIOExecutorService;
@@ -17,7 +17,6 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.io.NioFiles;
 import com.intellij.ui.User32Ex;
 import com.intellij.util.Suppressions;
-import com.intellij.util.TimeoutUtil;
 import com.intellij.util.system.OS;
 import com.sun.jna.platform.win32.WinDef;
 import com.sun.tools.attach.VirtualMachine;
@@ -52,10 +51,10 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.logging.LogRecord;
-import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNullElse;
 
@@ -64,6 +63,7 @@ import static java.util.Objects.requireNonNullElse;
  * and participates in the CLI bypassing arguments and relaying back exit codes and error messages.
  */
 @ApiStatus.Internal
+@SuppressWarnings("UseOptimizedEelFunctions")
 public final class DirectoryLock {
   private static final CollectingLogger LOG = new CollectingLogger(DirectoryLock.class);
 
@@ -86,6 +86,7 @@ public final class DirectoryLock {
     }
 
     @Override
+    @SuppressWarnings("SSBasedInspection")
     public @NotNull Attachment @NotNull [] getAttachments() {
       return myAttachments;
     }
@@ -98,7 +99,8 @@ public final class DirectoryLock {
   private static final String SERVER_THREAD_NAME = "External Command Listener";
 
   private static final AtomicInteger COUNT = new AtomicInteger();  // to ensure redirected port file uniqueness in tests
-  private static final long TIMEOUT_MS = Integer.getInteger("ij.dir.lock.timeout", 5_000);
+  private static final long CONNECT_TIMEOUT_MS = Integer.getInteger("ij.dir.lock.timeout", 5_000);
+  private static final long WAIT_TIMEOUT_MS = Integer.getInteger("ij.dir.lock.wait", 1_000);
   private static final List<String> ACK_PACKET = List.of("<<ACK>>");
 
   private final long myPid = ProcessHandle.current().pid();
@@ -172,72 +174,64 @@ public final class DirectoryLock {
       }
 
       var suppressed = new ArrayList<Exception>();
-      var command = ProcessHandle.current().info().command().orElse("???");
+      var command = ProcessHandle.current().info().command().orElse("<unknown>");
       LOG.debug("current command: " + command);
 
-      for (int attempt = 0; attempt < 1; attempt++) {
-        try {
-          return tryListen();
-        }
-        catch (IOException e) {
-          LOG.debug(e);
-          suppressed.add(e);
-        }
-
-        try {
-          return tryConnect(args, currentDirectory);
-        }
-        catch (IOException e) {
-          LOG.debug(e);
-          suppressed.add(e);
-        }
-
-        try {
-          var otherPid = remotePID();
-          var otherCommand = ProcessHandle.of(otherPid).map(ProcessHandle::info).flatMap(ProcessHandle.Info::command).orElse("-"); // not "???"
-          LOG.debug("competing process (by PID): PID=" + otherPid + ' ' + otherCommand);
-          if (command.equals(otherCommand)) {
-            cannotActivate(command, otherPid, suppressed);
-          }
-        }
-        catch (IOException | NumberFormatException e) {
-          LOG.debug(e);
-          suppressed.add(e);
-        }
-
-        LOG.debug("retrying in 200 ms ...");
-        TimeoutUtil.sleep(200);
+      try {
+        return tryListen();
       }
-
-      if (!Path.of(command).endsWith(OS.CURRENT == OS.Windows ? "java.exe" : "java")) {
-        var user = ProcessHandle.current().info().user().orElse("");
-        LOG.debug("current user: " + user);
-        var competition = ProcessHandle.allProcesses()
-          .filter(ph -> command.equals(ph.info().command().orElse("")) && user.equals(ph.info().user().orElse("")) && ph.pid() != myPid)
-          .toList();
-        if (!competition.isEmpty()) {
-          LOG.debug(
-            "competing processes:\n" +
-            competition.stream().map(ph -> "  PID=" + ph.pid() + " (" + ph.info().user() + ") " + ph.info().command()).collect(Collectors.joining())
-          );
-          cannotActivate(command, competition.get(0).pid(), suppressed);
-        }
+      catch (IOException e) {
+        LOG.debug(e);
+        suppressed.add(e);
       }
 
       try {
+        return tryConnect(args, currentDirectory);
+      }
+      catch (IOException e) {
+        LOG.debug(e);
+        suppressed.add(e);
+      }
+
+      try {
+        var otherPid = remotePID();
+        LOG.debug("locked by the process " + otherPid);
+        var otherProcess = ProcessHandle.of(otherPid).orElse(null);
+        if (otherProcess != null) {
+          var otherCommand = otherProcess.info().command().orElse(null);
+          LOG.debug("still running, command: " + requireNonNullElse(otherCommand, "<unknown>"));
+          if (otherCommand == null || command.equals(otherCommand)) {
+            LOG.debug("waiting ...");
+            try {
+              otherProcess.onExit().get(WAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+            }
+            catch (Exception e) {
+              suppressed.add(e);
+              throw cannotActivate(command, otherPid, suppressed);
+            }
+            LOG.debug("... done waiting");
+          }
+        }
+      }
+      catch (IOException | NumberFormatException e) {
+        LOG.debug(e);
+        suppressed.add(e);
+      }
+
+      try {
+        LOG.debug("deleting " + myLockFile);
+        Files.deleteIfExists(myLockFile);
         LOG.debug("deleting " + myPortFile);
         Files.deleteIfExists(myPortFile);
         if (myRedirectedPortFile != null) {
           LOG.debug("deleting " + myRedirectedPortFile);
           Files.deleteIfExists(myRedirectedPortFile);
         }
-        LOG.debug("deleting " + myLockFile);
-        Files.deleteIfExists(myLockFile);
 
         return tryListen();
       }
       catch (IOException e) {
-        suppressed.forEach(e::addSuppressed);
+        for (var exception : suppressed) e.addSuppressed(exception);
         throw e;
       }
     }
@@ -246,11 +240,11 @@ public final class DirectoryLock {
     }
   }
 
-  private static void cannotActivate(String command, long pid, List<Exception> suppressed) throws CannotActivateException {
+  private static CannotActivateException cannotActivate(String command, long pid, List<Exception> suppressed) {
     var threadDump = remoteThreadDump(pid);
     var cae = new CannotActivateException(BootstrapBundle.message("bootstrap.error.still.running", command, pid), threadDump);
-    suppressed.forEach(cae::addSuppressed);
-    throw cae;
+    for (var exception : suppressed) cae.addSuppressed(exception);
+    return cae;
   }
 
   @VisibleForTesting
@@ -266,34 +260,23 @@ public final class DirectoryLock {
       Suppressions.runSuppressing(
         serverChannel::close,
         () -> {
-          if (myRedirectedPortFile != null) {
-            Files.deleteIfExists(myRedirectedPortFile);
+          if (deleteLockFile) {
+            Files.deleteIfExists(myLockFile);
           }
         },
         () -> Files.deleteIfExists(myPortFile),
         () -> {
-          if (deleteLockFile) {
-            Files.deleteIfExists(myLockFile);
+          if (myRedirectedPortFile != null) {
+            Files.deleteIfExists(myRedirectedPortFile);
           }
-        });
+        }
+      );
     }
   }
 
   private @Nullable CliResult tryListen() throws IOException {
     var serverChannel = ServerSocketChannel.open(myFallbackMode ? StandardProtocolFamily.INET : StandardProtocolFamily.UNIX);
-
-    SocketAddress address;
-    if (myFallbackMode) {
-      Files.writeString(myPortFile, "0", StandardOpenOption.CREATE_NEW);
-      address = new InetSocketAddress(InetAddress.getByAddress(new byte[]{127, 0, 0, 1}), 0);
-    }
-    else if (myRedirectedPortFile != null) {
-      Files.writeString(myPortFile, myRedirectedPortFile.toString(), StandardOpenOption.CREATE_NEW);
-      address = UnixDomainSocketAddress.of(myRedirectedPortFile);
-    }
-    else {
-      address = UnixDomainSocketAddress.of(myPortFile);
-    }
+    var address = getListenAddress();
 
     LOG.debug("binding to " + address);
     serverChannel.bind(address);
@@ -310,36 +293,38 @@ public final class DirectoryLock {
     catch (IOException e) {
       LOG.debug(e);
       dispose(false);
-      throw new IOException("Cannot lock config directory " + myLockFile.getParent(), e);
+      throw new IOException("Cannot lock the config directory " + myLockFile.getParent(), e);
     }
 
     new Thread(this::acceptConnections, SERVER_THREAD_NAME).start();
     return null;
   }
 
+  private SocketAddress getListenAddress() throws IOException {
+    if (myFallbackMode) {
+      Files.writeString(myPortFile, "0", StandardOpenOption.CREATE_NEW);
+      return new InetSocketAddress(InetAddress.getByAddress(new byte[]{127, 0, 0, 1}), 0);
+    }
+    else if (myRedirectedPortFile != null) {
+      Files.writeString(myPortFile, myRedirectedPortFile.toString(), StandardOpenOption.CREATE_NEW);
+      return UnixDomainSocketAddress.of(myRedirectedPortFile);
+    }
+    else {
+      return UnixDomainSocketAddress.of(myPortFile);
+    }
+  }
+
   private CliResult tryConnect(List<String> args, Path currentDirectory) throws IOException {
     var pf = myFallbackMode ? StandardProtocolFamily.INET : StandardProtocolFamily.UNIX;
+    var address = getConnectAddress();
+
     try (var socketChannel = SocketChannel.open(pf); var selector = Selector.open()) {
       socketChannel.configureBlocking(false);
-
-      SocketAddress address;
-      if (myFallbackMode) {
-        var port = 0;
-        try { port = Integer.parseInt(Files.readString(myPortFile)); }
-        catch (NumberFormatException e) { throw new SocketException("Invalid port; " + e.getMessage()); }
-        address = new InetSocketAddress(InetAddress.getByAddress(new byte[]{127, 0, 0, 1}), port);
-      }
-      else if (myRedirectedPortFile != null) {
-        address = UnixDomainSocketAddress.of(Files.readString(myPortFile));
-      }
-      else {
-        address = UnixDomainSocketAddress.of(myPortFile);
-      }
 
       LOG.debug("connecting to " + address);
       socketChannel.register(selector, SelectionKey.OP_CONNECT);
       if (!socketChannel.connect(address)) {
-        if (selector.select(TIMEOUT_MS) == 0) throw new SocketTimeoutException("Timeout: connect");
+        if (selector.select(CONNECT_TIMEOUT_MS) == 0) throw new SocketTimeoutException("Timeout: connect");
         socketChannel.finishConnect();
       }
       LOG.debug("... connected");
@@ -353,7 +338,7 @@ public final class DirectoryLock {
       sendLines(socketChannel, request);
 
       try {
-        if (selector.select(TIMEOUT_MS) == 0) throw new SocketTimeoutException("Timeout: ACK");
+        if (selector.select(CONNECT_TIMEOUT_MS) == 0) throw new SocketTimeoutException("Timeout: ACK");
         var ack = receiveLines(socketChannel);
         if (!ack.equals(ACK_PACKET)) throw new IOException("Malformed ACK: " + ack);
 
@@ -367,6 +352,21 @@ public final class DirectoryLock {
         LOG.debug(e);
         throw new IOException("Communication interrupted", e);
       }
+    }
+  }
+
+  private SocketAddress getConnectAddress() throws IOException {
+    if (myFallbackMode) {
+      var port = 0;
+      try { port = Integer.parseInt(Files.readString(myPortFile)); }
+      catch (NumberFormatException e) { throw new SocketException("Invalid port; " + e.getMessage()); }
+      return new InetSocketAddress(InetAddress.getByAddress(new byte[]{127, 0, 0, 1}), port);
+    }
+    else if (myRedirectedPortFile != null) {
+      return UnixDomainSocketAddress.of(Files.readString(myPortFile));
+    }
+    else {
+      return UnixDomainSocketAddress.of(myPortFile);
     }
   }
 
@@ -391,7 +391,7 @@ public final class DirectoryLock {
         ProcessIOExecutorService.INSTANCE.execute(() -> handleConnection(socketChannel));
       }
       catch (ClosedChannelException e) {
-        LOG.debug(e);
+        LOG.debug("channel closed");
         break;
       }
       catch (Throwable t) {

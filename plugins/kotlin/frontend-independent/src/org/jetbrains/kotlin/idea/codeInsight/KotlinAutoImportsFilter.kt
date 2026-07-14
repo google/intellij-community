@@ -2,11 +2,11 @@
 package org.jetbrains.kotlin.idea.codeInsight
 
 import com.intellij.openapi.extensions.ExtensionPointName
-import com.intellij.openapi.util.IntellijInternalApi
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtFile
 
-@IntellijInternalApi
+@ApiStatus.Internal
 interface KotlinAutoImportsFilter {
     /**
      * Even if the option to perform auto import is disabled for Kotlin but [forceAutoImportForElement] is true, auto import must happen
@@ -19,7 +19,8 @@ interface KotlinAutoImportsFilter {
     fun filterSuggestions(suggestions: Collection<FqName>): Collection<FqName>
 
     companion object {
-        val EP_NAME = ExtensionPointName.create<KotlinAutoImportsFilter>("org.jetbrains.kotlin.idea.codeInsight.unambiguousImports")
+        val EP_NAME: ExtensionPointName<KotlinAutoImportsFilter> =
+            ExtensionPointName.create("org.jetbrains.kotlin.idea.codeInsight.unambiguousImports")
 
         private fun findRelevantExtension(file: KtFile, suggestions: Collection<FqName>): KotlinAutoImportsFilter? =
             EP_NAME.findFirstSafe { it.forceAutoImportForElement(file, suggestions) }

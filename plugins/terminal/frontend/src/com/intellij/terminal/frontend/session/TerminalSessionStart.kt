@@ -27,8 +27,7 @@ import org.jetbrains.plugins.terminal.ShellStartupOptions
 import org.jetbrains.plugins.terminal.original
 import org.jetbrains.plugins.terminal.session.impl.TerminalSession
 import org.jetbrains.plugins.terminal.session.impl.TerminalSessionTerminatedEvent
-import org.jetbrains.plugins.terminal.util.STOP_EMULATOR_TIMEOUT
-import org.jetbrains.plugins.terminal.util.waitFor
+import org.jetbrains.plugins.terminal.util.closeConnectorAndStopEmulation
 
 @ApiStatus.Internal
 fun startTerminalProcess(
@@ -51,7 +50,7 @@ fun startTerminalProcess(
 @ApiStatus.Internal
 @OptIn(AwaitCancellationAndInvoke::class)
 fun createTerminalSession(
-  project: Project,
+  project: Project?,
   ttyConnector: TtyConnector,
   options: ShellStartupOptions,
   settings: JBTerminalSystemSettingsProviderBase,
@@ -64,7 +63,9 @@ fun createTerminalSession(
 
   val outputScope = coroutineScope.childScope("Terminal output forwarding")
   val shellIntegrationController = TerminalShellIntegrationController(services.controller)
-  shellIntegrationController.addListener(TerminalShellIntegrationStatisticsListener(project))
+  if (project != null) {
+    shellIntegrationController.addListener(TerminalShellIntegrationStatisticsListener(project))
+  }
   val outputFlow = createTerminalOutputFlow(
     services,
     shellIntegrationController,
@@ -92,11 +93,7 @@ fun createTerminalSession(
 
   // For the case when coroutine scope is canceled externally
   coroutineScope.awaitCancellationAndInvoke {
-    val starter = services.terminalStarter
-    starter.close() // close in background
-    starter.ttyConnector.waitFor(STOP_EMULATOR_TIMEOUT) {
-      starter.requestEmulatorStop()
-    }
+    services.terminalStarter.closeConnectorAndStopEmulation()
   }
 
   return TerminalSessionImpl(

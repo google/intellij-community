@@ -201,6 +201,8 @@ class MainToolbar(
 
   internal fun getFocusableItems(): List<Component> = focusSupport.getFocusableAndEnabledItems()
 
+  internal fun restoreFocusToPreviousComponent() = focusSupport.restoreFocusToPreviousComponent()
+
   private fun updateToolbarActions() {
     for (component in components) {
       if (component is ActionToolbarImpl) {
@@ -221,7 +223,7 @@ class MainToolbar(
       CustomizationUtil.createToolbarCustomizationHandler(it, MAIN_TOOLBAR_ID, this, ActionPlaces.MAIN_TOOLBAR)
     }
 
-    val widgets = withContext(Dispatchers.EDT) {
+    val widgets = withContext(Dispatchers.UiWithModelAccess) {
       removeAll()
 
       flavor.addWidget()

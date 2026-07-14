@@ -9,12 +9,15 @@
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="25" />
-            <stringArg name="apiVersion" arg="2.3" />
-            <stringArg name="languageVersion" arg="2.3" />
+            <stringArg name="apiVersion" arg="2.4" />
+            <stringArg name="languageVersion" arg="2.4" />
           </stringArguments>
           <arrayArguments>
             <arrayArg name="pluginClasspaths">
-              <args>$MAVEN_REPOSITORY$/org/jetbrains/kotlin/kotlin-compose-compiler-plugin/2.3.21-RC2/kotlin-compose-compiler-plugin-2.3.21-RC2.jar</args>
+              <args>
+                <arg>$KOTLIN_BUNDLED$/lib/kotlinx-serialization-compiler-plugin.jar</arg>
+                <arg>$KOTLIN_COMPOSE_COMPILER_PLUGIN$</arg>
+              </args>
             </arrayArg>
           </arrayArguments>
         </compilerArguments>
@@ -70,5 +73,7 @@
     <orderEntry type="module" module-name="intellij.platform.util.ui" />
     <orderEntry type="module" module-name="intellij.platform.externalSystem.impl" />
     <orderEntry type="module" module-name="intellij.gradle" />
+    <orderEntry type="module" module-name="intellij.libraries.kotlinx.serialization.json" />
+    <orderEntry type="module" module-name="intellij.libraries.kotlinx.serialization.core" />
   </component>
 </module>

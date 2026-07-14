@@ -6,6 +6,12 @@
   <description>Allows to design Swing UI graphically, supports code generation/instrumentation, preview, widgets library and UI-related code inspections</description>
   <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
+    <module name="intellij.java.execution.impl"/>
+    <module name="intellij.java.psi"/>
+    <module name="intellij.java.syntax"/>
+    <module name="intellij.java.ui"/>
+    <module name="intellij.platform.jps.build"/>
+    <module name="intellij.xml.impl"/>
     <module name="intellij.xml.psi"/>
   </dependencies>
   <!-- endregion -->
@@ -46,7 +52,6 @@
     <projectConfigurable groupId="editor" instance="com.intellij.uiDesigner.GuiDesignerConfigurable" id="project.propGUI" key="title.gui.designer"
                          bundle="messages.UIDesignerBundle"/>
 
-    <favoriteNodeProvider implementation="com.intellij.uiDesigner.projectView.UIDesignerFavoriteNodeProvider"/>
     <renameHandler implementation="com.intellij.uiDesigner.projectView.FormRenameHandler"/>
     <implicitUsageProvider implementation="com.intellij.uiDesigner.binding.UIDesignerImplicitUsageProvider"/>
     <usageTypeProvider implementation="com.intellij.uiDesigner.binding.FormUsageTypeProvider"/>
@@ -90,8 +95,6 @@
     <projectService serviceImplementation="com.intellij.uiDesigner.propertyInspector.properties.UseParentLayoutProperty"/>
     <projectService serviceImplementation="com.intellij.uiDesigner.propertyInspector.properties.CustomCreateProperty"/>
     <projectService serviceImplementation="com.intellij.uiDesigner.propertyInspector.properties.ClientPropertiesProperty"/>
-
-    <moduleService serviceImplementation="com.intellij.uiDesigner.StringDescriptorManager"/>
 
     <annotator language="JAVA" implementationClass="com.intellij.uiDesigner.binding.FormClassAnnotator"/>
 

@@ -4,14 +4,20 @@ import com.intellij.openapi.extensions.ExtensionPointName
 import org.jetbrains.annotations.ApiStatus
 
 /**
- * This extension point allows to specify if editor can be closed by tabs limit
+ * Allows editor tabs to prevent automatic closing when the tab limit is exceeded.
+ * Tabs that are not allowed to close are also excluded from the tab-limit count.
  */
 @ApiStatus.Internal
 @ApiStatus.Experimental
 interface EditorAutoClosingHandler {
   companion object {
     val EP_NAME = ExtensionPointName.create<EditorAutoClosingHandler>("com.intellij.editorAutoClosingHandler")
+
+    fun isClosingAllowed(composite: EditorComposite): Boolean {
+      val extensions = EP_NAME.extensionList
+      return extensions.isEmpty() || extensions.all { it.isClosingAllowed(composite) }
+    }
   }
 
-  fun isClosingAllowed(composite : EditorComposite): Boolean
+  fun isClosingAllowed(composite: EditorComposite): Boolean
 }

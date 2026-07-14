@@ -31,7 +31,6 @@ import com.intellij.testFramework.fixtures.IdeaProjectTestFixture
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory
 import com.intellij.util.EnvironmentUtil
 import com.intellij.util.SystemProperties
-import com.intellij.util.ThrowableRunnable
 import com.intellij.util.lang.JavaVersion
 import org.assertj.core.api.Assertions.assertThat
 import org.jdom.Element
@@ -55,8 +54,8 @@ class ExternalSystemJdkUtilTest : UsefulTestCase() {
 
   override fun tearDown() {
     RunAll(
-      ThrowableRunnable { testFixture.tearDown() },
-      ThrowableRunnable { super.tearDown() }
+      { testFixture.tearDown() },
+      { super.tearDown() }
     ).run()
   }
 
@@ -164,6 +163,19 @@ class ExternalSystemJdkUtilTest : UsefulTestCase() {
     assertThat(getAvailableJdk(project).second).isEqualTo(sdk8)
   }
 
+
+  @Test
+  fun testIsSdkRegisteredInSdkTable() {
+    val sdk = createMockJdk(JavaVersion.compose(21))
+
+    assertThat(ExternalSystemJdkUtil.isSdkRegisteredInSdkTable(project, sdk)).isFalse()
+
+    WriteAction.run<Throwable> {
+      ProjectJdkTable.getInstance(project).addJdk(sdk, testFixture.testRootDisposable)
+    }
+
+    assertThat(ExternalSystemJdkUtil.isSdkRegisteredInSdkTable(project, sdk)).isTrue()
+  }
 
   private fun createMockJdk(jdkVersion: JavaVersion): Sdk {
     val jdkVersionStr = jdkVersion.toString()

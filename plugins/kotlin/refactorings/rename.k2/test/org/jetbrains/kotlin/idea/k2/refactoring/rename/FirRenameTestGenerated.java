@@ -3,7 +3,6 @@
 package org.jetbrains.kotlin.idea.k2.refactoring.rename;
 
 import com.intellij.testFramework.TestDataPath;
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode;
 import org.jetbrains.kotlin.idea.base.test.TestRoot;
 import org.jetbrains.kotlin.idea.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils;
@@ -20,12 +19,6 @@ import org.junit.runner.RunWith;
 @RunWith(JUnit3RunnerWithInners.class)
 @TestMetadata("../../idea/tests/testData/refactoring/rename")
 public class FirRenameTestGenerated extends AbstractFirRenameTest {
-    @java.lang.Override
-    @org.jetbrains.annotations.NotNull
-    public final KotlinPluginMode getPluginMode() {
-        return KotlinPluginMode.K2;
-    }
-
     private void runTest(String testDataFilePath) throws Exception {
         KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
@@ -413,6 +406,11 @@ public class FirRenameTestGenerated extends AbstractFirRenameTest {
     @TestMetadata("lambdaParameterRedeclaration/lambdaParameterRedeclaration.test")
     public void testLambdaParameterRedeclaration_LambdaParameterRedeclaration() throws Exception {
         runTest("../../idea/tests/testData/refactoring/rename/lambdaParameterRedeclaration/lambdaParameterRedeclaration.test");
+    }
+
+    @TestMetadata("localVariableNoConflictInDifferentWhenBranches/localVariableNoConflictInDifferentWhenBranches.test")
+    public void testLocalVariableNoConflictInDifferentWhenBranches_LocalVariableNoConflictInDifferentWhenBranches() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/rename/localVariableNoConflictInDifferentWhenBranches/localVariableNoConflictInDifferentWhenBranches.test");
     }
 
     @TestMetadata("memberFunctionRedeclaration/memberFunctionRedeclaration.test")

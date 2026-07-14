@@ -1,12 +1,16 @@
-<idea-plugin package="org.jetbrains.idea.devkit.kotlin">
+<idea-plugin>
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
     <plugin id="org.jetbrains.kotlin"/>
-    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
     <module name="intellij.devkit.core"/>
+    <module name="intellij.java.psi"/>
+    <module name="intellij.kotlin.codeInsight.fixes"/>
+    <module name="intellij.kotlin.codeInsight.shared"/>
+    <module name="intellij.xml.analysis"/>
     <module name="intellij.xml.dom"/>
     <module name="intellij.xml.psi"/>
-    <!-- endregion -->
   </dependencies>
+  <!-- endregion -->
 
   <resource-bundle>messages.DevKitKotlinBundle</resource-bundle>
 
@@ -121,6 +125,14 @@
                      implementationClass="org.jetbrains.idea.devkit.kotlin.inspections.KtPolySymbolPropertyTypeInspection"
                      key="inspection.polySymbol.property.type.mismatch.display.name"/>
 
+    <localInspection language="kotlin" shortName="KotlinApplicableInspectionBaseSimpleCallExpression"
+                     projectType="INTELLIJ_PLUGIN"
+                     groupBundle="messages.DevKitBundle"
+                     groupPathKey="inspections.group.path" groupKey="inspections.group.code"
+                     enabledByDefault="true" level="WARNING"
+                     implementationClass="org.jetbrains.idea.devkit.kotlin.inspections.KotlinApplicableInspectionBaseSimpleCallExpressionInspection"
+                     key="inspection.kotlin.applicable.inspection.base.simple.call.expression.display.name"/>
+
     <useScopeEnlarger implementation="org.jetbrains.idea.devkit.kotlin.driver.RemoteUseScopeEnlarger"/>
     <methodReferencesSearch implementation="org.jetbrains.idea.devkit.kotlin.driver.RemoteMethodReferenceSearcher"/>
     <overridingMethodsSearch implementation="org.jetbrains.idea.devkit.kotlin.driver.RemoteMethodImplementationSearcher"/>
@@ -130,8 +142,10 @@
 
     <iconProvider implementation="org.jetbrains.idea.devkit.kotlin.driver.RemoteIconProvider" order="first"/>
 
-    <registryKey key="devkit.inspections.forbidden.method.in.suspend.context" defaultValue="false"
+    <registryKey key="devkit.inspections.forbidden.method.in.suspend.context" defaultValue="true"
                  description="Enables checks for RequiresBlockingContext in suspend contexts"/>
+    <registryKey key="devkit.inspections.checked.exception.for.kotlin.throws" defaultValue="false"
+                 description="Enables KotlinCheckedExceptionInspection for @Throws annotations"/>
   </extensions>
 
   <extensions defaultExtensionNs="DevKit.lang">
@@ -166,7 +180,7 @@
       language="kotlin"
       implementationClass="org.jetbrains.idea.devkit.kotlin.inspections.KtUElementAsPsiCheckProvider"/>
     <staticInitializationInExtensionsVisitorProvider language="kotlin"
-      implementationClass="org.jetbrains.idea.devkit.kotlin.inspections.KtStaticInitializationInExtensionsVisitorProvider"/>
+                                                     implementationClass="org.jetbrains.idea.devkit.kotlin.inspections.KtStaticInitializationInExtensionsVisitorProvider"/>
     <methodNameProvider
       language="kotlin"
       implementationClass="org.jetbrains.idea.devkit.kotlin.inspections.KtMethodNameProvider"/>

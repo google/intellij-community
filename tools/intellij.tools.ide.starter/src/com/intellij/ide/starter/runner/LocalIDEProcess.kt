@@ -49,7 +49,7 @@ class LocalIDEProcess : IDEProcess {
 
       try {
         testContext.setProviderMemoryOnlyOnLinux()
-        @Suppress("SSBasedInspection")
+        @Suppress("SSBasedInspection", "RunBlockingInSuspendFunction")
         val jdkHome = runBlocking(Dispatchers.Default) {
           testContext.ide.resolveAndDownloadTheSameJDKOrFallback()
         }
@@ -86,15 +86,14 @@ class LocalIDEProcess : IDEProcess {
             errorDiagnosticFiles = startConfig.errorDiagnosticFiles,
             stdoutRedirect = stdout,
             stderrRedirect = stderr,
-            onProcessCreated = { process, pid ->
+            onProcessCreated = { process, _ ->
               span.addEvent("process created")
               runInterruptible {
-                EventsBus.postAndWaitProcessing(IdeLaunchEvent(runContext = this, ideProcess = IDEProcessHandle(process.toHandle())))
+                EventsBus.postAndWaitProcessing(IdeLaunchEvent(runContext = this, ideProcess = IDEProcessHandle(process)))
               }
               getIdeProcessIdWithRetry(process.toProcessInfo(), runContext)?.let {
                 ideProcessId = it
-                startCollectThreadDumpsLoop(logsDir, IDEProcessHandle(process.toHandle()), jdkHome,
-                                            startConfig.workDir, it, "ide")
+                startCollectThreadDumpsLoop(logsDir, IDEProcessHandle(process), jdkHome, startConfig.workDir, it, "ide")
               }
             },
             onBeforeKilled = { process, pid ->
@@ -172,13 +171,7 @@ class LocalIDEProcess : IDEProcess {
         }
         finally {
           computeWithSpan("runIde post-processing and artifacts publishing") {
-            kotlin.runCatching {
-              publishArtifacts()
-            }.onFailure {
-              logError("Fail to execute publishArtifacts run for $contextName", it)
-            }.onSuccess {
-              logOutput("Successfully finished publishArtifacts run for $contextName")
-            }
+            publishArtifacts()
           }
         }
       }

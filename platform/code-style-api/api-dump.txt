@@ -599,7 +599,6 @@ com.intellij.psi.codeStyle.CodeStyleSettingsListener
 - a:codeStyleSettingsChanged(com.intellij.psi.codeStyle.CodeStyleSettingsChangeEvent):V
 c:com.intellij.psi.codeStyle.CodeStyleSettingsManager
 - com.intellij.openapi.components.PersistentStateComponentWithModificationTracker
-- PER_PROJECT_SETTINGS:com.intellij.psi.codeStyle.CodeStyleSettings
 - PREFERRED_PROJECT_CODE_STYLE:java.lang.String
 - USE_PER_PROJECT_SETTINGS:Z
 - <init>():V
@@ -686,6 +685,7 @@ c:com.intellij.psi.codeStyle.CommonCodeStyleSettings
 - CATCH_ON_NEW_LINE:Z
 - CLASS_ANNOTATION_WRAP:I
 - CLASS_BRACE_STYLE:I
+- DOCUMENTATION_LINE_COMMENT_PREFERRED:Z
 - DOWHILE_BRACE_FORCE:I
 - sf:DO_NOT_FORCE:I
 - DO_NOT_INDENT_TOP_LEVEL_CLASS_MEMBERS:Z

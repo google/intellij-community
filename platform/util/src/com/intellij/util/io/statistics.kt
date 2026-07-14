@@ -60,11 +60,21 @@ data class PersistentHashMapStatistics(val persistentEnumeratorStatistics: Persi
 data class CachedChannelsStatistics(val hit: Int,
                                     val miss: Int,
                                     val load: Int,
-                                    val capacity: Int)
+                                    val bypassedCache: Int,
+                                    val capacity: Int) {
+  operator fun plus(other: CachedChannelsStatistics): CachedChannelsStatistics {
+    return CachedChannelsStatistics(
+      hit = this.hit + other.hit,
+      miss = this.miss + other.miss,
+      load = this.load + other.load,
+      bypassedCache = this.bypassedCache + other.bypassedCache,
+      capacity = this.capacity + other.capacity
+    )
+  }
+}
 
 @Internal
 data class FilePageCacheStatistics(val cachedChannelsStatistics: CachedChannelsStatistics,
-                                   val uncachedFileAccess: Int,
                                    val maxRegisteredFiles: Int,
                                    val maxCacheSizeInBytes: Long,
                                    val totalCachedSizeInBytes: Long,
@@ -75,15 +85,22 @@ data class FilePageCacheStatistics(val cachedChannelsStatistics: CachedChannelsS
                                    val disposedBuffers: Int,
                                    val totalPageDisposalUs: Long,
                                    val totalPageLoadUs: Long,
+                                   val totalPageStoreUs: Long,
+                                   val totalBytesStored: Long,
                                    val totalPagesLoaded: Long,
                                    val capacityInBytes: Long) {
   fun dumpInfoImportantForBuildProcess() : String {
     return "pageHits=$pageHits, " +
            "pageFastCacheHits=$pageFastCacheHits, " +
+
            "regularPageLoads=$regularPageLoads, " +
            "pageLoadsAboveSizeThreshold=$pageLoadsAboveSizeThreshold, " +
            "pageLoadUs=$totalPageLoadUs, " +
+
            "pageDisposalUs=$totalPageDisposalUs, " +
+           "pageStoreUs=${totalPageStoreUs}, " +
+           "bytesStored=${totalBytesStored}, " +
+
            "capacityInBytes=$capacityInBytes, " +
            "disposedBuffers=$disposedBuffers " +
            "maxRegisteredFiles=$maxRegisteredFiles " +

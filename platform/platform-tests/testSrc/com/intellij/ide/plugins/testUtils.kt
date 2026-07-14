@@ -2,7 +2,6 @@
 package com.intellij.ide.plugins
 
 import com.intellij.testFramework.LoggedErrorProcessor
-import com.intellij.util.ThrowableRunnable
 import java.util.concurrent.atomic.AtomicReference
 
 
@@ -21,6 +20,18 @@ internal fun <R> runAndReturnWithLoggedErrors(body: () -> R): Pair<R, List<Throw
       errors.getAndUpdate { it.add(t!!); it }
       return Action.NONE
     }
-  }, ThrowableRunnable { result.set(body()) })
+  }) { result.set(body()) }
   return result.get() to errors.get()
+}
+
+internal fun <R> runAndReturnWithLoggedWarnings(body: () -> R): Pair<R, List<String>> {
+  val result = AtomicReference<R>()
+  val warnings = AtomicReference<ArrayList<String>>(arrayListOf())
+  LoggedErrorProcessor.executeWith<RuntimeException?>(object : LoggedErrorProcessor() {
+    override fun processWarn(category: String, message: String, t: Throwable?): Boolean {
+      warnings.getAndUpdate { it.add(message); it }
+      return false
+    }
+  }) { result.set(body()) }
+  return result.get() to warnings.get()
 }

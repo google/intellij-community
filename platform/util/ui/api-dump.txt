@@ -97,10 +97,6 @@ f:com.intellij.icons.AllIcons$Actions
 - sf:MenuOpen:javax.swing.Icon
 - sf:MenuPaste:javax.swing.Icon
 - sf:MenuSaveall:javax.swing.Icon
-- sf:Menu_cut:javax.swing.Icon
-- sf:Menu_open:javax.swing.Icon
-- sf:Menu_paste:javax.swing.Icon
-- sf:Menu_saveall:javax.swing.Icon
 - sf:Minimap:javax.swing.Icon
 - sf:ModuleDirectory:javax.swing.Icon
 - sf:More:javax.swing.Icon
@@ -121,6 +117,10 @@ f:com.intellij.icons.AllIcons$Actions
 - sf:New:javax.swing.Icon
 - sf:NewFolder:javax.swing.Icon
 - sf:NextOccurence:javax.swing.Icon
+- sf:NotificationsBottomLeft:javax.swing.Icon
+- sf:NotificationsBottomRight:javax.swing.Icon
+- sf:NotificationsTopLeft:javax.swing.Icon
+- sf:NotificationsTopRight:javax.swing.Icon
 - sf:OfflineMode:javax.swing.Icon
 - sf:OpenNewTab:javax.swing.Icon
 - sf:Pause:javax.swing.Icon
@@ -174,7 +174,6 @@ f:com.intellij.icons.AllIcons$Actions
 - sf:RunAll:javax.swing.Icon
 - sf:RunAnything:javax.swing.Icon
 - sf:RunToCursor:javax.swing.Icon
-- sf:Run_anything:javax.swing.Icon
 - sf:Scratch:javax.swing.Icon
 - sf:Search:javax.swing.Icon
 - sf:SearchNewLine:javax.swing.Icon
@@ -189,7 +188,6 @@ f:com.intellij.icons.AllIcons$Actions
 - sf:ShowCode:javax.swing.Icon
 - sf:ShowImportStatements:javax.swing.Icon
 - sf:ShowReadAccess:javax.swing.Icon
-- sf:ShowViewer:javax.swing.Icon
 - sf:ShowWriteAccess:javax.swing.Icon
 - sf:SplitHorizontally:javax.swing.Icon
 - sf:SplitVertically:javax.swing.Icon
@@ -338,6 +336,7 @@ f:com.intellij.icons.AllIcons$Debugger
 - sf:Frame:javax.swing.Icon
 - sf:Freeze:javax.swing.Icon
 - sf:FreezeAll:javax.swing.Icon
+- sf:InspectionSeverity:javax.swing.Icon
 - sf:KillProcess:javax.swing.Icon
 - sf:LambdaBreakpoint:javax.swing.Icon
 - sf:MultipleBreakpoints:javax.swing.Icon
@@ -409,6 +408,8 @@ f:com.intellij.icons.AllIcons$Diff
 - sf:MagicResolveToolbar:javax.swing.Icon
 - sf:Remove:javax.swing.Icon
 - sf:Revert:javax.swing.Icon
+- sf:SideBySide:javax.swing.Icon
+- sf:Unified:javax.swing.Icon
 - <init>():V
 f:com.intellij.icons.AllIcons$Duplicates
 - sf:SendToTheLeft:javax.swing.Icon
@@ -422,17 +423,26 @@ f:com.intellij.icons.AllIcons$FileTypes
 - sf:Any_type:javax.swing.Icon
 - sf:Archive:javax.swing.Icon
 - sf:Aspectj:javax.swing.Icon
+- sf:Bazel:javax.swing.Icon
 - sf:BinaryData:javax.swing.Icon
+- sf:C:javax.swing.Icon
 - sf:Config:javax.swing.Icon
 - sf:Contexts:javax.swing.Icon
 - sf:ContextsModifier:javax.swing.Icon
+- sf:Cpp:javax.swing.Icon
+- sf:Csharp:javax.swing.Icon
 - sf:Css:javax.swing.Icon
 - sf:Csv:javax.swing.Icon
 - sf:Custom:javax.swing.Icon
 - sf:Diagram:javax.swing.Icon
+- sf:Docker:javax.swing.Icon
 - sf:Dtd:javax.swing.Icon
 - sf:Font:javax.swing.Icon
 - sf:Gitignore:javax.swing.Icon
+- sf:Gradle:javax.swing.Icon
+- sf:Graphql:javax.swing.Icon
+- sf:Groovy:javax.swing.Icon
+- sf:H:javax.swing.Icon
 - sf:Hprof:javax.swing.Icon
 - sf:Htaccess:javax.swing.Icon
 - sf:Html:javax.swing.Icon
@@ -444,20 +454,29 @@ f:com.intellij.icons.AllIcons$FileTypes
 - sf:JavaClass:javax.swing.Icon
 - sf:JavaOutsideSource:javax.swing.Icon
 - sf:JavaScript:javax.swing.Icon
+- sf:Jenkins:javax.swing.Icon
 - sf:Jfr:javax.swing.Icon
 - sf:Json:javax.swing.Icon
 - sf:JsonSchema:javax.swing.Icon
 - sf:Jsp:javax.swing.Icon
 - sf:Jspx:javax.swing.Icon
+- sf:Jupyter:javax.swing.Icon
 - sf:Manifest:javax.swing.Icon
+- sf:Markdown:javax.swing.Icon
 - sf:MicrosoftWindows:javax.swing.Icon
 - sf:Perl:javax.swing.Icon
 - sf:Properties:javax.swing.Icon
 - sf:Regexp:javax.swing.Icon
+- sf:Rst:javax.swing.Icon
 - sf:SourceMap:javax.swing.Icon
+- sf:Sql:javax.swing.Icon
+- sf:SwiftLang:javax.swing.Icon
+- sf:Terraform:javax.swing.Icon
 - sf:Text:javax.swing.Icon
+- sf:Toml:javax.swing.Icon
 - sf:UiForm:javax.swing.Icon
 - sf:Unknown:javax.swing.Icon
+- sf:Vue:javax.swing.Icon
 - sf:WsdlFile:javax.swing.Icon
 - sf:Xhtml:javax.swing.Icon
 - sf:Xml:javax.swing.Icon
@@ -563,7 +582,6 @@ f:com.intellij.icons.AllIcons$General
 - sf:LayoutPreviewOnly:javax.swing.Icon
 - sf:Learn:javax.swing.Icon
 - sf:LinkDropTriangle:javax.swing.Icon
-- sf:LocalizationSettings:javax.swing.Icon
 - sf:Locate:javax.swing.Icon
 - sf:LockedUltimate:javax.swing.Icon
 - sf:Menu:javax.swing.Icon
@@ -711,7 +729,6 @@ f:com.intellij.icons.AllIcons$Ide
 - sf:OutgoingChangesOn:javax.swing.Icon
 - sf:Pipette:javax.swing.Icon
 - sf:PipetteRollover:javax.swing.Icon
-- sf:Pipette_rollover:javax.swing.Icon
 - sf:PowerSaveMode:javax.swing.Icon
 - sf:Rating:javax.swing.Icon
 - sf:Rating1:javax.swing.Icon
@@ -840,6 +857,77 @@ f:com.intellij.icons.AllIcons$MeetNewUi
 - sf:DarkTheme:javax.swing.Icon
 - sf:LightTheme:javax.swing.Icon
 - <init>():V
+f:com.intellij.icons.AllIcons$Modifiers
+- sf:Arrow:javax.swing.Icon
+- sf:Arrowright:javax.swing.Icon
+- sf:Asterisk:javax.swing.Icon
+- sf:Bean:javax.swing.Icon
+- sf:Bench:javax.swing.Icon
+- sf:Blocked:javax.swing.Icon
+- sf:Braces:javax.swing.Icon
+- sf:Build:javax.swing.Icon
+- sf:Chat:javax.swing.Icon
+- sf:Check:javax.swing.Icon
+- sf:Client:javax.swing.Icon
+- sf:Clock:javax.swing.Icon
+- sf:Cloud:javax.swing.Icon
+- sf:Code:javax.swing.Icon
+- sf:Config:javax.swing.Icon
+- sf:Console:javax.swing.Icon
+- sf:Contexts:javax.swing.Icon
+- sf:Cross:javax.swing.Icon
+- sf:Cup:javax.swing.Icon
+- sf:DB:javax.swing.Icon
+- sf:Data:javax.swing.Icon
+- sf:Debug:javax.swing.Icon
+- sf:Dot:javax.swing.Icon
+- sf:Down:javax.swing.Icon
+- sf:Edit:javax.swing.Icon
+- sf:Embeddable:javax.swing.Icon
+- sf:Factory:javax.swing.Icon
+- sf:Failed:javax.swing.Icon
+- sf:Flow:javax.swing.Icon
+- sf:Gear:javax.swing.Icon
+- sf:Generated:javax.swing.Icon
+- sf:Git:javax.swing.Icon
+- sf:Github:javax.swing.Icon
+- sf:GoTo:javax.swing.Icon
+- sf:Group:javax.swing.Icon
+- sf:Inside:javax.swing.Icon
+- sf:Items:javax.swing.Icon
+- sf:JS:javax.swing.Icon
+- sf:Jetbrains:javax.swing.Icon
+- sf:Key:javax.swing.Icon
+- sf:Kotlin:javax.swing.Icon
+- sf:Library:javax.swing.Icon
+- sf:List:javax.swing.Icon
+- sf:Locked:javax.swing.Icon
+- sf:Memory:javax.swing.Icon
+- sf:Module:javax.swing.Icon
+- sf:Package:javax.swing.Icon
+- sf:Plug:javax.swing.Icon
+- sf:Plus:javax.swing.Icon
+- sf:Record:javax.swing.Icon
+- sf:Ref:javax.swing.Icon
+- sf:Refresh:javax.swing.Icon
+- sf:Replay:javax.swing.Icon
+- sf:Resources:javax.swing.Icon
+- sf:Run:javax.swing.Icon
+- sf:Save:javax.swing.Icon
+- sf:Schema:javax.swing.Icon
+- sf:Search:javax.swing.Icon
+- sf:Share:javax.swing.Icon
+- sf:Snapshot:javax.swing.Icon
+- sf:Spring:javax.swing.Icon
+- sf:Star:javax.swing.Icon
+- sf:Stop:javax.swing.Icon
+- sf:Suspend:javax.swing.Icon
+- sf:Table:javax.swing.Icon
+- sf:Test:javax.swing.Icon
+- sf:Watch:javax.swing.Icon
+- sf:Web:javax.swing.Icon
+- sf:Zip:javax.swing.Icon
+- <init>():V
 f:com.intellij.icons.AllIcons$Modules
 - sf:AddExcludedRoot:javax.swing.Icon
 - sf:Annotation:javax.swing.Icon
@@ -912,7 +1000,6 @@ f:com.intellij.icons.AllIcons$Nodes
 - sf:IdeaModule:javax.swing.Icon
 - sf:IdeaProject:javax.swing.Icon
 - sf:Include:javax.swing.Icon
-- sf:InspectionResults:javax.swing.Icon
 - sf:Interface:javax.swing.Icon
 - sf:JarDirectory:javax.swing.Icon
 - sf:JavaDocFolder:javax.swing.Icon
@@ -976,7 +1063,6 @@ f:com.intellij.icons.AllIcons$Nodes
 - sf:ResourceBundle:javax.swing.Icon
 - sf:RunnableMark:javax.swing.Icon
 - sf:RwAccess:javax.swing.Icon
-- sf:Rw_access:javax.swing.Icon
 - sf:SecurityRole:javax.swing.Icon
 - sf:Services:javax.swing.Icon
 - sf:Servlet:javax.swing.Icon
@@ -1009,7 +1095,6 @@ f:com.intellij.icons.AllIcons$Nodes
 - sf:WarningIntroduction:javax.swing.Icon
 - sf:WarningMark:javax.swing.Icon
 - sf:WebFolder:javax.swing.Icon
-- sf:Weblistener:javax.swing.Icon
 - sf:Word:javax.swing.Icon
 - sf:Workspace:javax.swing.Icon
 - sf:WriteAccess:javax.swing.Icon
@@ -1106,7 +1191,6 @@ f:com.intellij.icons.AllIcons$Providers
 - sf:ApacheIgnite:javax.swing.Icon
 - sf:ApachePhoenix:javax.swing.Icon
 - sf:Athena:javax.swing.Icon
-- sf:Aws:javax.swing.Icon
 - sf:Azure:javax.swing.Icon
 - sf:BigQuery:javax.swing.Icon
 - sf:Cassandra:javax.swing.Icon
@@ -1309,7 +1393,6 @@ f:com.intellij.icons.AllIcons$Toolwindows
 - sf:ToolWindowDebugger:javax.swing.Icon
 - sf:ToolWindowDevMode:javax.swing.Icon
 - sf:ToolWindowDuplicates:javax.swing.Icon
-- sf:ToolWindowFavorites:javax.swing.Icon
 - sf:ToolWindowFind:javax.swing.Icon
 - sf:ToolWindowHierarchy:javax.swing.Icon
 - sf:ToolWindowInspection:javax.swing.Icon
@@ -1631,6 +1714,7 @@ c:com.intellij.openapi.util.IconLoader$CachedImageIcon
 - com.intellij.ui.icons.CopyableIcon
 - com.intellij.ui.icons.DarkIconProvider
 - com.intellij.ui.icons.IconPathProvider
+- com.intellij.ui.icons.IconWithShape
 - com.intellij.ui.icons.IconWithToolTip
 f:com.intellij.openapi.util.text.TextWithMnemonic
 - sf:EMPTY:com.intellij.openapi.util.text.TextWithMnemonic
@@ -3445,6 +3529,8 @@ c:com.intellij.ui.scale.UserScaleContext
 - p:updateAll(com.intellij.ui.scale.UserScaleContext):Z
 com.intellij.ui.scale.UserScaleContext$UpdateListener
 - a:contextUpdated():V
+f:com.intellij.ui.svg.JsvgKt
+- sf:computeIntrinsicSize(java.lang.String,java.lang.String,F,F):kotlin.Pair
 com.intellij.ui.svg.SvgAttributePatcher
 - patchColors(java.util.Map):V
 f:com.intellij.ui.svg.SvgKt
@@ -3772,6 +3858,7 @@ f:com.intellij.util.ui.GraphicsUtil
 - s:charWidth(I,java.awt.Font):I
 - s:createAATextInfo(java.lang.Object):com.intellij.util.ui.AATextInfo
 - s:disableAAPainting(java.awt.Graphics):com.intellij.openapi.ui.GraphicsConfig
+- s:fontMetrics(java.awt.Font):java.awt.FontMetrics
 - s:isRemoteEnvironment():Z
 - s:paintWithAlpha(java.awt.Graphics,F):com.intellij.openapi.ui.GraphicsConfig
 - s:paintWithAlpha(java.awt.Graphics,F,java.lang.Runnable):V
@@ -5669,6 +5756,7 @@ f:com.intellij.util.ui.accessibility.AccessibleContextUtil
 - sf:setParent(java.awt.Component,java.awt.Component):V
 f:com.intellij.util.ui.accessibility.ScreenReader
 - sf:ACCESS_BRIDGE:java.lang.String
+- sf:ASSISTIVE_TECHNOLOGIES_PROPERTY:java.lang.String
 - sf:ATK_WRAPPER:java.lang.String
 - sf:SCREEN_READER_ACTIVE_PROPERTY:java.lang.String
 - <init>():V

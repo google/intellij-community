@@ -30,6 +30,7 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.progress.EmptyProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.util.Computable
 import com.intellij.openapi.util.ProperTextRange
 import com.intellij.openapi.util.io.FileUtil
@@ -44,7 +45,7 @@ import com.intellij.polySymbols.declarations.PolySymbolDeclarationProvider
 import com.intellij.polySymbols.impl.canUnwrapSymbols
 import com.intellij.polySymbols.query.PolySymbolMatch
 import com.intellij.polySymbols.query.PolySymbolQueryExecutorFactory
-import com.intellij.polySymbols.search.PsiSourcedPolySymbol
+import com.intellij.polySymbols.search.PsiLinkedPolySymbol
 import com.intellij.polySymbols.utils.PolySymbolDeclaredInPsi
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
@@ -116,12 +117,12 @@ fun CodeInsightTestFixture.checkNoDocumentationAtCaret() {
   assertNull(renderDocAtCaret())
 }
 
-fun CodeInsightTestFixture.checkDocumentationAtCaret() {
-  checkDocumentation(renderDocAtCaret())
+fun CodeInsightTestFixture.checkDocumentationAtCaret(fileSuffix: String = ".expected", directory: String = "") {
+  checkDocumentation(renderDocAtCaret(), fileSuffix = fileSuffix, directory = directory)
 }
 
-suspend fun CodeInsightTestFixture.checkDocumentationAtCaretSuspending() {
-  checkDocumentation(renderDocAtCaretSuspending())
+suspend fun CodeInsightTestFixture.checkDocumentationAtCaretSuspending(fileSuffix: String = ".expected", directory: String = "") {
+  checkDocumentation(renderDocAtCaretSuspending(), fileSuffix = fileSuffix, directory = directory)
 }
 
 fun CodeInsightTestFixture.checkLookupItems(
@@ -138,6 +139,7 @@ fun CodeInsightTestFixture.checkLookupItems(
   fileName: String = InjectedLanguageManager.getInstance(project).getTopLevelFile(file).virtualFile.nameWithoutExtension,
   expectedDataLocation: String = "",
   expectedItemsLocation: String = expectedDataLocation,
+  expectedItemsFileNameInfixProvider: (prefix: String, suffix: String) -> String = { _,_ -> "" },
   lookupItemFilter: (item: LookupElementInfo) -> Boolean = { true },
 ) {
   val hasDir = expectedItemsLocation.isNotEmpty()
@@ -160,11 +162,13 @@ fun CodeInsightTestFixture.checkLookupItems(
       val doc = targets.firstOrNull()?.let { computeDocumentationBlocking(it.createPointer()) }?.html?.trim()
 
       val sanitizedLookupString = lookupString.replace(Regex("[*\"?<>/\\[\\]:;|,#]"), "_")
-      checkDocumentation(doc ?: "<no documentation>", "$fileSuffix#$sanitizedLookupString", expectedDataLocation)
+      val fullPrefix = "$expectedDataLocation${InjectedLanguageManager.getInstance(project).getTopLevelFile(file).virtualFile.nameWithoutExtension}$fileSuffix#$sanitizedLookupString"
+      checkDocumentation(doc ?: "<no documentation>", "$fileSuffix#$sanitizedLookupString${expectedItemsFileNameInfixProvider(fullPrefix, ".html")}", expectedDataLocation)
     }
   }
 
   noAutoComplete {
+    val prefix = expectedItemsLocation + (if (hasDir) "/items" else "$fileName.items")
     if (locations.isEmpty() && namedLocations.isEmpty()) {
       completeBasic()
       checkListByFile(
@@ -177,7 +181,7 @@ fun CodeInsightTestFixture.checkLookupItems(
           renderDisplayEffects = renderDisplayEffects,
           lookupFilter = lookupItemFilter,
         ),
-        expectedFile = expectedItemsLocation + (if (hasDir) "/items" else "$fileName.items") + ".txt",
+        expectedFile = "${prefix}${expectedItemsFileNameInfixProvider(prefix, ".txt")}.txt",
         containsCheck = containsCheck,
       )
       checkLookupDocumentation()
@@ -200,7 +204,7 @@ fun CodeInsightTestFixture.checkLookupItems(
                 renderDisplayEffects = renderDisplayEffects,
                 lookupFilter = lookupItemFilter,
               ),
-              expectedFile = expectedItemsLocation + (if (hasDir) "/items" else "$fileName.items") + ".$index.txt",
+              expectedFile = "${prefix}${expectedItemsFileNameInfixProvider(prefix, ".$index.txt")}.$index.txt",
               containsCheck = containsCheck
             )
           }
@@ -316,11 +320,11 @@ private fun CodeInsightTestFixture.checkDocumentation(
 private fun CodeInsightTestFixture.renderDocAtCaret(): String? {
   val targets = PlatformTestUtil.callOnBgtSynchronously(
     {
-      ProgressManager.getInstance().runProcess(Computable {
-        runReadAction {
+      runBlockingMaybeCancellable {
+        readAction {
           IdeDocumentationTargetProvider.getInstance(project).documentationTargets(editor, file, caretOffset)
         }
-      }, EmptyProgressIndicator())
+      }
     }, 10)!!
 
   return targets.mapNotNull { computeDocumentationBlocking(it.createPointer()) }.render()
@@ -367,14 +371,15 @@ fun CodeInsightTestFixture.renderLookupItems(
   lookupElements?.asSequence()
     ?.map {
       val presentation = TestLookupElementPresentation.renderReal(it)
+      val prioritizedLookupElement = it.`as`(PrioritizedLookupElement::class.java)
       LookupElementInfo(
         lookupElement = it,
         lookupString = it.lookupString,
         displayText = presentation.itemText,
         tailText = presentation.tailText,
         typeText = presentation.typeText,
-        priority = (it as? PrioritizedLookupElement<*>)?.priority ?: 0.0,
-        proximity = (it as? PrioritizedLookupElement<*>)?.explicitProximity,
+        priority = prioritizedLookupElement?.priority ?: 0.0,
+        proximity = prioritizedLookupElement?.explicitProximity,
         isStrikeout = presentation.isStrikeout,
         isItemTextBold = presentation.isItemTextBold,
         isItemTextItalic = presentation.isItemTextItalic,
@@ -382,11 +387,11 @@ fun CodeInsightTestFixture.renderLookupItems(
         isTypeGreyed = presentation.isTypeGrayed,
       )
     }
-    ?.filter(lookupFilter)
     ?.sortedWith(
       Comparator.comparing { it: LookupElementInfo -> -it.priority }
         .thenComparingInt { -(it.proximity ?: 0) }
         .thenComparing { it: LookupElementInfo -> it.lookupString })
+    ?.filter(lookupFilter)
     ?.map {
       it.render(
         renderPriority = renderPriority,
@@ -442,7 +447,7 @@ fun CodeInsightTestFixture.polySymbolAtCaret(): PolySymbol? =
 
 fun CodeInsightTestFixture.polySymbolSourceAtCaret(): PsiElement? =
   when (val symbol = polySymbolAtCaret()) {
-    is PsiSourcedPolySymbol -> symbol.source
+    is PsiLinkedPolySymbol -> symbol.linkedElement
     is PolySymbolDeclaredInPsi -> symbol.sourceElement
     else -> null
   }
@@ -516,7 +521,7 @@ private fun <T> injectionThenHost(file: PsiFile, offset: Int, computation: (PsiF
 
 fun CodeInsightTestFixture.resolveToPolySymbolSource(signature: String): PsiElement {
   val polySymbol = resolvePolySymbolReference(signature)
-  val result = assertInstanceOf<PsiSourcedPolySymbol>(polySymbol).source
+  val result = assertInstanceOf<PsiLinkedPolySymbol>(polySymbol).linkedElement
   assertNotNull("PolySymbol $polySymbol source is null", result)
   return result!!
 }
@@ -692,7 +697,7 @@ fun CodeInsightTestFixture.checkTextByFile(actualContents: String, @TestDataFile
 
 fun CodeInsightTestFixture.canRenamePolySymbolAtCaret(): Boolean =
   polySymbolAtCaret().let {
-    it is RenameTarget || it?.renameTarget != null || (it is PsiSourcedPolySymbol && it.source != null)
+    it is RenameTarget || it?.renameTarget != null || (it is PsiLinkedPolySymbol && it.linkedElement != null)
   }
 
 fun CodeInsightTestFixture.renamePolySymbol(newName: String) {
@@ -706,14 +711,14 @@ fun CodeInsightTestFixture.renamePolySymbol(newName: String) {
   if (target == null) {
     target = when (symbol) {
       is RenameTarget -> symbol
-      is PsiSourcedPolySymbol -> {
-        val psiTarget = symbol.source
+      is PsiLinkedPolySymbol -> {
+        val psiTarget = symbol.linkedElement
                         ?: throw AssertionError("Symbol $symbol provides null source")
         renameElement(psiTarget, newName)
         return
       }
       else -> symbol.renameTarget
-              ?: throw AssertionError("Symbol $symbol does not provide rename target nor is a PsiSourcedPolySymbol")
+              ?: throw AssertionError("Symbol $symbol does not provide rename target nor is a PsiLinkedPolySymbol")
     }
   }
   if (target.createPointer().dereference() == null) {

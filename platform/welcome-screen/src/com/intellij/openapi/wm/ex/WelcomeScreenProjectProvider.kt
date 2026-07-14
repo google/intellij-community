@@ -39,7 +39,7 @@ fun getWelcomeScreenProjectProvider(): WelcomeScreenProjectProvider? {
 
 @Internal
 interface WelcomeScreenProjectSupport {
-  suspend fun createOrOpenWelcomeScreenProject(extension: WelcomeScreenProjectProvider): Project
+  suspend fun createOrOpenWelcomeScreenProject(extension: WelcomeScreenProjectProvider, projectToClose: Project? = null): Project
 
   suspend fun openProject(path: Path): Project
 }
@@ -67,6 +67,11 @@ abstract class WelcomeScreenProjectProvider {
       return extension.doIsWelcomeScreenProject(project) && extension.doIsEditableProject(project)
     }
 
+    fun isVcsEnabled(project: Project): Boolean {
+      val isEditable = isEditableWelcomeProject(project)
+      return isEditable && getWelcomeScreenProjectProvider()?.doIsVcsEnabled() ?: false
+    }
+
     fun isForceDisabledFileColors(): Boolean {
       val extension = getWelcomeScreenProjectProvider() ?: return false
       return extension.doIsForceDisabledFileColors()
@@ -86,8 +91,16 @@ abstract class WelcomeScreenProjectProvider {
       return getWelcomeScreenProjectProvider()?.canOpenFilesFromSystemFileManager(filePath) ?: false
     }
 
-    suspend fun createOrOpenWelcomeScreenProject(extension: WelcomeScreenProjectProvider): Project {
-      return serviceAsync<WelcomeScreenProjectSupport>().createOrOpenWelcomeScreenProject(extension)
+    fun getProjectPaneToActivateId(): String? {
+      return getWelcomeScreenProjectProvider()?.doGetProjectPaneToActivateId()
+    }
+
+    fun getStartupToolWindowIdToActivate(): String? {
+      return getWelcomeScreenProjectProvider()?.doGetStartupToolWindowIdToActivate()
+    }
+
+    suspend fun createOrOpenWelcomeScreenProject(extension: WelcomeScreenProjectProvider, projectToClose: Project? = null): Project {
+      return serviceAsync<WelcomeScreenProjectSupport>().createOrOpenWelcomeScreenProject(extension, projectToClose)
     }
   }
 
@@ -95,6 +108,13 @@ abstract class WelcomeScreenProjectProvider {
    * Return true if the welcome screen project can open [filePath] from the file manager (Explorer, Finder) or command line.
    */
   abstract fun canOpenFilesFromSystemFileManager(filePath: Path): Boolean
+
+  /**
+   * When [canOpenFilesFromSystemFileManager] returns true for a file that is already inside a known
+   * IntelliJ project (some ancestor contains a `.idea/` directory), this hook decides whether to
+   * open it in the welcome project or in the existing project right away.
+   */
+  open fun shouldOpenInWelcomeScreenIfFileBelongsToProject(filePath: Path): Boolean = true
 
   protected open fun getWelcomeScreenProjectPath(): Path {
     return Path.of(getProjectsBasePath(), getWelcomeScreenProjectName()).absolute()
@@ -118,20 +138,39 @@ abstract class WelcomeScreenProjectProvider {
     return false
   }
 
+  /**
+   * Return true if your project is a welcome screen that supports version control operations. This setting will be ignored unless the
+   * project is also editable. See [doIsEditableProject]
+   */
+  protected open fun doIsVcsEnabled(): Boolean = false
+
   protected abstract fun doIsForceDisabledFileColors(): Boolean
 
   protected abstract fun doGetCreateNewFileProjectPrefix(): String
 
   protected open suspend fun doCreateOrOpenWelcomeScreenProject(path: Path): Project {
+    return doCreateOrOpenWelcomeScreenProject(path, projectToClose = null)
+  }
+
+  protected open suspend fun doCreateOrOpenWelcomeScreenProject(path: Path, projectToClose: Project?): Project {
     return serviceAsync<WelcomeScreenProjectSupport>().openProject(path)
   }
 
   @Internal
   suspend fun doCreateOrOpenWelcomeScreenProjectForInternalUsage(path: Path): Project {
-    return doCreateOrOpenWelcomeScreenProject(path)
+    return doCreateOrOpenWelcomeScreenProject(path, projectToClose = null)
+  }
+
+  @Internal
+  suspend fun doCreateOrOpenWelcomeScreenProjectForInternalUsage(path: Path, projectToClose: Project?): Project {
+    return doCreateOrOpenWelcomeScreenProject(path, projectToClose)
   }
 
   protected open fun doIsHiddenInRecentProjects(): Boolean = true
+
+  protected open fun doGetProjectPaneToActivateId(): String? = null
+
+  protected open fun doGetStartupToolWindowIdToActivate(): String? = null
 
   @Internal
   fun isHiddenInRecentProjectsForInternalUsage(): Boolean = doIsHiddenInRecentProjects()
@@ -160,7 +199,7 @@ private fun getProjectsBasePath(): String {
 }
 
 private val projectsDirDefault: String
-  get() = if (PlatformUtils.isDataGrip() || PlatformUtils.isDataSpell()) getUserHomeProjectDir() else Path.of(PathManager.getConfigPath(), PROJECTS_DIR).toString()
+  get() = if (PlatformUtils.isDataGrip()) getUserHomeProjectDir() else Path.of(PathManager.getConfigPath(), PROJECTS_DIR).toString()
 
 private fun getUserHomeProjectDir(): String {
   val appNamesInfo = ApplicationNamesInfo.getInstance()

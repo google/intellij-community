@@ -8,12 +8,8 @@
     <module name="intellij.platform.editor"/>
     <module name="intellij.platform.editor.ui"/>
     <module name="intellij.platform.ide.impl"/>
+    <module name="intellij.platform.kernel"/>
     <module name="intellij.platform.util.coroutines"/>
   </dependencies>
   <!-- endregion -->
-  <extensions defaultExtensionNs="com.intellij">
-    <editorFactoryListener implementation="com.intellij.platform.editor.backend.BackendEditorFactoryListener"/>
-    <applicationService serviceImplementation="com.intellij.platform.editor.backend.BackendEditors"
-                        client="remote"/>
-  </extensions>
 </idea-plugin>

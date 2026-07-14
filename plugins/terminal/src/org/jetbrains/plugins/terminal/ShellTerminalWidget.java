@@ -29,6 +29,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.plugins.terminal.action.TerminalSplitAction;
 import org.jetbrains.plugins.terminal.arrangement.TerminalWorkingDirectoryManager;
+import org.jetbrains.plugins.terminal.block.ui.TerminalUiUtilsKt;
 import org.jetbrains.plugins.terminal.classic.ClassicTerminalCommandStartedListener;
 import org.jetbrains.plugins.terminal.classic.ClassicTerminalVfsRefresher;
 import org.jetbrains.plugins.terminal.fus.TerminalUsageTriggerCollector;
@@ -192,7 +193,7 @@ public class ShellTerminalWidget extends JBTerminalWidget implements TerminalPan
       List<String> commands = new ArrayList<>();
       myCommandsToExecute.drainTo(commands);
       for (String command : commands) {
-        TerminalUtil.sendCommandToExecute(command, terminalStarter);
+        TerminalUtil.sendCommandToExecute(TerminalUiUtilsKt.sanitizeLineSeparators(command), terminalStarter);
       }
     });
   }
@@ -296,7 +297,7 @@ public class ShellTerminalWidget extends JBTerminalWidget implements TerminalPan
     else {
       starter.close(); // close in background
       TtyConnector connector = starter.getTtyConnector();
-      TerminalUtilKt.waitFor(connector, TerminalUtilKt.STOP_EMULATOR_TIMEOUT, () -> {
+      TerminalUtilKt.waitForAsync(connector, TerminalUtilKt.CONNECTOR_CLOSING_TIMEOUT, () -> {
         if (connector.isConnected()) {
           LOG.warn("Cannot destroy " + TerminalUtilKt.getDebugName(connector));
         }

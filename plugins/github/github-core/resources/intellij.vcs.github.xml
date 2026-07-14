@@ -12,6 +12,7 @@
     <module name="intellij.platform.vcs.impl.shared"/>
     <module name="intellij.platform.vcs.log"/>
     <module name="intellij.platform.vcs.log.impl"/>
+    <module name="intellij.vcs.git.backend"/>
     <module name="intellij.vcs.git.shared"/>
   </dependencies>
   <!-- endregion -->
@@ -94,6 +95,7 @@
 
     <completion.contributor language="any" implementationClass="org.jetbrains.plugins.github.ui.GithubMarkdownCompletionContributor"/>
     <typedHandler implementation="org.jetbrains.plugins.github.ui.GithubMarkdownTypedHandler"/>
+    <backspaceHandlerDelegate implementation="org.jetbrains.plugins.github.ui.GithubMarkdownBackspaceHandler"/>
 
     <registryKey defaultValue="true" description="Applying suggested changes" key="github.suggested.changes.apply"/>
 
@@ -116,6 +118,8 @@
     <projectSettings service="org.jetbrains.plugins.github.util.GithubProjectSettings"/>
     <projectSettings service="org.jetbrains.plugins.github.pullrequest.config.GithubPullRequestsProjectUISettings"/>
     <projectSettings service="org.jetbrains.plugins.github.util.GithubSharedProjectSettings"/>
+
+    <advancedSetting default="github.com" id="github.aliases" groupKey="advanced.setting.github"/>
   </extensions>
 
   <extensions defaultExtensionNs="Git4Idea">
@@ -160,7 +164,7 @@
       <override-text place="EditorTabPopup"/>
       <override-text place="ProjectViewPopup" use-text-of-place="EditorTabPopup"/>
       <override-text place="EditorPopup" use-text-of-place="EditorTabPopup"/>
-      <override-text place="FavoritesPopup" use-text-of-place="EditorTabPopup"/>
+      <override-text place="BookmarksPopup" use-text-of-place="EditorTabPopup"/>
       <add-to-group group-id="Git.Hosting.Open.In.Browser.Group"/>
     </group>
     <group id="GitHub.Copy.Link" class="org.jetbrains.plugins.github.GHCopyLinkActionGroup"
@@ -252,7 +256,7 @@
         <keyboard-shortcut first-keystroke="shift meta S" keymap="QtCreator (Mac OS X)" remove="true"/>
 
         <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-        <add-to-group group-id="Diff.EditorPopupMenu" anchor="last"/>
+        <add-to-group group-id="Code.Review.Diff.Editor.Popup" anchor="after" relative-to-action="Code.Review.Editor.New.Comment"/>
 
         <override-text place="EditorPopupMenu"/>
         <override-text place="Diff.EditorPopupMenu" use-text-of-place="EditorPopupMenu"/>
@@ -284,9 +288,7 @@
            class="org.jetbrains.plugins.github.pullrequest.comment.action.GHPRDiffReviewThreadsToggleAction"
            icon="AllIcons.Actions.Show"
            popup="true">
-      <add-to-group group-id="Diff.EditorGutterPopupMenu.EditorSettings"
-                    relative-to-action="Vcs.Diff.ToggleDiffAligningMode"
-                    anchor="before"/>
+      <add-to-group group-id="Diff.ViewerSettings"/>
     </group>
 
     <group id="Github.Pull.Request.Branch.Popup.Actions">

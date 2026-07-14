@@ -19,6 +19,7 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.text.DateFormat
+import java.util.concurrent.atomic.AtomicLong
 
 private const val VERSION = 7
 private const val STORAGE_FILE: @NonNls String = "changes"
@@ -37,13 +38,9 @@ internal class PersistentChangeListStorage(
    */
   private val pendingChangeSets = ArrayDeque<ChangeSet>()
 
+  private val lastIdRef = AtomicLong()
   @get:VisibleForTesting
-  var lastId: Long = 0
-    private set
-
-  @get:VisibleForTesting
-  var lastWrittenId: Long = 0
-    private set
+  val lastId: Long get() = lastIdRef.get()
 
   private var isCompletelyBroken = false
 
@@ -87,8 +84,7 @@ internal class PersistentChangeListStorage(
       storage.setFSTimestamp(fsTimestamp)
     }
 
-    lastId = storage.getLastId()
-    lastWrittenId = storage.getLastId()
+    lastIdRef.set(storage.getLastId())
     return storage
   }
 
@@ -147,6 +143,7 @@ internal class PersistentChangeListStorage(
   override fun close(drop: Boolean) {
     if (!drop) {
       flushPending()
+      writeLastId()
     }
     Disposer.dispose(storage)
     if (drop) {
@@ -157,6 +154,7 @@ internal class PersistentChangeListStorage(
   override fun flush() {
     try {
       flushPending()
+      writeLastId()
       storage.force()
     }
     catch (e: IOException) {
@@ -164,9 +162,8 @@ internal class PersistentChangeListStorage(
     }
   }
 
-  @Synchronized
   override fun nextId(): Long {
-    return ++lastId
+    return lastIdRef.incrementAndGet()
   }
 
   @Synchronized
@@ -212,7 +209,6 @@ internal class PersistentChangeListStorage(
     }
   }
 
-  @Synchronized
   override fun iterate(): Iterator<ChangeSet> {
     flushPending()
     return object : Iterator<ChangeSet> {
@@ -237,6 +233,7 @@ internal class PersistentChangeListStorage(
     }
     else {
       doWriteNextSet(changeSet)
+      writeLastId()
     }
   }
 
@@ -257,12 +254,18 @@ internal class PersistentChangeListStorage(
       storage.writeStream(storage.createNextRecord(changeSet.timestamp), true).use { out ->
         changeSet.write(out)
       }
-      storage.setLastId(++lastWrittenId)
-      if (lastWrittenId > lastId) {
-        handleError(null,
-                    "ID desync detected - something is creating changesets with external IDs. LastID: $lastId, LastWrittenID: $lastWrittenId")
-        return
-      }
+    }
+    catch (e: IOException) {
+      handleError(e, null)
+    }
+  }
+
+  @Synchronized
+  private fun writeLastId() {
+    if (isCompletelyBroken) return
+
+    try {
+      storage.setLastId(lastId)
     }
     catch (e: IOException) {
       handleError(e, null)

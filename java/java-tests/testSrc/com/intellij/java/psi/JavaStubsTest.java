@@ -30,6 +30,7 @@ import com.intellij.psi.PsiNameValuePair;
 import com.intellij.psi.PsiParameter;
 import com.intellij.psi.PsiParameterList;
 import com.intellij.psi.PsiReferenceExpression;
+import com.intellij.psi.PsiReferenceList;
 import com.intellij.psi.PsiType;
 import com.intellij.psi.impl.java.stubs.index.JavaImplicitClassIndex;
 import com.intellij.psi.impl.source.PsiClassImpl;
@@ -179,14 +180,29 @@ public class JavaStubsTest extends LightJavaCodeInsightFixtureTestCase {
   }
 
   public void test_deprecated_enum_constant() {
-    PsiClass cls = myFixture.addClass("enum Foo { c1, @Deprecated c2, /** @deprecated */ c3 }");
+    PsiClass cls = myFixture.addClass("""
+      enum Foo {
+        c1, @Deprecated c2, /** @deprecated */ c3,
+        /// @deprecated no real deprecation
+        c4
+      }""");
     assertFalse(((PsiFileImpl)cls.getContainingFile()).isContentsLoaded());
 
     assertFalse(cls.getFields()[0].isDeprecated());
     assertTrue(cls.getFields()[1].isDeprecated());
     assertTrue(cls.getFields()[2].isDeprecated());
+    assertFalse(cls.getFields()[3].isDeprecated());
 
     assertFalse(((PsiFileImpl)cls.getContainingFile()).isContentsLoaded());
+  }
+
+  public void test_malformed_generic_in_implements_list_does_not_cause_stub_AST_mismatch() {
+    PsiJavaFile file = (PsiJavaFile)myFixture.addFileToProject("A.java", """
+      private static class A implements BiConsumer<List<A>, List<A>n>> {}
+      """);
+    PsiReferenceList implementsList = file.getClasses()[0].getImplementsList();
+    // getReferenceElements() always reads from AST; getReferencedTypes() reads via the stub when available.
+    assertEquals(implementsList.getReferenceElements().length, implementsList.getReferencedTypes().length);
   }
 
   public void test_breaking_and_adding_import_does_not_cause_stub_AST_mismatch() {

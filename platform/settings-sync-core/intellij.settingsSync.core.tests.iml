@@ -9,8 +9,8 @@
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="25" />
-            <stringArg name="apiVersion" arg="2.3" />
-            <stringArg name="languageVersion" arg="2.3" />
+            <stringArg name="apiVersion" arg="2.4" />
+            <stringArg name="languageVersion" arg="2.4" />
           </stringArguments>
           <arrayArguments>
             <arrayArg name="pluginClasspaths">
@@ -23,6 +23,9 @@
   </component>
   <component name="NewModuleRootManager" inherit-compiler-output="true">
     <exclude-output />
+    <content url="file://$MODULE_DIR$/testResources">
+      <sourceFolder url="file://$MODULE_DIR$/testResources" type="java-test-resource" />
+    </content>
     <content url="file://$MODULE_DIR$/tests">
       <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true" />
     </content>
@@ -67,7 +70,7 @@
     <orderEntry type="module" module-name="intellij.platform.testFramework.junit5" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.mockito" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.ide.observable" scope="TEST" />
-    <orderEntry type="module" module-name="intellij.vcs.git" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.vcs.git.backend" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.vcs" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.vcs.dvcs.impl" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.vcs.log.impl" scope="TEST" />
@@ -82,6 +85,9 @@
     <orderEntry type="module" module-name="intellij.regexp.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.debugger.impl.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.settingsSync.core" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.junit4" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.junit5" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.junit5.params" scope="TEST" />
   </component>
   <component name="TestModuleProperties" production-module="intellij.settingsSync.core" />
 </module>

@@ -6,25 +6,17 @@ import com.intellij.execution.target.TargetEnvironmentConfiguration
 import com.intellij.execution.target.TargetedCommandLineBuilder
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.Sdk
-import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.registry.RegistryManager
 import com.intellij.python.community.execService.BinaryToExec
 import com.jetbrains.python.errorProcessing.PyResult
-import com.jetbrains.python.sdk.conda.TargetCommandExecutor
 import com.jetbrains.python.sdk.conda.createCondaSdkFromExistingEnvironment
-import com.jetbrains.python.sdk.flavors.conda.PyCondaEnv.Companion.getEnvs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import org.jetbrains.annotations.ApiStatus
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * TODO: Once we get rid of [TargetCommandExecutor] and have access to [TargetEnvironmentConfiguration] use it validate conda binary in [getEnvs]
- * @see `PyCondaTest`
- */
 @ApiStatus.Internal
 data class PyCondaEnv(
   val envIdentity: PyCondaEnvIdentity,
@@ -82,7 +74,6 @@ data class PyCondaEnv(
   override fun toString(): String = "$envIdentity@$fullCondaPathOnTarget"
 }
 
-@OptIn(IntellijInternalApi::class)
 @Service(Service.Level.APP)
 private class CondaEnvService(scope: CoroutineScope) {
   private val _condaEnvProviderImpl: Deferred<PyCondaEnvProvider> = scope.async {
@@ -91,6 +82,7 @@ private class CondaEnvService(scope: CoroutineScope) {
       ttlAfterWrite = RegistryManager.getInstanceAsync().intValue("python.conda.envs.cache.ttl.seconds").seconds,
     )
   }
+
   private suspend fun condaEnvProvider() = _condaEnvProviderImpl.await()
 
   suspend fun getEnvs(binaryToExec: BinaryToExec, forceRefresh: Boolean): PyResult<List<PyCondaEnv>> =

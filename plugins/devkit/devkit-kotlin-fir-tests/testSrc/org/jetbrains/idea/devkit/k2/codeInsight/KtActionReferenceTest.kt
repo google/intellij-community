@@ -9,6 +9,7 @@ import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.fileEditor.impl.EditorEmptyTextPainter
 import com.intellij.openapi.options.Scheme
+import com.intellij.testFramework.ExpectedHighlightingData
 import com.intellij.testFramework.TestDataPath
 import com.intellij.testFramework.builders.JavaModuleFixtureBuilder
 import com.intellij.testFramework.fixtures.CodeInsightTestFixture
@@ -17,16 +18,10 @@ import com.intellij.ui.components.JBList
 import com.intellij.util.PathUtil
 import org.jetbrains.idea.devkit.inspections.UnresolvedPluginConfigReferenceInspection
 import org.jetbrains.idea.devkit.kotlin.DevkitKtTestsUtil
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode
-import org.jetbrains.kotlin.idea.test.ExpectedPluginModeProvider
-import org.jetbrains.kotlin.idea.test.setUpWithKotlinPlugin
 
 @TestDataPath("\$CONTENT_ROOT/testData/codeInsight/actionReference")
-class KtActionReferenceTest : JavaCodeInsightFixtureTestCase(), ExpectedPluginModeProvider {
-  override val pluginMode: KotlinPluginMode = KotlinPluginMode.K2
-  override fun setUp() {
-    setUpWithKotlinPlugin { super.setUp() }
-  }
+class KtActionReferenceTest : JavaCodeInsightFixtureTestCase() {
+    
 
   override fun getBasePath(): String {
     return DevkitKtTestsUtil.TESTDATA_PATH + "codeInsight/actionReference"
@@ -126,6 +121,7 @@ class KtActionReferenceTest : JavaCodeInsightFixtureTestCase(), ExpectedPluginMo
     assertSameElements(myFixture.getCompletionVariants("Caller.kt").orEmpty(), "myAction", "myGroup", "myActionWithoutExplicitId")
   }
 
+  @Suppress("DEPRECATION")
   fun testActionReferenceHighlighting() {
     myFixture.enableInspections(UnresolvedPluginConfigReferenceInspection::class.java)
     myFixture.createFile("plugin.xml", pluginXmlActions("""
@@ -138,7 +134,10 @@ class KtActionReferenceTest : JavaCodeInsightFixtureTestCase(), ExpectedPluginMo
       public class KeyEvent {}
     """.trimIndent())
 
-    myFixture.testHighlighting("ActionReferenceHighlighting.kt")
+    ExpectedHighlightingData.expectedDuplicatedHighlighting {
+      // missed a number of different dependencies which are hidden by the same key
+      myFixture.testHighlighting("ActionReferenceHighlighting.kt")
+    }
   }
 
   fun testActionReferenceToolWindowHighlighting() {

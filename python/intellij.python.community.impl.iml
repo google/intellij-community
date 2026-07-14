@@ -4,13 +4,13 @@
     <facet type="kotlin-language" name="Kotlin">
       <configuration version="5" platform="JVM 25" allPlatforms="JVM [25]" useProjectSettings="false">
         <compilerSettings>
-          <option name="additionalArguments" value="-Xjvm-default=all -XXLanguage:+AllowEagerSupertypeAccessibilityChecks -progressive" />
+          <option name="additionalArguments" value="-Xjvm-default=all -XXLanguage:+AllowEagerSupertypeAccessibilityChecks -progressive -opt-in=com.jetbrains.python.PyInternalExecApi" />
         </compilerSettings>
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="25" />
-            <stringArg name="apiVersion" arg="2.3" />
-            <stringArg name="languageVersion" arg="2.3" />
+            <stringArg name="apiVersion" arg="2.4" />
+            <stringArg name="languageVersion" arg="2.4" />
           </stringArguments>
           <arrayArguments>
             <arrayArg name="pluginClasspaths">
@@ -27,10 +27,11 @@
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/gen" isTestSource="false" generated="true" />
       <sourceFolder url="file://$MODULE_DIR$/pluginResources" type="java-resource" />
-      <sourceFolder url="file://$MODULE_DIR$/compatibilityResources" type="java-resource" />
       <excludeFolder url="file://$MODULE_DIR$/setup-test-environment/build" />
     </content>
     <orderEntry type="inheritedJdk" />
+    <orderEntry type="module" module-name="intellij.json" />
+    <orderEntry type="module" module-name="intellij.yaml" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="intellij.platform.analysis" />
     <orderEntry type="module" module-name="intellij.platform.codeStyle" />
@@ -48,7 +49,7 @@
     <orderEntry type="module" module-name="intellij.platform.projectModel" />
     <orderEntry type="module" module-name="intellij.platform.refactoring" />
     <orderEntry type="module" module-name="intellij.platform.remote.core" />
-    <orderEntry type="module" module-name="intellij.platform.structureView.impl" />
+    <orderEntry type="module" module-name="intellij.platform.structureView" />
     <orderEntry type="module" module-name="intellij.platform.usageView.impl" />
     <orderEntry type="module" module-name="intellij.platform.workspace.storage" />
     <orderEntry type="module" module-name="intellij.python.community" exported="" />
@@ -178,7 +179,7 @@
     <orderEntry type="module" module-name="intellij.python.community.execService" />
     <orderEntry type="module" module-name="intellij.python.community.services.systemPython" />
     <orderEntry type="module" module-name="intellij.python.community.services.internal.impl" />
-    <orderEntry type="library" scope="PROVIDED" name="io.github.z4kn4fein.semver.jvm" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.semver" />
     <orderEntry type="module" module-name="intellij.python.pyproject" />
     <orderEntry type="module" module-name="intellij.python.hatch" />
     <orderEntry type="module" module-name="intellij.platform.externalSystem.impl" />
@@ -191,8 +192,8 @@
     <orderEntry type="module" module-name="intellij.python.community.interpreters" />
     <orderEntry type="module" module-name="intellij.python.sdkConfigurator.common" />
     <orderEntry type="module" module-name="intellij.python.community.impl.poetry.common" />
-    <orderEntry type="module" module-name="intellij.python.community.impl.uv.common" />
-    <orderEntry type="module" module-name="intellij.python.common" />
+    <orderEntry type="module" module-name="intellij.python.uv.common" />
+    <orderEntry type="module" module-name="intellij.python.community.common" />
     <orderEntry type="module" module-name="intellij.platform.debugger.impl.shared" />
     <orderEntry type="module" module-name="intellij.python.processOutput.common" />
     <orderEntry type="module" module-name="intellij.platform.debugger.impl.rpc" />
@@ -203,5 +204,10 @@
     <orderEntry type="module" module-name="intellij.python.community.impl.conda" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.collections.immutable" />
     <orderEntry type="module" module-name="intellij.python.requirements" exported="" />
+    <orderEntry type="module" module-name="intellij.python.pytools" />
+    <orderEntry type="module" module-name="intellij.python.uv.backend" />
+    <orderEntry type="module" module-name="intellij.platform.testIntegration" />
+    <orderEntry type="module" module-name="intellij.platform.testIntegration.ui" />
+    <orderEntry type="module" module-name="intellij.python.community.impl.poetry.backend" />
   </component>
 </module>

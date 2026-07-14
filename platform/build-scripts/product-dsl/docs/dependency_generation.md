@@ -326,7 +326,7 @@ Bundled plugin content is ignored when deciding whether a target is globally emb
 
 Embedded-check scope depends on dependency origin:
 - Plugin XML dependency: products where the plugin is bundled; fallback to all discovered real products for non-bundled plugins.
-- Content module dependency (plugin-only source module): products where owner plugins are bundled; fallback to all discovered real products for non-bundled owners.
+- Content module dependency (plugin-only source module): products where owner plugins are bundled; fallback to all discovered real products for non-bundled owners. Content owned by module-set wrapper plugins is treated as module-set content and does not use this filter.
 - DSL test plugin dependency: only the owning DSL test plugin product.
 
 "Discovered real products" means `GenerationModel.discovery.products` (synthetic test product specs are excluded).
@@ -339,6 +339,9 @@ If a target is embedded in every product from the embedded-check scope, it is al
 - They're available at runtime without declaring a dependency
 - They can't be disabled or unloaded
 - Declaring them adds no value but creates maintenance burden
+
+Exception: content module dependencies remain explicit when the source descriptor overrides a service registered by the dependency descriptor.
+Service overrides depend on descriptor registration order, so embedded availability alone is not enough.
 
 ### Examples
 
@@ -356,7 +359,9 @@ This filtering applies to:
 - **Content module dependencies** (only for content modules **in plugins**, not directly in products)
 - **DSL test plugin dependency planning**
 
-Content modules directly in products (via module sets) do NOT skip embedded deps because they're not "inside a plugin" - they're at the product level where the embedding relationship is defined.
+For DSL test plugin main targets, an explicit `RUNTIME`-scoped dependency keeps a valid target as a generated module dependency. This is used when the test plugin needs a specific content module in its plugin classloader even though the module is already supplied by a bundled plugin, product content, or module set. It does not bypass plugin-owner availability checks: plugin-owned content whose owner is not resolvable still reports the normal DSL test plugin dependency error unless another graph source makes the same module resolvable in the DSL test plugin scope.
+
+Content modules directly in products (via module sets) and content modules owned by module-set wrapper plugins do NOT skip embedded deps because they're module-set/product-layout content, not regular plugin content.
 Plugin-only embedded sources also stay explicit because plugin content alone does not make a target globally embedded.
 
 ### Implementation

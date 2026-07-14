@@ -3,6 +3,7 @@ package com.intellij.openapi.progress.impl;
 
 import com.intellij.codeWithMe.ClientId;
 import com.intellij.concurrency.ContextAwareRunnable;
+import com.intellij.concurrency.ExternalIntelliJContextElement;
 import com.intellij.concurrency.ThreadContext;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.AccessToken;
@@ -479,7 +480,6 @@ public final class ProgressRunner<R> {
   ) {
     CompletableFuture<R> resultFuture = new CompletableFuture<>();
     ChildContext childContext = Propagation.createChildContext("ProgressRunner: " + task);
-    CoroutineContext context = childContext.getContext();
     Job job = childContext.getJob();
     if (job != null) {
       // cancellation of the Job cancels the future

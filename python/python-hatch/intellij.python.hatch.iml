@@ -4,13 +4,13 @@
     <facet type="kotlin-language" name="Kotlin">
       <configuration version="5" platform="JVM 25" allPlatforms="JVM [25]" useProjectSettings="false">
         <compilerSettings>
-          <option name="additionalArguments" value="-Xjvm-default=all -opt-in=kotlin.time.ExperimentalTime -XXLanguage:+AllowEagerSupertypeAccessibilityChecks -progressive" />
+          <option name="additionalArguments" value="-Xjvm-default=all -opt-in=kotlin.time.ExperimentalTime -XXLanguage:+AllowEagerSupertypeAccessibilityChecks -progressive -opt-in=com.jetbrains.python.PyInternalExecApi" />
         </compilerSettings>
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="25" />
-            <stringArg name="apiVersion" arg="2.3" />
-            <stringArg name="languageVersion" arg="2.3" />
+            <stringArg name="apiVersion" arg="2.4" />
+            <stringArg name="languageVersion" arg="2.4" />
           </stringArguments>
           <arrayArguments>
             <arrayArg name="pluginClasspaths">
@@ -44,10 +44,12 @@
     <orderEntry type="module" module-name="intellij.python.pyproject" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.serialization.json" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.serialization.core" />
-    <orderEntry type="library" scope="PROVIDED" name="io.github.z4kn4fein.semver.jvm" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.semver" />
     <orderEntry type="module" module-name="intellij.python.sdk.ui" />
-    <orderEntry type="module" module-name="intellij.python.common" />
+    <orderEntry type="module" module-name="intellij.python.community.common" />
     <orderEntry type="module" module-name="intellij.python.community.execService.python" />
     <orderEntry type="module" module-name="intellij.python.processOutput.common" />
+    <orderEntry type="module" module-name="intellij.python.pytools" />
+    <orderEntry type="module" module-name="intellij.platform.util.jdom" />
   </component>
 </module>

@@ -1,8 +1,10 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.k2.refactoring.util
 
+import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.isAncestor
+import com.intellij.psi.util.parentOfType
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
 import org.jetbrains.kotlin.analysis.api.KaSession
@@ -25,10 +27,15 @@ import org.jetbrains.kotlin.analysis.api.types.KaDefinitelyNotNullType
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.analysis.api.types.KaTypeParameterType
 import org.jetbrains.kotlin.analysis.api.types.KaTypePointer
+import org.jetbrains.kotlin.idea.base.codeInsight.handlers.fixers.end
+import org.jetbrains.kotlin.idea.base.codeInsight.handlers.fixers.range
+import org.jetbrains.kotlin.idea.base.codeInsight.handlers.fixers.start
 import org.jetbrains.kotlin.idea.base.psi.copied
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
+import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtProperty
+import org.jetbrains.kotlin.psi.KtPropertyAccessor
 import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtTypeArgumentList
 import org.jetbrains.kotlin.psi.KtTypeProjection
@@ -61,11 +68,45 @@ fun KaSession.areTypeArgumentsRedundant(
 }
 
 private fun buildCallExpressionWithoutTypeArgs(element: KtCallExpression): KtCallExpression? {
-    val fileCopy = element.containingKtFile.copied()
-    val elementCopy = PsiTreeUtil.findSameElementInCopy(element, fileCopy)
-    return elementCopy?.also {
-        it.typeArgumentList?.delete()
+    val context = element.findContextToAnalyze() ?: return null
+    val typeArgumentListRange = element.typeArgumentList?.textRange ?: return null
+    val contextStartOffset = context.range.start
+
+    val textWithoutTypeArgs = context.text.removeRange(
+        typeArgumentListRange.start - contextStartOffset,
+        typeArgumentListRange.end - contextStartOffset,
+    )
+
+    val (prefix, suffix) = if (hasPropertyAccessorBetween(element, context)) {
+        "object __Obj__  {" to "}"
+    } else "" to ""
+
+    val codeFragment = KtPsiFactory(
+        element.project,
+        markGenerated = false,
+    ).createBlockCodeFragment("$prefix$textWithoutTypeArgs$suffix", context)
+
+    return codeFragment.findElementAt(typeArgumentListRange.start + prefix.length - contextStartOffset)?.parentOfType()
+}
+
+/**
+ * Detects whether the code fragment is created inside a property accessor.
+ * This is needed because `KtBlockCodeFragment` loses expected-type information
+ * for property accessors.
+ *
+ * See:
+ * - org.jetbrains.kotlin.idea.inspections.tests.K2LocalInspectionTestGenerated.RemoveExplicitTypeArgumentsFormerIntentionTest#testGetterBody
+ * - org.jetbrains.kotlin.idea.inspections.tests.K2LocalInspectionTestGenerated.RemoveExplicitTypeArgumentsFormerIntentionTest#testGetterBodyInsideClass
+ * - org.jetbrains.kotlin.idea.inspections.tests.K2LocalInspectionTestGenerated.RemoveExplicitTypeArgumentsFormerIntentionTest#testSetterBody
+ * - org.jetbrains.kotlin.idea.inspections.tests.K2LocalInspectionTestGenerated.RemoveExplicitTypeArgumentsFormerIntentionTest#testSetterBodyInsideClass
+ */
+private fun hasPropertyAccessorBetween(element: KtElement, context: KtElement): Boolean {
+    var current = element.parent
+    while (current != null && current != context) {
+        if (current is KtPropertyAccessor) return true
+        current = current.parent
     }
+    return false
 }
 
 private fun KaSession.isInlineReifiedFunction(symbol: KaFunctionSymbol): Boolean =
@@ -179,16 +220,31 @@ fun KtTypeProjection.canBeReplacedWithUnderscore(callExpression: KtCallExpressio
 
 @OptIn(KaExperimentalApi::class)
 private fun buildCallExpressionWithUnderscores(element: KtCallExpression, typeProjectionToReplace: KtTypeProjection): KtCallExpression? {
-    val fileCopy = if (element.containingKtFile.copyOrigin != null) {
-        /**
-         * In intention actions such as
-         * [org.jetbrains.kotlin.idea.codeinsight.api.applicable.intentions.KotlinPsiUpdateModCommandAction],
-         * the PSI context is recomputed on a copied file right before the intention is invoked.
-         * In such cases, we can reuse and modify that existing copy instead of creating a new one.
-         *
-         * @see org.jetbrains.kotlin.idea.codeinsight.api.applicable.intentions.KotlinPsiUpdateModCommandAction.perform
-         */
-        element.containingFile
+    val copyOrigin = element.containingKtFile.copyOrigin
+    val fileCopy = if (copyOrigin != null) {
+        if (element.containingFile.isPhysical) {
+            /**
+             * It is a copy but marked as a physical.
+             * It is necessary to collect problems and can be used FLC or Command Completion. The document should be up to date.
+             * It is impossible to create a copy of a copy, so let's create a copy from the original file and replace the text.
+             */
+            val copyOrigin = copyOrigin
+            val copied = copyOrigin.copied()
+            val copyFileDocument = copied.fileDocument
+            copyFileDocument.replaceString(0, copyFileDocument.text.length, element.containingKtFile.fileDocument.text)
+            PsiDocumentManager.getInstance(element.project).commitDocument(copyFileDocument)
+            copied
+        } else {
+            /**
+             * In intention actions such as
+             * [org.jetbrains.kotlin.idea.codeinsight.api.applicable.intentions.KotlinPsiUpdateModCommandAction],
+             * the PSI context is recomputed on a copied file right before the intention is invoked.
+             * In such cases, we can reuse and modify that existing copy instead of creating a new one.
+             *
+             * @see org.jetbrains.kotlin.idea.codeinsight.api.applicable.intentions.KotlinPsiUpdateModCommandAction.perform
+             */
+            element.containingFile
+        }
     } else {
         element.containingKtFile.copied()
     }

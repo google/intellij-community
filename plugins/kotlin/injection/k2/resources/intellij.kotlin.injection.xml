@@ -1,4 +1,4 @@
-<idea-plugin package="org.jetbrains.kotlin.idea.k2.injection">
+<idea-plugin>
   <dependencies>
     <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
     <module name="intellij.java.psi"/>
@@ -12,7 +12,7 @@
                                   implementationClass="org.jetbrains.kotlin.idea.k2.injection.K2KotlinLanguageInjectionContributor"/>
     <languageInjectionPerformer language="kotlin"
                                 implementationClass="org.jetbrains.kotlin.idea.k2.injection.K2KotlinLanguageInjectionPerformer"/>
-
+    <multiHostInjector implementation="org.jetbrains.kotlin.idea.k2.injection.K2KDocCodeBlockLanguageInjector"/>
     <regExpLanguageHost forClass="org.jetbrains.kotlin.psi.KtStringTemplateExpression"
                         implementationClass="com.intellij.psi.impl.JavaRegExpHost"/>
 

@@ -1,0 +1,15 @@
+<idea-plugin>
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+  <dependencies>
+    <module name="intellij.debugger.streams.core"/>
+    <module name="intellij.debugger.streams.shared"/>
+    <module name="intellij.platform.kernel.backend"/>
+    <module name="intellij.platform.rpc.backend"/>
+  </dependencies>
+  <!-- endregion -->
+
+  <extensions defaultExtensionNs="com.intellij">
+    <platform.rpc.backend.remoteApiProvider
+      implementation="com.intellij.debugger.streams.backend.BackendStreamDebuggerRemoteApiProvider"/>
+  </extensions>
+</idea-plugin>

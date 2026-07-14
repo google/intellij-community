@@ -40,6 +40,7 @@ import javax.swing.event.DocumentEvent
 import kotlin.coroutines.coroutineContext
 import kotlin.time.Duration.Companion.milliseconds
 
+@ApiStatus.Internal
 abstract class SettingsFilter @ApiStatus.Internal protected constructor(
   project: Project?,
   groups: List<ConfigurableGroup>,
@@ -157,7 +158,20 @@ abstract class SettingsFilter @ApiStatus.Internal protected constructor(
     finally {
       isUpdateRejected = false
     }
-    update(type = DocumentEvent.EventType.CHANGE, adjustSelection = false, now = true)
+    if (text.isNullOrEmpty()) {
+      // Synchronously clear the filter state so that shouldBeShowing() returns true for all nodes
+      // immediately — callers like selectWithFilter may trigger a tree refilter right after this call.
+      job?.cancel()
+      job = null
+      context.isHoldingFilter = false
+      hits = null
+      filtered = null
+      search.textEditor.setBackground(UIUtil.getTextFieldBackground())
+      updateSpotlight(now = false)
+    }
+    else {
+      update(type = DocumentEvent.EventType.CHANGE, adjustSelection = false, now = true)
+    }
   }
 
   private fun update(type: DocumentEvent.EventType, adjustSelection: Boolean, now: Boolean) {

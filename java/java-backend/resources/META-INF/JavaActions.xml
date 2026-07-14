@@ -1,5 +1,8 @@
 <idea-plugin visibility="public">
   <resource-bundle>messages.ActionsBundle</resource-bundle>
+  <dependencies>
+    <module name="intellij.platform.backend"/>
+  </dependencies>
   <actions>
     <action id="FileChooser.GotoModule" class="com.intellij.openapi.fileChooser.actions.GotoModuleDirAction"
             icon="AllIcons.Actions.ModuleDirectory">
@@ -22,10 +25,6 @@
           <add-to-group group-id="ProjectWidget.Actions" anchor="first"/>
         </action>
         <action id="ImportProject" class="com.intellij.ide.actions.ImportProjectAction"/>
-        <action id="ProjectFromVersionControl" class="com.intellij.openapi.wm.impl.welcomeScreen.ProjectFromVersionControlAction">
-          <override-text place="ProjectWidgetPopup"/>
-          <add-to-group group-id="ProjectWidget.Actions"/>
-        </action>
       </group>
       <separator/>
       <action id="NewModule" class="com.intellij.openapi.roots.ui.configuration.actions.NewModuleAction"/>
@@ -50,35 +49,6 @@
     <action id="ShowSiblings" class="com.intellij.codeInsight.hint.actions.ShowSiblingsAction">
       <add-to-group group-id="QuickActions" anchor="after" relative-to-action="QuickImplementations"/>
     </action>
-    <action id="ShowRecentTests" class="com.intellij.testIntegration.ShowRecentTests">
-      <keyboard-shortcut first-keystroke="control shift SEMICOLON" keymap="$default"/>
-    </action>
-
-    <group id="ChangesViewPopupMenuRunGroup">
-      <reference ref="RunContextPopupGroup"/>
-      <add-to-group group-id="ChangesViewPopupMenu" anchor="before" relative-to-action="ShowDiscoveredTests"/>
-    </group>
-
-    <action class="com.intellij.execution.testDiscovery.actions.ShowAffectedTestsAction" id="ShowDiscoveredTests">
-      <add-to-group group-id="RunTestGroup" anchor="last"/>
-      <add-to-group group-id="ChangesViewPopupMenu" anchor="last"/>
-    </action>
-
-    <action class="com.intellij.execution.testDiscovery.actions.FindUnusedTestDataAction" id="FindUsedTestData"
-            internal="true"/>
-
-
-
-    <action id="JavaSoftExit" class="com.intellij.execution.impl.DefaultJavaProgramRunner$SoftExitAction">
-      <add-to-group group-id="RunTab.TopToolbar" anchor="after" relative-to-action="Stop"/>
-      <add-to-group group-id="RunTab.TopToolbar.Old" anchor="after" relative-to-action="Stop"/>
-    </action>
-
-    <action id="JavaControlBreak" class="com.intellij.execution.impl.DefaultJavaProgramRunner$ControlBreakAction">
-      <add-to-group group-id="RunTab.TopToolbar" anchor="after" relative-to-action="Stop"/>
-      <add-to-group group-id="RunTab.TopToolbar.Old" anchor="after" relative-to-action="Stop"/>
-    </action>
-
     <!-- View -->
     <reference ref="DelegateMethods">
       <add-to-group group-id="CodeMenu" anchor="after" relative-to-action="ImplementMethods"/>
@@ -184,16 +154,6 @@
       <add-to-group group-id="StructureViewPopupMenu" anchor="after" relative-to-action="RunContextPopupGroup"/>
     </group>
 
-
-    <group id="JavaCompileGroup">
-      <separator/>
-      <reference ref="ToggleMethodBreakpoint"/>
-      <reference ref="ToggleFieldBreakpoint"/>
-
-      <add-to-group group-id="ProjectViewCompileGroup" anchor="first"/>
-      <add-to-group group-id="StructureViewCompileGroup" anchor="first"/>
-    </group>
-
     <group id="AnalyzeJavaMenu">
       <separator/>
       <group id="ShowPackageDepsGroup">
@@ -271,10 +231,6 @@
       <action id="ImportModuleFromImlFile" class="com.intellij.ide.projectView.actions.ImportModuleFromImlFileAction"/>
       <add-to-group group-id="ProjectViewPopupMenuSettingsGroup" relative-to-action="MarkRootGroup" anchor="after"/>
     </group>
-
-    <action id="ChangesView.GroupBy.Module" class="com.intellij.openapi.vcs.changes.actions.SetModuleChangesGroupingAction">
-      <add-to-group group-id="ChangesView.GroupBy"/>
-    </action>
 
     <group id="JavaGenerateGroup1">
       <action id="GenerateTestMethod" class="com.intellij.testIntegration.GenerateTestMethodAction"/>
@@ -389,7 +345,6 @@
     <group id="Internal.Java" popup="true" internal="true" compact="true">
       <action id="GenerateVisitorByHierarchy" internal="true" class="com.intellij.internal.GenerateVisitorByHierarchyAction"/>
 
-      <action id="UsedIconsListing" internal="true" class="com.intellij.internal.UsedIconsListingAction"/>
       <action id="ExpressionStatistics" internal="true" class="com.intellij.internal.ExpressionStatisticsAction"/>
 
       <action id="StaticIconFields" internal="true" class="com.intellij.internal.StaticIconFieldsAction"/>
@@ -423,4 +378,9 @@
       <synonym key="action.DevKit.Bootstrap.synonym"/>
     </action>
   </actions>
+
+  <extensionPoints>
+    <extensionPoint qualifiedName="com.intellij.java.class.action.suppressor"
+                    interface="com.intellij.ide.actions.JavaClassActionSuppressor" dynamic="true"/>
+  </extensionPoints>
 </idea-plugin>

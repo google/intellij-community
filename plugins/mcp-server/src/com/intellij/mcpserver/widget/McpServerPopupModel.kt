@@ -1,6 +1,7 @@
 package com.intellij.mcpserver.widget
 
 import androidx.compose.runtime.Stable
+import com.intellij.execution.services.ServiceViewManager
 import com.intellij.ide.BrowserUtil
 import com.intellij.mcpserver.McpServerBundle
 import com.intellij.mcpserver.clients.McpClient
@@ -10,11 +11,16 @@ import com.intellij.mcpserver.createStreamableServerJsonEntry
 import com.intellij.mcpserver.impl.McpClientDetector
 import com.intellij.mcpserver.impl.McpServerService
 import com.intellij.mcpserver.impl.util.network.McpServerConnectionAddressProvider
+import com.intellij.mcpserver.services.McpServiceViewContributor
 import com.intellij.mcpserver.settings.McpServerSettings
+import com.intellij.mcpserver.toolwindow.McpDiagnosticService
 import com.intellij.mcpserver.util.getConsentDialog
 import com.intellij.mcpserver.util.getHelpLink
+import com.intellij.mcpserver.util.getPathForMcp
+import com.intellij.openapi.components.service
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.util.ui.TextTransferable
 
 
@@ -27,6 +33,7 @@ internal interface McpServerPopupModel {
   val unconfiguredMessage: String?
   val helpLink: String
   val detectedClientNames: List<String>
+  val activeConnectionCount: Int
 
   fun tryEnable(): Boolean
   fun disable()
@@ -36,6 +43,7 @@ internal interface McpServerPopupModel {
   fun copyStreamConfig(): Boolean
   fun browseUrl(url: String)
   fun onSettingsClick()
+  fun showInServiceView()
 }
 
 internal class McpServerPopupModelImpl(
@@ -64,6 +72,8 @@ internal class McpServerPopupModelImpl(
   override val braveMode: Boolean get() = settings.state.enableBraveMode
   override val sseUrl: String? get() = if (service.isRunning) addressProvider?.serverSseUrl else null
   override val streamUrl: String? get() = if (service.isRunning) addressProvider?.serverStreamUrl else null
+
+  override val activeConnectionCount: Int get() = service<McpDiagnosticService>().activeSessionCount
 
   override val helpLink: String get() = getHelpLink("mcp-server.html#supported-tools")
 
@@ -101,13 +111,13 @@ internal class McpServerPopupModelImpl(
   }
 
   override fun copySseConfig(): Boolean =
-    copyToClipboard(McpClient.json.encodeToString(createSseServerJsonEntry(service.port, null)))
+    copyToClipboard(McpClient.json.encodeToString(createSseServerJsonEntry(service.port, project.getPathForMcp())))
 
   override fun copyStdioConfig(): Boolean =
-    copyToClipboard(McpClient.json.encodeToString(createStdioMcpServerJsonConfiguration(service.port, null)))
+    copyToClipboard(McpClient.json.encodeToString(createStdioMcpServerJsonConfiguration(service.port, project.getPathForMcp())))
 
   override fun copyStreamConfig(): Boolean =
-    copyToClipboard(McpClient.json.encodeToString(createStreamableServerJsonEntry(service.port, null)))
+    copyToClipboard(McpClient.json.encodeToString(createStreamableServerJsonEntry(service.port, project.getPathForMcp())))
 
   override fun browseUrl(url: String) {
     BrowserUtil.browse(url)
@@ -115,5 +125,10 @@ internal class McpServerPopupModelImpl(
 
   override fun onSettingsClick() {
     onSettingsClickAction()
+  }
+
+  override fun showInServiceView() {
+    val toolWindowId = ServiceViewManager.getInstance(project).getToolWindowId(McpServiceViewContributor::class.java)
+    ToolWindowManager.getInstance(project).getToolWindow(toolWindowId)?.activate(null)
   }
 }

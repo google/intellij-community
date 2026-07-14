@@ -1,15 +1,17 @@
-<idea-plugin package="org.jetbrains.kotlin.idea.search.refIndex" visibility="internal">
+<idea-plugin visibility="internal">
   <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
     <module name="intellij.gradle"/>
     <module name="intellij.java.frontback.psi"/>
     <module name="intellij.java.psi"/>
     <module name="intellij.kotlin.gradle.gradle"/>
+    <module name="intellij.platform.jps.build"/>
+    <module name="intellij.maven"/>
   </dependencies>
   <!-- endregion -->
   <extensions defaultExtensionNs="com.intellij">
     <registryKey key="kotlin.cri.bta.support.enabled"
-                 defaultValue="false"
+                 defaultValue="true"
                  restartRequired="false"
                  description="Enable Kotlin Compiler Reference Index support for BTA-based builds (Gradle/Maven)"/>
 
@@ -33,7 +35,15 @@
 
     <languageCompilerRefAdapter.directInheritorProvider
             implementation="org.jetbrains.kotlin.idea.search.refIndex.KotlinDirectInheritorProvider"/>
+
+    <postStartupActivity implementation="org.jetbrains.kotlin.idea.search.refIndex.bta.CriMavenStartupActivity"
+                         order="after org.jetbrains.idea.maven.project.MavenProjectsManagerProjectActivity"/>
   </extensions>
+
+  <projectListeners>
+    <listener class="org.jetbrains.kotlin.idea.search.refIndex.bta.CriMavenImportListener"
+              topic="org.jetbrains.idea.maven.project.MavenImportListener"/>
+  </projectListeners>
 
   <extensionPoints>
     <extensionPoint

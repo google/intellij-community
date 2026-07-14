@@ -15,6 +15,7 @@ import com.intellij.openapi.roots.OrderEntry
 import com.intellij.openapi.roots.OrderEnumerator
 import com.intellij.openapi.roots.ProjectModelExternalSource
 import com.intellij.openapi.roots.RootPolicy
+import com.intellij.openapi.roots.impl.ModuleFileIndexImpl
 import com.intellij.openapi.roots.impl.ModuleOrderEnumerator
 import com.intellij.openapi.roots.impl.RootConfigurationAccessor
 import com.intellij.openapi.vfs.VirtualFile
@@ -73,7 +74,8 @@ class ModuleRootComponentBridge(
   override fun removeCachedJpsRootProperties(sourceRootUrl: VirtualFileUrl) {
   }
 
-  override fun dispose() = Unit
+  override fun dispose() {
+  }
 
   override fun dropCaches() {
     orderRootsCache.clearCache()
@@ -89,7 +91,9 @@ class ModuleRootComponentBridge(
   override fun getExternalSource(): ProjectModelExternalSource? =
     ExternalProjectSystemRegistry.getInstance().getExternalSource(module)
 
-  override fun getFileIndex(): ModuleFileIndex = currentModule.getService(ModuleFileIndex::class.java)!!
+  override fun getFileIndex(): ModuleFileIndex {
+    return ModuleFileIndexImpl(module)
+  }
 
   override fun getModifiableModel(): ModifiableRootModel = getModifiableModel(RootConfigurationAccessor.DEFAULT_INSTANCE)
   override fun getModifiableModel(accessor: RootConfigurationAccessor): ModifiableRootModel = ModifiableRootModelBridgeImpl(
@@ -145,9 +149,12 @@ class ModuleRootComponentBridge(
   override fun getSdk(): Sdk? = model.sdk
   override fun getSourceRoots(): Array<VirtualFile> = model.sourceRoots
   override fun getSourceRoots(includingTests: Boolean): Array<VirtualFile> = model.getSourceRoots(includingTests)
-  override fun getSourceRoots(rootType: JpsModuleSourceRootType<*>): MutableList<VirtualFile> = model.getSourceRoots(rootType)
-  override fun getSourceRoots(rootTypes: MutableSet<out JpsModuleSourceRootType<*>>): MutableList<VirtualFile> = model.getSourceRoots(
-    rootTypes)
+
+  override fun getSourceRoots(rootType: JpsModuleSourceRootType<*>): List<VirtualFile> = model.getSourceRoots(rootType)
+
+  override fun getSourceRoots(rootTypes: MutableSet<out JpsModuleSourceRootType<*>>): List<VirtualFile> {
+    return model.getSourceRoots(rootTypes)
+  }
 
   override fun getContentRoots(): Array<VirtualFile> = model.contentRoots
   override fun getContentRootUrls(): Array<String> = model.contentRootUrls

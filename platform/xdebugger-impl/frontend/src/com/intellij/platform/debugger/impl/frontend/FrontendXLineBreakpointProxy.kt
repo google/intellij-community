@@ -5,7 +5,6 @@ import com.intellij.ide.rpc.DocumentPatchVersion
 import com.intellij.ide.rpc.util.TextRangeDto
 import com.intellij.ide.rpc.util.textRange
 import com.intellij.ide.vfs.virtualFile
-import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.RangeMarker
@@ -23,17 +22,17 @@ import com.intellij.platform.debugger.impl.shared.proxy.XLineBreakpointHighlight
 import com.intellij.platform.debugger.impl.shared.proxy.XLineBreakpointProxy
 import com.intellij.platform.debugger.impl.shared.proxy.XLineBreakpointTypeProxy
 import com.intellij.platform.util.coroutines.childScope
-import com.intellij.xdebugger.SplitDebuggerMode
 import com.intellij.xdebugger.XDebuggerUtil
 import com.intellij.xdebugger.XSourcePosition
 import com.intellij.xdebugger.breakpoints.XLineBreakpointVerticalPlacement
-import com.intellij.xdebugger.impl.breakpoints.XBreakpointVisualRepresentation
+import com.intellij.xdebugger.impl.breakpoints.BreakpointDraggableObjectFactory
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.launch
+import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.TestOnly
 import java.util.concurrent.atomic.AtomicReference
 
 internal enum class RegistrationStatus {
@@ -109,7 +108,8 @@ internal class FrontendXLineBreakpointProxy(
 
   private var lineSourcePosition: XSourcePosition? = null
 
-  private val visualRepresentation = XBreakpointVisualRepresentation(cs, this, SplitDebuggerMode.isSplitDebugger(), manager)
+  private val visualRepresentation = XBreakpointVisualRepresentation(cs, this, manager)
+  private val breakpointDraggableObjectFactory = BreakpointDraggableObjectFactory(manager, this)
 
   private val lineBreakpointInfo: XLineBreakpointInfo
     get() = currentState.lineBreakpointInfo!!
@@ -127,14 +127,6 @@ internal class FrontendXLineBreakpointProxy(
    */
   override val attachments: List<XBreakpointAttachment> =
     FrontendXLineBreakpointAttachmentProvider.createAttachments(this, attachmentScope)
-
-  init {
-    attachmentScope.launch(Dispatchers.EDT) {
-      for (attachment in attachments) {
-        attachment.breakpointChanged()
-      }
-    }
-  }
 
   override fun isTemporary(): Boolean {
     return lineBreakpointInfo.isTemporary
@@ -298,7 +290,7 @@ internal class FrontendXLineBreakpointProxy(
   }
 
   override fun createBreakpointDraggableObject(): GutterDraggableObject {
-    return visualRepresentation.createBreakpointDraggableObject()
+    return breakpointDraggableObjectFactory.create()
   }
 
   override fun updateIcon() {
@@ -308,7 +300,18 @@ internal class FrontendXLineBreakpointProxy(
   override fun toString(): String {
     return this::class.simpleName + "(id=$id, type=${type.id}, line=${getLine()}, file=${getFileUrl()})"
   }
+
+  @TestOnly
+  internal fun installRangeMarkerForTest(rangeMarker: RangeMarker) {
+    visualRepresentation.installRangeMarkerForTest(rangeMarker)
+  }
 }
 
 private val UNAVAILABLE_RANGE = TextRangeDto(-1, -1)
 private fun XLineBreakpointInfo.invalidateHighlightingRangeOrNull() = if (highlightingRange == null) null else UNAVAILABLE_RANGE
+
+@ApiStatus.Internal
+@TestOnly
+fun installRangeMarkerForTest(breakpoint: XLineBreakpointProxy, rangeMarker: RangeMarker) {
+  (breakpoint as FrontendXLineBreakpointProxy).installRangeMarkerForTest(rangeMarker)
+}

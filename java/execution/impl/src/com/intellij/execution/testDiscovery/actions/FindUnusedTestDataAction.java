@@ -12,11 +12,14 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.compiler.JavaCompilerBundle;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VfsUtil;
+import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.PsiFile;
@@ -25,8 +28,8 @@ import com.intellij.usageView.UsageInfo;
 import com.intellij.usages.UsageInfo2UsageAdapter;
 import com.intellij.util.FunctionUtil;
 import com.intellij.util.containers.JBIterable;
-import com.intellij.vcsUtil.VcsFileUtil;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.List;
@@ -57,13 +60,13 @@ public final class FindUnusedTestDataAction extends DumbAwareAction {
     assert project != null;
     assert roots != null && roots.length > 0;
 
-    VirtualFile projectBasePath = ShowAffectedTestsAction.getBasePathAsVirtualFile(project);
+    VirtualFile projectBasePath = getBasePathAsVirtualFile(project);
     if (projectBasePath == null) return;
 
     Application application = ApplicationManager.getApplication();
     application.executeOnPooledThread(() -> {
       Set<String> paths = JBIterable.of(roots).flatMap(f -> VfsUtil.collectChildrenRecursively(f))
-        .map(f -> VcsFileUtil.getRelativeFilePath(f, projectBasePath))
+        .map(f -> VfsUtilCore.getRelativePath(f, projectBasePath))
         .filter(Objects::nonNull)
         .map(p -> "/" + p)
         .toSet();
@@ -75,12 +78,12 @@ public final class FindUnusedTestDataAction extends DumbAwareAction {
           VirtualFileManager vfm = VirtualFileManager.getInstance();
           PsiManager psiManager = PsiManager.getInstance(project);
           String basePath = projectBasePath.getPath();
-          application.runReadAction(() -> {
+          ReadAction.runBlocking(() -> {
             PsiFile[] files = JBIterable.of(filesWithoutTests)
-                .flatten(FunctionUtil.id())
-                .map(f -> vfm.refreshAndFindFileByUrl(PROTOCOL_PREFIX + basePath + f))
-                .map(psiManager::findFile)
-                .filter(Objects::nonNull).toSet().toArray(PsiFile.EMPTY_ARRAY);
+              .flatten(FunctionUtil.id())
+              .map(f -> vfm.refreshAndFindFileByUrl(PROTOCOL_PREFIX + basePath + f))
+              .map(psiManager::findFile)
+              .filter(Objects::nonNull).toSet().toArray(PsiFile.EMPTY_ARRAY);
 
             if (files.length == 0) {
               nothingToDo();
@@ -109,8 +112,13 @@ public final class FindUnusedTestDataAction extends DumbAwareAction {
 
   private static void nothingToDo() {
     Notifications.Bus.notify(new Notification(FindUnusedTestDataAction.class.getName(),
-                                              ExecutionBundle.message("well.done"),
-                                              ExecutionBundle.message("every.file.is.used"),
-                                              NotificationType.INFORMATION));
+                                               ExecutionBundle.message("well.done"),
+                                               ExecutionBundle.message("every.file.is.used"),
+                                               NotificationType.INFORMATION));
+  }
+
+  private static @Nullable VirtualFile getBasePathAsVirtualFile(@NotNull Project project) {
+    String basePath = project.getBasePath();
+    return basePath == null ? null : LocalFileSystem.getInstance().findFileByPath(basePath);
   }
 }

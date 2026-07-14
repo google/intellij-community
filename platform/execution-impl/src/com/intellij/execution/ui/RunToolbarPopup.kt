@@ -66,11 +66,13 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.openapi.ui.popup.ListPopupStep
 import com.intellij.openapi.ui.popup.PopupStep
 import com.intellij.openapi.ui.popup.StackingPopupDispatcher
 import com.intellij.openapi.ui.popup.util.PopupUtil
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.NlsActions
+import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VirtualFile
@@ -92,6 +94,7 @@ import com.intellij.ui.popup.list.ListPopupImpl
 import com.intellij.ui.popup.list.ListPopupModel
 import com.intellij.ui.popup.list.PopupListElementRenderer
 import com.intellij.util.messages.Topic
+import com.intellij.util.ui.GraphicsUtil
 import com.intellij.util.ui.JBDimension
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.JLabelUtil
@@ -113,6 +116,7 @@ import java.util.function.Predicate
 import javax.swing.GroupLayout
 import javax.swing.JComponent
 import javax.swing.JList
+import javax.swing.ListCellRenderer
 import kotlin.concurrent.read
 import kotlin.concurrent.write
 import kotlin.math.max
@@ -129,6 +133,8 @@ val RUN_CONFIGURATION_KEY: DataKey<RunnerAndConfigurationSettings> = DataKey.cre
 
 @JvmField
 internal val RUN_CONFIGURATION_ID: Key<String> = Key.create("sub.popup.run.configuration.unique.id")
+
+private val NEEDS_RUN_CONFIG_NAME_TRIMMING: Key<Boolean> = Key.create("sub.popup.run.configuration.need.trimming")
 
 private const val TAG_PINNED = "pinned"
 private const val TAG_RECENT = "recent"
@@ -330,7 +336,7 @@ internal class RunConfigurationsActionGroupPopup(actionGroup: ActionGroup,
   }
 
   override fun createPopup(parent: WizardPopup?, step: PopupStep<*>?, parentValue: Any?): WizardPopup {
-    val popup = super.createPopup(parent, step, parentValue)
+    val popup = ChildListPopup(parent, step, parentValue)
     popup.minimumSize = JBDimension(MINIMAL_POPUP_WIDTH, 0)
     return popup
   }
@@ -372,6 +378,30 @@ internal class RunConfigurationsActionGroupPopup(actionGroup: ActionGroup,
     else 0
   }
 
+  private inner class ChildListPopup(
+    parent: WizardPopup?,
+    step: PopupStep<*>?,
+    parentValue: Any?,
+  ) : ListPopupImpl(project, parent, step as ListPopupStep<*>, parentValue) {
+    override fun createContentPanel(
+      resizable: Boolean,
+      border: PopupBorder,
+      isToDrawMacCorner: Boolean,
+    ): MyContentPanel {
+      @Suppress("UNCHECKED_CAST")
+      if ((step as? ListPopupStep<PopupFactoryImpl.ActionItem>)?.values?.any { it.getClientProperty(NEEDS_RUN_CONFIG_NAME_TRIMMING) == true } == true) {
+        return ContentPanelWithMaxWidth(border)
+      }
+      else {
+        return super.createContentPanel(resizable, border, isToDrawMacCorner)
+      }
+    }
+
+    override fun getListElementRenderer(): ListCellRenderer<*> {
+      return MyListElementRenderer()
+    }
+  }
+
   private inner class ContentPanelWithMaxWidth(border: PopupBorder) : MyContentPanel(border) {
     // AbstractPopup only uses the preferred size, so we coerce it instead of overriding the max size.
     override fun getPreferredSize(): Dimension? {
@@ -397,12 +427,26 @@ internal class RunConfigurationsActionGroupPopup(actionGroup: ActionGroup,
       isReserveSpaceForExtraButtons = false // otherwise the name won't fit if the popup has the same width as the button
       mainPanelLayout.invalidateLayout(mainPanel) // clear the cached preferred size
       super.customizeComponent(list, value, isSelected)
-      ClientProperty.put(myTextLabel, SwingTextTrimmer.KEY, SwingTextTrimmer.createCustomTrimmer(object : SwingTextTrimmerStrategy {
-        override fun trim(text: @NlsActions.ActionText String, metrics: FontMetrics, availableWidth: Int): String {
-          return trimRunConfigurationName(text, availableWidth, metrics)
+      if (value?.getClientProperty(NEEDS_RUN_CONFIG_NAME_TRIMMING) == true) {
+        if (!isShowingTooltipForExtraButton) {
+          myRendererComponent.setToolTipText(null) // we override the tool tip using getToolTipOverride()
         }
-      }))
-      JLabelUtil.setTrimOverflow(myTextLabel, true)
+        ClientProperty.put(myTextLabel, SwingTextTrimmer.KEY, SwingTextTrimmer.createCustomTrimmer(object : SwingTextTrimmerStrategy {
+          override fun trim(text: @NlsActions.ActionText String, metrics: FontMetrics, availableWidth: Int): String {
+            return trimRunConfigurationName(text, availableWidth, GraphicsUtil.fontMetrics(metrics.font))
+          }
+        }))
+        JLabelUtil.setTrimOverflow(myTextLabel, true)
+      }
+    }
+
+    override fun getToolTipOverride(): @NlsContexts.Tooltip String? {
+      if (isShowingTooltipForExtraButton) return null
+      // A hack: this triggers com.intellij.ide.ui.laf.darcula.ui.DarculaLabelUI.layoutCL and updates the trimmer's status.
+      // The width and height we have to trust here because we have nothing else.
+      myTextLabel.getBaseline(myTextLabel.width, myTextLabel.height)
+      val trimmer = ClientProperty.get(myTextLabel, SwingTextTrimmer.KEY) ?: return null
+      return if (trimmer.isTrimmed) StringUtil.escapeXmlEntities(myTextLabel.text) else null
     }
 
     override fun layoutComponent(middleItemComponent: JComponent): JComponent {
@@ -570,6 +614,7 @@ private fun createRunConfigurationWithInlines(project: Project,
       super.update(e)
       // This popup has its own truncation logic, so we replace the shortened name set by super().
       e.presentation.setText(configuration.name, false)
+      e.presentation.putClientProperty(NEEDS_RUN_CONFIG_NAME_TRIMMING, true)
       val filtered = filterOutRunIfDebugResumeIsPresent(
         e, ActionGroupUtil.getVisibleActions(inlineActionGroup, e).toList())
       e.presentation.putClientProperty(ActionUtil.INLINE_ACTIONS, filtered)

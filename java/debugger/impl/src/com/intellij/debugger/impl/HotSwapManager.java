@@ -3,19 +3,27 @@ package com.intellij.debugger.impl;
 
 import com.intellij.debugger.JavaDebuggerBundle;
 import com.intellij.debugger.engine.DebuggerManagerThreadImpl;
+import com.intellij.debugger.engine.DebuggerUtils;
 import com.intellij.debugger.engine.events.DebuggerCommandImpl;
 import com.intellij.internal.statistic.collectors.fus.actions.persistence.ActionsCollectorImpl;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.components.Service;
+import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.OrderEnumerator;
+import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.util.NotNullLazyValue;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiFile;
+import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.xdebugger.impl.hotswap.HotSwapStatistics;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -24,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -49,17 +58,87 @@ public final class HotSwapManager {
     final long timeStamp = getTimeStamp(session);
     final Map<String, HotSwapFile> modifiedClasses = new HashMap<>();
 
-    List<String> paths = outputPaths != null ? outputPaths.getValue() :
-                         ReadAction.compute(() -> ContainerUtil.mapNotNull(
-                           OrderEnumerator.orderEntries(session.getProject()).classes().getRoots(),
-                           o -> o.isDirectory() && !o.getFileSystem().isReadOnly() ? o.getPath() : null
-                         ));
+    List<String> paths = outputPaths != null ? outputPaths.getValue() : getWritableOutputPaths(session);
     for (String path : paths) {
       String rootPath = FileUtil.toCanonicalPath(path);
       collectModifiedClasses(new File(path), rootPath, rootPath.length() + 1, modifiedClasses, progress, timeStamp);
     }
 
     return modifiedClasses;
+  }
+
+  private static @NotNull List<String> getWritableOutputPaths(@NotNull DebuggerSession session) {
+    return ReadAction.computeBlocking(() -> ContainerUtil.mapNotNull(
+      OrderEnumerator.orderEntries(session.getProject()).classes().getRoots(),
+      o -> o.isDirectory() && !o.getFileSystem().isReadOnly() ? o.getPath() : null
+    ));
+  }
+
+  /** Finds already compiled class files in class roots without applying the session HotSwap timestamp filter. */
+  @ApiStatus.Internal
+  public static @NotNull Map<String, HotSwapClassFile> findExistingClassesForHotSwap(@NotNull DebuggerSession session,
+                                                                                     @NotNull Collection<String> qualifiedNames,
+                                                                                     @NotNull HotSwapProgress progress) {
+    DebuggerManagerThreadImpl.assertIsManagerThread();
+    if (qualifiedNames.isEmpty() || progress.isCancelled()) {
+      return Collections.emptyMap();
+    }
+
+    return HotSwapClassFileFinder.findExistingClasses(getClassRoots(session, qualifiedNames), qualifiedNames, progress);
+  }
+
+  private static @NotNull List<VirtualFile> getClassRoots(@NotNull DebuggerSession session, @NotNull Collection<String> qualifiedNames) {
+    return ReadAction.computeBlocking(() -> {
+      Project project = session.getProject();
+      LinkedHashSet<VirtualFile> roots = new LinkedHashSet<>();
+      GlobalSearchScope searchScope = session.getSearchScope();
+      GlobalSearchScope allScope = GlobalSearchScope.allScope(project);
+      ProjectFileIndex fileIndex = ProjectFileIndex.getInstance(project);
+      for (String qualifiedName : qualifiedNames) {
+        Module module = findModuleForHotSwap(project, fileIndex, qualifiedName, searchScope, allScope);
+        if (module == null) {
+          continue;
+        }
+
+        Collections.addAll(roots, getClassRoots(module));
+      }
+      Collections.addAll(roots, OrderEnumerator.orderEntries(project).classes().getRoots());
+      return new ArrayList<>(roots);
+    });
+  }
+
+  private static VirtualFile @NotNull [] getClassRoots(@NotNull Module module) {
+    return OrderEnumerator.orderEntries(module).withoutSdk().withoutDepModules().classes().getRoots();
+  }
+
+  private static @Nullable Module findModuleForHotSwap(@NotNull Project project,
+                                                       @NotNull ProjectFileIndex fileIndex,
+                                                       @NotNull String qualifiedName,
+                                                       @NotNull GlobalSearchScope searchScope,
+                                                       @NotNull GlobalSearchScope allScope) {
+    PsiClass psiClass = findClassForHotSwap(project, qualifiedName, searchScope, allScope);
+
+    if (psiClass == null) {
+      int innerClassSeparator = qualifiedName.indexOf('$');
+      if (innerClassSeparator < 0) return null;
+
+      String topLevelName = qualifiedName.substring(0, innerClassSeparator);
+      psiClass = findClassForHotSwap(project, topLevelName, searchScope, allScope);
+    }
+
+    if (psiClass == null) return null;
+
+    PsiFile containingFile = psiClass.getContainingFile();
+    VirtualFile virtualFile = containingFile != null ? containingFile.getVirtualFile() : null;
+    return virtualFile != null ? fileIndex.getModuleForFile(virtualFile) : null;
+  }
+
+  private static @Nullable PsiClass findClassForHotSwap(@NotNull Project project,
+                                                        @NotNull String qualifiedName,
+                                                        @NotNull GlobalSearchScope searchScope,
+                                                        @NotNull GlobalSearchScope allScope) {
+    PsiClass psiClass = DebuggerUtils.findClass(qualifiedName, project, searchScope, false);
+    return psiClass != null ? psiClass : DebuggerUtils.findClass(qualifiedName, project, allScope, false);
   }
 
   private static boolean collectModifiedClasses(
@@ -90,7 +169,7 @@ public final class HotSwapManager {
     return project.getService(HotSwapManager.class);
   }
 
-  private void reloadClasses(DebuggerSession session, Map<String, HotSwapFile> classesToReload, HotSwapProgress progress) {
+  private void reloadClasses(DebuggerSession session, Map<String, ? extends HotSwapClassFile> classesToReload, HotSwapProgress progress) {
     final long newSwapTime = System.currentTimeMillis();
     new ReloadClassesWorker(session, progress).reloadClasses(classesToReload);
     if (progress.isCancelled()) {
@@ -99,6 +178,22 @@ public final class HotSwapManager {
     else {
       setTimeStamp(session, newSwapTime);
     }
+  }
+
+  /**
+   * Redefines selected already compiled classes without treating them as newly compiled modified classes.
+   * Does not update the session HotSwap timestamp or force the next HotSwap to do a full modified-class scan.
+   */
+  @ApiStatus.Internal
+  public static void reloadExistingClasses(@NotNull DebuggerSession session,
+                                           @NotNull Map<String, HotSwapClassFile> classesToReload,
+                                           @NotNull HotSwapProgress progress) {
+    DebuggerManagerThreadImpl.assertIsManagerThread();
+    if (classesToReload.isEmpty()) {
+      return;
+    }
+    progress.setDebuggerSession(session);
+    new ReloadClassesWorker(session, progress).reloadClasses(classesToReload);
   }
 
   public static Map<DebuggerSession, Map<String, HotSwapFile>> findModifiedClasses(
@@ -115,7 +210,7 @@ public final class HotSwapManager {
         String qualifiedName = getQualifiedName(relativePath, 0);
         if (qualifiedName != null) {
           final HotSwapFile hotswapFile = new HotSwapFile(new File(root, relativePath));
-          final long fileStamp = hotswapFile.file.lastModified();
+          final long fileStamp = hotswapFile.lastModified();
 
           for (Pair<DebuggerSession, Long> pair : sessionWithStamps) {
             final DebuggerSession session = pair.first;

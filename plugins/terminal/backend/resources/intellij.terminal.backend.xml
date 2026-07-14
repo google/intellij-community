@@ -1,4 +1,4 @@
-<idea-plugin visibility="internal" package="com.intellij.terminal.backend">
+<idea-plugin visibility="public">
   <dependencies>
     <module name="intellij.platform.backend"/>
     <module name="intellij.platform.kernel.backend"/>
@@ -7,6 +7,9 @@
 
   <extensions defaultExtensionNs="com.intellij">
     <platform.rpc.backend.remoteApiProvider implementation="com.intellij.terminal.backend.rpc.TerminalRemoteApiProvider"/>
+    <applicationService
+      serviceInterface="org.jetbrains.plugins.terminal.hyperlinks.menu.BackendHyperlinkInfoService"
+      serviceImplementation="com.intellij.terminal.backend.hyperlinks.BackendHyperlinkInfoServiceImpl"/>
   </extensions>
 
   <extensions defaultExtensionNs="org.jetbrains.plugins.terminal">

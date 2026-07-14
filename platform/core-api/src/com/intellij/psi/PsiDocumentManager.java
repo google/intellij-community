@@ -49,10 +49,12 @@ public abstract class PsiDocumentManager {
 
   // todo IJPL-339 rework usages
   @RequiresBackgroundThread(generateAssertion = false)
+  @RequiresReadLock
   public abstract @Nullable PsiFile getPsiFile(@NotNull Document document);
 
   @ApiStatus.Experimental
   @RequiresBackgroundThread(generateAssertion = false)
+  @RequiresReadLock
   public abstract @Nullable PsiFile getPsiFile(@NotNull Document document, @NotNull CodeInsightContext context);
 
   /**
@@ -61,9 +63,11 @@ public abstract class PsiDocumentManager {
    * @param document the document for which the PSI file is requested.
    * @return the PSI file instance, or {@code null} if there is currently no cached PSI tree for the file.
    */
+  @RequiresReadLock
   public abstract @Nullable PsiFile getCachedPsiFile(@NotNull Document document);
 
   @ApiStatus.Experimental
+  @RequiresReadLock
   public abstract @Nullable PsiFile getCachedPsiFile(@NotNull Document document, @NotNull CodeInsightContext context);
 
   /**
@@ -72,6 +76,7 @@ public abstract class PsiDocumentManager {
    * @param psiFile the file for which the document is requested.
    * @return the document instance, or {@code null} if the file is binary or has no associated document.
    */
+  @RequiresReadLock
   public abstract @Nullable Document getDocument(@NotNull PsiFile psiFile);
 
   /**
@@ -80,6 +85,7 @@ public abstract class PsiDocumentManager {
    * @param psiFile the file for which the document is requested.
    * @return the document instance, or {@code null} if there is currently no cached document for the file.
    */
+  @RequiresReadLock
   public abstract @Nullable Document getCachedDocument(@NotNull PsiFile psiFile);
 
   /**
@@ -112,7 +118,7 @@ public abstract class PsiDocumentManager {
    * Before a modified document is committed, accessing its PSI may return elements corresponding to the original (unmodified) state of
    * the document.<p/>
    * <p>
-   * For documents with event-system-enabled PSI ({@link FileViewProvider#isEventSystemEnabled()}), should be called on EDT in
+   * For documents with event-system-enabled PSI ({@link FileViewProvider#supportsSendingPsiEvents()}), should be called on EDT in
    * a write-safe context (see {@link com.intellij.openapi.application.TransactionGuard}).
    * For other documents, it can be called in background thread with read access. It's the responsibility of the caller to properly
    * synchronize that PSI and ensure no other threads are reading or modifying it concurrently.
@@ -176,7 +182,7 @@ public abstract class PsiDocumentManager {
 
   /**
    * @return if any modified documents with event-system-enabled PSI have not been committed.
-   * @see FileViewProvider#isEventSystemEnabled()
+   * @see FileViewProvider#supportsSendingPsiEvents()
    */
   @ApiStatus.Experimental
   public boolean hasEventSystemEnabledUncommittedDocuments() {

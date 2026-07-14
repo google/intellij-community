@@ -13,7 +13,7 @@ import com.jetbrains.python.errorProcessing.PyResult
 import com.jetbrains.python.packaging.common.PythonOutdatedPackage
 import com.jetbrains.python.sdk.add.v2.PathHolder
 import com.jetbrains.python.sdk.createSdk
-import com.jetbrains.python.sdk.getOrCreateAdditionalData
+import com.jetbrains.python.sdk.pySdkAdditionalData
 import com.jetbrains.python.sdk.impl.resolvePythonBinary
 import com.jetbrains.python.sdk.legacy.PythonSdkUtil
 import org.jetbrains.annotations.ApiStatus.Internal
@@ -23,11 +23,11 @@ import kotlin.io.path.pathString
 
 
 @Internal
-fun suggestedSdkName(basePath: Path): @NlsSafe String = "Poetry (${PathUtil.getFileName(basePath.pathString)})"
+internal fun suggestedSdkName(basePath: Path): @NlsSafe String = "Poetry (${PathUtil.getFileName(basePath.pathString)})"
 
 
 @Internal
-suspend fun createNewPoetrySdk(
+internal suspend fun createNewPoetrySdk(
   moduleBasePath: Path,
   basePythonBinaryPath: PythonBinary,
   installPackages: Boolean,
@@ -43,7 +43,7 @@ suspend fun createNewPoetrySdk(
 }
 
 @Internal
-suspend fun createPoetrySdk(
+internal suspend fun createPoetrySdk(
   basePath: Path,
   pythonBinaryPath: PathHolder.Eel,
 ): PyResult<Sdk> = withProgressText(PyBundle.message("python.sdk.progress.poetry.configuring")) {
@@ -58,7 +58,7 @@ internal val Sdk.isPoetry: Boolean
       return false
     }
 
-    return getOrCreateAdditionalData() is PyPoetrySdkAdditionalData
+    return pySdkAdditionalData is PyPoetrySdkAdditionalData
   }
 
 private suspend fun setUpPoetry(moduleBasePath: Path, basePythonBinaryPath: PythonBinary, installPackages: Boolean, errorSink: ErrorSink, inProjectEnv: Boolean = false): PyResult<PythonBinary> {
@@ -69,7 +69,7 @@ private suspend fun setUpPoetry(moduleBasePath: Path, basePythonBinaryPath: Pyth
   return PyResult.success(pythonBinaryPath)
 }
 
-fun parsePoetryShowOutdated(input: String): Map<String, PythonOutdatedPackage> {
+internal fun parsePoetryShowOutdated(input: String): Map<String, PythonOutdatedPackage> {
   return input
     .lines()
     .map { it.trim() }

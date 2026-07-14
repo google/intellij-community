@@ -8,9 +8,9 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.getOrCreateUserData
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiManager
+import com.intellij.ui.BrowserHyperlinkListener
 import com.intellij.ui.EditorNotificationPanel
 import com.intellij.ui.EditorNotificationProvider
 import com.intellij.ui.EditorNotifications
@@ -24,9 +24,6 @@ private val NOTIFICATION_ALLOWED_KEY = Key.create<Boolean>("KotlinUiDslUsageNoti
 private const val NOTIFICATION_ENABLED_KEY = "devkit.uiDsl.usage.notification.enabled"
 private const val NOTIFICATION_ENABLED_DEFAULT = true
 
-private val isNotificationFeatureEnabled: Boolean
-  get() = Registry.`is`("devkit.uiDsl.usage.notification.feature.enabled")
-
 private var isNotificationEnabled: Boolean
   get() = PropertiesComponent.getInstance().getBoolean(NOTIFICATION_ENABLED_KEY, NOTIFICATION_ENABLED_DEFAULT)
   set(value) {
@@ -39,7 +36,7 @@ internal class KotlinUiDslUsageNotificationProvider : EditorNotificationProvider
     project: Project,
     file: VirtualFile,
   ): Function<in FileEditor, out JComponent?>? {
-    if (!isNotificationFeatureEnabled || !isNotificationEnabled || file.extension != "kt") {
+    if (!isNotificationEnabled || file.extension != "kt") {
       return null
     }
 
@@ -70,9 +67,18 @@ private class UiDslEditorNotificationPanel(project: Project, file: VirtualFile, 
   init {
     text = DevkitUiDslBundle.message("kotlin.ui.dsl.usage.notification")
 
-    myTextLabel.editorPane?.addHyperlinkListener {
-      if (it.eventType == HyperlinkEvent.EventType.ACTIVATED) {
-        executeAction("UiDslShowcaseAction", it)
+    myTextLabel.editorPane?.let { editorPane ->
+      // Remove listeners that open the browser
+      for (listener in editorPane.hyperlinkListeners) {
+        if (listener is BrowserHyperlinkListener) {
+          editorPane.removeHyperlinkListener(listener)
+        }
+      }
+
+      editorPane.addHyperlinkListener {
+        if (it.eventType == HyperlinkEvent.EventType.ACTIVATED) {
+          executeAction("UiDslShowcaseAction", it)
+        }
       }
     }
 

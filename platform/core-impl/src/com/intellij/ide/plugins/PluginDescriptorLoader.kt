@@ -13,10 +13,9 @@ import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.util.BuildNumber
 import com.intellij.openapi.util.io.NioFiles
 import com.intellij.platform.pluginSystem.parser.impl.PluginDescriptorBuilder
-import com.intellij.platform.pluginSystem.parser.impl.PluginDescriptorFromXmlStreamConsumer
 import com.intellij.platform.pluginSystem.parser.impl.XIncludeLoader
-import com.intellij.platform.pluginSystem.parser.impl.consume
 import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleVisibilityValue
+import com.intellij.platform.pluginSystem.parser.impl.parsePluginXml
 import com.intellij.platform.pluginSystem.parser.impl.readBasicDescriptorData
 import com.intellij.platform.util.putMoreLikelyPluginJarsFirst
 import com.intellij.util.PlatformUtils
@@ -49,6 +48,7 @@ import java.io.IOException
 import java.io.InputStream
 import java.net.URL
 import java.nio.file.Files
+import java.nio.file.InvalidPathException
 import java.nio.file.NoSuchFileException
 import java.nio.file.NotDirectoryException
 import java.nio.file.Path
@@ -195,13 +195,12 @@ private fun loadDescriptorFromStream(
   pool: ZipEntryResolverPool,
   id: PluginId? = null,
 ): PluginMainDescriptor {
-  val raw = PluginDescriptorFromXmlStreamConsumer(loadingContext.readContext, createXIncludeLoader(pathResolver, dataLoader)).let {
-    it.consume(input, fileOrDir.toString())
-    loadingContext.patchPlugin(it.getBuilder())
+  val raw = parsePluginXml(input, fileOrDir.toString(), loadingContext.readContext, createXIncludeLoader(pathResolver, dataLoader)).let { builder ->
+    loadingContext.patchPlugin(builder)
     if (id != null) {
-      it.getBuilder().id = id.idString
+      builder.id = id.idString
     }
-    it.build()
+    builder.build()
   }
   val descriptor = PluginMainDescriptor(
     raw = raw,
@@ -235,7 +234,9 @@ fun loadPluginSubDescriptors(
     if (module.descriptorContent == null) {
       val jarFile = moduleDir?.resolve("${module.moduleId.name}.jar")
       if (jarFile != null && Files.exists(jarFile)) {
-        val subRaw = loadModuleFromSeparateJar(pool = pool, jarFile = jarFile, subDescriptorFile = subDescriptorFile, loadingContext = loadingContext)
+        val subRaw = loadModuleFromSeparateJar(pool = pool, jarFile = jarFile, subDescriptorFile = subDescriptorFile,pathResolver = pathResolver,
+                                               loadingContext = loadingContext,
+                                               dataLoader = dataLoader)
         val subDescriptor = descriptor.createContentModule(subRaw, subDescriptorFile, module)
         subDescriptor.ownClassPath = Collections.singletonList(jarFile)
         module.assignDescriptor(subDescriptor)
@@ -251,10 +252,7 @@ fun loadPluginSubDescriptors(
       }
     }
     else {
-      val subRaw = PluginDescriptorFromXmlStreamConsumer(loadingContext.readContext, null).let {
-        it.consume(createXmlStreamReader(module.descriptorContent))
-        it.getBuilder()
-      }
+      val subRaw = parsePluginXml(createXmlStreamReader(module.descriptorContent), loadingContext.readContext, null)
       val subDescriptor = descriptor.createContentModule(subRaw, subDescriptorFile, module)
       if (subRaw.`package` == null || subRaw.isSeparateJar) {
         val customRoots = pathResolver.resolveCustomModuleClassesRoots(module.moduleId)
@@ -480,7 +478,7 @@ internal fun CoroutineScope.scheduleLoading(
   mainClassLoaderDeferred: Deferred<ClassLoader>?,
   logDeferred: Deferred<Logger>?,
 ): Deferred<PluginSet> {
-  val initContext = ProductPluginInitContext()
+  val initContext = PluginInitContextFactory.getInstance().createActualContext()
   val resultDeferred = async(CoroutineName("plugin descriptor loading")) {
     loadDescriptors(zipPoolDeferred, mainClassLoaderDeferred)
   }
@@ -605,7 +603,7 @@ internal fun CoroutineScope.loadPluginDescriptorsForPathBasedLoader(
   bundledPluginDir: Path?,
 ): Deferred<List<DiscoveredPluginsList>> {
   val platformPrefix = PlatformUtils.getPlatformPrefix()
-  val jarFileForModule: (PluginModuleId, Path) -> Path? = { moduleId, moduleDir -> moduleDir.resolve("${moduleId.name}.jar") }
+  val jarFileForModule = createPathBasedProductModuleJarResolver(mainClassLoader)
 
   if (isUnitTestMode && !isInDevServerMode) {
     return loadPluginDescriptorsInDeprecatedUnitTestMode(
@@ -651,7 +649,7 @@ internal fun CoroutineScope.loadPluginDescriptorsForPathBasedLoader(
       val isGateway = PlatformUtils.isGateway()
       loadCoreProductPlugin(
         loadingContext = loadingContext,
-        pathResolver = ClassPathXmlPathResolver(classLoader = mainClassLoader, isRunningFromSourcesWithoutDevBuild = false, isOptionalProductModule = { false }),
+        pathResolver = ClassPathXmlPathResolver(classLoader = mainClassLoader, isRunningFromSourcesWithoutDevBuild = false),
         useCoreClassLoader = platformPrefix.startsWith("CodeServer") || forceUseCoreClassloader(),
         // GatewayStarter.kt adds JARs from the main IDE to the classpath and runs it with platformPrefix=Gateway.
         // So, there are two plugin.xml files in the product classpath (IDEA's one and Gateway's one - our cache contains product's ones).
@@ -684,6 +682,48 @@ internal fun CoroutineScope.loadPluginDescriptorsForPathBasedLoader(
       )
     }
   }
+}
+
+private fun createPathBasedProductModuleJarResolver(mainClassLoader: ClassLoader): (PluginModuleId, Path) -> Path? {
+  if (PlatformUtils.isGateway()) {
+    val gatewayModuleJars = collectGatewayProductContentModuleJars()
+    return { moduleId, moduleDir ->
+      gatewayModuleJars[moduleId.name]
+      ?: moduleDir.resolve("${moduleId.name}.jar")
+    }
+  }
+  else {
+    return { moduleId, moduleDir -> moduleDir.resolve("${moduleId.name}.jar") }
+  }
+}
+
+/**
+ * 'isDeprecatedLoader' does not handle the case when the 'Core' plugin references a module that is located outside the 'lib' directory.
+ * These modules are located in the 'plugins/gateway-plugin/lib' directory and need to be specified explicitly.
+ *
+ * If not used, the default of 'Core' plugin will be used, that may cause the same class being loaded twice.
+ */
+private fun collectGatewayProductContentModuleJars(): Map<String, Path> {
+  val path = System.getProperty("standalone.gateway.modules.classpath") ?: return emptyMap()
+  try {
+    val modulesFolder = Paths.get(path)
+    val modules = Files.newDirectoryStream(modulesFolder).use { stream ->
+      stream.filterTo(ArrayList()) {
+        it.fileName.toString().endsWith(".jar", ignoreCase = true)
+      }
+    }
+    return modules.associateBy {
+      val fileName = it.fileName.toString()
+      fileName.substring(0, fileName.length - ".jar".length)
+    }
+  }
+  catch (e: IOException) {
+    LOG.warn("Cannot load ${path}", e)
+  }
+  catch (e: InvalidPathException) {
+    LOG.warn("Cannot load ${path}", e)
+  }
+  return emptyMap()
 }
 
 private fun CoroutineScope.loadFromPluginClasspathDescriptor(
@@ -766,9 +806,8 @@ private fun loadPluginDescriptor(
   val item = fileItems.first()
   val pluginPathResolver = PluginXmlPathResolver.DEFAULT_PATH_RESOLVER
   val descriptorInput = createNonCoalescingXmlStreamReader(input = pluginDescriptorData, locationSource = item.path)
-  val raw = PluginDescriptorFromXmlStreamConsumer(readContext = loadingContext.readContext, xIncludeLoader = createXIncludeLoader(pluginPathResolver, dataLoader)).let {
-    it.consume(descriptorInput)
-    loadingContext.patchPlugin(it.getBuilder())
+  val raw = parsePluginXml(descriptorInput, readContext = loadingContext.readContext, xIncludeLoader = createXIncludeLoader(pluginPathResolver, dataLoader)).let {
+    loadingContext.patchPlugin(it)
     it.build()
   }
   val descriptor = PluginMainDescriptor(raw = raw, pluginPath = pluginDir, isBundled = true)
@@ -781,24 +820,20 @@ private fun loadPluginDescriptor(
       if (input == null) {
         val jarFile = pluginDir.resolve("lib/${if (module.defaultLoadingRule == ModuleLoadingRule.EMBEDDED) "" else "modules/"}${module.moduleId.name}.jar")
         classPath = Collections.singletonList(jarFile)
-        subRaw = loadModuleFromSeparateJar(pool = zipPool, jarFile = jarFile, subDescriptorFile = subDescriptorFile, loadingContext = loadingContext)
+        subRaw = loadModuleFromSeparateJar(pool = zipPool, jarFile = jarFile, subDescriptorFile = subDescriptorFile,pathResolver = pluginPathResolver,
+                                           loadingContext = loadingContext,
+                                           dataLoader = dataLoader)
       }
       else {
-        subRaw = PluginDescriptorFromXmlStreamConsumer(loadingContext.readContext, createXIncludeLoader(pluginPathResolver, dataLoader)).let {
-          it.consume(input, null)
-          it.getBuilder()
-        }
+        subRaw = parsePluginXml(input, null, loadingContext.readContext, createXIncludeLoader(pluginPathResolver, dataLoader))
       }
     }
     else {
-      subRaw = PluginDescriptorFromXmlStreamConsumer(loadingContext.readContext, createXIncludeLoader(pluginPathResolver, dataLoader)).let {
-        try{
-          it.consume(createXmlStreamReader(module.descriptorContent))
-        }
-        catch (e: XMLStreamException) {
-          throw IllegalArgumentException("Cannot parse module descriptor for $module in $descriptor.", e)
-        }
-        it.getBuilder()
+      subRaw = try {
+        parsePluginXml(createXmlStreamReader(module.descriptorContent), loadingContext.readContext, createXIncludeLoader(pluginPathResolver, dataLoader))
+      }
+      catch (e: XMLStreamException) {
+        throw IllegalArgumentException("Cannot parse module descriptor for $module in $descriptor.", e)
       }
       if (subRaw.`package` == null || subRaw.isSeparateJar) {
         classPath = Collections.singletonList(pluginDir.resolve("lib/modules/${module.moduleId.name}.jar"))
@@ -871,16 +906,14 @@ private fun loadModuleFromSeparateJar(
   pool: ZipEntryResolverPool,
   jarFile: Path,
   subDescriptorFile: String,
+  pathResolver: PathResolver,
   loadingContext: PluginDescriptorLoadingContext,
+  dataLoader: DataLoader,
 ): PluginDescriptorBuilder {
   val resolver = pool.load(jarFile)
   try {
     val input = resolver.loadZipEntry(subDescriptorFile) ?: throw IllegalStateException("Module descriptor $subDescriptorFile not found in $jarFile")
-    // product module is always fully resolved and do not contain `xi:include`
-    return PluginDescriptorFromXmlStreamConsumer(loadingContext.readContext, null).let {
-      it.consume(input, jarFile.toString())
-      it.getBuilder()
-    }
+    return parsePluginXml(input, jarFile.toString(), loadingContext.readContext, createXIncludeLoader(pathResolver, dataLoader))
   }
   finally {
     (resolver as? Closeable)?.close()
@@ -892,7 +925,6 @@ fun isProductWithTheOnlyDescriptor(platformPrefix: String): Boolean {
   return platformPrefix == PlatformUtils.IDEA_PREFIX ||
          platformPrefix == PlatformUtils.WEB_PREFIX ||
          platformPrefix == PlatformUtils.DBE_PREFIX ||
-         platformPrefix == PlatformUtils.DATASPELL_PREFIX ||
          platformPrefix == PlatformUtils.GATEWAY_PREFIX ||
          platformPrefix == "IntelliJServer" ||
          platformPrefix == "CodeServer"
@@ -926,10 +958,9 @@ internal fun loadCoreProductPlugin(
     override fun toString() = "product classpath (platformPrefix=${PlatformUtils.getPlatformPrefix()})"
   }
   val xIncludeLoader = pathResolver as? XIncludeLoader ?: createXIncludeLoader(pathResolver, dataLoader)
-  val consumer = PluginDescriptorFromXmlStreamConsumer(loadingContext.readContext, xIncludeLoader)
-  consumer.consume(reader)
-  loadingContext.patchPlugin(consumer.getBuilder())
-  val raw = consumer.build()
+  val builder = parsePluginXml(reader, loadingContext.readContext, xIncludeLoader)
+  loadingContext.patchPlugin(builder)
+  val raw = builder.build()
   val libDir = PathManager.getLibDir()
   val descriptor = PluginMainDescriptor(raw = raw, pluginPath = libDir, isBundled = true, useCoreClassLoader = useCoreClassLoader)
   loadContentModuleDescriptors(
@@ -994,10 +1025,6 @@ private fun loadContentModuleDescriptors(
 
     if (isDeprecatedLoader && jarFileForModule != null && Files.exists(jarFileForModule)) {
       val raw = MixedDirAndJarDataLoader(files = arrayOf(FileItem(jarFileForModule, subDescriptorFile)), pool = pool, jarOnly = !isRunningFromSourcesWithoutDevBuild).use { dataLoader ->
-        val consumer = PluginDescriptorFromXmlStreamConsumer(
-          readContext = loadingContext.readContext,
-          xIncludeLoader = createXIncludeLoader(pathResolver = PluginXmlPathResolver.DEFAULT_PATH_RESOLVER, dataLoader = dataLoader),
-        )
         //this is needed to be able to start the frontend process from sources without 'dev build'
         val data =
           if (isRunningFromSourcesWithoutDevBuild && jarFileForModule.isDirectory()) {
@@ -1008,8 +1035,12 @@ private fun loadContentModuleDescriptors(
               it.loadZipEntry(subDescriptorFile)
             } ?: error("Failed to load entry '$subDescriptorFile' from jar file '$jarFileForModule'")
           }
-        consumer.consume(data, dataLoader.toString())
-        consumer.getBuilder()
+        parsePluginXml(
+          input = data,
+          locationSource = dataLoader.toString(),
+          readContext = loadingContext.readContext,
+          xIncludeLoader = createXIncludeLoader(pathResolver = PluginXmlPathResolver.DEFAULT_PATH_RESOLVER, dataLoader = dataLoader)
+        )
       }
 
       val subDescriptor = descriptor.createContentModule(subBuilder = raw, descriptorPath = subDescriptorFile, module = module)
@@ -1036,12 +1067,10 @@ private fun loadProductModule(
   xIncludeLoader: XIncludeLoader,
   containerDescriptor: PluginMainDescriptor,
 ): Boolean {
-  val moduleId = module.moduleId
   val moduleRaw: PluginDescriptorBuilder = if (jarFile == null) {
     // do not log - the severity of the error is determined by the loadingStrategy, the default strategy does not return null at all
     PluginDescriptorBuilder.builder().apply {
       visibility = ModuleVisibilityValue.PUBLIC
-      `package` = "unresolved.${moduleId.name}"
     }
   }
   else {
@@ -1049,10 +1078,7 @@ private fun loadProductModule(
       "Product module ${module.moduleId.displayName} descriptor content is not embedded - corrupted distribution " +
       "(jarFile=$jarFile, containerDescriptor=$containerDescriptor, siblings=${containerDescriptor.content.modules.joinToString()})"
     })
-    PluginDescriptorFromXmlStreamConsumer(readContext = loadingContext.readContext, xIncludeLoader = xIncludeLoader).let {
-      it.consume(reader)
-      it.getBuilder()
-    }
+    parsePluginXml(input = reader, readContext = loadingContext.readContext, xIncludeLoader = xIncludeLoader)
   }
   val subDescriptor = containerDescriptor.createContentModule(moduleRaw, subDescriptorFile, module)
   subDescriptor.ownClassPath = jarFile?.let { Java11Shim.INSTANCE.listOf(it) } ?: Java11Shim.INSTANCE.listOf()
@@ -1204,7 +1230,7 @@ fun loadDescriptorsFromClassPathInTest(
               resource = url,
               filename = filename,
               loadingContext = loadingContext,
-              pathResolver = ClassPathXmlPathResolver(classLoader = loader, isRunningFromSourcesWithoutDevBuild = false, isOptionalProductModule = { false }),
+              pathResolver = ClassPathXmlPathResolver(classLoader = loader, isRunningFromSourcesWithoutDevBuild = false),
               useCoreClassLoader = true,
               pool = zipPool,
               libDir = null,
@@ -1299,9 +1325,8 @@ internal fun testOrDeprecatedLoadDescriptorFromResource(
       else -> return null
     }
 
-    val raw = PluginDescriptorFromXmlStreamConsumer(loadingContext.readContext, createXIncludeLoader(pathResolver, dataLoader)).let {
-      it.consume(input, file.toString())
-      loadingContext.patchPlugin(it.getBuilder())
+    val raw = parsePluginXml(input, file.toString(), loadingContext.readContext, createXIncludeLoader(pathResolver, dataLoader)).let {
+      loadingContext.patchPlugin(it)
       it.build()
     }
     // it is very important to not set `useCoreClassLoader = true` blindly
@@ -1364,7 +1389,7 @@ private fun loadPluginDependencyDescriptors(
   for (dependency in descriptor.pluginDependencies) {
     // because of https://youtrack.jetbrains.com/issue/IDEA-206274, configFile maybe not only for optional dependencies
 
-    if (dependency.isOptional && dependency.configFile == null && context.createEmptyDependsDescriptorForOptionalDependsWithoutConfigFile) {
+    if (dependency.isOptional && dependency.configFile == null) {
       // generate an empty "depends" descriptor; this is needed so that new plugin set resolver can associate the dependency with the sub-descriptor
       val subDescriptor = descriptor.createDependsSubDescriptor(PluginDescriptorBuilder.builder(), "", dependsTargetId = dependency.pluginId)
       dependency.setSubDescriptor(subDescriptor)

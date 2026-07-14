@@ -3,11 +3,9 @@ package org.jetbrains.kotlin.idea.fir.completion.commands
 
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl
 import com.intellij.openapi.util.registry.Registry
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode
 import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCase
 
 class K2CommandCompletionGoToTest : KotlinLightCodeInsightFixtureTestCase() {
-    override val pluginMode = KotlinPluginMode.K2
 
     override fun setUp() {
         super.setUp()
@@ -103,6 +101,46 @@ class K2CommandCompletionGoToTest : KotlinLightCodeInsightFixtureTestCase() {
             }
         }
       """.trimIndent()
+        )
+    }
+
+    fun testGoToImplementationNotOfferedForSamInterface() {
+        myFixture.configureByText(
+            "x.kt", """
+            fun interface Predicate {
+                fun accept.<caret>(): Boolean
+            }
+
+            fun usage() {
+                val p = Predicate { true }
+            }
+            """.trimIndent()
+        )
+        val elements = myFixture.completeBasic()
+        // A SAM interface that is only instantiated via lambdas has no class inheritors, and Kotlin's
+        // Go To Implementation does not navigate to such instantiations, so the command must not be offered.
+        assertTrue(
+            "'Go to implementation' must not be offered for a SAM interface with no explicit inheritors",
+            elements == null || elements.none { it.lookupString.contains("Go to impl", ignoreCase = true) }
+        )
+    }
+
+    fun testGoToImplementationOfferedForSamInterfaceWithExplicitImplementation() {
+        myFixture.configureByText(
+            "x.kt", """
+            fun interface Predicate {
+                fun accept.<caret>(): Boolean
+            }
+
+            class AlwaysTrue : Predicate {
+                override fun accept(): Boolean = true
+            }
+            """.trimIndent()
+        )
+        val elements = myFixture.completeBasic()
+        assertTrue(
+            "'Go to implementation' must be offered for a SAM interface that has an explicit inheritor",
+            elements != null && elements.any { it.lookupString.contains("Go to impl", ignoreCase = true) }
         )
     }
 }

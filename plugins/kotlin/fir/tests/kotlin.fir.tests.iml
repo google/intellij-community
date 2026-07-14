@@ -9,8 +9,8 @@
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="25" />
-            <stringArg name="apiVersion" arg="2.3" />
-            <stringArg name="languageVersion" arg="2.3" />
+            <stringArg name="apiVersion" arg="2.4" />
+            <stringArg name="languageVersion" arg="2.4" />
           </stringArguments>
           <arrayArguments>
             <arrayArg name="pluginClasspaths">
@@ -33,6 +33,7 @@
     <orderEntry type="module" module-name="intellij.java.indexing" scope="TEST" />
     <orderEntry type="module" module-name="intellij.java.testFramework" />
     <orderEntry type="module" module-name="intellij.java.psi" />
+    <orderEntry type="module" module-name="intellij.kotlin.references" scope="TEST" />
     <orderEntry type="library" name="kotlinc.kotlin-compiler-common" level="project" />
     <orderEntry type="library" name="kotlinc.low-level-api-fir" level="project" />
     <orderEntry type="library" scope="TEST" name="kotlinc.kotlin-compiler-tests" level="project" />
@@ -67,7 +68,6 @@
     <orderEntry type="module" module-name="intellij.platform.editor.ex" />
     <orderEntry type="module" module-name="intellij.kotlin.base.util" />
     <orderEntry type="module" module-name="intellij.kotlin.codeInsight.shared" />
-    <orderEntry type="module" module-name="kotlin.code-insight.override-implement.shared" />
     <orderEntry type="module" module-name="intellij.kotlin.codeInsight.overrideImplement" />
     <orderEntry type="module" module-name="kotlin.fir" />
     <orderEntry type="module" module-name="intellij.gradle.tests" />
@@ -82,12 +82,11 @@
     <orderEntry type="module" module-name="kotlin.jvm-debugger.evaluation" scope="TEST" />
     <orderEntry type="module" module-name="intellij.kotlin.analysis.platform" scope="TEST" />
     <orderEntry type="module" module-name="intellij.kotlin.base.analysis.platform" scope="TEST" />
-    <orderEntry type="module" module-name="kotlin.refactorings.common" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.kotlin.refactorings.base" scope="TEST" />
     <orderEntry type="module" module-name="intellij.kotlin.projectWizard.idea" scope="TEST" />
     <orderEntry type="module" module-name="intellij.kotlin.runConfigurations.jvm" scope="TEST" />
     <orderEntry type="module" module-name="intellij.java.execution.impl" scope="TEST" />
     <orderEntry type="module" module-name="intellij.kotlin.refactorings" scope="TEST" />
-    <orderEntry type="module" module-name="intellij.kotlin.refactorings.move" scope="TEST" />
     <orderEntry type="module" module-name="intellij.kotlin.completion.api" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.serialization.core" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.serialization.json" />
@@ -114,7 +113,6 @@
     <orderEntry type="module" module-name="intellij.kotlin.gradle.java.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.kotlin.gradle.scripting.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.kotlin.highlighting.tests" scope="TEST" />
-    <orderEntry type="module" module-name="intellij.kotlin.refactorings.move.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.kotlin.refactorings.rename.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.kotlin.base.plugin.testFramework" scope="TEST" />
     <orderEntry type="module" module-name="intellij.kotlin.base.psi" scope="TEST" />
@@ -147,5 +145,7 @@
     <orderEntry type="module" module-name="intellij.platform.workspace.jps" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.collections.immutable" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.concurrency" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.junit4" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.junit5" scope="TEST" />
   </component>
 </module>

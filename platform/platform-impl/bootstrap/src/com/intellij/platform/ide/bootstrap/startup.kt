@@ -4,6 +4,7 @@
 package com.intellij.platform.ide.bootstrap
 
 import com.intellij.BundleBase
+import com.intellij.accessibility.LinuxAccessibilitySupport
 import com.intellij.diagnostic.LoadingState
 import com.intellij.ide.BootstrapBundle
 import com.intellij.ide.CliResult
@@ -26,10 +27,10 @@ import com.intellij.openapi.application.ex.ApplicationInfoEx
 import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.application.impl.ApplicationImpl
 import com.intellij.openapi.application.impl.ApplicationInfoImpl
-import com.intellij.openapi.diagnostic.ExceptionWithAttachments
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.getOrLogException
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.progress.util.checkCancelledEvenWithPCEDisabled
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.ShutDownTracker
 import com.intellij.platform.diagnostic.telemetry.impl.span
@@ -40,6 +41,7 @@ import com.intellij.ui.mac.initMacApplication
 import com.intellij.ui.mac.screenmenu.Menu
 import com.intellij.ui.scale.JBUIScale
 import com.intellij.ui.svg.SvgCacheManager
+import com.intellij.util.ConcurrencyUtil
 import com.intellij.util.EnvironmentUtil
 import com.intellij.util.PlatformUtils
 import com.intellij.util.ShellEnvironmentReader
@@ -57,12 +59,14 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.jetbrains.annotations.ApiStatus
 import java.awt.Toolkit
 import java.lang.invoke.MethodHandles
@@ -72,15 +76,18 @@ import java.nio.charset.Charset
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.Random
 import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.atomic.AtomicReference
 import java.util.function.BiConsumer
+import java.util.function.Supplier
 import java.util.logging.ConsoleHandler
 import java.util.logging.Level
 import kotlin.system.exitProcess
+import kotlin.time.Duration.Companion.milliseconds
 
 internal const val IDE_STARTED: String = "------------------------------------------------------ IDE STARTED ------------------------------------------------------"
 private const val IDE_SHUTDOWN = "------------------------------------------------------ IDE SHUTDOWN ------------------------------------------------------"
@@ -123,6 +130,7 @@ fun startApplication(
     mainClassLoaderDeferred?.await()
     coroutineScope {
       // required for logging essential info about the IDE
+      @Suppress("DeferredResultUnused")
       async(CoroutineName("app name info")) {
         ApplicationNamesInfo.getInstance()
       }
@@ -153,9 +161,9 @@ fun startApplication(
     }
   }
 
-  val initAwtToolkitJob = scheduleInitAwtToolkit(scope = scope, lockSystemDirsJob = lockSystemDirsJob, busyThread = busyThread)
+  val initAwtToolkitJob = scheduleInitAwtToolkit(scope, lockSystemDirsJob, busyThread)
   val initBaseLafJob = scope.launch {
-    initUi(initAwtToolkitJob = initAwtToolkitJob, isHeadless = isHeadless, asyncScope = scope)
+    initUi(initAwtToolkitJob, isHeadless, scope)
   }
 
   var initUiScale: Job? = null
@@ -173,9 +181,9 @@ fun startApplication(
       }
     }
 
-    scheduleUpdateFrameClassAndWindowIconAndPreloadSystemFonts(scope = scope, initAwtToolkitJob = initAwtToolkitJob, initUiScale = initUiScale, appInfoDeferred = appInfoDeferred)
+    scheduleUpdateFrameClassAndWindowIconAndPreloadSystemFonts(scope, initAwtToolkitJob, initUiScale, appInfoDeferred)
 
-    scheduleShowSplashIfNeeded(scope = scope, lockSystemDirsJob = lockSystemDirsJob, initUiScale = initUiScale, appInfoDeferred = appInfoDeferred, args = args)
+    scheduleShowSplashIfNeeded(scope, lockSystemDirsJob, initUiScale, appInfoDeferred, args)
   }
 
   val initLafJob = scope.launch {
@@ -220,8 +228,7 @@ fun startApplication(
   }
 
   shellEnvDeferred = scope.async {
-    // EnvironmentUtil wants logger
-    logDeferred.join()
+    logDeferred.join()  // environment loading needs a logger
     span("environment loading", Dispatchers.IO) {
       val log = logger<AppStarter>()
       if (shouldLoadShellEnv(log)) {
@@ -231,29 +238,14 @@ fun startApplication(
     }
   }
 
-  scheduleLoadSystemLibsAndLogInfoAndInitMacApp(
-    scope = scope,
-    logDeferred = logDeferred,
-    appInfoDeferred = appInfoDeferred,
-    initUiDeferred = initLafJob,
-    args = args,
-    mainScope = mainScope,
-  )
+  scheduleLoadSystemLibsAndLogInfoAndInitMacApp(scope, logDeferred, appInfoDeferred, initLafJob, args, mainScope)
 
   val euaDocumentDeferred = scope.async { loadEuaDocument(appInfoDeferred) }
 
   val configImportDeferred = scope.async {
     importConfigIfNeeded(
-      scope = scope,
-      isHeadless = isHeadless,
-      configImportNeededDeferred = configImportNeededDeferred,
-      lockSystemDirsJob = lockSystemDirsJob,
-      logDeferred = logDeferred,
-      args = args,
-      customTargetDirectoryToImportConfig = customTargetDirectoryToImportConfig,
-      appStarterDeferred = appStarterDeferred,
-      euaDocumentDeferred = euaDocumentDeferred,
-      initLafJob = initLafJob,
+      scope, isHeadless, configImportNeededDeferred, lockSystemDirsJob, logDeferred, args, customTargetDirectoryToImportConfig,
+      appStarterDeferred, euaDocumentDeferred, initLafJob
     )
   }
 
@@ -290,12 +282,7 @@ fun startApplication(
       }
     }
 
-    PluginManagerCore.scheduleDescriptorLoading(
-      coroutineScope = this,
-      zipPoolDeferred = zipPoolDeferred,
-      mainClassLoaderDeferred = mainClassLoaderDeferred,
-      logDeferred = logDeferred,
-    )
+    PluginManagerCore.scheduleDescriptorLoading(coroutineScope = this, zipPoolDeferred, mainClassLoaderDeferred, logDeferred)
   }
 
   val isInternal = System.getProperty(ApplicationManagerEx.IS_INTERNAL_PROPERTY).toBoolean()
@@ -341,18 +328,7 @@ fun startApplication(
     }
 
     val args = ApplicationStartArguments.stripKnownArguments(args)
-    loadApp(
-      app = app,
-      pluginSetDeferred = pluginSetDeferred,
-      appInfoDeferred = appInfoDeferred,
-      euaDocumentDeferred = euaDocumentDeferred,
-      asyncScope = scope,
-      initLafJob = initLafJob,
-      logDeferred = logDeferred,
-      appRegisteredJob = appRegisteredJob,
-      args = args,
-      initAwtToolkitAndEventQueueJob = initEventQueueJob,
-    )
+    loadApp(app, pluginSetDeferred, appInfoDeferred, euaDocumentDeferred, scope, initLafJob, logDeferred, appRegisteredJob, args, initEventQueueJob)
   }
 
   scope.launch {
@@ -407,6 +383,14 @@ fun startApplication(
 
       ClassicUiToIslandsMigration.migrateSchemeAndUiSettingsIfNeeded()
       applyIslandsTheme(afterImportSettings = false)
+
+      if (OS.CURRENT == OS.Linux && InitialConfigImportState.isFirstSession()) {
+        LinuxAccessibilitySupport.showLinuxAccessibilityDialog()
+        if (LinuxAccessibilitySupport.applyRequestedChanges()) {
+          ApplicationManagerEx.getApplicationEx().restart(true)
+        }
+      }
+
       executeApplicationStarter(starter, args)
     }
     // no need to use a pool once started
@@ -426,7 +410,7 @@ private fun scheduleLoadSystemLibsAndLogInfoAndInitMacApp(
     if (OS.CURRENT == OS.Windows) {
       span("system libs setup") {
         if (System.getProperty("winp.folder.preferred") == null) {
-          System.setProperty("winp.folder.preferred", PathManager.getTempPath())
+          System.setProperty("winp.folder.preferred", PathManager.getTempDir().toString())
         }
       }
     }
@@ -446,7 +430,7 @@ private fun scheduleLoadSystemLibsAndLogInfoAndInitMacApp(
     if (OS.CURRENT == OS.macOS && !AppMode.isHeadless() && !AppMode.isRemoteDevHost()) {
       // JNA and Swing are used - invoke only after both are loaded
       initUiDeferred.join()
-      launch(CoroutineName("mac app init")) {
+      launch(CoroutineName("macOS app init")) {
         runCatching {
           initMacApplication(mainScope)
         }.getOrLogException(log)
@@ -462,7 +446,7 @@ fun setActivationListener(processor: (List<String>) -> Deferred<CliResult>) {
 }
 
 private suspend fun runPreAppClass(args: List<String>, classBeforeAppProperty: String) {
-  span("pre app class running") {
+  span("pre-app class running") {
     try {
       val aClass = AppStarter::class.java.classLoader.loadClass(classBeforeAppProperty)
       MethodHandles.lookup()
@@ -625,13 +609,16 @@ private fun setupLogger(scope: CoroutineScope, consoleLoggerJob: Job, checkSyste
   }
 }
 
+@ApiStatus.Internal
 fun logEssentialInfoAboutIde(log: Logger, appInfo: ApplicationInfo, args: List<String>) {
   val buildTimeString = DateTimeFormatter.RFC_1123_DATE_TIME.format(appInfo.buildTime)
+  val launchDateTime = ZonedDateTime.now()
   log.info("IDE: ${ApplicationNamesInfo.getInstance().fullProductName} (build #${appInfo.build.asString()}, $buildTimeString)")
   log.info("OS: ${OS.CURRENT.name} (${OS.CURRENT.version()})")
   log.info("JRE: ${System.getProperty("java.runtime.version", "-")}, ${System.getProperty("os.arch")} (${System.getProperty("java.vendor", "-")})")
   log.info("JVM: ${System.getProperty("java.vm.version", "-")} (${System.getProperty("java.vm.name", "-")})")
   log.info("PID: ${ProcessHandle.current().pid()}")
+  log.info("Timezone: ${launchDateTime.zone.id} (${launchDateTime.offset})")
   if (OS.isGenericUnix()) {
     log.info("desktop: ${System.getenv("XDG_CURRENT_DESKTOP")}")
     log.info("toolkit: ${Toolkit.getDefaultToolkit().javaClass.name}")
@@ -697,8 +684,13 @@ private fun shouldLoadShellEnv(log: Logger): Boolean {
   }
 
   val shLvl = System.getenv("SHLVL")
-  if (shLvl != null && @Suppress("RemoveUnnecessaryParentheses") (shLvl.toIntOrNull() ?: 1) > 0) {
+  if (shLvl != null && (shLvl.toIntOrNull() ?: 1) > 0) {
     log.info("skipping shell environment: the IDE is likely launched from a terminal (SHLVL=${shLvl})")
+    return false
+  }
+
+  if (AppMode.isRunningFromDevBuild()) {
+    log.info("skipping shell environment: dev mode")
     return false
   }
 
@@ -707,29 +699,55 @@ private fun shouldLoadShellEnv(log: Logger): Boolean {
 
 private fun loadEnvironment(parentJob: Job, log: Logger): Boolean {
   val envFuture = CompletableDeferred<Map<String, String>>(parentJob)
-  EnvironmentUtil.setEnvironmentLoader(envFuture)
+
+  EnvironmentUtil.setEnvironmentLoader(object : Supplier<Map<String, String>> {
+    private var env: Map<String, String>? = null
+
+    override fun get(): Map<String, String> {
+      if (env == null) {
+        env = @Suppress("RAW_RUN_BLOCKING") runBlocking {
+          awaitWithCheckCanceled(envFuture)
+        }
+      }
+      return env!!
+    }
+  })
 
   try {
-    val timeoutMillis = System.getProperty(LOAD_SHELL_ENV_TIMEOUT_PROPERTY)?.toLongOrNull() ?: 0
+    val timeoutMillis = System.getProperty(LOAD_SHELL_ENV_TIMEOUT_PROPERTY)?.toLongOrNull() ?: 0  // `0` means `ShellEnvironmentReader.DEFAULT_TIMEOUT_MILLIS`
     val env = ShellEnvironmentReader.readEnvironment(ShellEnvironmentReader.shellCommand(null, null, null), timeoutMillis).first
-    if ("LANG" !in env && "LC_ALL" !in env && @Suppress("SpellCheckingInspection") "LC_CTYPE" !in env) {
+    if ("LANG" !in env && "LC_ALL" !in env && "LC_CTYPE" !in env) {
       val value = EnvironmentUtil.setLocaleEnv(env, Charset.defaultCharset())
-      log.info(@Suppress("SpellCheckingInspection") "LC_CTYPE=${value}")
+      log.info("LC_CTYPE=${value}")
     }
     envFuture.complete(env.toImmutableMap())
     return true
   }
   catch (e: Throwable) {
     log.warn("can't get shell environment", e)
-    (e as? ExceptionWithAttachments)?.attachments?.forEach { log.warn("${it.path}:\n${it.displayText}") }
-    envFuture.complete(emptyMap())
+    envFuture.complete(EnvironmentUtil.getSystemEnv())
     return false
+  }
+}
+
+private suspend fun <T> awaitWithCheckCanceled(deferred: CompletableDeferred<T>): T {
+  while (true) {
+    if (!deferred.isCompleted) {
+      checkCancelledEvenWithPCEDisabled(indicator = null)
+    }
+    try {
+      return withTimeout(ConcurrencyUtil.DEFAULT_TIMEOUT_MS.milliseconds) {
+        deferred.await()
+      }
+    }
+    catch (_: TimeoutCancellationException) { }
   }
 }
 
 interface AppStarter {
   fun prepareStart(args: List<String>) {}
 
+  @ApiStatus.Internal
   suspend fun start(context: InitAppContext)
 
   /* called from IDE init thread */

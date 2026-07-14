@@ -43,9 +43,9 @@ enum class KotlinBuildToolFusMetricName(val metric: KotlinBuildToolFusMetric<*>)
     KMP_TOP_LEVEL_DEPENDENCIES_BLOCK(KotlinBuildToolBooleanFusMetric("KMP_TOP_LEVEL_DEPENDENCIES_BLOCK")),
     KMP_SWIFT_PM_IMPORT_HAS_DIRECT_DEPENDENCIES(KotlinBuildToolBooleanFusMetric("KMP_SWIFT_PM_IMPORT_HAS_DIRECT_DEPENDENCIES")),
     KMP_SWIFT_PM_IMPORT_HAS_TRANSITIVE_DEPENDENCIES_FROM_MODULAR_DEPENDENCIES(KotlinBuildToolBooleanFusMetric("KMP_SWIFT_PM_IMPORT_HAS_TRANSITIVE_DEPENDENCIES_FROM_MODULAR_DEPENDENCIES")),
-    KMP_SWIFT_PM_IMPORT_NUMBER_OF_DIRECT_DEPENDENCIES(KotlinBuildToolLongSumFusMetric("KMP_SWIFT_PM_IMPORT_NUMBER_OF_DIRECT_DEPENDENCIES")),
+    KMP_SWIFT_PM_IMPORT_NUMBER_OF_DIRECT_DEPENDENCIES(KotlinBuildToolLongSumFusMetric("KMP_SWIFT_PM_IMPORT_NUMBER_OF_DIRECT_DEPENDENCIES", anonymizeByRounding = true)),
     KMP_COCOAPODS_HAS_DIRECT_DEPENDENCIES(KotlinBuildToolBooleanFusMetric("KMP_COCOAPODS_HAS_DIRECT_DEPENDENCIES")),
-    KMP_COCOAPODS_NUMBER_OF_DIRECT_DEPENDENCIES(KotlinBuildToolLongSumFusMetric("KMP_COCOAPODS_NUMBER_OF_DIRECT_DEPENDENCIES")),
+    KMP_COCOAPODS_NUMBER_OF_DIRECT_DEPENDENCIES(KotlinBuildToolLongSumFusMetric("KMP_COCOAPODS_NUMBER_OF_DIRECT_DEPENDENCIES", anonymizeByRounding = true)),
 
     // JS SPECIFIC
     JS_GENERATE_EXTERNALS(KotlinBuildToolBooleanFusMetric("JS_GENERATE_EXTERNALS")),
@@ -68,6 +68,18 @@ enum class KotlinBuildToolFusMetricName(val metric: KotlinBuildToolFusMetric<*>)
 
 
     WASM_IR_INCREMENTAL(KotlinBuildToolBooleanFusMetric("WASM_IR_INCREMENTAL")),
+    WASM_COMPILER_MODE(
+        ConcatenatedAllowedListValuesStringFusMetric(
+            "WASM_COMPILER_MODE",
+            listOf(
+                "monolith",
+                "multimodule-open-world",
+                "multimodule-closed-world",
+                "multimodule-closed-world-only-in-dev",
+            )
+        )
+    ),
+
     //Garbage collector
     ENABLED_NOOP_GC(KotlinBuildToolBooleanFusMetric("ENABLED_NOOP_GC")),
     ENABLED_STWMS_GC(KotlinBuildToolBooleanFusMetric("ENABLED_STWMS_GC")),

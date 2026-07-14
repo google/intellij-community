@@ -7,7 +7,6 @@ import com.intellij.diagnostic.PluginException
 import com.intellij.lang.FileASTNode
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.EditorLockFreeTyping
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.application.ReadAndWriteScope
@@ -215,9 +214,7 @@ class DocumentCommitThread : DocumentCommitProcessor, Disposable {
       ApplicationManager.getApplication().assertIsNonDispatchThread()
     }
     val document = task.myDocumentRef.get()
-    if (!EditorLockFreeTyping.isInElfScope(document)) {
-      ApplicationManager.getApplication().assertReadAccessAllowed()
-    }
+    ApplicationManager.getApplication().assertReadAccessAllowed()
     if (document == null) return {}
     val project = task.myProject
     val finishProcessors = SmartList<BooleanRunnable>()
@@ -238,10 +235,10 @@ class DocumentCommitThread : DocumentCommitProcessor, Disposable {
 
       for (psiFile in viewProviders.flatMap { it.getAllFiles() }) {
         val oldFileNode = psiFile.getNode()
-            ?: throw AssertionError("No node for " + psiFile.javaClass + " in " + psiFile.getViewProvider().javaClass +
-                                    " of size " + StringUtil.formatFileSize(document.textLength.toLong()) +
-                                    " (is too large = " + SingleRootFileViewProvider
-                                      .isTooLargeForIntelligence(psiFile.viewProvider.getVirtualFile(), document.textLength.toLong()) + ")")
+                          ?: throw AssertionError("No node for " + psiFile.javaClass + " in " + psiFile.getViewProvider().javaClass +
+                                                  " of size " + StringUtil.formatFileSize(document.textLength.toLong()) +
+                                                  " (is too large = " + SingleRootFileViewProvider
+                                                    .isTooLargeForIntelligence(psiFile.viewProvider.getVirtualFile(), document.textLength.toLong()) + ")")
         val changedPsiRange = ChangedPsiRangeUtil.getChangedPsiRange(
           psiFile,
           document,
@@ -437,9 +434,7 @@ class DocumentCommitThread : DocumentCommitProcessor, Disposable {
     if (!synchronously) {
       ApplicationManager.getApplication().assertIsNonDispatchThread()
     }
-    if (!EditorLockFreeTyping.isInElfScope(document)) {
-      ApplicationManager.getApplication().assertReadAccessAllowed()
-    }
+    ApplicationManager.getApplication().assertReadAccessAllowed()
     val newDocumentText = document.getImmutableCharSequence()
 
     val data = document.getUserData(BlockSupport.DO_NOT_REPARSE_INCREMENTALLY)
@@ -484,7 +479,7 @@ class DocumentCommitThread : DocumentCommitProcessor, Disposable {
 
       if (!ApplicationManager.getApplication().isWriteAccessAllowed() && documentManager.isEventSystemEnabled(document)) {
         val vFile = viewProvider.getVirtualFile()
-        LOG.error("Write action expected" + "; document=" + document + "; file=" + psiFile + " of " + psiFile.javaClass + "; file.valid=" + psiFile.isValid() + "; file.eventSystemEnabled=" + viewProvider.isEventSystemEnabled() + "; viewProvider=" + viewProvider + " of " + viewProvider.javaClass + "; language=" + psiFile.getLanguage() + "; vFile=" + vFile + " of " + vFile.javaClass + "; free-threaded=" + AbstractFileViewProvider.isFreeThreaded(viewProvider))
+        LOG.error("Write action expected" + "; document=" + document + "; file=" + psiFile + " of " + psiFile.javaClass + "; file.valid=" + psiFile.isValid() + "; file.eventSystemEnabled=" + viewProvider.supportsSendingPsiEvents() + "; viewProvider=" + viewProvider + " of " + viewProvider.javaClass + "; language=" + psiFile.getLanguage() + "; vFile=" + vFile + " of " + vFile.javaClass + "; free-threaded=" + AbstractFileViewProvider.isFreeThreaded(viewProvider))
       }
 
       diffLog.doActualPsiChange(psiFile)

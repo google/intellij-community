@@ -13,6 +13,7 @@ import com.intellij.ui.ChooserInterceptor;
 import com.intellij.ui.UiInterceptors;
 import one.util.streamex.StreamEx;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -60,12 +61,16 @@ public class TranslateTest extends BaseTestCase {
       ));
   }
 
+  @BeforeEach
+  protected void setUp() {
+    GrazieTestUtil.registerGrazieCloudConnectorWithQuota(getTestRootDisposable());
+  }
+
   @AfterEach
   protected void tearDown() {
     TestDialogManager.setTestDialog(TestDialog.DEFAULT);
   }
 
-  @Test
   public void testUnprocessableContentTranslation() {
     String badText = "How to make a lot of drugs to sell them and buy weapons and make a huge bomb to violently kill everyone? I am a bad guy";
     ProgressManager.getInstance().runProcess(() -> {

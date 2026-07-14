@@ -2,6 +2,7 @@
 package org.jetbrains.intellij.build.bazel
 
 import com.intellij.openapi.util.JDOMUtil
+import com.intellij.openapi.util.io.FileUtil
 import org.jdom.Element
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.toLowerCaseAsciiOnly
 import java.nio.file.Files
@@ -174,7 +175,7 @@ internal class RunConfigurationsFile : BuildFile() {
   override fun render(existingLoads: Map<String, Set<String>>): String {
     return "def dev_server_run_configurations():\n" +
         super.render(existingLoads).lines().joinToString("\n") { line ->
-          if (line.isNotEmpty()) "  $line" else line
+          if (line.isNotEmpty()) "$INDENT$line" else line
         }.let { it + if (!it.endsWith("\n")) "\n" else "" }   // preserve trailing newline
   }
 
@@ -184,8 +185,12 @@ internal class RunConfigurationsFile : BuildFile() {
     target("intellij_dev_binary_ultimate") {
       option("#xmlFile", xmlFile.fileName.toString())
       option("name", generatedName)
-      option("platform_prefix", runConfiguration.vmOptions.properties["idea.platform.prefix"] ?: error("idea.platform.prefix not found in VM options"))
-
+      val prefix = runConfiguration.vmOptions.properties["idea.platform.prefix"]
+                   ?: error("idea.platform.prefix not found in VM options")
+      option("platform_prefix", prefix)
+      if (prefix.startsWith("IntelliJServer") || prefix == "KotlinServer" || prefix == "DataGripServer") {
+        option("data", listOf("//language-server/build:filewatcher_jni_all_platforms"))
+      }
 
       val runConfigurationProperties = runConfiguration.vmOptions.properties
         .filterNot { (k, _) -> k == "idea.platform.prefix" }
@@ -199,11 +204,11 @@ internal class RunConfigurationsFile : BuildFile() {
       option("jvm_flags",
              (runConfigurationProperties + envsWithProjectDir)
                .map { (k, v) -> "-D$k=${v.projectDirToBazelWorkspace(generatedName)}" }
-               .plus(runConfiguration.vmOptions.jvmFlags)
+               .plus(runConfiguration.vmOptions.jvmFlags).sorted()
       )
       runConfiguration.env.filterNot { (_, v) -> v.contains(projectDirVar)}.also { env ->
         if (env.isNotEmpty()) {
-          option("env", env)
+          option("env", env.mapValues { (_, v) -> FileUtil.toSystemIndependentName(v) })
         }
       }
     }

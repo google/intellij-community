@@ -1,7 +1,6 @@
 <idea-plugin visibility="internal">
   <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
-    <module name="intellij.platform.debugger"/>
     <module name="intellij.platform.debugger.impl"/>
     <module name="fleet.rhizomedb"/>
     <module name="intellij.libraries.fastutil"/>
@@ -18,6 +17,7 @@
     <module name="intellij.platform.ide"/>
     <module name="intellij.platform.ide.core"/>
     <module name="intellij.platform.ide.impl"/>
+    <module name="intellij.platform.kernel"/>
     <module name="intellij.platform.lang"/>
     <module name="intellij.platform.lang.core"/>
     <module name="intellij.platform.lang.impl"/>
@@ -29,14 +29,16 @@
     <module name="intellij.platform.util.ui"/>
   </dependencies>
   <!-- endregion -->
+  <resource-bundle>messages.ActionsBundle</resource-bundle>
   <extensionPoints>
     <extensionPoint qualifiedName="com.intellij.runDashboardManagerProxy"
                     interface="com.intellij.execution.dashboard.RunDashboardManagerProxy" dynamic="true"/>
-    <extensionPoint name="runDashboardGroupingRule"
+    <extensionPoint qualifiedName="com.intellij.runDashboardGroupingRule"
                     interface="com.intellij.platform.execution.dashboard.splitApi.frontend.RunDashboardGroupingRule" dynamic="true"/>
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
+    <runContentManagerExtension implementation="com.intellij.platform.execution.dashboard.RunDashboardRunContentManagerExtension"/>
     <legacyRunDashboardServiceSubstitutor implementation="com.intellij.platform.execution.dashboard.splitApi.LegacyRunDashboardServiceSubstitutorImpl"/>
     <platform.rpc.projectRemoteTopicListener implementation="com.intellij.platform.execution.dashboard.splitApi.frontend.RunContentSyncListener"/>
 

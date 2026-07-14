@@ -37,7 +37,7 @@ import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
-import com.intellij.openapi.util.IntellijInternalApi
+import com.intellij.openapi.updateSettings.impl.PluginUpdateSourceService
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.text.HtmlChunk
 import com.intellij.openapi.util.text.StringUtil
@@ -121,7 +121,6 @@ import javax.swing.text.html.ParagraphView
 import kotlin.coroutines.coroutineContext
 
 @Internal
-@IntellijInternalApi
 class PluginDetailsPageComponent @JvmOverloads constructor(
   private val pluginModel: PluginModelFacade,
   private val searchListener: LinkListener<Any>,
@@ -162,6 +161,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
   private var myVersion1: JBLabel? = null
   private var myVersion2: JLabel? = null
   private var mySize: JLabel? = null
+  private var myPluginId: JLabel? = null
   private var requiredPlugins: JEditorPane? = null
   private var customRepoForDebug: JLabel? = null
 
@@ -512,7 +512,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
     try {
       customizer.processPluginNameAndButtonsComponent(nameAndButtons)
     }
-    catch (e: Exception) {
+    catch (e: Throwable) {
       LOG.error("Error during PluginDetailsPage customization", e)
     }
   }
@@ -523,6 +523,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
   }
 
   private fun updatePlugin() {
+    val pluginUpdateSourceApplier = PluginUpdateSourceApplier(updateDescriptor ?: descriptorForActions!!)
     coroutineScope.launch {
       val modalityState = ModalityState.stateForComponent(updateButton!!)
       val customizedAction = pluginManagerCustomizer?.getUpdateButtonCustomizationModel(pluginModel,
@@ -535,14 +536,16 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
           customizedAction()
         }
         else {
-          pluginModel.installOrUpdatePlugin(
+          pluginUpdateSourceApplier.applyPluginUpdateSourceId()
+          val result = pluginModel.installOrUpdatePlugin(
             this@PluginDetailsPageComponent,
             descriptorForActions!!, updateDescriptor,
             modalityState,
           )
+          pluginUpdateSourceApplier.applyPluginUpdateSourcesBasedOnResult(result)
         }
       }
-    }
+    }.invokeOnCompletion(pluginUpdateSourceApplier::revertIfNeeded)
   }
 
   private fun createScrollPane(component: JComponent): JBScrollPane {
@@ -602,7 +605,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
     if (uiModel.isBundled) return
     val component = gearButton ?: return
     val modalityState = ModalityState.stateForComponent(component)
-    val customizationModel = pluginManagerCustomizer.getDisableButtonCustomizationModel(pluginModel, uiModel, installedDescriptorForMarketplace, modalityState)
+    val customizationModel = pluginManagerCustomizer.getDisableButtonCustomizationModel(pluginModel, uiModel, modalityState)
                              ?: return
     enableDisableController?.setOptions(customizationModel.additionalActions)
     val visible = customizationModel.isVisible && customizationModel.text == null
@@ -756,8 +759,10 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
 
         if (items == null || showComponent != component) return@launch
 
+        val updatedReviewComments = ReviewsPageContainer.withNextPage(reviewComments, items)
+        node.reviewComments = updatedReviewComments
+
         if (items.isNotEmpty()) {
-          reviewComments.addItems(items)
           val reviewPanel = reviewPanel ?: return@launch
           reviewPanel.addComments(items)
           reviewPanel.fullRepaint()
@@ -765,7 +770,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
 
         nextPageButton.icon = null
         nextPageButton.isEnabled = true
-        nextPageButton.isVisible = reviewComments.isNextPage
+        nextPageButton.isVisible = updatedReviewComments.hasNextPage
       }
     }
 
@@ -793,6 +798,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
     infoPanel.add(JLabel().also { myVersion2 = it })
     infoPanel.add(JLabel().also { date = it })
     infoPanel.add(JLabel().also { mySize = it })
+    infoPanel.add(JLabel().also { myPluginId = it })
     infoPanel.add(createRequiredPluginsComponent().also { requiredPlugins = it }, VerticalLayout.FILL_HORIZONTAL)
 
     rating!!.foreground = ListPluginComponent.GRAY_COLOR
@@ -800,6 +806,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
     myVersion2!!.foreground = ListPluginComponent.GRAY_COLOR
     date!!.foreground = ListPluginComponent.GRAY_COLOR
     mySize!!.foreground = ListPluginComponent.GRAY_COLOR
+    myPluginId!!.foreground = ListPluginComponent.GRAY_COLOR
 
     if (isMarketplace && ApplicationManager.getApplication().isInternal) {
       infoPanel.add(JLabel().also { customRepoForDebug = it })
@@ -1036,6 +1043,10 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
       myVersion2!!.isVisible = isVersion
     }
 
+    if (myPluginId != null) {
+      myPluginId!!.text = IdeBundle.message("plugins.configurable.additional.info.plugin.id.label", pluginModel.pluginId)
+    }
+
     val tags = pluginModel.calculateTags(this@PluginDetailsPageComponent.pluginModel.getModel().sessionId)
 
     tagPanel!!.setTags(tags)
@@ -1047,9 +1058,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
     else {
       val node = installedPluginMarketplaceNode
       updateMarketplaceTabsVisible(node != null)
-      if (node != null) {
-        showMarketplaceData(node)
-      }
+      showMarketplaceData(node)
       updateEnabledForProject()
     }
 
@@ -1161,13 +1170,6 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
         updateReviews(model)
       }
 
-      updateUrlComponent(forumUrl, "plugins.configurable.forum.url", model.forumUrl)
-      updateUrlComponent(licenseUrl, "plugins.configurable.license.url", model.licenseUrl)
-      updateUrlComponent(bugtrackerUrl, "plugins.configurable.bugtracker.url", model.bugtrackerUrl)
-      updateUrlComponent(documentationUrl, "plugins.configurable.documentation.url", model.documentationUrl)
-      updateUrlComponent(sourceCodeUrl, "plugins.configurable.source.code", model.sourceCodeUrl)
-      updateUrlComponent(pluginReportUrl, "plugins.configurable.report.marketplace.plugin", model.reportPluginUrl)
-
       vendorInfoPanel!!.show(model)
 
       requiredPluginNames = model.dependencyNames ?: emptyList()
@@ -1178,6 +1180,16 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
         customRepoForDebug!!.isVisible = customRepo != null
       }
     }
+    else {
+      vendorInfoPanel!!.show(null)
+    }
+
+    updateUrlComponent(forumUrl, "plugins.configurable.forum.url", model?.forumUrl)
+    updateUrlComponent(licenseUrl, "plugins.configurable.license.url", model?.licenseUrl)
+    updateUrlComponent(bugtrackerUrl, "plugins.configurable.bugtracker.url", model?.bugtrackerUrl)
+    updateUrlComponent(documentationUrl, "plugins.configurable.documentation.url", model?.documentationUrl)
+    updateUrlComponent(sourceCodeUrl, "plugins.configurable.source.code", model?.sourceCodeUrl)
+    updateUrlComponent(pluginReportUrl, "plugins.configurable.report.marketplace.plugin", model?.reportPluginUrl)
 
     this.rating!!.text = IdeBundle.message("plugins.configurable.rate.0", rating)
     this.rating!!.isVisible = rating != null
@@ -1197,11 +1209,10 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
     if (!show && reviewPanel != null) {
       reviewPanel!!.clear()
     }
-    if (!show && tabbedPane!!.selectedIndex > 1) {
+    if (!show && tabbedPane!!.selectedIndex == 2) {
       tabbedPane!!.selectedIndex = 0
     }
     tabbedPane!!.setEnabledAt(2, show) // review
-    tabbedPane!!.setEnabledAt(3, show) // additional info
   }
 
   private val installedPluginMarketplaceNode: PluginUiModel?
@@ -1217,7 +1228,7 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
 
     reviewNextPageButton!!.icon = null
     reviewNextPageButton!!.isEnabled = true
-    reviewNextPageButton!!.isVisible = comments != null && comments.isNextPage
+    reviewNextPageButton!!.isVisible = comments != null && comments.hasNextPage
   }
 
   private fun createUninstallAction(): UninstallAction<PluginDetailsPageComponent> {
@@ -1227,6 +1238,9 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
       { obj: PluginDetailsPageComponent -> obj.descriptorForActions },
       {
         scheduleNotificationsUpdate()
+        descriptorForActions?.let {
+          PluginUpdateSourceService.getInstance().erasePluginUpdateSourceId(it.pluginId)
+        }
       })
   }
 
@@ -1612,10 +1626,13 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
   }
 
   private fun installOrUpdatePlugin() {
+    val pluginUpdateSourceApplier = PluginUpdateSourceApplier(plugin!!)
     coroutineScope.launch(Dispatchers.EDT + ModalityState.stateForComponent(this).asContextElement()) {
+      pluginUpdateSourceApplier.applyPluginUpdateSourceId()
       val modalityState = ModalityState.stateForComponent(installButton!!.getComponent())
-      pluginModel.installOrUpdatePlugin(this@PluginDetailsPageComponent, plugin!!, null, modalityState)
-    }
+      val result = pluginModel.installOrUpdatePlugin(this@PluginDetailsPageComponent, plugin!!, null, modalityState)
+      pluginUpdateSourceApplier.applyPluginUpdateSourcesBasedOnResult(result)
+    }.invokeOnCompletion(pluginUpdateSourceApplier::revertIfNeeded)
   }
 
   private fun updateEnableForNameAndIcon() {
@@ -1750,19 +1767,16 @@ class PluginDetailsPageComponent @JvmOverloads constructor(
 }
 
 @ApiStatus.Internal
-@IntellijInternalApi
 suspend fun loadPluginDetails(model: PluginUiModel): PluginUiModel? {
   return UiPluginManager.getInstance().loadPluginDetails(model)
 }
 
 @ApiStatus.Internal
-@IntellijInternalApi
 fun loadAllPluginDetailsSync(existingModel: PluginUiModel, targetModel: PluginUiModel): PluginUiModel? {
   return runBlockingCancellable { loadAllPluginDetails(existingModel, targetModel) }
 }
 
 @ApiStatus.Internal
-@IntellijInternalApi
 suspend fun loadAllPluginDetails(existingModel: PluginUiModel, targetModel: PluginUiModel): PluginUiModel? {
   if (!existingModel.suggestedFeatures.isEmpty()) {
     targetModel.suggestedFeatures = existingModel.suggestedFeatures
@@ -1783,17 +1797,13 @@ suspend fun loadAllPluginDetails(existingModel: PluginUiModel, targetModel: Plug
 }
 
 @ApiStatus.Internal
-@IntellijInternalApi
 suspend fun loadReviews(existingModel: PluginUiModel): PluginUiModel? {
-  val reviewComments = ReviewsPageContainer(20, 0)
-  val reviews = UiPluginManager.getInstance().loadPluginReviews(existingModel.pluginId, reviewComments.getNextPage()) ?: emptyList()
-  reviewComments.addItems(reviews)
-  existingModel.reviewComments = reviewComments
+  val reviews = UiPluginManager.getInstance().loadPluginReviews(existingModel.pluginId, 1) ?: emptyList()
+  existingModel.reviewComments = ReviewsPageContainer.firstPage(reviews)
   return existingModel
 }
 
 @ApiStatus.Internal
-@IntellijInternalApi
 suspend fun loadDependencyNames(targetModel: PluginUiModel): PluginUiModel? {
   val resultNode = targetModel
   val pluginIds = resultNode.dependencies

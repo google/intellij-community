@@ -89,15 +89,16 @@ class SimpleLocalChangeListDiffViewer(context: DiffContext,
     val titles = super.createTitles()
     assert(titles.size == 2)
 
-    val titleWithCheckbox = JBUI.Panels.simplePanel()
+    val titleWithCheckbox = JBUI.Panels.simplePanel(4, 0).andTransparent()
+    titleWithCheckbox.setName("Side-by-Side Local Change List Diff Editor Title Panel")
     if (titles[1] != null) titleWithCheckbox.addToCenter(titles[1])
     titleWithCheckbox.addToLeft(excludeAllCheckboxPanel)
 
     return Arrays.asList(titles[0], titleWithCheckbox)
   }
 
-  override fun createEditorPopupActions(): List<AnAction> {
-    return super.createEditorPopupActions() +
+  override fun createEditorPopupChangesActions(): List<AnAction> {
+    return super.createEditorPopupChangesActions() +
            createTrackerEditorPopupActions(trackerActionProvider)
   }
 

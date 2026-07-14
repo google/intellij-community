@@ -3,7 +3,6 @@
 package org.jetbrains.kotlin.idea.fir.imports;
 
 import com.intellij.testFramework.TestDataPath;
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode;
 import org.jetbrains.kotlin.idea.base.test.TestRoot;
 import org.jetbrains.kotlin.idea.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils;
@@ -25,12 +24,6 @@ public abstract class K2JvmOptimizeImportsTestGenerated extends AbstractK2JvmOpt
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/editor/optimizeImports/jvm/allUnderImports")
         public static class AllUnderImports extends AbstractK2JvmOptimizeImportsTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -149,12 +142,6 @@ public abstract class K2JvmOptimizeImportsTestGenerated extends AbstractK2JvmOpt
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/editor/optimizeImports/jvm")
         public static class Uncategorized extends AbstractK2JvmOptimizeImportsTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -357,14 +344,18 @@ public abstract class K2JvmOptimizeImportsTestGenerated extends AbstractK2JvmOpt
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/editor/optimizeImports/common/basic")
         public static class Basic extends AbstractK2JvmOptimizeImportsTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("OperationReferenceFromObjectSuperInterface_Infix.kt")
+            public void testOperationReferenceFromObjectSuperInterface_Infix() throws Exception {
+                runTest("../../idea/tests/testData/editor/optimizeImports/common/basic/OperationReferenceFromObjectSuperInterface_Infix.kt");
+            }
+
+            @TestMetadata("OperationReferenceFromObjectSuperInterface_Operator.kt")
+            public void testOperationReferenceFromObjectSuperInterface_Operator() throws Exception {
+                runTest("../../idea/tests/testData/editor/optimizeImports/common/basic/OperationReferenceFromObjectSuperInterface_Operator.kt");
             }
 
             @TestMetadata("TypealiasedObject_InvokeFunction.kt")
@@ -476,19 +467,33 @@ public abstract class K2JvmOptimizeImportsTestGenerated extends AbstractK2JvmOpt
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/editor/optimizeImports/common/contextSensitiveResolution")
         public static class ContextSensitiveResolution extends AbstractK2JvmOptimizeImportsTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("AliasEnumEntryImport.kt")
+            public void testAliasEnumEntryImport() throws Exception {
+                runTest("../../idea/tests/testData/editor/optimizeImports/common/contextSensitiveResolution/AliasEnumEntryImport.kt");
             }
 
             @TestMetadata("EnumConstants.kt")
             public void testEnumConstants() throws Exception {
                 runTest("../../idea/tests/testData/editor/optimizeImports/common/contextSensitiveResolution/EnumConstants.kt");
+            }
+
+            @TestMetadata("ExplicitEnumEntryImportCanBeRemoved.kt")
+            public void testExplicitEnumEntryImportCanBeRemoved() throws Exception {
+                runTest("../../idea/tests/testData/editor/optimizeImports/common/contextSensitiveResolution/ExplicitEnumEntryImportCanBeRemoved.kt");
+            }
+
+            @TestMetadata("ExplicitEnumEntryImportWithoutContextSensitiveResolution.kt")
+            public void testExplicitEnumEntryImportWithoutContextSensitiveResolution() throws Exception {
+                runTest("../../idea/tests/testData/editor/optimizeImports/common/contextSensitiveResolution/ExplicitEnumEntryImportWithoutContextSensitiveResolution.kt");
+            }
+
+            @TestMetadata("ExplicitSealedSubclassImportConflictsWithSameFileClass.kt")
+            public void testExplicitSealedSubclassImportConflictsWithSameFileClass() throws Exception {
+                runTest("../../idea/tests/testData/editor/optimizeImports/common/contextSensitiveResolution/ExplicitSealedSubclassImportConflictsWithSameFileClass.kt");
             }
 
             @TestMetadata("FromCompanionObject.kt")
@@ -505,12 +510,6 @@ public abstract class K2JvmOptimizeImportsTestGenerated extends AbstractK2JvmOpt
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/editor/optimizeImports/common/kDoc")
         public static class KDoc extends AbstractK2JvmOptimizeImportsTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -579,12 +578,6 @@ public abstract class K2JvmOptimizeImportsTestGenerated extends AbstractK2JvmOpt
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/editor/optimizeImports/common/kt21515")
         public static class Kt21515 extends AbstractK2JvmOptimizeImportsTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -618,12 +611,6 @@ public abstract class K2JvmOptimizeImportsTestGenerated extends AbstractK2JvmOpt
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/editor/optimizeImports/common")
         public static class Uncategorized extends AbstractK2JvmOptimizeImportsTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }

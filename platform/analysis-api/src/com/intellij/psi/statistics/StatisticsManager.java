@@ -1,9 +1,11 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.statistics;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.KeyedExtensionCollector;
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -21,6 +23,7 @@ public abstract class StatisticsManager {
    */
   public static final int RECENCY_OBLIVION_THRESHOLD = 10000;
 
+  @SuppressWarnings("rawtypes")
   public static final KeyedExtensionCollector<Statistician, Key> COLLECTOR = new KeyedExtensionCollector<>("com.intellij.statistician");
 
   public static @Nullable <T, Loc> StatisticsInfo serialize(Key<? extends Statistician<T, Loc>> key, T element, Loc location) {
@@ -74,4 +77,12 @@ public abstract class StatisticsManager {
    * @return infos by this context ordered by usage time: recent first
    */
   public abstract StatisticsInfo[] getAllValues(@NonNls String context);
+
+  /**
+   * Drops all collected statistics (both in-memory and persisted). Intended for internal/diagnostic use only,
+   * e.g. to get deterministic completion ordering while testing.
+   */
+  @ApiStatus.Internal
+  @RequiresBackgroundThread
+  public void clearStatistics() { }
 }

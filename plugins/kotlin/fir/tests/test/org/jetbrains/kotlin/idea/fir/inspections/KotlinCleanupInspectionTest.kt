@@ -6,8 +6,10 @@ import com.intellij.codeInspection.InspectionManager
 import com.intellij.codeInspection.ex.GlobalInspectionContextBase
 import com.intellij.profile.codeInspection.InspectionProjectProfileManager
 import com.intellij.testFramework.LightProjectDescriptor
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode
 import org.jetbrains.kotlin.idea.base.test.TestRoot
+import org.jetbrains.kotlin.idea.codeInsight.inspections.SortModifiersInspection
+import org.jetbrains.kotlin.idea.codeInsight.inspections.KotlinCleanupInspection
+import org.jetbrains.kotlin.idea.codeInsight.inspections.diagnosticBased.RedundantModalityModifierInspection
 import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCase
 import org.jetbrains.kotlin.idea.test.KotlinWithJdkAndRuntimeLightProjectDescriptor
 import org.jetbrains.kotlin.test.TestMetadata
@@ -18,11 +20,13 @@ import org.junit.runner.RunWith
 @TestMetadata("testData/inspections/cleanup")
 @RunWith(JUnit38ClassRunner::class)
 class KotlinCleanupInspectionTest : KotlinLightCodeInsightFixtureTestCase() {
-    override val pluginMode: KotlinPluginMode = KotlinPluginMode.K2
 
     override fun getProjectDescriptor(): LightProjectDescriptor = KotlinWithJdkAndRuntimeLightProjectDescriptor.getInstance()
 
     private fun doTest(dir: String, result: String, vararg files: String) {
+        myFixture.enableInspections(KotlinCleanupInspection::class.java)
+        myFixture.enableInspections(SortModifiersInspection::class.java)
+        myFixture.enableInspections(RedundantModalityModifierInspection::class.java)
         myFixture.configureByFiles(*files.map { "$dir/$it" }.toTypedArray())
 
         val project = myFixture.project
@@ -35,13 +39,11 @@ class KotlinCleanupInspectionTest : KotlinLightCodeInsightFixtureTestCase() {
         myFixture.checkResultByFile("$dir/$result")
     }
 
-    // IGNORE_K2 KTIJ-38163
-    fun _testBasic() {
-        doTest("basic", "basic.kt.after", "basic.kt", "JavaAnn.java", "deprecatedSymbols.kt")
+    fun testBasic() {
+        doTest("basic", "basic.kt.after.k2", "basic.kt", "JavaAnn.java", "deprecatedSymbols.kt")
     }
 
-    // IGNORE_K2 KTIJ-38163
-    fun _testExpressionWithMultipleDeprecatedCalls() {
+    fun testExpressionWithMultipleDeprecatedCalls() {
         doTest(
             "expressionWithMultipleDeprecatedCalls",
             "expressionWithMultipleDeprecatedCalls.kt.after",

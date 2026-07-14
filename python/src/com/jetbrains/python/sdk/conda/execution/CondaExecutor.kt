@@ -3,7 +3,6 @@ package com.jetbrains.python.sdk.conda.execution
 
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.projectRoots.Sdk
-import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.platform.eel.isWindows
 import com.intellij.platform.eel.provider.osFamily
 import com.intellij.python.community.execService.BinOnEel
@@ -25,7 +24,7 @@ import com.jetbrains.python.packaging.common.PythonPackage
 import com.jetbrains.python.sdk.conda.execution.models.CondaEnvInfo
 import com.jetbrains.python.sdk.flavors.conda.PyCondaEnvIdentity
 import com.jetbrains.python.sdk.flavors.conda.PyCondaFlavorData
-import com.jetbrains.python.sdk.getOrCreateAdditionalData
+import com.jetbrains.python.sdk.pySdkAdditionalData
 import com.jetbrains.python.sdk.runExecutableWithProgress
 import com.jetbrains.python.sdk.targetEnvConfiguration
 import org.jetbrains.annotations.ApiStatus
@@ -40,9 +39,8 @@ import kotlin.io.path.pathString
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
-@OptIn(IntellijInternalApi::class)
 @ApiStatus.Internal
-object CondaExecutor {
+internal object CondaExecutor {
   suspend fun createNamedEnv(binaryToExec: BinaryToExec, envName: String, pythonVersion: String): PyResult<Unit> {
     val args = listOf("create", "-y", "-n", envName, "python=${pythonVersion}")
     return runConda(
@@ -232,9 +230,9 @@ object CondaExecutor {
 
 
 @ApiStatus.Internal
-fun Sdk.getCondaBinToExecute(): BinaryToExec {
+internal fun Sdk.getCondaBinToExecute(): BinaryToExec {
   val targetConfig = targetEnvConfiguration
-  val pathOnTarget = (getOrCreateAdditionalData().flavorAndData.data as PyCondaFlavorData).env.fullCondaPathOnTarget
+  val pathOnTarget = (pySdkAdditionalData.flavorAndData.data as PyCondaFlavorData).env.fullCondaPathOnTarget
 
   val binToExec = when (targetConfig) {
     null -> BinOnEel(Path(pathOnTarget))

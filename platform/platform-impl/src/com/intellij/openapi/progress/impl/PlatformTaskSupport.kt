@@ -6,6 +6,7 @@ import com.intellij.concurrency.resetThreadContext
 import com.intellij.ide.IdeBundle
 import com.intellij.ide.IdeEventQueue
 import com.intellij.ide.consumeUnrelatedEvent
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.UI
@@ -15,6 +16,7 @@ import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.application.impl.JobProvider
 import com.intellij.openapi.application.impl.inModalContext
 import com.intellij.openapi.application.isModalAwareContext
+import com.intellij.openapi.application.runReadActionBlocking
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.trace
 import com.intellij.openapi.progress.CeProcessCanceledException
@@ -35,7 +37,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.impl.DialogWrapperPeerImpl.isHeadlessEnv
 import com.intellij.openapi.util.EmptyRunnable
-import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.NlsContexts.ModalProgressTitle
 import com.intellij.openapi.util.NlsContexts.ProgressTitle
 import com.intellij.openapi.util.registry.Registry
@@ -364,7 +365,6 @@ class PlatformTaskSupport(private val cs: CoroutineScope) : TaskSupport {
     }
   }
 
-  @OptIn(IntellijInternalApi::class)
   private fun <T> CoroutineScope.runWithModalProgressBlockingInternal(
     dispatcher: CoroutineDispatcher?,
     descriptor: ModalIndicatorDescriptor,
@@ -375,7 +375,11 @@ class PlatformTaskSupport(private val cs: CoroutineScope) : TaskSupport {
       val dispatcherCtx = dispatcher ?: EmptyCoroutineContext
       val modalityContext = newModalityState.asContextElement()
       val pipe = cs.createProgressPipe()
-      val (permitCtx, cleanup) = getLockPermitContext(true)
+      val (permitCtx, cleanup) = if (ApplicationManager.getApplication().isWriteAccessAllowed) {
+        runReadActionBlocking { getLockPermitContext(true) }
+      } else {
+        getLockPermitContext(true)
+      }
       val taskJob = async(dispatcherCtx + modalityContext + permitCtx) {
         progressStarted(descriptor.title, descriptor.cancellation, pipe.progressUpdates())
         // an unhandled exception in `async` can kill the entire computation tree

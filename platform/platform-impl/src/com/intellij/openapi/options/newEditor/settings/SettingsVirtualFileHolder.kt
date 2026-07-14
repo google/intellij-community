@@ -47,7 +47,6 @@ import com.intellij.util.application
 import com.intellij.util.concurrency.SynchronizedClearableLazy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
 import org.jetbrains.concurrency.Promise
 import org.jetbrains.concurrency.resolvedPromise
@@ -57,7 +56,6 @@ import java.util.concurrent.atomic.AtomicReference
 import java.util.function.Function
 import javax.swing.JComponent
 
-@ApiStatus.Internal
 @Service(Level.PROJECT)
 internal class SettingsVirtualFileHolder private constructor(private val project: Project) {
   companion object {
@@ -205,7 +203,6 @@ internal class SettingsVirtualFileHolder private constructor(private val project
       val group = ConfigurableExtensionPointUtil.getConfigurableGroup(project, /* withIdeSettings = */true)
         .takeIf { !it.configurables.isEmpty() }
       val configurableToSelect = ConfigurableVisitor.findById(configurableId, listOf(group)) ?: return
-      settingsEditor.setNavigatingNow()
       settingsEditor.select(configurableToSelect)
     }
   }

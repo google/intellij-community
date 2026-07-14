@@ -1,13 +1,12 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.base.fir.analysisApiPlatform.sessions
 
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.components.resolveToCall
-import org.jetbrains.kotlin.analysis.api.resolution.successfulFunctionCallOrNull
+import org.jetbrains.kotlin.analysis.api.components.resolveCall
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.analyzeInModalWindow
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode
 import org.jetbrains.kotlin.idea.test.AbstractMultiModuleTest
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtFile
@@ -28,9 +27,6 @@ import java.io.File
 class CyclicDependenciesSymbolResolutionTest : AbstractMultiModuleTest() {
 
     override fun getTestDataDirectory(): File = error("Should not be called")
-
-    override val pluginMode: KotlinPluginMode
-        get() = KotlinPluginMode.K2
 
     fun `test that function symbols from cyclic dependencies can be resolved`() {
         val moduleA = createModuleInTmpDir("a") {
@@ -65,6 +61,7 @@ class CyclicDependenciesSymbolResolutionTest : AbstractMultiModuleTest() {
 
     private fun KtNamedFunction.getBodyCallExpression(): KtCallExpression = bodyExpression!! as KtCallExpression
 
+    @OptIn(KaExperimentalApi::class)
     context(_: KaSession)
     private fun KtCallExpression.assertCalleeNameAndType(file: KtFile, expectedName: String, expectedType: KaType) {
         val ktFunction = file.declarations.first() as KtNamedFunction
@@ -73,7 +70,7 @@ class CyclicDependenciesSymbolResolutionTest : AbstractMultiModuleTest() {
         val ktCallee = ktCall.calleeExpression as KtSimpleNameExpression
         Assert.assertEquals(expectedName, ktCallee.getReferencedName())
 
-        val callableSymbol = ktCall.resolveToCall()!!.successfulFunctionCallOrNull()!!.symbol
+        val callableSymbol = ktCall.resolveCall()!!.symbol
         Assert.assertEquals(expectedType, callableSymbol.returnType)
     }
 }

@@ -135,6 +135,13 @@ interface WorkspaceFileIndexEx : WorkspaceFileIndex {
   
   @ApiStatus.Internal
   fun reset()
+
+  /**
+   * Use [isIndexable]
+   */
+  @ApiStatus.Internal
+  @RequiresReadLock
+  fun isUrlIndexableRecursiveFileSetRoot(url: String): Boolean
 }
 
 internal class WorkspaceFileIndexCleaner: PersistentFsConnectionListener {

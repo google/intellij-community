@@ -9,8 +9,8 @@
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="25" />
-            <stringArg name="apiVersion" arg="2.3" />
-            <stringArg name="languageVersion" arg="2.3" />
+            <stringArg name="apiVersion" arg="2.4" />
+            <stringArg name="languageVersion" arg="2.4" />
           </stringArguments>
           <arrayArguments>
             <arrayArg name="pluginClasspaths">
@@ -39,13 +39,13 @@
     <orderEntry type="module" module-name="intellij.libraries.jackson.databind" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.jackson.module.kotlin" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinTestAssertionsCoreJvm" scope="TEST" />
-    <orderEntry type="library" scope="TEST" name="JUnit5" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.junit5" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.mockito" scope="TEST" />
     <orderEntry type="library" scope="TEST" name="mockito-junit-jupiter" level="project" />
     <orderEntry type="module" module-name="intellij.platform.diagnostic.telemetry" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.diagnostic.telemetry.exporters" scope="TEST" />
-    <orderEntry type="library" scope="TEST" name="opentelemetry" level="project" />
-    <orderEntry type="library" scope="TEST" name="opentelemetry-semconv" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.opentelemetry" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.opentelemetry.semconv" scope="TEST" />
     <orderEntry type="module" module-name="intellij.tools.ide.util.common" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.serialization.core" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.serialization.json" scope="TEST" />

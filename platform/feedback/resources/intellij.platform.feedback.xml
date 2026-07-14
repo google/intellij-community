@@ -1,5 +1,21 @@
-<!-- todo: register this as a content module (IJPL-210868); currently it's included via 'xi:include' tag -->
-<idea-plugin>
+<idea-plugin visibility="public">
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+  <dependencies>
+    <module name="intellij.libraries.kotlinx.datetime"/>
+    <module name="intellij.libraries.kotlinx.serialization.core"/>
+    <module name="intellij.libraries.kotlinx.serialization.json"/>
+    <module name="intellij.platform.core"/>
+    <module name="intellij.platform.core.impl"/>
+    <module name="intellij.platform.core.ui"/>
+    <module name="intellij.platform.editor.ui"/>
+    <module name="intellij.platform.ide.core"/>
+    <module name="intellij.platform.ide.impl"/>
+    <module name="intellij.platform.lang"/>
+    <module name="intellij.platform.projectModel"/>
+    <module name="intellij.platform.statistics"/>
+    <module name="intellij.platform.util.ui"/>
+  </dependencies>
+  <!-- endregion -->
   <extensionPoints>
     <extensionPoint qualifiedName="com.intellij.feedback.idleFeedbackSurvey" interface="com.intellij.platform.feedback.FeedbackSurvey"
                     dynamic="true"/>
@@ -51,7 +67,7 @@
     <applicationService serviceImplementation="com.intellij.platform.feedback.editor.smoothcaret.SmoothCaretUsageLocalStorage"/>
 
     <feedback.idleFeedbackSurvey implementation="com.intellij.platform.feedback.editor.ux.EditorUxFeedbackSurvey"/>
-    <registryKey key="editor.ux.survey.enabled" defaultValue="true" description="Enables Editor UX survey for 10% users"/>
+    <registryKey key="editor.ux.survey.enabled" defaultValue="false" description="Enables Editor UX survey for 10% users"/>
 
     <registryKey key="csat.survey.enabled" defaultValue="true" description="Enables periodic CSAT survey"/>
     <registryKey key="csat.survey.today" defaultValue="" description="ISO Formatted today date such as 2011-12-03"/>

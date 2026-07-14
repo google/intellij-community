@@ -1,13 +1,9 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.util;
 
-import com.intellij.openapi.util.SystemInfoRt;
 import com.intellij.util.containers.CollectionFactory;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.system.OS;
-import kotlinx.coroutines.CompletableDeferred;
-import kotlinx.coroutines.CompletableDeferredKt;
-import kotlinx.coroutines.future.FutureKt;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -27,6 +23,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -34,45 +31,7 @@ public final class EnvironmentUtil {
   private static final String DESKTOP_STARTUP_ID = "DESKTOP_STARTUP_ID";
   private static final String MAC_OS_LOCALE_PATH = "/usr/share/locale";
 
-  /** @deprecated primitive well-known constant; inline */
-  @Deprecated
-  @ApiStatus.ScheduledForRemoval
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  public static final String DISABLE_OMZ_AUTO_UPDATE = "DISABLE_AUTO_UPDATE";
-  /** @deprecated primitive well-known constant; inline */
-  @Deprecated
-  @ApiStatus.ScheduledForRemoval
-  public static final String BASH_EXECUTABLE_NAME = "bash";
-  /** @deprecated primitive well-known constant; inline */
-  @Deprecated
-  @ApiStatus.ScheduledForRemoval
-  public static final String SHELL_VARIABLE_NAME = "SHELL";
-  /** @deprecated primitive well-known constant; inline */
-  @Deprecated
-  @ApiStatus.ScheduledForRemoval
-  public static final String SHELL_LOGIN_ARGUMENT = "-l";
-  /** @deprecated primitive well-known constant; inline */
-  @Deprecated
-  @ApiStatus.ScheduledForRemoval
-  public static final String SHELL_COMMAND_ARGUMENT = "-c";
-  /** @deprecated non-standard command (POSIX specifies '.'); do not use */
-  @Deprecated
-  @ApiStatus.ScheduledForRemoval
-  public static final String SHELL_SOURCE_COMMAND = "source";
-  /** @deprecated primitive well-known constant; inline */
-  @Deprecated
-  @ApiStatus.ScheduledForRemoval
-  public static final String SHELL_ENV_COMMAND = "/usr/bin/env";
-  /** @deprecated primitive well-known constant; inline */
-  @Deprecated
-  @ApiStatus.ScheduledForRemoval
-  public static final String ENV_ZERO_ARGUMENT = "-0";
-  /** @deprecated implementation detail; do not use */
-  @Deprecated
-  @ApiStatus.ScheduledForRemoval
-  public static final String MacOS_LOADER_BINARY = "printenv";
-
-  private static final AtomicReference<CompletableDeferred<Map<String, String>>> ourEnvGetter = new AtomicReference<>();
+  private static final AtomicReference<Supplier<Map<String, String>>> ourEnvLoader = new AtomicReference<>();
 
   private EnvironmentUtil() { }
 
@@ -82,43 +41,35 @@ public final class EnvironmentUtil {
    * <p>On Windows, the returned map is case-insensitive (i.e. {@code map.get("Path") == map.get("PATH")} holds).</p>
    *
    * <p>On macOS, things are complicated.<br/>
-   * An app launched by a GUI launcher (Finder, Dock, Spotlight etc.) receives a pretty empty and useless environment,
+   * An app launched by a GUI launcher (Finder, Dock, Spotlight, etc.) receives a pretty empty and useless environment,
    * since standard Unix ways of setting variables via e.g. {@code ~/.profile} do not work. What's more important, there are no
    * sane alternatives. This causes a lot of user complaints about tools working in a terminal not working when launched
    * from the IDE. To ease their pain, the IDE loads a shell environment
    * (see {@link com.intellij.platform.ide.bootstrap.StartupUtil#shouldLoadShellEnv} for gory details)
    * and returns it as the result.<br/>
-   * And one more thing (c): locale variables on macOS are usually set by a terminal app - meaning they are missing
+   * And one more thing (c): a terminal app usually sets locale variables on macOS - meaning they are missing
    * even from a shell environment above. This again causes user complaints about tools being unable to output anything
-   * outside ASCII range when launched from the IDE. Resolved by adding LC_CTYPE variable to the map if it doesn't contain
+   * outside the ASCII range when launched from the IDE. Resolved by adding the 'LC_CTYPE' variable to the map if it doesn't contain
    * explicitly set locale variables (LANG/LC_ALL/LC_CTYPE).<br/>
    * <b>Note:</b> this call may block until the environment is loaded.</p>
    *
    * @return unmodifiable map of the process environment.
    */
   public static @NotNull Map<String, String> getEnvironmentMap() {
-    CompletableDeferred<Map<String, String>> getter = ourEnvGetter.get();
-    if (getter == null) {
-      getter = CompletableDeferredKt.CompletableDeferred(getSystemEnv());
-      if (!ourEnvGetter.compareAndSet(null, getter)) {
-        getter = ourEnvGetter.get();
+    Supplier<Map<String, String>> envLoader = ourEnvLoader.get();
+    if (envLoader == null) {
+      Map<String, String> systemEnv = getSystemEnv();
+      envLoader = () -> systemEnv;
+      if (!ourEnvLoader.compareAndSet(null, envLoader)) {
+        envLoader = ourEnvLoader.get();
       }
     }
-    try {
-      Map<String, String> result = getter.isCompleted() ? getter.getCompleted() : FutureKt.asCompletableFuture(getter).join();
-      if (result.isEmpty()) {
-        ourEnvGetter.set(CompletableDeferredKt.CompletableDeferred(result = getSystemEnv()));  // loading failed
-      }
-      return result;
-    }
-    catch (Throwable t) {
-      throw new AssertionError(t);  // unknown state; not expected to happen
-    }
+    return envLoader.get();
   }
 
   @ApiStatus.Internal
-  public static void setEnvironmentLoader(@NotNull CompletableDeferred<Map<String, String>> loader) {
-    ourEnvGetter.set(loader);
+  public static void setEnvironmentLoader(@NotNull Supplier<Map<String, String>> loader) {
+    ourEnvLoader.set(loader);
   }
 
   @ApiStatus.Internal
@@ -232,7 +183,7 @@ public final class EnvironmentUtil {
 
   public static void inlineParentOccurrences(@NotNull Map<String, String> envs, @NotNull Map<String, String> parentEnv) {
     // On Windows, names of environment variables are case-insensitive. On UNIX, names are case-sensitive.
-    Comparator<String> keyComparator = SystemInfoRt.isWindows ? String.CASE_INSENSITIVE_ORDER : Comparator.naturalOrder();
+    Comparator<String> keyComparator = OS.CURRENT == OS.Windows ? String.CASE_INSENSITIVE_ORDER : Comparator.naturalOrder();
     Map<String, String> lookup = new TreeMap<>(keyComparator);
     lookup.putAll(envs);
     lookup.putAll(parentEnv);
@@ -252,18 +203,5 @@ public final class EnvironmentUtil {
         lookup.put(key, value);
       }
     }
-  }
-
-  @SuppressWarnings({"IO_FILE_USAGE", "UnnecessaryFullyQualifiedName"})
-  public static boolean containsEnvKeySubstitution(final String envKey, final String val) {
-    return ArrayUtil.find(val.split(java.io.File.pathSeparator), "$" + envKey + "$") != -1;
-  }
-
-  @ApiStatus.Internal
-  @SuppressWarnings({"IO_FILE_USAGE", "UnnecessaryFullyQualifiedName"})
-  public static void appendSearchPath(@NotNull Map<String, String> env, @NotNull String envName, @NotNull String pathToAppend) {
-    String currentPath = env.get(envName);
-    String newPath = currentPath != null ? currentPath + java.io.File.pathSeparator + pathToAppend : pathToAppend;
-    env.put(envName, newPath);
   }
 }

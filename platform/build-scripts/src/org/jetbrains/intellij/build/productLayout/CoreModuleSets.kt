@@ -7,7 +7,7 @@ package org.jetbrains.intellij.build.productLayout
  * Core platform module sets forming the foundation of IntelliJ products.
  *
  * This file contains the base module sets that provide the platform infrastructure:
- * - **libraries***: Library modules (platform, IDE, ktor, misc)
+ * - **libraries***: Library modules (platform, IDE, ktor, Jackson)
  * - **corePlatform**: Base platform without IDE (for analysis tools)
  * - **coreIde**: Platform + basic IDE functionality
  * - **coreLang**: Platform + IDE + language support
@@ -119,15 +119,33 @@ object CoreModuleSets {
     embeddedModule("intellij.libraries.protobuf")
     embeddedModule("intellij.libraries.proxy.vole")
     embeddedModule("intellij.libraries.rhino")
+    embeddedModule("intellij.libraries.semver")
     embeddedModule("intellij.libraries.snakeyaml")
     embeddedModule("intellij.libraries.snakeyaml.engine")
     embeddedModule("intellij.libraries.stream")
     embeddedModule("intellij.libraries.velocity")
     embeddedModule("intellij.libraries.xtext.xbase")
     embeddedModule("intellij.libraries.xz")
-    // Temporary embedded while opentelemetry-exporter-otlp-common library remains embedded due to a dependency (IJPL-233394)
+
+    embeddedModule("intellij.libraries.opentelemetry")
+    embeddedModule("intellij.libraries.opentelemetry.extension.kotlin")
+    embeddedModule("intellij.libraries.opentelemetry.exporter.otlp.common")
+    embeddedModule("intellij.libraries.opentelemetry.semconv")
     embeddedModule("intellij.libraries.opentelemetry.sdk.autoconfigure.spi")
     embeddedModule("intellij.libraries.opentelemetry.exporter.sender.jdk")
+  }
+
+  /**
+   * Eclipse LSP4J library wrapper modules used by LSP and DAP support.
+   *
+   * Kept separate from `librariesPlatform()` because LSP4J is not a universal platform dependency.
+   * Kept embedded because LSP support modules are embedded.
+   */
+  fun librariesLsp4j(): ModuleSet = moduleSet("libraries.lsp4j", outputModule = "intellij.platform.lsp") {
+    embeddedModule("intellij.libraries.eclipse.lsp4j")
+    embeddedModule("intellij.libraries.eclipse.lsp4j.debug")
+    embeddedModule("intellij.libraries.eclipse.lsp4j.jsonrpc")
+    embeddedModule("intellij.libraries.eclipse.lsp4j.jsonrpc.debug")
   }
 
   /**
@@ -148,7 +166,6 @@ object CoreModuleSets {
     module("intellij.libraries.jackson.dataformat.toml")
 
     module("intellij.libraries.jackson.datatype.jdk8")
-    module("intellij.libraries.jackson.datatype.joda")
     module("intellij.libraries.jackson.datatype.jsr310")
 
     embeddedModule("intellij.libraries.jackson.module.kotlin")
@@ -179,7 +196,6 @@ object CoreModuleSets {
    * **Note:** Image libraries (imgscalr, jsvg) are in `librariesPlatform()` as they're needed by `platform.util.ui`
    */
   fun librariesIde(): ModuleSet = moduleSet("libraries.ide") {
-    embeddedModule("intellij.libraries.jcef")
     embeddedModule("intellij.libraries.jediterm.core")
     embeddedModule("intellij.libraries.jediterm.ui")
     embeddedModule("intellij.libraries.jgoodies.common")
@@ -212,45 +228,6 @@ object CoreModuleSets {
     embeddedModule("intellij.libraries.ktor.client.cio")
   }
 
-  /**
-   * Miscellaneous library modules for specialized use cases.
-   *
-   * **Note:** All libs here must NOT be embedded. If embedded, move to `librariesPlatform()` or `librariesIde()`.
-   *
-   * **Typical use cases:** XML-RPC communication, CSV parsing, document storage
-   * **Usage pattern:** Product-specific, not universally needed by all products
-   */
-  fun librariesMisc(): ModuleSet = moduleSet("libraries.misc") {
-    // all libs here must not be embedded, if it is embedded, it should be moved to libs-core.xml
-    module("intellij.libraries.javax.activation")
-    module("intellij.libraries.xml.rpc")
-    module("intellij.libraries.kotlinx.document.store.mvstore")
-    module("intellij.libraries.opencsv")
-    module("intellij.libraries.lucene.common")
-    module("intellij.libraries.plexus.utils")
-    module("intellij.libraries.maven.resolver.provider")
-  }
-
-  /**
-   * Temporarily bundled library modules (planned to be removed).
-   *
-   * **⚠️ WARNING:** These are product-specific dependencies that should NOT be in core platform.
-   *
-   * **Current users:** Only DBE (DataGrip) - see jettison/xstream comments below
-   * **Goal:** Remove from `corePlatform` and move to specific products that need them
-   * **Typical NON-users:** Most products don't need these legacy libraries
-   */
-  fun librariesTemporaryBundled(): ModuleSet = moduleSet("libraries.temporaryBundled") {
-    // Currently used only by DBE (see https://youtrack.jetbrains.com/issue/IJPL-211789/CNFE-org.codehaus.jettison.mapped.Configuration).
-    // Declared as a dependency of xstream because xstream technically depends on it.
-    // Marked as `embedded`: since xstream depends on it, this module must be embedded as well.
-    // No other module should require jettison when using xstream; in general, avoid using xstream at all.
-    embeddedModule("intellij.libraries.jettison")
-    // lang-impl should not use it and embedded should be removed
-    embeddedModule("intellij.libraries.xstream")
-    module("intellij.libraries.commons.text")
-  }
-
   // endregion
 
   // region Platform
@@ -276,11 +253,15 @@ object CoreModuleSets {
   fun corePlatform(): ModuleSet = moduleSet("core.platform", selfContained = true, outputModule = "intellij.platform.ide.core", includeDependencies = true) {
     moduleSet(librariesPlatform())
 
+    embeddedModule("intellij.platform.runtime.product")
+
     embeddedModule("intellij.platform.diagnostic.telemetry")
 
     embeddedModule("intellij.platform.util.ex")
     embeddedModule("intellij.platform.util.ui")
     embeddedModule("intellij.platform.util.coroutines")
+
+    embeddedModule("intellij.platform.icons.impl.intellij")
 
     embeddedModule("intellij.platform.locking.impl")
 
@@ -377,7 +358,6 @@ object CoreModuleSets {
     embeddedModule("intellij.platform.macro")
     embeddedModule("intellij.platform.usageView.impl")
 
-    embeddedModule("intellij.platform.testRunner")
     embeddedModule("intellij.platform.execution")
     embeddedModule("intellij.platform.execution.impl")
 
@@ -387,16 +367,19 @@ object CoreModuleSets {
     embeddedModule("intellij.platform.configurationStore.impl")
 
     embeddedModule("intellij.platform.lang.core")
+    embeddedModule("intellij.platform.testIntegration")
+    embeddedModule("intellij.platform.testIntegration.ui")
     embeddedModule("intellij.platform.lang")
     embeddedModule("intellij.platform.lang.impl")
 
     embeddedModule("intellij.platform.statistics")
     embeddedModule("intellij.platform.statistics.config")
+    embeddedModule("intellij.platform.statistics.uploader")
+    embeddedModule("intellij.platform.experiment")
     embeddedModule("intellij.platform.ide.impl")
 
     embeddedModule("intellij.platform.rd.community")
 
-    embeddedModule("intellij.platform.ide.ui.inspector")
     embeddedModule("intellij.platform.remote.core")
     embeddedModule("intellij.platform.ide.remote")
     embeddedModule("intellij.platform.threadDumpParser")
@@ -412,6 +395,7 @@ object CoreModuleSets {
     // Additional dependencies specific to lang.impl and ide.impl
     embeddedModule("intellij.platform.ide.concurrency")
     embeddedModule("intellij.platform.builtInServer")
+    embeddedModule("intellij.platform.discoverability")
     embeddedModule("intellij.platform.externalSystem")
     embeddedModule("intellij.platform.eel.impl")
     embeddedModule("intellij.platform.eel.nioFs.impl")
@@ -419,9 +403,6 @@ object CoreModuleSets {
     embeddedModule("intellij.platform.diff.impl")
     embeddedModule("intellij.platform.util.diff")
     embeddedModule("fleet.andel")
-
-    // Temporary: lang.impl incorrectly depends on xstream (should be removed)
-    moduleSet(librariesTemporaryBundled())
   }
 
   // endregion
@@ -434,6 +415,8 @@ object CoreModuleSets {
     embeddedModule("fleet.fastutil")
     embeddedModule("fleet.kernel")
     embeddedModule("fleet.multiplatform.shims")
+    embeddedModule("fleet.openmap")
+    embeddedModule("fleet.radixTrie")
     embeddedModule("fleet.reporting.api")
     embeddedModule("fleet.reporting.shared")
     embeddedModule("fleet.rhizomedb")

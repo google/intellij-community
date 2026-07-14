@@ -80,7 +80,7 @@ internal object MarkdownPsiStructureUtil {
     }
     val structureContainer = when (element) {
       is MarkdownFile -> element
-      else -> element.parentOfType(withSelf = true, TRANSPARENT_CONTAINERS)
+      else -> element.parentOfType(TRANSPARENT_CONTAINERS, withSelf = true)
     }
     if (structureContainer == null) {
       return
@@ -128,7 +128,7 @@ internal object MarkdownPsiStructureUtil {
           }
           if (maxContentLevel == null || isSameLevelOrHigher(element, maxContentLevel)) {
             maxContentLevel = element
-            if (element.elementType in PRESENTABLE_TYPES) {
+            if (element.hasType(PRESENTABLE_TYPES)) {
               resultConsumer.consume(element)
             }
           }

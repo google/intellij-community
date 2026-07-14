@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:ApiStatus.Experimental
 @file:JvmName("CodeInsightContextAwareSearchScopes")
 
@@ -6,8 +6,19 @@ package com.intellij.psi.search
 
 import com.intellij.codeInsight.multiverse.CodeInsightContext
 import com.intellij.codeInsight.multiverse.anyContext
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.debug
+import com.intellij.openapi.diagnostic.fileLogger
 import com.intellij.openapi.vfs.VirtualFile
 import org.jetbrains.annotations.ApiStatus
+
+private val diagLog = fileLogger()
+
+private fun CodeInsightContextFileInfo.diagName(): String = when (this) {
+  is ActualContextFileInfo -> "ActualContextFileInfo(contexts=${contexts.size})"
+  is NoContextFileInfo -> "NoContextFileInfo"
+  is DoesNotContainFileInfo -> "DoesNotContainFileInfo(EXCLUDED)"
+}
 
 /**
  * Implement this interface in your [SearchScope] if you want to associate information about [CodeInsightContext]s and [VirtualFile]s
@@ -28,16 +39,18 @@ interface CodeInsightContextAwareSearchScope {
 @ApiStatus.Experimental
 fun SearchScope.contains(file: VirtualFile, context: CodeInsightContext): Boolean {
   val info = this.codeInsightContextInfo
-  return when (info) {
+  val result = when (info) {
     is NoContextInformation -> this.contains(file)
     is ActualCodeInsightContextInfo -> info.contains(file, context)
   }
+  diagLog.debug { "[scope-ctx-diag] contains file=${file.name} context=$context scope=${this.javaClass.simpleName}/${this.displayName} -> $result" }
+  return result
 }
 
 @ApiStatus.Experimental
 fun SearchScope.getFileContextInfo(file: VirtualFile): CodeInsightContextFileInfo {
   val info = this.codeInsightContextInfo
-  return when (info) {
+  val result = when (info) {
     is NoContextInformation -> {
       if (this.contains(file))
         NoContextFileInfo()
@@ -46,6 +59,8 @@ fun SearchScope.getFileContextInfo(file: VirtualFile): CodeInsightContextFileInf
     }
     is ActualCodeInsightContextInfo -> info.getFileInfo(file)
   }
+  diagLog.debug { "[scope-ctx-diag] getFileContextInfo file=${file.name} scope=${this.javaClass.simpleName}/${this.displayName} -> ${result.diagName()}" }
+  return result
 }
 
 @ApiStatus.Experimental
@@ -191,21 +206,59 @@ fun ActualContextFileInfo(contexts: Collection<CodeInsightContext>): ActualConte
 
 /**
  * Constructs an [CodeInsightContextFileInfo] with the given [contexts].
- * Should be used if the [GlobalSearchScope] contains the file.
  *
- * If the [contexts] are empty, then [NoContextFileInfo] is returned.
- * Otherwise, [ActualContextFileInfo] is returned.
+ * If [contexts] is empty, it can mean two things:
+ * - The file is not in the scope. In this case, the function returns [DoesNotContainFileInfo]
+ * - The file is in scope, but the scope is not aware of contexts. In this case, the function returns [NoContextFileInfo]
+ * If [contexts] is not empty, it means the scope DOES contain the file. In this case, the function returns [ActualContextFileInfo]
+ *
+ * @param contexts           inferred contexts for the given file.
+ * @param scopeContainsFile  if true, the scope contains the file, false otherwise
  *
  * @see CodeInsightContextFileInfo
  */
 @ApiStatus.Experimental
-fun createContainingContextFileInfo(contexts: Collection<CodeInsightContext>): CodeInsightContextFileInfo {
+fun createContainingContextFileInfo(contexts: Collection<CodeInsightContext>, scopeContainsFile: Boolean): CodeInsightContextFileInfo {
+  if (!scopeContainsFile) {
+    if (contexts.isNotEmpty()) {
+      fileLogger().error("scope does not contain file, but contexts are not empty: $contexts")
+    }
+    return DoesNotContainFileInfo()
+  }
+
   if (contexts.isEmpty()) {
     return NoContextFileInfo()
   }
   else {
     return ActualContextFileInfo(contexts)
   }
+}
+
+@ApiStatus.Experimental
+fun createContainingContextFileInfo(
+  contexts: Collection<CodeInsightContext>,
+  file: VirtualFile,
+  scope: SearchScope,
+): CodeInsightContextFileInfo =
+  createContainingContextFileInfo(contexts) { scope.contains(file) }
+
+@ApiStatus.Experimental
+fun createContainingContextFileInfo(
+  contexts: Collection<CodeInsightContext>,
+  checkIfContains: () -> Boolean,
+): CodeInsightContextFileInfo {
+  val contains = if (contexts.isEmpty()) {
+    checkIfContains()
+  }
+  else {
+    if (ApplicationManager.getApplication().isUnitTestMode) {
+      fileLogger().assertTrue(checkIfContains(), "scope does not contain file, but contexts are not empty: $contexts")
+    }
+    else {
+      true
+    }
+  }
+  return createContainingContextFileInfo(contexts, contains)
 }
 
 /**

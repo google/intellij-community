@@ -2,12 +2,16 @@
 <module type="JAVA_MODULE" version="4">
   <component name="NewModuleRootManager" inherit-compiler-output="true">
     <exclude-output />
+    <content url="file://$MODULE_DIR$/testResources">
+      <sourceFolder url="file://$MODULE_DIR$/testResources" type="java-test-resource" />
+    </content>
     <content url="file://$MODULE_DIR$/testSrc">
       <sourceFolder url="file://$MODULE_DIR$/testSrc" isTestSource="true" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" scope="TEST" name="kotlin-stdlib" level="project" />
+    <orderEntry type="library" scope="TEST" name="diogen-analysis" level="project" />
     <orderEntry type="module" module-name="intellij.driver.model" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.analysis" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.codeStyle" scope="TEST" />
@@ -40,8 +44,8 @@
     <orderEntry type="module" module-name="intellij.platform.execution.impl" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.util.ex" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.ide.internal" scope="TEST" />
-    <orderEntry type="library" scope="TEST" name="opentelemetry" level="project" />
-    <orderEntry type="library" scope="TEST" name="opentelemetry-semconv" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.opentelemetry" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.opentelemetry.semconv" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.coroutines.core" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.diagnostic.telemetry" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.ide.impl" scope="TEST" />
@@ -64,9 +68,13 @@
     <orderEntry type="module" module-name="intellij.java.guiForms.rt" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.debugger.impl.shared" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.debugger.impl.ui" scope="TEST" />
-    <orderEntry type="module" module-name="intellij.platform.structureView.impl" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.platform.structureView" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.testFramework.teamCity" scope="TEST" />
     <orderEntry type="module" module-name="intellij.performanceTesting" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.performanceTesting.freezes" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.junit4" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.junit5" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.junit5.params" scope="TEST" />
   </component>
   <component name="TestModuleProperties" production-module="intellij.performanceTesting" />
 </module>

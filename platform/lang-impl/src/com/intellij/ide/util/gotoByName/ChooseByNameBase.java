@@ -36,6 +36,7 @@ import com.intellij.openapi.actionSystem.UiDataProvider;
 import com.intellij.openapi.actionSystem.toolbarLayout.ToolbarLayoutStrategy;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.WriteIntentReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
@@ -1471,13 +1472,17 @@ public abstract class ChooseByNameBase implements ChooseByNameViewModel {
     public Continuation runBackgroundProcess(final @NotNull ProgressIndicator indicator) {
       if (myProject == null || DumbService.isDumbAware(myModel)) return super.runBackgroundProcess(indicator);
 
-      return DumbService.getInstance(myProject).runReadActionInSmartMode(() -> performInReadAction(indicator));
+      return ReadAction.nonBlocking(() -> performInReadAction(indicator))
+        .inSmartMode(myProject)
+        .wrapProgress(indicator)
+        .executeSynchronously();
     }
 
     @Override
     public @Nullable Continuation performInReadAction(@NotNull ProgressIndicator indicator) throws ProcessCanceledException {
       if (isProjectDisposed()) return null;
 
+      myUpdateListAlarm.cancelAllRequests();
       Set<Object> elements = Collections.synchronizedSet(new LinkedHashSet<>());
       scheduleIncrementalListUpdate(elements, 0);
 
@@ -1486,14 +1491,7 @@ public abstract class ChooseByNameBase implements ChooseByNameViewModel {
       final String cardToShow = elements.isEmpty() ? NOT_FOUND_CARD : scopeExpanded ? NOT_FOUND_IN_PROJECT_CARD : CHECK_BOX_CARD;
 
       Set<Object> objects = filter(elements);
-      Object selected;
-      if (myInitialSelection != null) {
-        selected = myInitialSelection.fun(objects);
-        myInitialSelection = null;
-      }
-      else {
-        selected = null;
-      }
+      Object selected = myInitialSelection != null ? myInitialSelection.fun(objects) : null;
       AnchoredSet resultSet = new AnchoredSet(objects);
       return new Continuation(() -> {
         if (!checkDisposed() && !myProgress.isCanceled()) {
@@ -1502,6 +1500,7 @@ public abstract class ChooseByNameBase implements ChooseByNameViewModel {
 
           showCard(cardToShow, 0);
 
+          myInitialSelection = null;
           Set<Object> filtered = resultSet.getElements();
           backgroundCalculationFinished(filtered, selected == null ? mySelectionPolicy : new SelectObject(selected));
           myCallback.consume(filtered);
@@ -1714,7 +1713,7 @@ public abstract class ChooseByNameBase implements ChooseByNameViewModel {
               }
             };
 
-            ApplicationManager.getApplication().runReadAction(() -> {
+            ReadAction.runBlocking(() -> {
               myCalcUsagesThread.addElementsByPattern(text, collected, indicator, everywhere);
 
               indicator.setText(LangBundle.message("progress.text.prepare"));

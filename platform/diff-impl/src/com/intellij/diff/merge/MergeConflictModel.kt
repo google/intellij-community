@@ -14,8 +14,8 @@ import com.intellij.diff.util.MergeConflictType
 import com.intellij.diff.util.Side
 import com.intellij.diff.util.ThreeSide
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.UiWithModelAccess
-import com.intellij.openapi.application.edtWriteAction
 import com.intellij.openapi.command.UndoConfirmationPolicy
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diff.DiffBundle
@@ -66,6 +66,13 @@ class MergeConflictModel(
   var wasReviewed: Boolean = false
     private set
 
+  /**
+   * Tracks how this file's conflicts were resolved (e.g. accepted left, accepted right, or merged manually = null).
+   * Used by the iterative merge dialog to determine the correct VCS resolution when finalizing
+   * (e.g. `git add` for merged files vs `git rm` for files where the deleted side was accepted).
+   */
+  var chosenSide: Side? = null
+
   @RequiresBlockingContext
   @Throws(DiffTooBigException::class, InvalidDiffRequestException::class)
   fun rediffBlocking(
@@ -106,7 +113,7 @@ class MergeConflictModel(
   }
 
   @RequiresEdt
-  private suspend fun setInitialOutputContent(document: Document, content: CharSequence): Boolean = edtWriteAction {
+  private suspend fun setInitialOutputContent(document: Document, content: CharSequence): Boolean = withContext(Dispatchers.EDT) {
     DiffUtil.executeWriteCommand(document, project, DiffBundle.message("message.init.merge.content.command")) {
       document.setText(content)
       DiffUtil.putNonundoableOperation(project, document)
@@ -184,6 +191,7 @@ class MergeConflictModel(
                         affectedIndexes = affected) {
       resetAllChanges()
       replaceAllChanges(side)
+      markReviewed()
     }
   }
 
@@ -254,7 +262,7 @@ class MergeConflictModel(
   }
 
   @RequiresWriteLock
-  fun replaceWithNewContent(index: Int, newContent: CharSequence): LineRange {
+  private fun replaceWithNewContent(index: Int, newContent: CharSequence): LineRange {
     val change = getByIndex(index)
     val newContentLines: Array<String> = LineTokenizer.tokenize(newContent, false)
     resultModel.replaceChange(change.index, listOf(*newContentLines))
@@ -315,8 +323,9 @@ class MergeConflictModel(
   }
 
   @RequiresWriteLock
-  fun replaceAllChanges(side: Side) {
+  private fun replaceAllChanges(side: Side) {
     getAllChanges().forEach { change: TextMergeChange -> replaceChange(change.index, side, true) }
+    chosenSide = side
   }
 
   @RequiresWriteLock
@@ -384,6 +393,7 @@ class MergeConflictModel(
 
   override fun dispose() {
     Disposer.dispose(resultModel)
+    mergeChanges = emptyList()
   }
 
   fun executeMergeCommand(

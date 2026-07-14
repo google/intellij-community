@@ -1,7 +1,9 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.ide.impl.wsl.ijent.nio
 
 import com.intellij.platform.eel.EelDescriptor
+import com.intellij.platform.eel.channels.EelDelicateApi
+import com.intellij.platform.eel.provider.utils.impl.ijentToLocal
 import com.intellij.platform.eel.provider.EelDescriptorOwner
 import org.jetbrains.annotations.ApiStatus
 import java.nio.file.FileStore
@@ -14,8 +16,7 @@ import java.nio.file.attribute.UserPrincipalLookupService
 /**
  * See [IjentWslNioFileSystemProvider].
  */
-@ApiStatus.Internal
-class IjentWslNioFileSystem internal constructor(
+internal class IjentWslNioFileSystem internal constructor(
   private val provider: IjentWslNioFileSystemProvider,
   internal val wslId: String,
   private val ijentFs: FileSystem,
@@ -59,8 +60,9 @@ class IjentWslNioFileSystem internal constructor(
       addAll(ijentFs.supportedFileAttributeViews())
     }
 
+  @OptIn(EelDelicateApi::class)
   override fun getPath(first: String, vararg more: String): Path =
-    IjentWslNioPath(this, originalFs.getPath(first, *more), null)
+    IjentWslNioPath(this, originalFs.getPath(ijentToLocal(first), *more.map { ijentToLocal(it) }.toTypedArray()), null)
 
   override fun getPathMatcher(syntaxAndPattern: String?): PathMatcher =
     originalFs.getPathMatcher(syntaxAndPattern)
@@ -70,4 +72,16 @@ class IjentWslNioFileSystem internal constructor(
 
   override fun newWatchService(): WatchService =
     ijentFs.newWatchService()
+
+  override fun equals(other: Any?): Boolean =
+    this === other ||
+    other is IjentWslNioFileSystem &&
+    provider == other.provider &&
+    wslId == other.wslId
+
+  override fun hashCode(): Int {
+    var result = provider.hashCode()
+    result = 31 * result + wslId.hashCode()
+    return result
+  }
 }

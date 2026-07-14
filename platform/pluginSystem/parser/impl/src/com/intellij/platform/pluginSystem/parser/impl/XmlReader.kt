@@ -155,16 +155,6 @@ private val KNOWN_KOTLIN_PLUGIN_IDS = Java11Shim.INSTANCE.copyOf(listOf(
   "org.jetbrains.kotlin.native.appcode"
 ))
 
-fun isKotlinPlugin(pluginId: String): Boolean = pluginId in KNOWN_KOTLIN_PLUGIN_IDS
-
-private val K2_ALLOWED_PLUGIN_IDS = Java11Shim.INSTANCE.copyOf(KNOWN_KOTLIN_PLUGIN_IDS + listOf(
-  "org.jetbrains.android",
-  "androidx.compose.plugins.idea",
-  "com.jetbrains.kmm",
-  "com.jetbrains.kotlin.ocswift",
-  "com.jetbrains.rider.android"
-))
-
 private fun readRootElementChild(
   consumer: PluginDescriptorFromXmlStreamConsumer,
   reader: XMLStreamReader2,
@@ -706,17 +696,9 @@ private fun readContentModuleAttributes(
 }
 
 private fun readContent(reader: XMLStreamReader2, builder: PluginDescriptorBuilder, readContext: PluginDescriptorReaderContext) {
-  for (i in 0 until reader.attributeCount) {
-    if (reader.getAttributeLocalName(i) == PluginXmlConst.CONTENT_NAMESPACE_ATTR) {
-      val namespace = readContext.interner.name(reader.getAttributeValue(i))
-      if (builder.namespace == null) {
-        builder.namespace = namespace
-      }
-      else if (builder.namespace != namespace) {
-        LOG.error("Some 'content' tag already set namespace ('${builder.namespace}'), but a different namespace '$namespace' is specified at ${reader.location}; " +
-                  "it will be ignored because multiple namespace in a single plugin aren't allowed")
-      }
-    }
+  val namespace = readNamespaceAttribute(reader, readContext)
+  if (builder.firstNamespaceOfContentTag == null) {
+    builder.firstNamespaceOfContentTag = namespace
   }
 
   consumeChildElements(reader) { elementName ->
@@ -736,6 +718,7 @@ private fun readContent(reader: XMLStreamReader2, builder: PluginDescriptorBuild
       builder.addContentModule(
         ContentModuleElement(
           name = name,
+          namespace = namespace,
           loadingRule = attrs.loadingRule,
           requiredIfAvailable = attrs.requiredIfAvailable,
           embeddedDescriptorContent = null,
@@ -750,6 +733,7 @@ private fun readContent(reader: XMLStreamReader2, builder: PluginDescriptorBuild
       builder.addContentModule(
         ContentModuleElement(
           name = name,
+          namespace = namespace,
           loadingRule = attrs.loadingRule,
           requiredIfAvailable = attrs.requiredIfAvailable,
           embeddedDescriptorContent = descriptorContent,
@@ -773,6 +757,33 @@ private fun readContent(reader: XMLStreamReader2, builder: PluginDescriptorBuild
   assert(reader.isEndElement)
 }
 
+private const val DEFAULT_NAMESPACE = "jetbrains"
+private val NAMESPACE_REGEX = Regex("^[a-zA-Z0-9]+([_-][a-zA-Z0-9]+)*\$")
+
+private fun internAndValidateNamespace(originalNamespace: String?, reader: XMLStreamReader2, interner: XmlInterner?): String? {
+  if (originalNamespace == null) return null
+  val namespace = interner?.name(originalNamespace) ?: originalNamespace
+  //optimization: there is no need to validate the default namespace
+  if (namespace != DEFAULT_NAMESPACE) {
+    if (!NAMESPACE_REGEX.matches(namespace)) {
+      throw RuntimeException("Namespace '$namespace' doesn't match the pattern '${NAMESPACE_REGEX.pattern}' (${reader.location})")
+    }
+    if (namespace.length !in 5..30) {
+      throw RuntimeException("Length of namespace '$namespace' is not in range 5..30 (${reader.location})")
+    }
+  }
+  return namespace
+}
+
+private fun readNamespaceAttribute(reader: XMLStreamReader2, readContext: PluginDescriptorReaderContext?): String? {
+  for (i in 0 until reader.attributeCount) {
+    if (reader.getAttributeLocalName(i) == PluginXmlConst.CONTENT_NAMESPACE_ATTR) {
+      return internAndValidateNamespace(reader.getAttributeValue(i), reader, readContext?.interner)
+    }
+  }
+  return null
+}
+
 private fun readDependencies(reader: XMLStreamReader2, builder: PluginDescriptorBuilder, interner: XmlInterner) {
   consumeChildElements(reader) { elementName ->
     when (elementName) {
@@ -782,7 +793,9 @@ private fun readDependencies(reader: XMLStreamReader2, builder: PluginDescriptor
         for (i in 0 until reader.attributeCount) {
           when (reader.getAttributeLocalName(i)) {
             PluginXmlConst.DEPENDENCIES_MODULE_NAME_ATTR -> name = interner.name(reader.getAttributeValue(i))
-            PluginXmlConst.DEPENDENCIES_MODULE_NAMESPACE_ATTR -> namespace = interner.name(reader.getAttributeValue(i))
+            PluginXmlConst.DEPENDENCIES_MODULE_NAMESPACE_ATTR -> {
+              namespace = internAndValidateNamespace(reader.getAttributeValue(i), reader, interner)
+            }
           }
         }
         builder.addDependency(DependenciesElement.ModuleDependency(name!!, namespace))
@@ -819,20 +832,14 @@ private fun readInclude(
       PluginXmlConst.INCLUDE_HREF_ATTR -> path = getNullifiedAttributeValue(reader, i)
       PluginXmlConst.INCLUDE_XPOINTER_ATTR -> pointer = reader.getAttributeValue(i)?.takeIf { !it.isEmpty() && it != allowedPointer }
       PluginXmlConst.INCLUDE_INCLUDE_IF_ATTR -> {
-        checkConditionalIncludeIsSupported("includeIf", builder)
-        val value = reader.getAttributeValue(i)?.let { System.getProperty(it) }
-        if (value != "true") {
-          reader.skipElement()
-          return
-        }
+        LOG.warn("includeIf attribute support is disabled and has no effect anymore IJPL-215563 (plugin id=${builder.id}, location=${reader.location})")
+        reader.skipElement()
+        return
       }
       PluginXmlConst.INCLUDE_INCLUDE_UNLESS_ATTR -> {
-        checkConditionalIncludeIsSupported("includeUnless", builder)
-        val value = reader.getAttributeValue(i)?.let { System.getProperty(it) }
-        if (value == "true") {
-          reader.skipElement()
-          return
-        }
+        LOG.warn("includeUnless attribute support is disabled and has no effect anymore IJPL-215563 (plugin id=${builder.id}, location=${reader.location})")
+        reader.skipElement()
+        return
       }
       else -> throw RuntimeException("Unknown attribute ${reader.getAttributeLocalName(i)} (${reader.location})")
     }
@@ -865,7 +872,9 @@ private fun readInclude(
   if (loadedXInclude != null) {
     consumer.pushIncludeBase(LoadPathUtil.getChildBaseDir(base = consumer.includeBase, relativePath = path))
     try {
-      consumer.consume(loadedXInclude.inputStream, loadedXInclude.diagnosticReferenceLocation)
+      val includedXmlReader = createNonCoalescingXmlStreamReader(input = loadedXInclude.inputStream,
+                                                                 locationSource = loadedXInclude.diagnosticReferenceLocation)
+      consumer.consume(includedXmlReader)
     }
     finally {
       consumer.popIncludeBase()
@@ -886,12 +895,6 @@ private fun readInclude(
   }
 }
 
-private fun checkConditionalIncludeIsSupported(attribute: String, builder: PluginDescriptorBuilder) {
-  if (builder.id !in K2_ALLOWED_PLUGIN_IDS) {
-    throw IllegalArgumentException("$attribute of 'include' is not supported")
-  }
-}
-
 private var dateTimeFormatter: DateTimeFormatter? = null
 
 private object PluginParser
@@ -906,7 +909,6 @@ private fun parseReleaseDate(dateString: String): LocalDate? {
 
   var formatter = dateTimeFormatter
   if (formatter == null) {
-    @Suppress("SpellCheckingInspection")
     formatter = DateTimeFormatter.ofPattern("yyyyMMdd", Locale.US)!!
     dateTimeFormatter = formatter
   }
@@ -930,10 +932,8 @@ private fun readListeners(reader: XMLStreamReader2, containerDescriptor: ScopedE
     for (i in 0 until reader.attributeCount) {
       when (reader.getAttributeLocalName(i)) {
         PluginXmlConst.LISTENER_OS_ATTR -> os = readOSValue(reader.getAttributeValue(i))
-        PluginXmlConst.LISTENER_CLASS_ATTR -> listenerClassName = getNullifiedAttributeValue(
-          reader, i)
-        PluginXmlConst.LISTENER_TOPIC_ATTR -> topicClassName = getNullifiedAttributeValue(
-          reader, i)
+        PluginXmlConst.LISTENER_CLASS_ATTR -> listenerClassName = getNullifiedAttributeValue(reader, i)
+        PluginXmlConst.LISTENER_TOPIC_ATTR -> topicClassName = getNullifiedAttributeValue(reader, i)
         PluginXmlConst.LISTENER_ACTIVE_IN_TEST_MODE_ATTR -> activeInTestMode = reader.getAttributeAsBoolean(i)
         PluginXmlConst.LISTENER_ACTIVE_IN_HEADLESS_MODE_ATTR -> activeInHeadlessMode = reader.getAttributeAsBoolean(i)
       }
@@ -1040,14 +1040,25 @@ private fun getEventTypeString(eventType: Int): String {
  * Used for lightweight extraction without full descriptor parsing.
  */
 class ContentParseResult(
+  @JvmField val pluginId: String?,
   @JvmField val contentModules: List<ContentModuleElement>,
   @JvmField val xIncludePaths: List<String>,
+  /** Visibility of this content module descriptor root. Defaults to private when the attribute is absent. */
+  @JvmField val moduleVisibility: ModuleVisibilityValue = ModuleVisibilityValue.PRIVATE,
   /** Module dependencies from <dependencies><module name="..."/> elements */
   @JvmField val moduleDependencies: List<String> = emptyList(),
   /** Plugin dependencies from <dependencies><plugin id="..."/> elements */
   @JvmField val pluginDependencies: List<String> = emptyList(),
   /** Plugin aliases from <module value="..."/> elements at root level */
   @JvmField val pluginAliases: List<String> = emptyList(),
+  /** Service keys registered by service extension points. */
+  @JvmField val registeredServiceKeys: Set<String> = emptySet(),
+  /** Service keys registered with `overrides="true"`. */
+  @JvmField val overridingServiceKeys: Set<String> = emptySet(),
+  /** Action group IDs declared by `<actions><group id="...">`. */
+  @JvmField val declaredActionGroupIds: Set<String> = emptySet(),
+  /** Action group IDs referenced by `<add-to-group group-id="...">`. */
+  @JvmField val referencedActionGroupIds: Set<String> = emptySet(),
 )
 
 /**
@@ -1057,6 +1068,8 @@ class ContentParseResult(
  * This is a lightweight parser that only looks for:
  * - `<content><module>` elements
  * - `xi:include` elements (at root level)
+ * - service registrations
+ * - action group declarations and references
  *
  * All other elements are skipped efficiently.
  */
@@ -1070,7 +1083,7 @@ fun parseContentAndXIncludes(input: ByteArray, locationSource: String?): Content
       return parseElementForContentAndIncludes(reader = reader)
     }
     else {
-      return ContentParseResult(contentModules = emptyList(), xIncludePaths = emptyList())
+      return ContentParseResult(pluginId = null, contentModules = emptyList(), xIncludePaths = emptyList())
     }
   }
   finally {
@@ -1081,11 +1094,24 @@ fun parseContentAndXIncludes(input: ByteArray, locationSource: String?): Content
 private fun parseElementForContentAndIncludes(reader: XMLStreamReader2): ContentParseResult {
   val xIncludePaths = ArrayList<String>()
   val contentModules = ArrayList<ContentModuleElement>()
+  var moduleVisibility = ModuleVisibilityValue.PRIVATE
+  for (i in 0 until reader.attributeCount) {
+    if (reader.getAttributeLocalName(i) == PluginXmlConst.CONTENT_MODULE_VISIBILITY_ATTR) {
+      moduleVisibility = readModuleVisibility(reader.getAttributeValue(i), reader)
+      break
+    }
+  }
   val moduleDependencies = ArrayList<String>()
   val pluginDependencies = ArrayList<String>()
   val pluginAliases = ArrayList<String>()
+  var pluginId: String? = null
+  val registeredServiceKeys = HashSet<String>()
+  val overridingServiceKeys = HashSet<String>()
+  val declaredActionGroupIds = HashSet<String>()
+  val referencedActionGroupIds = HashSet<String>()
   consumeChildElements(reader) { localName ->
     when (localName) {
+      PluginXmlConst.ID_ELEM -> pluginId = getNullifiedContent(reader)
       PluginXmlConst.INCLUDE_ELEM if reader.namespaceURI == PluginXmlConst.XINCLUDE_NAMESPACE_URI -> {
         // Extract xi:include href
         val href = XmlReadUtils.findAttributeValue(reader, PluginXmlConst.INCLUDE_HREF_ATTR)
@@ -1096,9 +1122,10 @@ private fun parseElementForContentAndIncludes(reader: XMLStreamReader2): Content
       }
       PluginXmlConst.CONTENT_ELEM -> {
         // Parse content modules
+        val namespace = readNamespaceAttribute(reader, readContext = null)
         consumeChildElements(reader) { childName ->
           if (childName == PluginXmlConst.CONTENT_MODULE_ELEM) {
-            contentModules.add(readContentModuleElement(reader))
+            contentModules.add(readContentModuleElement(reader, namespace))
           }
           else {
             reader.skipElement()
@@ -1132,6 +1159,12 @@ private fun parseElementForContentAndIncludes(reader: XMLStreamReader2): Content
         }
         reader.skipElement()
       }
+      PluginXmlConst.EXTENSIONS_ELEM -> {
+        readRegisteredServiceKeys(reader, registeredServiceKeys, overridingServiceKeys)
+      }
+      PluginXmlConst.ACTIONS_ELEM -> {
+        readActionGroupIds(reader, declaredActionGroupIds, referencedActionGroupIds)
+      }
       else -> {
         // Recursively check nested elements for xi:includes (they can appear at root level only,
         // but we still need to traverse to find them in case of nested structures)
@@ -1142,10 +1175,113 @@ private fun parseElementForContentAndIncludes(reader: XMLStreamReader2): Content
       }
     }
   }
-  return ContentParseResult(contentModules, xIncludePaths, moduleDependencies, pluginDependencies, pluginAliases)
+  return ContentParseResult(
+    pluginId = pluginId,
+    contentModules = contentModules,
+    xIncludePaths = xIncludePaths,
+    moduleVisibility = moduleVisibility,
+    moduleDependencies = moduleDependencies,
+    pluginDependencies = pluginDependencies,
+    pluginAliases = pluginAliases,
+    registeredServiceKeys = registeredServiceKeys,
+    overridingServiceKeys = overridingServiceKeys,
+    declaredActionGroupIds = declaredActionGroupIds,
+    referencedActionGroupIds = referencedActionGroupIds,
+  )
 }
 
-private fun readContentModuleElement(reader: XMLStreamReader2): ContentModuleElement {
+private fun readActionGroupIds(
+  reader: XMLStreamReader2,
+  declaredActionGroupIds: MutableSet<String>,
+  referencedActionGroupIds: MutableSet<String>,
+) {
+  consumeChildElements(reader) { elementName ->
+    readActionElementGroupIds(reader, elementName, declaredActionGroupIds, referencedActionGroupIds)
+  }
+}
+
+private fun readActionElementGroupIds(
+  reader: XMLStreamReader2,
+  elementName: String,
+  declaredActionGroupIds: MutableSet<String>,
+  referencedActionGroupIds: MutableSet<String>,
+) {
+  when (elementName) {
+    PluginXmlConst.ACTION_GROUP_ELEM -> {
+      if (!isActionOverride(reader)) {
+        XmlReadUtils.findAttributeValue(reader, PluginXmlConst.ACTION_GROUP_ID_ATTR)?.let(declaredActionGroupIds::add)
+      }
+      consumeChildElements(reader) { childName ->
+        readActionElementGroupIds(reader, childName, declaredActionGroupIds, referencedActionGroupIds)
+      }
+    }
+    PluginXmlConst.ACTION_ELEM -> {
+      consumeChildElements(reader) { childName ->
+        readActionElementGroupIds(reader, childName, declaredActionGroupIds, referencedActionGroupIds)
+      }
+    }
+    PluginXmlConst.ADD_TO_GROUP_ELEM -> {
+      XmlReadUtils.findAttributeValue(reader, PluginXmlConst.ADD_TO_GROUP_GROUP_ID_ATTR)?.let(referencedActionGroupIds::add)
+      reader.skipElement()
+    }
+    else -> reader.skipElement()
+  }
+}
+
+private fun isActionOverride(reader: XMLStreamReader2): Boolean {
+  for (i in 0 until reader.attributeCount) {
+    if (reader.getAttributeLocalName(i) == PluginXmlConst.ACTION_OVERRIDES_ATTR) {
+      return reader.getAttributeAsBoolean(i)
+    }
+  }
+  return false
+}
+
+private fun readRegisteredServiceKeys(
+  reader: XMLStreamReader2,
+  registeredServiceKeys: MutableSet<String>,
+  overridingServiceKeys: MutableSet<String>,
+) {
+  val defaultExtensionNs = XmlReadUtils.findAttributeValue(reader, PluginXmlConst.EXTENSIONS_DEFAULT_EXTENSION_NS_ATTR)
+  consumeChildElements(reader) { elementName ->
+    var serviceInterface: String? = null
+    var serviceImplementation: String? = null
+    var qualifiedExtensionPointName: String? = null
+    var overrides = false
+
+    for (i in 0 until reader.attributeCount) {
+      when (reader.getAttributeLocalName(i)) {
+        PluginXmlConst.SERVICE_EP_SERVICE_INTERFACE_ATTR -> serviceInterface = getNullifiedAttributeValue(reader, i)
+        PluginXmlConst.SERVICE_EP_SERVICE_IMPLEMENTATION_ATTR -> serviceImplementation = getNullifiedAttributeValue(reader, i)
+        PluginXmlConst.SERVICE_EP_OVERRIDES_ATTR -> overrides = reader.getAttributeAsBoolean(i)
+        PluginXmlConst.EXTENSION_POINT_ATTR -> qualifiedExtensionPointName = getNullifiedAttributeValue(reader, i)
+      }
+    }
+
+    if (qualifiedExtensionPointName == null) {
+      qualifiedExtensionPointName = "${defaultExtensionNs ?: reader.namespaceURI}.${elementName}"
+    }
+
+    when (qualifiedExtensionPointName) {
+      PluginXmlConst.FQN_APPLICATION_SERVICE,
+      PluginXmlConst.FQN_PROJECT_SERVICE,
+      PluginXmlConst.FQN_MODULE_SERVICE,
+        -> {
+        val serviceKey = serviceInterface ?: serviceImplementation
+        if (serviceKey != null) {
+          registeredServiceKeys.add(serviceKey)
+          if (overrides) {
+            overridingServiceKeys.add(serviceKey)
+          }
+        }
+      }
+    }
+
+    reader.skipElement()
+  }
+}
+
+private fun readContentModuleElement(reader: XMLStreamReader2, namespace: String?): ContentModuleElement {
   val attrs = readContentModuleAttributes(reader)
   val name = attrs.name
   if (name.isNullOrEmpty()) {
@@ -1154,6 +1290,7 @@ private fun readContentModuleElement(reader: XMLStreamReader2): ContentModuleEle
   reader.skipElement()
   return ContentModuleElement(
     name = name,
+    namespace = namespace,
     loadingRule = attrs.loadingRule,
     requiredIfAvailable = attrs.requiredIfAvailable,
     embeddedDescriptorContent = null,

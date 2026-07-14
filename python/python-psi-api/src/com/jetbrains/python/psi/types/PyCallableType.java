@@ -3,7 +3,7 @@ package com.jetbrains.python.psi.types;
 
 import com.intellij.openapi.util.text.StringUtil;
 import com.jetbrains.python.PyNames;
-import com.jetbrains.python.psi.PyCallSiteExpression;
+import com.jetbrains.python.psi.PyCallSiteOwner;
 import com.jetbrains.python.psi.PyCallable;
 import com.jetbrains.python.psi.PyFunction;
 import org.jetbrains.annotations.ApiStatus;
@@ -41,7 +41,7 @@ public interface PyCallableType extends PyType {
    * Returns the type which is the result of calling an instance of this type.
    */
   @Nullable
-  PyType getCallType(@NotNull TypeEvalContext context, @NotNull PyCallSiteExpression callSite);
+  PyType getCallType(@NotNull TypeEvalContext context, @NotNull PyCallSiteOwner callSite);
 
   /**
    * Returns the list of parameter types.
@@ -75,6 +75,7 @@ public interface PyCallableType extends PyType {
    */
   @ApiStatus.Experimental
   default @Nullable PyCallableParameterVariadicType getParametersType(@NotNull TypeEvalContext context) {
+    // TODO: introduce a form for gradual variadic type to replace null here
     return null;
   }
 
@@ -118,15 +119,6 @@ public interface PyCallableType extends PyType {
 
   default @Nullable PyFunction.Modifier getModifier() {
     return null;
-  }
-
-  /**
-   * @return number of implicitly passed positional parameters; 0 means no parameters are passed implicitly.
-   * Note that a <tt>*args</tt> is never marked as passed implicitly.
-   * E.g. for a function like <tt>foo(a, b, *args)</tt> always holds <tt>getImplicitOffset() < 2</tt>.
-   */
-  default int getImplicitOffset() {
-    return 0;
   }
 
   @Override

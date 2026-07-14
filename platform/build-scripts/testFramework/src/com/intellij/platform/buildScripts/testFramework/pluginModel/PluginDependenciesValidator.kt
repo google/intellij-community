@@ -1,6 +1,4 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:OptIn(IntellijInternalApi::class)
-
 package com.intellij.platform.buildScripts.testFramework.pluginModel
 
 import com.intellij.ide.plugins.ContentModuleDescriptor
@@ -15,27 +13,27 @@ import com.intellij.ide.plugins.PluginMainDescriptor
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.ide.plugins.PluginModuleId
 import com.intellij.ide.plugins.PluginSet
+import com.intellij.ide.plugins.ResolvedPluginSet
 import com.intellij.ide.plugins.cl.PluginClassLoader
 import com.intellij.ide.plugins.contentModuleName
 import com.intellij.ide.plugins.isLoaded
 import com.intellij.ide.plugins.loadPluginSubDescriptors
-import com.intellij.openapi.util.IntellijInternalApi
-import com.intellij.openapi.util.text.HtmlChunk
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.platform.ide.bootstrap.ZipFilePoolImpl
 import com.intellij.platform.pluginSystem.parser.impl.LoadPathUtil
 import com.intellij.platform.pluginSystem.parser.impl.LoadedXIncludeReference
 import com.intellij.platform.pluginSystem.parser.impl.PluginDescriptorBuilder
-import com.intellij.platform.pluginSystem.parser.impl.PluginDescriptorFromXmlStreamConsumer
 import com.intellij.platform.pluginSystem.parser.impl.PluginDescriptorReaderContext
 import com.intellij.platform.pluginSystem.parser.impl.XIncludeLoader
-import com.intellij.platform.pluginSystem.parser.impl.consume
 import com.intellij.platform.pluginSystem.parser.impl.elements.ContentModuleElement
 import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleLoadingRuleValue
+import com.intellij.platform.pluginSystem.parser.impl.parsePluginXml
 import com.intellij.platform.pluginSystem.testFramework.PluginSetTestBuilder
 import com.intellij.platform.pluginSystem.testFramework.isModuleSetPath
 import com.intellij.platform.pluginSystem.testFramework.loadRawPluginDescriptorInTest
 import com.intellij.platform.pluginSystem.testFramework.resolveModuleSetPath
 import com.intellij.platform.runtime.product.ProductMode
+import com.intellij.util.SmartList
 import com.intellij.util.SystemProperties
 import com.intellij.util.lang.UrlClassLoader
 import kotlinx.coroutines.sync.Mutex
@@ -50,6 +48,7 @@ import org.jetbrains.jps.model.module.JpsModuleDependency
 import org.jetbrains.jps.model.module.JpsModuleSourceRoot
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.BitSet
 import kotlin.io.path.inputStream
 import kotlin.io.path.name
 import kotlin.io.path.pathString
@@ -145,11 +144,18 @@ class PluginDependenciesValidator private constructor(
 
   private fun checkPluginSet(pluginSet: PluginSet) {
     val jpsModuleToRuntimeDescriptors = LinkedHashMap<String, MutableList<IdeaPluginDescriptorImpl>>()
+    val runtimeDescriptorToJpsModules = HashMap<IdeaPluginDescriptorImpl, String>()
     for (descriptor in pluginSet.getEnabledModules()) {
       val jarFiles = descriptor.ownClassPath ?: continue
       jarFiles.groupByTo(jpsModuleToRuntimeDescriptors, {
         getModuleName(it) ?: error("Cannot detect module name for $it in $descriptor")  
       }, { descriptor })
+    }
+
+    for ((jpsModule, descriptors) in jpsModuleToRuntimeDescriptors) {
+      for (descriptor in descriptors) {
+        runtimeDescriptorToJpsModules[descriptor] = jpsModule
+      }
     }
 
     val unusedIgnoredDependenciesPatterns = options.missingCompileDeps.toMutableSet()
@@ -211,13 +217,13 @@ class PluginDependenciesValidator private constructor(
         scope == JpsJavaDependencyScope.COMPILE
         || scope == JpsJavaDependencyScope.PROVIDED && dependency is JpsModuleDependency && dependency.moduleReference.moduleName !in compileOnlyDependencies
       }
-      enumerator.processModules { targetModule ->
+      enumerator.forEachModule { targetModule ->
         val targetModuleName = targetModule.name
         if (targetModuleName !in moduleDependenciesAtRuntime) {
           val ignoredDependencyPattern = findIgnoredDependencyPattern(sourceModule.name, targetModuleName)
           if (ignoredDependencyPattern != null) {
             unusedIgnoredDependenciesPatterns.remove(ignoredDependencyPattern)
-            return@processModules
+            return@forEachModule
           }
 
           val allExpectedTargets = jpsModuleToRuntimeDescriptors[targetModuleName]
@@ -232,7 +238,7 @@ class PluginDependenciesValidator private constructor(
                 |$messageDescribingHowToUpdateLayoutData 
                 |""".trimMargin()
             errors.add(PluginModuleConfigurationError(pluginModelModuleName = sourceModule.name, errorMessage = errorMessage))
-            return@processModules
+            return@forEachModule
           }
 
           val expectedTargets = allExpectedTargets.filter { it.contentModuleName?.contains("/") != true }.takeIf { it.isNotEmpty() } ?: allExpectedTargets
@@ -271,6 +277,10 @@ class PluginDependenciesValidator private constructor(
     unusedIgnoredDependenciesPatterns.forEach { entry ->
         println("Unused ignored dependency pattern: '${entry.fromModule}' -> '${entry.toModule}' (${entry.issueId})")
     }
+
+    if (options.checkExtensionPointDependencies && errors.isEmpty()) {
+      checkExtensionsUseOnlyExtensionPointsFromDependencies(pluginSet, runtimeDescriptorToJpsModules)
+    }
   }
 
   private fun findIgnoredDependencyPattern(fromModule: String, toModule: String): MissingCompileDep? {
@@ -288,11 +298,94 @@ class PluginDependenciesValidator private constructor(
     return options.missingCompileDeps.find { fromModule.matches(it.fromModule) && toModule.matches(it.toModule) }
   }
 
+  private fun checkExtensionsUseOnlyExtensionPointsFromDependencies(
+    pluginSet: PluginSet,
+    runtimeDescriptorToJpsModules: Map<IdeaPluginDescriptorImpl, String>,
+  ) {
+    fun reportExtensionPointMisuse(descriptor: IdeaPluginDescriptorImpl, epName: String, message: String) {
+      val violation = ExtensionPointDependencyViolation(descriptor, epName)
+      if (violation in options.extensionPointDependencyViolationsToIgnore) {
+        return
+      }
+      errors.add(
+        PluginModuleConfigurationError(
+          pluginModelModuleName = runtimeDescriptorToJpsModules[descriptor] ?: violation.moduleName,
+          errorMessage = buildString {
+            appendLine(message)
+            appendLine()
+            appendLine("extensionPoint = $epName")
+            append("violation = $violation")
+          }
+        )
+      )
+    }
+
+    val extensionPointDeclarations = HashMap<String, MutableList<IdeaPluginDescriptorImpl>>()
+    for (descriptor in pluginSet.resolvedPluginSet.sortedResolvedDescriptors) {
+      for (container in listOf(descriptor.appContainerDescriptor, descriptor.projectContainerDescriptor, descriptor.moduleContainerDescriptor)) {
+        for (ep in container.extensionPoints) {
+          extensionPointDeclarations.computeIfAbsent(ep.getQualifiedName(descriptor)) { SmartList() }.add(descriptor)
+        }
+      }
+    }
+
+    val closureHandler = TransitiveDependenciesClosureHandler(pluginSet.resolvedPluginSet)
+    val staleSuppressions = mutableSetOf<ExtensionPointDependencyViolation>() // collect only those that are verified to be fixed
+
+    for (descriptor in pluginSet.resolvedPluginSet.sortedResolvedDescriptors) {
+      for ((epName, _) in descriptor.extensions) {
+        val declarationSources = extensionPointDeclarations[epName].orEmpty()
+        if (declarationSources.isEmpty()) {
+          reportExtensionPointMisuse(
+            descriptor = descriptor,
+            epName = epName,
+            message = "${descriptor.shortPresentation} declares an extension for extension point '$epName' which is not registered in any loaded plugin/module"
+          )
+          continue
+        }
+
+        var ok = false
+        for (dependency in closureHandler.getDependenciesClosureScopeIterator(descriptor)) {
+          if (dependency in declarationSources) {
+            ok = true
+            break
+          }
+        }
+        if (!ok) {
+          val declarationsPart = when {
+            declarationSources.size == 1 -> "which is registered in ${declarationSources.first().shortPresentation} " +
+                                            "but ${descriptor.shortPresentation} does not depend on it in runtime"
+            else -> "which is registered in ${declarationSources.joinToString(prefix = "[", postfix = "]") { it.shortPresentation }} " +
+                    "but ${descriptor.shortPresentation} does not depend on any of them in runtime"
+          }
+          reportExtensionPointMisuse(
+            descriptor = descriptor,
+            epName = epName,
+            message = """
+              |${descriptor.shortPresentation} declares an extension for extension point '$epName' $declarationsPart.
+              |Make sure there is a runtime dependency from ${descriptor.shortPresentation} to a module that registers the '$epName' extension point.
+            """.trimMargin()
+          )
+        }
+        else {
+          val violation = ExtensionPointDependencyViolation(descriptor, epName)
+          if (violation in options.extensionPointDependencyViolationsToIgnore) {
+            staleSuppressions += violation
+          }
+        }
+      }
+    }
+
+    if (staleSuppressions.isNotEmpty()) {
+      logger<PluginDependenciesValidator>().warn("Stale 'extension point dependency violation' suppressions:\n${staleSuppressions.joinToString(separator = "\n")}")
+    }
+  }
+
   private val IdeaPluginDescriptorImpl.shortPresentation: String
     get() = when (this) {
       is PluginMainDescriptor -> "main plugin module of '${pluginId}'"
       is ContentModuleDescriptor -> "content module '${contentModuleName}' of plugin '${pluginId}'"
-      is DependsSubDescriptor -> "depends sub descriptor of plugin '${pluginId}'"
+      is DependsSubDescriptor -> "<depends> config of plugin '${pluginId}'"
     }
 
   /**
@@ -310,13 +403,12 @@ class PluginDependenciesValidator private constructor(
     val raw = PluginDescriptorBuilder.builder().apply {
       this.id = pluginId
       if (moduleIds.isNotEmpty()) {
-        // namespace is required for ClassLoaderConfigurator (packagePrefix != null on content modules)
-        this.namespace = "jetbrains"
         for (moduleId in moduleIds) {
           // The `package` attribute on the embedded descriptor keeps jarFiles null on the content
           // module (loadPluginSubDescriptors won't set it), so checkPluginSet skips it.
           addContentModule(ContentModuleElement(
             name = moduleId,
+            namespace = "jetbrains",
             loadingRule = ModuleLoadingRuleValue.OPTIONAL,
             requiredIfAvailable = null,
             embeddedDescriptorContent = "<idea-plugin package=\"com.stub.$moduleId\" visibility=\"public\"/>".toCharArray(),
@@ -359,7 +451,7 @@ class PluginDependenciesValidator private constructor(
           errors.add(PluginModuleConfigurationError(
             pluginModelModuleName = it.mainJpsModule,
             errorMessage = e.message ?: e.toString(),
-            pluginLoadingError = PluginLoadingError(reason = null, htmlMessageSupplier = { HtmlChunk.text(e.message ?: e.toString()) }, error = e),
+            pluginLoadingError = PluginLoadingError(reason = null, messageSupplier = { e.message ?: e.toString() }, error = e),
           ))
           null
         }
@@ -490,10 +582,7 @@ class PluginDependenciesValidator private constructor(
         for (root in module.productionSourceRoots) {
           val file = root.findFile(path)
           if (file != null) {
-            return PluginDescriptorFromXmlStreamConsumer(readContext, xIncludeLoader).let {
-              it.consume(file.inputStream(), null)
-              it.getBuilder()
-            }
+            return parsePluginXml(file.inputStream(), null, readContext, xIncludeLoader)
           }
         }
       }
@@ -508,10 +597,7 @@ class PluginDependenciesValidator private constructor(
       val moduleDescriptor = findResourceFile(jpsModule, configFilePath)
       require(moduleDescriptor != null) { "Cannot find module descriptor '$configFilePath' in '$jpsModuleName' module" }
       val xIncludeLoader = PluginContentModuleFromSourceXIncludeLoader(jpsModule, xIncludeLoader)
-      return PluginDescriptorFromXmlStreamConsumer(readContext, xIncludeLoader).let {
-        it.consume(moduleDescriptor.inputStream(), null)
-        it.getBuilder()
-      }
+      return parsePluginXml(moduleDescriptor.inputStream(), null, readContext, xIncludeLoader)
     }
 
     override fun resolveCustomModuleClassesRoots(moduleId: PluginModuleId): List<Path> {
@@ -602,6 +688,50 @@ private fun suggestFix(
     is DependsSubDescriptor -> {
       """since files included via <depends> tag cannot declare additional dependencies,
         |$extractToContentModule""".trimMargin()
+    }
+  }
+}
+
+private class TransitiveDependenciesClosureHandler(private val resolvedPluginSet: ResolvedPluginSet) {
+  private val indexToDescriptor = resolvedPluginSet.sortedResolvedDescriptors.toList()
+  private val descriptorsCount = indexToDescriptor.size
+  private val descriptorToIndex = indexToDescriptor.withIndex().associateTo(HashMap(indexToDescriptor.size)) { it.value to it.index }
+  private val transitiveDependenciesClosure = MutableList<BitSet?>(descriptorsCount) { null }
+
+  // we know there are no cycles; total complexity O(M*N/w), where N - descriptors, M - dependency edges;
+  // not thread safe, but potential data races are benign
+  private fun getDependenciesClosureRow(index: Int): BitSet {
+    transitiveDependenciesClosure[index]?.let {
+      return it
+    }
+    val row = BitSet(descriptorsCount)
+    row.set(index)
+    for (dependency in resolvedPluginSet.getDirectResolvedDependencies(indexToDescriptor[index])) {
+      val dependencyIndex = descriptorToIndex[dependency]!!
+      row.or(getDependenciesClosureRow(dependencyIndex))
+    }
+    transitiveDependenciesClosure[index] = row
+    return row
+  }
+
+  /**
+   * Resulting iterator includes [descriptor]
+   */
+  fun getDependenciesClosureScopeIterator(descriptor: IdeaPluginDescriptorImpl): Iterator<IdeaPluginDescriptorImpl> {
+    val ownIndex = descriptorToIndex[descriptor] ?: throw IllegalArgumentException("Unexpected descriptor $descriptor")
+    val dependencies = getDependenciesClosureRow(ownIndex)
+    return object : Iterator<IdeaPluginDescriptorImpl> {
+      var nextIndex = dependencies.nextSetBit(0)
+
+      override fun next(): IdeaPluginDescriptorImpl {
+        val result = indexToDescriptor[nextIndex]
+        nextIndex = dependencies.nextSetBit(nextIndex + 1)
+        return result
+      }
+
+      override fun hasNext(): Boolean {
+        return nextIndex != -1
+      }
     }
   }
 }

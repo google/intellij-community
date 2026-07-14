@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vfs.impl;
 
 import com.intellij.openapi.diagnostic.Logger;
@@ -13,12 +13,13 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -30,7 +31,7 @@ import java.util.function.BiFunction;
 import static com.intellij.reference.SoftReference.dereference;
 
 /**
- * Use {@link TempCopyArchiveHandler} if you'd like to extract archive to a temporary file
+ * Use {@link TempCopyArchiveHandler} if you'd like to extract the archive to a temporary file
  * and use it to read attributes and content.
  */
 public abstract class ArchiveHandler {
@@ -72,7 +73,9 @@ public abstract class ArchiveHandler {
 
   /** @deprecated please use {@link #getPath} instead */
   @Deprecated
-  public @NotNull File getFile() {
+  @ApiStatus.ScheduledForRemoval
+  @SuppressWarnings({"IO_FILE_USAGE", "UnnecessaryFullyQualifiedName"})
+  public @NotNull java.io.File getFile() {
     return getPath().toFile();
   }
 
@@ -191,6 +194,12 @@ public abstract class ArchiveHandler {
           else {
             try {
               map = createEntriesMap();
+            }
+            catch (NoSuchFileException | FileNotFoundException e) {
+              // a missing archive (e.g., an undownloaded sources jar) is an expected state, not a corruption
+              myCorrupted = true;
+              Logger.getInstance(getClass()).warn(e.getClass().getSimpleName() + ": " + getPath());
+              map = Collections.emptyMap();
             }
             catch (Exception e) {
               myCorrupted = true;

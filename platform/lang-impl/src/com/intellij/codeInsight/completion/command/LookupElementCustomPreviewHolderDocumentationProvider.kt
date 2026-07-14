@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.completion.command
 
 import com.intellij.codeInsight.CodeInsightSettings
@@ -31,6 +31,8 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.ex.AnActionListener
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.readAction
+import com.intellij.openapi.application.runReadActionBlocking
+import com.intellij.openapi.diagnostic.fileLogger
 import com.intellij.openapi.diff.DiffColors
 import com.intellij.openapi.editor.colors.EditorColors
 import com.intellij.openapi.editor.colors.EditorColorsManager
@@ -41,6 +43,7 @@ import com.intellij.openapi.editor.richcopy.HtmlSyntaxInfoUtil
 import com.intellij.openapi.editor.richcopy.SyntaxInfoBuilder
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.util.text.HtmlChunk
@@ -59,16 +62,17 @@ import com.intellij.ui.DeferredIcon
 import com.intellij.ui.LayeredIcon
 import com.intellij.ui.RowIcon
 import com.intellij.ui.icons.CachedImageIcon
+import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.messages.MessageBusConnection
 import com.intellij.util.ui.UIUtil
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.VisibleForTesting
-import java.util.function.Function
 
-
+@ApiStatus.Internal
 class LookupElementCustomPreviewHolderDocumentationProvider : LookupElementDocumentationTargetProvider {
   override fun documentationTarget(psiFile: PsiFile, element: LookupElement, offset: Int): DocumentationTarget? {
-    val customPreviewHolder = getLookupElementCustomPreviewHolder(element) ?: return null
-    val anchorElement = if (offset - 1 >= 0) psiFile.findElementAt(offset - 1) else psiFile.findElementAt(offset)
+    val customPreviewHolder = element.getCustomPreviewHolder() ?: return null
+    val anchorElement = if (offset >= 1) psiFile.findElementAt(offset - 1) else psiFile.findElementAt(offset)
     if (anchorElement == null) return null
     return CustomPreviewDocumentationTarget(anchorElement, customPreviewHolder, offset)
   }
@@ -91,21 +95,21 @@ private class CustomPreviewDocumentationTarget(
   }
 
   override fun computePresentation(): TargetPresentation {
-    if (customPreviewHolder is LookupElement) {
-      val presentation = LookupElementPresentation()
-      customPreviewHolder.renderElement(presentation)
-
-      var presentableText = presentation.itemText
-      if (presentableText == null && customPreviewHolder is CommandCompletionLookupElement) {
-        presentableText = customPreviewHolder.command.presentableName
-      }
-      presentableText = presentableText ?: ""
-      return TargetPresentation.builder(presentableText)
-        .icon(presentation.icon)
-        .containerText(presentation.tailText)
-        .presentation()
+    if (customPreviewHolder !is LookupElement) {
+      return TargetPresentation.builder("").presentation()
     }
-    return TargetPresentation.builder("").presentation()
+
+    val presentation = LookupElementPresentation()
+    customPreviewHolder.renderElement(presentation)
+
+    val presentableText = presentation.itemText
+                          ?: (customPreviewHolder as? CommandCompletionLookupElement)?.command?.presentableName
+                          ?: ""
+
+    return TargetPresentation.builder(presentableText)
+      .icon(presentation.icon)
+      .containerText(presentation.tailText)
+      .presentation()
   }
 
   override fun computeDocumentation(): DocumentationResult {
@@ -311,7 +315,7 @@ private class CustomPreviewDocumentationTarget(
   }
 }
 
-private fun String.indexesOf(fragment: String): MutableList<Int> {
+private fun String.indexesOf(fragment: String): List<Int> {
   val result = mutableListOf<Int>()
   var index = indexOf(fragment)
   while (index >= 0) {
@@ -321,6 +325,7 @@ private fun String.indexesOf(fragment: String): MutableList<Int> {
   return result
 }
 
+@ApiStatus.Internal
 @VisibleForTesting
 fun combineFragments(
   fragments: List<IntentionPreviewDiffResult.Fragment>,
@@ -366,33 +371,34 @@ fun combineFragments(
 
 internal class CommandCompletionLookupMayHaveCustomPreviewProvider : LookupMayHaveCustomPreviewProvider {
   override fun mayHaveCustomPreview(lookup: Lookup): Boolean {
+    if (!lookup.isCompletion) return false
     if (!ApplicationCommandCompletionService.getInstance().commandCompletionEnabled()) return false
-    val editor = lookup.editor
     val psiFile = lookup.psiFile ?: return false
     val project = lookup.project
-    val topLevelFile = InjectedLanguageManager.getInstance(project).getTopLevelFile(psiFile)
-    if (topLevelFile?.virtualFile == null || topLevelFile.virtualFile is LightVirtualFile) {
+    val topLevelFile = InjectedLanguageManager.getInstance(project).getTopLevelFile(psiFile) ?: return false
+    if (topLevelFile.virtualFile == null || topLevelFile.virtualFile is LightVirtualFile) {
       return false
     }
-    if (lookup !is LookupImpl) return false
-    val completionService = editor.project?.getService(CommandCompletionService::class.java)
-    completionService?.getFactory(psiFile.language) ?: return false
-    return true
+    val completionService = project.getService(CommandCompletionService::class.java)
+    return completionService.getFactory(psiFile.language) != null
   }
 }
-
 
 internal class CustomLookupIntentionPreviewListener : LookupManagerListener {
   override fun activeLookupChanged(oldLookup: Lookup?, newLookup: Lookup?) {
     if (newLookup !is LookupImpl) return
+
     newLookup.addLookupListener(object : LookupListener {
       override fun lookupShown(event: LookupEvent) {
-        if (LookupMayHaveCustomPreviewProvider.EP_NAME.extensionList.none { it.mayHaveCustomPreview(newLookup) }) return
-        installLookupIntentionPreviewListener(newLookup)
+        if (LookupMayHaveCustomPreviewProvider.mayHaveCustomPreview(newLookup)) {
+          installLookupIntentionPreviewMachinery(newLookup)
+        }
       }
     })
   }
 }
+
+private val preview_installed_key = Key.create<Boolean>("preview.installed")
 
 /**
  * Installs a listener on the provided lookup that enables preview functionality for intentions
@@ -400,42 +406,51 @@ internal class CustomLookupIntentionPreviewListener : LookupManagerListener {
  * for relevant completion items when the lookup selection changes.
  *
  * @param lookup the instance of `LookupImpl` for which the preview listener is to be installed
+ * @return true if preview machinery was installed during this call
  */
-internal fun installLookupIntentionPreviewListener(lookup: LookupImpl) {
-  if (!EditorSettingsExternalizable.getInstance().isShowIntentionPreview) return
+@ApiStatus.Internal
+@RequiresEdt
+fun installLookupIntentionPreviewMachinery(lookup: LookupImpl): Boolean {
+  if (!lookup.replace(preview_installed_key, null, true)) {
+    return false
+  }
+
+  if (!lookup.isShown) {
+    fileLogger().error("Lookup must be shown when preview is being installed")
+  }
+
+  if (!EditorSettingsExternalizable.getInstance().isShowIntentionPreview) return false
   val project = lookup.project
-  val file = lookup.psiFile ?: return
-  if (showJavaDocPreview(project)) return
-  val previewHandler =
-    LookupPreviewHandler(
-      project, lookup,
-      Function { element: Any? ->
-        return@Function element as? LookupElement
-      },
-      Function { element: LookupElement? ->
-        val commandElement = getLookupElementCustomPreviewHolder(element)
-        commandElement?.preview(ActionContext.from(lookup.editor, file)) ?: IntentionPreviewInfo.EMPTY
-      }
-    )
+  val file = lookup.psiFile ?: return false
+  if (showJavaDocPreview(project)) return false
+
+  val previewHandler = LookupPreviewHandler(
+    /* project = */ project,
+    /* lookup = */ lookup,
+    /* mapper = */ { element -> element as? LookupElement },
+    /* previewGenerator = */ { element -> generatePreview(element, lookup, file) }
+  )
 
   val listener = object : LookupListener {
     private var shown: Boolean = false
-    override fun currentItemChanged(event: LookupEvent) {
-      val currentItem = event.lookup.currentItem
-      val element = getLookupElementCustomPreviewHolder(currentItem)
-      if (!shown && element != null) {
-        shown = true
-        previewHandler.showInitially()
-      }
-    }
 
+    override fun currentItemChanged(event: LookupEvent) = tryShowPreview()
     override fun itemSelected(event: LookupEvent): Unit = stopPreview()
     override fun lookupCanceled(event: LookupEvent): Unit = stopPreview()
+
+    fun tryShowPreview() {
+      if (shown || lookup.currentItem?.getCustomPreviewHolder() == null) return
+      shown = true
+      previewHandler.showInitially()
+    }
+
     fun stopPreview() {
-      previewHandler.close()
+      runReadActionBlocking { previewHandler.close() }
       lookup.removeLookupListener(this)
     }
   }
+
+  listener.tryShowPreview()
 
   lookup.addLookupListener(listener)
 
@@ -448,13 +463,26 @@ internal fun installLookupIntentionPreviewListener(lookup: LookupImpl) {
       listener.stopPreview()
     }
   })
+  return true
 }
 
-fun getLookupElementCustomPreviewHolder(element: LookupElement?): LookupElementCustomPreviewHolder? {
-  if (element is CompletionItemLookupElement) {
-    return element.item() as? LookupElementCustomPreviewHolder
-  }
-  return element?.`as`(LookupElementCustomPreviewHolder::class.java)
+private fun generatePreview(
+  element: LookupElement,
+  lookup: LookupImpl,
+  file: PsiFile,
+): IntentionPreviewInfo {
+  val previewHolder = element.getCustomPreviewHolder() ?: return IntentionPreviewInfo.EMPTY
+  val ctx = ActionContext.from(lookup.editor, file)
+  return previewHolder.preview(ctx)
+}
+
+@ApiStatus.Internal
+fun LookupElement.getCustomPreviewHolder(): LookupElementCustomPreviewHolder? {
+  val holder =
+    this.`as`(CompletionItemLookupElement::class.java)?.item() as? LookupElementCustomPreviewHolder
+    ?: this.`as`(LookupElementCustomPreviewHolder::class.java)
+
+  return holder?.takeIf { it.hasPreview() }
 }
 
 internal fun showJavaDocPreview(project: Project): Boolean =

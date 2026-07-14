@@ -2,6 +2,8 @@
 package com.intellij.platform.debugger.impl.frontend
 
 import com.intellij.diagnostic.logging.LogFilesManager
+import com.intellij.execution.EXECUTION_ENVIRONMENT_ID
+import com.intellij.execution.RUN_CONTENT_DESCRIPTOR_ID
 import com.intellij.execution.RunContentDescriptorIdImpl
 import com.intellij.execution.process.ProcessHandler
 import com.intellij.execution.runners.RunTab
@@ -43,7 +45,6 @@ import com.intellij.platform.debugger.impl.rpc.XSuspendContextDto
 import com.intellij.platform.debugger.impl.rpc.XValueMarkerId
 import com.intellij.platform.debugger.impl.rpc.actionIds
 import com.intellij.platform.debugger.impl.rpc.consoleView
-import com.intellij.platform.debugger.impl.shared.FrontendDescriptorStateManager
 import com.intellij.platform.debugger.impl.shared.childScopeCancelledOnSessionEvents
 import com.intellij.platform.debugger.impl.shared.proxy.XBreakpointProxy
 import com.intellij.platform.debugger.impl.shared.proxy.XDebugSessionProxy
@@ -71,7 +72,6 @@ import com.intellij.xdebugger.impl.frame.XValueMarkers
 import com.intellij.xdebugger.impl.inline.DebuggerInlayListener
 import com.intellij.xdebugger.impl.rpc.sourcePosition
 import com.intellij.xdebugger.impl.rpc.toRpc
-import com.intellij.xdebugger.impl.ui.SplitDebuggerDataKeys
 import com.intellij.xdebugger.impl.ui.XDebugSessionData
 import com.intellij.xdebugger.impl.ui.XDebugSessionTab
 import com.intellij.xdebugger.ui.XDebugTabLayouter
@@ -186,8 +186,8 @@ class FrontendXDebuggerSession(
 
   override val editorsProvider: XDebuggerEditorsProvider = getEditorsProvider(
     cs, sessionDto.editorsProviderDto, documentIdProvider = { frontendDocumentId, expression, position, mode ->
-    XDebugSessionApi.getInstance().createDocument(frontendDocumentId, sessionDto.id, expression, position, mode)
-  })
+      XDebugSessionApi.getInstance().createDocument(frontendDocumentId, sessionDto.id, expression, position, mode)
+    })
 
   override val isLibraryFrameFilterSupported: Boolean = sessionDto.isLibraryFrameFilterSupported
 
@@ -222,8 +222,8 @@ class FrontendXDebuggerSession(
     get() = sessionDto.extraStopActions.mapNotNull { it.action() }
   override val consoleActions: List<AnAction>
     get() = sessionDto.consoleViewData?.actionIds()?.mapNotNull { it.action() }
-          ?: consoleView?.createConsoleActions()?.toList()
-          ?: emptyList()
+            ?: consoleView?.createConsoleActions()?.toList()
+            ?: emptyList()
   override val coroutineScope: CoroutineScope = cs
 
   private val _currentStateMessageState: StateFlow<String>? = createMessageStateFlowIfNeeded()
@@ -258,7 +258,7 @@ class FrontendXDebuggerSession(
       val processDescriptorDeferred = sessionDto.processDescriptor
       if (processDescriptorDeferred != null) {
         val processDescriptor = processDescriptorDeferred.await()
-        FrontendDescriptorStateManager.getInstance(project).registerProcessDescriptor(id, processDescriptor, cs)
+        FrontendCustomDescriptorStateManager.getInstance(project).registerProcessDescriptor(id, processDescriptor, cs)
       }
       sessionDto.sessionEvents.toFlow().collect { event ->
         with(event) {
@@ -425,12 +425,17 @@ class FrontendXDebuggerSession(
       // so [consoleView] will return an up-to-date result
       consoleViewDeferred.await()
 
-      XDebugSessionTab.create(proxy, tabInfo.iconId?.icon(), tabInfo.executionEnvironmentProxyDto?.executionEnvironment(project, tabScope), contentToReuse,
-                              tabInfo.forceNewDebuggerUi, tabInfo.withFramesCustomization, tabInfo.defaultFramesViewKey).apply {
+      XDebugSessionTab.create(proxy,
+                              tabInfo.iconId?.icon(),
+                              tabInfo.executionEnvironmentProxyDto?.executionEnvironment(project, tabScope),
+                              contentToReuse,
+                              tabInfo.forceNewDebuggerUi,
+                              tabInfo.withFramesCustomization,
+                              tabInfo.defaultFramesViewKey).apply {
         setAdditionalKeysProvider { sink ->
-          sink[SplitDebuggerDataKeys.SPLIT_RUN_CONTENT_DESCRIPTOR_KEY] = backendRunContentDescriptorId
+          sink[RUN_CONTENT_DESCRIPTOR_ID] = backendRunContentDescriptorId
           if (executionEnvironmentId != null) {
-            sink[SplitDebuggerDataKeys.SPLIT_EXECUTION_ENVIRONMENT_KEY] = executionEnvironmentId
+            sink[EXECUTION_ENVIRONMENT_ID] = executionEnvironmentId
           }
         }
         sessionTabDeferred.complete(this)
@@ -517,6 +522,10 @@ class FrontendXDebuggerSession(
       topSourcePosition = getFrameSourcePosition(frame)
     }
 
+    // N.B. notifyChanged guarantees that we notify listeners about user action,
+    // including side effects, such as navigation to the selected position.
+    // That's why callers should call this method only if the 'frame change' event is actually needed
+    // or check whether the frame is currently the same instead.
     currentStackFrame.value = StackFrameUpdate.notifyChanged(frame)
     val suspendContext = getCurrentSuspendContext() ?: return
     suspendContext.lifetimeScope.launch {
@@ -579,7 +588,11 @@ class FrontendXDebuggerSession(
     }
   }
 
-  override fun registerAdditionalActions(leftToolbar: DefaultActionGroup, topLeftToolbar: DefaultActionGroup, settings: DefaultActionGroup) {
+  override fun registerAdditionalActions(
+    leftToolbar: DefaultActionGroup,
+    topLeftToolbar: DefaultActionGroup,
+    settings: DefaultActionGroup,
+  ) {
     // Only individual actions are currently serialized in RemDev.
     // As a result, additional actions registered on the backend are added here as a flat list,
     // and separators e.g. from the original backend structure are not preserved.
@@ -587,7 +600,8 @@ class FrontendXDebuggerSession(
     val monolithSession = XDebuggerEntityConverter.getSession(this)
     if (monolithSession != null) {
       monolithSession.debugProcess.registerAdditionalActions(leftToolbar, topLeftToolbar, settings)
-    } else {
+    }
+    else {
       leftToolbar.addActions(sessionDto.leftToolbarActions)
       topLeftToolbar.addActions(sessionDto.topToolbarActions)
       settings.addActions(sessionDto.settingsActions)
@@ -623,7 +637,7 @@ class FrontendXDebuggerSession(
   override fun muteBreakpoints(value: Boolean) {
     // Optimistic update
     sessionData.isBreakpointsMuted = value
-    manager.breakpointsManager.getLineBreakpointManager().queueAllBreakpointsUpdate()
+    manager.breakpointsManager.getLineBreakpointVisualizationManager().queueAllBreakpointsUpdate()
   }
 
   override fun isInactiveSlaveBreakpoint(breakpoint: XBreakpointProxy): Boolean {
@@ -711,7 +725,7 @@ private fun <T> CoroutineScope.syncWithLocalFlow(sourceFlow: Flow<T>, localFlowS
 private suspend fun Flow<XExecutionStackGroupsEvent>.collectExecutionStackGroupEvents(
   project: Project,
   coroutineScope: CoroutineScope,
-  container: XSuspendContext.XExecutionStackGroupContainer
+  container: XSuspendContext.XExecutionStackGroupContainer,
 ) {
   collect { executionStackEvent ->
     when (executionStackEvent) {
@@ -731,5 +745,3 @@ private suspend fun Flow<XExecutionStackGroupsEvent>.collectExecutionStackGroupE
     }
   }
 }
-
-

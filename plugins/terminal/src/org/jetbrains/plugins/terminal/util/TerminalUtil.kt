@@ -7,22 +7,33 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.KeyboardShortcut
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.fileLogger
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.keymap.KeyMapBundle
 import com.intellij.openapi.keymap.Keymap
 import com.intellij.openapi.keymap.KeymapManager
 import com.intellij.openapi.keymap.ex.KeymapManagerEx
 import com.intellij.openapi.util.Disposer
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
+import com.intellij.util.concurrency.annotations.RequiresReadLockAbsence
+import com.intellij.util.io.awaitExit
 import com.jediterm.terminal.ProcessTtyConnector
+import com.jediterm.terminal.TerminalStarter
 import com.jediterm.terminal.TtyConnector
 import com.jediterm.terminal.model.TerminalModelListener
 import com.jediterm.terminal.model.TerminalTextBuffer
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.time.withTimeout
+import kotlinx.coroutines.time.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
+import org.jetbrains.plugins.terminal.LocalTerminalTtyConnector
+import org.jetbrains.plugins.terminal.LocalTtyConnectorClosingException
 import org.jetbrains.plugins.terminal.ShellTerminalWidget
+import org.jetbrains.plugins.terminal.original
 import java.nio.file.Files
 import java.nio.file.InvalidPathException
 import java.nio.file.Path
@@ -36,7 +47,80 @@ internal fun TerminalTextBuffer.addModelListener(parentDisposable: Disposable, l
 }
 
 @ApiStatus.Internal
-fun TtyConnector.waitFor(timeout: Duration, callback: () -> Unit) {
+@JvmField
+val CONNECTOR_CLOSING_TIMEOUT: Duration = Duration.ofSeconds(3)
+
+@ApiStatus.Internal
+suspend fun TerminalStarter.closeConnectorAndStopEmulation() {
+  // It is a cleanup activity - it shouldn't be canceled in the middle
+  withContext(Dispatchers.IO + NonCancellable) {
+    // No exception is expected there, but let's use `try` for extra safety to ensure that `requestEmulatorStop` is called in any case.
+    try {
+      ttyConnector.closeAndWaitFor(CONNECTOR_CLOSING_TIMEOUT)
+    }
+    finally {
+      // Stop reading from the connector
+      requestEmulatorStop()
+    }
+  }
+}
+
+/**
+ * @return the exit code of the process if it was closed successfully, null otherwise.
+ */
+@ApiStatus.Internal
+suspend fun TtyConnector.closeAndWaitFor(timeout: Duration): Int? {
+  return withContext(Dispatchers.IO) {
+    val localTtyConnector = original as? LocalTerminalTtyConnector
+    if (localTtyConnector != null) {
+      localTtyConnector.closeAndWaitFor(timeout)
+    }
+    else {
+      close()
+      waitFor(timeout)
+    }
+  }
+}
+
+private suspend fun LocalTerminalTtyConnector.closeAndWaitFor(timeout: Duration): Int? {
+  try {
+    closeSafely()
+  }
+  catch (e: LocalTtyConnectorClosingException) {
+    logger<LocalTerminalTtyConnector>().warn(e.message, e.cause)
+    // No need to wait for the connector to close because closing activities failed
+    // So, let's return null immediately.
+    return null
+  }
+
+  return waitFor(timeout)
+}
+
+/**
+ * Waits for the [TtyConnector] closing until [timeout] elapses.
+ * @return the exit code of the process if it was closed successfully, null otherwise.
+ */
+@ApiStatus.Internal
+suspend fun TtyConnector.waitFor(timeout: Duration): Int? {
+  if (!this.isConnected) {
+    return waitFor() // should return the exit code of the process immediately
+  }
+  return withTimeoutOrNull(timeout) {
+    val processTtyConnector = original as? ProcessTtyConnector
+    if (processTtyConnector != null) {
+      processTtyConnector.process.awaitExit()
+    }
+    else withContext(Dispatchers.IO) {
+      waitFor()
+    }
+  }
+}
+
+/**
+ * Waits for the TtyConnector closing and executes the [callback] asynchronously.
+ */
+@ApiStatus.Internal
+fun TtyConnector.waitForAsync(timeout: Duration, callback: () -> Unit) {
   if (!this.isConnected) {
     callback()
     return
@@ -78,10 +162,6 @@ internal fun TtyConnector.getDebugName(): @NonNls String {
   }
   return name
 }
-
-@ApiStatus.Internal
-@JvmField
-val STOP_EMULATOR_TIMEOUT: Duration = Duration.ofMillis(1500)
 
 @ApiStatus.Internal
 fun <T : Any> fireListenersAndLogAllExceptions(
@@ -135,8 +215,10 @@ private fun getKeymapToModify(): Keymap? {
   else keymapToModify
 }
 
-internal fun toExistentNioDirectory(directory: String?, labelToLogOnFailure: String? = null): Path? {
-  directory ?: return null
+@RequiresBackgroundThread(generateAssertion = false)
+@RequiresReadLockAbsence(generateAssertion = false)
+internal fun String?.toExistentNioDirectory(labelToLogOnFailure: String? = null): Path? {
+  val directory = this ?: return null
   if (directory.isBlank()) {
     if (labelToLogOnFailure != null) {
       val type = if (directory.isEmpty()) "empty" else "blank"

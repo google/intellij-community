@@ -12,10 +12,10 @@ import andel.operation.isIdentity
 import andel.operation.isNotIdentity
 import andel.text.Text
 import andel.text.TextRange
+import fleet.openmap.BoundedOpenMap
+import fleet.openmap.MutableOpenMap
 import fleet.util.UID
 import fleet.util.logging.KLoggers
-import fleet.util.openmap.BoundedOpenMap
-import fleet.util.openmap.MutableOpenMap
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
@@ -113,7 +113,7 @@ private fun MutableEditor.toTransient(syncEditor: suspend (TransientEditor) -> U
 
 private class PerCaretOrchestrator {
   companion object {
-    val logger = KLoggers.logger(PerCaretOrchestrator::class)
+    val logger by lazy { KLoggers.logger(PerCaretOrchestrator::class) }
   }
 
   val continuations: MutableMap<TransientEditor, Continuation<Unit>> = HashMap()

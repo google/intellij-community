@@ -11,6 +11,13 @@
     expressions and named templates for XSLT documents.
   ]]></description>
 
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+  <dependencies>
+    <module name="intellij.platform.structureView"/>
+    <module name="intellij.xml.dom.impl"/>
+    <module name="intellij.xml.impl"/>
+  </dependencies>
+  <!-- endregion -->
   <depends>com.intellij.modules.xml</depends>
   <resource-bundle>messages.XPathBundle</resource-bundle>
 

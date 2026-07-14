@@ -98,9 +98,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jdom.Element
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.ApiStatus.Internal
 import java.awt.BorderLayout
 import java.awt.Color
@@ -223,7 +225,9 @@ open class EditorComposite internal constructor(
         }
       }
 
-      coroutineScope.launch(ModalityState.any().asContextElement() + clientId.asContextElement() + tracer.rootSpan("EditorComposite model flow", arrayOf("file", file.name))) {
+      coroutineScope.launch(ModalityState.any()
+                              .asContextElement() + clientId.asContextElement() + tracer.rootSpan("EditorComposite model flow",
+                                                                                                  arrayOf("file", file.name))) {
         span("waiting initDeferred") {
           initDeferred.await()
         }
@@ -260,6 +264,9 @@ open class EditorComposite internal constructor(
   fun isAvailable(): Boolean = fileEditorWithProviders.value !== INITIAL_EMPTY
 
   @Internal
+  fun isDisposed(): Boolean = !coroutineScope.isActive
+
+  @Internal
   protected open suspend fun beforeFileOpen(scope: CoroutineScope, model: EditorCompositeModel) {
   }
 
@@ -292,8 +299,10 @@ open class EditorComposite internal constructor(
       val selectedFileEditor = getSelectedEditor(fileEditorWithProviders, model.state)
 
       // read not in EDT
-      val states = fileEditorWithProviders.map { (_, provider) ->
-        getEditorState(provider, model.state)
+      val states = span("read editor state") {
+        fileEditorWithProviders.map { (_, provider) ->
+          getEditorState(provider, model.state)
+        }
       }
 
       val fileEditorManager = project.serviceAsync<FileEditorManager>()
@@ -312,13 +321,13 @@ open class EditorComposite internal constructor(
         span("Artificially wait if the skeleton has been set recently to avoid flickering") {
           compositePanel.skeleton?.let { editorSkeleton ->
             val hasBeenShownFor = System.currentTimeMillis() - editorSkeleton.initialTime.get()
-            if (hasBeenShownFor < SKELETON_DELAY) {
-              delay(SKELETON_DELAY - hasBeenShownFor)
+            if (hasBeenShownFor < editorSkeleton.skeletonDelayMs) {
+              delay(editorSkeleton.skeletonDelayMs - hasBeenShownFor)
             }
           }
         }
 
-        applyFileEditorsInEdt(
+        applyFileEditorsInEdtWithSpans(
           states = states,
           fileEditorWithProviders = fileEditorWithProviders,
           selectedFileEditorProvider = selectedFileEditor,
@@ -354,7 +363,7 @@ open class EditorComposite internal constructor(
     fileEditorWithProviders.assignEditorProperties()
 
     val states = oldBadForRemoteDevGetStates(fileEditorWithProviders = fileEditorWithProviders, state = model.state)
-    applyFileEditorsInEdt(fileEditorWithProviders = fileEditorWithProviders, selectedFileEditorProvider = null, states = states)
+    applyFileEditorsInEdt(fileEditorWithProviders = fileEditorWithProviders, states = states)
   }
 
   private fun List<FileEditorWithProvider>.assignEditorProperties(): Unit = forEach { it.fileEditor.assignProperties() }
@@ -403,7 +412,7 @@ open class EditorComposite internal constructor(
     )
 
     val states = oldBadForRemoteDevGetStates(fileEditorWithProviders = fileEditorWithProviders, state = model.state)
-    applyFileEditorsInEdt(fileEditorWithProviders = fileEditorWithProviders, selectedFileEditorProvider = null, states = states)
+    applyFileEditorsInEdt(fileEditorWithProviders = fileEditorWithProviders, states = states)
 
     shownDeferred.complete(Unit)
 
@@ -422,37 +431,85 @@ open class EditorComposite internal constructor(
   }
 
   @RequiresEdt
-  private fun applyFileEditorsInEdt(
+  private suspend fun applyFileEditorsInEdtWithSpans(
     fileEditorWithProviders: List<FileEditorWithProvider>,
     states: List<FileEditorState?>,
     selectedFileEditorProvider: FileEditorProvider?,
-  ) = WriteIntentReadAction.run {
-    for ((index, fileEditorWithProvider) in fileEditorWithProviders.withIndex()) {
-      states.get(index)?.also { state ->
-        computeOrLogException(
-          lambda = { restoreEditorState(fileEditorWithProvider, state, exactState = false, project) },
-          errorMessage = { "failed to restore state for $fileEditorWithProvider" },
-        )
-      }
+  ) {
+    span("restore editor state") {
+      restoreEditorStatesInEdt(fileEditorWithProviders = fileEditorWithProviders, states = states)
     }
-
-    var fileEditorWithProviderToSelect = fileEditorWithProviders.firstOrNull()
-    if (fileEditorWithProviders.size == 1) {
-      setEditorComponent(fileEditorWithProviderToSelect!!.fileEditor)
+    val fileEditorWithProviderToSelect = span("set editor component") {
+      setEditorComponentInEdt(
+        fileEditorWithProviders = fileEditorWithProviders,
+        selectedFileEditorProvider = selectedFileEditorProvider,
+      )
     }
-    else {
-      val tabbedPaneWrapper = createTabbedPaneWrapper(component = null, fileEditorWithProviders = fileEditorWithProviders)
-      setTabbedPaneComponent(tabbedPaneWrapper = tabbedPaneWrapper)
+    span("validate editor component") {
+      validateEditorComponentInEdt()
+    }
+    span("editor select notify") {
+      selectEditorInEdt(fileEditorWithProviderToSelect)
+    }
+    setFileEditorsInEdt(fileEditorWithProviders = fileEditorWithProviders, selectedEditor = fileEditorWithProviderToSelect)
+  }
 
-      if (selectedFileEditorProvider != null) {
-        val index = fileEditorWithProviders.indexOfFirst { it.provider === selectedFileEditorProvider }
-        if (index != -1) {
-          tabbedPaneWrapper.selectedIndex = index
-          fileEditorWithProviderToSelect = fileEditorWithProviders.get(index)
+  @RequiresEdt
+  private fun applyFileEditorsInEdt(
+    fileEditorWithProviders: List<FileEditorWithProvider>,
+    states: List<FileEditorState?>,
+  ) {
+    restoreEditorStatesInEdt(fileEditorWithProviders = fileEditorWithProviders, states = states)
+    val fileEditorWithProviderToSelect = setEditorComponentInEdt(
+      fileEditorWithProviders = fileEditorWithProviders,
+      selectedFileEditorProvider = null,
+    )
+    validateEditorComponentInEdt()
+    selectEditorInEdt(fileEditorWithProviderToSelect)
+    setFileEditorsInEdt(fileEditorWithProviders = fileEditorWithProviders, selectedEditor = fileEditorWithProviderToSelect)
+  }
+
+  @RequiresEdt
+  private fun restoreEditorStatesInEdt(fileEditorWithProviders: List<FileEditorWithProvider>, states: List<FileEditorState?>) =
+    WriteIntentReadAction.run {
+      for ((index, fileEditorWithProvider) in fileEditorWithProviders.withIndex()) {
+        states.get(index)?.also { state ->
+          computeOrLogException(
+            lambda = { restoreEditorState(fileEditorWithProvider, state, exactState = false, project) },
+            errorMessage = { "failed to restore state for $fileEditorWithProvider" },
+          )
         }
       }
     }
 
+  @RequiresEdt
+  private fun setEditorComponentInEdt(
+    fileEditorWithProviders: List<FileEditorWithProvider>,
+    selectedFileEditorProvider: FileEditorProvider?,
+  ): FileEditorWithProvider? {
+    var fileEditorWithProviderToSelect = fileEditorWithProviders.firstOrNull()
+    WriteIntentReadAction.run {
+      if (fileEditorWithProviders.size == 1) {
+        setEditorComponent(fileEditorWithProviderToSelect!!.fileEditor)
+      }
+      else {
+        val tabbedPaneWrapper = createTabbedPaneWrapper(component = null, fileEditorWithProviders = fileEditorWithProviders)
+        setTabbedPaneComponent(tabbedPaneWrapper = tabbedPaneWrapper)
+
+        if (selectedFileEditorProvider != null) {
+          val index = fileEditorWithProviders.indexOfFirst { it.provider === selectedFileEditorProvider }
+          if (index != -1) {
+            tabbedPaneWrapper.selectedIndex = index
+            fileEditorWithProviderToSelect = fileEditorWithProviders.get(index)
+          }
+        }
+      }
+    }
+    return fileEditorWithProviderToSelect
+  }
+
+  @RequiresEdt
+  private fun validateEditorComponentInEdt() = WriteIntentReadAction.run {
     computeOrLogException(
       lambda = {
         // ensure FileEditor's component has valid boundaries after creation
@@ -462,17 +519,24 @@ open class EditorComposite internal constructor(
       },
       errorMessage = { "failed to validate panel component" },
     )
+  }
 
+  @RequiresEdt
+  private fun selectEditorInEdt(fileEditorWithProviderToSelect: FileEditorWithProvider?) = WriteIntentReadAction.run {
     computeOrLogException(
       lambda = { fileEditorWithProviderToSelect?.fileEditor?.selectNotify() },
       errorMessage = { "exception during selectNotify" },
     )
-
-    // Only after applyFileEditorsInEdt - for external clients composite API should use _actual_ _applied_ state, not intermediate.
-    // For example, see EditorHistoryManager -
-    // we will get assertion if we return a non-empty list of editors but do not set selected file editor.
-    setFileEditors(fileEditorWithProviders, fileEditorWithProviderToSelect)
   }
+
+  @RequiresEdt
+  private fun setFileEditorsInEdt(fileEditorWithProviders: List<FileEditorWithProvider>, selectedEditor: FileEditorWithProvider?) =
+    WriteIntentReadAction.run {
+      // Only after applyFileEditorsInEdt - for external clients composite API should use _actual_ _applied_ state, not intermediate.
+      // For example, see EditorHistoryManager -
+      // we will get assertion if we return a non-empty list of editors but do not set selected file editor.
+      setFileEditors(fileEditorWithProviders, selectedEditor)
+    }
 
   private suspend fun getSelectedEditor(fileEditorWithProviders: List<FileEditorWithProvider>, state: FileEntry?): FileEditorProvider? {
     return if (state != null) {
@@ -621,6 +685,10 @@ open class EditorComposite internal constructor(
               replaceWith = ReplaceWith("FileEditorManager.getInstance()"),
               level = DeprecationLevel.ERROR)
   val fileEditorManager: FileEditorManager
+    @ApiStatus.ScheduledForRemoval
+    @Deprecated(message = "Use FileEditorManager.getInstance()",
+                replaceWith = ReplaceWith("FileEditorManager.getInstance()"),
+                level = DeprecationLevel.ERROR)
     get() = FileEditorManager.getInstance(project)
 
   @get:Deprecated("use {@link #getAllEditors()}", ReplaceWith("allEditors"), level = DeprecationLevel.ERROR)
@@ -906,7 +974,8 @@ open class EditorComposite internal constructor(
         currentInTab = false,
         ideFingerprint = null,
         managingFsCreationTimestamp = getManagingFsCreationTimestamp(file),
-        protocol = getProtocol(file)
+        protocol = getProtocol(file),
+        isExcludedFromTabLimit = !EditorAutoClosingHandler.isClosingAllowed(this@EditorComposite),
       )
     }
   }
@@ -1020,8 +1089,9 @@ internal class EditorCompositePanel(@JvmField val composite: EditorComposite) : 
     isFocusCycleRoot = true
 
     if (EditorSkeletonPolicy.shouldShowSkeleton(composite)) {
+      val skeletonDelay = EditorSkeletonPolicy.getSkeletonDelayMs(composite)
       skeletonScope.launch(Dispatchers.UI) {
-        setNewSkeleton(EditorCompositeSkeletonFactory.getInstance(composite.project).createSkeleton(skeletonScope))
+        setNewSkeleton(EditorCompositeSkeletonFactory.getInstance(composite.project).createSkeleton(skeletonScope, skeletonDelay))
       }
     }
     else {

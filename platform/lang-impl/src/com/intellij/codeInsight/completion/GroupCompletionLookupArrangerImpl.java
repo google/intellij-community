@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.completion;
 
 import com.intellij.codeInsight.completion.group.CompletionGroup;
@@ -6,7 +6,6 @@ import com.intellij.codeInsight.completion.impl.CompletionSorterImpl;
 import com.intellij.codeInsight.lookup.LookupElement;
 import com.intellij.codeInsight.lookup.LookupGroupArranger;
 import com.intellij.codeInsight.lookup.impl.SeparatorLookupElement;
-import com.intellij.openapi.util.Pair;
 import com.intellij.util.containers.JBIterable;
 import com.intellij.util.containers.MultiMap;
 import org.jetbrains.annotations.ApiStatus;
@@ -16,11 +15,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-
-import static com.intellij.codeInsight.completion.group.CompletionGroup.COMPLETION_GROUP_KEY;
 
 /**
  * Implementation of {@link LookupGroupArranger} designed to handle grouping of completion items within lookup components.
@@ -31,14 +26,14 @@ public final class GroupCompletionLookupArrangerImpl extends CompletionLookupArr
   private boolean mySupportGroups = true;
   private final MultiMap<CompletionGroup, LookupElement> myGroupCache = new MultiMap<>();
 
-  public GroupCompletionLookupArrangerImpl(CompletionProcessEx process) {
+  public GroupCompletionLookupArrangerImpl(@NotNull CompletionProcessEx process) {
     super(process);
   }
 
 
   @Override
-  protected boolean isCustomElements(@NotNull LookupElement item) {
-    return item.getUserData(COMPLETION_GROUP_KEY) != null;
+  protected boolean isCustomElement(@NotNull LookupElement item) {
+    return CompletionGroup.get(item) != null;
   }
 
   @Override
@@ -48,64 +43,19 @@ public final class GroupCompletionLookupArrangerImpl extends CompletionLookupArr
 
   @Override
   protected void customizeListModel(@NotNull List<LookupElement> model) {
-    if (!mySupportGroups || !hasCustomElements()) {
+    List<GroupSeparator> separators = GroupSeparators.computeGroupSeparators(model, mySupportGroups, hasCustomElements());
+    if (separators == null) {
       super.customizeListModel(model);
       return;
     }
-    //checks:
-    //- all groups are at the bottom
-    //- they are not mixed
-    if (model.isEmpty()) {
-      super.customizeListModel(model);
-      return;
-    }
-    LookupElement lastElement = model.getLast();
-    if (!isCustomElements(lastElement)) {
-      super.customizeListModel(model);
-      return;
-    }
-    boolean stopCustom = false;
-    Set<CompletionGroup> visitedGroup = new HashSet<>();
-    CompletionGroup currentGroup = lastElement.getUserData(COMPLETION_GROUP_KEY);
-    List<Pair<Integer, CompletionGroup>> groups = new ArrayList<>();
-    for (int i = model.size() - 2; i >= 0; i--) {
-      LookupElement element = model.get(i);
-      if (!stopCustom && !isCustomElements(element)) {
-        stopCustom = true;
-        groups.add(Pair.create(i + 1, currentGroup));
-      }
-      else if (stopCustom && isCustomElements(element)) {
-        super.customizeListModel(model);
-        return;
-      }
-      else if(!stopCustom) {
-        CompletionGroup group = element.getUserData(COMPLETION_GROUP_KEY);
-        if (group == null) {
-          super.customizeListModel(model);
-          return;
-        }
-        if (!group.equals(currentGroup) && !visitedGroup.add(group)) {
-          super.customizeListModel(model);
-          return;
-        }
-        if (!group.equals(currentGroup)) {
-          groups.add(Pair.create(i + 1, currentGroup));
-        }
-        currentGroup = group;
-      }
-    }
-    if (!stopCustom) {
-      groups.add(Pair.create(0, currentGroup));
-    }
+    GroupSeparators.insertGroupSeparators(model, separators, this::createGroupSeparator);
+  }
 
-    Collections.reverse(groups);
-    for (int i = 0; i < groups.size(); i++) {
-      Pair<Integer, CompletionGroup> group = groups.get(i);
-      SeparatorLookupElement separatorLookupElement = new SeparatorLookupElement(group.second.displayName());
-      registerMatcher(separatorLookupElement, PlainPrefixMatcher.ALWAYS_TRUE);
-      associateSorter(separatorLookupElement, new CompletionSorterImpl(new ArrayList<>()));
-      model.add(group.first + i, separatorLookupElement);
-    }
+  private @NotNull LookupElement createGroupSeparator(@NotNull CompletionGroup group) {
+    SeparatorLookupElement separator = new SeparatorLookupElement(group.displayName());
+    registerMatcher(separator, PlainPrefixMatcher.ALWAYS_TRUE);
+    associateSorter(separator, new CompletionSorterImpl(new ArrayList<>()));
+    return separator;
   }
 
   @Override
@@ -132,10 +82,10 @@ public final class GroupCompletionLookupArrangerImpl extends CompletionLookupArr
   protected boolean supportCustomCaches(@Nullable LookupElement item) {
     if (item == null) return false;
     if (mySupportGroups) {
-      CompletionGroup group = item.getUserData(COMPLETION_GROUP_KEY);
+      CompletionGroup group = CompletionGroup.get(item);
       if (group != null) {
         if (isPrefixItem(item, true)) {
-          item.putUserData(COMPLETION_GROUP_KEY, null);
+          CompletionGroup.drop(item);
           return false;
         }
         myGroupCache.putValue(group, item);

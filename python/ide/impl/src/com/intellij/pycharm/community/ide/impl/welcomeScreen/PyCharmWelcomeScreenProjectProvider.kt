@@ -10,6 +10,7 @@ import com.intellij.platform.PlatformProjectOpenProcessor
 import com.intellij.pycharm.community.ide.impl.miscProject.impl.MISC_PROJECT_WITH_WELCOME_NAME
 import com.intellij.pycharm.community.ide.impl.miscProject.impl.miscProjectDefaultPath
 import com.jetbrains.python.orLogException
+import com.jetbrains.python.projectCreation.SystemPythonRequirements
 import com.jetbrains.python.projectCreation.createVenvAndSdk
 import com.jetbrains.python.sdk.ModuleOrProject
 import com.jetbrains.python.sdk.withSdkConfigurationLock
@@ -34,6 +35,9 @@ internal class PyCharmWelcomeScreenProjectProvider : WelcomeScreenProjectProvide
 
   override fun doGetCreateNewFileProjectPrefix(): String = "awesomeProject"
 
+  // We explicitly want to open existing project if the file already belongs to it
+  override fun shouldOpenInWelcomeScreenIfFileBelongsToProject(filePath: Path): Boolean = false
+
   override fun canOpenFilesFromSystemFileManager(filePath: Path): Boolean {
     return Registry.`is`("welcome.screen.open.files", false) && filePath.extension == "ipynb"
   }
@@ -51,7 +55,8 @@ internal class PyCharmWelcomeScreenProjectProvider : WelcomeScreenProjectProvide
       // Don't prompt to install Python on the welcome screen (PY-88204).
       // If Python is already available, the venv/SDK will be configured silently.
       withSdkConfigurationLock(project) {
-        createVenvAndSdk(ModuleOrProject.ProjectOnly(project), confirmInstallation = { false }).orLogException(thisLogger())
+        val systemPythonRequirements = SystemPythonRequirements.ByVersionSpecifier(confirmInstallation = { false })
+        createVenvAndSdk(ModuleOrProject.ProjectOnly(project), systemPythonRequirements).orLogException(thisLogger())
       }
     }
     return project

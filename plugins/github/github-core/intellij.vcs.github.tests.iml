@@ -9,8 +9,8 @@
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="25" />
-            <stringArg name="apiVersion" arg="2.3" />
-            <stringArg name="languageVersion" arg="2.3" />
+            <stringArg name="apiVersion" arg="2.4" />
+            <stringArg name="languageVersion" arg="2.4" />
           </stringArguments>
           <arrayArguments>
             <arrayArg name="pluginClasspaths">
@@ -40,7 +40,7 @@
     <orderEntry type="module" module-name="intellij.platform.util.diff" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.vcs" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.externalProcessAuthHelper" scope="TEST" />
-    <orderEntry type="module" module-name="intellij.vcs.git" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.vcs.git.backend" scope="TEST" />
     <orderEntry type="module" module-name="intellij.vcs.git.shared" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.core.impl" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.vcs.impl" scope="TEST" />
@@ -85,10 +85,10 @@
     <orderEntry type="library" scope="PROVIDED" name="kotlinc.kotlinx-serialization-compiler-plugin" level="project" />
     <orderEntry type="module" module-name="intellij.platform.util.coroutines" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.util.ui" scope="TEST" />
-    <orderEntry type="library" scope="TEST" name="JUnit4" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.junit4" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.coroutines.test" scope="TEST" />
-    <orderEntry type="library" scope="TEST" name="io.mockk" level="project" />
-    <orderEntry type="library" scope="TEST" name="io.mockk.jvm" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.mockk" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.mockk.jvm" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.ide.ui" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.gson" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.classgraph" scope="TEST" />
@@ -141,9 +141,12 @@
     <orderEntry type="module" module-name="intellij.platform.lang" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.concurrency" scope="TEST" />
     <orderEntry type="module" module-name="intellij.vcs.github" scope="TEST" />
-    <orderEntry type="module" module-name="intellij.vcs.git.tests" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.vcs.git.backend.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.collaborationTools.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.testFramework.junit5.codeInsight" scope="TEST" />
+    <orderEntry type="library" scope="TEST" name="app.cash.turbine.jvm" level="project" />
+    <orderEntry type="module" module-name="intellij.libraries.junit5" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.junit5.params" scope="TEST" />
   </component>
   <component name="TestModuleProperties" production-module="intellij.vcs.github" />
 </module>

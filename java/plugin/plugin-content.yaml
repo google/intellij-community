@@ -8,28 +8,64 @@
   files:
   - name: $PROJECT_DIR$/community/lib/ecj-4.jar
   reason: withProjectLibrary
+- name: lib/intellij-test-discovery-agent.jar
+  library: intellij-test-discovery
+  module: intellij.libraries.test.discovery
+  files:
+  - name: $MAVEN_REPOSITORY$/org/jetbrains/intellij/deps/intellij-test-discovery-agent/1/intellij-test-discovery-agent-1.jar
+- name: lib/intellij.java.compiler.antTasks.jar
+  contentModules:
+  - name: intellij.java.compiler.antTasks
+- name: lib/intellij.java.compiler.instrumentationUtil.jar
+  contentModules:
+  - name: intellij.java.compiler.instrumentationUtil
+- name: lib/intellij.java.compiler.instrumentationUtil.java8.jar
+  contentModules:
+  - name: intellij.java.compiler.instrumentationUtil.java8
+- name: lib/intellij.java.debugger.impl.shared.jar
+  contentModules:
+  - name: intellij.java.debugger.impl.shared
+- name: lib/intellij.java.debugger.libraries.jb.jdi.jar
+  contentModules:
+  - name: intellij.java.debugger.libraries.jb.jdi
+    libraries:
+      jb-jdi:
+      - name: $MAVEN_REPOSITORY$/org/jetbrains/intellij/deps/jb-jdi/2/jb-jdi-2.jar
+- name: lib/intellij.java.execution.impl.shared.jar
+  contentModules:
+  - name: intellij.java.execution.impl.shared
+- name: lib/intellij.java.frontback.impl.jar
+  contentModules:
+  - name: intellij.java.frontback.impl
+- name: lib/intellij.java.frontback.psi.impl.jar
+  contentModules:
+  - name: intellij.java.frontback.psi.impl
+- name: lib/intellij.java.frontback.psi.jar
+  contentModules:
+  - name: intellij.java.frontback.psi
+- name: lib/intellij.java.guiForms.compiler.jar
+  contentModules:
+  - name: intellij.java.guiForms.compiler
+- name: lib/intellij.java.psi.impl.jar
+  contentModules:
+  - name: intellij.java.psi.impl
+- name: lib/intellij.java.psi.jar
+  contentModules:
+  - name: intellij.java.psi
+- name: lib/intellij.java.syntax.jar
+  contentModules:
+  - name: intellij.java.syntax
+- name: lib/intellij.libraries.test.discovery.jar
+  contentModules:
+  - name: intellij.libraries.test.discovery
+- name: lib/intellij.platform.jps.build.javac.rt.jar
+  contentModules:
+  - name: intellij.platform.jps.build.javac.rt
 - name: lib/java-impl.jar
   modules:
   - name: intellij.java.plugin
   contentModules:
-  - name: intellij.java.syntax
-  - name: intellij.java.frontback.psi
-  - name: intellij.java.frontback.psi.impl
-  - name: intellij.java.psi
-  - name: intellij.java.psi.impl
-  - name: intellij.java.frontback.impl
-  - name: intellij.platform.jps.build.javac.rt
-  - name: intellij.java.guiForms.compiler
-  - name: intellij.java.compiler.antTasks
-  - name: intellij.java.compiler.instrumentationUtil
-  - name: intellij.java.compiler.instrumentationUtil.java8
-  - name: intellij.java.debugger.impl.shared
-  - name: intellij.java.execution.impl.shared
-- name: lib/jb-jdi.jar
-  library: jb-jdi
-  files:
-  - name: $MAVEN_REPOSITORY$/org/jetbrains/intellij/deps/jb-jdi/2/jb-jdi-2.jar
-  reason: withProjectLibrary
+  - name: intellij.java.bookmarks
 - name: lib/jps-javac-extension.jar
   library: jps-javac-extension
   files:
@@ -46,15 +82,24 @@
 - name: lib/modules/intellij.debugger.jvm.advanced.java.jar
   contentModules:
   - name: intellij.debugger.jvm.advanced.java
+- name: lib/modules/intellij.debugger.jvm.advanced.java.logpoints.jar
+  contentModules:
+  - name: intellij.debugger.jvm.advanced.java.logpoints
 - name: lib/modules/intellij.debugger.logpoints.backend.jar
   contentModules:
   - name: intellij.debugger.logpoints.backend
 - name: lib/modules/intellij.debugger.logpoints.frontend.jar
   contentModules:
   - name: intellij.debugger.logpoints.frontend
+- name: lib/modules/intellij.debugger.logpoints.frontend.split.jar
+  contentModules:
+  - name: intellij.debugger.logpoints.frontend.split
 - name: lib/modules/intellij.debugger.logpoints.java.jar
   contentModules:
   - name: intellij.debugger.logpoints.java
+- name: lib/modules/intellij.debugger.logpoints.shared.jar
+  contentModules:
+  - name: intellij.debugger.logpoints.shared
 - name: lib/modules/intellij.java.analysis.impl.jar
   contentModules:
   - name: intellij.java.analysis.impl
@@ -181,9 +226,15 @@
 - name: lib/modules/intellij.java.structureView.jar
   contentModules:
   - name: intellij.java.structureView
-- name: lib/modules/intellij.java.terminal.jar
+- name: lib/modules/intellij.java.terminal.backend.jar
   contentModules:
-  - name: intellij.java.terminal
+  - name: intellij.java.terminal.backend
+- name: lib/modules/intellij.java.terminal.frontend.jar
+  contentModules:
+  - name: intellij.java.terminal.frontend
+- name: lib/modules/intellij.java.terminal.shared.jar
+  contentModules:
+  - name: intellij.java.terminal.shared
 - name: lib/modules/intellij.java.typeMigration.jar
   contentModules:
   - name: intellij.java.typeMigration
@@ -205,6 +256,9 @@
 - name: lib/modules/intellij.java.vcs.jar
   contentModules:
   - name: intellij.java.vcs
+- name: lib/modules/intellij.java.xml.dom.impl.jar
+  contentModules:
+  - name: intellij.java.xml.dom.impl
 - name: lib/modules/intellij.jsp.jar
   contentModules:
   - name: intellij.jsp

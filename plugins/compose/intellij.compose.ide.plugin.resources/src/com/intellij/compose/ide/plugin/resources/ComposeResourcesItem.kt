@@ -173,14 +173,23 @@ internal enum class ResourceType(val typeName: String, val resourceName: String,
 
   val accessorName = if (typeName == "string-array") "array" else typeName
 
+
   companion object {
     fun fromString(str: String): ResourceType =
       entries.firstOrNull { it.typeName.equals(str, ignoreCase = true) } ?: error("Unknown resource type: '$str'.")
 
-    fun fromPath(path: Path): ResourceType =
-      entries.firstOrNull { it.dirName.equals(path.parent.name, ignoreCase = true) } ?: error("Unknown resource type: '${path.parent.name}'.")
+    fun fromPath(path: Path): ResourceType {
+      val resourceDirName = path.parent.name.substringBefore('-')
+      return entries.firstOrNull { it.dirName.equals(resourceDirName, ignoreCase = true) }
+             ?: error("Unknown resource type: '${path.parent.name}'.")
+    }
+
+    fun fromAccessor(name: String): ResourceType =
+      entries.firstOrNull { it.accessorName.equals(name, ignoreCase = true) } ?: error("Unknown resource type: '$name'.")
 
     val KNOWN_RESOURCE_NAMES: Set<String> = entries.mapToSetOrEmpty { it.resourceName }
+
+    val stringEntries = entries.filter { it.isStringType }
   }
 }
 

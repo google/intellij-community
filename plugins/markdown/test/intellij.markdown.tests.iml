@@ -9,8 +9,13 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="intellij.markdown" />
+    <orderEntry type="module" module-name="intellij.markdown.frontend" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.markdown.jcef" />
     <orderEntry type="module" module-name="intellij.markdown.backend" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.markdown.java" />
+    <orderEntry type="module" module-name="intellij.java.execution.impl" />
     <orderEntry type="module" module-name="intellij.markdown.fenceInjection" />
+    <orderEntry type="module" module-name="intellij.markdown.fenceInjector.textMate" scope="TEST" />
     <orderEntry type="module" module-name="intellij.markdown.frontmatter" />
     <orderEntry type="module" module-name="intellij.markdown.frontmatter.toml" />
     <orderEntry type="module" module-name="intellij.platform.core.impl" />
@@ -31,6 +36,9 @@
     <orderEntry type="module" module-name="intellij.grazie.core" scope="TEST" />
     <orderEntry type="module" module-name="intellij.xml.psi" scope="TEST" />
     <orderEntry type="module" module-name="intellij.yaml" />
+    <orderEntry type="module" module-name="intellij.json" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.json.backend" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.lucene.common" scope="TEST" />
     <orderEntry type="module" module-name="intellij.xml.psi.impl" />
     <orderEntry type="module" module-name="intellij.platform.builtInServer" />
     <orderEntry type="module" module-name="intellij.platform.core.ui" />
@@ -42,14 +50,19 @@
     <orderEntry type="module" module-name="intellij.xml.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.xml.langInjection" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.tests" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.platform.todo" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.fastutil" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.jsoup" />
     <orderEntry type="module" module-name="intellij.libraries.jcef" />
+    <orderEntry type="module" module-name="intellij.platform.ui.jcef" />
+    <orderEntry type="module" module-name="intellij.jcef.plugin" scope="RUNTIME" />
     <orderEntry type="module" module-name="intellij.libraries.assertj.core" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.util.ex" />
     <orderEntry type="module" module-name="intellij.platform.util.ui" scope="TEST" />
     <orderEntry type="module" module-name="intellij.libraries.markdown" />
     <orderEntry type="module" module-name="intellij.toml" />
     <orderEntry type="module" module-name="intellij.toml.core" />
+    <orderEntry type="module" module-name="intellij.toml.json" scope="TEST" />
     <orderEntry type="module" module-name="intellij.yaml.backend" />
     <orderEntry type="module" module-name="intellij.platform.testFramework.junit5" scope="TEST" />
     <orderEntry type="module" module-name="intellij.tools.ide.metrics.benchmark" scope="TEST" />
@@ -60,9 +73,15 @@
     <orderEntry type="module" module-name="intellij.platform.images.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.regexp.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.debugger.impl.tests" scope="TEST" />
-    <orderEntry type="module" module-name="intellij.platform.structureView.impl" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.platform.structureView" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.platform.structureView.plugin" scope="RUNTIME" />
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.collections.immutable" />
     <orderEntry type="module" module-name="intellij.platform.lang.core" />
     <orderEntry type="module" module-name="intellij.platform.execution" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.textmate" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.textmate.plugin" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.junit4" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.junit5" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.grazie.tests" scope="TEST" />
   </component>
 </module>

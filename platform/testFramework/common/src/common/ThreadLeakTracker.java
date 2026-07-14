@@ -7,6 +7,7 @@ import com.intellij.diagnostic.PerformanceWatcher;
 import com.intellij.execution.process.ProcessIOExecutorService;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.impl.TestOnlyThreading;
+import com.intellij.openapi.diagnostic.AsyncLogKt;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.ShutDownTracker;
@@ -86,6 +87,7 @@ public final class ThreadLeakTracker {
       "Cleaner-0", // Thread[Cleaner-0,8,InnocuousThreadGroup], java.lang.ref.Cleaner in android layoutlib, Java9+
       "CompilerThread0",
       "Coroutines Debugger Cleaner", // kotlinx.coroutines.debug.internal.DebugProbesImpl.startWeakRefCleanerThread
+      "docker-java-stream", // com.github.dockerjava.core.DefaultInvocationBuilder.executeAndStream spawns this for every streaming command (events, logs, attach, pull, etc.)
       "dockerjava-netty",
       "embeddings-server",
       "EventQueueMonitor-ComponentEvtDispatch", // com.sun.java.accessibility.util.ComponentEvtDispatchThread
@@ -93,6 +95,7 @@ public final class ThreadLeakTracker {
       FilePageCacheLockFree.DEFAULT_HOUSEKEEPER_THREAD_NAME,
       "Finalizer",
       FlushingDaemon.NAME,
+      "FrontendToBackend",
       "grpc-default-worker-",  // grpc_netty_shaded
       "grpc-nio-worker-",
       "HttpClient-",  // JRE's HttpClient thread pool is not supposed to be disposed - to reuse connections
@@ -126,6 +129,7 @@ public final class ThreadLeakTracker {
       "qtp", // used in tests for mocking via WireMock in integration testing
       "rd throttler", // daemon thread created by com.jetbrains.rd.util.AdditionalApiKt.getTimer
       "Reference Handler",
+      "Rider.Backend", // ignore process + io threads because backend follows application lifecycle and can be started during the test
       "RMI GC Daemon",
       "RMI TCP ",
       "Save classpath indexes for file loader",
@@ -140,6 +144,7 @@ public final class ThreadLeakTracker {
       "UserActivityMonitor thread",
       "VM Periodic Task Thread",
       "VM Thread",
+      "WriteAheadLogFlusher",
       "YJPAgent-Telemetry"
     );
     validateWhitelistedThreads(offenders);
@@ -160,6 +165,7 @@ public final class ThreadLeakTracker {
   }
 
   public static void awaitQuiescence() {
+    AsyncLogKt.awaitLogQueueProcessed();
     NettyUtil.awaitQuiescenceOfGlobalEventExecutor(100, TimeUnit.SECONDS);
     ShutDownTracker.getInstance().waitFor(100, TimeUnit.SECONDS);
   }

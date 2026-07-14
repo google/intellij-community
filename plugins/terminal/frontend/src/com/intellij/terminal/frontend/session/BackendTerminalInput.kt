@@ -12,12 +12,10 @@ import kotlinx.coroutines.launch
 import org.jetbrains.plugins.terminal.block.ui.withLock
 import org.jetbrains.plugins.terminal.session.impl.TerminalClearBufferEvent
 import org.jetbrains.plugins.terminal.session.impl.TerminalCloseEvent
-import org.jetbrains.plugins.terminal.session.impl.TerminalHyperlinkClickedEvent
 import org.jetbrains.plugins.terminal.session.impl.TerminalInputEvent
 import org.jetbrains.plugins.terminal.session.impl.TerminalResizeEvent
 import org.jetbrains.plugins.terminal.session.impl.TerminalWriteBytesEvent
-import org.jetbrains.plugins.terminal.util.STOP_EMULATOR_TIMEOUT
-import org.jetbrains.plugins.terminal.util.waitFor
+import org.jetbrains.plugins.terminal.util.closeConnectorAndStopEmulation
 import java.util.concurrent.CancellationException
 import kotlin.time.TimeSource
 
@@ -53,7 +51,7 @@ private suspend fun handleInputEvents(channel: ReceiveChannel<TerminalInputEvent
   }
 }
 
-private fun handleInputEvent(event: TerminalInputEvent, services: JediTermServices) {
+private suspend fun handleInputEvent(event: TerminalInputEvent, services: JediTermServices) {
   LOG.trace { "Input event received: $event" }
 
   val terminalStarter = services.terminalStarter
@@ -76,10 +74,7 @@ private fun handleInputEvent(event: TerminalInputEvent, services: JediTermServic
       terminalStarter.postResize(termSize, RequestOrigin.User)
     }
     is TerminalCloseEvent -> {
-      terminalStarter.close()
-      terminalStarter.ttyConnector.waitFor(STOP_EMULATOR_TIMEOUT) {
-        terminalStarter.requestEmulatorStop()
-      }
+      terminalStarter.closeConnectorAndStopEmulation()
     }
     is TerminalClearBufferEvent -> {
       val textBuffer = services.textBuffer
@@ -98,11 +93,13 @@ private fun handleInputEvent(event: TerminalInputEvent, services: JediTermServic
           val lastLine = textBuffer.getLine(controller.y - 1)
           textBuffer.clearScreenBuffer()
           textBuffer.addLine(lastLine)
-          controller.y = 1
+          controller.linePositionAbsolute(1)
         }
       }
     }
-    is TerminalHyperlinkClickedEvent -> { } // handled by BackendTerminalHyperlinkFacade
+    else -> {
+      // Ignore unknown event
+    }
   }
 }
 

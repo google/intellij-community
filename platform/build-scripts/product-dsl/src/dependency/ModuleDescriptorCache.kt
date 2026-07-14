@@ -7,8 +7,8 @@ import com.fasterxml.aalto.WFCException
 import com.intellij.platform.pluginGraph.ContentModuleName
 import com.intellij.platform.pluginGraph.baseModuleName
 import com.intellij.platform.pluginGraph.toDescriptorFileName
+import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleVisibilityValue
 import com.intellij.platform.pluginSystem.parser.impl.parseContentAndXIncludes
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.intellij.build.ModuleOutputProvider
@@ -45,8 +45,18 @@ internal class ModuleDescriptorCache(
     @JvmField val existingPluginDependencies: List<String> = emptyList(),
     /** Plugin aliases declared via `<module value="..."/>` in the descriptor. */
     @JvmField val pluginAliases: List<String> = emptyList(),
+    /** Visibility from the descriptor root. Absent visibility means private. */
+    @JvmField val moduleVisibility: ModuleVisibilityValue = ModuleVisibilityValue.PRIVATE,
     /** Module dependencies already declared in the XML file (e.g., `<module name="..."/>`). */
     @JvmField val existingModuleDependencies: List<String> = emptyList(),
+    /** Service keys registered by this descriptor. */
+    @JvmField val registeredServiceKeys: Set<String> = emptySet(),
+    /** Service keys registered with `overrides="true"`. */
+    @JvmField val overridingServiceKeys: Set<String> = emptySet(),
+    /** Action group IDs declared by this descriptor. */
+    @JvmField val declaredActionGroupIds: Set<String> = emptySet(),
+    /** Action group IDs referenced by this descriptor. */
+    @JvmField val referencedActionGroupIds: Set<String> = emptySet(),
     /**
      * Suppressible error if the descriptor has issues (e.g., non-standard XML root element).
      * Collected by generators and filtered through suppression config based on [UnsuppressedPipelineError.suppressionKey].
@@ -136,7 +146,12 @@ internal class ModuleDescriptorCache(
       skipDependencyGeneration = skipDependencyGeneration,
       existingPluginDependencies = parseResult.pluginDependencies,
       pluginAliases = parseResult.pluginAliases,
+      moduleVisibility = parseResult.moduleVisibility,
       existingModuleDependencies = parseResult.moduleDependencies,
+      registeredServiceKeys = parseResult.registeredServiceKeys,
+      overridingServiceKeys = parseResult.overridingServiceKeys,
+      declaredActionGroupIds = parseResult.declaredActionGroupIds,
+      referencedActionGroupIds = parseResult.referencedActionGroupIds,
       suppressibleError = suppressibleError,
     )
   }

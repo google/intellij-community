@@ -7,8 +7,6 @@ import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.Sdk
-import com.intellij.openapi.projectRoots.impl.ProjectJdkImpl
-import com.intellij.openapi.util.UserDataHolder
 import com.intellij.openapi.util.Version
 import com.intellij.python.community.impl.installer.BinaryInstallerUsagesCollector
 import com.intellij.python.community.impl.installer.PySdkToInstallManager
@@ -16,6 +14,7 @@ import com.intellij.ui.SimpleColoredComponent
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.jetbrains.python.psi.LanguageLevel
+import com.jetbrains.python.sdk.add.v2.InstallablePythonSdk
 import com.jetbrains.python.sdk.flavors.PythonSdkFlavor
 import com.jetbrains.python.sdk.installer.BinaryInstallation
 import com.jetbrains.python.sdk.installer.installBinary
@@ -27,38 +26,20 @@ internal val LOGGER: Logger = Logger.getInstance(PySdkToInstall::class.java)
 
 @CalledInAny
 @Internal
-fun getSdksToInstall(): List<PySdkToInstall> {
+internal fun getSdksToInstall(): List<PySdkToInstall> {
   return PySdkToInstallManager.getAvailableVersionsToInstall().map {
     PySdkToInstall(it.value)
   }
 }
 
-// TODO: PythonInterpreterService: get rid of this function
-@RequiresEdt
-@Internal
-fun installSdkIfNeeded(sdk: Sdk, module: Module?, existingSdks: List<Sdk>, context: UserDataHolder? = null): Result<Sdk> =
-  if (sdk is PySdkToInstall) sdk.install(module) {
-    context?.let { detectSystemWideSdks(module, existingSdks, context) } ?: detectSystemWideSdks(module, existingSdks)
-  }
-  else Result.success(sdk)
-
-
 /**
  * Generic PySdkToInstall. Compatible with all OS / CpuArch.
  */
 @Internal
-class PySdkToInstall(
+internal class PySdkToInstall(
   val installation: BinaryInstallation,
-) : ProjectJdkImpl(
-  installation.release.title,
-  PythonSdkType.getInstance(),
-  "",
-  /**
-   * We use [com.jetbrains.python.sdk.flavors.PythonSdkFlavor.getLanguageLevelFromVersionStringStaticSafe] to parse versions of this type
-   * of SDK. That method relies on the version string being prepended with "Python ".
-   */
-  "${PythonSdkFlavor.PYTHON_VERSION_STRING_PREFIX}${installation.release.version}"
-) {
+) : InstallablePythonSdk {
+  override val name: String = installation.release.title
 
   /**
    * Customize [renderer], which is typically either [com.intellij.ui.ColoredListCellRenderer] or [com.intellij.ui.ColoredTreeCellRenderer].
@@ -74,7 +55,7 @@ class PySdkToInstall(
 
   @RequiresEdt
   @Internal
-  fun install(module: Module?, systemWideSdksDetector: () -> List<Sdk>): Result<Sdk> {
+  override fun install(module: Module?, systemWideSdksDetector: () -> List<Sdk>): Result<Sdk> {
     val project = module?.project
     return installBinary(installation, project) {
       findInstalledSdkInternal(

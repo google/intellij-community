@@ -18,6 +18,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.UI
+import com.intellij.openapi.application.UiWithModelAccess
 import com.intellij.openapi.application.WriteIntentReadAction
 import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.application.impl.InternalUICustomization
@@ -71,7 +72,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.ApiStatus.Internal
-import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Component
 import java.awt.Container
@@ -103,6 +103,7 @@ class EditorWindow internal constructor(
   val owner: EditorsSplitters,
   @JvmField internal val coroutineScope: CoroutineScope,
 ) {
+  @Internal
   companion object {
     @JvmField
     val DATA_KEY: DataKey<EditorWindow> = DataKey.create("editorWindow")
@@ -430,7 +431,8 @@ class EditorWindow internal constructor(
         if (options.requestFocus) {
           withContext(Dispatchers.Default) {
             composite.waitForAvailable()
-            withContext(Dispatchers.UI) {
+            // IJPL-237573
+            withContext(Dispatchers.UiWithModelAccess) {
               focusEditorOnComposite(composite = composite, splitters = owner, forceFocus = options.forceFocus)
             }
           }
@@ -439,6 +441,7 @@ class EditorWindow internal constructor(
     }
 
     updateTabsVisibility()
+    owner.updateEmptyStateComponent()
     owner.validate()
   }
 
@@ -699,7 +702,8 @@ class EditorWindow internal constructor(
   }
 
   @RequiresEdt
-  internal fun closeFile(file: VirtualFile, composite: EditorComposite, disposeIfNeeded: Boolean = true) {
+  @Internal
+  fun closeFile(file: VirtualFile, composite: EditorComposite, disposeIfNeeded: Boolean = true) {
     runBulkTabChange(owner) {
       val fileEditorManager = manager
       try {
@@ -808,8 +812,8 @@ class EditorWindow internal constructor(
       }
       is EditorsSplitters -> {
         val currentFocusComponent = IdeFocusManager.getGlobalInstance().getFocusedDescendantFor(parent)
-        parent.removeAll()
-        parent.add(otherComponent, BorderLayout.CENTER)
+        parent.clearEditorComponent()
+        parent.addEditorComponent(otherComponent)
         parent.revalidate()
         currentFocusComponent?.requestFocusInWindow()
       }
@@ -1036,6 +1040,8 @@ class EditorWindow internal constructor(
       owner.scheduleUpdateFileColor(composite.file)
     }
     if (wasPinned != pinned && EDT.isCurrentThreadEdt()) {
+      owner.manager.project.messageBus.syncPublisher(FileEditorManagerListener.FILE_EDITOR_MANAGER)
+        .filePinStateChanged(owner.manager, composite.file)
       (tabbedPane.tabs as? JBTabsImpl)?.doLayout()
     }
   }
@@ -1067,7 +1073,7 @@ class EditorWindow internal constructor(
     }
 
     val limit = tabLimit
-    fun isUnderLimit(): Boolean = tabbedPane.tabCount <= limit || tabbedPane.tabCount == 0 || !isAnyTabClosable(fileToIgnore)
+    fun isUnderLimit(): Boolean = (tabbedPane.tabCount - tabsExcludedFromLimitCount()) <= limit || tabbedPane.tabCount == 0 || !isAnyTabClosable(fileToIgnore)
 
     if (isUnderLimit()) {
       return
@@ -1171,14 +1177,13 @@ class EditorWindow internal constructor(
     return isFileOpen(file) && file != fileToIgnore && !isFilePinned(file) && isClosingAllowed(file)
   }
 
-  private fun isClosingAllowed(file: VirtualFile): Boolean {
-    val extensions = EditorAutoClosingHandler.EP_NAME.extensionList
-    if (extensions.isEmpty()) {
-      return true
-    }
+  private fun tabsExcludedFromLimitCount(): Int {
+    return tabbedPane.tabs.tabs.count { !isClosingAllowed(it.composite.file) }
+  }
 
+  private fun isClosingAllowed(file: VirtualFile): Boolean {
     val composite = getComposite(file) ?: return true
-    return extensions.all { it.isClosingAllowed(composite) }
+    return EditorAutoClosingHandler.isClosingAllowed(composite)
   }
 
   override fun toString(): String {
@@ -1229,7 +1234,7 @@ private fun swapComponents(parent: JPanel, toAdd: JComponent, toRemove: JCompone
   else {
     check(parent is EditorsSplitters)
     parent.remove(toRemove)
-    parent.add(toAdd, BorderLayout.CENTER)
+    parent.addEditorComponent(toAdd)
   }
 }
 

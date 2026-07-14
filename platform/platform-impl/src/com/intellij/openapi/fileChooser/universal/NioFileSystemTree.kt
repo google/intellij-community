@@ -4,28 +4,29 @@ package com.intellij.openapi.fileChooser.universal
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.actionSystem.DataKey
-import com.intellij.openapi.application.Application
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.fileChooser.FileSystemTree
 import com.intellij.openapi.fileChooser.universal.NioFileChooserUtil.toNioPathSafe
+import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.MessageType
+import com.intellij.openapi.ui.popup.Balloon
+import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.IconLoader.getTransparentIcon
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.ui.MessageType
-import com.intellij.openapi.ui.popup.Balloon
-import com.intellij.openapi.ui.popup.JBPopupFactory
-import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.ColoredTreeCellRenderer
 import com.intellij.ui.DoubleClickListener
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.TreeUIHelper
+import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.tree.AsyncTreeModel
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.containers.ContainerUtil
@@ -245,6 +246,16 @@ class NioFileSystemTree(
 
   override fun dispose() {
     unsubscribeAll()
+    if (fileWatcherAdapter != null) {
+      try {
+        FileWatcherAppScopeHolder.getInstance().scope.launch {
+          fileWatcherAdapter.stop()
+        }
+      }
+      catch (e: Exception) {
+        LOG.debug("Error stopping file watcher adapter", e)
+      }
+    }
   }
 
   fun select(file: Path?, onDone: Runnable?) {
@@ -372,6 +383,36 @@ class NioFileSystemTree(
       }
     }
     fireSelection(selection)
+  }
+
+  fun computeSelectionAfterDeletion(): Path? {
+    val selectionPath = myTree.selectionPath ?: return null
+    val parentPath = selectionPath.parentPath ?: return null
+    val selectionRow = myTree.getRowForPath(selectionPath)
+    if (selectionRow < 0) return getNioPath(parentPath)
+
+    // Look for next sibling among the rows following the selected one.
+    for (row in (selectionRow + 1) until myTree.rowCount) {
+      val rowPath = myTree.getPathForRow(row) ?: continue
+      if (rowPath.parentPath == parentPath) {
+        return getNioPath(rowPath)
+      }
+      // Once we leave the parent's subTree, there are no more siblings ahead.
+      if (!parentPath.isDescendant(rowPath)) break
+    }
+
+    // Look for previous sibling among the rows preceding the selected one.
+    for (row in (selectionRow - 1) downTo 0) {
+      val rowPath = myTree.getPathForRow(row) ?: continue
+      if (rowPath.parentPath == parentPath) {
+        return getNioPath(rowPath)
+      }
+      // Once we leave the parent's subTree backwards, no more previous siblings.
+      if (!parentPath.isDescendant(rowPath)) break
+    }
+
+    // Fall back to the containing directory.
+    return getNioPath(parentPath)
   }
 
   companion object {

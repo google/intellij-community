@@ -13,7 +13,6 @@ interface PluginInitializationContext {
   val productBuildNumber: BuildNumber
   val essentialPlugins: Set<PluginId>
   fun isPluginDisabled(id: PluginId): Boolean
-  fun isPluginExpired(id: PluginId): Boolean // TODO this method should disappear and related logic should be managed by [provideProductRulesImposedModuleExclusions]
   fun isPluginBroken(id: PluginId, version: String?): Boolean
 
   /**
@@ -69,16 +68,16 @@ interface PluginInitializationContext {
   fun provideModuleExclusionsImposedByProductRules(pluginSet: UnambiguousPluginSet): Sequence<Pair<PluginModuleDescriptor, ProductRulesImposedExclusionReason>>
 
   /**
-   * Tells the plugin set resolver that [module] should belong to the same [RuntimeModuleGroup] (the same classloader) as the returned result (if not null).
-   */
-  fun provideCustomRuntimeModuleGroupAffiliation(module: PluginModuleDescriptor, pluginSet: UnambiguousPluginSet): PluginModuleDescriptor?
-
-  /**
    * To preserve compatibility, all "active" `<depends>` dependencies imply extra dependencies on all "active" content modules of the target.
    * This method allows controlling this mechanism.
    * @return `false` if additional edges to content modules should not be generated when there is a `<depends>` edge to the [resolvedTarget].
    */
   fun shouldIncludeContentModulesForDependsEdgeTarget(resolvedTarget: PluginMainDescriptor): Boolean
+
+  /**
+   * Only is called once during the startup initialization
+   */
+  fun runConfigurationDuringStartup(totalPluginSet: AmbiguousPluginSet)
 
   companion object
 }

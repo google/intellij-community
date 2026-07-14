@@ -16,6 +16,7 @@ import com.intellij.driver.sdk.ui.components.common.IdeaFrameUI
 import com.intellij.driver.sdk.ui.components.common.WelcomeScreenUI
 import com.intellij.driver.sdk.ui.components.common.tabbedPane
 import com.intellij.driver.sdk.ui.components.elements.DialogUiComponent
+import com.intellij.driver.sdk.ui.components.elements.PopupUiComponent
 import com.intellij.driver.sdk.ui.components.elements.accessibleList
 import com.intellij.driver.sdk.ui.components.elements.button
 import com.intellij.driver.sdk.ui.components.elements.checkBox
@@ -23,6 +24,7 @@ import com.intellij.driver.sdk.ui.components.elements.dialog
 import com.intellij.driver.sdk.ui.components.elements.popup
 import com.intellij.driver.sdk.ui.components.elements.textField
 import com.intellij.driver.sdk.ui.components.elements.waitSelected
+import com.intellij.driver.sdk.ui.components.plugins.DependenciesLoadingDialogUI
 import com.intellij.driver.sdk.ui.ui
 import com.intellij.driver.sdk.ui.xQuery
 import com.intellij.openapi.util.SystemInfo
@@ -48,7 +50,7 @@ fun WelcomeScreenUI.pluginsPage(action: PluginsSettingsPageUiComponent.() -> Uni
 
 fun Driver.openPluginsSettings() {
   step("Open the Plugin Manager by invoking the action") {
-    invokeAction("WelcomeScreen.Plugins", now = false)
+    invokeAction("ShowPlugins", now = false)
   }
 }
 
@@ -103,6 +105,13 @@ class PluginsSettingsPageUiComponent(data: ComponentData) : UiComponent(data) {
     return this
   }
 
+  fun openGearSettings(): PopupUiComponent {
+    step("Click on Gear icon and open settings popup") {
+      gearButton.click()
+    }
+    return driver.ui.popup()
+  }
+
   fun searchForPlugin(pluginName: String): PluginsSettingsPageUiComponent {
     step("Search for '$pluginName'") {
       searchPluginTextField.text = pluginName
@@ -118,12 +127,6 @@ class PluginsSettingsPageUiComponent(data: ComponentData) : UiComponent(data) {
       }
     }
     return this
-  }
-
-  fun PluginsSettingsPageUiComponent.waitForPluginInList(pluginName: String, timeout: Duration = 10.seconds): ListPluginComponent {
-    return step("Wait for plugin '$pluginName' to appear in the list") {
-      listPluginComponent(pluginName).waitFound(timeout)
-    }
   }
 
   fun getPluginsList(): List<ListPluginComponent> =
@@ -258,8 +261,8 @@ class PluginsSettingsPageUiComponent(data: ComponentData) : UiComponent(data) {
     val restartButton = x { byType("com.intellij.ide.plugins.newui.RestartButton") }
     val uninstallButton = x { and(byType(JButton::class.java), byAccessibleName("Uninstall")) }
     val installedButton = x { and(byType(JButton::class.java), byAccessibleName("Installed")) }
-    val disableButton = x { and(byType(JButton::class.java), byAccessibleName("Disable")) }
-    val enableButton = x { and(byType(JButton::class.java), byAccessibleName("Enable")) }
+    val disableButton = x { and(or(byClass("JButton"), byClass("MainButton")), byAccessibleName("Disable")) }
+    val enableButton = x { and(or(byType(JButton::class.java), byClass("MainButton")), byAccessibleName("Enable")) }
     val arrowButton = x { byType($$"com.intellij.ui.components.BasicOptionButtonUI$ArrowButton")}
     val restartIdeButton = x { byAccessibleName("Restart IDE") }
     val tabbedPane = tabbedPane()
@@ -287,8 +290,8 @@ class PluginsSettingsPageUiComponent(data: ComponentData) : UiComponent(data) {
     }
 
     class OptionButtonUiComponent(data: ComponentData) : UiComponent(data) {
-      val disableButton = x { and(byType(JButton::class.java), byAccessibleName("Disable")) }
-      val enableButton = x { and(byType(JButton::class.java), byAccessibleName("Enable")) }
+      val disableButton = x { and(or(byType(JButton::class.java), byClass("MainButton")), byAccessibleName("Disable")) }
+      val enableButton = x { and(or(byType(JButton::class.java), byClass("MainButton")), byAccessibleName("Enable")) }
     }
   }
 }
@@ -322,3 +325,5 @@ class RestartDialog(data: ComponentData) : DialogUiComponent(data) {
     }
   }
 }
+
+

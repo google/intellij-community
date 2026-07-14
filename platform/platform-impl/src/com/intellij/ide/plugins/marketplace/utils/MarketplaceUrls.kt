@@ -6,17 +6,16 @@ import com.intellij.ide.plugins.newui.PluginUiModel
 import com.intellij.openapi.application.impl.ApplicationInfoImpl
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.util.BuildNumber
-import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.util.Url
 import com.intellij.util.Urls
 import com.intellij.util.io.URLUtil
 import com.intellij.util.system.CpuArch
+import com.intellij.util.system.LowLevelLocalMachineAccess
 import com.intellij.util.system.OS
 import org.jetbrains.annotations.ApiStatus
 import java.net.URI
 
 @ApiStatus.Internal
-@IntellijInternalApi
 object MarketplaceUrls {
   private val IDE_BUILD_FOR_REQUEST = URLUtil.encodeURIComponent(ApplicationInfoImpl.getShadowInstanceImpl().pluginCompatibleBuild)
 
@@ -58,6 +57,7 @@ object MarketplaceUrls {
 
   fun getSearchNearestUpdate(): String = Urls.newFromEncoded("${getPluginManagerUrl()}/api/search/updates/nearest").toExternalForm()
 
+  @OptIn(LowLevelLocalMachineAccess::class)
   fun getSearchPluginsUrl(query: String, count: Int, includeIncompatible: Boolean): Url {
     val params = mapOf(
       "build" to IDE_BUILD_FOR_REQUEST,
@@ -92,6 +92,7 @@ object MarketplaceUrls {
   }
 
   @JvmStatic
+  @OptIn(LowLevelLocalMachineAccess::class)
   fun getPluginDownloadUrl(
     descriptor: PluginUiModel,
     uuid: String,
@@ -119,4 +120,5 @@ object MarketplaceUrls {
   private fun PluginId.urlEncode(): String = URLUtil.encodeURIComponent(idString)
 }
 
+@OptIn(LowLevelLocalMachineAccess::class)
 internal fun buildOsParameter(): String = "${OS.CURRENT} ${OS.CURRENT.version()}"

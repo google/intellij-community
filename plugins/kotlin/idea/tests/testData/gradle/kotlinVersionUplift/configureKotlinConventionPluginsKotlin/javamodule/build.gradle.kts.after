@@ -1,14 +1,15 @@
 plugins {
     id("java")
-    kotlin("jvm") version "1.8.22"
+    kotlin("jvm") version "2.3.20"
 }
 
 java {
 }
-dependencies {
-}
 repositories {
     mavenCentral()
+}
+dependencies {
+    testImplementation(kotlin("test"))
 }
 kotlin {
     jvmToolchain(11)

@@ -26,28 +26,6 @@ import org.jetbrains.jps.model.module.JpsModuleDependency
 import org.jetbrains.jps.model.module.JpsModuleReference
 import java.util.SortedSet
 
-/**
- * List of modules that are included in lib/app.jar in all IntelliJ-based IDEs and loaded by the core classloader.
- * 
- * **Please don't add new modules here!**
- *
- * If you need to add a module to all IDEs, register it as a content module in intellij.moduleSets.essential.xml,
- * see [this article](https://youtrack.jetbrains.com/articles/IJPL-A-956) for details. You can use 'loading="embedded"' to make it still loaded by the core classloader if needed.
- */
-@Suppress("RemoveRedundantQualifierName")
-internal val PLATFORM_CORE_MODULES = java.util.List.of(
-  "intellij.platform.remoteServers.impl",
-  "intellij.platform.feedback",
-  "intellij.platform.buildScripts.downloader",
-
-  "intellij.platform.runtime.product",
-
-  // do we need it?
-  "intellij.platform.sqlite",
-
-  "intellij.platform.bookmarks",
-)
-
 @Suppress("RemoveRedundantQualifierName")
 private val PLATFORM_CUSTOM_PACK_MODE: Map<String, LibraryPackMode> = java.util.Map.of(
   "jetbrains-annotations", LibraryPackMode.STANDALONE_SEPARATE_WITHOUT_VERSION_NAME,
@@ -118,6 +96,9 @@ internal suspend fun createPlatformLayout(projectLibrariesUsedByPlugins: SortedS
     "slf4j-jdk14",
   ), UTIL_8_JAR)
 
+  // the library is put to a separate JAR due to IJPL-248572; todo: include it only for Linux: IJPL-249098
+  layout.withProjectLibraries(sequenceOf("jetbrains.intellij.deps.java.atk.wrapper.linux"))
+
   // https://jetbrains.team/p/ij/reviews/67104/timeline
   // https://youtrack.jetbrains.com/issue/IDEA-179784
   // https://youtrack.jetbrains.com/issue/IDEA-205600
@@ -128,32 +109,8 @@ internal suspend fun createPlatformLayout(projectLibrariesUsedByPlugins: SortedS
     "jaxb-api",
   ))
 
-  layout.withProjectLibraries(
-    sequenceOf(
-      "org.codehaus.groovy:groovy",
-      "org.codehaus.groovy:groovy-jsr223",
-      "org.codehaus.groovy:groovy-json",
-      "org.codehaus.groovy:groovy-templates",
-      "org.codehaus.groovy:groovy-xml",
-    ),
-    "groovy.jar"
-  )
-  // ultimate only
-  if (context.project.libraryCollection.findLibrary("org.apache.ivy") != null) {
-    @Suppress("DEPRECATION")
-    layout.withProjectLibrary("org.apache.ivy", "groovy.jar", reason = "ivy workaround")
-  }
-  // TODO(Shumaf.Lovpache): IJPL-1014 convert lsp4j to product modules after merge into master
-  if (context.project.libraryCollection.findLibrary("eclipse.lsp4j") != null) {
-    layout.withProjectLibraries(
-      sequenceOf(
-        "eclipse.lsp4j",
-        "eclipse.lsp4j.jsonrpc",
-        "eclipse.lsp4j.debug",
-        "eclipse.lsp4j.jsonrpc.debug",
-      )
-    )
-  }
+  // the library is put to a separate JAR due to IJPL-248591; it would be better to get rid of it completely, see IJPL-749
+  layout.withModuleLibrary(libraryName = "swingx", moduleName = "intellij.libraries.swingx")
 
   // platform-loader.jar is loaded by JVM classloader as part of loading our custom PathClassLoader class - reduce file size
   addModule(PLATFORM_LOADER_JAR, sequenceOf(
@@ -172,10 +129,6 @@ internal suspend fun createPlatformLayout(projectLibrariesUsedByPlugins: SortedS
   ), productLayout = productLayout, layout = layout)
   addModule("externalProcess-rt.jar", sequenceOf(
     "intellij.platform.externalProcessAuthHelper.rt"
-  ), productLayout = productLayout, layout = layout)
-  addModule("stats.jar", sequenceOf(
-    "intellij.platform.experiment",
-    "intellij.platform.statistics.uploader",
   ), productLayout = productLayout, layout = layout)
   if (!productLayout.excludedModuleNames.contains("intellij.java.guiForms.rt")) {
     layout.withModule("intellij.java.guiForms.rt", "forms_rt.jar")
@@ -199,8 +152,6 @@ internal suspend fun createPlatformLayout(projectLibrariesUsedByPlugins: SortedS
     explicit.add(ModuleItem(moduleName = moduleName, relativeOutputFile = "$moduleName.jar", reason = "productImplementationModules"))
     markContentModuleToScrambleIfNeeded(moduleName = moduleName, context = context, isEmbedded = true)
   }
-  explicit.addAll(toModuleItemSequence(list = PLATFORM_CORE_MODULES, productLayout = productLayout))
-
   val explicitModuleNames = explicit.map { it.moduleName }
   val outputProvider = context.outputProvider
   val runtimeDependencyIndex = RuntimeDependencyIndex((context as BuildContextImpl).jarPackagerDependencyHelper)
@@ -439,12 +390,6 @@ fun getEnabledPluginModules(pluginsToPublish: Set<PluginLayout>, context: BuildC
   result.addAll(context.getBundledPluginModules())
   pluginsToPublish.mapTo(result) { it.mainModule }
   return result
-}
-
-private fun toModuleItemSequence(list: Collection<String>, productLayout: ProductModulesLayout): Sequence<ModuleItem> {
-  return list.asSequence()
-    .filter { !productLayout.excludedModuleNames.contains(it) }
-    .map { ModuleItem(moduleName = it, relativeOutputFile = "$it.jar", reason = "PLATFORM_CORE_MODULES") }
 }
 
 /**

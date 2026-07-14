@@ -55,6 +55,9 @@ private class RasterizedImageDataLoader(override val path: String,
                                         private val classLoaderRef: WeakReference<ClassLoader>,
                                         private val cacheKey: Int,
                                         override val flags: Int) : ImageDataLoader {
+  private val isSvg: Boolean
+    get() = cacheKey != 0
+  
   override fun getCoords(): Pair<String, ClassLoader>? = classLoaderRef.get()?.let { path to it }
 
   override fun serializeToByteArray(): ImageDataLoaderDescriptor {
@@ -70,11 +73,10 @@ private class RasterizedImageDataLoader(override val path: String,
     )
   }
 
-  override fun loadImage(parameters: LoadIconParameters, scaleContext: ScaleContext): Image? {
+  override fun loadImage(parameters: LoadIconParameters, scaleContext: ScaleContext): ImageWithShape<Image>? {
     val classLoader = classLoaderRef.get() ?: return null
     try {
       val start = StartUpMeasurer.getCurrentTimeIfEnabled()
-      val isSvg = cacheKey != 0
       val image = loadRasterized(path = path,
                                  scaleContext = scaleContext,
                                  parameters = parameters,
@@ -137,11 +139,13 @@ private class PatchedRasterizedImageDataLoader(override val path: String,
                                                override val flags: Int) : ImageDataLoader {
   override fun getCoords(): Pair<String, ClassLoader>? = classLoaderRef.get()?.let { path to it }
 
-  override fun loadImage(parameters: LoadIconParameters, scaleContext: ScaleContext): Image? {
+  private val isSvg: Boolean
+      get() = path.endsWith(".svg")
+
+  override fun loadImage(parameters: LoadIconParameters, scaleContext: ScaleContext): ImageWithShape<Image>? {
     val classLoader = classLoaderRef.get() ?: return null
     try {
       val start = StartUpMeasurer.getCurrentTimeIfEnabled()
-      val isSvg = path.endsWith(".svg")
 
       val scale = scaleContext.getScale(DerivedScaleType.PIX_SCALE).toFloat()
       val dotIndex = path.lastIndexOf('.')
@@ -156,7 +160,8 @@ private class PatchedRasterizedImageDataLoader(override val path: String,
                               parameters = parameters,
                               path = path,
                               classLoader = classLoader,
-                              isEffectiveDark = parameters.isDark)
+                              isEffectiveDark = parameters.isDark,
+                              withShape = flags and ImageDescriptor.IS_MODIFIER_ICON == ImageDescriptor.IS_MODIFIER_ICON)
 
       if (start != -1L) {
         IconLoadMeasurer.loadFromResources.end(start)
@@ -186,7 +191,7 @@ private fun loadRasterized(path: String,
                            classLoader: ClassLoader,
                            isSvg: Boolean,
                            rasterizedCacheKey: Int,
-                           @MagicConstant(flagsFromClass = ImageDescriptor::class) imageFlags: Int): Image? {
+                           @MagicConstant(flagsFromClass = ImageDescriptor::class) imageFlags: Int): ImageWithShape<Image>? {
   val scale = scaleContext.getScale(DerivedScaleType.PIX_SCALE).toFloat()
   val dotIndex = path.lastIndexOf('.')
   val name = if (dotIndex < 0) path else path.substring(0, dotIndex)
@@ -228,17 +233,26 @@ private fun loadRasterized(path: String,
       scale = scale,
       compoundCacheKey = SvgCacheClassifier(scale = scale, isDark = isEffectiveDark, isStroke = parameters.isStroke),
       colorPatcherProvider = parameters.colorPatcher,
+      withShape = imageFlags and ImageDescriptor.IS_MODIFIER_ICON == ImageDescriptor.IS_MODIFIER_ICON
     )
   }
   else {
-    loadPngFromClassResource(path = effectivePath, classLoader = classLoader)
+    loadPngFromClassResource(path = effectivePath, classLoader = classLoader)?.let { result ->
+      ImageWithShape(result, null)
+    }
   }
 
-  return convertImage(image = image ?: return null,
-                      filters = parameters.filters,
-                      scaleContext = scaleContext,
-                      isUpScaleNeeded = !isSvg,
-                      imageScale = nonSvgScale)
+  if (image?.image == null) return null
+
+  return ImageWithShape(
+    convertImage(
+      image = image.image,
+      filters = parameters.filters,
+      scaleContext = scaleContext,
+      isUpScaleNeeded = !isSvg,
+      imageScale = nonSvgScale),
+    image.shape
+  )
 }
 
 private class PatchedIconDescriptor(@JvmField val name: String, @JvmField val scale: Float)
@@ -251,7 +265,9 @@ private fun loadPatched(name: String,
                         parameters: LoadIconParameters,
                         path: String,
                         classLoader: ClassLoader,
-                        isEffectiveDark: Boolean): Image? {
+                        isEffectiveDark: Boolean,
+                        withShape: Boolean,
+): ImageWithShape<Image>? {
   val stroke = PatchedIconDescriptor("${name}_stroke.$ext", if (isSvg) scale else 1f)
   val retinaDark = PatchedIconDescriptor("$name@2x_dark.$ext", if (isSvg) scale else 2f)
   val dark = PatchedIconDescriptor("${name}_dark.$ext", if (isSvg) scale else 1f)
@@ -274,18 +290,26 @@ private fun loadPatched(name: String,
                                compoundCacheKey = SvgCacheClassifier(scale = descriptor.scale,
                                                                      isDark = isEffectiveDark,
                                                                      isStroke = parameters.isStroke),
-                               colorPatcherProvider = parameters.colorPatcher)
+                               colorPatcherProvider = parameters.colorPatcher,
+                               withShape = withShape)
     }
     else {
-      loadPngFromClassResource(path = descriptor.name, classLoader = classLoader)
+      loadPngFromClassResource(path = descriptor.name, classLoader = classLoader)?.let { result ->
+        ImageWithShape(result, null)
+      }
     }
 
-    if (image != null) {
-      return convertImage(image = image,
-                          filters = parameters.filters,
-                          scaleContext = scaleContext,
-                          isUpScaleNeeded = !isSvg && (descriptor === plain || descriptor === dark),
-                          imageScale = descriptor.scale)
+    if (image?.image != null) {
+      return ImageWithShape(
+        convertImage(
+          image = image.image,
+          filters = parameters.filters,
+          scaleContext = scaleContext,
+          isUpScaleNeeded = !isSvg && (descriptor === plain || descriptor === dark),
+          imageScale = descriptor.scale
+        ),
+        image.shape
+      )
     }
   }
   return null
@@ -296,13 +320,15 @@ private fun loadSvgFromClassResource(classLoader: ClassLoader?,
                                      precomputedCacheKey: Int,
                                      scale: Float,
                                      compoundCacheKey: SvgCacheClassifier,
-                                     colorPatcherProvider: SVGLoader.SvgElementColorPatcherProvider?): Image? {
+                                     colorPatcherProvider: SVGLoader.SvgElementColorPatcherProvider?,
+                                     withShape: Boolean): ImageWithShape<Image>? {
   return loadAndCacheIfApplicable(path = path,
                                   precomputedCacheKey = precomputedCacheKey,
                                   scale = scale,
                                   compoundCacheKey = compoundCacheKey,
                                   colorPatcherDigest = colorPatcherDigestShim(colorPatcherProvider),
-                                  colorPatcher = colorPatcherProvider?.attributeForPath(path)) {
+                                  colorPatcher = colorPatcherProvider?.attributeForPath(path),
+                                  withShape = withShape) {
     getResourceData(path = path, resourceClass = null, classLoader = classLoader)
   }
 }

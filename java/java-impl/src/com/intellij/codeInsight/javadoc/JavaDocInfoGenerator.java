@@ -8,7 +8,6 @@ import com.intellij.codeInsight.CodeInsightBundle;
 import com.intellij.codeInsight.documentation.DocumentationManagerProtocol;
 import com.intellij.codeInsight.documentation.DocumentationManagerUtil;
 import com.intellij.codeInsight.javadoc.markdown.JavaDocMarkdownFlavourDescriptor;
-import com.intellij.ide.highlighter.HtmlFileType;
 import com.intellij.java.JavaBundle;
 import com.intellij.java.syntax.parser.JavaKeywords;
 import com.intellij.javadoc.JavadocGeneratorRunProfile;
@@ -30,6 +29,7 @@ import com.intellij.openapi.editor.colors.EditorColorsManager;
 import com.intellij.openapi.editor.colors.EditorColorsScheme;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.openapi.editor.richcopy.HtmlSyntaxInfoUtil;
+import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.IndexNotReadyException;
 import com.intellij.openapi.project.Project;
@@ -140,6 +140,7 @@ import com.intellij.psi.javadoc.PsiDocTagValue;
 import com.intellij.psi.javadoc.PsiDocToken;
 import com.intellij.psi.javadoc.PsiInlineDocTag;
 import com.intellij.psi.javadoc.PsiMarkdownCodeBlock;
+import com.intellij.psi.javadoc.PsiMarkdownLink;
 import com.intellij.psi.javadoc.PsiMarkdownReferenceLabel;
 import com.intellij.psi.javadoc.PsiMarkdownReferenceLink;
 import com.intellij.psi.javadoc.PsiSnippetAttribute;
@@ -516,7 +517,7 @@ public class JavaDocInfoGenerator {
 
       if (text.toUpperCase(Locale.ROOT).contains("HREF=\"")) {
         PsiFile fromText = PsiFileFactory.getInstance(myProject)
-          .createFileFromText("DUMMY__.html", HtmlFileType.INSTANCE, text, System.currentTimeMillis(), false);
+          .createFileFromText("DUMMY__.html", FileTypeManager.getInstance().getFileTypeByExtension("html"), text, System.currentTimeMillis(), false);
         Collection<XmlTag> tags = PsiTreeUtil.findChildrenOfType(fromText, XmlTag.class);
         for (XmlTag tag : tags) {
           if (!tag.getName().toLowerCase(Locale.ROOT).equals("a")) {
@@ -695,6 +696,11 @@ public class JavaDocInfoGenerator {
     }
     else if (myElement instanceof PsiPackage pkg) {
       generatePackageJavaDoc(buffer, pkg, generatePrologue);
+    }
+    else if (myElement instanceof PsiPackageStatement psiPackage) {
+      PsiPackage aPackage = JavaPsiFacade.getInstance(myProject).findPackage(psiPackage.getPackageName());
+      if (aPackage == null) return false;
+      generatePackageJavaDoc(buffer, aPackage, generatePrologue);
     }
     else if (myElement instanceof PsiJavaModule module) {
       generateModuleJavaDoc(buffer, module, generatePrologue);
@@ -1527,7 +1533,7 @@ public class JavaDocInfoGenerator {
     AnnotationFormat format = place == SignaturePlace.Javadoc ? AnnotationFormat.JavaDocShort : AnnotationFormat.ToolTip;
     for (AnnotationDocGenerator anno : AnnotationDocGenerator.getAnnotationsToShow(owner)) {
       if (ignoreNonSourceAnnotations && (anno.isInferred() || anno.isExternal())) continue;
-      if (anno.isNonCodeTypeUseAnnotation() && AnnotationDocGenerator.getContextType(owner) instanceof PsiArrayType) continue;
+      if (anno.isInferredTypeUseAnnotation() && AnnotationDocGenerator.getContextType(owner) instanceof PsiArrayType) continue;
       anno.generateAnnotation(buffer, format, generateLink, isRendered(), doHighlightSignatures());
 
       buffer.append(NBSP);
@@ -1944,7 +1950,8 @@ public class JavaDocInfoGenerator {
             StringBuilder value = new StringBuilder();
             generateLiteralValue(value, tag, false);
             int offset = !value.isEmpty() && value.charAt(0) == ' ' ? 1 : 0;
-            htmlCodeBlockContents.append(value, offset, value.length());
+            String escapedValue = StringUtil.escapeXmlEntities(value.toString());
+            htmlCodeBlockContents.append(escapedValue, offset, escapedValue.length());
             continue;
           }
           else {
@@ -1986,6 +1993,9 @@ public class JavaDocInfoGenerator {
       }
       else if (element instanceof PsiMarkdownReferenceLink link) {
         generateMarkdownLinkValue(link, subBuffer);
+      }
+      else if (element instanceof PsiMarkdownLink link) {
+        collectElementText(subBuffer, link);
       }
       else {
         String text;
@@ -2437,7 +2447,7 @@ public class JavaDocInfoGenerator {
     PsiElement label = referenceLink.getLabel();
 
     String referenceText = reference != null ? reference.getText() : "";
-    String labelText = label instanceof PsiMarkdownReferenceLabel ? label.getText() : null;
+    String labelText = label instanceof PsiMarkdownReferenceLabel referenceLabel ? referenceLabel.getLabelText() : null;
 
     // JEP 467 requires reference brackets to be escaped, remove the escape to match the reference
     referenceText = referenceText.replace("\\[", "[").replace("\\]", "]");
@@ -2568,6 +2578,11 @@ public class JavaDocInfoGenerator {
   }
 
   private void generateDeprecatedSection(StringBuilder buffer, PsiDocComment comment) {
+    if (comment.isMarkdownComment() &&
+        comment.getOwner() instanceof PsiModifierListOwner owner &&
+        !owner.hasAnnotation(CommonClassNames.JAVA_LANG_DEPRECATED)) {
+      return;
+    }
     generateSingleTagSection(buffer, comment, "deprecated", JavaBundle.messagePointer("javadoc.deprecated"));
   }
 

@@ -3,6 +3,7 @@
 package com.intellij.platform.testFramework.monorepo
 
 import com.intellij.openapi.application.ArchivedCompilationContextUtil
+import com.intellij.openapi.application.PathManager
 import com.intellij.project.loadIntelliJProject
 import com.intellij.testFramework.PlatformTestUtil
 import org.jetbrains.jps.model.JpsProject
@@ -31,15 +32,23 @@ object MonorepoProjectStructure {
 fun JpsModule.hasProductionSources(): Boolean = getSourceRoots(JavaSourceRootType.SOURCE).iterator().hasNext()
 
 /**
- * Calls [processor] for the path containing the production output of [this@processModuleProductionOutput].
+ * Calls [processor] for the path containing the production output of this module.
  * Works both when module output is located in a directory and when it's packed in a JAR.
  */
-fun <T> JpsModule.processProductionOutput(processor: (outputRoot: Path) -> T): T {
-  val archivedCompiledClassesMapping = ArchivedCompilationContextUtil.archivedCompiledClassesMapping
-  val outputJarPath = archivedCompiledClassesMapping?.get("production/$name")
+fun <T> JpsModule.processProductionOutput(processor: (outputRoot: Path) -> T): T = processOutput(forTests = false, processor)
+
+/**
+ * Calls [processor] for the path containing the test output of this module.
+ * Works both when module output is located in a directory and when it's packed in a JAR.
+ */
+fun <T> JpsModule.processTestOutput(processor: (outputRoot: Path) -> T): T = processOutput(forTests = true, processor)
+
+private fun <T> JpsModule.processOutput(forTests: Boolean, processor: (outputRoot: Path) -> T): T {
+  val archivedCompiledClassesMapping = getArchivedCompiledClassesMapping(project)
+  val outputJarPath = archivedCompiledClassesMapping?.get("${if (forTests) "test" else "production"}/$name")
   if (outputJarPath == null) {
-    val outputDirectoryPath = JpsJavaExtensionService.getInstance().getOutputDirectoryPath(this, false)
-                              ?: error("Output directory is not specified for '$name'")
+    val outputDirectoryPath = JpsJavaExtensionService.getInstance().getOutputDirectoryPath(this, forTests)
+                              ?: error("${if (forTests) "Test output" else "Output"} directory is not specified for '$name'")
     return processor(outputDirectoryPath)
   }
   else {
@@ -51,7 +60,7 @@ fun <T> JpsModule.processProductionOutput(processor: (outputRoot: Path) -> T): T
 
 val JpsModule.productionOutputPaths: List<Path>
   get() {
-    val archivedCompiledClassesMapping = ArchivedCompilationContextUtil.archivedCompiledClassesMapping
+    val archivedCompiledClassesMapping = getArchivedCompiledClassesMapping(project)
     if (archivedCompiledClassesMapping != null) {
       val outputJarPath = archivedCompiledClassesMapping["production/$name"]
       return outputJarPath?.let { listOf(Path.of(it)) } ?: emptyList()
@@ -61,10 +70,22 @@ val JpsModule.productionOutputPaths: List<Path>
 
 val JpsModule.testOutputPaths: List<Path>
   get() {
-    val archivedCompiledClassesMapping = ArchivedCompilationContextUtil.archivedCompiledClassesMapping
+    val archivedCompiledClassesMapping = getArchivedCompiledClassesMapping(project)
     if (archivedCompiledClassesMapping != null) {
       val outputJarPath = archivedCompiledClassesMapping["test/$name"]
       return outputJarPath?.let { listOf(Path.of(it)) } ?: emptyList()
     }
     return listOf(JpsJavaExtensionService.getInstance().getOutputDirectoryPath(this, true) ?: error("Test output directory is not specified for '$name'"))
   }
+
+private fun getArchivedCompiledClassesMapping(project: JpsProject): Map<String, String>? {
+  val compiledClassesMapping = ArchivedCompilationContextUtil.archivedCompiledClassesMapping
+  if (compiledClassesMapping != null) {
+    val projectHome = JpsModelSerializationDataService.getBaseDirectoryPath(project)
+    val currentProcessHome = PathManager.getHomeDir()
+    require(currentProcessHome == projectHome || currentProcessHome.resolve("community") == projectHome) {
+      "Output classes mapping is requested for the project at $projectHome, but current process home is $currentProcessHome"
+    }
+  }
+  return compiledClassesMapping
+}

@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.idea.devkit.k2.inspections
 
 import com.intellij.openapi.module.Module
@@ -12,9 +12,6 @@ import com.intellij.testFramework.fixtures.DefaultLightProjectDescriptor
 import com.intellij.testFramework.fixtures.LightJavaCodeInsightFixtureTestCase
 import com.intellij.testFramework.fixtures.kotlin.withKotlinStdlib
 import org.jetbrains.idea.devkit.kotlin.inspections.ForbiddenInSuspectContextMethodInspection
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode
-import org.jetbrains.kotlin.idea.test.ExpectedPluginModeProvider
-import org.jetbrains.kotlin.idea.test.setUpWithKotlinPlugin
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,8 +26,8 @@ class ForbiddenInSuspectContextMethodInspectionTest : KtBlockingContextInspectio
     myFixture.enableInspections(ForbiddenInSuspectContextMethodInspection::class.java)
   }
 
-  private val progressManagerDescr = "Do not call 'ProgressManager.checkCanceled' in suspend context. Use top-level 'checkCancelled' function"
-  private val progressManagerFix = "Replace 'ProgressManager.checkCanceled' with coroutine-friendly 'checkCancelled'"
+  private val progressManagerDescr = "Do not call 'ProgressManager.checkCanceled' in suspend context. Use top-level 'checkCanceled' function"
+  private val progressManagerFix = "Replace 'ProgressManager.checkCanceled' with coroutine-friendly 'checkCanceled'"
 
   private val invokeAndWaitDescr = "'invokeAndWait' can block current coroutine. Use 'Dispatchers.EDT' instead"
   private val invokeAndWaitFix = "Replace 'invokeAndWait' call with 'withContext(Dispatchers.EDT) {}'"
@@ -89,10 +86,9 @@ class ForbiddenInSuspectContextMethodInspectionTest : KtBlockingContextInspectio
 
     myFixture.checkResult("""
       import com.intellij.openapi.progress.ProgressManager.checkCanceled
-      import com.intellij.openapi.progress.checkCancelled
       
       suspend fun myFun() {
-          checkCancelled()
+          com.intellij.openapi.progress.checkCanceled()
       }
     """.trimIndent())
   }
@@ -204,11 +200,11 @@ class ForbiddenInSuspectContextMethodInspectionTest : KtBlockingContextInspectio
     myFixture.checkResult("""
       @file:Suppress("UNUSED_VARIABLE", "UNUSED_PARAMETER")
       import com.intellij.openapi.progress.ProgressManager
-      import com.intellij.openapi.progress.checkCancelled
+      import com.intellij.openapi.progress.checkCanceled
       
       fun myFun() {
         suspend fun myInnerFun() {
-            checkCancelled()
+            checkCanceled()
         }
       }
     """.trimIndent())
@@ -240,14 +236,14 @@ class ForbiddenInSuspectContextMethodInspectionTest : KtBlockingContextInspectio
     myFixture.checkResult("""
       @file:Suppress("UNUSED_VARIABLE", "UNUSED_PARAMETER")
       import com.intellij.openapi.progress.ProgressManager
-      import com.intellij.openapi.progress.checkCancelled
+      import com.intellij.openapi.progress.checkCanceled
       
       fun callSuspendFunction(function: suspend () -> Unit) {
       }
       
       val myLambda: () -> Unit = {
         callSuspendFunction {
-            checkCancelled()
+            checkCanceled()
         }
       }
     """.trimIndent())
@@ -279,11 +275,11 @@ class ForbiddenInSuspectContextMethodInspectionTest : KtBlockingContextInspectio
 
     myFixture.configureByText("file.kt", """
       import com.intellij.util.concurrency.annotations.*
-      
+
       @RequiresBlockingContext
       fun iVeryNeedBlockingContext() {
       }
-      
+
       suspend fun suspendContext() {
         <warning descr="Method 'iVeryNeedBlockingContext' annotated with @RequiresBlockingContext. It is not designed to be called in suspend functions">iVeryN<caret>eedBlockingContext</warning>()
       }
@@ -292,6 +288,121 @@ class ForbiddenInSuspectContextMethodInspectionTest : KtBlockingContextInspectio
     myFixture.testHighlighting()
 
     val intention = myFixture.getAvailableIntention(progressManagerFix)
+    assertNullK(intention)
+  }
+
+  private val replaceWithSuspendAlternativeFix = "Replace with suspend alternative"
+
+  @Test
+  fun `custom marked function with ReplaceWith`() {
+    RegistryManager.getInstance().get("devkit.inspections.forbidden.method.in.suspend.context")
+      .setValue(true, testRootDisposable)
+
+    myFixture.configureByText("suspendAlternative.kt", """
+      package com.example
+
+      suspend fun suspendAlternative() {
+      }
+    """.trimIndent())
+
+    myFixture.configureByText("file.kt", """
+      import com.intellij.util.concurrency.annotations.*
+
+      @RequiresBlockingContext(ReplaceWith("suspendAlternative()", "com.example.suspendAlternative"))
+      fun blockingFunction() {
+      }
+
+      suspend fun suspendContext() {
+          <warning descr="Method 'blockingFunction' annotated with @RequiresBlockingContext. It is not designed to be called in suspend functions">blocking<caret>Function</warning>()
+      }
+    """.trimIndent())
+
+    myFixture.testHighlighting()
+
+    val intention = myFixture.getAvailableIntention(replaceWithSuspendAlternativeFix)
+    assertNotNullK(intention)
+    myFixture.launchAction(intention)
+
+    myFixture.checkResult("""
+      import com.example.suspendAlternative
+      import com.intellij.util.concurrency.annotations.*
+
+      @RequiresBlockingContext(ReplaceWith("suspendAlternative()", "com.example.suspendAlternative"))
+      fun blockingFunction() {
+      }
+
+      suspend fun suspendContext() {
+          suspendAlternative()
+      }
+    """.trimIndent())
+  }
+
+  @Test
+  fun `custom marked function with ReplaceWith without imports`() {
+    RegistryManager.getInstance().get("devkit.inspections.forbidden.method.in.suspend.context")
+      .setValue(true, testRootDisposable)
+
+    myFixture.configureByText("file.kt", /* language=kotlin */ """
+      package demo
+
+      import com.intellij.util.concurrency.annotations.*
+
+      @RequiresBlockingContext(ReplaceWith("suspendAlternative()", imports = []))
+      fun blockingFunction() {
+      }
+
+      suspend fun suspendAlternative() {
+      }
+
+      suspend fun suspendContext() {
+          <warning descr="Method 'blockingFunction' annotated with @RequiresBlockingContext. It is not designed to be called in suspend functions">blocking<caret>Function</warning>()
+      }
+    """.trimIndent())
+
+    myFixture.testHighlighting()
+
+    val intention = myFixture.getAvailableIntention(replaceWithSuspendAlternativeFix)
+    assertNotNullK(intention)
+    myFixture.launchAction(intention)
+
+    myFixture.checkResult("""
+      package demo
+
+      import com.intellij.util.concurrency.annotations.*
+
+      @RequiresBlockingContext(ReplaceWith("suspendAlternative()", imports = []))
+      fun blockingFunction() {
+      }
+
+      suspend fun suspendAlternative() {
+      }
+
+      suspend fun suspendContext() {
+          suspendAlternative()
+      }
+    """.trimIndent())
+  }
+
+  @Test
+  fun `custom marked function with empty ReplaceWith has no quickfix`() {
+    RegistryManager.getInstance().get("devkit.inspections.forbidden.method.in.suspend.context")
+      .setValue(true, testRootDisposable)
+
+    myFixture.configureByText("file.kt", """
+      import com.intellij.util.concurrency.annotations.*
+
+      @RequiresBlockingContext(ReplaceWith(""))
+      fun blockingFunction() {
+      }
+
+      suspend fun suspendContext() {
+        <warning descr="Method 'blockingFunction' annotated with @RequiresBlockingContext. It is not designed to be called in suspend functions">blocking<caret>Function</warning>()
+      }
+    """.trimIndent())
+
+    myFixture.testHighlighting()
+
+    val intention = myFixture.getAvailableIntention(replaceWithSuspendAlternativeFix)
     assertNullK(intention)
   }
 
@@ -384,7 +495,7 @@ class ForbiddenInSuspectContextMethodInspectionTest : KtBlockingContextInspectio
       @RequiresBlockingContext
       fun blockingFun() {
         runBlockingCancellable {
-            checkCancelled()
+            checkCanceled()
         }
       }
     """.trimIndent())
@@ -415,7 +526,7 @@ class ForbiddenInSuspectContextMethodInspectionTest : KtBlockingContextInspectio
       
       suspend fun process(items: List<Int>) {
         items.map {
-          checkCancelled()
+          checkCanceled()
           it + 1
         }
       }
@@ -758,22 +869,28 @@ class ForbiddenInSuspectContextMethodInspectionTest : KtBlockingContextInspectio
 }
 
 @RunWith(JUnit4::class)
-abstract class KtBlockingContextInspectionTestCase : LightJavaCodeInsightFixtureTestCase(), ExpectedPluginModeProvider {
-  override val pluginMode: KotlinPluginMode = KotlinPluginMode.K2
+abstract class KtBlockingContextInspectionTestCase : LightJavaCodeInsightFixtureTestCase() {
 
-  override fun setUp() {
-    setUpWithKotlinPlugin { super.setUp() }
-  }
+    
 
   override fun getProjectDescriptor(): LightProjectDescriptor = PROJECT_DESCRIPTOR_WITH_KOTLIN
 
   @Before
   fun addAnnotation() {
-    myFixture.addClass("""
+    myFixture.addFileToProject("RequiresBlockingContext.kt", """
       package com.intellij.util.concurrency.annotations;
-      
-      
-      public @interface RequiresBlockingContext {}
+
+      @MustBeDocumented
+      @Retention(AnnotationRetention.BINARY)
+      @Target(
+        AnnotationTarget.FUNCTION,
+        AnnotationTarget.PROPERTY_GETTER,
+        AnnotationTarget.PROPERTY_SETTER,
+      )
+      @ApiStatus.Experimental
+      annotation class RequiresBlockingContext(
+        val replaceWith: ReplaceWith = ReplaceWith(""),
+      )
     """.trimIndent())
   }
 
@@ -865,7 +982,7 @@ abstract class KtBlockingContextInspectionTestCase : LightJavaCodeInsightFixture
       import kotlinx.coroutines.*
 
       @Suppress("RedundantSuspendModifier")
-      suspend fun checkCancelled(): Unit = Unit
+      suspend fun checkCanceled(): Unit = Unit
       
       fun <T> runBlockingCancellable(action: suspend CoroutineScope.() -> T): T {
         throw RuntimeException("Unimplemented")

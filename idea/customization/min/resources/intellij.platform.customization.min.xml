@@ -17,7 +17,7 @@
     <applicationService serviceImplementation="com.intellij.platform.templates.ProjectTemplateExportable"/>
     <projectTemplateFileProcessor implementation="com.intellij.platform.templates.SystemFileProcessor"/>
 
-    <moduleRendererFactory implementation="com.intellij.ide.util.DefaultModuleRendererFactory" order="last,before platform"/>
+    <moduleRendererFactory implementation="com.intellij.ide.util.DefaultModuleRendererFactory" order="last,before platform" id="default"/>
 
     <moduleConfigurationEditorProvider implementation="com.intellij.openapi.module.WebModuleConfigurationEditorProvider"/>
 
@@ -46,9 +46,6 @@
     <action id="WelcomeScreen.OpenProject" class="com.intellij.ide.actions.OpenFileAction$OnWelcomeScreen">
       <add-to-group group-id="WelcomeScreen.QuickStart" anchor="before" relative-to-action="Vcs.VcsClone"/>
     </action>
-
-    <action id="RerunFailedTests" class="com.intellij.execution.testframework.actions.RerunFailedTestsAction"
-            icon="AllIcons.RunConfigurations.RerunFailedTests"/>
 
     <action id="ConsoleView.FoldLinesLikeThis" class="com.intellij.execution.console.FoldLinesLikeThis">
       <add-to-group group-id="ConsoleEditorPopupMenu" anchor="after" relative-to-action="$SearchWeb"/>

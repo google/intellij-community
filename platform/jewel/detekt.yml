@@ -1,16 +1,7 @@
-build:
-  maxIssues: 0
-  excludeCorrectable: false
-  weights:
-  # complexity: 2
-  # LongParameterList: 1
-  # style: 1
-  # comments: 1
-
 config:
   validation: true
   # when writing own rules with new properties, exclude the property path e.g.: 'my_rule_set,.*>.*>[my_property]'
-  excludes: ''
+  excludes: []
 
 processors:
   active: true
@@ -58,6 +49,7 @@ coroutines:
 
 exceptions:
   active: true
+  excludes: [ '**/test/**', '**/androidTest/**', '**/*.Test.kt', '**/*.Spec.kt', '**/*.Spek.kt' ]
   NotImplementedDeclaration:
     active: true
   ObjectExtendsThrowable:
@@ -137,13 +129,11 @@ style:
     active: true
   OptionalUnit:
     active: true
-  PreferToOverPairSyntax:
-    active: true
   RedundantExplicitType:
     active: true
   ReturnCount:
     active: false
-  SpacingBetweenPackageAndImports:
+  SpacingAfterPackageAndImports:
     active: true
   ThrowsCount:
     active: true
@@ -154,14 +144,11 @@ style:
     active: true
   UnnecessaryParentheses:
     active: false
-  UnnecessaryAbstractClass:
-    ignoreAnnotated:
-      - Module
-  UntilInsteadOfRangeTo:
+  RangeUntilInsteadOfRangeTo:
     active: true
-  UnusedImports:
+  UnusedImport:
     active: true
-  UnusedPrivateMember:
+  UnusedPrivateFunction:
     # We need to disable this otherwise we'd need to @Suppress all Composable previews...
     active: false
   UseArrayLiteralsInAnnotations:
@@ -192,6 +179,7 @@ jewel:
   EqualityMembersRule:
     annotated:
       - GenerateDataFunctions
+    autoCorrect: true
 
 Compose:
   CompositionLocalAllowlist:

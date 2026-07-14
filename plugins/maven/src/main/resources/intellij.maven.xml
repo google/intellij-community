@@ -14,10 +14,17 @@
     <module name="intellij.java.psi"/>
     <module name="intellij.java.syntax"/>
     <module name="intellij.java.ui"/>
+    <module name="intellij.java.xml.dom.impl"/>
+    <module name="intellij.platform.buildScripts.downloader"/>
+    <module name="intellij.platform.testRunner"/>
     <module name="intellij.properties.backend"/>
     <module name="intellij.properties.backend.psi"/>
     <module name="intellij.properties.psi"/>
     <module name="intellij.spellchecker"/>
+    <module name="intellij.xml.analysis"/>
+    <module name="intellij.xml.dom"/>
+    <module name="intellij.xml.dom.impl"/>
+    <module name="intellij.xml.impl"/>
   </dependencies>
   <!-- endregion -->
 
@@ -95,7 +102,8 @@
     <moduleBuilder builderClass="org.jetbrains.idea.maven.wizards.archetype.MavenArchetypeNewProjectWizard$Builder"/>
     <!--<frameworkSupport implementation="org.jetbrains.idea.maven.wizards.MavenFrameworkSupportProvider"/>-->
     <moduleExtension implementation="org.jetbrains.idea.maven.importing.MavenSourceFoldersModuleExtension"/>
-    <moduleService serviceImplementation="org.jetbrains.idea.maven.importing.MavenPomPathModuleService"/>
+    <workspaceModel.customImlComponentNameContributor
+      implementation="org.jetbrains.idea.maven.importing.MavenPomPathModuleServiceCustomImlComponentNameContributor"/>
     <trustedProjectsLocator implementation="org.jetbrains.idea.maven.wizards.MavenTrustedProjectsLocator"/>
 
     <applicationService serviceInterface="org.jetbrains.idea.maven.server.MavenServerManager"
@@ -287,29 +295,8 @@
     <completion.contributor language="XML"
                             implementationClass="org.jetbrains.idea.maven.dom.model.completion.MavenSmartCompletionContributor"/>
     <completion.contributor language="XML"
-                            implementationClass="org.jetbrains.idea.maven.dom.model.completion.MavenVersionCompletionContributor"/>
-
-    <completion.contributor language="XML"
-                            implementationClass="org.jetbrains.idea.maven.dom.model.completion.MavenGroupIdCompletionContributor"/>
-
-    <completion.contributor language="XML"
-                            implementationClass="org.jetbrains.idea.maven.dom.model.completion.MavenArtifactIdCompletionContributor"/>
-
-    <completion.contributor language="XML"
-                            implementationClass="org.jetbrains.idea.maven.dom.model.completion.MavenDependencyTopLevelCompletionContributor"/>
-
-    <completion.contributor language="XML"
                             implementationClass="org.jetbrains.idea.maven.dom.model.completion.MavenPomXmlCompletionTagListenerContributor"
                             order="first"/>
-
-    <completion.contributor language="XML"
-                            implementationClass="org.jetbrains.idea.maven.dom.model.completion.MavenDependenciesCompletionContributor"/>
-
-    <completion.contributor language="XML"
-                            implementationClass="org.jetbrains.idea.maven.dom.model.completion.MavenPluginCompletionContributor"/>
-
-    <completion.contributor language="XML"
-                            implementationClass="org.jetbrains.idea.maven.dom.model.completion.MavenExtensionCompletionContributor"/>
 
     <psi.referenceContributor language="XML"
                               implementation="org.jetbrains.idea.maven.dom.references.MavenXmlPropertyPsiReferenceContributor"/>
@@ -524,7 +511,6 @@
 
     <dependencyCollector kind="java" implementation="org.jetbrains.idea.maven.project.MavenDependencyCollector"/>
     <dependencyCollector kind="maven-packaging" implementation="org.jetbrains.idea.maven.project.MavenPackagingDependencyCollector"/>
-    <dependencyCollector kind="maven-version-support" implementation="org.jetbrains.idea.maven.maven2.Maven2VersionDependencyCollector"/>
 
     <newProjectWizard.java.buildSystem implementation="org.jetbrains.idea.maven.wizards.MavenJavaNewProjectWizard"/>
     <commandLineInspectionProjectConfigurator implementation="org.jetbrains.idea.maven.MavenCommandLineInspectionProjectConfigurator"/>

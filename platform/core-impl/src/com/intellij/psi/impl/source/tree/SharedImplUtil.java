@@ -5,7 +5,6 @@ package com.intellij.psi.impl.source.tree;
 import com.intellij.lang.ASTNode;
 import com.intellij.lang.FileASTNode;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.EditorLockFreeTyping;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiElementVisitor;
@@ -16,6 +15,7 @@ import com.intellij.psi.impl.CheckUtil;
 import com.intellij.psi.impl.DebugUtil;
 import com.intellij.psi.impl.source.SourceTreeToPsiMap;
 import com.intellij.psi.impl.source.codeStyle.CodeEditUtil;
+import com.intellij.psi.impl.source.tree.mvcc.InternalPsiVersioning;
 import com.intellij.psi.tree.IElementType;
 import com.intellij.util.CharTable;
 import com.intellij.util.IncorrectOperationException;
@@ -27,7 +27,7 @@ import org.jetbrains.annotations.Nullable;
 public final class SharedImplUtil {
   private static final Logger LOG = Logger.getInstance(SharedImplUtil.class);
   private static final boolean CHECK_FOR_READ_ACTION = DebugUtil.DO_EXPENSIVE_CHECKS ||
-                                                       (ApplicationManager.getApplication().isInternal() && !EditorLockFreeTyping.isEnabled());
+                                                       ApplicationManager.getApplication().isInternal();
 
   private SharedImplUtil() {
   }
@@ -74,11 +74,7 @@ public final class SharedImplUtil {
   }
 
   public static FileASTNode findFileElement(@NotNull ASTNode element) {
-    ASTNode parent = element.getTreeParent();
-    while (parent != null) {
-      element = parent;
-      parent = parent.getTreeParent();
-    }
+    element = TreeUtil.findTopmostParent(element);
 
     if (CHECK_FOR_READ_ACTION && element instanceof TreeElement) {
       ((TreeElement)element).assertReadAccessAllowed();
@@ -116,7 +112,8 @@ public final class SharedImplUtil {
     ASTNode next = SourceTreeToPsiMap.psiElementToTree(last).getTreeNext();
     ASTNode parent = null;
     for (ASTNode element = SourceTreeToPsiMap.psiElementToTree(first); element != next; element = element.getTreeNext()) {
-      TreeElement elementCopy = ChangeUtil.copyElement((TreeElement)element, table);
+      final ASTNode finalElement = element;
+      TreeElement elementCopy = ChangeUtil.copyElement((TreeElement)finalElement, table);
       if (element == first.getNode()) {
         copyFirst = elementCopy;
       }

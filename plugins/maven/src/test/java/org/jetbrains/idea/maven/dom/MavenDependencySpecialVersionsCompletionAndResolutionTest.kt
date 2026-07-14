@@ -1,40 +1,32 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.idea.maven.dom
 
+import com.intellij.maven.testFramework.fixtures.MavenDomTestFixture
+import com.intellij.maven.testFramework.fixtures.MavenDomTestFixtureIndices
+import com.intellij.maven.testFramework.fixtures.MavenVersionArguments
+import com.intellij.maven.testFramework.fixtures.createProjectPom
+import com.intellij.maven.testFramework.fixtures.mavenDomFixture
+import com.intellij.testFramework.junit5.TestApplication
 import kotlinx.coroutines.runBlocking
-import org.junit.Test
+import org.jetbrains.idea.maven.fixtures.checkHighlighting
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedClass
+import org.junit.jupiter.params.provider.ArgumentsSource
 
-class MavenDependencySpecialVersionsCompletionAndResolutionTest : MavenDomWithIndicesTestCase() {
-  override fun setUp() = runBlocking {
-    super.setUp()
-    importProjectAsync("""
-                    <groupId>test</groupId>
-                    <artifactId>project</artifactId>
-                    <version>1</version>
-                    """.trimIndent())
-  }
+@TestApplication
+@ParameterizedClass
+@ArgumentsSource(MavenVersionArguments::class)
+class MavenDependencySpecialVersionsCompletionAndResolutionTest(mavenVersion: String, modelVersion: String) {
 
-  //@Test 
-  //public void testResolvingDependenciesWithVersionRanges() throws Throwable {
-  //  createProjectPom("<groupId>test</groupId>\n" +
-  //                   "<artifactId>project</artifactId>\n" +
-  //                   "<version>1</version>\n" +
-  //
-  //                   "<dependencies>\n" +
-  //                   "  <dependency>\n" +
-  //                   "    <groupId>junit</groupId>\n" +
-  //                   "    <artifactId><cursor>junit</artifactId>\n" +
-  //                   "    <version>[4,5]</version>\n" +
-  //                   "  </dependency>\n" +
-  //                   "</dependencies>");
-  //
-  //  String libPath = myIndicesFixture.getRepositoryHelper().getTestDataPath("local1/junit/junit/4.0/junit-4.0.jar");
-  //  VirtualFile f = LocalFileSystem.getInstance().refreshAndFindFileByPath(libPath);
-  //  assertResolved(myProjectPom, findPsiFile(f));
-  //}
+  private val maven by mavenDomFixture(
+    mavenVersion = mavenVersion, modelVersion = modelVersion,
+    initialPom = MavenDomTestFixture.DEFAULT_POM,
+    indices = MavenDomTestFixtureIndices("local1", listOf("local2")),
+  )
+
   @Test
   fun testDoNotHighlightVersionRanges() = runBlocking {
-    createProjectPom("""
+    maven.createProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -47,12 +39,12 @@ class MavenDependencySpecialVersionsCompletionAndResolutionTest : MavenDomWithIn
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testDoNotHighlightLatestAndReleaseDependencies() = runBlocking {
-    createProjectPom("""
+    maven.createProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -70,6 +62,6 @@ class MavenDependencySpecialVersionsCompletionAndResolutionTest : MavenDomWithIn
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 }

@@ -4,9 +4,9 @@ package org.jetbrains.plugins.gradle.frameworkSupport.buildscript
 import org.gradle.util.GradleVersion
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.plugins.gradle.frameworkSupport.GradleDsl
+import org.jetbrains.plugins.gradle.frameworkSupport.GradleDsl.Companion.buildScriptName
 import org.jetbrains.plugins.gradle.frameworkSupport.script.GradleScriptElement.Statement.Expression
 import org.jetbrains.plugins.gradle.frameworkSupport.script.GradleScriptTreeBuilder
-import org.jetbrains.plugins.gradle.util.GradleConstants
 import java.util.function.Consumer
 
 @ApiStatus.NonExtendable
@@ -22,6 +22,7 @@ interface GradleBuildScriptBuilder<Self : GradleBuildScriptBuilder<Self>>
   fun configureTask(name: String, type: String, configure: Consumer<GradleScriptTreeBuilder>): Self = configureTask(name, type, configure::accept)
   fun configureTask(name: String, type: String, configure: GradleScriptTreeBuilder.() -> Unit): Self
 
+  @ApiStatus.ScheduledForRemoval
   @Deprecated("Renamed, use the [test] function instead.")
   fun configureTestTask(configure: GradleScriptTreeBuilder.() -> Unit): Self = test(configure)
 
@@ -147,11 +148,12 @@ interface GradleBuildScriptBuilder<Self : GradleBuildScriptBuilder<Self>>
     }
 
     @JvmStatic
+    @Deprecated("Use GradleDsl.buildScriptName instead", ReplaceWith(
+        "gradleDsl.buildScriptName",
+        "org.jetbrains.plugins.gradle.frameworkSupport.GradleDsl.Companion.buildScriptName"
+    ))
     fun getBuildScriptName(gradleDsl: GradleDsl): String {
-      return when (gradleDsl) {
-        GradleDsl.GROOVY -> GradleConstants.DEFAULT_SCRIPT_NAME
-        GradleDsl.KOTLIN -> GradleConstants.KOTLIN_DSL_SCRIPT_NAME
-      }
+      return gradleDsl.buildScriptName
     }
   }
 }

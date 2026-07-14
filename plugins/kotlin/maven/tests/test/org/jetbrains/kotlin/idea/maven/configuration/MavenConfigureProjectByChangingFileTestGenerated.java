@@ -3,7 +3,6 @@
 package org.jetbrains.kotlin.idea.maven.configuration;
 
 import com.intellij.testFramework.TestDataPath;
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode;
 import org.jetbrains.kotlin.idea.base.test.TestRoot;
 import org.jetbrains.kotlin.idea.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils;
@@ -20,12 +19,6 @@ import org.junit.runner.RunWith;
 @RunWith(JUnit3RunnerWithInners.class)
 @TestMetadata("testData/configurator/jvm")
 public class MavenConfigureProjectByChangingFileTestGenerated extends AbstractMavenConfigureProjectByChangingFileTest {
-    @java.lang.Override
-    @org.jetbrains.annotations.NotNull
-    public final KotlinPluginMode getPluginMode() {
-        return KotlinPluginMode.K2;
-    }
-
     private void runTest(String testDataFilePath) throws Exception {
         KotlinTestUtils.runTest(this::doTestWithMaven, this, testDataFilePath);
     }
@@ -88,6 +81,11 @@ public class MavenConfigureProjectByChangingFileTestGenerated extends AbstractMa
     @TestMetadata("simpleProjectKotlin2_3_10AddsExtensionsToPlugin")
     public void testSimpleProjectKotlin2_3_10AddsExtensionsToPlugin() throws Exception {
         runTest("testData/configurator/jvm/simpleProjectKotlin2_3_10AddsExtensionsToPlugin/");
+    }
+
+    @TestMetadata("simpleProjectKotlin2_4DoesntAddSourceDirectories")
+    public void testSimpleProjectKotlin2_4DoesntAddSourceDirectories() throws Exception {
+        runTest("testData/configurator/jvm/simpleProjectKotlin2_4DoesntAddSourceDirectories/");
     }
 
     @TestMetadata("simpleProjectMilestone")

@@ -4,14 +4,26 @@
     <plugin id="com.intellij.properties"/>
     <module name="intellij.java.backend"/>
     <module name="intellij.java.aetherDependencyResolver"/>
+    <module name="intellij.java.debugger.impl"/>
+    <module name="intellij.java.execution.impl"/>
+    <module name="intellij.java.psi"/>
+    <module name="intellij.java.syntax"/>
+    <module name="intellij.java.ui"/>
+    <module name="intellij.java.xml.dom.impl"/>
     <module name="intellij.json.backend"/>
     <module name="intellij.libraries.xerces"/>
+    <module name="intellij.platform.jps.build"/>
+    <module name="intellij.platform.structureView"/>
+    <module name="intellij.platform.testRunner"/>
     <module name="intellij.properties.backend"/>
     <module name="intellij.properties.backend.psi"/>
     <module name="intellij.spellchecker"/>
+    <module name="intellij.xml.analysis"/>
     <module name="intellij.xml.dom.impl"/>
+    <module name="intellij.xml.impl"/>
     <module name="intellij.xml.parser"/>
     <module name="intellij.xml.psi"/>
+    <module name="intellij.xml.structureView.impl"/>
   </dependencies>
   <!-- endregion -->
 
@@ -40,6 +52,7 @@
 
     <junitPatcher implementation="org.jetbrains.idea.devkit.run.JUnitDevKitPatcher"/>
     <runConfigurationExtension implementation="org.jetbrains.idea.devkit.run.DevKitApplicationPatcher"/>
+    <runConfigurationExtension implementation="org.jetbrains.idea.devkit.run.IdeStarterRunConfigurationExtension"/>
     <compiler.buildTargetScopeProvider implementation="org.jetbrains.idea.devkit.build.PluginModuleBuildScopeProvider"/>
 
     <registryKey key="devkit.generate.intellij.module.repository" defaultValue="true"
@@ -136,17 +149,37 @@
 
     <registryKey defaultValue="false" description="Enables experimental new remote dev module in intellij repository"
                  key="devkit.new.remdev.module.action"/>
-    <registryKey key="devkit.remote.dev.split.mode.analysis.transitive.dependencies" defaultValue="true"
+    <registryKey key="devkit.split.mode.analysis.transitive.dependencies" defaultValue="true"
                  description="Enables transitive descriptor dependency analysis for DevKit split-mode inspections."/>
-    <registryKey key="devkit.remote.dev.split.mode.analysis.containing.plugins" defaultValue="false"
+    <registryKey key="devkit.split.mode.analysis.containing.plugins" defaultValue="false"
                  description="Enables containing plugin descriptor analysis for DevKit split-mode inspections."/>
-    <registryKey key="devkit.remote.dev.split.mode.inspections.skip.predefined" defaultValue="true"
+    <registryKey key="devkit.split.mode.inspections.skip.predefined" defaultValue="true"
                  description="Skips DevKit Split Mode inspections in modules and XML descriptors with predefined module kinds."/>
-    <registryKey key="devkit.remote.dev.split.mode.inspections.enable.xml.for.non.native.plugin" defaultValue="false"
+    <registryKey key="devkit.split.mode.inspections.enable.in.implicit.module.kind" defaultValue="false"
                  description="Keeps XML split-mode inspections enabled in plugin.xml files that are indirectly frontend-only, backend-only, or mixed."/>
-    <registryKey key="devkit.remote.dev.split.mode.analysis.predefined.module.kinds.additional.file" defaultValue=""
-                 description="Optional filesystem path to an extra predefined split-mode module kinds JSON file loaded in addition to the bundled DevKit data."
+    <registryKey key="devkit.split.mode.report.implicit.module.kind" defaultValue="true"
+                 description="Enables reporting errors about modules that effectively work only on frontend or backend, but do not explicitly state that fact via platform dependency"/>
+    <registryKey key="devkit.split.mode.custom.icons" defaultValue="false"
+                 description="Enables deferred accurate split-mode icon resolution for DevKit descriptor and directory icons."/>
+    <registryKey key="devkit.split.mode.inlay.plugin.descriptor.kind" defaultValue="true"
+                 description="Shows inline split-mode compatibility hints for DevKit plugin descriptors."/>
+    <registryKey key="devkit.split.mode.run.jps.to.bazel.in.quick.fix" defaultValue="false"
+                 description="Automatically run JPS to Bazel conversion after applying a fix that touches runtime/compile dependencies"/>
+    <registryKey key="devkit.split.mode.add.to.exclusions.quick.fix.enabled" defaultValue="false"
+                 description="Enables the DevKit split-mode quick fix that suppresses a single violation through DevKitSplitModeInspectionExclusions.json."/>
+
+    <registryKey key="devkit.split.mode.analysis.api.restrictions.source" defaultValue="[bundled*|project|project-or-bundled]"
+                 description="Source of ApiRestrictions.json5 for DevKit split-mode inspections."
                  restartRequired="true"/>
+    <registryKey key="devkit.split.mode.analysis.predefined.module.kinds.source" defaultValue="[bundled*|project|project-or-bundled]"
+                 description="Source of PredefinedModuleKinds.json5 for DevKit split-mode inspections."
+                 restartRequired="true"/>
+    <registryKey key="devkit.split.mode.qodana.analysis.scope.source" defaultValue="[bundled|project*|project-or-bundled]"
+                 description="Source of SplitModeQodanaAnalysisScope.json for DevKit split-mode inspections."
+                 restartRequired="true"/>
+
+    <registryKey key="devkit.split.mode.qodana.analysis.scope.limiter.enabled" defaultValue="false"
+                 description="Limits DevKit split-mode inspections to modules listed in the Qodana analysis scope file."/>
     <registryKey key="devkit.obsolete.new.file.actions.enabled" defaultValue="false"
                  description="Enables old-fashioned File-New actions for plugin modules"/>
 
@@ -181,6 +214,12 @@
                      enabledByDefault="true" level="ERROR"
                      implementationClass="org.jetbrains.idea.devkit.inspections.remotedev.SplitModeMixedDependenciesInspection"
                      key="inspection.split.mode.mixed.dependencies.display.name"/>
+    <localInspection language="XML" shortName="SplitModeImplicitModuleKind" applyToDialects="false"
+                     projectType="INTELLIJ_PLUGIN"
+                     groupPathKey="inspections.group.path" groupKey="inspections.group.descriptor"
+                     enabledByDefault="true" level="WEAK WARNING"
+                     implementationClass="org.jetbrains.idea.devkit.inspections.remotedev.SplitModeImplicitModuleKindInspection"
+                     key="inspection.split.mode.implicit.module.kind.display.name"/>
     <localInspection language="XML" applyToDialects="false"
                      projectType="INTELLIJ_PLUGIN"
                      groupPathKey="inspections.group.path" groupKey="inspections.group.descriptor"
@@ -544,6 +583,12 @@
                      enabledByDefault="true" level="ERROR"
                      implementationClass="org.jetbrains.idea.devkit.inspections.ListenerImplementationMustNotBeDisposableInspection"/>
 
+    <localInspection language="UAST" shortName="DebugOnlyTestExtension"
+                     groupPathKey="inspections.group.path"
+                     key="inspections.debug.only.test.extension.display.name" groupKey="inspections.group.code"
+                     enabledByDefault="true" level="ERROR"
+                     implementationClass="org.jetbrains.idea.devkit.inspections.DebugOnlyTestExtensionInspection"/>
+
     <localInspection language="UAST"
                      key="inspection.potential.deadlock.during.service.init.display.name"
                      shortName="PotentialDeadlockInServiceInitialization"
@@ -569,6 +614,7 @@
                      key="inspection.can.be.dumb.aware.name"/>
 
     <localInspection isInternal="true"
+                     shortName="MissingFrontendOrBackendRuntimeDependency"
                      language="XML" applyToDialects="false"
                      projectType="INTELLIJ_PLUGIN"
                      groupPathKey="inspections.group.path" groupKey="inspections.group.descriptor"
@@ -607,11 +653,25 @@
 
     <localInspection language="XML" applyToDialects="false"
                      projectType="INTELLIJ_PLUGIN"
+                     groupPathKey="inspections.group.path" groupKey="inspections.group.descriptor"
+                     enabledByDefault="true" level="WARNING"
+                     implementationClass="org.jetbrains.idea.devkit.inspections.AllContentModulesOptionalLoadingRuleInspection"
+                     key="inspection.all.content.modules.default.loading.rule.name"/>
+
+    <localInspection language="XML" applyToDialects="false"
+                     projectType="INTELLIJ_PLUGIN"
                      isInternal="true"
                      groupPathKey="inspections.group.path" groupKey="inspections.group.descriptor"
                      enabledByDefault="false" level="WARNING"
                      implementationClass="org.jetbrains.idea.devkit.inspections.OptionalDependencyViaDependsTagInspection"
                      key="inspection.optional.dependency.declared.by.depends.tag.name"/>
+
+    <localInspection language="XML" applyToDialects="false"
+                     projectType="INTELLIJ_PLUGIN"
+                     groupPathKey="inspections.group.path" groupKey="inspections.group.descriptor"
+                     enabledByDefault="true" level="WARNING"
+                     implementationClass="org.jetbrains.idea.devkit.inspections.EmptyPluginXmlTagInspection"
+                     key="inspection.empty.plugin.xml.tag.name"/>
 
     <localInspection language="XML" applyToDialects="false"
                      projectType="INTELLIJ_PLUGIN"
@@ -662,7 +722,6 @@
     <stacktrace.fold substring="at com.intellij.codeWithMe.ClientId.withClientId"/>
     <stacktrace.fold substring="at com.intellij.ide.IdeEventQueue"/>
     <stacktrace.fold substring="at com.intellij.openapi.application.ReadAction."/>
-    <stacktrace.fold substring="at com.intellij.openapi.application.RunResult.run("/>
     <stacktrace.fold substring="at com.intellij.openapi.application.TransactionGuardImpl"/>
     <stacktrace.fold substring="at com.intellij.openapi.application.WriteAction."/>
     <stacktrace.fold substring="at com.intellij.openapi.application.impl.AnyThreadWriteThreadingSupport"/>
@@ -727,6 +786,15 @@
                                     implementationClass="org.jetbrains.idea.devkit.references.DevKitRelatedPropertiesProvider"/>
     <codeInsight.lineMarkerProvider language="XML"
                                     implementationClass="org.jetbrains.idea.devkit.navigation.DescriptorsIncludingContentModuleLineMarkerProvider"/>
+    <codeInsight.declarativeInlayProvider
+      providerId="devkit.plugin.descriptor.split.mode.kind"
+      bundle="messages.DevKitBundle"
+      nameKey="inlay.split.mode.module.kind.name"
+      descriptionKey="inlay.split.mode.module.kind.description"
+      group="OTHER_GROUP"
+      implementationClass="org.jetbrains.idea.devkit.navigation.DescriptorSplitModeInlayHintsProvider"
+      isEnabledByDefault="true"
+      language="XML"/>
     <psi.referenceContributor
       language="Properties"
       implementation="org.jetbrains.idea.devkit.references.MessageBundleReferenceContributor"/>
@@ -742,7 +810,8 @@
                      shortName="PluginKeysAreProhibitedInPlatformRegistry"
                      implementationClass="org.jetbrains.idea.devkit.inspections.RegistryPropertiesInspection"/>
 
-    <moduleService serviceImplementation="org.jetbrains.idea.devkit.build.PluginBuildConfiguration"/>
+    <workspaceModel.customImlComponentNameContributor
+      implementation="org.jetbrains.idea.devkit.build.PluginBuildConfigurationImlComponentNameContributor"/>
     <backgroundPostStartupActivity
       implementation="org.jetbrains.idea.devkit.inspections.missingApi.update.IntelliJSdkExternalAnnotationsUpdateStartupActivity"/>
     <java.externalAnnotation.locationProvider
@@ -800,6 +869,8 @@
     <consoleFilterProvider implementation="org.jetbrains.idea.devkit.run.ModulePathFilterProvider"/>
     <registryKey key="devkit.module.hyperlink.show.chooser" defaultValue="false"
                  description="Show file chooser when clicking module names in console (iml + descriptor xml)"/>
+    <registryKey key="devkit.ide.starter.run.modes.enabled" defaultValue="true"
+                 description="Show 'Use Installer' / 'Split Mode' toggles in gutter popup and apply env variables for IDE Starter tests"/>
 
     <properties.extendedUseScopeProvider implementation="org.jetbrains.idea.devkit.references.BundleExtendedUseScopeProvider"/>
     <properties.spellcheckerMnemonicsTokenizer implementation="org.jetbrains.idea.devkit.spellchecker.DevKitMnemonicsTokenizer"/>
@@ -809,6 +880,10 @@
     <postStartupActivity implementation="org.jetbrains.idea.devkit.templates.UpdateFileTemplatesSchemeToProjectActivity"/>
     <projectSettings service="org.jetbrains.idea.devkit.inspections.missingApi.resolve.LibrariesWithIntellijClassesSetting"/>
     <applicationSettings service="org.jetbrains.idea.devkit.actions.updateFromSources.UpdateFromSourcesSettings"/>
+
+    <runConfigurationExtension implementation="org.jetbrains.idea.devkit.dcevm.DevkitDcevmCommandLinePatcher"/>
+    <executor implementation="org.jetbrains.idea.devkit.dcevm.DevkitDcevmExecutor"/>
+    <programRunner implementation="org.jetbrains.idea.devkit.dcevm.DevkitDcevmRunner"/>
   </extensions>
 
   <extensions defaultExtensionNs="DevKit.lang">
@@ -1000,6 +1075,8 @@
       <action class="org.jetbrains.idea.devkit.actions.ShuffleNamesAction" id="ShuffleNamesAction"/>
       <action internal="true" class="org.jetbrains.idea.devkit.actions.ShowSerializedXmlAction" id="ShowSerializedXml"/>
       <action internal="true" class="org.jetbrains.idea.devkit.actions.ShowHelpPageByIdAction" id="ShowHelpPageById"/>
+      <action id="DevKit.AnalyzePersistentSyntaxTreeOverhead" internal="true"
+              class="org.jetbrains.idea.devkit.hprof.AnalyzePersistentSyntaxTreeOverheadAction"/>
       <action id="AnalyzeUnloadablePlugins" internal="true" class="org.jetbrains.idea.devkit.internal.AnalyzeUnloadablePluginsAction"/>
       <add-to-group group-id="Internal" anchor="last"/>
     </group>
@@ -1011,5 +1088,15 @@
       <add-to-group group-id="BuildMenu" anchor="last"/>
     </action>
     <action id="UpdateIdeFromSourcesSettings" class="org.jetbrains.idea.devkit.actions.updateFromSources.UpdateIdeFromSourcesSettingsAction"/>
+
+    <group id="IdeStarterRunModeActions">
+      <separator/>
+      <action id="ToggleInstaller"
+              class="org.jetbrains.idea.devkit.run.ToggleInstallerAction"/>
+      <action id="ToggleSplitMode"
+              class="org.jetbrains.idea.devkit.run.ToggleSplitModeAction"/>
+      <separator/>
+      <add-to-group group-id="RunLineMarkerExtraActions" relative-to-action="CreateRunConfiguration" anchor="before"/>
+    </group>
   </actions>
 </idea-plugin>

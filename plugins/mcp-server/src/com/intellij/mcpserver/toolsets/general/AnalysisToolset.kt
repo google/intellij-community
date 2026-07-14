@@ -12,6 +12,7 @@ import com.intellij.build.events.FinishBuildEvent
 import com.intellij.build.events.MessageEvent
 import com.intellij.build.events.StartBuildEvent
 import com.intellij.lang.annotation.HighlightSeverity
+import com.intellij.mcpserver.McpProjectDependenciesProvider
 import com.intellij.mcpserver.McpServerBundle
 import com.intellij.mcpserver.McpToolset
 import com.intellij.mcpserver.annotations.McpDescription
@@ -26,13 +27,13 @@ import com.intellij.mcpserver.reportToolActivity
 import com.intellij.mcpserver.toolsets.Constants
 import com.intellij.mcpserver.util.projectDirectory
 import com.intellij.mcpserver.util.relativizeIfPossible
+import com.intellij.mcpserver.util.checkIndexingInProgress
 import com.intellij.mcpserver.util.resolveInProject
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.trace
 import com.intellij.openapi.module.ModuleManager
-import com.intellij.openapi.roots.OrderEnumerator
 import com.intellij.openapi.util.NlsContexts.ProgressTitle
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFileManager
@@ -64,25 +65,26 @@ class AnalysisToolset : McpToolset {
         |Use this tool to lint several files after editing them.
         |Returns per-file problems with severity, description, and location information.
         |Batch responses may include file entries with `timedOut: true` and empty `problems` when individual files exceed the available budget.
+        |File entries with a `notAnalyzedReason` indicate files that could not be analyzed (e.g., outside project content roots, excluded, or unsupported file type).
         |Top-level `more: true` means the batch is incomplete.
         |`min_severity` must be `warning` or `error`; defaults to `warning`.
         |Note: Only analyzes files within the project directory.
         |Note: Lines and Columns are 1-based.
     """)
   suspend fun lint_files(
-    @McpDescription("List of project-relative file paths to analyze. Duplicate paths are ignored after normalization.")
-    file_paths: List<String>,
+    @McpDescription("List of project-relative files to analyze. Duplicate paths are ignored after normalization.")
+    files: List<String>,
     @McpDescription("Minimum severity to include: `warning` or `error`. Defaults to `warning`.")
     min_severity: String = LintMinSeverity.WARNING.apiValue,
     @McpDescription(Constants.TIMEOUT_MILLISECONDS_DESCRIPTION)
     timeout: Int = LINT_FILES_DEFAULT_TIMEOUT_MILLISECONDS_VALUE,
   ): LintFilesResult {
-    currentCoroutineContext().reportToolActivity(McpServerBundle.message("tool.activity.collecting.file.problems.batch", file_paths.size))
+    currentCoroutineContext().reportToolActivity(McpServerBundle.message("tool.activity.collecting.file.problems.batch", files.size))
     return collectLintFiles(
-      filePaths = file_paths,
+      filePaths = files,
       minSeverityValue = min_severity,
       timeout = timeout,
-      progressTitle = McpServerBundle.message("progress.title.analyzing.files", file_paths.size),
+      progressTitle = McpServerBundle.message("progress.title.analyzing.files", files.size),
       useBatchTimeouts = true,
     )
   }
@@ -112,6 +114,9 @@ class AnalysisToolset : McpToolset {
       progressTitle = McpServerBundle.message("progress.title.analyzing.file", filePath.substringAfterLast('/').substringAfterLast('\\')),
     )
     val item = lintResult.items.firstOrNull()
+    if (item?.notAnalyzedReason != null) {
+      mcpFail("File cannot be analyzed: ${item.notAnalyzedReason}")
+    }
     val result = FileProblemsResult(
       filePath = item?.filePath ?: filePath,
       errors = item?.problems?.map { it.toLegacyFileProblem() }.orEmpty(),
@@ -158,16 +163,23 @@ class AnalysisToolset : McpToolset {
     timeout: Int = Constants.MEDIUM_TIMEOUT_MILLISECONDS_VALUE,
   ): String {
     currentCoroutineContext().reportToolActivity(McpServerBundle.message("tool.activity.analyzing.calls", symbolFqn))
-    return analyzeCalls(
-      symbolFqn = symbolFqn,
-      analysisKind = analysisKind,
-      depth = depth,
-      maxChildren = maxChildren,
-      maxNodes = maxNodes,
-      treePath = treePath,
-      childOffset = childOffset,
-      timeout = timeout,
-    )
+    val project = currentCoroutineContext().project
+    val (callHierarchy, partialResultReason) = checkIndexingInProgress(project) {
+      analyzeCalls(
+        symbolFqn = symbolFqn,
+        analysisKind = analysisKind,
+        depth = depth,
+        maxChildren = maxChildren,
+        maxNodes = maxNodes,
+        treePath = treePath,
+        childOffset = childOffset,
+        timeout = timeout,
+      )
+    }
+    if (partialResultReason != null) {
+      return "> Note: $partialResultReason\n\n$callHierarchy"
+    }
+    return callHierarchy
   }
 
   @McpTool
@@ -372,28 +384,23 @@ class AnalysisToolset : McpToolset {
   @McpTool
   @McpDescription("""
     |Get a list of all dependencies defined in the project.
+    |Includes JPS module libraries and ecosystem-specific dependencies contributed by language plugins.
+    |(e.g. package.json, deno.json dependencies)
+    |Each entry has a name and, when known, a version, a dependencyType (e.g. devDependencies),
+    |and a source (e.g. jps-library, package.json).
     |Returns structured information about project library names.
   """)
   suspend fun get_project_dependencies(): ProjectDependenciesResult {
     currentCoroutineContext().reportToolActivity(McpServerBundle.message("tool.activity.checking.dependencies"))
     val project = currentCoroutineContext().project
 
-    val dependencies = readAction {
-      val moduleManager = ModuleManager.getInstance(project)
-      moduleManager.modules.flatMap { module ->
-        OrderEnumerator.orderEntries(module)
-          .librariesOnly()
-          .classes()
-          .roots
-          .map { root ->
-            DependencyInfo(
-              name = root.name
-            )
-          }
-      }.distinctBy { it.name }
+    val providedDependencies = McpProjectDependenciesProvider.EP.extensionList.flatMap { provider ->
+      provider.collectDependencies(project).map {
+        DependencyInfo(it.name, it.version, it.dependencyType, it.source)
+      }
     }
 
-    return ProjectDependenciesResult(dependencies)
+    return ProjectDependenciesResult(providedDependencies.distinct())
   }
 
   private suspend fun collectLintFiles(
@@ -416,7 +423,7 @@ class AnalysisToolset : McpToolset {
     val completedFilePaths = ConcurrentHashMap.newKeySet<String>(requestedFiles.size)
     val onFileResult: (LintFileResult) -> Unit = { result ->
       completedFilePaths.add(result.filePath)
-      if (result.problems.isNotEmpty() || result.timedOut == true) {
+      if (result.problems.isNotEmpty() || result.timedOut == true || result.notAnalyzedReason != null) {
         completedResults.putIfAbsent(result.filePath, result)
       }
     }
@@ -460,6 +467,8 @@ class AnalysisToolset : McpToolset {
   @Serializable
   data class LintFileResult(
     val filePath: String,
+    @EncodeDefault(mode = EncodeDefault.Mode.NEVER)
+    val notAnalyzedReason: String? = null,
     @EncodeDefault(mode = EncodeDefault.Mode.ALWAYS)
     val problems: List<LintProblem> = emptyList(),
     @property:McpDescription(Constants.TIMED_OUT_DESCRIPTION)
@@ -549,6 +558,12 @@ class AnalysisToolset : McpToolset {
   @Serializable
   data class DependencyInfo(
     @JvmField val name: String,
+    @EncodeDefault(mode = EncodeDefault.Mode.NEVER)
+    @JvmField val version: String? = null,
+    @EncodeDefault(mode = EncodeDefault.Mode.NEVER)
+    @JvmField val dependencyType: String? = null,
+    @EncodeDefault(mode = EncodeDefault.Mode.NEVER)
+    @JvmField val source: String? = null,
   )
 
   @Serializable

@@ -15,10 +15,17 @@
     <module name="intellij.platform.lang.core"/>
     <module name="intellij.platform.lvcs"/>
     <module name="intellij.platform.projectModel"/>
+    <module name="intellij.platform.testIntegration"/>
     <module name="intellij.platform.util.ex"/>
     <module name="intellij.platform.util.ui"/>
   </dependencies>
   <!-- endregion -->
+
+  <extensionPoints>
+    <extensionPoint qualifiedName="com.intellij.buildProgressListenerRegistrar"
+                    interface="com.intellij.build.BuildProgressListenerRegistrar"
+                    dynamic="true"/>
+  </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
     <registryKey key="execution.filters.with.hyperlinks.allow.overlapping"

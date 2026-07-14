@@ -82,6 +82,7 @@ import com.intellij.psi.search.SearchScope;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.InheritanceUtil;
 import com.intellij.psi.util.PsiTreeUtil;
+import com.intellij.psi.util.PsiTypesUtil;
 import com.intellij.psi.util.PsiUtil;
 import com.intellij.psi.util.TypeConversionUtil;
 import com.intellij.refactoring.IntroduceVariableUtil;
@@ -391,13 +392,9 @@ public final class RefactoringUtil {
 
     PsiElementFactory factory = JavaPsiFacade.getElementFactory(expr.getProject());
 
-    if (expr instanceof PsiParenthesizedExpression) {
-      PsiExpression expr1 = ((PsiParenthesizedExpression)expr).getExpression();
-      if (expr1 != null) {
-        expr = expr1;
-      }
-    }
-    PsiDeclarationStatement decl = factory.createVariableDeclarationStatement(id, expr.getType(), expr);
+    expr = PsiUtil.skipParenthesizedExprDown(expr);
+    PsiType type = PsiTypesUtil.removeExternalAnnotations(expr.getType());
+    PsiDeclarationStatement decl = factory.createVariableDeclarationStatement(id, type, expr);
     if (declareFinal) {
       PsiUtil.setModifierProperty(((PsiLocalVariable)decl.getDeclaredElements()[0]), PsiModifier.FINAL, true);
     }
@@ -546,7 +543,7 @@ public final class RefactoringUtil {
   /**
    * @deprecated use CommonJavaRefactoringUtil.findPackageDirectoryInSourceRoot instead.
    */
-  @Deprecated
+  @Deprecated(forRemoval = true)
   public static PsiDirectory findPackageDirectoryInSourceRoot(PackageWrapper aPackage, final VirtualFile sourceRoot) {
     return CommonJavaRefactoringUtil.findPackageDirectoryInSourceRoot(aPackage, sourceRoot);
   }
@@ -757,10 +754,8 @@ public final class RefactoringUtil {
   }
 
   public static boolean isModifiedInScope(PsiVariable variable, PsiElement scope) {
-    for (PsiReference reference : ReferencesSearch.search(variable, new LocalSearchScope(scope), false).asIterable()) {
-      if (isAssignmentLHS(reference.getElement())) return true;
-    }
-    return false;
+    return ReferencesSearch.search(variable, new LocalSearchScope(scope), false)
+      .anyMatch(reference -> isAssignmentLHS(reference.getElement()));
   }
 
 

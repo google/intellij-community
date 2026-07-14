@@ -24,6 +24,7 @@ import com.intellij.openapi.fileEditor.FileEditorStateLevel
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.platform.ide.progress.runWithModalProgressBlocking
+import com.intellij.platform.diagnostic.telemetry.impl.span
 import com.intellij.ui.EditorNotifications
 import com.intellij.util.ArrayUtil
 import com.intellij.util.AwaitCancellationAndInvoke
@@ -55,7 +56,7 @@ import kotlin.time.Duration.Companion.milliseconds
 private val LOG: Logger = logger<AsyncEditorLoader>()
 
 @Internal
-class  AsyncEditorLoader internal constructor(
+class AsyncEditorLoader internal constructor(
   private val project: Project,
   private val provider: TextEditorProvider,
   @JvmField val coroutineScope: CoroutineScope,
@@ -153,14 +154,16 @@ class  AsyncEditorLoader internal constructor(
       )
       // await instead of join to get errors here
       try {
-        task.await()
+        span("editor: doc load await") {
+          task.await()
+        }
         LOG.trace { "async editor task finished for $editorFileName" }
       }
       finally {
         indicatorJob.cancel()
       }
 
-      withContext(Dispatchers.EDT + CoroutineName("execute delayed actions")) {
+      span("async editor delayed actions", Dispatchers.EDT) {
         // mark as loaded before daemonCodeAnalyzer restart,
         // does it from EDT to avoid execution of any following scroll requests before already scheduled delayedActions
         textEditor.editor.putUserData(ASYNC_LOADER, null)
@@ -174,7 +177,9 @@ class  AsyncEditorLoader internal constructor(
           scrollingModel.enableAnimation()
         }
       }
-      project.serviceAsync<EditorNotifications>().scheduleUpdateNotifications(textEditor)
+      span("editor notifications schedule") {
+        project.serviceAsync<EditorNotifications>().scheduleUpdateNotifications(textEditor)
+      }
     }
       .invokeOnCompletion {
         // make sure that async loaded marked as completed

@@ -6,6 +6,7 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.ide.CopyPasteManager;
 import com.intellij.psi.PsiElement;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 import java.awt.datatransfer.Transferable;
@@ -25,6 +26,7 @@ public final class CopyPasteUtil {
     CopyPasteManager.getInstance().addContentChangedListener(new DefaultCopyPasteListener(consumer), parent);
   }
 
+  @ApiStatus.Internal
   public static final class DefaultCopyPasteListener implements CopyPasteManager.ContentChangedListener {
     private final Consumer<? super PsiElement> consumer;
 
@@ -40,6 +42,7 @@ public final class CopyPasteUtil {
         updateByTransferable(newTransferable);
       }
       else {
+        //noinspection UseRunReadActionBlockingShortcut
         application.runReadAction(() -> {
           updateByTransferable(oldTransferable);
           updateByTransferable(newTransferable);

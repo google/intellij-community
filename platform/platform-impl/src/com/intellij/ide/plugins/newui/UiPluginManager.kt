@@ -20,7 +20,6 @@ import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import kotlinx.coroutines.CoroutineScope
@@ -37,7 +36,6 @@ import javax.swing.JComponent
  */
 @Service
 @ApiStatus.Internal
-@IntellijInternalApi
 class UiPluginManager {
   suspend fun getPlugins(): List<PluginUiModel> {
     return getController().getPlugins()
@@ -63,10 +61,6 @@ class UiPluginManager {
 
   suspend fun getInstalledPlugins(): List<PluginUiModel> {
     return getController().getInstalledPlugins()
-  }
-
-  suspend fun getUpdateModels(): List<PluginUiModel> {
-    return getController().getUpdates()
   }
 
   suspend fun loadPluginDetails(model: PluginUiModel): PluginUiModel? {
@@ -238,7 +232,7 @@ class UiPluginManager {
 
   @RequiresBackgroundThread(generateAssertion = false)
   fun isNeedUpdate(pluginId: PluginId): Boolean {
-    return runBlockingMaybeCancellable { getController().isNeedUpdate(pluginId) }
+    return runBlockingMaybeCancellable { PluginUpdatesService.getInstance().awaitHasUpdate(pluginId) }
   }
 
   suspend fun getPluginInstallationState(pluginId: PluginId): PluginInstallationState {
@@ -252,8 +246,9 @@ class UiPluginManager {
     return DefaultUiPluginManagerController
   }
 
-  fun subscribeToUpdatesCount(sessionId: String, callback: (Int?) -> Unit): PluginUpdatesService {
-    return getController().connectToUpdateServiceWithCounter(sessionId, callback)
+  fun subscribeToPluginUpdatesFiltered(sessionId: String, callback: (List<PluginUiModel>) -> Unit): PluginUpdateSubscription {
+    val session = PluginManagerSessionService.getInstance().createSession(sessionId)
+    return PluginUpdatesService.getInstance().subscribe { updatedPlugins -> callback(updatedPlugins.all.filter { session.isPluginEnabled(it.pluginId) }) }
   }
 
   companion object {

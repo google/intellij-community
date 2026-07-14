@@ -4,6 +4,7 @@ package org.jetbrains.kotlin.idea.debugger.coroutine.view
 import com.intellij.testFramework.LightProjectDescriptor
 import com.intellij.testFramework.TestDataPath
 import com.intellij.unscramble.CompoundDumpItem
+import com.intellij.unscramble.MergeableDumpItem
 import com.intellij.unscramble.dumpItems
 import com.intellij.unscramble.parseIntelliJThreadDump
 import com.intellij.unscramble.serializeIntelliJThreadDump
@@ -64,8 +65,8 @@ class CoroutineThreadDumpTest : KotlinLightCodeInsightFixtureTestCase() {
         assertEquals(Long.MIN_VALUE, parentCoroutine.parentTreeId)
         assertEquals(300L, childCoroutine.parentTreeId)
         assertEquals(300L, otherDispatcherCoroutine.parentTreeId)
-        assertEquals(childCoroutine.mergeableToken, parentCoroutine.mergeableToken)
-        assertFalse(childCoroutine.mergeableToken == otherDispatcherCoroutine.mergeableToken)
+        assertEquals((childCoroutine as MergeableDumpItem).mergeableToken, (parentCoroutine as MergeableDumpItem).mergeableToken)
+        assertFalse(childCoroutine.mergeableToken == (otherDispatcherCoroutine as MergeableDumpItem).mergeableToken)
     }
 
     @Test

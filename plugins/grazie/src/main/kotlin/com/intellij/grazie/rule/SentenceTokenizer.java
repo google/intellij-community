@@ -2,6 +2,7 @@ package com.intellij.grazie.rule;
 
 import ai.grazie.nlp.tokenizer.Tokenizer;
 import ai.grazie.nlp.tokenizer.sentence.StandardSentenceTokenizer;
+import ai.grazie.text.Text;
 import ai.grazie.text.exclusions.Exclusion;
 import ai.grazie.text.exclusions.ExclusionUtilsKt;
 import ai.grazie.text.exclusions.SentenceWithExclusions;
@@ -15,7 +16,6 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.util.ReflectionUtil;
 import com.intellij.util.containers.ContainerUtil;
-import kotlin.ranges.IntRange;
 import one.util.streamex.IntStreamEx;
 import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.NotNull;
@@ -26,26 +26,19 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SentenceTokenizer {
-  private static final Logger LOG = Logger.getInstance("#com.intellij.grazie.text.SentenceTokenizer");
+public final class SentenceTokenizer {
+  private static final Logger LOG = Logger.getInstance("#com.intellij.grazie.rule.SentenceTokenizer");
   private static final Key<List<Tokenizer.Token>> tokenized =
     Key.create("grazie pro sentence tokenization");
 
   public static List<Tokenizer.Token> toTokens(@NotNull TextContent text) {
     List<Tokenizer.Token> result = text.getUserData(tokenized);
     if (result == null) {
-      result = tokenize((CharSequence)text);
+      Text textWithExclusions = ExclusionUtilsKt.withExclusions(new Text(bombed(text)), rangeExclusions(text, new TextRange(0, text.length())));
+      result = StandardSentenceTokenizer.Companion.getDefault().tokenize(textWithExclusions);
       text.putUserData(tokenized, result);
     }
     return result;
-  }
-
-  public static List<Tokenizer.Token> tokenize(@NotNull CharSequence text) {
-    CharSequence bombed = bombed(text);
-    return ContainerUtil.map(
-      StandardSentenceTokenizer.Companion.getDefault().tokenRanges(bombed),
-      r -> new Tokenizer.Token(text.subSequence(r.getStart(), r.getEndExclusive()).toString(), new IntRange(r.getStart(), r.getEndInclusive()))
-    );
   }
 
   private static CharSequence bombed(@NotNull CharSequence text) {
@@ -62,14 +55,19 @@ public class SentenceTokenizer {
   }
 
   public static List<Sentence> tokenize(@NotNull TextContent content) {
-    List<Tokenizer.Token> tokens = toTokens(content);
-    return ContainerUtil.map(tokens, SentenceTokenizer::toSentence);
+    return ContainerUtil.map(toTokens(content), SentenceTokenizer::toSentence);
   }
 
   private static Sentence toSentence(Tokenizer.Token token) {
     var range = new ai.grazie.text.TextRange(token.getRange().getFirst(), token.getRange().getLast() + 1);
-    @SuppressWarnings({"unchecked", "rawtypes"}) List<Exclusion> exclusions = (List) ExclusionUtilsKt.getExclusions(token.getText());
-    return new Sentence(range.getStart(), token.getToken(), exclusions);
+    return new Sentence(range.getStart(), token.getToken(), tokenExclusions(token));
+  }
+
+  private static List<Exclusion> tokenExclusions(@NotNull Tokenizer.Token token) {
+    return ContainerUtil.map(
+      ExclusionUtilsKt.getExclusions(token.getText()),
+      e -> e instanceof Exclusion ? (Exclusion)e : new Exclusion(e.getOffset(), e.isUnknown() ? Exclusion.Kind.Unknown : Exclusion.Kind.Markup)
+    );
   }
 
   public static List<Exclusion> rangeExclusions(TextContent textContent, TextRange range) {

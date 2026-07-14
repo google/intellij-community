@@ -8,6 +8,12 @@ import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
 import java.util.Collections
 
+@ApiStatus.Internal
+class PluginSubsystemInput(
+  val initContext: PluginInitializationContext,
+  val discoveryResult: PluginsDiscoveryResult,
+)
+
 // if otherwise not specified, `module` in terms of v2 plugin model
 @ApiStatus.Internal
 class PluginSet internal constructor(
@@ -17,8 +23,8 @@ class PluginSet internal constructor(
   private val enabledModuleMap: Map<PluginModuleId, ContentModuleDescriptor>,
   private val enabledPluginAndV1ModuleMap: Map<PluginId, PluginModuleDescriptor>,
   private val enabledModules: List<PluginModuleDescriptor>,
-  private val topologicalComparator: Comparator<PluginModuleDescriptor>,
-  val resolvedPluginSet: ResolvedPluginSet?,
+  val resolvedPluginSet: ResolvedPluginSet,
+  val input: PluginSubsystemInput,
 ) {
   /**
    * You must not use this method before [ClassLoaderConfigurator.configure].
@@ -27,7 +33,7 @@ class PluginSet internal constructor(
 
   internal fun getSortedDependencies(moduleDescriptor: IdeaPluginDescriptorImpl): List<PluginModuleDescriptor> {
     if (moduleDescriptor is DependsSubDescriptor) {
-      if (resolvedPluginSet == null || resolvedPluginSet.isExcluded(moduleDescriptor)) {
+      if (resolvedPluginSet.isExcluded(moduleDescriptor)) {
         return Collections.emptyList()
       }
       val main = moduleDescriptor.getMainDescriptor()
@@ -38,8 +44,6 @@ class PluginSet internal constructor(
     }
     return sortedModulesWithDependencies.directDependencies.getOrDefault(moduleDescriptor, Collections.emptyList())
   }
-
-  fun getModuleTopologicalComparator(): Comparator<PluginModuleDescriptor> = topologicalComparator
 
   @TestOnly
   fun getUnsortedEnabledModules(): Collection<ContentModuleDescriptor> = Java11Shim.INSTANCE.copyOf(enabledModuleMap.values)
@@ -55,36 +59,6 @@ class PluginSet internal constructor(
   fun findEnabledModule(moduleId: PluginModuleId): ContentModuleDescriptor? = enabledModuleMap.get(moduleId)
 
   fun isModuleEnabled(id: PluginModuleId): Boolean = enabledModuleMap.containsKey(id)
-
-  fun withPlugin(plugin: PluginMainDescriptor): PluginSetBuilder {
-    // in tests or on plugin installation it is not present in a plugin list, may exist on plugin update, though
-    // linear search is ok here - not a hot method
-    val oldPlugin = enabledPlugins.find { it.legacyEquals(plugin) } // todo may exist on update
-    PluginManagerCore.logger.assertTrue(oldPlugin == null || !oldPlugin.isMarkedForLoading, "$oldPlugin is still loaded")
-    PluginManagerCore.logger.assertTrue(plugin.isMarkedForLoading, "$plugin is not marked for loading")
-
-    val unsortedPlugins = LinkedHashSet(allPlugins)
-    unsortedPlugins.removeIf { it.legacyEquals(plugin) }
-    unsortedPlugins.add(plugin)
-
-    // FIXME handle potential conflict
-    // FIXME this method loses information (takes only currently loaded plugins)
-    val newUnambiguousPluginSet = UnambiguousPluginSet.tryBuild(unsortedPlugins.toList())
-                                  ?: error("plugin substitution creates a conflict: $plugin")
-    return PluginSetBuilder(ProductPluginInitContext(), newUnambiguousPluginSet)
-  }
-
-  fun withoutPlugin(plugin: PluginMainDescriptor, disable: Boolean = true): PluginSetBuilder {
-    val newAllPlugins = if (disable) {
-      allPlugins
-    } else {
-      val newAllPlugins = LinkedHashSet(allPlugins)
-      newAllPlugins.removeIf { it.legacyEquals(plugin) }
-      newAllPlugins
-    }
-    val newUnambiguousPluginSet = UnambiguousPluginSet.tryBuild(newAllPlugins.toList())!!
-    return PluginSetBuilder(ProductPluginInitContext(), newUnambiguousPluginSet)
-  }
 
   /**
    * Returns a map from plugin ID and plugin aliases to the corresponding plugin or module descriptors from all plugins, not only enabled.
@@ -125,56 +99,20 @@ class PluginSet internal constructor(
   }
 
   fun getModulesOrderedForClassLoaderConfiguration(): Sequence<PluginModuleDescriptor> {
-    return if (resolvedPluginSet != null) {
-      resolvedPluginSet.runtimeModuleGroupGraph.sortedGroups.asSequence()
-        .flatMap { it.sortedDescriptors }.filterIsInstance<PluginModuleDescriptor>()
-    } else {
-      enabledModules.asSequence()
-    }
+    return resolvedPluginSet.runtimeModuleGroupGraph.sortedGroups.asSequence()
+      .flatMap { it.sortedDescriptors }.filterIsInstance<PluginModuleDescriptor>()
   }
-
-  var descriptorsSequenceForRegistrationInBisectMode: Sequence<IdeaPluginDescriptorImpl>? = null
 
   fun sequenceResolvedSortedDescriptorsForRegistration(): Sequence<IdeaPluginDescriptorImpl> {
-    if (descriptorsSequenceForRegistrationInBisectMode != null) {
-      return descriptorsSequenceForRegistrationInBisectMode!!
-    }
-    return if (resolvedPluginSet != null) {
-      resolvedPluginSet.sortedResolvedDescriptors.asSequence()
-    } else {
-      sequence {
-        for (module in enabledModules) {
-          yield(module)
-          sequenceSubDescriptorsForRegistration(module)
-        }
-      }
-    }
+    return resolvedPluginSet.sortedResolvedDescriptors.asSequence()
   }
-}
 
-private fun IdeaPluginDescriptorImpl.legacyEquals(other: Any?): Boolean {
-  return this === other || other is IdeaPluginDescriptorImpl && pluginId == other.pluginId && descriptorPath == other.descriptorPath
-}
-
-@ApiStatus.Internal
-suspend fun SequenceScope<IdeaPluginDescriptorImpl>.sequenceSubDescriptorsForRegistration(moduleDescriptor: IdeaPluginDescriptorImpl) {
-  if (!moduleDescriptor.isMarkedForLoading) {
-    return
-  }
-  for (dep in moduleDescriptor.dependencies) {
-    val subDescriptor = dep.subDescriptor
-    if (subDescriptor?.isMarkedForLoading != true) {
-      continue
-    }
-
-    yield(subDescriptor)
-
-    for (subDep in subDescriptor.dependencies) {
-      val d = subDep.subDescriptor
-      if (d?.isMarkedForLoading == true) {
-        yield(d)
-        assert(d.dependencies.isEmpty() || d.dependencies.all { it.subDescriptor == null })
-      }
+  override fun toString(): String {
+    return buildString {
+      val resolvedPluginsCount = resolvedPluginSet.sortedResolvedDescriptors.filterIsInstance<PluginMainDescriptor>().count()
+      val resolvedContentModulesCount = resolvedPluginSet.sortedResolvedDescriptors.filterIsInstance<ContentModuleDescriptor>().count()
+      val excludedModulesCount = resolvedPluginSet.candidateSet.plugins.flatMap { it.sequenceAllDescriptors() }.count { resolvedPluginSet.isExcluded(it) }
+      append("PluginSet(resolvedPlugins=${resolvedPluginsCount}, resolvedContentModules=${resolvedContentModulesCount}, excludedModules=${excludedModulesCount})")
     }
   }
 }

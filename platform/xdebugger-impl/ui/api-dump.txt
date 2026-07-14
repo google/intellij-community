@@ -80,9 +80,6 @@ c:com.intellij.xdebugger.impl.actions.ViewBreakpointsAction
 - actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
 - update(com.intellij.openapi.actionSystem.AnActionEvent):V
-f:com.intellij.xdebugger.impl.breakpoints.BreakpointListUpdaterService
-- <init>(kotlinx.coroutines.CoroutineScope):V
-- f:getUpdateJob():kotlinx.coroutines.Job
 com.intellij.xdebugger.impl.breakpoints.XBreakpointTypeWithDocumentDelegation
 - a:getDocumentForHighlighting(com.intellij.openapi.editor.Document):com.intellij.openapi.editor.Document
 c:com.intellij.xdebugger.impl.breakpoints.XExpressionState
@@ -267,6 +264,7 @@ c:com.intellij.xdebugger.impl.frame.XStandaloneVariablesView
 - com.intellij.xdebugger.impl.frame.XVariablesViewBase
 - pf:myStackFrame:com.intellij.xdebugger.frame.XStackFrame
 - <init>(com.intellij.openapi.project.Project,com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider,com.intellij.xdebugger.frame.XStackFrame):V
+- <init>(com.intellij.openapi.project.Project,com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider,com.intellij.xdebugger.frame.XStackFrame,java.lang.Boolean):V
 - rebuildView():V
 a:com.intellij.xdebugger.impl.frame.XVariablesViewBase
 - com.intellij.openapi.Disposable
@@ -387,7 +385,7 @@ f:com.intellij.xdebugger.impl.ui.DebuggerUIUtil
 - s:repaintCurrentEditor(com.intellij.openapi.project.Project):V
 - s:setActionEnabled(com.intellij.openapi.actionSystem.AnActionEvent,Z):V
 - s:setTreeNodeValue(com.intellij.xdebugger.impl.ui.tree.nodes.XValueNodeImpl,com.intellij.xdebugger.XExpression,com.intellij.util.Consumer):V
-- s:showBreakpointEditor(com.intellij.openapi.project.Project,javax.swing.JComponent,java.awt.Point,javax.swing.JComponent,java.lang.Runnable,java.lang.Runnable,java.lang.Object):com.intellij.openapi.ui.popup.Balloon
+- s:showBreakpointEditor(com.intellij.openapi.project.Project,javax.swing.JComponent,java.awt.Point,javax.swing.JComponent,java.lang.Runnable,java.lang.Object):com.intellij.openapi.ui.popup.Balloon
 - s:showPopupForEditorLine(com.intellij.openapi.ui.popup.JBPopup,com.intellij.openapi.editor.Editor,I):V
 - s:showValuePopup(com.intellij.xdebugger.frame.XFullValueEvaluator,java.awt.event.MouseEvent,com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor):V
 - s:showXBreakpointEditorBalloon(com.intellij.openapi.project.Project,java.awt.Point,javax.swing.JComponent,Z,com.intellij.xdebugger.breakpoints.XBreakpoint):V

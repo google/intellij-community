@@ -1,17 +1,39 @@
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.idea.maven.inspections.dom
 
 import com.intellij.lang.annotation.HighlightSeverity
+import com.intellij.maven.testFramework.fixtures.MavenDomTestFixture
+import com.intellij.maven.testFramework.fixtures.MavenDomTestFixture.Highlight
+import com.intellij.maven.testFramework.fixtures.MavenDomTestFixtureIndices
+import com.intellij.maven.testFramework.fixtures.MavenVersionArguments
+import com.intellij.maven.testFramework.fixtures.createModulePom
+import com.intellij.maven.testFramework.fixtures.createProjectPom
+import com.intellij.maven.testFramework.fixtures.importProjectAsync
+import com.intellij.maven.testFramework.fixtures.mavenDomFixture
+import com.intellij.testFramework.junit5.TestApplication
 import kotlinx.coroutines.runBlocking
-import org.jetbrains.idea.maven.dom.MavenDomWithIndicesTestCase
 import org.jetbrains.idea.maven.dom.inspections.MavenDuplicateDependenciesInspection
-import org.junit.Test
+import org.jetbrains.idea.maven.fixtures.checkHighlighting
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedClass
+import org.junit.jupiter.params.provider.ArgumentsSource
 
-class MavenDuplicatedDependencyInspectionTest : MavenDomWithIndicesTestCase() {
+@TestApplication
+@ParameterizedClass
+@ArgumentsSource(MavenVersionArguments::class)
+class MavenDuplicatedDependencyInspectionTest(mavenVersion: String, modelVersion: String) {
+
+  private val maven by mavenDomFixture(
+    mavenVersion = mavenVersion, modelVersion = modelVersion,
+    initialPom = MavenDomTestFixture.DEFAULT_POM,
+    indices = MavenDomTestFixtureIndices("local1", listOf("local2")),
+  )
+
   @Test
   fun testDuplicatedInSameFile() = runBlocking {
-    fixture.enableInspections(MavenDuplicateDependenciesInspection::class.java)
+    maven.fixture.enableInspections(MavenDuplicateDependenciesInspection::class.java)
 
-    createProjectPom("""
+    maven.createProjectPom("""
                        <groupId>mavenParent</groupId>
                        <artifactId>childA</artifactId>
                        <version>1.0</version>
@@ -31,14 +53,14 @@ class MavenDuplicatedDependencyInspectionTest : MavenDomWithIndicesTestCase() {
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testDuplicatedInSameFileDifferentVersion() = runBlocking {
-    fixture.enableInspections(MavenDuplicateDependenciesInspection::class.java)
+    maven.fixture.enableInspections(MavenDuplicateDependenciesInspection::class.java)
 
-    createProjectPom("""
+    maven.createProjectPom("""
                        <groupId>mavenParent</groupId>
                        <artifactId>childA</artifactId>
                        <version>1.0</version>
@@ -57,14 +79,14 @@ class MavenDuplicatedDependencyInspectionTest : MavenDomWithIndicesTestCase() {
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testDuplicatedInParentDifferentScope() = runBlocking {
-    fixture.enableInspections(MavenDuplicateDependenciesInspection::class.java)
+    maven.fixture.enableInspections(MavenDuplicateDependenciesInspection::class.java)
 
-    createModulePom("child", """
+    maven.createModulePom("child", """
       <groupId>mavenParent</groupId>
       <artifactId>child</artifactId>
       <version>1.0</version>
@@ -85,7 +107,7 @@ class MavenDuplicatedDependencyInspectionTest : MavenDomWithIndicesTestCase() {
       </dependencies>
       """.trimIndent())
 
-    createProjectPom("""
+    maven.createProjectPom("""
                        <groupId>mavenParent</groupId>
                        <artifactId>parent</artifactId>
                        <version>1.0</version>
@@ -105,16 +127,16 @@ class MavenDuplicatedDependencyInspectionTest : MavenDomWithIndicesTestCase() {
                        </dependencies>
                        """.trimIndent())
 
-    importProjectAsync()
+    maven.importProjectAsync()
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testDuplicatedInParentSameScope() = runBlocking {
-    fixture.enableInspections(MavenDuplicateDependenciesInspection::class.java)
+    maven.fixture.enableInspections(MavenDuplicateDependenciesInspection::class.java)
 
-    createModulePom("child", """
+    maven.createModulePom("child", """
       <groupId>mavenParent</groupId>
       <artifactId>child</artifactId>
       <version>1.0</version>
@@ -135,7 +157,7 @@ class MavenDuplicatedDependencyInspectionTest : MavenDomWithIndicesTestCase() {
       </dependencies>
       """.trimIndent())
 
-    createProjectPom("""
+    maven.createProjectPom("""
                        <groupId>mavenParent</groupId>
                        <artifactId>parent</artifactId>
                        <version>1.0</version>
@@ -154,16 +176,16 @@ class MavenDuplicatedDependencyInspectionTest : MavenDomWithIndicesTestCase() {
                        </dependencies>
                        """.trimIndent())
 
-    importProjectAsync()
+    maven.importProjectAsync()
 
-    checkHighlighting(projectPom, Highlight(severity = HighlightSeverity.WARNING, text = "dependency", description = "Dependency is duplicated in file(s): child "))
+    maven.checkHighlighting(maven.projectPom, Highlight(severity = HighlightSeverity.WARNING, text = "dependency", description = "Dependency is duplicated in file(s): child "))
   }
 
   @Test
   fun testDuplicatedInParentDifferentVersion() = runBlocking {
-    fixture.enableInspections(MavenDuplicateDependenciesInspection::class.java)
+    maven.fixture.enableInspections(MavenDuplicateDependenciesInspection::class.java)
 
-    createModulePom("child", """
+    maven.createModulePom("child", """
       <groupId>mavenParent</groupId>
       <artifactId>child</artifactId>
       <version>1.0</version>
@@ -183,7 +205,7 @@ class MavenDuplicatedDependencyInspectionTest : MavenDomWithIndicesTestCase() {
       </dependencies>
       """.trimIndent())
 
-    importProjectAsync("""
+    maven.importProjectAsync("""
                     <groupId>mavenParent</groupId>
                     <artifactId>parent</artifactId>
                     <version>1.0</version>
@@ -202,14 +224,14 @@ class MavenDuplicatedDependencyInspectionTest : MavenDomWithIndicesTestCase() {
                     </dependencies>
                     """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testDuplicatedInManagedDependencies() = runBlocking {
-    fixture.enableInspections(MavenDuplicateDependenciesInspection::class.java)
+    maven.fixture.enableInspections(MavenDuplicateDependenciesInspection::class.java)
 
-    createProjectPom("""
+    maven.createProjectPom("""
                        <groupId>mavenParent</groupId>
                        <artifactId>childA</artifactId>
                        <version>1.0</version>
@@ -239,6 +261,6 @@ class MavenDuplicatedDependencyInspectionTest : MavenDomWithIndicesTestCase() {
                        </dependencyManagement>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 }

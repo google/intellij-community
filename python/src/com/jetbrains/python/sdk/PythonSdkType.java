@@ -2,21 +2,18 @@
 package com.jetbrains.python.sdk;
 
 import com.intellij.execution.configurations.GeneralCommandLine;
-import com.intellij.execution.target.TargetEnvironmentConfiguration;
 import com.intellij.ide.DataManager;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationListener;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.projectRoots.AdditionalDataConfigurable;
-import com.intellij.openapi.projectRoots.ProjectJdkTable;
 import com.intellij.openapi.projectRoots.Sdk;
 import com.intellij.openapi.projectRoots.SdkAdditionalData;
 import com.intellij.openapi.projectRoots.SdkModel;
@@ -44,8 +41,8 @@ import com.jetbrains.python.psi.LanguageLevel;
 import com.jetbrains.python.sdk.add.PyAddSdkDialog;
 import com.jetbrains.python.sdk.flavors.CPythonSdkFlavor;
 import com.jetbrains.python.sdk.flavors.PythonSdkFlavor;
+import com.jetbrains.python.sdk.impl.SdkInternalUtilKt;
 import com.jetbrains.python.sdk.legacy.PythonSdkUtil;
-import com.jetbrains.python.target.PyDetectedSdkAdditionalData;
 import com.jetbrains.python.target.PyInterpreterVersionUtil;
 import com.jetbrains.python.target.PyTargetAwareAdditionalData;
 import com.jetbrains.python.venvReader.VirtualEnvReaderKt;
@@ -77,7 +74,6 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
-import static com.intellij.execution.target.TargetBasedSdks.loadTargetConfiguration;
 import static com.intellij.platform.ide.progress.TasksKt.runWithModalProgressBlocking;
 import static com.jetbrains.python.statistics.PythonSDKUpdaterIdsHolder.REFRESH_SKELETONS_FOR_REMOTE_INTERPRETER_FAILED;
 
@@ -122,12 +118,9 @@ public final class PythonSdkType extends SdkType {
 
   @Override
   public @NotNull Collection<String> suggestHomePaths() {
-    final Sdk[] existingSdks = ReadAction.compute(() -> ProjectJdkTable.getInstance().getAllJdks());
-    final List<PyDetectedSdk> sdks = PySdkExtKt.detectSystemWideSdks(null, Arrays.asList(existingSdks));
-    //return all detected items after PY-41218 is fixed
-    final Sdk latest = StreamEx.of(sdks).findFirst().orElse(null);
+    final String latest = StreamEx.of(SdkInternalUtilKt.getBasePythonsPaths()).findFirst().orElse(null);
     if (latest != null) {
-      return Collections.singleton(latest.getHomePath());
+      return Collections.singleton(latest);
     }
     return Collections.emptyList();
   }
@@ -176,7 +169,8 @@ public final class PythonSdkType extends SdkType {
         if (files.length != 0) {
           VirtualFile file = files[0];
 
-          record ValidationResult(boolean isValid, boolean isDirectory) {}
+          record ValidationResult(boolean isValid, boolean isDirectory) {
+          }
 
           ValidationResult result = runWithModalProgressBlocking(
             ModalTaskOwner.guess(), PyBundle.message("modal.progress.title.path.validation"), TaskCancellation.cancellable(),
@@ -209,8 +203,11 @@ public final class PythonSdkType extends SdkType {
       @Override
       public boolean isFileSelectable(@Nullable VirtualFile file) {
         if (file == null) return false;
-        Path pythonPath = VirtualEnvReaderKt.VirtualEnvReader().findPythonInPythonRoot(file.toNioPath());
-        return pythonPath != null;
+        // A regular file may be a Python binary or a wrapper script (e.g. a .bat/.sh launching Python), so allow
+        // selecting any file and let validateSelectedFiles() reject the invalid ones (PY-89236). A directory is
+        // selectable only when it contains a Python binary (the folder-selection feature from PY-86247).
+        if (!file.isDirectory()) return true;
+        return VirtualEnvReaderKt.VirtualEnvReader().findPythonInPythonRoot(file.toNioPath()) != null;
       }
     }
       .withTitle(PyBundle.message("sdk.select.path"))
@@ -300,10 +297,10 @@ public final class PythonSdkType extends SdkType {
     }
     var pythonEnvironment = PythonEnvironmentKt.detectPythonEnvironment(pythonBinary).getSuccessOrNull();
     if (pythonEnvironment == null) {
-      return FileUtil.getLocationRelativeToUserHome(pythonBinary.toAbsolutePath().toString());
+      return FileUtil.getLocationRelativeToUserHome(pythonBinary.toAbsolutePath().toString(), false);
     }
     var path = pythonEnvironment instanceof HasPythonHome ? ((HasPythonHome)pythonEnvironment).getPythonHomePath() : pythonBinary;
-    return FileUtil.getLocationRelativeToUserHome(path.toAbsolutePath().toString());
+    return FileUtil.getLocationRelativeToUserHome(path.toAbsolutePath().toString(), false);
   }
 
   @Override
@@ -325,23 +322,13 @@ public final class PythonSdkType extends SdkType {
 
     if (homePath != null) {
 
-      if (additional.getAttributeBooleanValue(PyDetectedSdkAdditionalData.PY_DETECTED_SDK_MARKER)) {
-        PyDetectedSdkAdditionalData data = new PyDetectedSdkAdditionalData(null, null);
-        data.load(additional);
-        TargetEnvironmentConfiguration targetEnvironmentConfiguration = loadTargetConfiguration(additional);
-        if (targetEnvironmentConfiguration != null) {
-          data.setTargetEnvironmentConfiguration(targetEnvironmentConfiguration);
-        }
-        return data;
-      }
-
       var targetAdditionalData = PyTargetAwareAdditionalData.loadTargetAwareData(currentSdk, additional);
       if (targetAdditionalData != null) {
         return targetAdditionalData;
       }
       else if (isCustomPythonSdkHomePath(homePath)) {
         LOG.warn("Pretarget SDK skipped " + homePath);
-        return PyInvalidSdk.INSTANCE;
+        return new PyInvalidSdk();
       }
     }
 
@@ -402,7 +389,7 @@ public final class PythonSdkType extends SdkType {
           projectRef.set(CommonDataKeys.PROJECT.getData(DataManager.getInstance().getDataContext(ownerComponent)));
         }
         else {
-        projectRef.set(CommonDataKeys.PROJECT.getData(DataManager.getInstance().getDataContext()));
+          projectRef.set(CommonDataKeys.PROJECT.getData(DataManager.getInstance().getDataContext()));
         }
       });
     }

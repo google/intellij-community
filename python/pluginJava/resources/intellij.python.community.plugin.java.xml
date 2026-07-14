@@ -1,11 +1,15 @@
 <idea-plugin visibility="internal">
   <!--For IU or IC-->
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
     <!-- Supports Java -->
     <module name="intellij.java.backend"/>
+    <module name="intellij.java.psi"/>
+    <module name="intellij.java.ui"/>
     <module name="intellij.python.community.core.impl"/>
     <module name="intellij.python.community.plugin.impl"/>
   </dependencies>
+  <!-- endregion -->
 
   <extensions defaultExtensionNs="com.intellij">
     <newProjectWizard.languageGenerator implementation="com.intellij.python.community.plugin.java.PythonNewProjectWizard"/>
@@ -17,7 +21,6 @@
     <completion.contributor language="Python" implementationClass="com.intellij.python.community.plugin.java.psi.impl.PyConstructorArgumentCompletionContributor"/>
     <sdkEditorAdditionalOptionsProvider implementation="com.intellij.python.community.plugin.java.PythonSdkEditorAdditionalOptionsProvider"/>
 
-    <commandLineInspectionProjectConfigurator implementation="com.intellij.python.community.plugin.java.inspections.PythonPluginCommandLineInspectionProjectConfigurator"/>
   </extensions>
 
   <extensions defaultExtensionNs="Pythonid">

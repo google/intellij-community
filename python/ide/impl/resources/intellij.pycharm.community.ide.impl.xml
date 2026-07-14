@@ -1,16 +1,18 @@
 <idea-plugin visibility="internal">
   <!--Customization code for both Community and Pro PyCharms-->
   <dependencies>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
     <plugin id="com.intellij.modules.python"/>
-    <module name="intellij.python.common"/>
-    <module name="intellij.platform.whatsNew"/>
     <module name="intellij.platform.ide.nonModalWelcomeScreen"/>
     <module name="intellij.platform.ide.nonModalWelcomeScreen.backend"/>
-    <module name="intellij.python.sdkConfigurator.common"/>
-    <module name="intellij.python.sdk.ui"/>
-    <module name="intellij.python.community.impl.poetry.common"/>
-    <module name="intellij.python.community.impl.uv.common"/>
+    <module name="intellij.platform.whatsNew"/>
+    <module name="intellij.python.community.common"/>
     <module name="intellij.python.community.execService.python"/>
+    <module name="intellij.python.community.impl.poetry.common"/>
+    <module name="intellij.python.sdk.ui"/>
+    <module name="intellij.python.sdkConfigurator.common"/>
+    <module name="intellij.python.uv.common"/>
+    <!-- endregion -->
   </dependencies>
 
   <projectListeners>
@@ -25,7 +27,7 @@
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
-    <registryKey defaultValue="[off|on|ask*]" description="Load project structure from pyproject.toml" key="intellij.python.pyproject.model"
+    <registryKey defaultValue="[off|on*|ask]" description="Load project structure from pyproject.toml" key="intellij.python.pyproject.model"
                  restartRequired="true" overrides="true"/>
     <projectService serviceInterface="com.intellij.psi.search.ProjectScopeBuilder"
                     serviceImplementation="com.intellij.pycharm.community.ide.impl.PyProjectScopeBuilder"
@@ -99,9 +101,6 @@
                              instance="com.intellij.pycharm.community.ide.impl.settings.MemoryUsageConfigurable"
                              groupId="root"/>
 
-    <registryKey key="dataspell.interpreter.widget" defaultValue="true"
-                 description="Interpreter widget for lightweight interpreter management"/>
-
     <statusBarWidgetFactory id="pythonInterpreterWidget"
                             implementation="com.intellij.pycharm.community.ide.impl.configuration.PySdkStatusBarWidgetFactory"
                             order="after CodeStyleStatusBarWidget, before git, before hg, before Notifications"/>
@@ -154,6 +153,8 @@
   <applicationListeners>
     <listener class="com.intellij.pycharm.community.ide.impl.welcomeScreen.PyWelcomeScreenFreeModeTracker"
               topic="com.intellij.ide.AppLifecycleListener"/>
+    <listener class="com.intellij.pycharm.community.ide.impl.welcomeScreen.PyWelcomeScreenFreeModeTracker"
+              topic="com.intellij.ui.LicensingFacade$LicenseStateListener"/>
     <listener class="com.intellij.pycharm.community.ide.impl.promo.CommunityToUnifiedListener"
               topic="com.intellij.ide.AppLifecycleListener"/>
   </applicationListeners>

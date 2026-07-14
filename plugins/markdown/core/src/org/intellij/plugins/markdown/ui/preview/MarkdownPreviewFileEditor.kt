@@ -40,7 +40,6 @@ import kotlinx.coroutines.launch
 import org.intellij.plugins.markdown.MarkdownBundle
 import org.intellij.plugins.markdown.settings.MarkdownExtensionsSettings
 import org.intellij.plugins.markdown.settings.MarkdownSettings
-import org.intellij.plugins.markdown.ui.preview.jcef.MarkdownJCEFHtmlPanel
 import org.intellij.plugins.markdown.util.MarkdownPluginScope
 import org.jetbrains.annotations.ApiStatus.Internal
 import java.awt.AWTEvent
@@ -67,7 +66,7 @@ class MarkdownPreviewFileEditor(
   var lastPanelProviderInfo: MarkdownHtmlPanelProvider.ProviderInfo? = null
     private set
 
-  private var lastRenderedHtml = ""
+  private var lastRenderedContent = ""
 
   private var mainEditor = MutableStateFlow<Editor?>(null)
 
@@ -240,10 +239,14 @@ class MarkdownPreviewFileEditor(
       return
     }
 
-    val settings = MarkdownSettings.getInstance(project)
-    val textPreprocessor = retrievePanelProvider(settings).sourceTextPreprocessor
-    lastRenderedHtml = readAction {
-      val text = textPreprocessor.preprocessText(project, document, file)
+    lastRenderedContent = readAction {
+      val text = if (panel is MarkdownContentPanel) {
+        document.text
+      }
+      else {
+        val textPreprocessor = retrievePanelProvider(MarkdownSettings.getInstance(project)).sourceTextPreprocessor
+        textPreprocessor.preprocessText(project, document, file)
+      }
       logger.info("MarkdownPreviewFileEditor: readAction finished")
       text
     }
@@ -256,9 +259,14 @@ class MarkdownPreviewFileEditor(
     writeIntentReadAction {
       val offset = editor.caretModel.offset
       val line = editor.document.getLineNumber(offset)
-      logger.info("MarkdownPreviewFileEditor: setHtml length: ${lastRenderedHtml.length}, offset: $offset, line: $line")
-      panel.setHtml(lastRenderedHtml, offset, line, file)
-      logger.info("MarkdownPreviewFileEditor: setHtml finished")
+      logger.info("MarkdownPreviewFileEditor: setContent length: ${lastRenderedContent.length}, offset: $offset, line: $line")
+      if (panel is MarkdownContentPanel) {
+        panel.setMarkdown(lastRenderedContent, offset, line, file)
+      }
+      else {
+        panel.setHtml(lastRenderedContent, offset, line, file)
+      }
+      logger.info("MarkdownPreviewFileEditor: setContent finished")
     }
   }
 
@@ -283,7 +291,7 @@ class MarkdownPreviewFileEditor(
     htmlPanelWrapper.add(panel.component, BorderLayout.CENTER)
     if (htmlPanelWrapper.isShowing) htmlPanelWrapper.validate()
     htmlPanelWrapper.repaint()
-    lastRenderedHtml = ""
+    lastRenderedContent = ""
     putUserData(PREVIEW_BROWSER, WeakReference(panel))
     updateHtml()
   }
@@ -347,6 +355,6 @@ class MarkdownPreviewFileEditor(
     val PREVIEW_BROWSER: Key<WeakReference<MarkdownHtmlPanel>> = Key.create("PREVIEW_BROWSER")
 
     internal val PREVIEW_POPUP_POINT: DataKey<RelativePoint> = DataKey.create("PREVIEW_POPUP_POINT")
-    internal val PREVIEW_JCEF_PANEL: DataKey<WeakReference<MarkdownJCEFHtmlPanel>> = DataKey.create("PREVIEW_JCEF_PANEL")
+    internal val PREVIEW_BROWSER_ACTIONS: DataKey<WeakReference<MarkdownPreviewBrowserActions>> = DataKey.create("PREVIEW_BROWSER_ACTIONS")
   }
 }

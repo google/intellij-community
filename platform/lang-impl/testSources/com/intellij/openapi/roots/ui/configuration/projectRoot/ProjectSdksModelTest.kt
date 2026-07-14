@@ -17,6 +17,7 @@ import com.intellij.util.Consumer
 import com.intellij.util.ui.UIUtil
 import org.junit.Assert
 import org.junit.Test
+import java.io.IOException
 import kotlin.io.path.absolute
 import kotlin.io.path.createTempDirectory
 import kotlin.io.path.pathString
@@ -95,19 +96,18 @@ class ProjectSdksModelTest : LightPlatformTestCase() {
       var isSameCallStack = true
 
       try {
-        model.setupInstallableSdk(type, object : SdkDownloadTask {
-          override fun getSuggestedSdkName() = sdkName
-          override fun getPlannedHomeDir() = plannedDir.pathString
-          override fun getPlannedVersion() = "1.2.3"
-          override fun doDownload(indicator: ProgressIndicator) {
-            ApplicationManager.getApplication().assertIsNonDispatchThread()
+        model.setupInstallableSdk(type, MyDownloadTask(
+          homeDir = plannedDir,
+          sdkName = sdkName,
+          onDownload = {indicator ->
+                ApplicationManager.getApplication().assertIsNonDispatchThread()
 
-            //ProgressManager works in the same thread in tests
-            assertThat(isSameCallStack).withFailMessage("Is should be in the same call stack!").isTrue()
+                //ProgressManager works in the same thread in tests
+                assertThat(isSameCallStack).withFailMessage("Is should be in the same call stack!").isTrue()
 
-            actualDownload(indicator)
+                actualDownload(indicator)
           }
-        }, Consumer(onSdk))
+        ),  Consumer(onSdk))
       }
       finally {
         isSameCallStack = false
@@ -140,7 +140,7 @@ class ProjectSdksModelTest : LightPlatformTestCase() {
           assertThat(model.sdks).withFailMessage("SDK should be added to the model").anyMatch { it.name == sdkName }
         }
 
-        error("Download task has to fail")
+        throw IOException("Download task has to fail")
       }
     }
     catch (t: Throwable) {

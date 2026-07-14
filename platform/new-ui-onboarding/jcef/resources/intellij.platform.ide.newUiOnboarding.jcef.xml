@@ -1,0 +1,12 @@
+<idea-plugin>
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+  <dependencies>
+    <module name="intellij.platform.ide.newUiOnboarding"/>
+    <module name="intellij.platform.ui.jcef"/>
+  </dependencies>
+  <!-- endregion -->
+
+  <extensions defaultExtensionNs="com.intellij.ide.newUiOnboarding">
+    <browserPageRenderer implementation="com.intellij.platform.ide.newUiOnboarding.jcef.JcefNewUiOnboardingBrowserPageRenderer"/>
+  </extensions>
+</idea-plugin>

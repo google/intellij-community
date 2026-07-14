@@ -1,11 +1,13 @@
-<idea-plugin package="org.jetbrains.kotlin.tools.composeProjectWizard">
+<idea-plugin>
 
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
     <module name="intellij.kotlin.projectWizard.idea"/>
-    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
     <module name="intellij.java.syntax"/>
-    <!-- endregion -->
+    <module name="intellij.java.ui"/>
+    <module name="intellij.kotlin.projectWizard.core"/>
   </dependencies>
+  <!-- endregion -->
 
 <!--  <extensionPoints>-->
 <!--    <extensionPoint qualifiedName="org.jetbrains.kotlin.idea.ideaWizardService" area="IDEA_PROJECT"-->

@@ -16,7 +16,6 @@ import com.intellij.util.ObjectUtils;
 import com.intellij.util.SingleEdtTaskScheduler;
 import com.intellij.util.ui.MouseEventAdapter;
 import com.intellij.util.ui.MouseEventHandler;
-import com.intellij.util.ui.StartupUiUtil;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.accessibility.ScreenReader;
 import org.jetbrains.annotations.ApiStatus;
@@ -121,7 +120,6 @@ public abstract class AbstractExpandableItemsHandler<KeyType, ComponentType exte
       myComponent.validate();
     }
     myPopup = new MovablePopup(myComponent, myTipComponent);
-    myPopup.setHeavyWeight(!StartupUiUtil.isWaylandToolkit());
 
     MouseEventHandler dispatcher = new MouseEventHandler() {
       @Override
@@ -396,8 +394,14 @@ public abstract class AbstractExpandableItemsHandler<KeyType, ComponentType exte
     updateAlarm.cancel();
     if (myPopup.isVisible()) {
       myPopup.setVisible(false);
+    }
+
+    if (myKey != null) {
+      // Restore the element state to its initial state even when myPopup is not shown.
+      // Needed for inactive windows: the element rendering is updated on mouse hover, but myPopup is not shown.
       repaintKeyItem();
     }
+
     myKey = null;
   }
 

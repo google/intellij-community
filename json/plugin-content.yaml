@@ -1,6 +1,8 @@
-- name: lib/json.jar
+- name: lib/intellij.json.jar
   contentModules:
   - name: intellij.json
+- name: lib/intellij.json.syntax.jar
+  contentModules:
   - name: intellij.json.syntax
 - name: lib/modules/intellij.json.backend.jar
   contentModules:
@@ -11,3 +13,23 @@
 - name: lib/modules/intellij.json.frontend.split.jar
   contentModules:
   - name: intellij.json.frontend.split
+- name: lib/modules/intellij.json.networknt.wrapper.jar
+  contentModules:
+  - name: intellij.json.networknt.wrapper
+    libraries:
+      json-schema-validator-jetbrains:
+      - name: $MAVEN_REPOSITORY$/com/networknt/json-schema-validator/3/json-schema-validator-3.jar
+      jackson-databind-3:
+      - name: $MAVEN_REPOSITORY$/tools/jackson/core/jackson-databind/3/jackson-databind-3.jar
+      jackson-core-3:
+      - name: $MAVEN_REPOSITORY$/tools/jackson/core/jackson-core/3/jackson-core-3.jar
+- name: lib/modules/intellij.json.structureView.jar
+  contentModules:
+  - name: intellij.json.structureView
+- name: lib/modules/intellij.libraries.joni.jar
+  contentModules:
+  - name: intellij.libraries.joni
+    libraries:
+      joni:
+      - name: $MAVEN_REPOSITORY$/org/jruby/joni/joni/2/joni-2.jar
+      - name: $MAVEN_REPOSITORY$/org/jruby/jcodings/jcodings/1/jcodings-1.jar

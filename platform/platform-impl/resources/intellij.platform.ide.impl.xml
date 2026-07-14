@@ -25,7 +25,6 @@
     <module name="intellij.libraries.jackson3.module.kotlin"/>
     <module name="intellij.libraries.java.compatibility"/>
     <module name="intellij.libraries.jbr"/>
-    <module name="intellij.libraries.jcef"/>
     <module name="intellij.libraries.jgoodies.common"/>
     <module name="intellij.libraries.jgoodies.forms"/>
     <module name="intellij.libraries.jsoup"/>
@@ -39,6 +38,9 @@
     <module name="intellij.libraries.miglayout.swing"/>
     <module name="intellij.libraries.netty.buffer"/>
     <module name="intellij.libraries.netty.codec.http"/>
+    <module name="intellij.libraries.opentelemetry"/>
+    <module name="intellij.libraries.opentelemetry.extension.kotlin"/>
+    <module name="intellij.libraries.opentelemetry.semconv"/>
     <module name="intellij.libraries.oro.matcher"/>
     <module name="intellij.libraries.protobuf"/>
     <module name="intellij.libraries.pty4j"/>
@@ -59,6 +61,7 @@
     <module name="intellij.platform.editor.ex"/>
     <module name="intellij.platform.editor.ui"/>
     <module name="intellij.platform.eel.impl"/>
+    <module name="intellij.platform.eel.nioFs.impl"/>
     <module name="intellij.platform.execution"/>
     <module name="intellij.platform.ide"/>
     <module name="intellij.platform.ide.concurrency"/>
@@ -74,6 +77,7 @@
     <module name="intellij.platform.projectModel"/>
     <module name="intellij.platform.projectModel.impl"/>
     <module name="intellij.platform.rd.community"/>
+    <module name="intellij.platform.runtime.product"/>
     <module name="intellij.platform.statistics"/>
     <module name="intellij.platform.util.coroutines"/>
     <module name="intellij.platform.util.diff"/>
@@ -86,6 +90,12 @@
     <extensionPoint qualifiedName="com.intellij.editor.interLineBreakpointConfigurationProvider"
                     interface="com.intellij.openapi.editor.impl.InterLineBreakpointConfigurationProvider"
                     dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.editorEmptyTextProvider"
+                    interface="com.intellij.openapi.fileEditor.impl.EditorEmptyTextProvider"
+                    dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.editorEmptyStateComponentProvider"
+                    interface="com.intellij.openapi.fileEditor.impl.EditorEmptyStateComponentProvider"
+                    dynamic="true"/>
     <extensionPoint name="imageReaderWriterSpi"
                     beanClass="com.intellij.util.imageio.ImageReaderWriterSpiBean"
                     dynamic="true">
@@ -95,10 +105,18 @@
   <extensions defaultExtensionNs="com.intellij">
     <ApplicationLoadListener implementation="com.intellij.util.imageio.ImageReaderWriterSpiRegistrar"/>
     <applicationActivity implementation="com.intellij.ide.debug.ImageDebugUtilLoader"/>
+    <applicationService serviceImplementation="com.intellij.ui.WaylandAppIconPatcher"
+                        preload="notHeadless"
+                        os="linux"/>
     <registryKey
       key="universal.file.chooser.is.enabled"
-      defaultValue="false"
+      defaultValue="true"
       description="Enable the universal file chooser dialog"
+    />
+    <registryKey
+      key="ide.hide.default.project.directory.for.isolated.workspace"
+      defaultValue="true"
+      description="Hide the 'Default project directory' setting for projects in an isolated environment (Docker containers/devcontainers, SSH, remote dev)"
     />
     <registryKey
       key="ide.project.frame.auto.fix.size.windows.interval"
@@ -117,14 +135,28 @@
       description="Custom ITN error reporting endpoint. Only HTTPS URLs whose host ends with .jetbrains.com are accepted"
     />
     <registryKey
-      key="ide.linux.ijpl43505"
-      defaultValue="true"
-      description="Enable the fix for IJPL-43505 Window header disappears after opening more than one project"
-      restartRequired="true"
+      key="ea.diagnostic.endpoint.public.key"
+      defaultValue=""
+      description="Pinned public key for the ITN error reporting endpoint. Required when ea.diagnostic.endpoint is set. Accepts Base64-encoded SubjectPublicKeyInfo bytes or PEM text"
     />
+    <registryKey
+      key="ea.auto.report.feature.visible"
+      defaultValue="true"
+      description="Makes the automatic error reporting feature visible in UI and available to enable/disable"
+      restartRequired="true"/>
+    <registryKey
+      key="ea.auto.report.forced" defaultValue="none"
+      description="Forces the automatic error reporting feature to be enabled with a certain level. Values: all | freezes | none"
+      restartRequired="true"/>
+    <registryKey
+      key="ea.auto.report.forced.tag" defaultValue=""
+      description="Additional tag for error reports"/>
 
     <statistics.counterUsagesCollector implementationClass="com.intellij.platform.ide.menu.MainMenuCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.ide.minimap.MinimapUsageCollector"/>
+    <editorEmptyStateComponentProvider implementation="com.intellij.openapi.fileEditor.impl.EditorEmptyTextComponentProvider" order="last"/>
+    <editorEmptyTextProvider implementation="com.intellij.openapi.fileEditor.impl.DefaultEditorEmptyTextProvider" order="last"/>
+    <pluginUpdatesProvider implementation="com.intellij.ide.plugins.newui.DefaultPluginUpdatesProvider"/>
     <projectSettings service="com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.UnknownFeaturesCollector"/>
     <projectSettings service="com.intellij.ui.RecentsManager"/>
     <projectSettings service="com.intellij.ide.errorTreeView.impl.ErrorTreeViewConfiguration"/>

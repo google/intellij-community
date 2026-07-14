@@ -1,0 +1,49 @@
+<idea-plugin>
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+  <dependencies>
+    <plugin id="com.intellij.mermaid"/>
+    <module name="intellij.libraries.jcef"/>
+    <module name="intellij.markdown"/>
+    <module name="intellij.platform.ui.jcef"/>
+  </dependencies>
+  <!-- endregion -->
+
+  <extensions defaultExtensionNs="org.intellij.markdown">
+    <browserPreviewExtensionProvider implementation="com.intellij.mermaid.markdown.jcef.MermaidBrowserExtension$Provider"
+                                     order="first"/>
+
+    <!--suppress PluginXmlValidity -->
+    <fenceGeneratingProvider implementation="com.intellij.mermaid.markdown.jcef.MermaidCodeGeneratingProviderExtension"
+                             order="first"/>
+    <fenceLanguageProvider implementation="com.intellij.mermaid.markdown.jcef.AdditionalMermaidInfoStringValuesContributor"
+                           order="after DefaultMermaidCodeFenceLanguageProvider"/>
+  </extensions>
+  <extensions defaultExtensionNs="com.intellij">
+    <fileEditorProvider implementation="com.intellij.mermaid.markdown.preview.MermaidEditorWithPreviewProvider"/>
+
+    <editorNotificationProvider implementation="com.intellij.mermaid.markdown.preview.ExportedDiagramEditorNotificationProvider"/>
+
+    <completion.contributor language="Markdown"
+                            implementationClass="com.intellij.mermaid.markdown.editor.MarkdownCodeFenceCompletionContributor"/>
+
+    <typedHandler implementation="com.intellij.mermaid.markdown.editor.MarkdownCodeFenceTypedHandlerDelegate"/>
+
+    <httpRequestHandler implementation="com.intellij.mermaid.markdown.preview.MermaidPreviewStaticServer"/>
+
+    <!--suppress PluginXmlValidity -->
+    <advancedSetting default=""
+                     bundle="messages.MermaidBundle"
+                     titleKey="mermaid.additional.code.fence.pattern.regex"
+                     groupKey="mermaid.advanced.settings.group"
+                     id="mermaid.additional.code.fence.pattern.regex"/>
+  </extensions>
+
+  <actions resource-bundle="messages.MermaidBundle">
+    <action id="Mermaid.ExportDiagram"
+            icon="AllIcons.ToolbarDecorator.Export"
+            class="com.intellij.mermaid.markdown.preview.ExportDiagramAction">
+      <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+      <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+    </action>
+  </actions>
+</idea-plugin>

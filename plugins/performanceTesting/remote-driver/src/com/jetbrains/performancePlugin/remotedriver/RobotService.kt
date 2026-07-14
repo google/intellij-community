@@ -1,8 +1,9 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.performancePlugin.remotedriver
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
-import com.jetbrains.performancePlugin.remotedriver.robot.SmoothRobot
+import com.jetbrains.performancePlugin.remotedriver.robot.IdeRobot
 import com.jetbrains.performancePlugin.remotedriver.xpath.XpathDataModelCreator
 import com.jetbrains.performancePlugin.remotedriver.xpath.convertToHtml
 import org.jetbrains.annotations.ApiStatus
@@ -11,9 +12,9 @@ import java.nio.file.Paths
 @Suppress("unused")
 @Service(Service.Level.APP)
 @ApiStatus.Internal
-class RobotService {
+class RobotService : Disposable {
   @Suppress("MemberVisibilityCanBePrivate")
-  val robot: SmoothRobot = SmoothRobot()
+  val robot: IdeRobot = IdeRobot.create()
 
   fun saveHierarchy(folderPath: String, fileName: String = "ui.html") {
     val html = XpathDataModelCreator().create(null).convertToHtml()
@@ -24,6 +25,10 @@ class RobotService {
         Paths.get(folderPath).resolve(staticFilePath).toFile().apply { resolve("..").mkdirs() }.writeBytes(resource.readBytes())
       }
     }
+  }
+
+  override fun dispose() {
+    robot.cleanUp()
   }
 
   private val staticFiles = listOf(

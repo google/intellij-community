@@ -215,7 +215,7 @@ public final class ExternalSystemJdkUtil {
   /**
    * @deprecated use {@link #suggestJdkHomePaths()} instead.
    */
-  @Deprecated
+  @Deprecated(forRemoval = true)
   public static @NotNull Collection<String> suggestJdkHomePaths() {
     return getJavaSdkType().suggestHomePaths();
   }
@@ -352,5 +352,12 @@ public final class ExternalSystemJdkUtil {
     var sdkTable = project == null ? ProjectJdkTable.getInstance() : ProjectJdkTable.getInstance(project);
     var allJdks = sdkTable.getSdksOfType(getJavaSdkType());
     return ContainerUtil.find(allJdks, it -> FileUtil.pathsEqual(jdkHome, it.getHomePath()));
+  }
+
+  @ApiStatus.Internal
+  public static boolean isSdkRegisteredInSdkTable(@NotNull Project project, @NotNull Sdk sdk) {
+    var sdkTable = ProjectJdkTable.getInstance(project);
+    var allSdks = sdkTable.getSdksOfType(sdk.getSdkType());
+    return ContainerUtil.exists(allSdks, sdk::equals);
   }
 }

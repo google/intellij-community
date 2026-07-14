@@ -1,6 +1,6 @@
 <idea-plugin>
   <extensions defaultExtensionNs="com.intellij">
-    <toolWindow id="Terminal" anchor="bottom" icon="org.jetbrains.plugins.terminal.TerminalIcons.OpenTerminal_13x13"
+    <toolWindow id="Terminal" anchor="bottom" icon="com.intellij.terminal.icons.TerminalIcons.OpenTerminal_13x13"
                 factoryClass="org.jetbrains.plugins.terminal.TerminalToolWindowFactory"
                 secondary="false"
                 canCloseContents="true"/>
@@ -48,7 +48,7 @@
                  description="Enable new terminal for Fish"/>
     <registryKey key="terminal.new.ui.show.promotion" defaultValue="false"
                  description="Whether to show the GotIt tooltip with a proposal to try the New Terminal"/>
-    <registryKey key="terminal.agent.workbench.promotion.enabled" defaultValue="true"
+    <registryKey key="terminal.agent.workbench.promotion.enabled" defaultValue="false"
                  description="Enable Agent Workbench promotion in the reworked terminal when supported AI CLIs are used"/>
     <registryKey key="terminal.agent.predefined.actions.enabled" defaultValue="true"
                  description="Show AI agent actions in the terminal title and predefined terminal sessions"
@@ -72,7 +72,7 @@
                  description="Show generic file hyperlinks for relative paths in the reworked terminal. Requires enabled `terminal.generic.hyperlinks`."/>
     <registryKey key="terminal.ai.inline.completion.enabled" defaultValue="false"
                  description="Whether Terminal AI Inline Completion is enabled and visible in the settings"/>
-    <consoleFilterProvider implementation="org.jetbrains.plugins.terminal.block.reworked.hyperlinks.TerminalGenericFileFilterProvider"/>
+    <consoleFilterProvider implementation="org.jetbrains.plugins.terminal.hyperlinks.filter.TerminalGenericFileFilterProvider"/>
 
     <experimentalFeature id="terminal.shell.command.handling" percentOfUsers="100"/>
     <terminal.shellCommandHandler implementation="org.jetbrains.plugins.terminal.RunAnythingTerminalBridge"/>
@@ -124,9 +124,8 @@
     <advancedSetting id="terminal.shift.enter.sends.esc.cr" default="true"
                      bundle="messages.TerminalBundle" groupKey="group.advanced.settings.terminal"/>
 
-    <remote.customDataContextSerializer implementation="org.jetbrains.plugins.terminal.block.reworked.TerminalSessionIdDataContextSerializer" />
-    <remote.customDataContextSerializer implementation="org.jetbrains.plugins.terminal.block.reworked.IsAlternateBufferDataContextSerializer" />
-    <remote.customDataContextSerializer implementation="org.jetbrains.plugins.terminal.block.reworked.hyperlinks.HyperlinkIdDataContextSerializer" />
+    <remote.customDataContextSerializer implementation="org.jetbrains.plugins.terminal.hyperlinks.menu.TerminalHyperlinksSessionIdDataContextSerializer"/>
+    <remote.customDataContextSerializer implementation="org.jetbrains.plugins.terminal.hyperlinks.menu.HyperlinkIdDataContextSerializer"/>
 
     <notificationGroup displayType="BALLOON" id="terminal" bundle="messages.TerminalBundle" key="notification.group.terminal"/>
 
@@ -157,8 +156,8 @@
   <extensionPoints>
     <extensionPoint qualifiedName="org.jetbrains.plugins.terminal.shellExecOptionsCustomizer"
                     interface="org.jetbrains.plugins.terminal.startup.ShellExecOptionsCustomizer" dynamic="true"/>
-    <extensionPoint qualifiedName="org.jetbrains.plugins.terminal.terminalSettingsProvider" dynamic="true"
-                    interface="org.jetbrains.plugins.terminal.settings.TerminalSettingsProvider"/>
+    <extensionPoint qualifiedName="org.jetbrains.plugins.terminal.shellExecOptionsCustomizerDisabler"
+                    interface="org.jetbrains.plugins.terminal.startup.ShellExecOptionsCustomizerDisabler" dynamic="true"/>
     <!--suppress DeprecatedClassUsageInspection -->
     <extensionPoint qualifiedName="org.jetbrains.plugins.terminal.localTerminalCustomizer"
                     interface="org.jetbrains.plugins.terminal.LocalTerminalCustomizer" dynamic="true"/>
@@ -199,6 +198,6 @@
   </projectListeners>
 
   <actions resource-bundle="messages.TerminalBundle">
-    <group id="Terminal.HyperlinkContextMenu" class="org.jetbrains.plugins.terminal.hyperlinks.HyperlinkContextMenuActionGroup" />
+    <group id="Terminal.HyperlinkContextMenu" class="org.jetbrains.plugins.terminal.hyperlinks.menu.HyperlinkContextMenuActionGroup"/>
   </actions>
 </idea-plugin>

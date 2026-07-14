@@ -97,9 +97,9 @@ def _collect_resources(ctx):
     result = []
     if ctx.attr.resources:
         res = struct(
-          files = ctx.files.resources,
-          strip_prefix = ctx.file.strip_prefix,
-          add_prefix = "",
+            files = ctx.files.resources,
+            strip_prefix = ctx.file.strip_prefix,
+            add_prefix = "",
         )
         result.append(res)
     for r in ctx.attr.resource_jars:
@@ -237,6 +237,7 @@ def _run_jvm_builder(
         mnemonic = "JvmCompile",
         env = {
             "MALLOC_ARENA_MAX": "2",
+            "FORCE_REBUILD": "1",  # increment manually in case of remote cache poisoning
         },
         inputs = depset(srcs.all_srcs + srcs.src_jars + all_resources, transitive = transitiveInputs),
         outputs = outputs,

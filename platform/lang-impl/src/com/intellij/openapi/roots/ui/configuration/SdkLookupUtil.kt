@@ -1,5 +1,7 @@
 // Copyright 2000-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 @file:JvmName("SdkLookupUtil")
+@file:ApiStatus.Internal
+
 package com.intellij.openapi.roots.ui.configuration
 
 import com.intellij.openapi.application.WriteAction
@@ -8,8 +10,8 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.projectRoots.SdkType
-import com.intellij.util.ThrowableRunnable
 import java.util.function.Consumer
+import org.jetbrains.annotations.ApiStatus
 
 /**
  * Finds sdk at everywhere with parameters that defined by [configure]
@@ -43,9 +45,7 @@ fun lookupAndSetupSdkBlocking(project: Project, indicator: ProgressIndicator, sd
 
   try {
     if (sdk != null) {
-      WriteAction.runAndWait(
-        ThrowableRunnable { applySdk.accept(sdk) }
-      )
+      WriteAction.runAndWait<Throwable> { applySdk.accept(sdk) }
     }
   }
   catch (t: Throwable) {

@@ -1,10 +1,9 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.core.script.k2.definitions
 
 import com.intellij.openapi.project.Project
 import org.jetbrains.kotlin.idea.base.plugin.artifacts.KotlinArtifacts
-import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
-import org.jetbrains.kotlin.idea.core.script.v1.kotlinScriptTemplateInfo
+import org.jetbrains.kotlin.idea.core.script.shared.definition.kotlinScriptTemplate
 import org.jetbrains.kotlin.idea.core.script.v1.loggingReporter
 import org.jetbrains.kotlin.scripting.definitions.ScriptDefinition
 import org.jetbrains.kotlin.scripting.definitions.ScriptDefinitionsFromClasspathDiscoverySource
@@ -30,13 +29,12 @@ class MainKtsScriptDefinitionSource(val project: Project) : ScriptDefinitionsSou
             return discoveredDefinitions.map { definition ->
                 val compilationConfiguration = definition.compilationConfiguration.with {
                     ide.dependenciesSources(JvmDependency(KotlinArtifacts.kotlinStdlibSources))
-                    ide {
-                        kotlinScriptTemplateInfo {
-                            id = "main-kts"
-                            title = ".main.kts"
-                            templateName = "Kotlin Script MainKts"
-                            description = KotlinBundle.message("action.new.script.description.main.kts")
-                        }
+                    kotlinScriptTemplate {
+                        id = "main-kts"
+                        title = ".main.kts"
+                        templateName = "Kotlin Script MainKts"
+                        @Suppress("HardCodedStringLiteral")
+                        description = "Standalone script, supports @file:DependsOn for external library imports."
                     }
                 }
 

@@ -1,9 +1,9 @@
 package com.jetbrains.python.psi.types
 
 import com.intellij.psi.PsiElement
-import com.intellij.psi.util.findParentOfType
+import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.python.PyNames
-import com.jetbrains.python.codeInsight.parseStdDataclassParameters
+import com.jetbrains.python.codeInsight.parseStdOrDataclassTransformDataclassParameters
 import com.jetbrains.python.codeInsight.typing.PyTypingTypeProvider
 import com.jetbrains.python.codeInsight.typing.PyTypingTypeProvider.Companion.CALLABLE
 import com.jetbrains.python.codeInsight.typing.PyTypingTypeProvider.Companion.CALLABLE_EXT
@@ -13,8 +13,8 @@ import com.jetbrains.python.codeInsight.typing.PyTypingTypeProvider.Companion.PR
 import com.jetbrains.python.codeInsight.typing.PyTypingTypeProvider.Companion.isFinal
 import com.jetbrains.python.codeInsight.typing.PyTypingTypeProvider.Companion.isReadOnly
 import com.jetbrains.python.psi.PyAnnotation
-import com.jetbrains.python.psi.PyAnnotationOwner
 import com.jetbrains.python.psi.PyArgumentList
+import com.jetbrains.python.psi.PyAssignmentStatement
 import com.jetbrains.python.psi.PyBinaryExpression
 import com.jetbrains.python.psi.PyClass
 import com.jetbrains.python.psi.PyExpressionStatement
@@ -30,7 +30,6 @@ import com.jetbrains.python.psi.PySubscriptionExpression
 import com.jetbrains.python.psi.PyTargetExpression
 import com.jetbrains.python.psi.PyTupleExpression
 import com.jetbrains.python.psi.PyTypeAliasStatement
-import com.jetbrains.python.psi.PyTypeCommentOwner
 import com.jetbrains.python.psi.PyTypeDeclarationStatement
 import com.jetbrains.python.psi.PyUtil
 import com.jetbrains.python.psi.types.PyInferredVarianceJudgment.attributeDoesNotAffectVarianceInference
@@ -48,12 +47,17 @@ import org.jetbrains.annotations.ApiStatus
 @ApiStatus.Experimental
 object PyExpectedVarianceJudgment {
 
+  /** Return the expected variance for the given location. The location must be a reference inside a type expression. */
+  @JvmStatic
+  fun getExpectedVariance(element: PyReferenceExpression, context: TypeEvalContext): Variance? {
+    return getExpectedVariance(element as PsiElement, context)
+  }
+
   /**
-   * Returns the variance expected from the given type variable at its current location.
+   * Return the expected variance for the given location.
    * Returns null usually if the given location is not applicable for variance judgment.
    */
-  @JvmStatic
-  fun getExpectedVariance(element: PsiElement, context: TypeEvalContext): Variance? {
+  private fun getExpectedVariance(element: PsiElement, context: TypeEvalContext): Variance? {
     val parent = PyUtil.getFragmentContextAwareParent(element)
     if (parent == null) return null
 
@@ -62,6 +66,8 @@ object PyExpectedVarianceJudgment {
       is PyTypeAliasStatement,
       is PyExpressionStatement, // parent of synthetic expressions created by PyElementGenerator#createExpressionFromText()
         -> BIVARIANT
+      is PyAssignmentStatement,
+        -> fromAssignmentStatement(element, context)
       is PyFunction,
         -> fromFunction(element, parent)
       is PyTypeDeclarationStatement,
@@ -82,12 +88,12 @@ object PyExpectedVarianceJudgment {
       is PyTupleExpression,
       is PyStarExpression,
         -> {
+        val grandParent = PyUtil.getFragmentContextAwareParent(parent)
         when (parent) {
           is PySubscriptionExpression,
             -> fromElementInSubscriptionExpression(0, parent, context)
-          is PyTupleExpression if parent.parent is PySubscriptionExpression
-            -> fromElementInSubscriptionExpression(parent.elements.indexOf(element),
-                                                   parent.parent as PySubscriptionExpression, context)
+          is PyTupleExpression if grandParent is PySubscriptionExpression
+            -> fromElementInSubscriptionExpression(parent.elements.indexOf(element), grandParent, context)
           else
             -> getExpectedVariance(parent, context)
         }
@@ -98,20 +104,27 @@ object PyExpectedVarianceJudgment {
   }
 
   private fun fromFunction(function: PyFunction, parent: PsiElement): Variance? {
-    if (parent !is PyStatementList && parent.parent !is PyClass) return null
+    if (parent !is PyStatementList || PyUtil.getFragmentContextAwareParent(parent) !is PyClass) return null
     if (functionDoesNotAffectVarianceInference(function)) return null
     return COVARIANT
   }
 
   private fun fromTypeDeclarationStatement(element: PyTypeDeclarationStatement, parent: PsiElement, context: TypeEvalContext): Variance? {
-    val parentClass = parent.parent
+    val parentClass = PyUtil.getFragmentContextAwareParent(parent)
     if (parentClass !is PyClass) {
-      // assume that we are in a type alias: `My_Class_Int = My_Class[int]`
+      // assume that we are e.g., on top level
       return BIVARIANT
     }
     val targetExpr = element.target as? PyTargetExpression ?: return null
     if (attributeDoesNotAffectVarianceInference(targetExpr)) return null
-    if (isEffectivelyReadOnly(targetExpr, parentClass, context)) return COVARIANT
+    if (isEffectivelyReadOnly(targetExpr, context)) return COVARIANT
+    return INVARIANT
+  }
+
+  private fun fromAssignmentStatement(element: PyAssignmentStatement, context: TypeEvalContext): Variance? {
+    val targetExpr = element.targets.singleOrNull() as? PyTargetExpression ?: return null
+    if (attributeDoesNotAffectVarianceInference(targetExpr)) return null
+    if (isEffectivelyReadOnly(targetExpr, context)) return COVARIANT
     return INVARIANT
   }
 
@@ -120,9 +133,9 @@ object PyExpectedVarianceJudgment {
     subscriptionExpr: PySubscriptionExpression,
     context: TypeEvalContext,
   ): Variance? {
-    val qualifier = subscriptionExpr.qualifier as? PyReferenceExpression ?: return null
+    val qualifier = subscriptionExpr.operand as? PyReferenceExpression ?: return null
     val physicalElement = PyUtil.getFragmentContext(qualifier)
-    val parentNamedParameter = physicalElement?.findParentOfType<PyNamedParameter>()
+    val parentNamedParameter = PsiTreeUtil.getStubOrPsiParentOfType(physicalElement, PyNamedParameter::class.java)
     if (parentNamedParameter?.isSelf == true) return null
 
     val qualifierQNames = PyTypingTypeProvider.resolveToQualifiedNames(qualifier, context)
@@ -135,11 +148,11 @@ object PyExpectedVarianceJudgment {
     }
 
     var qualifierType = PyTypingTypeProvider.getType(subscriptionExpr.operand, context)?.get()
-    if (qualifierType is PyClassType && qualifierType !is PyCollectionType) {
+    if (qualifierType is PyClassType && !qualifierType.isParameterized) {
       // convert raw types to generic types
       qualifierType = PyTypeChecker.findGenericDefinitionType(qualifierType.pyClass, context) ?: qualifierType
     }
-    if (qualifierType is PyCollectionType) {
+    if (qualifierType is PyClassType && qualifierType.isParameterized) {
       val paramVariance = getTypeParameterVarianceAtIndex(qualifierType, refIndex, context) ?: return null
       val outerVariance = getExpectedVariance(subscriptionExpr, context) ?: return null
       return combineVariance(outerVariance, paramVariance)
@@ -148,27 +161,29 @@ object PyExpectedVarianceJudgment {
   }
 
   private fun getTypeParameterVarianceAtIndex(qualifierType: PyClassType, index: Int, context: TypeEvalContext): Variance? {
-    if (qualifierType is PyCollectionType) {
-      if (qualifierType.classQName == PyNames.TUPLE) {
+    if (qualifierType.isParameterized) {
+      if (qualifierType.classQName == PyNames.FQN.TUPLE) {
         return COVARIANT
       }
       // check definition type since generic type aliases are parameterized, i.e.: `A_Alias_1 = ClassA[T_co]` will be ClassA[Any]
       val definitionType = PyTypeChecker.findGenericDefinitionType(qualifierType.pyClass, context) ?: qualifierType
-      val typeParamType = definitionType.elementTypes.getOrNull(index) as? PyTypeParameterType
-                          ?: qualifierType.elementTypes.getOrNull(index) as? PyTypeParameterType
+      val typeParamType = definitionType.typeArguments.getOrNull(index) as? PyTypeParameterType
+                          ?: qualifierType.typeArguments.getOrNull(index) as? PyTypeParameterType
                           ?: return null
       return getDeclaredOrInferredVariance(typeParamType, context)
     }
     return null
   }
 
-  private fun isEffectivelyReadOnly(element: PsiElement, parentClass: PyClass, context: TypeEvalContext): Boolean {
-    if (element is PyTypeCommentOwner && element is PyAnnotationOwner) {
-      if (isFinal(element, context) || isReadOnly(element, context)) {
-        return true
-      }
+  /** Return true iff the given element is effectively read-only due to being final, read-only, or frozen. */
+  @JvmStatic
+  fun isEffectivelyReadOnly(targetExpr: PyTargetExpression, context: TypeEvalContext): Boolean {
+    if (isFinal(targetExpr, context) || isReadOnly(targetExpr, context)) {
+      return true
     }
-    val isFrozen = parseStdDataclassParameters(parentClass, context)?.frozen ?: false
+
+    val containingClass = targetExpr.containingClass ?: return false
+    val isFrozen = parseStdOrDataclassTransformDataclassParameters(containingClass, context)?.frozen ?: false
     return isFrozen
   }
 

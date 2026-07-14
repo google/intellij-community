@@ -4,6 +4,7 @@ package com.intellij.java.codeInsight;
 import com.intellij.codeInsight.intention.AddAnnotationModCommandAction;
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.codeInspection.i18n.I18nInspection;
+import com.intellij.codeInspection.unusedSymbol.UnusedSymbolLocalInspection;
 import com.intellij.java.JavaBundle;
 import com.intellij.modcommand.ActionContext;
 import com.intellij.modcommand.ModCommandExecutor;
@@ -49,7 +50,7 @@ public class ExternalAnnotationsTest extends UsefulTestCase {
     myFixture.setUp();
     Module myModule = builder.getFixture().getModule();
     ModuleRootModificationUtil.updateModel(myModule, model -> {
-      DefaultLightProjectDescriptor.addJetBrainsAnnotations(model);
+      DefaultLightProjectDescriptor.addJetBrainsAnnotationsWithTypeUse(model);
       String contentUrl = VfsUtilCore.pathToUrl(myFixture.getTempDirPath());
       model.addContentEntry(contentUrl).addSourceFolder(contentUrl + "/src", false);
       final JavaModuleExternalPaths extension = model.getModuleExtension(JavaModuleExternalPaths.class);
@@ -73,6 +74,50 @@ public class ExternalAnnotationsTest extends UsefulTestCase {
       myFixture = null;
       super.tearDown();
     }
+  }
+  
+  public void testSafeDelete() {
+    myFixture.enableInspections(new UnusedSymbolLocalInspection());
+    myFixture.configureByFiles("src/safeDelete/Hello.java", "content/anno/safeDelete/annotations.xml");
+    IntentionAction intention = myFixture.getAvailableIntention("Safe delete 'test(List<String>)'");
+    myFixture.launchAction(intention);
+    myFixture.checkResultByFile("content/anno/safeDelete/annotations.xml",
+                                "content/anno/safeDelete/annotations_after.xml",
+                                true);
+  }
+  
+  public void testMakeExplicit() {
+    myFixture.configureByFiles("src/makeExplicit/Hello.java", "content/anno/makeExplicit/annotations.xml");
+    IntentionAction intention = myFixture.getAvailableIntention("Insert '@Contract(pure=true) @NotNull'");
+    myFixture.launchAction(intention);
+    myFixture.checkResultByFile("content/anno/makeExplicit/annotations.xml",
+                                "content/anno/makeExplicit/annotations_after.xml",
+                                true);
+    myFixture.checkResultByFile("src/makeExplicit/Hello.java",
+                                "src/makeExplicit/Hello_after.java",
+                                true);
+  }
+
+  public void testMakeExplicitParam() {
+    myFixture.configureByFiles("src/makeExplicitParam/Hello.java", "content/anno/makeExplicitParam/annotations.xml");
+    IntentionAction intention = myFixture.getAvailableIntention("Insert '@NotNull @Unmodifiable'");
+    myFixture.launchAction(intention);
+    myFixture.checkResultByFile("content/anno/makeExplicitParam/annotations.xml",
+                                "content/anno/makeExplicitParam/annotations_after.xml",
+                                true);
+    myFixture.checkResultByFile("src/makeExplicitParam/Hello.java",
+                                "src/makeExplicitParam/Hello_after.java",
+                                true);
+  }
+  
+  public void testDeannotate() {
+    myFixture.configureByFiles("src/deannotate/Hello.java", "content/anno/deannotate/annotations.xml");
+    IntentionAction intention = myFixture.getAvailableIntention(JavaBundle.message("deannotate.intention.action.several.text"));
+    myFixture.launchAction(intention);
+    NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+    myFixture.checkResultByFile("content/anno/deannotate/annotations.xml",
+                                "content/anno/deannotate/annotations_after.xml",
+                                true);
   }
 
   public void testAddedAnnotationInCodeWhenAlreadyPresent() {

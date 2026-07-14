@@ -3,8 +3,8 @@
   <id>com.intellij.mcpServer</id>
   <category>AI-Powered</category>
   <description><![CDATA[
-    MCP (Model Context Protocol) Server for IntelliJ IDEs
-    This plugin integrates the MCP server into IntelliJ-based IDEs, enabling seamless communication between Large Language Models (LLMs)
+    MCP (Model Context Protocol) Server for JetBrains IDEs
+    This plugin integrates the MCP server into JetBrains IDEs, enabling seamless communication between LLMsc
     and your development environment. It provides tools for interacting with the IDE, including:
     <ul>
       <li>Reading the current file</li>
@@ -16,9 +16,6 @@
   ]]></description>
   <vendor>JetBrains</vendor>
 
-  <depends config-file="mcpServer-terminal.xml" optional="true">org.jetbrains.plugins.terminal</depends>
-  <depends config-file="mcpServer-vcs.xml" optional="true">Git4Idea</depends>
-
   <dependencies>
     <module name="intellij.libraries.kotlinx.io"/>
     <module name="intellij.libraries.ktor.client"/>
@@ -28,13 +25,12 @@
     <module name="intellij.libraries.ktor.client.cio"/>
     <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
     <module name="intellij.platform.compose"/>
-    <module name="intellij.platform.vcs.impl"/>
     <!-- endregion -->
   </dependencies>
-  <!--suppress PluginXmlValidity -->
   <content namespace="jetbrains">
-    <!-- The implicit main module of the plugin depends on internal modules (intellij.libraries.ktor.client, intellij.libraries.ktor.io, intellij.libraries.kotlinx.io), so it's required to set the namespace for it
-         todo: extract elements and dependencies to an explicit content module (see IJPL-212351) -->
+    <module name="intellij.mcpserver.vcs"/>
+    <module name="intellij.mcpserver.terminal"/>
+    <module name="intellij.mcpserver.terminal.frontend"/>
   </content>
 
   <extensionPoints>
@@ -42,11 +38,19 @@
     <extensionPoint name="mcpToolFilterProvider" interface="com.intellij.mcpserver.McpToolFilterProvider" dynamic="true" />
     <extensionPoint name="mcpToolset" interface="com.intellij.mcpserver.McpToolset" dynamic="true" />
     <extensionPoint name="mcpProjectPathCustomizer" interface="com.intellij.mcpserver.McpProjectPathCustomizer" dynamic="true" />
+    <extensionPoint name="mcpManagedSessionSupport" interface="com.intellij.mcpserver.McpManagedSessionSupport" dynamic="true" />
+    <extensionPoint name="elicitationProvider" interface="com.intellij.mcpserver.elicitation.McpElicitationProvider" dynamic="true" />
+    <extensionPoint name="projectDependenciesProvider" interface="com.intellij.mcpserver.McpProjectDependenciesProvider" dynamic="true" />
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
     <applicationService serviceImplementation="com.intellij.mcpserver.impl.util.network.McpServerConnectionAddressProvider"/>
     <applicationService serviceImplementation="com.intellij.mcpserver.impl.McpServerService"/>
+    <applicationService serviceInterface="com.intellij.mcpserver.impl.McpSessionProjectResolver" serviceImplementation="com.intellij.mcpserver.impl.McpSessionProjectResolverImpl"/>
+
+    <applicationService serviceImplementation="com.intellij.mcpserver.toolsets.general.SymbolSearchEngine" open="true"/>
+
+    <serviceViewContributor implementation="com.intellij.mcpserver.services.McpServiceViewContributor"/>
 
     <statistics.counterUsagesCollector implementationClass="com.intellij.mcpserver.statistics.McpServerCounterUsagesCollector"/>
     <statistics.validation.customValidationRule implementation="com.intellij.mcpserver.statistics.McpServerCounterUsagesCollector$McpToolNameValidator"/>
@@ -54,15 +58,16 @@
 
     <appStarter id="mcpServer" implementation="com.intellij.mcpserver.McpServerHeadlessStarter" internal="true"/>
     <backgroundPostStartupActivity implementation="com.intellij.mcpserver.impl.McpServerService$MyProjectListener" />
-    <postStartupActivity implementation="com.intellij.mcpserver.impl.McpClientDetectionActivity" />
     <notificationGroup id="MCP Server" displayType="BALLOON" bundle="messages.McpServerBundle" key="notification.group.mcp.server"
       notificationIds="mcp.client.detected;mcp.client.autoconfigured;mcp.client.error.autoconfigured;mcp.client.wrong.port.detected"/>
 
     <mcpServer.mcpToolsProvider implementation="com.intellij.mcpserver.impl.ReflectionToolsProvider" />
+    <mcpServer.elicitationProvider implementation="com.intellij.mcpserver.elicitation.McpElicitationCliProvider" />
     <mcpServer.mcpToolFilterProvider implementation="com.intellij.mcpserver.impl.DisallowListBasedMcpToolFilterProvider" />
     <mcpServer.mcpToolFilterProvider implementation="com.intellij.mcpserver.impl.SettingsBasedMcpToolFilterProvider" />
     <mcpServer.mcpToolFilterProvider implementation="com.intellij.mcpserver.impl.RegistryKeyMcpToolFilterProvider" />
     <mcpServer.mcpToolFilterProvider implementation="com.intellij.mcpserver.impl.IndividualRegistryKeyMcpToolFilterProvider" />
+    <mcpServer.projectDependenciesProvider implementation="com.intellij.mcpserver.toolsets.general.JpsDependenciesProvider" />
 
     <mcpServer.mcpToolset implementation="com.intellij.mcpserver.toolsets.general.ExecutionToolset" />
     <mcpServer.mcpToolset implementation="com.intellij.mcpserver.toolsets.general.AnalysisToolset" />
@@ -70,15 +75,12 @@
     <mcpServer.mcpToolset implementation="com.intellij.mcpserver.toolsets.general.FormattingToolset" />
     <mcpServer.mcpToolset implementation="com.intellij.mcpserver.toolsets.general.UniversalToolset" />
     <mcpServer.mcpToolset implementation="com.intellij.mcpserver.toolsets.general.ReadToolset" />
-    <mcpServer.mcpToolset implementation="com.intellij.mcpserver.toolsets.general.TextToolset" />
     <mcpServer.mcpToolset implementation="com.intellij.mcpserver.toolsets.general.PatchToolset" />
     <mcpServer.mcpToolset implementation="com.intellij.mcpserver.toolsets.general.SearchToolset" />
     <mcpServer.mcpToolset implementation="com.intellij.mcpserver.toolsets.general.CodeInsightToolset" />
     <mcpServer.mcpToolset implementation="com.intellij.mcpserver.toolsets.general.RefactoringToolset" />
+    <mcpServer.mcpToolset implementation="com.intellij.mcpserver.toolsets.general.DiagnosticsToolset" />
 
-    <registryKey defaultValue="false"
-                 description="Detect MCP clients to suggest enable MCP server on project startup"
-                 key="mcp.server.detect.mcp.clients"/>
     <registryKey defaultValue="true"
                  description="Whether to return output schema and structured output from tools"
                  key="mcp.server.structured.tool.output"/>
@@ -94,6 +96,9 @@
     <registryKey defaultValue="false"
                  description="Show advanced filter options UI in MCP tool filter settings"
                  key="mcp.server.show.advanced.filter.options.ui"/>
+    <registryKey defaultValue="1000"
+                 description="Throttle interval in milliseconds for MCP progress notifications and keep-alives"
+                 key="mcp.server.progress.notification.interval.ms"/>
 
     <statusBarWidgetFactory id="McpServerStatusBarWidget"
                              implementation="com.intellij.mcpserver.widget.McpServerStatusBarWidgetFactory"
@@ -115,7 +120,6 @@
       dynamic="true"
       parentId="com.intellij.mcpserver.settings"/>
 
-    <applicationSettings service="com.intellij.mcpserver.impl.McpClientDetectionSettings"/>
     <applicationSettings service="com.intellij.mcpserver.settings.McpServerSettings"/>
     <applicationSettings service="com.intellij.mcpserver.settings.McpToolDisallowListSettings"/>
     <applicationSettings service="com.intellij.mcpserver.settings.McpToolFilterSettings"/>

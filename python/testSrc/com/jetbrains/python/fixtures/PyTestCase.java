@@ -85,6 +85,8 @@ import org.jetbrains.annotations.Nullable;
 import org.junit.Assert;
 
 import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -108,11 +110,35 @@ public abstract class PyTestCase extends UsefulTestCase {
     super.setUp();
 
     IdeaTestFixtureFactory factory = IdeaTestFixtureFactory.getFixtureFactory();
-    TestFixtureBuilder<IdeaProjectTestFixture> fixtureBuilder = factory.createLightFixtureBuilder(getProjectDescriptor(), getTestName(false));
+    TestFixtureBuilder<IdeaProjectTestFixture> fixtureBuilder =
+      factory.createLightFixtureBuilder(getProjectDescriptor(), getTestName(false));
     final IdeaProjectTestFixture fixture = fixtureBuilder.getFixture();
     myFixture = IdeaTestFixtureFactory.getFixtureFactory().createCodeInsightFixture(fixture, createTempDirFixture());
     myFixture.setTestDataPath(getTestDataPath());
     myFixture.setUp();
+
+    // Enable Any/Unknown type support by default in all tests; opt out per method or class with @PyAnyTypeDisabled.
+    Registry.get("python.type.any").setValue(!isPyAnyTypeDisabledForCurrentTest());
+  }
+
+  private boolean isPyAnyTypeDisabledForCurrentTest() {
+    for (Class<?> c = getClass(); c != null && PyTestCase.class.isAssignableFrom(c); c = c.getSuperclass()) {
+      if (c.isAnnotationPresent(PyAnyTypeDisabled.class)) {
+        return true;
+      }
+    }
+    String name = getName();
+    if (name != null) {
+      try {
+        Method testMethod = getClass().getMethod(name);
+        if (testMethod.isAnnotationPresent(PyAnyTypeDisabled.class)) {
+          return true;
+        }
+      }
+      catch (NoSuchMethodException ignored) {
+      }
+    }
+    return false;
   }
 
   @Override
@@ -135,6 +161,7 @@ public abstract class PyTestCase extends UsefulTestCase {
       addSuppressedException(e);
     }
     finally {
+      Registry.get("python.type.any").resetToDefault();
       super.tearDown();
     }
   }
@@ -310,6 +337,35 @@ public abstract class PyTestCase extends UsefulTestCase {
     IndexingTestUtil.waitUntilIndexesAreReadyInAllOpenedProjects();
   }
 
+  protected void enableTestDataTypeshedStubsForPackages(String @NotNull ... packageNames) throws IOException {
+    final String absPath = getTestDataPath() + "/resolve/typeshed/stubs";
+    final VirtualFile sourceThirdPartyStubRoot = LocalFileSystem.getInstance().refreshAndFindFileByPath(absPath);
+    assertNotNull("Third-party typeshed root '" + absPath + "' not found", sourceThirdPartyStubRoot);
+
+    final VirtualFile targetThirdPartyStubRoot = PyTypeShed.INSTANCE.getThirdPartyStubRoot();
+    assertNotNull("Bundled third-party typeshed root not found", targetThirdPartyStubRoot);
+
+    final List<VirtualFile> copiedStubRoots = new ArrayList<>();
+    WriteAction.run(() -> {
+      for (String packageName : packageNames) {
+        final VirtualFile sourceStubRoot = sourceThirdPartyStubRoot.findChild(packageName);
+        assertNotNull("Stub package root for " + packageName + " not found under " + absPath, sourceStubRoot);
+
+        final VirtualFile existingStubRoot = targetThirdPartyStubRoot.findChild(packageName);
+        if (existingStubRoot != null) {
+          VfsTestUtil.deleteFile(existingStubRoot);
+        }
+
+        final VirtualFile targetStubRoot = VfsTestUtil.createDir(targetThirdPartyStubRoot, packageName);
+        VfsUtil.copyDirectory(this, sourceStubRoot, targetStubRoot, null);
+        copiedStubRoots.add(targetStubRoot);
+      }
+    });
+
+    Disposer.register(getTestRootDisposable(), () -> WriteAction.run(() -> copiedStubRoots.forEach(VfsTestUtil::deleteFile)));
+    enablePyiStubsForPackages(packageNames);
+  }
+
   protected void enablePyiStubsForPackages(String @NotNull ... packageNames) {
     Sdk sdk = PythonSdkUtil.findPythonSdk(myFixture.getModule());
     assertNotNull(sdk);
@@ -350,7 +406,7 @@ public abstract class PyTestCase extends UsefulTestCase {
     return PsiDocumentManager.getInstance(myFixture.getProject()).getDocument(myFixture.getFile()).getText().indexOf(signature);
   }
 
-  private void setLanguageLevel(@Nullable LanguageLevel languageLevel) {
+  protected void setLanguageLevel(@Nullable LanguageLevel languageLevel) {
     Project project = myFixture.getProject();
     if (project != null) {
       PythonLanguageLevelPusher.setForcedLanguageLevel(project, languageLevel);
@@ -400,7 +456,10 @@ public abstract class PyTestCase extends UsefulTestCase {
     String path = virtualFile.getPath();
     String name = virtualFile.getName();
     String errorMessage = "Operations should have been performed on stubs but caused file to be parsed: " + path;
-    String tip = "As a starting point for an investigation, a breakpoint can be set in com.intellij.psi.impl.source.PsiFileImpl#loadTreeElement with a condition `getName().equals(\"" + name + "\")`.\nThen the stacktrace can be investigated to find the root cause.";
+    String tip =
+      "As a starting point for an investigation, a breakpoint can be set in com.intellij.psi.impl.source.PsiFileImpl#loadTreeElement with a condition `getName().equals(\"" +
+      name +
+      "\")`.\nThen the stacktrace can be investigated to find the root cause.";
     assertNull(errorMessage + "\n" + tip,
                ((PyFileImpl)file).getTreeElement());
   }

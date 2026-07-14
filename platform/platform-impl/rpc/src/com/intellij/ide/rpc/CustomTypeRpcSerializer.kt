@@ -8,7 +8,7 @@ import com.intellij.openapi.diagnostic.fileLogger
 import com.intellij.openapi.diagnostic.rethrowControlFlowException
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.util.PlatformUtils
-import fleet.util.openmap.SerializedValue
+import fleet.openmap.SerializedValue
 import org.jetbrains.annotations.ApiStatus
 import kotlin.reflect.KClass
 
@@ -62,7 +62,8 @@ fun <ValueClass : Any> serializeToRpc(value: ValueClass, logErrorAsWarning: Bool
 }
 
 private fun shouldSkipSerializationInMonolith(): Boolean {
-  return ApplicationManager.getApplication().currentSessionOrNull?.isLocal == true
+  val application = ApplicationManager.getApplication() ?: return true
+  return application.currentSessionOrNull?.isLocal == true
           && !AppMode.isRemoteDevHost()
           && !PlatformUtils.isJetBrainsClient()
 }

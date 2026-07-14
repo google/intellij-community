@@ -3,7 +3,6 @@
 package org.jetbrains.kotlin.idea.k2.codeInsight.gradle
 
 import com.intellij.openapi.module.ModuleManager
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode
 import org.jetbrains.kotlin.idea.codeInsight.gradle.AbstractGradleMultiFileQuickFixTest
 import org.jetbrains.kotlin.idea.configuration.KotlinLibraryVersionProvider
 import org.jetbrains.kotlin.idea.fir.K2DirectiveBasedActionUtils
@@ -14,8 +13,6 @@ import org.junit.Test
 import java.io.File
 
 class K2GradleQuickFixTest : AbstractGradleMultiFileQuickFixTest() {
-    override val pluginMode: KotlinPluginMode
-        get() = KotlinPluginMode.K2
 
     override fun checkUnexpectedErrors(mainFile: File, ktFile: KtFile, fileText: String) {
         K2DirectiveBasedActionUtils.checkForUnexpectedErrors(mainFile, ktFile, fileText)
@@ -135,6 +132,38 @@ class K2GradleQuickFixTest : AbstractGradleMultiFileQuickFixTest() {
         doMultiFileQuickFixTest(
             ignoreChangesInBuildScriptFiles = false,
             additionalResultFileFilter = { file -> file.name != "settings.gradle.kts" }
+        )
+    }
+
+    @Test
+    @PluginTargetVersions(pluginVersion = "2.1+")
+    fun testEnableMultiDollarInterpolationNewLine() {
+        doMultiFileQuickFixTest(
+            ignoreChangesInBuildScriptFiles = false
+        )
+    }
+
+    @Test
+    @PluginTargetVersions(pluginVersion = "2.1+")
+    fun testEnableMultiDollarInterpolationSameLine() {
+        doMultiFileQuickFixTest(
+            ignoreChangesInBuildScriptFiles = false
+        )
+    }
+
+    @Test
+    @PluginTargetVersions(pluginVersion = "2.1+")
+    fun testEnableMultiDollarInterpolationComma() {
+        doMultiFileQuickFixTest(
+            ignoreChangesInBuildScriptFiles = false
+        )
+    }
+
+    @Test
+    @PluginTargetVersions(pluginVersion = "2.1+")
+    fun testEnableMultiDollarInterpolationComments() {
+        doMultiFileQuickFixTest(
+            ignoreChangesInBuildScriptFiles = false
         )
     }
 

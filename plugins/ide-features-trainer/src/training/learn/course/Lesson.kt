@@ -5,6 +5,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.BuildNumber
 import com.intellij.openapi.wm.ToolWindowAnchor
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import org.jetbrains.annotations.NonNls
 import training.dsl.TaskTestContext
@@ -43,10 +44,19 @@ abstract class Lesson(@NonNls val id: String, @Nls val name: String) {
   open val helpLinks: Map<String, String> get() = emptyMap()
 
   /** IDs of TipAndTrick suggestions in that this lesson can be promoted */
+  @ApiStatus.ScheduledForRemoval
   @Deprecated("Specify tips in LearningCourse.getLessonIdToTipsMap()")
   open val suitableTips: List<String> = emptyList()
 
   open val testScriptProperties: TaskTestContext.TestScriptProperties = TaskTestContext.TestScriptProperties()
+
+  /**
+   * When true, [training.learn.lesson.LessonManager.lessonShouldBeOpenedCompleted] never returns
+   * true for this lesson, so every entry path (welcome screen, Learn tab list, Find Action, …)
+   * opens the lesson body afresh instead of the "passed" recap pane. Useful for one-shot tours
+   * where there is no review value in a completed-lesson view.
+   */
+  open val alwaysRestart: Boolean = false
 
   open fun onLessonEnd(project: Project, lessonEndInfo: LessonEndInfo) = Unit
 

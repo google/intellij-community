@@ -9,7 +9,9 @@ import com.intellij.internal.statistic.collectors.fus.ui.SettingsCounterUsagesCo
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationBundle
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.options.BackedByPersistentState
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.options.DslConfigurableBase
 import com.intellij.openapi.options.SearchableConfigurable
@@ -46,7 +48,6 @@ import com.intellij.ui.layout.not
 import com.intellij.ui.layout.selected
 import com.intellij.ui.layout.selectedValueIs
 import com.intellij.util.Alarm
-import com.intellij.util.PlatformUtils
 import com.intellij.util.SingleAlarm
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.NamedColorUtil
@@ -79,7 +80,11 @@ private class SettingsRow(
 }
 
 @ApiStatus.Internal
-class AdvancedSettingsConfigurable : DslConfigurableBase(), SearchableConfigurable, Configurable.NoScroll {
+class AdvancedSettingsConfigurable : DslConfigurableBase(), SearchableConfigurable, Configurable.NoScroll, BackedByPersistentState {
+  @ApiStatus.Internal
+  override fun getBackingComponents(): Collection<PersistentStateComponent<*>> =
+    listOf(AdvancedSettings.getInstance() as AdvancedSettingsImpl)
+
   private val settingsGroups = mutableListOf<SettingsGroup>()
   private lateinit var nothingFoundRow: Row
   private var onlyShowModified = false
@@ -196,13 +201,6 @@ class AdvancedSettingsConfigurable : DslConfigurableBase(), SearchableConfigurab
     }
   }
 
-  private fun AdvancedSettingBean.isApplicable(): Boolean {
-    return when {
-      id == "project.view.do.not.autoscroll.to.libraries" -> !PlatformUtils.isDataGrip()
-      else -> true
-    }
-  }
-
   private fun updateSearch() {
     applyFilter(searchField.text, onlyShowModified)
   }
@@ -269,7 +267,7 @@ class AdvancedSettingsConfigurable : DslConfigurableBase(), SearchableConfigurab
 
   override fun getDisplayName(): String = ApplicationBundle.message("title.advanced.settings")
 
-  override fun getId(): String = "advanced.settings"
+  override fun getId(): String = ADVANCED_SETTINGS_CONFIGURABLE_ID
 
   override fun getHelpTopic(): String = "Advanced_settings"
 

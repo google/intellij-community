@@ -9,26 +9,27 @@ import com.intellij.mcpserver.annotations.McpTool
 import com.intellij.mcpserver.mcpFail
 import com.intellij.mcpserver.project
 import com.intellij.mcpserver.reportToolActivity
+import com.intellij.mcpserver.util.awaitExternalChangesAndIndexing
 import com.intellij.mcpserver.util.resolveInProject
 import com.intellij.openapi.application.backgroundWriteAction
-import com.intellij.openapi.application.readAction
 import com.intellij.openapi.application.readAndBackgroundWriteAction
 import com.intellij.openapi.application.readAndEdtWriteAction
 import com.intellij.openapi.components.serviceAsync
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.findOrCreateFile
+import com.intellij.openapi.vfs.newvfs.ManagingFS
 import com.intellij.openapi.vfs.transformer.TextPresentationTransformers
-import com.intellij.util.DocumentUtil
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.withContext
 import kotlin.io.path.name
 import kotlin.io.path.pathString
+import kotlin.time.measureTime
 
 class PatchToolset : McpToolset {
   @McpTool
@@ -50,22 +51,52 @@ class PatchToolset : McpToolset {
 
     val patchText = PatchApplyEngine.extractPatchText(input, patch)
     val operations = PatchApplyEngine.parsePatch(patchText)
+    if (operations.any { it is DeletePatchOperation || it is UpdatePatchOperation }) {
+      awaitExternalChangesAndIndexing(project)
+    }
 
+    var applied = 0
+    val errors = mutableListOf<String>()
     for (operation in operations) {
-      when (operation) {
-        is AddPatchOperation -> applyAdd(project, fileDocumentManager, operation)
-        is DeletePatchOperation -> applyDelete(this, project, localFileSystem, operation)
-        is UpdatePatchOperation -> applyUpdate(this, project, localFileSystem, fileDocumentManager, operation)
+      runCatching {
+        when (operation) {
+          is AddPatchOperation -> applyAdd(project, operation)
+          is DeletePatchOperation -> applyDelete(this, project, localFileSystem, operation)
+          is UpdatePatchOperation -> applyUpdate(this, project, localFileSystem, fileDocumentManager, operation)
+        }
+      }.onSuccess {
+        applied++
+      }.onFailure {
+        errors += "${operation.path}: ${it.message}"
       }
     }
 
-    val touched = operations.size
-    val suffix = if (touched == 1) "" else "s"
-    return "Applied patch to $touched file$suffix."
+    val saveDocsSecs = measureTime {
+      FileDocumentManager.getInstance().saveAllDocuments()
+    }.inWholeSeconds
+    if (saveDocsSecs > 10) {
+      thisLogger().error("saveAllDocuments took $saveDocsSecs seconds")
+    }
+
+    val flushSecs = measureTime {
+      ManagingFS.getInstance().flushPendingUpdates()
+    }.inWholeSeconds
+    if (flushSecs > 10) {
+      thisLogger().error("flushPendingUpdates took $flushSecs seconds")
+    }
+
+    val total = operations.size
+    val failed = errors.size
+
+    var result = "$applied out of $total operations applied."
+    if (failed != 0) {
+      result += " $failed operations failed to be applied due to errors:\n${errors.joinToString("\n")}"
+    }
+    return result
   }
 }
 
-private suspend fun applyAdd(project: Project, fileDocumentManager: FileDocumentManager, operation: AddPatchOperation) {
+private suspend fun applyAdd(project: Project, operation: AddPatchOperation) {
   val targetPath = project.resolveInProject(operation.path)
   val parentPath = targetPath.parent ?: mcpFail("Add File requires a parent directory")
 
@@ -104,67 +135,66 @@ private suspend fun applyUpdate(
   val sourceFile = findFile(localFileSystem, sourcePath, operation.path)
   if (sourceFile.isDirectory) mcpFail("Path is not a file: ${operation.path}")
 
-  val hasCachedDocument = readAction {
-    fileDocumentManager.getCachedDocument(sourceFile) != null
-  }
-
-  if (hasCachedDocument) {
-    applyUpdateWithDocument(requestor, project, fileDocumentManager, sourceFile, sourcePath, operation)
-  }
-  else {
+  if (!tryApplyUpdateWithDocument(requestor, project, fileDocumentManager, sourceFile, sourcePath, operation)) {
     applyUpdateWithoutDocument(requestor, project, sourceFile, sourcePath, operation)
   }
 }
 
-private suspend fun applyUpdateWithDocument(
+private suspend fun tryApplyUpdateWithDocument(
   requestor: Any,
   project: Project,
   fileDocumentManager: FileDocumentManager,
   sourceFile: VirtualFile,
   sourcePath: java.nio.file.Path,
   operation: UpdatePatchOperation,
-) {
-  val changedDocument = readAndEdtWriteAction {
+): Boolean {
+  val result = readAndEdtWriteAction {
+    val document = fileDocumentManager.getCachedDocument(sourceFile)
+                   ?: return@readAndEdtWriteAction value(CachedDocumentPatchResult.NotCached)
     if (sourceFile.fileType.isBinary) mcpFail("File ${operation.path} is binary")
-    val document = fileDocumentManager.getDocument(sourceFile)
-                   ?: mcpFail("Could not get document for ${operation.path}")
     val originalText = TextPresentationTransformers.toPersistent(document.text, virtualFile = sourceFile).toString()
     val updatedText = if (operation.hunks.isEmpty()) originalText else PatchApplyEngine.applyHunks(originalText, operation.hunks)
     val moveTarget = operation.moveTo?.let { moveTo ->
       val resolved = project.resolveInProject(moveTo)
-      if (resolved == sourcePath) null else moveTo to resolved
+      if (resolved == sourcePath) null else MoveTarget(moveTo, resolved)
     }
     val hasContentChanges = updatedText != originalText
     if (!hasContentChanges && moveTarget == null) {
-      return@readAndEdtWriteAction value<Document?>(null)
+      return@readAndEdtWriteAction value(CachedDocumentPatchResult.Applied(null))
     }
 
-    writeAction {
-      val targetFile: VirtualFile
-      if (moveTarget != null) {
-        val (moveTo, movePath) = moveTarget
-        targetFile = moveFile(requestor, sourceFile, movePath, moveTo)
-      }
-      else {
-        targetFile = sourceFile
-      }
-
+    this.writeAction {
+      val targetFile = moveTarget?.let {
+        moveFile(requestor, sourceFile, it.path, it.pathInProject)
+      } ?: sourceFile
       if (hasContentChanges) {
-        writeFileTextByDocument(document, targetFile, updatedText)
-        document
+        document.setText(TextPresentationTransformers.fromPersistent(updatedText, virtualFile = targetFile))
+        CachedDocumentPatchResult.Applied(document)
       }
       else {
-        null
+        CachedDocumentPatchResult.Applied(null)
       }
     }
   }
 
-  if (changedDocument != null) {
-    withContext(Dispatchers.Default) {
-      fileDocumentManager.saveDocument(changedDocument)
+  return when (result) {
+    is CachedDocumentPatchResult.NotCached -> false
+    is CachedDocumentPatchResult.Applied -> {
+      result.changedDocument?.let { fileDocumentManager.saveDocument(it) }
+      true
     }
   }
 }
+
+private sealed interface CachedDocumentPatchResult {
+  data object NotCached : CachedDocumentPatchResult
+  data class Applied(val changedDocument: Document?) : CachedDocumentPatchResult
+}
+
+private data class MoveTarget(
+  val pathInProject: String,
+  val path: java.nio.file.Path,
+)
 
 private suspend fun applyUpdateWithoutDocument(
   requestor: Any,
@@ -187,7 +217,7 @@ private suspend fun applyUpdateWithoutDocument(
       return@readAndBackgroundWriteAction value(Unit)
     }
 
-    writeAction {
+    this.writeAction {
       val targetFile: VirtualFile
       val targetPathInProject: String
       if (moveTarget != null) {
@@ -215,7 +245,7 @@ private fun findFile(localFileSystem: LocalFileSystem, resolvedPath: java.nio.fi
 
 private fun moveFile(requestor: Any, file: VirtualFile, targetPath: java.nio.file.Path, targetPathInProject: String): VirtualFile {
   val parentPath = targetPath.parent ?: mcpFail("Move to requires a parent directory")
-  val targetParent = VfsUtil.createDirectories(parentPath.pathString)
+  val targetParent = VfsUtil.createDirectoryIfMissing(parentPath.pathString)!!
   val targetName = targetPath.name
   val existing = targetParent.findChild(targetName)
   if (existing != null && existing != file) mcpFail("File already exists: $targetPathInProject")
@@ -229,17 +259,6 @@ private fun moveFile(requestor: Any, file: VirtualFile, targetPath: java.nio.fil
   return file
 }
 
-private fun writeFileTextByDocument(
-  document: Document,
-  file: VirtualFile,
-  text: String,
-) {
-  val documentText = TextPresentationTransformers.fromPersistent(text, virtualFile = file)
-  DocumentUtil.executeInBulk(document, true) {
-    document.setText(documentText)
-  }
-}
-
 private fun writeFileTextByVfs(
   file: VirtualFile,
   text: String,
@@ -247,7 +266,7 @@ private fun writeFileTextByVfs(
 ) {
   val documentText = TextPresentationTransformers.fromPersistent(text, virtualFile = file)
   try {
-    VfsUtil.saveText(file, documentText.toString())
+    VfsUtilCore.saveText(file, documentText.toString())
   }
   catch (e: Exception) {
     mcpFail("Could not write file $pathInProject: ${e.message}")

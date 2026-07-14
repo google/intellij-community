@@ -35,7 +35,6 @@ class MavenProjectReader(
   private val myProject: Project,
   private val mavenEmbedderWrappers: MavenEmbedderWrappers,
   val generalSettings: MavenGeneralSettings,
-  val explicitProfiles: MavenExplicitProfiles,
   private val locator: MavenProjectReaderProjectLocator,
 ) {
   private val myCache = MavenReadProjectCache()
@@ -44,8 +43,8 @@ class MavenProjectReader(
 
   suspend fun readProjectAsync(file: VirtualFile): MavenProjectReaderResult {
     val recursionGuard: MutableSet<VirtualFile> = HashSet()
-    val readResult = readProjectModel(file, explicitProfiles, recursionGuard)
-    val model = myReadHelper.interpolate(file, readResult.first.model)
+    val readResult = readProjectModel(file, recursionGuard)
+    val model = myReadHelper.interpolate(file, readResult.model)
 
     val modelMap: MutableMap<String, String> = HashMap()
     val mavenId = model.mavenId
@@ -60,15 +59,13 @@ class MavenProjectReader(
 
     return MavenProjectReaderResult(model,
                                     modelMap,
-                                    readResult.second,
-                                    readResult.first.problems)
+                                    readResult.problems)
   }
 
   private suspend fun readProjectModel(
     file: VirtualFile,
-    explicitProfiles: MavenExplicitProfiles,
     recursionGuard: MutableSet<VirtualFile>,
-  ): Pair<RawModelReadResult, MavenExplicitProfiles> {
+  ): RawModelReadResult {
     var cachedModelReadResult = myCache[file]
     if (cachedModelReadResult == null) {
       cachedModelReadResult = doReadProjectModel(myProject, file, false)
@@ -84,11 +81,10 @@ class MavenProjectReader(
       modelFromCache,
       file,
       problems,
-      explicitProfiles,
       recursionGuard)
     addSettingsProfiles(file, modelWithInheritance, alwaysOnProfiles, problems)
     repairModelBody(modelWithInheritance)
-    return Pair.create(RawModelReadResult(modelWithInheritance, problems, alwaysOnProfiles), explicitProfiles)
+    return RawModelReadResult(modelWithInheritance, problems, alwaysOnProfiles)
   }
 
   private suspend fun doReadProjectModel(project: Project, file: VirtualFile, headerOnly: Boolean): RawModelReadResult {
@@ -294,7 +290,6 @@ class MavenProjectReader(
     model: MavenModel,
     file: VirtualFile,
     problems: MutableCollection<MavenProjectProblem>,
-    explicitProfiles: MavenExplicitProfiles,
     recursionGuard: MutableSet<VirtualFile>,
   ): MavenModel {
     if (recursionGuard.contains(file)) {
@@ -372,7 +367,7 @@ class MavenProjectReader(
         override suspend fun processRelativeParent(parentFile: VirtualFile): Pair<VirtualFile, RawModelReadResult>? {
           val parentModel = doReadProjectModel(myProject, parentFile, true).model
           val parentId = parentDesc?.parentId
-          if (parentId != parentModel.mavenId) return null
+          if (!isDeclaredParent(parentId, parentModel.mavenId)) return null
 
           return super.processRelativeParent(parentFile)
         }
@@ -382,12 +377,21 @@ class MavenProjectReader(
         }
 
         override suspend fun doProcessParent(parentFile: VirtualFile): Pair<VirtualFile, RawModelReadResult>? {
-          val result = readProjectModel(parentFile, explicitProfiles, recursionGuard).first
+          val result = readProjectModel(parentFile, recursionGuard)
           return Pair.create(parentFile, result)
         }
       }.process(generalSettings, projectFile, parentDesc)
     return parentModelWithProblems
   }
+
+  private fun isDeclaredParent(declared: MavenId?, actual: MavenId): Boolean {
+    if (declared == null) return false
+    if (declared == actual) return true
+    if (declared.groupId != actual.groupId || declared.artifactId != actual.artifactId) return false
+    return isUnresolvedPlaceholder(declared.version) || isUnresolvedPlaceholder(actual.version)
+  }
+
+  private fun isUnresolvedPlaceholder(version: String?): Boolean = version != null && version.contains("\${")
 
   private suspend fun addSettingsProfiles(
     projectFile: VirtualFile,

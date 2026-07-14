@@ -1,20 +1,15 @@
 // Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package org.jetbrains.idea.maven.project
 
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressIndicator
-import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.roots.ProjectFileIndex
-import com.intellij.openapi.util.Comparing
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.Pair
-import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.NioFiles
 import com.intellij.openapi.util.text.StringUtil
-import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.platform.diagnostic.telemetry.helpers.use
 import com.intellij.platform.diagnostic.telemetry.helpers.useWithScope
 import com.intellij.platform.util.progress.RawProgressReporter
@@ -24,46 +19,52 @@ import com.intellij.util.containers.FileCollectionFactory
 import com.intellij.util.messages.Topic
 import it.unimi.dsi.fastutil.Hash
 import it.unimi.dsi.fastutil.objects.ObjectOpenCustomHashSet
-import kotlinx.coroutines.*
-import org.jdom.output.Format
-import org.jdom.output.XMLOutputter
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
-import org.jetbrains.annotations.TestOnly
 import org.jetbrains.idea.maven.buildtool.MavenSyncSession
-import org.jetbrains.idea.maven.dom.references.MavenFilteredPropertyPsiReferenceProvider
-import org.jetbrains.idea.maven.model.*
+import org.jetbrains.idea.maven.model.MavenArtifact
+import org.jetbrains.idea.maven.model.MavenCoordinate
+import org.jetbrains.idea.maven.model.MavenExplicitProfiles
+import org.jetbrains.idea.maven.model.MavenId
+import org.jetbrains.idea.maven.model.MavenProfileKind
+import org.jetbrains.idea.maven.model.MavenWorkspaceMap
 import org.jetbrains.idea.maven.project.MavenProjectsTreeUpdater.UpdateSpec
 import org.jetbrains.idea.maven.telemetry.tracer
-import org.jetbrains.idea.maven.utils.*
-import java.io.*
-import java.lang.Runnable
+import org.jetbrains.idea.maven.utils.MavenJDOMUtil
+import org.jetbrains.idea.maven.utils.MavenLog
+import org.jetbrains.idea.maven.utils.MavenUtil
+import org.jetbrains.idea.maven.utils.Strings
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
+import java.io.DataInputStream
+import java.io.DataOutputStream
+import java.io.File
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.*
+import java.util.Collections
+import java.util.EventListener
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.function.Consumer
 import java.util.function.Predicate
 import java.util.regex.Pattern
-import java.util.zip.CRC32
 
 class MavenProjectsTree(val project: Project) {
   private val myStructureLock = ReentrantReadWriteLock()
   private val myStructureReadLock: Lock = myStructureLock.readLock()
   private val myStructureWriteLock: Lock = myStructureLock.writeLock()
 
-  private val myManagedFilesPaths: MutableSet<String> = LinkedHashSet()
-
   private val myIgnoredFilesPaths: MutableList<String> = ArrayList()
 
   private val myIgnoredFilesPatterns: MutableList<String> = ArrayList()
 
   private var myIgnoredFilesPatternsCache: Pattern? = null
-
-  @Transient
-  private var myExplicitProfiles: MavenExplicitProfiles = MavenExplicitProfiles.NONE
-  private val myTemporarilyRemovedExplicitProfiles = MavenExplicitProfiles(HashSet(), HashSet())
 
   private val myRootProjects = mutableListOf<MavenProject>() //2
 
@@ -109,11 +110,17 @@ class MavenProjectsTree(val project: Project) {
 
     DataOutputStream(BufferedOutputStream(Files.newOutputStream(NioFiles.createParentDirectories(file)))).use { out ->
       out.writeUTF(STORAGE_VERSION)
-      writeCollection(out, copy.myManagedFilesPaths)
+
+      // managed file paths
+      writeCollection(out, emptyList())
       writeCollection(out, copy.myIgnoredFilesPaths)
       writeCollection(out, copy.myIgnoredFilesPatterns)
-      writeCollection(out, copy.myExplicitProfiles.enabledProfiles)
-      writeCollection(out, copy.myExplicitProfiles.disabledProfiles)
+
+      // enabled profiles
+      writeCollection(out, emptySet())
+      // disabled profiles
+      writeCollection(out, emptySet())
+
       copy.writeProjectsRecursively(out, copy.myRootProjects)
     }
   }
@@ -128,52 +135,6 @@ class MavenProjectsTree(val project: Project) {
       writeProjectsRecursively(out, getModules(mavenProject))
     }
   }
-
-  val managedFilesPaths: List<String>
-    get() = withReadLock {
-      ArrayList(myManagedFilesPaths)
-    }
-
-  fun resetManagedFilesPathsAndProfiles(paths: List<String>, profiles: MavenExplicitProfiles) {
-    withWriteLock {
-      myManagedFilesPaths.replaceWith(LinkedHashSet(paths))
-      explicitProfiles = profiles
-    }
-  }
-
-  @TestOnly
-  fun resetManagedFilesAndProfiles(files: List<VirtualFile>, profiles: MavenExplicitProfiles) {
-    resetManagedFilesPathsAndProfiles(MavenUtil.collectPaths(files), profiles)
-  }
-
-  fun addManagedFilesWithProfiles(files: List<VirtualFile>, profiles: MavenExplicitProfiles) {
-    val (newFiles, newProfiles) = withReadLock {
-      val newFiles = ArrayList(myManagedFilesPaths)
-      newFiles.addAll(MavenUtil.collectPaths(files))
-
-      val newProfiles = myExplicitProfiles.clone()
-      newProfiles.enabledProfiles.addAll(profiles.enabledProfiles)
-      newProfiles.disabledProfiles.addAll(profiles.disabledProfiles)
-      (newFiles to newProfiles)
-    }
-
-    resetManagedFilesPathsAndProfiles(newFiles, newProfiles)
-  }
-
-  fun removeManagedFiles(files: List<VirtualFile>) {
-    val filePaths = files.map { it.path }.toSet()
-    withWriteLock { myManagedFilesPaths.removeAll(filePaths) }
-  }
-
-  val existingManagedFiles: List<VirtualFile>
-    get() {
-      val result: MutableList<VirtualFile> = ArrayList()
-      for (path in managedFilesPaths) {
-        val f = LocalFileSystem.getInstance().findFileByPath(path)
-        if (f != null && f.exists()) result.add(f)
-      }
-      return result
-    }
 
   var ignoredFilesPaths: List<String>
     get() = withReadLock {
@@ -281,27 +242,6 @@ class MavenProjectsTree(val project: Project) {
     return@withReadLock myIgnoredFilesPatternsCache!!.matcher(path).matches()
   }
 
-
-  var explicitProfiles: MavenExplicitProfiles
-    get() = withReadLock {
-      myExplicitProfiles.clone()
-    }
-    set(explicitProfiles) {
-      withWriteLock { myExplicitProfiles = explicitProfiles.clone() }
-      fireProfilesChanged()
-    }
-
-  private fun updateExplicitProfiles() {
-    val available = availableProfiles
-
-    withWriteLock {
-      updateExplicitProfiles(myExplicitProfiles.enabledProfiles, myTemporarilyRemovedExplicitProfiles.enabledProfiles,
-                             available)
-      updateExplicitProfiles(myExplicitProfiles.disabledProfiles, myTemporarilyRemovedExplicitProfiles.disabledProfiles,
-                             available)
-    }
-  }
-
   val availableProfiles: Set<String>
     get() {
       val res = HashSet<String>()
@@ -313,8 +253,7 @@ class MavenProjectsTree(val project: Project) {
       return res
     }
 
-  val profilesWithStates: Collection<Pair<String, MavenProfileKind>>
-    get() {
+  fun getProfilesWithStates(explicitProfiles: MavenExplicitProfiles): Collection<Pair<String, MavenProfileKind>> {
       val result: MutableCollection<Pair<String, MavenProfileKind>> = ArrayListSet()
 
       val available: MutableCollection<String> = HashSet()
@@ -345,45 +284,37 @@ class MavenProjectsTree(val project: Project) {
       return result
     }
 
-
-  @Deprecated("use {@link MavenProjectsManager#updateAllMavenProjects(MavenImportSpec)} instead")
-  fun updateAll(
-    force: Boolean,
-    generalSettings: MavenGeneralSettings,
-    mavenEmbedderWrappers: MavenEmbedderWrappers,
-    process: MavenProgressIndicator,
-  ) {
-    runBlockingMaybeCancellable { updateAll(force, generalSettings, mavenEmbedderWrappers, process.indicator) }
-  }
-
   @ApiStatus.Internal
-  suspend fun updateAll(
+  suspend fun updateAllFiles(
+    managedFiles: List<String>,
     force: Boolean,
     generalSettings: MavenGeneralSettings,
-    mavenEmbedderWrappers: MavenEmbedderWrappers,
-    process: ProgressIndicator,
-  ): MavenProjectsTreeUpdateResult {
-    return updateAll(force, generalSettings, mavenEmbedderWrappers, toRawProgressReporter(process))
-  }
-
-  @ApiStatus.Internal
-  suspend fun updateAll(
-    force: Boolean,
-    generalSettings: MavenGeneralSettings,
+    explicitProfiles: MavenExplicitProfiles,
     mavenEmbedderWrappers: MavenEmbedderWrappers,
     progressReporter: RawProgressReporter,
   ): MavenProjectsTreeUpdateResult {
-    val managedFiles = existingManagedFiles
+    val files = managedFiles.mapNotNull { VirtualFileManager.getInstance().findFileByNioPath(Path.of(it)) }
+    return updateAll(files, force, generalSettings, explicitProfiles, mavenEmbedderWrappers, progressReporter)
+  }
 
-    val projectReader = MavenProjectReader(project, mavenEmbedderWrappers, generalSettings, explicitProfiles, projectLocator)
+  @ApiStatus.Internal
+  suspend fun updateAll(
+    files: List<VirtualFile>,
+    force: Boolean,
+    generalSettings: MavenGeneralSettings,
+    explicitProfiles: MavenExplicitProfiles,
+    mavenEmbedderWrappers: MavenEmbedderWrappers,
+    progressReporter: RawProgressReporter,
+  ): MavenProjectsTreeUpdateResult {
+    val projectReader = MavenProjectReader(project, mavenEmbedderWrappers, generalSettings, projectLocator)
 
     val updated = tracer.spanBuilder("updateProjectTree").useWithScope {
-      update(managedFiles, true, force, projectReader, progressReporter)
+      update(files, true, force, projectReader, explicitProfiles, progressReporter)
     }
 
-    val obsoleteFiles = ContainerUtil.subtract(rootProjectsFiles, managedFiles)
+    val obsoleteFiles = ContainerUtil.subtract(rootProjectsFiles, files)
     val deleted = tracer.spanBuilder("cleanupProjectTree").useWithScope {
-      delete(projectReader, obsoleteFiles, progressReporter)
+      delete(projectReader, explicitProfiles, obsoleteFiles, progressReporter)
     }
 
     val updateResult = updated.plus(deleted)
@@ -396,11 +327,12 @@ class MavenProjectsTree(val project: Project) {
     files: Collection<VirtualFile>,
     force: Boolean,
     generalSettings: MavenGeneralSettings,
+    explicitProfiles: MavenExplicitProfiles,
     mavenEmbedderWrappers: MavenEmbedderWrappers,
     progressReporter: RawProgressReporter,
   ): MavenProjectsTreeUpdateResult {
-    val projectReader = MavenProjectReader(project, mavenEmbedderWrappers, generalSettings, explicitProfiles, projectLocator)
-    return update(files, false, force, projectReader, progressReporter)
+    val projectReader = MavenProjectReader(project, mavenEmbedderWrappers, generalSettings, projectLocator)
+    return update(files, false, force, projectReader, explicitProfiles, progressReporter)
   }
 
   private suspend fun update(
@@ -408,6 +340,7 @@ class MavenProjectsTree(val project: Project) {
     updateModules: Boolean,
     forceRead: Boolean,
     projectReader: MavenProjectReader,
+    explicitProfiles: MavenExplicitProfiles,
     progressReporter: RawProgressReporter,
   ): MavenProjectsTreeUpdateResult {
     val updateContext = MavenProjectsTreeUpdateContext(this)
@@ -416,7 +349,8 @@ class MavenProjectsTree(val project: Project) {
       this,
       updateContext,
       projectReader,
-      progressReporter,
+      explicitProfiles,
+    progressReporter,
       updateModules)
 
     val filesToAddModules = HashSet<VirtualFile>()
@@ -450,9 +384,6 @@ class MavenProjectsTree(val project: Project) {
       }
     }
 
-    tracer.spanBuilder("updateProfiles").use {
-      updateExplicitProfiles()
-    }
     updateContext.fireUpdatedIfNecessary()
 
     return updateContext.toUpdateResult()
@@ -473,30 +404,21 @@ class MavenProjectsTree(val project: Project) {
            '}'
   }
 
-  fun isManagedFile(moduleFile: VirtualFile): Boolean {
-    return isManagedFile(moduleFile.path)
-  }
-
-  private fun isManagedFile(path: String): Boolean = withReadLock {
-    for (each in myManagedFilesPaths) {
-      if (FileUtil.pathsEqual(each, path)) return@withReadLock true
-    }
-    return@withReadLock false
-  }
-
   @ApiStatus.Internal
   suspend fun delete(
     files: List<VirtualFile>,
     generalSettings: MavenGeneralSettings,
+    explicitProfiles: MavenExplicitProfiles,
     mavenEmbedderWrappers: MavenEmbedderWrappers,
     progressReporter: RawProgressReporter,
   ): MavenProjectsTreeUpdateResult {
-    val projectReader = MavenProjectReader(project, mavenEmbedderWrappers, generalSettings, explicitProfiles, projectLocator)
-    return delete(projectReader, files, progressReporter)
+    val projectReader = MavenProjectReader(project, mavenEmbedderWrappers, generalSettings, projectLocator)
+    return delete(projectReader,explicitProfiles, files, progressReporter)
   }
 
   private suspend fun delete(
     projectReader: MavenProjectReader,
+    explicitProfiles: MavenExplicitProfiles,
     files: Collection<VirtualFile>,
     progressReporter: RawProgressReporter,
   ): MavenProjectsTreeUpdateResult {
@@ -516,6 +438,7 @@ class MavenProjectsTree(val project: Project) {
       this,
       updateContext,
       projectReader,
+      explicitProfiles,
       progressReporter,
       false)
 
@@ -530,7 +453,6 @@ class MavenProjectsTree(val project: Project) {
         updateContext.updated(mavenProject, MavenProjectChanges.NONE)
       }
     }
-    updateExplicitProfiles()
     updateContext.fireUpdatedIfNecessary()
 
     return updateContext.toUpdateResult()
@@ -539,14 +461,7 @@ class MavenProjectsTree(val project: Project) {
   @ApiStatus.Internal
   internal fun doDelete(aggregator: MavenProject?, project: MavenProject, updateContext: MavenProjectsTreeUpdateContext) {
     for (each in getModules(project)) {
-      if (isManagedFile(each.path)) {
-        if (reconnectRoot(each)) {
-          updateContext.updated(each, MavenProjectChanges.NONE)
-        }
-      }
-      else {
-        doDelete(project, each, updateContext)
-      }
+      doDelete(project, each, updateContext)
     }
 
     withWriteLock {
@@ -639,89 +554,6 @@ class MavenProjectsTree(val project: Project) {
     get() = withReadLock {
       myRootProjects.toList()
     }
-
-  fun getFilterConfigCrc(fileIndex: ProjectFileIndex): Int {
-    ApplicationManager.getApplication().assertReadAccessAllowed()
-
-    return withReadLock {
-      val crc = CRC32()
-      val profiles = myExplicitProfiles
-      updateCrc(crc, profiles.hashCode())
-
-      val allProjects: Collection<MavenProject> = myVirtualFileToProjectMapping.values
-
-      crc.update(allProjects.size and 0xFF)
-      for (mavenProject in allProjects) {
-        val pomFile = mavenProject.file
-        val module = fileIndex.getModuleForFile(pomFile)
-        if (module == null) continue
-
-        if (!Comparing.equal(fileIndex.getContentRootForFile(pomFile), pomFile.parent)) continue
-
-        updateCrc(crc, module.name)
-
-        val mavenId = mavenProject.mavenId
-        updateCrc(crc, mavenId.groupId)
-        updateCrc(crc, mavenId.artifactId)
-        updateCrc(crc, mavenId.version)
-
-        val parentId = mavenProject.parentId
-        if (parentId != null) {
-          updateCrc(crc, parentId.groupId)
-          updateCrc(crc, parentId.artifactId)
-          updateCrc(crc, parentId.version)
-        }
-
-        updateCrc(crc, mavenProject.directory)
-        updateCrc(crc, MavenFilteredPropertyPsiReferenceProvider.getDelimitersPattern(mavenProject).pattern())
-        updateCrc(crc, mavenProject.modelMap.hashCode())
-        updateCrc(crc, mavenProject.resources.hashCode())
-        updateCrc(crc, mavenProject.testResources.hashCode())
-        updateCrc(crc, getFilterExclusions(mavenProject).hashCode())
-        updateCrc(crc, mavenProject.properties.hashCode())
-
-        for (each in mavenProject.filterPropertiesFiles) {
-          val file = File(each)
-          updateCrc(crc, file.lastModified())
-        }
-
-        val outputter = XMLOutputter(Format.getCompactFormat())
-
-        val crcWriter: Writer = object : Writer() {
-          override fun write(cbuf: CharArray, off: Int, len: Int) {
-            var i = off
-            val end = off + len
-            while (i < end) {
-              crc.update(cbuf[i].code)
-              i++
-            }
-          }
-
-          override fun flush() {
-          }
-
-          override fun close() {
-          }
-        }
-
-        try {
-          val resourcePluginCfg = mavenProject.getPluginConfiguration("org.apache.maven.plugins", "maven-resources-plugin")
-          if (resourcePluginCfg != null) {
-            outputter.output(resourcePluginCfg, crcWriter)
-          }
-
-          val warPluginCfg = mavenProject.getPluginConfiguration("org.apache.maven.plugins", "maven-war-plugin")
-          if (warPluginCfg != null) {
-            outputter.output(warPluginCfg, crcWriter)
-          }
-        }
-        catch (e: IOException) {
-          LOG.error(e)
-        }
-      }
-      crc.value.toInt()
-    }
-  }
 
   val rootProjectsFiles: List<VirtualFile>
     get() = MavenUtil.collectFiles(rootProjects)
@@ -1014,11 +846,6 @@ class MavenProjectsTree(val project: Project) {
   }
 
   inner class Updater {
-    fun setManagedFiles(paths: List<String>): Updater {
-      myManagedFilesPaths.replaceWith(paths)
-      return this
-    }
-
     fun setRootProjects(roots: List<MavenProject>): Updater {
       myRootProjects.clear()
       roots.forEach { root ->
@@ -1054,12 +881,9 @@ class MavenProjectsTree(val project: Project) {
     }
 
     fun copyFrom(projectTree: MavenProjectsTree): Updater {
-
-      addFrom(projectTree) { it.myManagedFilesPaths }
       projectTree.myRootProjects.forEach {
         myRootProjects.addProject(it)
       }
-
 
       addFromMap(projectTree) { it.myMavenIdToProjectMapping }
       addFromMap(projectTree) { it.myVirtualFileToProjectMapping }
@@ -1116,10 +940,16 @@ class MavenProjectsTree(val project: Project) {
       try {
         storageVersion = inputStream.readUTF()
 
-        myManagedFilesPaths.replaceWith(readCollection(inputStream, LinkedHashSet()))
+        // managed file paths
+        readCollection(inputStream, LinkedHashSet())
+
         myIgnoredFilesPaths.replaceWith(readCollection(inputStream, ArrayList()))
         myIgnoredFilesPatterns.replaceWith(readCollection(inputStream, ArrayList()))
-        myExplicitProfiles = MavenExplicitProfiles(readCollection(inputStream, HashSet()), readCollection(inputStream, HashSet()))
+
+        // enabled profiles
+        readCollection(inputStream, HashSet())
+        // disabled profiles
+        readCollection(inputStream, HashSet())
 
         if (STORAGE_VERSION == storageVersion) {
           readProjectsRecursively(inputStream, this).forEach {
@@ -1213,32 +1043,6 @@ class MavenProjectsTree(val project: Project) {
 
       explicitProfiles.removeAll(removedProfiles)
       explicitProfiles.addAll(restoredProfiles)
-    }
-
-    private fun updateCrc(crc: CRC32, xInt: Int) {
-      var x = xInt
-      crc.update(x and 0xFF)
-      x = x ushr 8
-      crc.update(x and 0xFF)
-      x = x ushr 8
-      crc.update(x and 0xFF)
-      x = x ushr 8
-      crc.update(x)
-    }
-
-    private fun updateCrc(crc: CRC32, l: Long) {
-      updateCrc(crc, l.toInt())
-      updateCrc(crc, (l ushr 32).toInt())
-    }
-
-    private fun updateCrc(crc: CRC32, s: String?) {
-      if (s == null) {
-        crc.update(111)
-      }
-      else {
-        updateCrc(crc, s.hashCode())
-        crc.update(s.length and 0xFF)
-      }
     }
 
     @JvmStatic

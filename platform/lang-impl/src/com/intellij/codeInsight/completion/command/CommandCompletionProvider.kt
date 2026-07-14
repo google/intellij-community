@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.completion.command
 
 import com.intellij.codeInsight.completion.CompletionLocation
@@ -67,7 +67,6 @@ import com.intellij.testFramework.LightVirtualFile
 import com.intellij.util.ProcessingContext
 import com.intellij.util.Processor
 import kotlinx.serialization.Serializable
-import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Unmodifiable
 
 private const val STANDARD_MEAN_PRIORITY = 100.0
@@ -86,7 +85,6 @@ private val CHAR_TO_FILTER_WITH_SPACE = setOf('\'', '"', '_', '-', ' ')
  * completions for specific command-based scenarios in supported languages or files.
  *
  */
-@ApiStatus.Internal
 internal class CommandCompletionProvider(val contributor: CommandCompletionContributor) : CompletionProvider<CompletionParameters?>() {
 
   companion object {
@@ -223,7 +221,7 @@ internal class CommandCompletionProvider(val contributor: CommandCompletionContr
       val baseMatcher = CamelHumpMatcher(prefix, false, true)
       commands.forEach { command ->
         ProgressManager.checkCanceled()
-        CommandCompletionCollector.shown(command::class.java, originalFile.language, commandCompletionType::class.java)
+        CommandCompletionCollector.shown(command::class.java, originalFile.language, commandCompletionType)
         val customPrefixMatcher = command.customPrefixMatcher(prefix)
         val lookupElements = createLookupElements(command, commandCompletionFactory, prefix, customPrefixMatcher)
         if (customPrefixMatcher != null) {
@@ -267,7 +265,7 @@ internal class CommandCompletionProvider(val contributor: CommandCompletionContr
 
   private fun enableFastShown(parameters: CompletionParameters) {
     if (Registry.`is`("ide.completion.command.faster.paint")) {
-      if (!GroupedCompletionContributor.isGroupEnabledInApp()) return
+      if (!GroupedCompletionContributor.isGroupEnabled(parameters.editor)) return
       if (!contributor.groupIsEnabled(parameters)) return
       val completionProgressIndicator = parameters.process as? CompletionProgressIndicator
       val count = completionProgressIndicator?.lookup?.list?.model?.size ?: 0
@@ -554,7 +552,6 @@ internal class CommandCompletionProvider(val contributor: CommandCompletionContr
   }
 }
 
-@ApiStatus.Internal
 internal class CommandCompletionUnsupportedOperationException
   : UnsupportedOperationException("It's unexpected to invoke this method on a command completion calculating.")
 
@@ -605,6 +602,24 @@ internal sealed interface InvocationCommandType {
   data class FullLine(override val pattern: String, override val suffix: String) : InvocationCommandType
 }
 
+/**
+ * Returns the number of characters before [offset] at which the command-completion
+ * invocation [suffix] (e.g. `.` or `..`) starts in [text], or `0` if no suitable
+ * position is found.
+ *
+ * The search proceeds in three stages:
+ *  1. Direct match — try progressively shorter prefixes of [suffix] ending exactly at [offset].
+ *  2. Lookback across an identifier-like run (letters, digits, spaces, characters from [suffix])
+ *     up to 30 chars; succeeds when [suffix] (or its first char) is found at that position.
+ *     A two-char symmetric suffix (e.g. `..`) is handled specially so the index points before
+ *     the full pair.
+ *  3. Empty-line lookback — if the user is typing on an otherwise empty line (only letters,
+ *     spaces, tabs or `'` between [offset] and the preceding newline), return the distance to
+ *     the last non-whitespace character before that line.
+ *
+ * The returned index is the *distance back from [offset]*, so the suffix lives in
+ * `text.substring(offset - result, offset - result + suffix.length)`.
+ */
 internal fun findActualIndex(suffix: String, text: CharSequence, offset: Int): Int {
   var indexOf = suffix.length
   if (offset > text.length || offset == 0) return 0

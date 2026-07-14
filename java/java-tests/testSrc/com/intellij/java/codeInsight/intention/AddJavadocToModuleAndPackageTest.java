@@ -1,6 +1,8 @@
 // Copyright 2000-2017 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.java.codeInsight.intention;
 
+import com.intellij.pom.java.LanguageLevel;
+import com.intellij.testFramework.IdeaTestUtil;
 import com.intellij.testFramework.LightProjectDescriptor;
 import com.intellij.testFramework.fixtures.LightJavaCodeInsightFixtureTestCase;
 import org.jetbrains.annotations.NotNull;
@@ -30,5 +32,25 @@ public class AddJavadocToModuleAndPackageTest extends LightJavaCodeInsightFixtur
                              *\s
                              */
                             module org.some.awesome{}""");
+  }
+
+  public void testPackageInfoMarkdown() {
+    myFixture.configureByText("package-info.java", "package org.some.awe<caret>some;");
+    IdeaTestUtil.withLevel(getModule(), LanguageLevel.JDK_23, ()-> {
+      myFixture.launchAction(myFixture.findSingleIntention("Add Javadoc"));
+      myFixture.checkResult("""
+                              /// <caret>
+                              package org.some.awesome;""");
+    });
+  }
+
+  public void testModuleInfoMarkdown() {
+    myFixture.configureByText("module-info.java", "module org.some.awe<caret>some{}");
+    IdeaTestUtil.withLevel(getModule(), LanguageLevel.JDK_23, ()-> {
+        myFixture.launchAction(myFixture.findSingleIntention("Add Javadoc"));
+        myFixture.checkResult("""
+                            /// <caret>
+                            module org.some.awesome{}""");
+      });
   }
 }

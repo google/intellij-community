@@ -14,6 +14,8 @@
 - getLanguage():com.intellij.lang.Language
 - getLanguageDomainId():java.lang.String
 - getPropertyDescription(java.lang.String):java.lang.String
+*:com.intellij.build.BuildProgressObservable
+- a:addListener(com.intellij.build.BuildProgressListener,com.intellij.openapi.Disposable):V
 *:com.intellij.build.BuildViewSettingsProvider
 - a:isExecutionViewHidden():Z
 *:com.intellij.build.BuildWorkspaceConfiguration
@@ -21,6 +23,7 @@
 - a:isShowFirstErrorInEditor():Z
 *:com.intellij.build.eventBuilders.BuildIssueEventBuilder
 - a:build():com.intellij.build.events.BuildIssueEvent
+- a:withFilePosition(com.intellij.build.FilePosition):com.intellij.build.eventBuilders.BuildIssueEventBuilder
 - a:withHint(java.lang.String):com.intellij.build.eventBuilders.BuildIssueEventBuilder
 - a:withId(java.lang.Object):com.intellij.build.eventBuilders.BuildIssueEventBuilder
 - a:withParentId(java.lang.Object):com.intellij.build.eventBuilders.BuildIssueEventBuilder
@@ -224,7 +227,7 @@ com.intellij.build.events.StartBuildEvent
 *:com.intellij.codeInsight.hints.InlayHintsProviderFactory
 - com.intellij.openapi.project.PossiblyDumbAware
 - *sf:Companion:com.intellij.codeInsight.hints.InlayHintsProviderFactory$Companion
-- s:getEP():com.intellij.openapi.extensions.ExtensionPointName
+- *s:getEP():com.intellij.openapi.extensions.ExtensionPointName
 - getLanguages():java.lang.Iterable
 - getProvidersInfo():java.util.List
 - getProvidersInfo(com.intellij.openapi.project.Project):java.util.List
@@ -245,7 +248,7 @@ com.intellij.build.events.StartBuildEvent
 - f:hintsEnabledGlobally():Z
 - f:hintsShouldBeShown(com.intellij.codeInsight.hints.SettingsKey,com.intellij.lang.Language):Z
 - f:hintsShouldBeShown(com.intellij.lang.Language):Z
-- sf:instance():com.intellij.codeInsight.hints.InlayHintsSettings
+- *sf:instance():com.intellij.codeInsight.hints.InlayHintsSettings
 - loadState(com.intellij.codeInsight.hints.InlayHintsSettings$State):V
 - f:saveLastViewedProviderId(java.lang.String):V
 - f:setEnabledGlobally(Z):V
@@ -456,6 +459,8 @@ f:com.intellij.codeInsight.hints.declarative.InlayProviderOption
 *:com.intellij.execution.dashboard.RunDashboardChecker
 - a:countUniqueConfigurations(com.intellij.openapi.project.Project):I
 - a:getTypeId():java.lang.String
+*:com.intellij.execution.services.ServiceViewAddActionContributor
+- a:getContributorClass():java.lang.Class
 com.intellij.execution.services.ServiceViewDescriptor
 - *:getUniqueId():java.lang.String
 *:com.intellij.ide.actions.searcheverywhere.SearchEverywhereSpellCheckResult
@@ -636,7 +641,7 @@ a:com.intellij.task.ProjectTaskRunner
 *:com.intellij.task.RunConfigurationTaskState
 - *sf:Companion:com.intellij.task.RunConfigurationTaskState$Companion
 - createCustomActions(com.intellij.execution.process.ProcessHandler,com.intellij.execution.ui.ExecutionConsole,com.intellij.execution.Executor):java.util.List
-- s:getKEY():com.intellij.openapi.util.Key
+- *s:getKEY():com.intellij.openapi.util.Key
 - a:handleCreatedTargetEnvironment(com.intellij.execution.target.TargetEnvironment,com.intellij.execution.target.TargetProgressIndicator):java.lang.String
 - a:prepareTargetEnvironmentRequest(com.intellij.execution.target.TargetEnvironmentRequest,com.intellij.execution.target.TargetProgressIndicator):V
 - a:processExecutionResult(com.intellij.execution.process.ProcessHandler,com.intellij.execution.ui.ExecutionConsole):V
@@ -652,5 +657,3 @@ a:com.intellij.task.ProjectTaskRunner
 - isAborted():Z
 - s:valueOf(java.lang.String):com.intellij.task.TaskRunnerResults
 - s:values():com.intellij.task.TaskRunnerResults[]
-com.intellij.testIntegration.TestFinder
-- *:navigateToTestImmediately(com.intellij.psi.PsiElement):Z

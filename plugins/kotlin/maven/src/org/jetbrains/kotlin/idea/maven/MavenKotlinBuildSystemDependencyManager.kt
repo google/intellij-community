@@ -3,7 +3,7 @@ package org.jetbrains.kotlin.idea.maven
 
 import com.intellij.modcommand.ActionContext
 import com.intellij.modcommand.ModCommand
-import com.intellij.openapi.application.writeAction
+import com.intellij.openapi.application.edtWriteAction
 import com.intellij.openapi.command.executeCommand
 import com.intellij.openapi.externalSystem.autoimport.ExternalSystemProjectNotificationAware
 import com.intellij.openapi.module.Module
@@ -35,7 +35,7 @@ class MavenKotlinBuildSystemDependencyManager(
     }
 
     private fun findPomFile(module: Module): XmlFile? {
-        return KotlinMavenConfigurator.findModulePomFile(module) as? XmlFile
+        return KotlinMavenConfigurator.findModulePomFile(module)
     }
 
     @Deprecated(
@@ -44,9 +44,9 @@ class MavenKotlinBuildSystemDependencyManager(
     )
     override fun addDependency(module: Module, libraryDescriptor: ExternalLibraryDescriptor): Job {
         return coroutineScope.launchTracked {
-            writeAction {
-                val pomFile = findPomFile(module) ?: return@writeAction
-                val pom = PomFile.forFileOrNull(pomFile) ?: return@writeAction
+            edtWriteAction {
+                val pomFile = findPomFile(module) ?: return@edtWriteAction
+                val pom = PomFile.forFileOrNull(pomFile) ?: return@edtWriteAction
                 val version = libraryDescriptor.preferredVersion ?: libraryDescriptor.maxVersion ?: libraryDescriptor.minVersion
                 val mavenId = MavenId(libraryDescriptor.libraryGroupId, libraryDescriptor.libraryArtifactId, version)
 
@@ -70,9 +70,6 @@ class MavenKotlinBuildSystemDependencyManager(
 
         val actionContext = ActionContext.from(null, contextFile)
 
-        val version = libraryDescriptor.preferredVersion ?: libraryDescriptor.maxVersion ?: libraryDescriptor.minVersion
-        val mavenId = MavenId(libraryDescriptor.libraryGroupId, libraryDescriptor.libraryArtifactId, version)
-
         val scope = when (libraryDescriptor.preferredScope) {
             DependencyScope.COMPILE -> MavenArtifactScope.COMPILE
             DependencyScope.TEST -> MavenArtifactScope.TEST
@@ -83,8 +80,10 @@ class MavenKotlinBuildSystemDependencyManager(
 
         return ModCommand.psiUpdate(actionContext) {
             val writablePomFile = it.getWritable(pomFile)
-            val pom = PomFile.forFileOrNull(writablePomFile)
-            pom?.addDependency(mavenId, scope)
+            val pom = PomFile.forFileOrNull(writablePomFile) ?: return@psiUpdate
+            val version = pom.findVersionToAdd(libraryDescriptor)
+            val mavenId = MavenId(libraryDescriptor.libraryGroupId, libraryDescriptor.libraryArtifactId, version)
+            pom.addDependency(mavenId, scope)
         }.andThen(KotlinDependencyProvider.syncModCommand(pomFile))
     }
 
@@ -105,4 +104,15 @@ class MavenKotlinBuildSystemDependencyManager(
     override fun startProjectSync() {
         KotlinProjectConfigurationService.getInstance(project).queueSyncIfPossible()
     }
+}
+
+private fun PomFile.findVersionToAdd(libraryDescriptor: ExternalLibraryDescriptor): String? {
+    val requestedVersion = libraryDescriptor.preferredVersion ?: libraryDescriptor.maxVersion ?: libraryDescriptor.minVersion
+    if (libraryDescriptor.libraryGroupId == KotlinMavenConfigurator.GROUP_ID &&
+        findProperty(KotlinMavenConfigurator.KOTLIN_VERSION_PROPERTY) != null
+    ) {
+        return $$"${$${KotlinMavenConfigurator.KOTLIN_VERSION_PROPERTY}}"
+    }
+
+    return requestedVersion
 }

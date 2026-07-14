@@ -1,7 +1,25 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.idea.maven.dom
 
 import com.intellij.codeInsight.intention.IntentionActionDelegate
+import com.intellij.maven.testFramework.fixtures.MavenCustomRepositoryHelper
+import com.intellij.maven.testFramework.fixtures.MavenDomTestFixture
+import com.intellij.maven.testFramework.fixtures.MavenDomTestFixtureIndices
+import com.intellij.maven.testFramework.fixtures.MavenVersionArguments
+import com.intellij.maven.testFramework.fixtures.assertModules
+import com.intellij.maven.testFramework.fixtures.configConfirmationForYesAnswer
+import com.intellij.maven.testFramework.fixtures.configureProjectPom
+import com.intellij.maven.testFramework.fixtures.createModulePom
+import com.intellij.maven.testFramework.fixtures.findPsiFile
+import com.intellij.maven.testFramework.fixtures.importProjectAsync
+import com.intellij.maven.testFramework.fixtures.importProjectsAsync
+import com.intellij.maven.testFramework.fixtures.importProjectsWithErrors
+import com.intellij.maven.testFramework.fixtures.mavenDomFixture
+import com.intellij.maven.testFramework.fixtures.mn
+import com.intellij.maven.testFramework.fixtures.projectRoot
+import com.intellij.maven.testFramework.fixtures.updateAllProjects
+import com.intellij.maven.testFramework.fixtures.updateModulePom
+import com.intellij.maven.testFramework.fixtures.updateProjectPom
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.application.readAction
@@ -11,24 +29,42 @@ import com.intellij.psi.codeStyle.CodeStyleSettingsManager
 import com.intellij.psi.codeStyle.CommonCodeStyleSettings
 import com.intellij.psi.formatter.xml.XmlCodeStyleSettings
 import com.intellij.testFramework.IndexingTestUtil
+import com.intellij.testFramework.junit5.TestApplication
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import org.jetbrains.idea.maven.MavenCustomRepositoryHelper
 import org.jetbrains.idea.maven.dom.converters.MavenDependencyCompletionUtil
 import org.jetbrains.idea.maven.dom.intentions.ChooseFileIntentionAction
 import org.jetbrains.idea.maven.dom.model.MavenDomProjectModel
-import org.junit.Test
+import org.jetbrains.idea.maven.fixtures.assertCompletionVariants
+import org.jetbrains.idea.maven.fixtures.assertCompletionVariantsInclude
+import org.jetbrains.idea.maven.fixtures.assertCompletionVariantsNoCache
+import org.jetbrains.idea.maven.fixtures.assertResolved
+import org.jetbrains.idea.maven.fixtures.checkHighlighting
+import org.jetbrains.idea.maven.fixtures.getCompletionVariants
+import org.jetbrains.idea.maven.fixtures.getIntentionAtCaret
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedClass
+import org.junit.jupiter.params.provider.ArgumentsSource
 import java.io.IOException
 
-class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase() {
-  override fun importProjectOnSetup(): Boolean {
-    return true
-  }
+@TestApplication
+@ParameterizedClass
+@ArgumentsSource(MavenVersionArguments::class)
+class MavenDependencyCompletionAndResolutionTest(mavenVersion: String, modelVersion: String) {
+
+  private val maven by mavenDomFixture(
+    mavenVersion = mavenVersion, modelVersion = modelVersion,
+    initialPom = MavenDomTestFixture.DEFAULT_POM,
+    indices = MavenDomTestFixtureIndices("local1", listOf("local2")),
+  )
 
   @Test
   fun testGroupIdCompletion() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -39,12 +75,12 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                        </dependencies>
                        """.trimIndent())
 
-    assertCompletionVariantsInclude(projectPom, RENDERING_TEXT, "junit", "jmock", "test")
+    maven.assertCompletionVariantsInclude(maven.projectPom, maven.RENDERING_TEXT, "junit", "jmock", "test")
   }
 
   @Test
   fun testArtifactIdCompletion() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -56,12 +92,12 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                        </dependencies>
                        """.trimIndent())
 
-    assertCompletionVariants(projectPom, RENDERING_TEXT, "junit")
+    maven.assertCompletionVariants(maven.projectPom, maven.RENDERING_TEXT, "junit")
   }
 
   @Test
   fun testDoNotCompleteArtifactIdOnUnknownGroup() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -73,12 +109,12 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                        </dependencies>
                        """.trimIndent())
 
-    assertCompletionVariants(projectPom)
+    maven.assertCompletionVariants(maven.projectPom)
   }
 
   @Test
   fun testVersionCompletion() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -91,13 +127,13 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                        </dependencies>
                        """.trimIndent())
 
-    val variants = getCompletionVariants(projectPom)
+    val variants = maven.getCompletionVariants(maven.projectPom)
     assertEquals(mutableListOf("4.0", "3.8.2", "3.8.1"), variants)
   }
 
   @Test
   fun testDoNotCompleteVersionIfNoGroupIdAndArtifactId() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -108,12 +144,12 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                        </dependencies>
                        """.trimIndent())
 
-    assertCompletionVariants(projectPom) // should not throw
+    maven.assertCompletionVariants(maven.projectPom) // should not throw
   }
 
   @Test
   fun testAddingLocalProjectsIntoCompletion() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>project-group</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -124,23 +160,23 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                        </modules>
                        """.trimIndent())
 
-    createModulePom("m1",
-                    """
+    maven.createModulePom("m1",
+                          """
                       <groupId>project-group</groupId>
                       <artifactId>m1</artifactId>
                       <version>1</version>
                       """.trimIndent())
 
-    val m = createModulePom("m2",
-                            """
+    val m = maven.createModulePom("m2",
+                                  """
                                       <groupId>project-group</groupId>
                                       <artifactId>m2</artifactId>
                                       <version>2</version>
                                       """.trimIndent())
 
-    importProjectAsync()
+    maven.importProjectAsync()
 
-    createModulePom("m2", """
+    maven.createModulePom("m2", """
       <groupId>project-group</groupId>
       <artifactId>m2</artifactId>
       <version>2</version>
@@ -152,13 +188,12 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
       </dependencies>
       """.trimIndent())
 
-    assertCompletionVariants(m, LOOKUP_STRING, "project-group:project:1", "project-group:m1:1", "project-group:m2:2")
-    assertCompletionVariants(m, RENDERING_TEXT, "project", "m1", "m2")
+    maven.assertCompletionVariants(m, maven.RENDERING_TEXT, "project", "m1", "m2")
   }
 
   @Test
   fun testResolvingPropertiesForLocalProjectsInCompletion() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -169,8 +204,8 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                        </modules>
                        """.trimIndent())
 
-    createModulePom("m1",
-                    """
+    maven.createModulePom("m1",
+                          """
                       <artifactId>module1</artifactId>
                       <parent>
                         <groupId>test</groupId>
@@ -179,17 +214,17 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                       </parent>
                       """.trimIndent())
 
-    val m = createModulePom("m2",
-                            """
+    val m = maven.createModulePom("m2",
+                                  """
                                       <groupId>test</groupId>
                                       <artifactId>module2</artifactId>
                                       <version>1</version>
                                       """.trimIndent())
 
-    importProjectAsync()
-    assertModules("project", mn("project", "module1"), "module2")
+    maven.importProjectAsync()
+    maven.assertModules("project", maven.mn("project", "module1"), "module2")
 
-    updateModulePom("m2", """
+    maven.updateModulePom("m2", """
       <groupId>test</groupId>
       <artifactId>module2</artifactId>
       <version>1</version>
@@ -202,9 +237,9 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
       </dependencies>
       """.trimIndent())
 
-    assertCompletionVariants(m, "1")
+    maven.assertCompletionVariants(m, "1")
 
-    updateModulePom("m2", """
+    maven.updateModulePom("m2", """
       <groupId>test</groupId>
       <artifactId>module2</artifactId>
       <version>1</version>
@@ -217,12 +252,12 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
       </dependencies>
       """.trimIndent())
 
-    checkHighlighting(m)
+    maven.checkHighlighting(m)
   }
 
   @Test
   fun testChangingExistingProjects() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -233,22 +268,22 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                        </modules>
                        """.trimIndent())
 
-    val m1 = createModulePom("m1",
-                             """
+    val m1 = maven.createModulePom("m1",
+                                   """
                                        <groupId>test</groupId>
                                        <artifactId>m1</artifactId>
                                        <version>1</version>
                                        """.trimIndent())
 
-    createModulePom("m2",
-                    """
+    maven.createModulePom("m2",
+                          """
                       <groupId>test</groupId>
                       <artifactId>m2</artifactId>
                       <version>1</version>
                       """.trimIndent())
-    importProjectAsync()
+    maven.importProjectAsync()
 
-    updateModulePom("m1", """
+    maven.updateModulePom("m1", """
       <groupId>test</groupId>
       <artifactId>m1</artifactId>
       <version>1</version>
@@ -260,24 +295,23 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
       </dependencies>
       """.trimIndent())
 
-    assertCompletionVariants(m1, LOOKUP_STRING, "test:project:1", "test:m1:1", "test:m2:1")
-    assertCompletionVariants(m1, RENDERING_TEXT, "project", "m1", "m2")
+    maven.assertCompletionVariants(m1, maven.RENDERING_TEXT, "project", "m1", "m2")
 
-    updateModulePom("m1", """
+    maven.updateModulePom("m1", """
       <groupId>test</groupId>
       <artifactId>m1</artifactId>
       <version>1</version>
       """.trimIndent())
 
-    updateModulePom("m2", """
+    maven.updateModulePom("m2", """
       <groupId>test</groupId>
       <artifactId>m2_new</artifactId>
       <version>1</version>
       """.trimIndent())
 
-    updateAllProjects()
+    maven.updateAllProjects()
 
-    updateModulePom("m1", """
+    maven.updateModulePom("m1", """
       <groupId>test</groupId>
       <artifactId>m1</artifactId>
       <version>1</version>
@@ -289,20 +323,19 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
       </dependencies>
       """.trimIndent())
 
-    assertCompletionVariantsNoCache(m1, LOOKUP_STRING, "test:project:1", "test:m1:1", "test:m2_new:1")
-    assertCompletionVariantsNoCache(m1, RENDERING_TEXT, "project", "m1", "m2_new")
+    maven.assertCompletionVariantsNoCache(m1, maven.RENDERING_TEXT, "project", "m1", "m2_new")
   }
 
   @Test
   fun testChangingExistingProjectsWithArtifactIdsRemoval() = runBlocking {
-    val m = createModulePom("m1",
-                            """
+    val m = maven.createModulePom("m1",
+                                  """
                                       <groupId>project-group</groupId>
                                       <artifactId>m1</artifactId>
                                       <version>1</version>
                                       """.trimIndent())
 
-    configureProjectPom("""
+    maven.configureProjectPom("""
                           <groupId>test</groupId>
                           <artifactId>project</artifactId>
                           <version>1</version>
@@ -314,14 +347,14 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                           </dependencies>
                           """.trimIndent())
 
-    importProjectsWithErrors(projectPom, m)
+    maven.importProjectsWithErrors(maven.projectPom, m)
 
-    assertCompletionVariants(projectPom, RENDERING_TEXT, "m1")
+    maven.assertCompletionVariants(maven.projectPom, maven.RENDERING_TEXT, "m1")
 
-    updateModulePom("m1", "")
-    importProjectsWithErrors(projectPom, m)
+    maven.updateModulePom("m1", "")
+    maven.importProjectsWithErrors(maven.projectPom, m)
 
-    configureProjectPom("""
+    maven.configureProjectPom("""
                           <groupId>test</groupId>
                           <artifactId>project</artifactId>
                           <version>1</version>
@@ -333,26 +366,26 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                           </dependencies>
                           """.trimIndent())
 
-    assertCompletionVariantsNoCache(projectPom, RENDERING_TEXT)
+    maven.assertCompletionVariantsNoCache(maven.projectPom, maven.RENDERING_TEXT)
   }
 
   @Test
   fun testRemovingExistingProjects() = runBlocking {
-    val m1 = createModulePom("m1",
-                             """
+    val m1 = maven.createModulePom("m1",
+                                   """
                                              <groupId>project-group</groupId>
                                              <artifactId>m1</artifactId>
                                              <version>1</version>
                                              """.trimIndent())
 
-    val m2 = createModulePom("m2",
-                             """
+    val m2 = maven.createModulePom("m2",
+                                   """
                                              <groupId>project-group</groupId>
                                              <artifactId>m2</artifactId>
                                              <version>1</version>
                                              """.trimIndent())
 
-    configureProjectPom("""
+    maven.configureProjectPom("""
                           <groupId>test</groupId>
                           <artifactId>project</artifactId>
                           <version>1</version>
@@ -364,24 +397,22 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                           </dependencies>
                           """.trimIndent())
 
-    importProjectsWithErrors(projectPom, m1, m2)
+    maven.importProjectsWithErrors(maven.projectPom, m1, m2)
 
-    IndexingTestUtil.waitUntilIndexesAreReady(project)
+    IndexingTestUtil.waitUntilIndexesAreReady(maven.project)
 
-    assertCompletionVariantsInclude(projectPom, RENDERING_TEXT, "m1", "m2")
-    assertCompletionVariantsInclude(projectPom, LOOKUP_STRING, "project-group:m1:1", "project-group:m2:1")
+    maven.assertCompletionVariantsInclude(maven.projectPom, maven.RENDERING_TEXT, "m1", "m2")
 
     WriteAction.runAndWait<IOException> { m1.delete(null) }
 
-    configConfirmationForYesAnswer()
+    maven.configConfirmationForYesAnswer()
 
-    assertCompletionVariantsInclude(projectPom, RENDERING_TEXT, "m2")
-    assertCompletionVariantsInclude(projectPom, LOOKUP_STRING, "project-group:m2:1")
+    maven.assertCompletionVariantsInclude(maven.projectPom, maven.RENDERING_TEXT, "m2")
   }
 
   @Test
   fun testResolutionOutsideTheProject() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -394,19 +425,19 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                        </dependencies>
                        """.trimIndent())
 
-    val filePath = myIndicesFixture!!.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.pom")
+    val filePath = maven.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.pom")
     val f = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(filePath)
-    assertResolved(projectPom, findPsiFile(f))
+    maven.assertResolved(maven.projectPom, maven.findPsiFile(f))
   }
 
   @Test
   fun testResolutionParentPathOutsideTheProject() = runBlocking {
-    val filePath = myIndicesFixture!!.repositoryHelper.getTestData("local1/org/example/example/1.0/example-1.0.pom")
+    val filePath = maven.repositoryHelper.getTestData("local1/org/example/example/1.0/example-1.0.pom")
 
-    val relativePath = projectRoot.toNioPath().relativize(filePath).toString()
+    val relativePath = maven.projectRoot.toNioPath().relativize(filePath).toString()
     val relativePathUnixSeparator = relativePath.replace("\\\\".toRegex(), "/")
 
-    updateProjectPom("""<groupId>test</groupId>
+    maven.updateProjectPom("""<groupId>test</groupId>
 <artifactId>project</artifactId>
 <version>1</version>
 <parent>
@@ -418,12 +449,12 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
     )
 
     val f = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(filePath)
-    assertResolved(projectPom, findPsiFile(f))
+    maven.assertResolved(maven.projectPom, maven.findPsiFile(f))
   }
 
   @Test
   fun testResolveManagedDependency() = runBlocking {
-    configureProjectPom("""
+    maven.configureProjectPom("""
                           <groupId>test</groupId>
                           <artifactId>project</artifactId>
                           <version>1</version>
@@ -443,20 +474,20 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                             </dependency>
                           </dependencies>
                           """.trimIndent())
-    importProjectAsync()
+    maven.importProjectAsync()
 
-    val filePath = myIndicesFixture!!.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.pom")
+    val filePath = maven.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.pom")
     val f = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(filePath)
-    assertResolved(projectPom, findPsiFile(f))
+    maven.assertResolved(maven.projectPom, maven.findPsiFile(f))
   }
 
   @Test
   fun testResolveLATESTDependency() = runBlocking {
-    val helper = MavenCustomRepositoryHelper(dir, "local1")
+    val helper = MavenCustomRepositoryHelper(maven.dir, "local1")
     val repoPath = helper.getTestData("local1")
-    repositoryPath = repoPath
+    maven.repositoryPath = repoPath
 
-    updateProjectPom("""
+    maven.updateProjectPom("""
                     <groupId>test</groupId>
                     <artifactId>project</artifactId>
                     <version>1</version>
@@ -468,9 +499,9 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                       </dependency>
                     </dependencies>
                     """.trimIndent())
-    updateAllProjects()
+    maven.updateAllProjects()
 
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -483,15 +514,15 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                        </dependencies>
                        """.trimIndent())
 
-    val filePath = myIndicesFixture!!.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.pom")
+    val filePath = maven.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.pom")
     val f = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(filePath)
 
-    assertResolved(projectPom, findPsiFile(f))
+    maven.assertResolved(maven.projectPom, maven.findPsiFile(f))
   }
 
   @Test
   fun testResolutionIsTypeBased() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -505,32 +536,32 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                        </dependencies>
                        """.trimIndent())
 
-    val filePath = myIndicesFixture!!.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.pom")
+    val filePath = maven.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.pom")
     val f = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(filePath)
 
-    assertResolved(projectPom, findPsiFile(f))
+    maven.assertResolved(maven.projectPom, maven.findPsiFile(f))
   }
 
   @Test
   fun testResolutionInsideTheProject() = runBlocking {
-    val m1 = createModulePom("m1",
-                             """
+    val m1 = maven.createModulePom("m1",
+                                   """
                                        <groupId>test</groupId>
                                        <artifactId>m1</artifactId>
                                        <version>1</version>
                                        """.trimIndent())
 
-    val m2 = createModulePom("m2",
-                             """
+    val m2 = maven.createModulePom("m2",
+                                   """
                                        <groupId>test</groupId>
                                        <artifactId>m2</artifactId>
                                        <version>1</version>
                                        """.trimIndent())
 
-    importProjectsAsync(projectPom, m1, m2)
+    maven.importProjectsAsync(maven.projectPom, m1, m2)
 
-    createModulePom("m1",
-                    """
+    maven.createModulePom("m1",
+                          """
                       <groupId>test</groupId>
                       <artifactId>m1</artifactId>
                       <version>1</version>
@@ -543,14 +574,14 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                       </dependencies>
                       """.trimIndent())
 
-    assertResolved(m1, findPsiFile(m2))
+    maven.assertResolved(m1, maven.findPsiFile(m2))
   }
 
   @Test
   fun testResolvingSystemScopeDependencies() = runBlocking {
-    val libPath = myIndicesFixture!!.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.jar")
+    val libPath = maven.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.jar")
 
-    updateProjectPom("""<groupId>test</groupId>
+    maven.updateProjectPom("""<groupId>test</groupId>
 <artifactId>project</artifactId>
 <version>1</version>
 <dependencies>
@@ -564,13 +595,13 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
 </dependencies>
 """)
 
-    assertResolved(projectPom, findPsiFile(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(libPath)))
-    checkHighlighting()
+    maven.assertResolved(maven.projectPom, maven.findPsiFile(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(libPath)))
+    maven.checkHighlighting()
   }
 
   @Test
   fun testHighlightInvalidSystemScopeDependencies() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -584,14 +615,14 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testDoNotHighlightValidSystemScopeDependencies() = runBlocking {
-    val libPath = myIndicesFixture!!.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.jar")
+    val libPath = maven.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.jar")
 
-    updateProjectPom("""<groupId>test</groupId>
+    maven.updateProjectPom("""<groupId>test</groupId>
 <artifactId>project</artifactId>
 <version>1</version>
 <dependencies>
@@ -605,14 +636,14 @@ $libPath</systemPath>
   </dependency>
 </dependencies>
 """)
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testResolvingSystemScopeDependenciesWithProperties() = runBlocking {
-    val libPath = myIndicesFixture!!.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.jar")
+    val libPath = maven.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.jar")
 
-    updateProjectPom("""<groupId>test</groupId>
+    maven.updateProjectPom("""<groupId>test</groupId>
 <artifactId>project</artifactId>
 <version>1</version>
 <properties>
@@ -630,15 +661,15 @@ $libPath</depPath>
 </dependencies>
 """)
 
-    assertResolved(projectPom, findPsiFile(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(libPath)))
-    checkHighlighting()
+    maven.assertResolved(maven.projectPom, maven.findPsiFile(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(libPath)))
+    maven.checkHighlighting()
   }
 
   @Test
   fun testCompletionSystemScopeDependenciesWithProperties() = runBlocking {
-    val libPath = myIndicesFixture!!.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.jar")
+    val libPath = maven.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.jar")
 
-    updateProjectPom("""<groupId>test</groupId>
+    maven.updateProjectPom("""<groupId>test</groupId>
 <artifactId>project</artifactId>
 <version>1</version>
 <properties>
@@ -656,14 +687,14 @@ ${libPath.parent}</depDir>
 </dependencies>
 """)
 
-    assertCompletionVariants(projectPom, RENDERING_TEXT, "junit-4.0.jar")
+    maven.assertCompletionVariants(maven.projectPom, maven.RENDERING_TEXT, "junit-4.0.jar")
   }
 
   @Test
   fun testResolvingSystemScopeDependenciesFromSystemPath() = runBlocking {
-    val libPath = myIndicesFixture!!.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.jar")
+    val libPath = maven.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.jar")
 
-    updateProjectPom("""<groupId>test</groupId>
+    maven.updateProjectPom("""<groupId>test</groupId>
 <artifactId>project</artifactId>
 <version>1</version>
 <dependencies>
@@ -677,13 +708,13 @@ ${libPath.parent}</depDir>
 </dependencies>
 """)
 
-    assertResolved(projectPom, findPsiFile(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(libPath)))
-    checkHighlighting()
+    maven.assertResolved(maven.projectPom, maven.findPsiFile(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(libPath)))
+    maven.checkHighlighting()
   }
 
   @Test
   fun testChooseFileIntentionForSystemDependency() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -697,22 +728,22 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    val action = getIntentionAtCaret("Choose File")
+    val action = maven.getIntentionAtCaret("Choose File")
     assertNotNull(action)
 
-    val libPath = myIndicesFixture!!.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.jar")
+    val libPath = maven.repositoryHelper.getTestData("local1/junit/junit/4.0/junit-4.0.jar")
     val libFile = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(libPath)
 
     val intentionAction = IntentionActionDelegate.unwrap(action!!)
     (intentionAction as ChooseFileIntentionAction).setFileChooser { arrayOf(libFile) }
     val xmlSettings =
-      CodeStyleSettingsManager.getInstance(project).getCurrentSettings().getCustomSettings(XmlCodeStyleSettings::class.java)
+      CodeStyleSettingsManager.getInstance(maven.project).getCurrentSettings().getCustomSettings(XmlCodeStyleSettings::class.java)
 
     val prevValue = xmlSettings.XML_TEXT_WRAP
     try {
       // prevent file path from wrapping.
       xmlSettings.XML_TEXT_WRAP = CommonCodeStyleSettings.DO_NOT_WRAP
-      fixture.launchAction(action)
+      maven.fixture.launchAction(action)
     }
     finally {
       xmlSettings.XML_TEXT_WRAP = prevValue
@@ -720,16 +751,16 @@ ${libPath.parent}</depDir>
     }
 
     val expectedValue = readAction {
-      val model = MavenDomUtil.getMavenDomProjectModel(project, projectPom)
+      val model = MavenDomUtil.getMavenDomProjectModel(maven.project, maven.projectPom)
       val dep = model!!.getDependencies().getDependencies()[0]
       dep.getSystemPath().getValue()
     }
-    assertEquals(findPsiFile(libFile), expectedValue)
+    assertEquals(maven.findPsiFile(libFile), expectedValue)
   }
 
   @Test
   fun testNoChooseFileIntentionForNonSystemDependency() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -743,13 +774,13 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    val action = getIntentionAtCaret("Choose File")
+    val action = maven.getIntentionAtCaret("Choose File")
     assertNull(action)
   }
 
   @Test
   fun testTypeCompletion() = runBlocking {
-    configureProjectPom("""
+    maven.configureProjectPom("""
                           <groupId>test</groupId>
                           <artifactId>project</artifactId>
                           <version>1</version>
@@ -760,13 +791,13 @@ ${libPath.parent}</depDir>
                           </dependencies>
                           """.trimIndent())
 
-    assertCompletionVariants(projectPom, RENDERING_TEXT, "jar", "test-jar", "pom", "ear", "ejb", "ejb-client", "war", "bundle",
-                             "jboss-har", "jboss-sar", "maven-plugin")
+    maven.assertCompletionVariants(maven.projectPom, maven.RENDERING_TEXT, "jar", "test-jar", "pom", "ear", "ejb", "ejb-client", "war", "bundle",
+                                   "jboss-har", "jboss-sar", "maven-plugin")
   }
 
   @Test
   fun testDoNotHighlightUnknownType() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -780,12 +811,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testScopeCompletion() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -796,12 +827,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    assertCompletionVariants(projectPom, RENDERING_TEXT, "compile", "provided", "runtime", "test", "system")
+    maven.assertCompletionVariants(maven.projectPom, maven.RENDERING_TEXT, "compile", "provided", "runtime", "test", "system")
   }
 
   @Test
   fun testDoNotHighlightUnknownScopes() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -815,12 +846,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testPropertiesInScopes() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -837,12 +868,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testDoesNotHighlightCorrectValues() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -855,12 +886,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testHighlightingVersionIfVersionIsWrong() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -873,13 +904,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
-
 
   @Test
   fun testHighlightingArtifactIdAndVersionIfGroupIsUnknown() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -892,12 +922,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testHighlightingArtifactAndVersionIfGroupIsEmpty() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -910,12 +940,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testHighlightingVersionAndArtifactIfArtifactTheyAreFromAnotherGroup() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -928,12 +958,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testHighlightingVersionIfArtifactIsEmpty() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -946,12 +976,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testHighlightingVersionIfArtifactIsUnknown() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -964,12 +994,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testHighlightingVersionItIsFromAnotherGroup() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -982,12 +1012,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testHighlightingCoordinatesWithClosedTags() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -1000,12 +1030,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testHandlingProperties() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -1015,10 +1045,10 @@ ${libPath.parent}</depDir>
                          <dep.version>4.0</dep.version>
                        </properties>
                        """.trimIndent())
-    importProjectAsync()
+    maven.importProjectAsync()
 
     // properties are taken from loaded project
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -1031,12 +1061,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testHandlingPropertiesWhenProjectIsNotYetLoaded() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -1054,12 +1084,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testDontHighlightProblemsInNonManagedPom1() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -1068,8 +1098,8 @@ ${libPath.parent}</depDir>
                        </properties>
                        """.trimIndent())
 
-    val m = createModulePom("m1",
-                            """
+    val m = maven.createModulePom("m1",
+                                  """
                                       <artifactId>m1</artifactId>
                                       <parent>
                                         <groupId>test</groupId>
@@ -1085,14 +1115,14 @@ ${libPath.parent}</depDir>
                                       </dependencies>
                                       """.trimIndent())
 
-    importProjectAsync()
+    maven.importProjectAsync()
 
-    checkHighlighting(m)
+    maven.checkHighlighting(m)
   }
 
   @Test
   fun testDontHighlightProblemsInNonManagedPom2() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -1101,8 +1131,8 @@ ${libPath.parent}</depDir>
                        </properties>
                        """.trimIndent())
 
-    val m = createModulePom("m1",
-                            """
+    val m = maven.createModulePom("m1",
+                                  """
                                       <artifactId>m1</artifactId>
                                       <parent>
                                         <groupId>test</groupId>
@@ -1114,13 +1144,13 @@ ${libPath.parent}</depDir>
                                       </properties>
                                       """.trimIndent())
 
-    importProjectAsync()
-    checkHighlighting(m)
+    maven.importProjectAsync()
+    maven.checkHighlighting(m)
   }
 
   @Test
   fun testExclusionCompletion() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -1138,13 +1168,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    assertCompletionVariants(projectPom, RENDERING_TEXT, "jmock")
+    maven.assertCompletionVariants(maven.projectPom, maven.RENDERING_TEXT, "jmock")
   }
-
 
   @Test
   fun testDoNotHighlightUnknownExclusions() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -1162,12 +1191,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testExclusionHighlightingAbsentGroupId() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -1184,12 +1213,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testExclusionHighlightingAbsentArtifactId() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -1207,12 +1236,12 @@ ${libPath.parent}</depDir>
                        </dependencies>
                        """.trimIndent())
 
-    checkHighlighting()
+    maven.checkHighlighting()
   }
 
   @Test
   fun testImportDependencyChainedProperty() = runBlocking {
-    updateProjectPom("""
+    maven.updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -1233,7 +1262,7 @@ ${libPath.parent}</depDir>
                        </dependencyManagement>
                        """.trimIndent())
 
-    createModulePom("m1", """
+    maven.createModulePom("m1", """
       <parent>
           <groupId>test</groupId>
           <artifactId>project</artifactId>
@@ -1247,17 +1276,40 @@ ${libPath.parent}</depDir>
         </dependency>
       </dependencies>
       """.trimIndent())
-    importProjectAsync()
+    maven.importProjectAsync()
 
     withContext(Dispatchers.EDT) {
-      //maybe readacton
       writeIntentReadAction {
-        val model = MavenDomUtil.getMavenDomModel(project, projectPom, MavenDomProjectModel::class.java)!!
+        val model = MavenDomUtil.getMavenDomModel(maven.project, maven.projectPom, MavenDomProjectModel::class.java)!!
 
-        val dependency = MavenDependencyCompletionUtil.findManagedDependency(model, project, "org.example", "something")
+        val dependency = MavenDependencyCompletionUtil.findManagedDependency(model, maven.project, "org.example", "something")
         assertNotNull(dependency)
         assertEquals("42", dependency!!.version.stringValue)
       }
     }
+  }
+
+  @Test
+  fun testNoCompletionInProjectRootGroupId() = runBlocking {
+    maven.updateProjectPom("""
+                       <groupId>junit<caret></groupId>
+                       <artifactId>project</artifactId>
+                       <version>1</version>
+                       """.trimIndent())
+
+    // completion must NOT fire inside the root project coordinate tags
+    maven.assertCompletionVariants(maven.projectPom)
+  }
+
+  @Test
+  fun testNoCompletionInProjectRootArtifactId() = runBlocking {
+    maven.updateProjectPom("""
+                       <groupId>test</groupId>
+                       <artifactId>project<caret></artifactId>
+                       <version>1</version>
+                       """.trimIndent())
+
+    // completion must NOT fire inside the root project coordinate tags
+    maven.assertCompletionVariants(maven.projectPom)
   }
 }

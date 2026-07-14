@@ -22,6 +22,7 @@ import com.intellij.psi.javadoc.PsiDocComment;
 import com.intellij.psi.javadoc.PsiDocTag;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.ArrayUtil;
+import com.intellij.util.CommentUtil;
 import com.intellij.util.IncorrectOperationException;
 import com.intellij.util.containers.ContainerUtil;
 import com.siyeh.ig.psiutils.CommentTracker;
@@ -68,7 +69,7 @@ class RemoveSuppressWarningAction extends ModCommandQuickFix {
       if (commentOwner != null) {
         PsiElement psiElement = JavaSuppressionUtil.getElementMemberSuppressedIn(commentOwner, myID);
         if (psiElement instanceof PsiAnnotation annotation) {
-          if (!ExternalAnnotationsManager.getInstance(annotation.getProject()).isExternalAnnotation(annotation)) {
+          if (!ExternalAnnotationsManager.isExternal(annotation)) {
             removeFromAnnotation(annotation);
           }
         }
@@ -154,9 +155,12 @@ class RemoveSuppressWarningAction extends ModCommandQuickFix {
     }
     else {
       PsiElement[] descriptionElements =
-        JavaPsiFacade.getElementFactory(tag.getProject()).createDocCommentFromText("/**" + nextText + "*/", tag).getDescriptionElements();
+        JavaPsiFacade.getElementFactory(tag.getProject())
+          .createDocCommentFromText(CommentUtil.convertToDocComment(docComment, nextText), tag)
+          .getDescriptionElements();
       if (descriptionElements.length > 0) {
-        docComment.addRangeAfter(descriptionElements[0], descriptionElements[descriptionElements.length - 1], tag);
+        docComment.addRangeAfter(descriptionElements[0],
+                                 descriptionElements[descriptionElements.length - (docComment.isMarkdownComment() ? 1 : 2)], tag);
       }
       tag.delete();
     }
@@ -208,7 +212,7 @@ class RemoveSuppressWarningAction extends ModCommandQuickFix {
     PsiModifierListOwner owner = PsiTreeUtil.getParentOfType(element, PsiModifierListOwner.class, false);
     if (owner == null) return ModCommand.nop();
     if (JavaSuppressionUtil.getElementMemberSuppressedIn(owner, myID) instanceof PsiAnnotation annotation &&
-        ExternalAnnotationsManager.getInstance(annotation.getProject()).isExternalAnnotation(annotation)) {
+        ExternalAnnotationsManager.isExternal(annotation)) {
       return removeFromAnnotationExternal(annotation, owner);
     }
     return ModCommand.nop();

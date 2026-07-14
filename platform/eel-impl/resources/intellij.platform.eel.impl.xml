@@ -6,25 +6,17 @@
     <module name="intellij.libraries.pty4j"/>
     <module name="intellij.platform.core"/>
     <module name="intellij.platform.core.impl"/>
-    <module name="intellij.platform.editor.ui"/>
     <module name="intellij.platform.ide.core"/>
     <module name="intellij.platform.util.coroutines"/>
   </dependencies>
   <!-- endregion -->
-  <extensions defaultExtensionNs="com.intellij">
-    <advancedSetting
-      id="container.environments.env.var.shell.mode"
-      enumClass="com.intellij.platform.eel.impl.settings.LoginShellEnvVarModeProviderImpl$EnvVarShellMode"
-      default="LOGIN_INTERACTIVE"
-      bundle="messages.EelImplBundle"
-      groupKey="advanced.settings.container.environments"
-    />
-  </extensions>
   <extensionPoints>
     <extensionPoint qualifiedName="com.intellij.platform.eel.impl.portAccessibleLocally"
                     dynamic="false"
                     interface="com.intellij.platform.eel.provider.portAccessibleLocally.EelPortAccessibleLocally"/>
     <extensionPoint qualifiedName="com.intellij.eelMachineResolver"
                     interface="com.intellij.platform.eel.provider.EelMachineResolver" dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.eelEnvironment"
+                    interface="com.intellij.platform.eel.impl.base.EelEnvironmentHousekeepingService" dynamic="true"/>
   </extensionPoints>
 </idea-plugin>

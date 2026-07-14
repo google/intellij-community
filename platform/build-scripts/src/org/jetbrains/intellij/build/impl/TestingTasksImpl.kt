@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplacePutWithAssignment", "ReplaceGetOrSet", "BlockingMethodInNonBlockingContext")
 
 package org.jetbrains.intellij.build.impl
@@ -22,6 +22,7 @@ import com.intellij.platform.util.coroutines.filterConcurrent
 import com.intellij.testFramework.SkipInHeadlessEnvironment
 import com.intellij.util.io.awaitExit
 import com.intellij.util.lang.UrlClassLoader
+import com.intellij.util.text.nullize
 import io.opentelemetry.api.trace.Span
 import jetbrains.buildServer.messages.serviceMessages.BlockClosed
 import jetbrains.buildServer.messages.serviceMessages.BlockOpened
@@ -74,10 +75,15 @@ import kotlin.io.path.outputStream
 import kotlin.io.path.readLines
 import kotlin.random.Random
 
+private const val EXIT_FAILURE = 41  // prevent ignoring any System.exit(1) as test failures
 private const val NO_TESTS_ERROR = 42
 
 internal class TestingTasksImpl(context: CompilationContext, private val options: TestingOptions) : TestingTasks {
   private val context: CompilationContext = if (options.useArchivedCompiledClasses) context.asArchived else context
+  private val testPatternSystemPropertyKey = "intellij.build.test.patterns"
+  private val testGroupSystemPropertyKey = "intellij.build.test.groups"
+  private val testIncludeTagsSystemPropertyKey = "intellij.build.test.tags"
+  private val testExcludeTagsSystemPropertyKey = "intellij.build.test.excluded.tags"
 
   override val coverage: Coverage by lazy {
     CoverageImpl(
@@ -251,13 +257,13 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
     if (options.testConfigurations != null) {
       val testConfigurationsOptionName = "intellij.build.test.configurations"
       if (options.testPatterns != null) {
-        errorOptionIgnored(testConfigurationsOptionName, "intellij.build.test.patterns")
+        errorOptionIgnored(testConfigurationsOptionName, testPatternSystemPropertyKey)
       }
       if (options.testSimplePatterns != null) {
         errorOptionIgnored(testConfigurationsOptionName, "intellij.build.test.simple.patterns")
       }
       if (options.testGroups != null) {
-        errorOptionIgnored(testConfigurationsOptionName, "intellij.build.test.groups")
+        errorOptionIgnored(testConfigurationsOptionName, testGroupSystemPropertyKey)
       }
       if (mainModule != null && !options.validateMainModule) {
         errorOptionIgnored(testConfigurationsOptionName, "intellij.build.test.main.module")
@@ -268,10 +274,10 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
     }
     else if (options.testPatterns != null) {
       if (options.testSimplePatterns != null) {
-        errorOptionIgnored("intellij.build.test.patterns", "intellij.build.test.simple.patterns")
+        errorOptionIgnored(testPatternSystemPropertyKey, "intellij.build.test.simple.patterns")
       }
       if (options.testGroups != null) {
-        errorOptionIgnored("intellij.build.test.patterns", "intellij.build.test.groups")
+        errorOptionIgnored(testPatternSystemPropertyKey, testGroupSystemPropertyKey)
       }
     }
     else if (options.testSimplePatterns != null) {
@@ -279,12 +285,12 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
         context.messages.logErrorAndThrow("'intellij.build.test.simple.patterns' option should be used only for local runs")
       }
       if (options.testGroups != null) {
-        errorOptionIgnored("intellij.build.test.simple.patterns", "intellij.build.test.groups")
+        errorOptionIgnored("intellij.build.test.simple.patterns", testGroupSystemPropertyKey)
       }
     }
 
     if (options.testConfigurations == null && options.testPatterns == null && options.testSimplePatterns == null && options.testGroups == null) {
-      context.messages.logErrorAndThrow("'intellij.build.test.configurations', 'intellij.build.test.patterns', 'intellij.build.test.simple.patterns', or 'intellij.build.test.groups' option should be set")
+      context.messages.logErrorAndThrow("'intellij.build.test.configurations', '$testPatternSystemPropertyKey', 'intellij.build.test.simple.patterns', or '$testGroupSystemPropertyKey' option should be set")
     }
 
     if (options.validateMainModule && mainModule.isNullOrEmpty()) {
@@ -362,9 +368,10 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
 
     // configure TestCaseLoader#isClassNameIncluded with the properties from the test process
     "test.group.roots".let { systemProperties[it]?.run { System.setProperty(it, this) } }  // from systemProperties
-    "intellij.build.test.patterns".let { options.testPatterns?.run { System.setProperty(it, this) } }  // from options, e.g. TestingTasksImpl#runTestsSkippedInHeadlessEnvironment
-    "intellij.build.test.groups".let { options.testGroups?.run { System.setProperty(it, this) } }  // from options, e.g. RunAnyTestTheSameWayTeamCityDoes#run
+    testPatternSystemPropertyKey.let { options.testPatterns?.run { System.setProperty(it, this) } }  // from options, e.g. TestingTasksImpl#runTestsSkippedInHeadlessEnvironment
+    testGroupSystemPropertyKey.let { options.testGroups?.run { System.setProperty(it, this) } }  // from options, e.g. RunAnyTestTheSameWayTeamCityDoes#run
     setPropertyFromPass(TestCaseLoader.INCLUDE_UNCONVENTIONALLY_NAMED_TESTS_FLAG)
+    setPropertyFromPass(TestCaseLoader.INCLUDE_ALL_UNCONVENTIONALLY_NAMED_TESTS_FLAG)
 
     // configure TestCaseLoader#matchesCurrentBucket with the properties from the test process
     listOf(
@@ -423,6 +430,16 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
     val testModules = let {
       if (searchForTestsAcrossModuleDependencies && System.getProperty("pass.jar.dependencies.to.tests") == null && options.testSimplePatterns == null) guessTestModulesForGroupsAndPatterns(mainModule, rootExcludeCondition, systemProperties)
       else listOf(mainModule)
+    }.let { modules ->
+      //filter out only for community (ALL_EXCLUDE_DEFINED)
+      if (options.testGroups?.contains(GroupBasedTestClassFilter.ALL_EXCLUDE_DEFINED) == true) {
+        val (bazelMigratedModules, jpsModules) = modules.partition { COMMUNITY_AGGREGATOR_BAZEL_MIGRATED_MODULES.contains(it.name) }
+        if (bazelMigratedModules.isNotEmpty()) {
+          context.messages.info("Skipping tests in ${bazelMigratedModules.size} modules migrated to Bazel: ${bazelMigratedModules.joinToString(", ") { it.name }}")
+        }
+        jpsModules
+      }
+      else modules
     }
 
     context.messages.info("Will run tests from simple patterns, patterns, or groups in ${testModules.size} modules: ${testModules.joinToString(", ") { it.name }}")
@@ -515,7 +532,7 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
       context.messages.logErrorAndThrow("Remote debugging supports debugging all test methods in a class for now, but target class isn't specified")
     }
     if (options.testPatterns != null) {
-      context.messages.warning("'intellij.build.test.patterns' option is ignored while debugging via TeamCity plugin")
+      context.messages.warning("'$testPatternSystemPropertyKey' option is ignored while debugging via TeamCity plugin")
     }
     if (options.testConfigurations != null) {
       context.messages.warning("'intellij.build.test.configurations' option is ignored while debugging via TeamCity plugin")
@@ -550,9 +567,10 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
 
     val modulePath: List<String>?
     var testClasspath = buildList {
+      val runContextModule = if (runContextModule.name != "intellij.ml.llm.tests") runContextModule else mainModule  // TODO: switch to test module classpath by default
       addAll(context.getModuleRuntimeClasspath(runContextModule, forTests = true))
 
-      //module with "com.intellij.TestAll" which output should be found in `testClasspath + modulePath`
+      //module with "com.intellij.TestCaseLoader" which output should be found in `testClasspath + modulePath`
       val testFrameworkCoreModule = outputProvider.findRequiredModule("intellij.platform.testFramework.core")
       addAll(context.getModuleRuntimeClasspath(testFrameworkCoreModule, false) )
     }.distinct()
@@ -586,16 +604,17 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
 
     val devBuildServerSettings = DevBuildServerSettings.readDevBuildServerSettingsFromIntellijYaml(mainModule.name)
       .takeIf { runContextModule.name != "intellij.clion.main.tests" }  // TODO: remove this after fixing clion tests build types
+      .takeIf { runContextModule.name != "intellij.idea.community.main.tests" }
     val bootstrapClasspath = context.getModuleRuntimeClasspath(module = outputProvider.findRequiredModule("intellij.tools.testsBootstrap"), forTests = false)
       .mapTo(mutableListOf()) { it.toString() }
     @Suppress("NAME_SHADOWING")
     val systemProperties = systemProperties.toMutableMap()
     systemProperties.put("io.netty.allocator.type", "pooled")
     systemProperties.put("test.roots", testRoots.joinToString(File.pathSeparator, transform = toExistingAbsolutePathConverter))
-    testPatterns?.let { systemProperties.putIfAbsent("intellij.build.test.patterns", it) }
-    testGroups?.let { systemProperties.putIfAbsent("intellij.build.test.groups", it) }
-    testTags?.let { systemProperties.putIfAbsent("intellij.build.test.tags", it) }
-    testExcludedTags?.let { systemProperties.putIfAbsent("intellij.build.test.excluded.tags", it) }
+    testPatterns?.let { systemProperties.putIfAbsent(testPatternSystemPropertyKey, it) }
+    testGroups?.let { systemProperties.putIfAbsent(testGroupSystemPropertyKey, it) }
+    testTags?.let { systemProperties.putIfAbsent(testIncludeTagsSystemPropertyKey, it) }
+    testExcludedTags?.let { systemProperties.putIfAbsent(testExcludeTagsSystemPropertyKey, it) }
     systemProperties.putIfAbsent(TestingOptions.PERFORMANCE_TESTS_ONLY_FLAG, options.isPerformanceTestsOnly.toString())
     val allJvmArgs = ArrayList(jvmArgs)
     prepareEnvForTestRun(jvmArgs = allJvmArgs, systemProperties = systemProperties, classPath = bootstrapClasspath, remoteDebugging = remoteDebugging, cleanSystemDir = false)
@@ -646,6 +665,41 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
       devBuildServerSettings = devBuildServerSettings,
     )
     notifySnapshotBuilt(allJvmArgs)
+  }
+
+  private fun BuildMessages.analyzeAndLogTags(includedTagsAsString: String?, excludedTagsAsString: String?) {
+    fun parseTagProperty(tagsAsString: String): Set<String> {
+      return tagsAsString.splitToSequence(";").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    }
+
+    // Case when no tags were provided
+    if (includedTagsAsString == null && excludedTagsAsString == null) {
+      info("No INCLUDE or EXCLUDE tags were specified")
+    }
+    else if (includedTagsAsString != null && excludedTagsAsString == null) {
+      val values = parseTagProperty(includedTagsAsString)
+      info("INCLUDE tags that will be applied: $values")
+    }
+    else if (includedTagsAsString == null && excludedTagsAsString != null) {
+      val values = parseTagProperty(excludedTagsAsString)
+      info("EXCLUDE tags that will be applied: $values")
+    }
+    else if (includedTagsAsString != null && excludedTagsAsString != null){
+      // Both tags are present
+      // As of JUnit5 functionality, if same values present in both INCLUDE and EXCLUDE tags - actual tag value will be counted as EXCLUDED.
+      val includedTags = parseTagProperty(includedTagsAsString)
+      val excludedTags = parseTagProperty(excludedTagsAsString)
+
+      (includedTags intersect excludedTags)
+        .apply { check(this.isEmpty()) { "Configuration error: INCLUDE and EXCLUDE tags must be mutually exclusive. Found overlapping tag(s): $this" } }
+
+      info(
+        """
+        INCLUDE tags that will be applied: $includedTags
+        EXCLUDE tags that will be applied: $excludedTags
+      """.trimIndent()
+      )
+    }
   }
 
   private suspend fun getRuntimeExecutablePath(): Path {
@@ -699,9 +753,10 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
       index = 0,
       elements = generateVmOptions(
         isEAP = true,
-        customVmMemoryOptions = if (customMemoryOptions == null) mapOf("-Xms" to "750m", "-Xmx" to "1024m") else emptyMap(),
+        customMemoryVmOptions = if (customMemoryOptions == null) mapOf("-Xms" to "750m", "-Xmx" to "1024m") else emptyMap(),
         additionalVmOptions = customMemoryOptions ?: emptyList(),
         platformPrefix = options.platformPrefix,
+        isHeadless = false,
       ),
     )
 
@@ -791,7 +846,7 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
 
     if (options.isEnableCausalProfiling) {
       val causalProfilingOptions = CausalProfilingOptions.IMPL
-      systemProperties.put("intellij.build.test.patterns", causalProfilingOptions.testClass.replace(".", "\\."))
+      systemProperties.put(testPatternSystemPropertyKey, causalProfilingOptions.testClass.replace(".", "\\."))
       jvmArgs.addAll(buildCausalProfilingAgentJvmArg(causalProfilingOptions, context))
     }
 
@@ -882,6 +937,7 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
     devBuildServerSettings: DevBuildServerSettings?,
   ) {
     val messages = context.messages
+    messages.analyzeAndLogTags(systemProperties.get(testIncludeTagsSystemPropertyKey), systemProperties.get(testExcludeTagsSystemPropertyKey))
     if (options.testSimplePatterns != null) {
       val exitCode = blockWithDefaultFlowId("running tests w/ simple patterns") {
         runJUnit5Engine(
@@ -898,7 +954,7 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
         )
       }
 
-      if (exitCode == 1) throw RuntimeException("Tests failed")
+      if (exitCode == EXIT_FAILURE) throw RuntimeException("Tests failed")
       else if (exitCode == NO_TESTS_ERROR) throw NoTestsFound()
       else if (exitCode != 0) throw RuntimeException("Unexpected exit code $exitCode when running tests w/ simple patterns")
     }
@@ -952,7 +1008,7 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
               devBuildSettings = devBuildServerSettings,
             )
           }
-          if (exitCode == 1) hasFailures = true  // reported as test failure or assertNoUnhandledExceptions if exception
+          if (exitCode == EXIT_FAILURE) hasFailures = true  // reported as test failure or assertNoUnhandledExceptions if exception
           else if (exitCode == NO_TESTS_ERROR) throw NoTestsFound()
           else if (exitCode != 0) throw RuntimeException("Unexpected exit code $exitCode when running tests in dedicated runtime (class mode)")
         }
@@ -997,7 +1053,7 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
               devBuildSettings = devBuildServerSettings,
             )
           }
-          if (exitCode == 1) hasFailures = true  // reported as test failure or assertNoUnhandledExceptions if exception
+          if (exitCode == EXIT_FAILURE) hasFailures = true  // reported as test failure or assertNoUnhandledExceptions if exception
           else if (exitCode == NO_TESTS_ERROR) throw NoTestsFound()
           else if (exitCode != 0) throw RuntimeException("Unexpected exit code $exitCode when running tests in dedicated runtime (package mode)")
         }
@@ -1066,7 +1122,7 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
           if (attempt > 1) {
             additionalProperties["intellij.build.test.ignoreFirstAndLastTests"] = "true"
             check(!failedClasses.isNullOrEmpty())  // already checked in the previous attempt
-            additionalProperties["intellij.build.test.patterns"] = failedClasses.joinToString(";")
+            additionalProperties[testPatternSystemPropertyKey] = failedClasses.joinToString(";")
           }
 
           blockWithDefaultFlowId("run tests${spanNameSuffix}") {
@@ -1094,13 +1150,13 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
               options.bucketsCount < 2) {
             throw NoTestsFound()
           }
-          if (exitCode != 0 && exitCode != 1 && exitCode != NO_TESTS_ERROR) {
+          if (exitCode != 0 && exitCode != EXIT_FAILURE && exitCode != NO_TESTS_ERROR) {
             throw RuntimeException("Unexpected exit code $exitCode when running tests")
           }
 
           if (options.attemptCount > 1) {
             if (failedClasses!!.isNotEmpty()) {
-              if (exitCode != 1) throw RuntimeException("Unexpected exit code $exitCode when running tests but found failed tests to retry")
+              if (exitCode != EXIT_FAILURE) throw RuntimeException("Unexpected exit code $exitCode when running tests but found failed tests to retry")
               messages.warning("Will rerun tests: $failedClasses")
             }
             else {
@@ -1119,7 +1175,7 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
           messages.warning("Can't delete config or system path: ${e.stackTraceToString()}")
         }
 
-        val hadRunFailures = exitCode == 1
+        val hadRunFailures = exitCode == EXIT_FAILURE
         hadAnyFailures = hadAnyFailures || hadRunFailures
 
         // On TeamCity test failures themselves control the build status, no need to report them as additional errors
@@ -1312,7 +1368,12 @@ internal class TestingTasksImpl(context: CompilationContext, private val options
 }
 
 private fun appendJUnitStarter(classPath: MutableList<String>, context: CompilationContext) {
-  for ((libName, moduleName) in arrayOf("JUnit5" to null, "JUnit5Launcher" to null, "JUnit5Vintage" to "intellij.libraries.junit5.vintage", "JUnit5Jupiter" to "intellij.libraries.junit5.jupiter")) {
+  for ((libName, moduleName) in arrayOf(
+    "JUnit5" to "intellij.libraries.junit5",
+    "JUnit5Launcher" to "intellij.libraries.junit5.launcher",
+    "JUnit5Vintage" to "intellij.libraries.junit5.vintage",
+    "JUnit5Jupiter" to "intellij.libraries.junit5.jupiter",
+  )) {
     for (library in context.outputProvider.findLibraryRoots(libName, moduleName)) {
       classPath.add(library.toString())
     }
@@ -1424,3 +1485,172 @@ private suspend fun publishTestDiscovery(messages: BuildMessages, file: String?)
   }
   messages.buildStatus("With Discovery, {build.status.text}")
 }
+
+private val COMMUNITY_AGGREGATOR_BAZEL_MIGRATED_MODULES = listOf(
+  "intellij.maven.server.eventListener.tests",
+  "intellij.agent.workbench.chat.tests",
+  "intellij.ant.tests",
+  "intellij.commander.tests",
+  "intellij.completionMlRanking.tests",
+  "intellij.completionMlRankingModels.tests",
+  "intellij.configurationScript.tests",
+  "intellij.configurationScript.test.java",
+  "intellij.copyright.tests",
+  "intellij.devkit.apiDump.lang.tests",
+  "intellij.devkit.debugger.tests",
+  "intellij.devkit.gradle.tests",
+  "intellij.devkit.i18n.tests",
+  "intellij.devkit.java.tests",
+  "intellij.devkit.testFramework",
+  "intellij.devkit.workspaceModel.tests",
+  "intellij.eclipse.tests",
+  "intellij.editorconfig.backend.tests",
+  "intellij.evaluationPlugin.languages.java.tests",
+  "intellij.evaluationPlugin.languages.kotlin.tests",
+  "intellij.evaluationPlugin.tests",
+  "intellij.execution.process.mediator.client.tests",
+  "intellij.execution.process.mediator.common.tests",
+  "intellij.featuresTrainer.tests",
+  "intellij.findUsagesMl.tests",
+  "intellij.gradle.completion.tests",
+  "intellij.gradle.java.maven.tests",
+  "intellij.gradle.toolingExtension.tests",
+  "intellij.groovy.structuralSearch.tests",
+  "intellij.html.tools.tests",
+  "intellij.ide.startup.importSettings.tests",
+  "intellij.idea.community.build.tasks.tests",
+  "intellij.idea.tools.launch.tests",
+  "intellij.java.byteCodeViewer.tests",
+  "intellij.java.debugger.streams.tests",
+  "intellij.java.guiForms.compiler.tests",
+  "intellij.java.guiForms.designer.tests",
+  "intellij.java.i18n.tests",
+  "intellij.java.jshell.protocol.tests",
+  "intellij.javaFX.community.tests",
+  "intellij.javaFX.tests",
+  "intellij.kotlin.gradle.tooling.impl.tests",
+  "intellij.kotlin.onboarding.tests",
+  "intellij.maven.proofreading.tests",
+  "intellij.maven.testFramework.tests",
+  "intellij.notebooks.visualization.tests",
+  "intellij.java.manifest.tests",
+  "intellij.json.networknt.wrapper.tests",
+  "intellij.jsonpath.tests",
+  "intellij.jvm.analysis.java.tests",
+  "intellij.markdown.tests",
+  "intellij.java.testFramework.tests",
+  "intellij.testng.rt.tests",
+  "intellij.java.typeMigration.tests",
+  "intellij.java.coverage.tests",
+  "intellij.platform.acp.tests",
+  "intellij.platform.backend.observation.tests",
+  "intellij.platform.completion.common.tests",
+  "intellij.platform.compose.tests",
+  "intellij.performanceTesting.tests",
+  "intellij.platform.buildScripts.productDsl.tests",
+  "intellij.platform.buildScripts.usages.tests",
+  "intellij.platform.collaborationTools.tests",
+  "intellij.platform.coverage.tests",
+  "intellij.performanceTesting.ui.tests",
+  "intellij.platform.debugger.impl.frontend.tests",
+  "intellij.platform.debugger.impl.ui.tests",
+  "intellij.platform.diagnostic.freezeAnalyzer.tests",
+  "intellij.platform.diagnostic.telemetry.agent.extension.tests",
+  "intellij.platform.diagnostic.telemetry.rt.tests",
+  "intellij.platform.diff.tests",
+  "intellij.platform.discoverability.tests",
+  "intellij.platform.eel.tests",
+  "intellij.platform.execution.tests",
+  "intellij.platform.experiment.tests",
+  "intellij.platform.externalProcessAuthHelper.tests",
+  "intellij.platform.icons.impl.intellij.tests",
+  "intellij.platform.ide.concurrency.tests",
+  "intellij.platform.ide.nonModalWelcomeScreen.tests",
+  "intellij.platform.ijent.tests",
+  "intellij.platform.images.build.tests",
+  "intellij.platform.images.tests",
+  "intellij.platform.indexing.tests",
+  "intellij.platform.inspect.tests",
+  "intellij.platform.instanceContainer.tests",
+  "intellij.platform.jewel.decoratedWindow.tests",
+  "intellij.platform.jewel.foundation.tests",
+  "intellij.platform.jewel.ideLafBridge.tests",
+  "intellij.platform.jewel.markdown.core.tests",
+  "intellij.platform.jewel.markdown.extensions.autolink.tests",
+  "intellij.platform.jewel.markdown.extensions.gfmAlerts.tests",
+  "intellij.platform.jewel.markdown.extensions.gfmTables.tests",
+  "intellij.platform.jewel.markdown.extensions.images.tests",
+  "intellij.platform.objectSerializer.tests",
+  "intellij.python.community.execService.tests",
+  "intellij.python.community.services.internal.impl.tests",
+  "intellij.python.community.services.shared.tests",
+  "intellij.python.processOutput.frontend.tests",
+  "intellij.python.sdk.tests",
+  "intellij.python.test.env.junit5",
+  "intellij.python.pytools.tests",
+  "intellij.regexp.tests",
+  "intellij.remoteDev.util.tests",
+  "intellij.repository.search.completion.tests",
+  "intellij.searchEverywhereLucene.backend.tests",
+  "intellij.searchEverywhereMl.typos.tests",
+  "intellij.statsCollector.tests",
+  "intellij.platform.jewel.ui.tests",
+  "intellij.platform.jps.model.tests",
+  "intellij.platform.markdown.utils.tests",
+  "intellij.platform.ml.impl.tests",
+  "intellij.platform.pluginGraph.tests",
+  "intellij.platform.pluginSystem.parser.impl.tests",
+  "intellij.platform.polySymbols.tests",
+  "intellij.platform.problemView.backend.tests",
+  "intellij.platform.problemView.ui.tests",
+  "intellij.platform.runtime.product.tests",
+  "intellij.platform.runtime.repository.tests",
+  "intellij.platform.searchEverywhere.backend.tests",
+  "intellij.platform.searchEverywhere.frontend.tests",
+  "intellij.platform.serviceContainer.tests",
+  "intellij.platform.settings.local.tests",
+  "intellij.platform.smRunner.tests",
+  "intellij.platform.sqlite.tests",
+  "intellij.platform.statistics.devkit.tests",
+  "intellij.platform.statistics.tests",
+  "intellij.platform.structuralSearch.tests",
+  "intellij.platform.syntax.extensions.tests",
+  "intellij.platform.syntax.i18n.tests",
+  "intellij.platform.syntax.psi.tests",
+  "intellij.platform.syntax.tests",
+  "intellij.platform.testFramework.tests",
+  "intellij.platform.testFramework.junit5.jimfs.tests",
+  "intellij.platform.testFramework.junit5.projectStructure.tests",
+  "intellij.platform.testFramework.selfContainedProjects.tests",
+  "intellij.platform.testRunner.tests",
+  "intellij.platform.threadDumpParser.tests",
+  "intellij.platform.uast.tests",
+  "intellij.platform.util.coroutines.tests",
+  "intellij.platform.util.progress.tests",
+  "intellij.platform.util.rt.tests",
+  "intellij.platform.util.text.matching.tests",
+  "intellij.platform.vcs.core.tests",
+  "intellij.platform.vcs.dvcs.impl.tests",
+  "intellij.platform.whatsNew.tests",
+  "intellij.testng.tests",
+  "intellij.textmate.core.tests",
+  "intellij.textmate.joni.tests",
+  "intellij.textmate.tests",
+  "intellij.toml.tests",
+  "intellij.tools.cmd.tests",
+  "intellij.tools.ide.metrics.benchmark.tests",
+  "intellij.tools.ide.metrics.collector.tests",
+  "intellij.tools.ide.starter.bus.tests",
+  "intellij.turboComplete.tests",
+  "intellij.vcs.git.featuresTrainer.tests",
+  "intellij.vcs.github.tests",
+  "intellij.vcs.github.tracker.tests",
+  "kotlin.gradle.gradle-java.tests",
+  "intellij.xpath.tests",
+  "intellij.yaml.backend.tests",
+  "intellij.yaml.tests",
+  "intellij.xml.dom.tests",
+  "intellij.xml.tests",
+  "intellij.xml.xmlbeans.tests",
+  "intellij.platform.testFramework.monorepo.tests",
+)

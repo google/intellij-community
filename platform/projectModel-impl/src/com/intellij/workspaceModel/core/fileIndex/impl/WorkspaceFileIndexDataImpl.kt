@@ -4,6 +4,7 @@ package com.intellij.workspaceModel.core.fileIndex.impl
 import com.intellij.ide.highlighter.ArchiveFileType
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.serviceAsync
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileTypes.FileTypeRegistry
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.impl.PackageDirectoryCacheImpl
@@ -32,11 +33,13 @@ import com.intellij.platform.workspace.storage.WorkspaceEntityWithSymbolicId
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import com.intellij.util.CollectionQuery
 import com.intellij.util.Query
+import com.intellij.util.SmartList
 import com.intellij.util.concurrency.ThreadingAssertions
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.util.containers.CollectionFactory
 import com.intellij.util.containers.ConcurrentBitSet
 import com.intellij.util.containers.HashingStrategy
+import com.intellij.util.containers.forEachLoggingErrors
 import com.intellij.workspaceModel.core.fileIndex.DependencyDescription
 import com.intellij.workspaceModel.core.fileIndex.EntityStorageKind
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileIndexChangedEvent
@@ -48,7 +51,7 @@ import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileSetData
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileSetExclusionCondition
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileSetRegistrar
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileSetWithCustomData
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap
+import java.util.concurrent.ConcurrentHashMap
 
 @Suppress("DuplicatedCode")
 internal suspend fun initWorkspaceFileIndexData(
@@ -56,7 +59,7 @@ internal suspend fun initWorkspaceFileIndexData(
   contributorList: List<WorkspaceFileIndexContributor<*>>,
 ): WorkspaceFileIndexDataImpl {
   @Suppress("SSBasedInspection")
-  val fileSets = Object2ObjectOpenHashMap<VirtualFile, StoredFileSetCollection>()
+  val fileSets = ConcurrentHashMap<VirtualFile, StoredFileSetCollection>()
   val fileSetsByPackagePrefix = PackagePrefixStorage()
 
   @Suppress("UnsafeOpenServiceCast")
@@ -116,7 +119,7 @@ internal fun blockingInitWorkspaceFileIndexData(
   contributorList: List<WorkspaceFileIndexContributor<*>>,
 ): WorkspaceFileIndexDataImpl {
   @Suppress("SSBasedInspection")
-  val fileSets = Object2ObjectOpenHashMap<VirtualFile, StoredFileSetCollection>()
+  val fileSets = ConcurrentHashMap<VirtualFile, StoredFileSetCollection>()
   val fileSetsByPackagePrefix = PackagePrefixStorage()
 
   @Suppress("UnsafeOpenServiceCast")
@@ -212,7 +215,7 @@ internal class WorkspaceFileIndexDataImpl(
             if (storedKindMask == StoredFileSetKindMask.ACCEPTED_FILE_SET) {
               return@addMeasuredTime storedFileSets as WorkspaceFileInternalInfo
             }
-            val acceptedFileSets = ArrayList<WorkspaceFileSetImpl>()
+            val acceptedFileSets = SmartList<WorkspaceFileSetImpl>()
             //copy a mutable variable used from lambda to a 'val' to ensure that kotlinc won't wrap it into IntRef
             val currentKindMask = acceptedKindsMask
             //this should be a rare case, so it's ok to use less optimal code here and check 'isUnloaded' again
@@ -244,7 +247,6 @@ internal class WorkspaceFileIndexDataImpl(
     if (hasDirtyEntities && ApplicationManager.getApplication().isWriteAccessAllowed) {
       updateDirtyEntities()
     }
-    ThreadingAssertions.assertReadAccess()
     nonIncrementalContributors.updateIfNeeded(fileSets, fileSetsByPackagePrefix, nonExistingFilesRegistry)
   }
 
@@ -441,13 +443,13 @@ internal class WorkspaceFileIndexDataImpl(
     ThreadingAssertions.assertWriteAccess()
     val removeRegistrar = RemoveFileSetsRegistrarImpl(storageKind, nonExistingFilesRegistry, fileSets, fileSetsByPackagePrefix)
     val storeRegistrar = StoreFileSetsRegistrarImpl(storageKind, nonExistingFilesRegistry, fileSets, fileSetsByPackagePrefix)
-    contributorList.filter { it.storageKind == storageKind }.forEach {
+    contributorList.filter { it.storageKind == storageKind }.forEachLoggingErrors(logger) {
       processChangesByContributor(it, event, storeRegistrar, removeRegistrar)
     }
     resetFileCache()
     val registeredFileSets = storeRegistrar.registeredFileSets
     val removedFileSets = removeRegistrar.removedFileSets
-    deduplicateFileSetsAndPublishChangeEvent(registeredFileSets, removedFileSets, event.storageAfter)
+    deduplicateFileSetsAndPublishChangeEvent(registeredFileSets, removedFileSets)
   }
 
   /**
@@ -461,7 +463,6 @@ internal class WorkspaceFileIndexDataImpl(
   private fun deduplicateFileSetsAndPublishChangeEvent(
     registeredFileSets: MutableSet<StoredFileSet>,
     removedFileSets: MutableSet<StoredFileSet>,
-    storageAfter: ImmutableEntityStorage,
   ) {
     val iterator = registeredFileSets.iterator()
     while (iterator.hasNext()) {
@@ -475,7 +476,7 @@ internal class WorkspaceFileIndexDataImpl(
     val registeredFileSets = registeredFileSets.filterIsInstance<WorkspaceFileSet>()
 
     if (registeredFileSets.isNotEmpty() || removedExclusions.isNotEmpty()) {
-      val changeLog = WorkspaceFileIndexChangedEvent(registeredFileSets, removedExclusions, storageAfter)
+      val changeLog = WorkspaceFileIndexChangedEvent(registeredFileSets, removedExclusions)
       project.messageBus.syncPublisher(WorkspaceFileIndexListener.TOPIC).workspaceFileIndexChanged(changeLog)
     }
   }
@@ -510,7 +511,7 @@ internal class WorkspaceFileIndexDataImpl(
 
     removedFileSets.addAll(removeRegistrar.removedFileSets)
     WorkspaceFileIndexDataMetrics.updateDirtyEntitiesTimeNanosec.addElapsedTime(start)
-    deduplicateFileSetsAndPublishChangeEvent(storeRegistrar.registeredFileSets, removedFileSets, storage)
+    deduplicateFileSetsAndPublishChangeEvent(storeRegistrar.registeredFileSets, removedFileSets)
   }
 
   override fun resetFileCache() {
@@ -612,7 +613,7 @@ internal class WorkspaceFileIndexDataImpl(
     packageDirectoryCache.clear()
   }
 
-  override fun getNonExistentFileSetKinds(url: VirtualFileUrl): Set<NonExistingFileSetKind> = nonExistingFilesRegistry.getFileSetKindsFor(url)
+  override fun getNonExistentFileSetKinds(url: VirtualFileUrl, includeNonRecursive: Boolean): Set<NonExistingFileSetKind> = nonExistingFilesRegistry.getFileSetKindsFor(url, includeNonRecursive)
 
   override fun analyzeVfsChanges(events: List<VFileEvent>): VfsChangeApplier? = nonExistingFilesRegistry.analyzeVfsChanges(events, this)
 }
@@ -631,6 +632,8 @@ private fun registerAllEntities(
   }
 }
 
+private val logger = Logger.getInstance(WorkspaceFileIndexDataImpl::class.java)
+
 private fun <E : WorkspaceEntity> registerFileSets(
   entity: E,
   storage: EntityStorage,
@@ -638,7 +641,7 @@ private fun <E : WorkspaceEntity> registerFileSets(
   contributors: List<WorkspaceFileIndexContributor<WorkspaceEntity>>,
 ) {
   WorkspaceFileIndexDataMetrics.registerFileSetsTimeNanosec.addMeasuredTime {
-    for (contributor in contributors) {
+    contributors.forEachLoggingErrors(logger) { contributor ->
       contributor.registerFileSets(entity, registrar, storage)
     }
   }
@@ -656,6 +659,7 @@ private class RemoveFileSetsRegistrarImpl(
     val rootFile = root.virtualFile
     if (rootFile == null) {
       nonExistingFilesRegistry.unregisterUrl(root, entity, storageKind)
+      removePackagePrefixFileSets(entity, customData)
     }
     else {
       registerFileSet(rootFile, kind, entity, customData)
@@ -673,6 +677,10 @@ private class RemoveFileSetsRegistrarImpl(
     }
 
     fileSets.removeValueIf(root, removeCondition)
+    removePackagePrefixFileSets(entity, customData)
+  }
+
+  private fun removePackagePrefixFileSets(entity: WorkspaceEntity, customData: WorkspaceFileSetData?) {
     if (customData is JvmPackageRootDataInternal) {
       fileSetsByPackagePrefix.removeByPrefixAndPointer(customData.packagePrefix, entity.createPointer())
     }
@@ -745,6 +753,14 @@ private class RemoveFileSetsRegistrarImpl(
   }
 }
 
+private fun WorkspaceFileKind.toNonExistingFileSetKind(): NonExistingFileSetKind {
+  return when (this) {
+    WorkspaceFileKind.CONTENT, WorkspaceFileKind.TEST_CONTENT -> NonExistingFileSetKind.INCLUDED_CONTENT
+    WorkspaceFileKind.CONTENT_NON_INDEXABLE -> NonExistingFileSetKind.INCLUDED_CONTENT_NON_INDEXABLE
+    else -> NonExistingFileSetKind.INCLUDED_OTHER
+  }
+}
+
 internal fun WorkspaceFileKind.toMask(): Int {
   val mask = when (this) {
     WorkspaceFileKind.CONTENT, WorkspaceFileKind.TEST_CONTENT -> WorkspaceFileKindMask.CONTENT
@@ -787,8 +803,13 @@ private class StoreFileSetsRegistrarImpl(
       registerFileSet(rootFile, kind, entity, customData, recursive)
     }
     else {
-      val fileSetKind = if (kind.isContent) NonExistingFileSetKind.INCLUDED_CONTENT else NonExistingFileSetKind.INCLUDED_OTHER
-      nonExistingFilesRegistry.registerUrl(root, entity, storageKind, fileSetKind)
+      nonExistingFilesRegistry.registerUrl(
+        root = root,
+        entity = entity,
+        storageKind = storageKind,
+        fileSetKind = kind.toNonExistingFileSetKind(),
+        recursive = recursive,
+      )
     }
   }
 
@@ -823,7 +844,8 @@ private class StoreFileSetsRegistrarImpl(
   override fun registerExcludedRoot(excludedRoot: VirtualFileUrl, entity: WorkspaceEntity) {
     val excludedRootFile = excludedRoot.virtualFile
     if (excludedRootFile == null) {
-      nonExistingFilesRegistry.registerUrl(excludedRoot, entity, storageKind, NonExistingFileSetKind.EXCLUDED_FROM_CONTENT)
+      nonExistingFilesRegistry.registerUrl(excludedRoot, entity, storageKind, NonExistingFileSetKind.EXCLUDED_FROM_CONTENT,
+                                           recursive = true)
     }
     else {
       val fileSet = ExcludedFileSet.ByFileKind(excludedRootFile, WorkspaceFileKindMask.ALL, entity.createPointer(), storageKind)
@@ -835,8 +857,13 @@ private class StoreFileSetsRegistrarImpl(
   override fun registerExcludedRoot(excludedRoot: VirtualFileUrl, excludedFrom: WorkspaceFileKind, entity: WorkspaceEntity) {
     val file = excludedRoot.virtualFile
     if (file == null) {
-      val fileSetKind = if (excludedFrom.isContent) NonExistingFileSetKind.EXCLUDED_FROM_CONTENT else NonExistingFileSetKind.EXCLUDED_OTHER
-      nonExistingFilesRegistry.registerUrl(excludedRoot, entity, storageKind, fileSetKind)
+      nonExistingFilesRegistry.registerUrl(
+        root = excludedRoot,
+        entity = entity,
+        storageKind = storageKind,
+        fileSetKind = if (excludedFrom.isContent) NonExistingFileSetKind.EXCLUDED_FROM_CONTENT else NonExistingFileSetKind.EXCLUDED_OTHER,
+        recursive = true,
+      )
     }
     else {
       val mask = when (excludedFrom) {
@@ -854,7 +881,7 @@ private class StoreFileSetsRegistrarImpl(
     val rootFile = root.virtualFile
     if (!patterns.isEmpty()) {
       if (rootFile == null) {
-        nonExistingFilesRegistry.registerUrl(root, entity, storageKind, NonExistingFileSetKind.EXCLUDED_OTHER)
+        nonExistingFilesRegistry.registerUrl(root, entity, storageKind, NonExistingFileSetKind.EXCLUDED_OTHER, recursive = true)
       }
       else {
         val fileSet = ExcludedFileSet.ByPattern(rootFile, patterns, entity.createPointer(), storageKind)
@@ -867,7 +894,7 @@ private class StoreFileSetsRegistrarImpl(
   override fun registerExclusionCondition(root: VirtualFileUrl, condition: WorkspaceFileSetExclusionCondition, entity: WorkspaceEntity) {
     val rootFile = root.virtualFile
     if (rootFile == null) {
-      nonExistingFilesRegistry.registerUrl(root, entity, storageKind, NonExistingFileSetKind.EXCLUDED_OTHER)
+      nonExistingFilesRegistry.registerUrl(root, entity, storageKind, NonExistingFileSetKind.EXCLUDED_OTHER, recursive = true)
     }
     else {
       val fileSet = ExcludedFileSet.ByCondition(rootFile, condition, entity.createPointer(), storageKind)

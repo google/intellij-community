@@ -15,6 +15,7 @@ import com.intellij.ide.plugins.newui.PluginModelAsyncOperationsExecutor
 import com.intellij.ide.plugins.newui.PluginModelFacade
 import com.intellij.ide.plugins.newui.PluginPriceService
 import com.intellij.ide.plugins.newui.PluginUiModel
+import com.intellij.ide.plugins.newui.PluginUpdateSubscription
 import com.intellij.ide.plugins.newui.PluginUpdatesService
 import com.intellij.ide.plugins.newui.PluginsGroup
 import com.intellij.ide.plugins.newui.PluginsGroupComponent
@@ -35,9 +36,9 @@ import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.PlatformDataKeys
 import com.intellij.openapi.actionSystem.impl.PresentationFactory
-import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ModalityState.any
+import com.intellij.openapi.application.UI
 import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.extensions.PluginId
@@ -52,6 +53,8 @@ import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupListener
 import com.intellij.openapi.ui.popup.LightweightWindowEvent
 import com.intellij.openapi.updateSettings.impl.PluginAutoUpdateListener
+import com.intellij.openapi.updateSettings.impl.PluginUpdateSourceId
+import com.intellij.openapi.updateSettings.impl.PluginUpdateSourceService
 import com.intellij.openapi.updateSettings.impl.UpdateOptions
 import com.intellij.openapi.updateSettings.impl.UpdateSettings
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.FUSEventSource
@@ -99,7 +102,7 @@ class PluginManagerConfigurablePanel @RequiresEdt constructor(searchQuery: Strin
   private val coroutineScope: CoroutineScope
 
   private val pluginModelFacade: PluginModelFacade
-  private val pluginUpdatesService: PluginUpdatesService
+  private val updateSubscription: PluginUpdateSubscription
   private val pluginManagerCustomizer: PluginManagerCustomizer? = PluginManagerCustomizer.getInstance()
 
   private val tabHeaderComponent: TabbedPaneHeaderComponent
@@ -120,6 +123,7 @@ class PluginManagerConfigurablePanel @RequiresEdt constructor(searchQuery: Strin
 
   private val callbackLock: Any = Any()
   private var shutdownCallbackExecuted: Boolean = false
+  private var applyScheduled: Boolean = false
 
   init {
     pluginModelFacade = PluginModelFacade(MyPluginModel(null))
@@ -127,12 +131,6 @@ class PluginManagerConfigurablePanel @RequiresEdt constructor(searchQuery: Strin
     val childScope = parentScope.childScope(javaClass.name, Dispatchers.IO, true)
     pluginModelFacade.getModel().coroutineScope = childScope
     coroutineScope = childScope
-
-    pluginUpdatesService =
-      UiPluginManager.getInstance().subscribeToUpdatesCount(pluginModelFacade.getModel().sessionId) { updatesCount ->
-        coroutineScope.launch(Dispatchers.EDT + any().asContextElement()) { onPluginUpdatesRecalculation(updatesCount) }
-      }
-    pluginModelFacade.getModel().pluginUpdatesService = pluginUpdatesService
 
     CustomPluginRepositoryService.getInstance().clearCache()
 
@@ -160,6 +158,11 @@ class PluginManagerConfigurablePanel @RequiresEdt constructor(searchQuery: Strin
     if (pluginManagerCustomizer != null) {
       pluginManagerCustomizer.initCustomizer(cardPanel)
     }
+
+    updateSubscription =
+      UiPluginManager.getInstance().subscribeToPluginUpdatesFiltered(pluginModelFacade.getModel().sessionId) { pluginUpdates ->
+        coroutineScope.launch(Dispatchers.UI + any().asContextElement()) { onPluginUpdatesRecalculation(pluginUpdates) }
+      }
   }
 
   @RequiresEdt
@@ -282,31 +285,38 @@ class PluginManagerConfigurablePanel @RequiresEdt constructor(searchQuery: Strin
   private fun resetPanels() {
     CustomPluginRepositoryService.getInstance().clearCache()
     marketplaceTab.resetCache()
-    pluginUpdatesService.recalculateUpdates()
+    PluginUpdatesService.getInstance().recalculateUpdates()
     marketplaceTab.onPanelReset(tabHeaderComponent.getSelectionTab() == MARKETPLACE_TAB)
   }
 
-  private fun onPluginUpdatesRecalculation(updatesCount: Int?) {
-    val count = updatesCount ?: 0
-    val text = Integer.toString(count)
-
-    val tooltip = PluginUpdatesService.getUpdatesTooltip()
+  private fun onPluginUpdatesRecalculation(pluginUpdates: List<PluginUiModel>) {
+    val text = Integer.toString(pluginUpdates.size)
+    val tooltip = getUpdatesTooltip(pluginUpdates)
     tabHeaderComponent.setTabTooltip(INSTALLED_TAB, tooltip)
 
-    installedTab.onPluginUpdatesRecalculation(updatesCount, tooltip)
+    installedTab.onPluginUpdatesRecalculation(pluginUpdates.size, tooltip)
 
     installedTabHeaderUpdatesCountIcon.setText(text)
     tabHeaderComponent.update()
   }
 
+  @Nls
+  fun getUpdatesTooltip(pluginUpdates: List<PluginUiModel>): @Nls String? {
+    if (pluginUpdates.isEmpty()) {
+      return null
+    }
+    return IdeBundle.message("updates.plugin.ready.tooltip",
+                             StringUtil.join(pluginUpdates.map { it.name }, ", "),
+                             pluginUpdates.size)
+  }
+
   private fun createMarketplaceTab(): MarketplacePluginsTab {
-    return MarketplacePluginsTab(pluginModelFacade, coroutineScope, pluginManagerCustomizer, pluginUpdatesService)
+    return MarketplacePluginsTab(pluginModelFacade, coroutineScope, pluginManagerCustomizer)
   }
 
   private fun createInstalledTab(): InstalledPluginsTab {
     val installedPluginsTab = InstalledPluginsTab(
       pluginModelFacade,
-      pluginUpdatesService,
       coroutineScope,
       { _ -> tabHeaderComponent.setSelectionWithEvents(MARKETPLACE_TAB) },
     )
@@ -354,7 +364,7 @@ class PluginManagerConfigurablePanel @RequiresEdt constructor(searchQuery: Strin
 
     installedTab.getInstalledSearchPanel().dispose()
 
-    pluginUpdatesService.dispose()
+    updateSubscription.cancel()
     PluginPriceService.cancel()
 
     pluginsState.runShutdownCallback()
@@ -377,18 +387,31 @@ class PluginManagerConfigurablePanel @RequiresEdt constructor(searchQuery: Strin
   }
 
   fun scheduleApply() {
+    synchronized(callbackLock) {
+      if (applyScheduled) {
+        return
+      }
+      applyScheduled = true
+    }
     application.invokeLater({
       try {
-        apply()
-        WelcomeScreenEventCollector.logPluginsModified()
-        synchronized(callbackLock) {
-          if (disposeStarted && !shutdownCallbackExecuted) {
-            InstalledPluginsState.getInstance().runShutdownCallback()
+        if (isModified()) {
+          apply()
+          WelcomeScreenEventCollector.logPluginsModified()
+          synchronized(callbackLock) {
+            if (disposeStarted && !shutdownCallbackExecuted) {
+              InstalledPluginsState.getInstance().runShutdownCallback()
+            }
           }
         }
       }
       catch (exception: ConfigurationException) {
         Logger.getInstance(PluginsTabFactory::class.java).error(exception)
+      }
+      finally {
+        synchronized(callbackLock) {
+          applyScheduled = false
+        }
       }
     }, ModalityState.nonModal())
   }
@@ -636,6 +659,10 @@ class PluginManagerConfigurablePanel @RequiresEdt constructor(searchQuery: Strin
         return
       }
       this@PluginManagerConfigurablePanel.onPluginInstalledFromDisk(callbackData)
+    }
+
+    override fun onPluginWithUpdateSourceInstalledFromDisk(pluginId: PluginId, updateSourceId: PluginUpdateSourceId) {
+      PluginUpdateSourceService.getInstance().setPluginUpdateSourceId(pluginId, updateSourceId)
     }
   }
 

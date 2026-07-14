@@ -39,9 +39,9 @@ class MarkdownParserManager: Disposable {
     if (info != null && info.bufferHash == buffer.hashCode() && info.buffer == buffer) {
       return info.tree
     }
-    val parseResult = MarkdownParser(flavour).parse(
+    val parseResult = createMarkdownParser(flavour).parse(
       MarkdownElementTypes.MARKDOWN_FILE,
-      buffer.toString(),
+      buffer,
       parseInlines = false
     )
     lastParsingResult.set(SoftReference(ParsingResult(buffer, parseResult)))
@@ -64,6 +64,10 @@ class MarkdownParserManager: Disposable {
     fun getInstance(): MarkdownParserManager {
       return service()
     }
+
+    @JvmStatic
+    fun createMarkdownParser(flavour: MarkdownFlavourDescriptor, assertionsEnabled: Boolean = true): MarkdownParser =
+      MarkdownParser(flavour, assertionsEnabled) { ProgressManager.checkCanceled() }
 
     @JvmStatic
     @JvmOverloads

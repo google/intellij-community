@@ -9,46 +9,64 @@ import com.intellij.platform.eel.annotations.NativePath
 import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.eel.pathSeparator
 import com.intellij.platform.eel.provider.LocalEelDescriptor
-import org.jetbrains.plugins.terminal.util.ShellIntegration
+import org.jetbrains.annotations.ApiStatus
 import java.nio.file.Path
 import java.util.Collections
 
-internal class MutableShellExecOptionsImpl(
+@ApiStatus.Internal
+class MutableShellExecOptionsImpl(
   private var _execCommand: ShellExecCommand,
   override val workingDirectory: EelPath,
   private val mutableEnvs: MutableMap<String, String>,
-  private val shellIntegration: ShellIntegration?,
+  private val shellIntegrationAvailable: Boolean,
   private val requester: Class<out ShellExecOptionsCustomizer>,
 ) : MutableShellExecOptions {
 
   private val translator: TerminalLocalPathTranslator = TerminalLocalPathTranslator(eelDescriptor)
 
   override fun setEnvironmentVariable(name: String, value: String?) {
-    if (value == null) {
-      mutableEnvs.remove(name)
-      LOG.debug { "$requester removed environment variable '$name'" }
-    }
-    else {
-      mutableEnvs[name] = value
-      LOG.debug { "$requester: setEnvironmentVariable('$name', '$value')" }
-    }
+    doSetEnvironmentVariable(name, value, "setEnvironmentVariable")
   }
 
   override fun setEnvironmentVariableToPath(name: String, path: Path?) {
     if (path == null) {
-      mutableEnvs.remove(name)
-      LOG.debug { "$requester removed environment variable '$name'" }
+      doSetEnvironmentVariable(name, null, "setEnvironmentVariableToPath")
     }
     else {
       val translatedPath = translatePathToRemote(path)
       if (translatedPath != null) {
-        mutableEnvs[name] = translatedPath
-        LOG.debug { "$requester: setEnvironmentVariableToPath('$name', '$translatedPath')" }
+        LOG.debug { "$requester: path translated: '$path' -> '$translatedPath'" }
+        doSetEnvironmentVariable(name, translatedPath, "setEnvironmentVariableToPath")
       }
       else {
         LOG.debug { "$requester: path translation failed for setEnvironmentVariableToPath('$name', '$path'), skipping" }
       }
     }
+  }
+
+  private fun doSetEnvironmentVariable(name: String, value: String?, context: String) {
+    if (value == null) {
+      removeEnv(name, context)
+      if (shellIntegrationAvailable) {
+        removeEnv(name.ensureStartsWith(INTELLIJ_FORCE_SET_PREFIX), context)
+      }
+    }
+    else {
+      setEnv(name, value, context)
+      if (shellIntegrationAvailable) {
+        setEnv(name.ensureStartsWith(INTELLIJ_FORCE_SET_PREFIX), value, context)
+      }
+    }
+  }
+
+  private fun removeEnv(name: String, context: String) {
+    val success = mutableEnvs.remove(name) != null
+    LOG.debug { "$requester: $context: removed environment variable: $name ($success)" }
+  }
+
+  private fun setEnv(name: String, value: String, context: String) {
+    mutableEnvs[name] = value
+    LOG.debug { "$requester: $context: set environment variable: $name='$value'" }
   }
 
   override fun appendEntryToPATH(entry: Path) {
@@ -73,7 +91,7 @@ internal class MutableShellExecOptionsImpl(
       LOG.debug { "$requester: prependEntryToPathLikeEnv('$envName', '$entry') failed, skipping" }
       return
     }
-    val envName = if (shellIntegration != null) envName.ensureStartsWith(INTELLIJ_FORCE_PREPEND_PREFIX) else envName
+    val envName = if (shellIntegrationAvailable) envName.ensureStartsWith(INTELLIJ_FORCE_PREPEND_PREFIX) else envName
     mutableEnvs[envName] = joinWithPathLikeEnv(remotePath, envName, true)
     LOG.debug { "$requester: prependEntryToPathLikeEnv('$envName', '$remotePath')" }
   }
@@ -95,9 +113,10 @@ internal class MutableShellExecOptionsImpl(
     return value
   }
 
-  override val shellIntegrationConfigurer: ShellIntegrationConfigurer? = shellIntegration?.let {
+  override val shellIntegrationConfigurer: ShellIntegrationConfigurer? = if (shellIntegrationAvailable) {
     ShellIntegrationConfigurerImpl(_execCommand.shellName, mutableEnvs, translator, requester)
   }
+  else null
 
   override val eelDescriptor: EelDescriptor
     get() = workingDirectory.descriptor
@@ -123,7 +142,7 @@ internal class MutableShellExecOptionsImpl(
     return translator.translateAbsoluteLocalPathToRemote(path)?.toString()
   }
 
-  override fun toString() = ShellExecOptionsImpl.stringify(_execCommand, workingDirectory, envs)
+  override fun toString(): String = ShellExecOptionsImpl.stringify(_execCommand, workingDirectory, envs)
 }
 
 private fun String.ensureStartsWith(prefix: String): String = if (this.startsWith(prefix)) this else prefix + this
@@ -131,4 +150,5 @@ private fun String.ensureEndsWith(suffix: String): String = if (this.endsWith(su
 
 private const val PATH: String = "PATH"
 private const val INTELLIJ_FORCE_PREPEND_PREFIX: String = "_INTELLIJ_FORCE_PREPEND_"
+private const val INTELLIJ_FORCE_SET_PREFIX: String = "_INTELLIJ_FORCE_SET_"
 private val LOG: Logger = logger<MutableShellExecOptionsImpl>()

@@ -33,6 +33,7 @@ import git4idea.test.file
 import git4idea.test.git
 import git4idea.test.makeCommit
 import git4idea.test.resolveConflicts
+import git4idea.test.runUnderProgress
 import junit.framework.TestCase
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume
@@ -895,9 +896,11 @@ class GitSingleRepoRebaseTest : GitRebaseBaseTest() {
     refresh()
     updateChangeListManager()
 
-    val uiHandler = Mockito.mock(GitBranchUiHandler::class.java)
-    `when`(uiHandler.progressIndicator).thenReturn(EmptyProgressIndicator())
-    GitBranchWorker(project, git, uiHandler).rebaseOnCurrent(listOf(repo), "feature")
+    runUnderProgress { indicator ->
+      val uiHandler = Mockito.mock(GitBranchUiHandler::class.java)
+      `when`(uiHandler.progressIndicator).thenReturn(indicator)
+      GitBranchWorker(project, git, uiHandler).rebaseOnCurrent(listOf(repo), "feature")
+    }
 
     assertSuccessfulRebaseNotification(expectedNotification())
     repo.`assert feature rebased on master`()

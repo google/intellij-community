@@ -2,93 +2,41 @@
 package com.intellij.testFramework.junit5.impl
 
 import com.intellij.testFramework.junit5.SystemProperty
+import com.intellij.testFramework.junit5.SystemPropertyClassLevel
 import org.jetbrains.annotations.TestOnly
-import org.junit.jupiter.api.extension.ExtensionContext
-import org.junit.jupiter.api.extension.InvocationInterceptor
-import org.junit.jupiter.api.extension.ReflectiveInvocationContext
-import org.junit.platform.commons.support.AnnotationSupport
-import java.lang.reflect.Constructor
-import java.lang.reflect.Method
 
 @TestOnly
-internal class SystemPropertyExtension : InvocationInterceptor {
-
-  override fun interceptBeforeAllMethod(
-    invocation: InvocationInterceptor.Invocation<Void>,
-    invocationContext: ReflectiveInvocationContext<Method>,
-    extensionContext: ExtensionContext,
+internal class SystemPropertyExtension :
+  SystemKeyValueExtensionBase<SystemPropertyExtension.SystemPropertyValueHolder, SystemProperty, SystemPropertyClassLevel>(
+    classLevelPropertiesKey,
+    SystemProperty::class.java,
+    SystemPropertyClassLevel::class.java
   ) {
-    intercept(invocation, invocationContext)
+
+  data class SystemPropertyValueHolder(val propertyKey: String, val previousValue: String?)
+
+  companion object {
+    private val classLevelPropertiesKey: TypedStoreKey<List<SystemPropertyValueHolder>> =
+      TypedStoreKey.createKey<List<SystemPropertyValueHolder>>()
   }
 
-  override fun <T> interceptTestClassConstructor(
-    invocation: InvocationInterceptor.Invocation<T>,
-    invocationContext: ReflectiveInvocationContext<Constructor<T>>,
-    extensionContext: ExtensionContext,
-  ): T {
-    return intercept(invocation, invocationContext)
-  }
 
-  override fun interceptBeforeEachMethod(
-    invocation: InvocationInterceptor.Invocation<Void>,
-    invocationContext: ReflectiveInvocationContext<Method>,
-    extensionContext: ExtensionContext,
-  ) {
-    intercept(invocation, invocationContext)
-  }
+  override fun setPropertyValue(annotation: SystemProperty): SystemPropertyValueHolder =
+    setPropertyImpl(annotation.propertyKey, annotation.propertyValue)
 
-  override fun interceptTestMethod(
-    invocation: InvocationInterceptor.Invocation<Void>,
-    invocationContext: ReflectiveInvocationContext<Method>,
-    extensionContext: ExtensionContext,
-  ) {
-    intercept(invocation, invocationContext)
-  }
+  override fun setClassPropertyValue(annotation: SystemPropertyClassLevel): SystemPropertyValueHolder =
+    setPropertyImpl(annotation.propertyKey, annotation.propertyValue)
 
-  override fun interceptTestTemplateMethod(
-    invocation: InvocationInterceptor.Invocation<Void>,
-    invocationContext: ReflectiveInvocationContext<Method>,
-    extensionContext: ExtensionContext,
-  ) {
-    intercept(invocation, invocationContext)
-  }
-
-  override fun interceptAfterEachMethod(
-    invocation: InvocationInterceptor.Invocation<Void>,
-    invocationContext: ReflectiveInvocationContext<Method>,
-    extensionContext: ExtensionContext,
-  ) {
-    intercept(invocation, invocationContext)
-  }
-
-  override fun interceptAfterAllMethod(
-    invocation: InvocationInterceptor.Invocation<Void>,
-    invocationContext: ReflectiveInvocationContext<Method>,
-    extensionContext: ExtensionContext,
-  ) {
-    intercept(invocation, invocationContext)
-  }
-
-  private fun <T> intercept(invocation: InvocationInterceptor.Invocation<T>, invocationContext: ReflectiveInvocationContext<*>): T {
-    val annotations = AnnotationSupport.findRepeatableAnnotations(invocationContext.targetClass, SystemProperty::class.java) +
-                      AnnotationSupport.findRepeatableAnnotations(invocationContext.executable, SystemProperty::class.java)
-    if (annotations.isEmpty()) {
-      return invocation.proceed()
+  override fun resetPropertyValue(oldValue: SystemPropertyValueHolder) {
+    if (oldValue.previousValue == null) {
+      System.clearProperty(oldValue.propertyKey)
     }
-    val valuesBefore = annotations.map { annotation ->
-      Pair(annotation, annotation.setPropertyValue())
-    }
-    try {
-      return invocation.proceed()
-    }
-    finally {
-      for ((annotation, previousValue) in valuesBefore.asReversed()) {
-        annotation.resetPropertyValue(previousValue)
-      }
+    else {
+      System.setProperty(oldValue.propertyKey, oldValue.previousValue)
     }
   }
 
-  private fun SystemProperty.setPropertyValue(): String? {
+  private fun setPropertyImpl(propertyKey: String, propertyValue: String): SystemPropertyValueHolder {
     val previousValue = System.getProperty(propertyKey)
     if (propertyValue.isEmpty()) {
       System.clearProperty(propertyKey)
@@ -96,15 +44,6 @@ internal class SystemPropertyExtension : InvocationInterceptor {
     else {
       System.setProperty(propertyKey, propertyValue)
     }
-    return previousValue
-  }
-
-  private fun SystemProperty.resetPropertyValue(previousValue: String?) {
-    if (previousValue == null) {
-      System.clearProperty(propertyKey)
-    }
-    else {
-      System.setProperty(propertyKey, previousValue)
-    }
+    return SystemPropertyValueHolder(propertyKey, previousValue)
   }
 }

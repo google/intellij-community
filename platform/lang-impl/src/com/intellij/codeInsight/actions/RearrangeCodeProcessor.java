@@ -29,26 +29,26 @@ public class RearrangeCodeProcessor extends AbstractLayoutCodeProcessor {
   private final Collection<TextRange> myRanges = new ArrayList<>();
 
   public RearrangeCodeProcessor(@NotNull AbstractLayoutCodeProcessor previousProcessor) {
-    super(previousProcessor, CodeInsightBundle.message("command.rearrange.code"), getProgressText());
+    super(previousProcessor, getCommandName(), getProgressText());
   }
 
   public RearrangeCodeProcessor(@NotNull AbstractLayoutCodeProcessor previousProcessor, @NotNull SelectionModel selectionModel) {
-    super(previousProcessor, CodeInsightBundle.message("command.rearrange.code"), getProgressText());
+    super(previousProcessor, getCommandName(), getProgressText());
     mySelectionModel = selectionModel;
   }
 
   public RearrangeCodeProcessor(@NotNull PsiFile psiFile, @NotNull SelectionModel selectionModel) {
-    super(psiFile.getProject(), psiFile, getProgressText(), CodeInsightBundle.message("command.rearrange.code"), false);
+    super(psiFile.getProject(), psiFile, getProgressText(), getCommandName(), false);
     mySelectionModel = selectionModel;
   }
 
   public RearrangeCodeProcessor(@NotNull PsiFile psiFile) {
-    super(psiFile.getProject(), psiFile, getProgressText(), CodeInsightBundle.message("command.rearrange.code"), false);
+    super(psiFile.getProject(), psiFile, getProgressText(), getCommandName(), false);
   }
 
   @SuppressWarnings("unused") // Used in Rider
   public RearrangeCodeProcessor(@NotNull PsiFile psiFile, TextRange[] ranges) {
-    super(psiFile.getProject(), psiFile, getProgressText(), CodeInsightBundle.message("command.rearrange.code"), false);
+    super(psiFile.getProject(), psiFile, getProgressText(), getCommandName(), false);
     for (TextRange range : ranges) {
       if (range != null) {
         myRanges.add(range);
@@ -72,6 +72,13 @@ public class RearrangeCodeProcessor extends AbstractLayoutCodeProcessor {
     super(project, files, getProgressText(), commandName, postRunnable, processChangedTextOnly);
   }
 
+  public RearrangeCodeProcessor(@NotNull Project project,
+                                PsiFile @NotNull [] files,
+                                @Nullable Runnable postRunnable,
+                                boolean processChangedTextOnly) {
+    super(project, files, getProgressText(), getCommandName(), postRunnable, processChangedTextOnly);
+  }
+
   @Override
   protected @NotNull FutureTask<Boolean> prepareTask(final @NotNull PsiFile psiFile, final boolean processChangedTextOnly) {
     // Task prepared by prepareTask is executed on EDT, but calculation of VCS changes may include operations
@@ -89,7 +96,7 @@ public class RearrangeCodeProcessor extends AbstractLayoutCodeProcessor {
           PsiDocumentManager.getInstance(myProject).commitDocument(document);
           Runnable command = prepareRearrangeCommand(psiFile, ranges);
           try {
-            CommandProcessor.getInstance().executeCommand(myProject, command, CodeInsightBundle.message("command.rearrange.code"), null);
+            CommandProcessor.getInstance().executeCommand(myProject, command, getCommandName(), null);
           }
           finally {
             PsiDocumentManager.getInstance(myProject).commitDocument(document);
@@ -130,5 +137,9 @@ public class RearrangeCodeProcessor extends AbstractLayoutCodeProcessor {
 
   public static @NlsContexts.ProgressText String getProgressText() {
     return CodeInsightBundle.message("process.rearrange.code");
+  }
+
+  private static @NlsContexts.Command String getCommandName() {
+    return CodeInsightBundle.message("command.rearrange.code");
   }
 }

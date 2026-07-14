@@ -56,6 +56,9 @@ private suspend fun getFilteredProcessList(filter: Predicate<OSProcess>? = null)
     .map { it.toProcessInfo() }
 }
 
+private suspend fun getChildProcessList(parentPid: Long): List<ProcessInfo> =
+  getFilteredProcessList { p -> p.parentProcessID.toLong() == parentPid }
+
 /**
  * Identifies and terminates any leftover processes from previous test runs, specifically those
  * whose command lines contain specific substrings indicative of test runs.
@@ -115,14 +118,23 @@ suspend fun findAndKillProcessesBySubPathInArguments(pathToSearch: String, onFou
                               onFoundProcesses = onFoundProcesses)
 }
 
+suspend fun findAndKillProcessesByName(nameToSearch: String, onFoundProcesses: (List<ProcessInfo>) -> Unit = {}) {
+  return findAndKillProcesses(message = "Killing process with name '$nameToSearch'",
+                              processName = nameToSearch,
+                              onFoundProcesses = onFoundProcesses,
+                              filter = { true })
+}
+
 suspend fun findAndKillProcesses(
   message: String? = null,
+  processName: String? = null,
   filter: Predicate<ProcessInfo>,
   onFoundProcesses: (List<ProcessInfo>) -> Unit = {},
 ) {
   val prefix = message ?: "Killing process matching '$filter' in command line"
   logOutput("$prefix ...")
-  val processInfosToKill = getProcessList(filter)
+  val processInfosToKill = processName?.let { getProcessList(processName = it).filter { filter.test(it) } }
+                           ?: getProcessList(filter)
 
   if (processInfosToKill.any { it.pid == ProcessHandle.current().pid() }) {
     error("The filter has resolved the current process")
@@ -130,7 +142,7 @@ suspend fun findAndKillProcesses(
 
   if (processInfosToKill.isNotEmpty()) {
     onFoundProcesses.invoke(processInfosToKill)
-    logOutput("$prefix: [${processInfosToKill.joinToString(", ")}] will be killed")
+    logOutput("$prefix: These processes will be killed: ${processInfosToKill.joinToString("\n") { it.description }}")
     killProcesses(processInfosToKill)
   }
   else {
@@ -241,16 +253,13 @@ private suspend fun getIdeProcessId(parentProcessInfo: ProcessInfo, runContext: 
 
   logOutput("Guessing IDE process ID on Linux (pid of the IDE process wrapper ${parentProcessInfo.pid})")
 
-  val suitableChildren = getProcessList().filter { processInfo ->
-    processInfo.parentPid == parentProcessInfo.pid && processInfo.isIde(runContext)
-  }
+  val children = getChildProcessList(parentProcessInfo.pid)
+  val suitableChildren = children.filter { it.isIde(runContext) }
 
   if (suitableChildren.isEmpty()) {
     throw Exception("There are no suitable candidates for IDE process\n" +
                     "All children: \n" +
-                    getProcessList()
-                      .filter { it.parentPid == parentProcessInfo.pid }
-                      .joinToString("\n") { it.description })
+                    children.joinToString("\n") { it.description })
   }
 
   if (suitableChildren.size > 1) {

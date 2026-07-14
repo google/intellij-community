@@ -15,8 +15,15 @@
  */
 package com.jetbrains.python.inspections;
 
+import com.jetbrains.python.allure.Layers;
+import com.jetbrains.python.allure.Subsystems;
+
+import com.jetbrains.python.documentation.PyDocumentationSettings;
+import com.jetbrains.python.documentation.docstrings.DocStringFormat;
 import com.jetbrains.python.fixtures.PyTestCase;
 
+@Subsystems.Inspections
+@Layers.Functional
 public class PyNumpyTypeTest extends PyTestCase {
   public static final String TEST_DIRECTORY = "inspections/PyNumpyType/";
 
@@ -27,9 +34,23 @@ public class PyNumpyTypeTest extends PyTestCase {
   }
 
   private void doTest() {
-    myFixture.configureByFile(TEST_DIRECTORY + getTestName(false) + ".py");
-    myFixture.enableInspections(PyTypeCheckerInspection.class);
-    myFixture.checkHighlighting(true, false, true);
+    doTest(true);
+  }
+
+  private void doTest(boolean enableNumpyDocStringFormat) {
+    PyDocumentationSettings settings = PyDocumentationSettings.getInstance(myFixture.getModule());
+    DocStringFormat originalFormat = settings.getFormat();
+    try {
+      if (enableNumpyDocStringFormat) {
+        settings.setFormat(DocStringFormat.NUMPY);
+      }
+      myFixture.configureByFile(TEST_DIRECTORY + getTestName(false) + ".py");
+      myFixture.enableInspections(PyTypeCheckerInspection.class);
+      myFixture.checkHighlighting(true, false, true);
+    }
+    finally {
+      settings.setFormat(originalFormat);
+    }
   }
 
   public void testNominalType() {
@@ -64,6 +85,14 @@ public class PyNumpyTypeTest extends PyTestCase {
     doTest();
   }
 
+  public void testDefaultNone() {
+    doTest();
+  }
+
+  public void testDefaultValueVariants() {
+    doTest();
+  }
+
   public void testSort() {
     doTest();
   }
@@ -72,8 +101,12 @@ public class PyNumpyTypeTest extends PyTestCase {
     doTest();
   }
 
-  public void testUFunc() {
+  public void testTypeHintHasPriority() {
     doTest();
+  }
+
+  public void testUFunc() {
+    doTest(false);
   }
 
   public void testUFuncMixedWithNumber() {
@@ -82,19 +115,19 @@ public class PyNumpyTypeTest extends PyTestCase {
 
   public void testReturnOptional() {
     myFixture.configureByFile(TEST_DIRECTORY + getTestName(false) + ".py");
-    myFixture.enableInspections(PyTupleAssignmentBalanceInspection.class);
+    myFixture.enableInspections(PyTypeCheckerInspection.class);
     myFixture.checkHighlighting(true, false, true);
   }
 
   public void testReturnTuple() {
     myFixture.configureByFile(TEST_DIRECTORY + getTestName(false) + ".py");
-    myFixture.enableInspections(PyTupleAssignmentBalanceInspection.class);
+    myFixture.enableInspections(PyTypeCheckerInspection.class);
     myFixture.checkHighlighting(true, false, true);
   }
 
   public void testSlogdet() {
     myFixture.configureByFile(TEST_DIRECTORY + getTestName(false) + ".py");
-    myFixture.enableInspections(PyTupleAssignmentBalanceInspection.class);
+    myFixture.enableInspections(PyTypeCheckerInspection.class);
     myFixture.checkHighlighting(true, false, true);
   }
 }

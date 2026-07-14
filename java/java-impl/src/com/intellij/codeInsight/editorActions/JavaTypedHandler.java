@@ -3,6 +3,7 @@ package com.intellij.codeInsight.editorActions;
 
 import com.intellij.application.options.CodeStyle;
 import com.intellij.codeInsight.AutoPopupController;
+import com.intellij.codeInsight.CodeInsightSettings;
 import com.intellij.codeInsight.completion.JavaClassReferenceCompletionContributor;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
@@ -218,7 +219,12 @@ public final class JavaTypedHandler extends JavaTypedHandlerBase {
       int offset = editor.getCaretModel().getOffset();
 
       PsiElement lastElement = file.findElementAt(offset - 1);
-      return lastElement != null && StringUtil.endsWithChar(lastElement.getText(), '@');
+      if (lastElement != null) {
+        String lastElementText = lastElement.getText();
+        return StringUtil.endsWithChar(lastElementText, '@') ||
+               (CodeInsightSettings.getInstance().JAVADOC_STUB_ON_ENTER && StringUtil.endsWith(lastElementText, "///"));
+      }
+      return false;
     });
   }
 

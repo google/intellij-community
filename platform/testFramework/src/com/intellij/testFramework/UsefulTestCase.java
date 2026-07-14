@@ -50,6 +50,7 @@ import com.intellij.util.io.PathKt;
 import com.intellij.util.ui.UIUtil;
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
+import junit.framework.TestResult;
 import kotlinx.coroutines.Job;
 import org.jdom.Element;
 import org.jetbrains.annotations.ApiStatus;
@@ -248,6 +249,11 @@ public abstract class UsefulTestCase extends TestCase {
   }
 
   @Override
+  public void run(TestResult result) {
+    ApplicationManagerEx.runInStressTest(isStressTest(), () -> super.run(result));
+  }
+
+  @Override
   protected void setUp() throws Exception {
     super.setUp();
 
@@ -256,7 +262,6 @@ public abstract class UsefulTestCase extends TestCase {
     setupTempDir();
 
     boolean isStressTest = isStressTest();
-    ApplicationManagerEx.setInStressTest(isStressTest);
     if (isPerformanceTest()) {
       Timings.getStatistics();
     }
@@ -541,6 +546,11 @@ Most likely there was an uncaught exception in asynchronous execution that resul
   }
 
   protected void runBare(@NotNull ThrowableRunnable<Throwable> testRunnable) throws Throwable {
+    // Toggle the stress-test flag here too (not only in run(TestResult)): JUnit4 reaches runBare() without calling it.
+    ApplicationManagerEx.runInStressTest(isStressTest(), () -> doRunBare(testRunnable));
+  }
+
+  private void doRunBare(@NotNull ThrowableRunnable<Throwable> testRunnable) throws Throwable {
     ThrowableRunnable<Throwable> wrappedRunnable = wrapTestRunnable(testRunnable);
     if (runInDispatchThread()) {
       try {

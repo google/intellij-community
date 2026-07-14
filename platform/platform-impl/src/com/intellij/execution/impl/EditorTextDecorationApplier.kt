@@ -415,7 +415,7 @@ private class EditorTextDecorationApplierImpl(private val editor: EditorEx, pare
         offset in highlighter.startOffset until highlighter.endOffset // process...() treats the end as inclusive, that's why
       ) {
         result = HighlightedTextDecoration(hyperlink, highlighter)
-        false
+        hyperlink.isInvisibleLink // prefer visible link
       }
       else {
         true
@@ -470,7 +470,6 @@ private class EditorTextDecorationApplierImpl(private val editor: EditorEx, pare
     override fun mouseMoved(e: EditorMouseEvent) {
       val highlightedLink = findDecoration(e)
       if (highlightedLink?.link?.action == null) {
-        editor.setCustomCursor(EditorTextDecorationApplierImpl::class.java, null)
         hyperlinkInteraction.linkHovered(null, e)
         hoveredHyperlink = null
       }

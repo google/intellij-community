@@ -4,8 +4,8 @@ package com.intellij.completion.ml.sorting
 
 import com.intellij.codeInsight.completion.CompletionFinalSorter
 import com.intellij.codeInsight.completion.CompletionParameters
-import com.intellij.codeInsight.completion.NewRdCompletionSupport
 import com.intellij.codeInsight.completion.ml.MLRankingIgnorable
+import com.intellij.codeInsight.lookup.LookupArranger
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementDecorator
 import com.intellij.codeInsight.lookup.LookupManager
@@ -14,6 +14,7 @@ import com.intellij.completion.ml.features.RankingFeaturesOverrides
 import com.intellij.completion.ml.performance.MLCompletionPerformanceTracker
 import com.intellij.completion.ml.personalization.session.SessionFactorsUtils
 import com.intellij.completion.ml.settings.CompletionMLRankingSettings
+import com.intellij.completion.ml.sorting.MLSorter.Companion.REORDER_ONLY_TOP_K
 import com.intellij.completion.ml.storage.MutableLookupStorage
 import com.intellij.completion.ml.util.RelevanceUtil
 import com.intellij.completion.ml.util.prefix
@@ -28,12 +29,19 @@ import com.intellij.textMatching.PrefixMatchingUtil
 import java.util.IdentityHashMap
 import java.util.concurrent.TimeUnit
 
-class MLSorterFactory : CompletionFinalSorter.Factory {
-  override fun newSorter(): MLSorter = MLSorter()
+/** Creates the [MLSorter] registered as the completion final sorter. */
+internal class MLSorterFactory : CompletionFinalSorter.Factory {
+  override fun newSorter(arranger: LookupArranger?): CompletionFinalSorter =
+    MLSorter(arranger)
 }
 
-
-class MLSorter : CompletionFinalSorter() {
+/**
+ * [CompletionFinalSorter] that reorders the top completion items using scores from the language's
+ * ML ranking model. Runs last in the pipeline; per-item scores are cached by element identity.
+ */
+private class MLSorter(
+  private val arranger: LookupArranger?
+) : CompletionFinalSorter() {
   private companion object {
     private val LOG = logger<MLSorter>()
     private const val REORDER_ONLY_TOP_K = 5
@@ -42,6 +50,7 @@ class MLSorter : CompletionFinalSorter() {
   private val cachedScore: MutableMap<LookupElement, ItemRankInfo> = IdentityHashMap()
   private val reorderOnlyTopItems: Boolean = Registry.`is`("completion.ml.reorder.only.top.items", true)
 
+  /** Returns cached ML-rank diagnostics (rank and original position) per item for the completion details UI. */
   override fun getRelevanceObjects(items: MutableIterable<LookupElement>): Map<LookupElement, List<Pair<String, Any>>> {
     if (cachedScore.isEmpty()) {
       return items.associateWith { listOf(Pair.create(FeatureUtils.ML_RANK, FeatureUtils.NONE as Any)) }
@@ -75,10 +84,14 @@ class MLSorter : CompletionFinalSorter() {
     score?.mlRank == null
   }
 
+  /**
+   * Scores [items] with the ranking model and returns them reordered (only the top [REORDER_ONLY_TOP_K]
+   * when enabled). Returns the input order untouched when there is no active lookup/storage or when
+   * feature computation and reranking are disabled.
+   */
   override fun sort(items: Iterable<LookupElement>, parameters: CompletionParameters): Iterable<LookupElement> {
-    if (NewRdCompletionSupport.isFrontendRdCompletionOn()) return items // todo support it on frontend
     val lookup = LookupManager.getActiveLookup(parameters.editor) as? LookupImpl ?: return items
-    val lookupStorage = MutableLookupStorage.get(lookup) ?: return items
+    val lookupStorage = MutableLookupStorage.getMutableLookupStorage(lookup) ?: return items
     // Do nothing if unable to reorder items or to log the weights
     if (!lookupStorage.shouldComputeFeatures()) return items
     val startedTimestamp = System.currentTimeMillis()
@@ -128,7 +141,7 @@ class MLSorter : CompletionFinalSorter() {
       lookupStorage.initUserFactors(lookup.project)
     }
     val meaningfulRelevanceExtractor = MeaningfulFeaturesExtractor()
-    val relevanceObjects = lookup.getRelevanceObjects(items, false)
+    val relevanceObjects = getRelevanceObjects(lookup, items)
     val calculatedElementFeatures = mutableListOf<ElementFeatures>()
     for (element in items) {
       val position = positionsBefore.getValue(element)
@@ -168,6 +181,14 @@ class MLSorter : CompletionFinalSorter() {
     }
 
     tracker.finished(lookupStorage.performanceTracker)
+  }
+
+  private fun getRelevanceObjects(lookup : LookupImpl, items: List<LookupElement>): Map<LookupElement, List<Pair<String, in Any>>> {
+    if (arranger == null) {
+      // for compatibility, arranger can be null
+      return lookup.getRelevanceObjects(items, false)
+    }
+    return arranger.getRelevanceObjects(items, false)
   }
 
   private fun overrideElementFeaturesIfNeeded(elementFeatures: ElementFeatures, language: Language): ElementFeatures {

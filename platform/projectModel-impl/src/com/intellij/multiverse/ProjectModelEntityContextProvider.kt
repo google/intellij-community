@@ -12,21 +12,24 @@ import com.intellij.openapi.roots.libraries.Library
 import com.intellij.openapi.roots.libraries.LibraryContext
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.backend.workspace.WorkspaceModel
+import com.intellij.platform.backend.workspace.WorkspaceModelChangeListener
+import com.intellij.platform.backend.workspace.WorkspaceModelTopics
 import com.intellij.platform.workspace.jps.entities.ContentRootEntity
 import com.intellij.platform.workspace.jps.entities.LibraryEntity
-import com.intellij.platform.workspace.jps.entities.ModuleEntity
+import com.intellij.platform.workspace.jps.entities.LibraryId
+import com.intellij.platform.workspace.jps.entities.ModuleId
 import com.intellij.platform.workspace.jps.entities.SdkEntity
+import com.intellij.platform.workspace.jps.entities.SdkId
 import com.intellij.platform.workspace.jps.entities.SourceRootEntity
 import com.intellij.platform.workspace.storage.EntityPointer
 import com.intellij.platform.workspace.storage.ImmutableEntityStorage
+import com.intellij.platform.workspace.storage.VersionedStorageChange
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileSet
 import com.intellij.workspaceModel.core.fileIndex.impl.WorkspaceFileIndexEx
 import com.intellij.workspaceModel.core.fileIndex.impl.WorkspaceFileSetRecognizer
 import com.intellij.workspaceModel.ide.impl.legacyBridge.sdk.SdkBridgeImpl.Companion.findSdk
 import com.intellij.workspaceModel.ide.legacyBridge.findLibraryBridge
 import com.intellij.workspaceModel.ide.legacyBridge.findModule
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.mapNotNull
 import org.jetbrains.annotations.ApiStatus
 
 internal class ProjectModelEntityContextProvider : CodeInsightContextProvider {
@@ -78,98 +81,104 @@ internal class ProjectModelEntityContextProvider : CodeInsightContextProvider {
     val entity = entityPointer.resolve(storage) ?: return null
 
     if (entity is SourceRootEntity) {
-      val modulePointer = entity.contentRoot.module.createPointer<ModuleEntity>()
-      return ModuleContextImpl(modulePointer, project)
+      return ModuleContextImpl(entity.contentRoot.module.symbolicId, project)
     }
 
     if (entity is ContentRootEntity) {
-      val modulePointer = entity.module.createPointer<ModuleEntity>()
-      return ModuleContextImpl(modulePointer, project)
+      return ModuleContextImpl(entity.module.symbolicId, project)
     }
 
     if (entity is LibraryEntity) {
-      return LibraryContextImpl(entity.createPointer(), project)
+      return LibraryContextImpl(entity.symbolicId, project)
     }
 
     if (entity is SdkEntity) {
-      return SdkContextImpl(entity.createPointer(), project)
+      return SdkContextImpl(entity.symbolicId, project)
     }
 
     return null
   }
 
-  override fun invalidationRequestFlow(project: Project): Flow<Unit> {
-    val eventLog = WorkspaceModel.getInstance(project).eventLog
-    return eventLog.mapNotNull { change ->
-      Unit.takeIf { change.getChanges(ModuleEntity::class.java).isNotEmpty() }
-    }
+  override fun subscribeToChanges(
+    project: Project,
+    invalidator: CodeInsightContextProvider.Invalidator,
+  ) {
+    project.messageBus.connect().subscribe(WorkspaceModelTopics.CHANGED, object : WorkspaceModelChangeListener {
+      override fun beforeChanged(event: VersionedStorageChange) {
+        invalidator.requestInvalidation()
+      }
+
+      override fun changed(event: VersionedStorageChange) {
+        invalidator.requestInvalidation()
+      }
+    })
   }
 }
 
 @ApiStatus.Internal
 class ModuleContextImpl(
-  private val modulePointer: EntityPointer<ModuleEntity>,
+  private val moduleId: ModuleId,
   private val project: Project
 ) : ModuleContext {
   override fun getModule(): Module? {
     val storage = WorkspaceModel.getInstance(project).currentSnapshot
-    val entity = modulePointer.resolve(storage) ?: return null
+    val entity = storage.resolve(moduleId) ?: return null
     return entity.findModule(storage)
   }
 
   override fun equals(other: Any?): Boolean {
-    return modulePointer == (other as? ModuleContextImpl)?.modulePointer
+    return moduleId == (other as? ModuleContextImpl)?.moduleId
   }
 
   override fun hashCode(): Int {
-    return modulePointer.hashCode()
+    return moduleId.hashCode()
   }
 
-  override fun toString(): String = "ModuleContextImpl(modulePointer=$modulePointer, project=${project.name})"
+  override fun toString(): String = "ModuleContextImpl(moduleId=$moduleId, project=${project.name})"
 }
 
 @ApiStatus.Internal
 class LibraryContextImpl(
-  private val libraryPointer: EntityPointer<LibraryEntity>,
+  private val libraryId: LibraryId,
   private val project: Project,
 ) : LibraryContext {
 
   override fun getLibrary(): Library? {
     val storage = WorkspaceModel.getInstance(project).currentSnapshot
-    val entity = libraryPointer.resolve(storage) ?: return null
+    val entity = storage.resolve(libraryId) ?: return null
     return entity.findLibraryBridge(storage)
   }
 
   override fun equals(other: Any?): Boolean {
-    return libraryPointer == (other as? LibraryContextImpl)?.libraryPointer
+    return libraryId == (other as? LibraryContextImpl)?.libraryId
   }
 
   override fun hashCode(): Int {
-    return libraryPointer.hashCode()
+    return libraryId.hashCode()
   }
 
-  override fun toString(): String = "LibraryContextImpl(libraryPointer=$libraryPointer, project=${project.name})"
+  override fun toString(): String = "LibraryContextImpl(libraryId=$libraryId, project=${project.name})"
 }
 
 @ApiStatus.Internal
 class SdkContextImpl(
-  private val sdkPointer: EntityPointer<SdkEntity>,
+  private val sdkId: SdkId,
   private val project: Project,
 ) : SdkContext {
 
   override fun getSdk(): Sdk? {
     val storage = WorkspaceModel.getInstance(project).currentSnapshot
-    val entity = sdkPointer.resolve(storage) ?: return null
+    val entity = storage.resolve(sdkId) ?: return null
     return storage.findSdk(entity)
   }
 
   override fun equals(other: Any?): Boolean {
-    return sdkPointer == (other as? SdkContextImpl)?.sdkPointer
+    return sdkId == (other as? SdkContextImpl)?.sdkId
   }
 
   override fun hashCode(): Int {
-    return sdkPointer.hashCode()
+    return sdkId.hashCode()
   }
 
-  override fun toString(): String = "SdkContextImpl(sdkPointer=$sdkPointer, project=${project.name})"
+  override fun toString(): String = "SdkContextImpl(sdkId=$sdkId, project=${project.name})"
 }

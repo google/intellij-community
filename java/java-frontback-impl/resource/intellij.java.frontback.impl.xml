@@ -1,4 +1,13 @@
 <idea-plugin visibility="public">
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+  <dependencies>
+    <module name="intellij.java.frontback.psi"/>
+    <module name="intellij.java.frontback.psi.impl"/>
+    <module name="intellij.java.psi"/>
+    <module name="intellij.java.psi.impl"/>
+    <module name="intellij.java.syntax"/>
+  </dependencies>
+  <!-- endregion -->
   <extensionPoints>
     <!--suppress PluginXmlValidity -->
     <extensionPoint qualifiedName="com.intellij.java.definitions" interface="com.intellij.codeInsight.definition.AbstractBasicJavaDefinitionService" dynamic="true"/>
@@ -103,7 +112,7 @@
 
     <completion.frontendFriendlyInsertHandler target="com.intellij.codeInsight.completion.FrontendFriendlyOverridableSpaceInsertHandler"/>
 
-    <registryKey key="java.folding.split.frontend.backend" defaultValue="true"
+    <registryKey key="java.folding.split.frontend.backend" defaultValue="false"
                  description="Split Java code folding between frontend (syntax-based) and backend (resolve-based) builders"/>
     <applicationSettings service="com.intellij.codeInsight.folding.impl.JavaCodeFoldingSettingsImpl"/>
   </extensions>

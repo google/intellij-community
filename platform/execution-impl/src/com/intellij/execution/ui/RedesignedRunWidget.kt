@@ -71,6 +71,7 @@ import com.intellij.ui.icons.toStrokeIcon
 import com.intellij.ui.popup.ActionPopupStep
 import com.intellij.ui.scale.JBUIScale
 import com.intellij.util.ui.EmptyIcon
+import com.intellij.util.ui.GraphicsUtil
 import com.intellij.util.ui.JBDimension
 import com.intellij.util.ui.JBEmptyBorder
 import com.intellij.util.ui.JBInsets
@@ -129,19 +130,31 @@ private fun createRunActionToolbar(): ActionToolbar {
   toolbar.isReservePlaceAutoPopupIcon = false
   toolbar.layoutStrategy = ToolbarLayoutStrategy.NOWRAP_STRATEGY
   toolbar.component.isOpaque = false
-  toolbar.component.border = null
+  val toolbarInsetsSupplier: Supplier<Insets> = Supplier {
+    // If the toolbar has other actions to the left (added by the user), then the inset is needed (IJPL-145970),
+    // otherwise it isn't needed because we have a 20px gap between the center and the right toolbar anyway.
+    @Suppress("UseDPIAwareInsets") // the supplier must provide unscaled values
+    Insets(0, if (isFirst(toolbar)) 0 else 12 , 0, 16)
+  }
+  toolbar.component.border = JBUI.Borders.empty(JBInsets.create(toolbarInsetsSupplier, toolbarInsetsSupplier.get()))
   toolbar.setMinimumButtonSize {
     JBUI.size(JBUI.CurrentTheme.RunWidget.actionButtonWidth(), JBUI.CurrentTheme.RunWidget.toolbarHeight())
   }
-  val insetsSupplier: Supplier<Insets> = Supplier {
+  val buttonInsetsSupplier: Supplier<Insets> = Supplier {
     val horizontal = JBUI.CurrentTheme.RunWidget.toolbarBorderDirectionalGap()
     val mainToolbarInsets = (JBUI.CurrentTheme.Toolbar.mainToolbarButtonInsets() as JBInsets).unscaled
     @Suppress("UseDPIAwareInsets") // the supplier must provide unscaled values
     Insets(mainToolbarInsets.top, horizontal, mainToolbarInsets.bottom, horizontal)
   }
-  toolbar.setActionButtonBorder(JBEmptyBorder(JBInsets.create(insetsSupplier, insetsSupplier.get())))
+  toolbar.setActionButtonBorder(JBEmptyBorder(JBInsets.create(buttonInsetsSupplier, buttonInsetsSupplier.get())))
   toolbar.setCustomButtonLook(RunWidgetButtonLook())
   return toolbar
+}
+
+private fun isFirst(toolbar: ActionToolbarImpl): Boolean {
+  val component = toolbar.component
+  val parent = component.parent ?: return true // doesn't really matter, as it's not showing
+  return parent.getComponent(0) == component
 }
 
 private val runToolbarDataKey = Key.create<Boolean>("run-toolbar-data")
@@ -153,9 +166,7 @@ internal class RedesignedRunToolbarWrapper : WindowHeaderPlaceholder() {
   override fun actionPerformed(e: AnActionEvent): Unit = error("Should not be invoked")
 
   override fun createCustomComponent(presentation: Presentation, place: String): JComponent {
-    val toolbar = createRunActionToolbar()
-    toolbar.component.border = JBUI.Borders.empty(0, 12, 0, 16)
-    return toolbar.component
+    return createRunActionToolbar().component
   }
 
   override fun update(e: AnActionEvent) {
@@ -512,13 +523,6 @@ open class RedesignedRunConfigurationSelector : TogglePopupAction(), CustomCompo
       // Replace the maybe-cut-off name (set by delegate.update) with the full one, the UI will then cut it as needed.
       e.presentation.setText(configurationName, false)
     }
-    if (configurationName?.length?.let { it > CONFIGURATION_NAME_NON_TRIM_MAX_LENGTH } == true) {
-      e.presentation.setDescription(ExecutionBundle.messagePointer("choose.run.configuration.action.new.ui.button.description.long",
-                                                                   StringUtil.escapeXmlEntities(configurationName)))
-    }
-    else {
-      e.presentation.setDescription(ExecutionBundle.messagePointer("choose.run.configuration.action.new.ui.button.description"))
-    }
   }
 
   override fun getActionUpdateThread() = ActionUpdateThread.BGT
@@ -538,7 +542,10 @@ private class RedesignedRunConfigurationSelectorButton(
   JBUI.size(16, JBUI.CurrentTheme.RunWidget.toolbarHeight())
 }) {
   
-  private var lastDumblyTrimmedText: @NlsActions.ActionText String? = null
+  private var isTrimmed = false
+  private var lastMaxTextWidth: Int? = null
+  private var lastFullText: @NlsActions.ActionText String? = null
+  private var lastSmartlyTrimmedTextWidth: Int = 0
   private lateinit var lastSmartlyTrimmedText: @NlsActions.ActionText String
 
   init {
@@ -569,6 +576,20 @@ private class RedesignedRunConfigurationSelectorButton(
     updateFont()
   }
 
+  override fun updateToolTipText() {
+    // we provide our own
+  }
+
+  override fun getToolTipText(): String {
+    return if (isTrimmed) {
+      ExecutionBundle.message("choose.run.configuration.action.new.ui.button.description.long",
+                                     StringUtil.escapeXmlEntities(text))
+    }
+    else {
+      ExecutionBundle.message("choose.run.configuration.action.new.ui.button.description")
+    }
+  }
+
   override fun layout(
     fm: FontMetrics,
     fullText: @NlsActions.ActionText String,
@@ -577,19 +598,39 @@ private class RedesignedRunConfigurationSelectorButton(
     outIconRect: Rectangle,
     outTextRect: Rectangle,
   ): @NlsActions.ActionText String {
-    val dumblyTrimmedText = super.layout(fm, fullText, icon, inViewRect, outIconRect, outTextRect)
-    if (fullText.isEmpty()) return fullText // to avoid silly edge-case errors
-    if (fullText == dumblyTrimmedText) return dumblyTrimmedText // nothing to trim, enough space
-    if (lastDumblyTrimmedText == dumblyTrimmedText) return lastSmartlyTrimmedText // no need to recompute
-    val smartlyTrimmedText = trimRunConfigurationName(fullText, fm.stringWidth(dumblyTrimmedText), fm)
-    lastDumblyTrimmedText = dumblyTrimmedText
+    val effectiveFM = GraphicsUtil.fontMetrics(fm.font)
+    super.layout(effectiveFM, fullText, icon, inViewRect, outIconRect, outTextRect)
+    if (fullText.isEmpty()) { // to avoid silly edge-case errors
+      isTrimmed = false
+      return fullText
+    }
+    // We need to recalculate this, because super.layout() is very inaccurate in some environments (e.g., macOS),
+    // as it assumes that the string width is equal to the sum of character widths, which isn't always the case.
+    val maxTextWidth = inViewRect.width - (outIconRect.width + if (icon == null) 0 else iconTextSpace())
+    val fullTextWidth = effectiveFM.stringWidth(fullText)
+    if (fullTextWidth <= maxTextWidth) { // nothing to trim, enough space
+      isTrimmed = false
+      outTextRect.width = fullTextWidth
+      return fullText
+    }
+    isTrimmed = true
+    if (lastFullText == fullText && lastMaxTextWidth == maxTextWidth) { // no need to recompute
+      outTextRect.width = lastSmartlyTrimmedTextWidth
+      return lastSmartlyTrimmedText 
+    }
+    val smartlyTrimmedText = trimRunConfigurationName(fullText, maxTextWidth, effectiveFM)
+    lastMaxTextWidth = maxTextWidth
+    lastFullText = fullText
     lastSmartlyTrimmedText = smartlyTrimmedText
+    outTextRect.width = effectiveFM.stringWidth(smartlyTrimmedText)
+    lastSmartlyTrimmedTextWidth = outTextRect.width
     return smartlyTrimmedText
   }
 
   fun updateFont() {
     font = JBUI.CurrentTheme.RunWidget.configurationSelectorFont()
-    lastDumblyTrimmedText = null
+    lastMaxTextWidth = null
+    lastFullText = null
   }
 
   override fun getButtonRect(): Rectangle? = super.buttonRect.apply {

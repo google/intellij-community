@@ -7,7 +7,6 @@ import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.persistentListOf
 import org.jetbrains.intellij.build.dependencies.BuildDependenciesDownloader
 import org.jetbrains.intellij.build.dependencies.BuildDependenciesExtractOptions
-import org.jetbrains.intellij.build.impl.BuildUtils.checkedReplace
 import org.jetbrains.intellij.build.impl.BundledMavenDownloader
 import org.jetbrains.intellij.build.impl.LibraryPackMode
 import org.jetbrains.intellij.build.impl.ModuleItem
@@ -17,11 +16,12 @@ import org.jetbrains.intellij.build.impl.PluginLayout.Companion.pluginAuto
 import org.jetbrains.intellij.build.impl.PluginLayout.Companion.pluginAutoWithCustomDirName
 import org.jetbrains.intellij.build.impl.PluginVersionEvaluatorResult
 import org.jetbrains.intellij.build.impl.ProjectLibraryData
+import org.jetbrains.intellij.build.impl.SUPPORTED_DISTRIBUTIONS
 import org.jetbrains.intellij.build.impl.SupportedDistribution
+import org.jetbrains.intellij.build.impl.patchOsSpecificPluginXml
 import org.jetbrains.intellij.build.impl.projectStructureMapping.DistributionFileEntry
 import org.jetbrains.intellij.build.impl.projectStructureMapping.ProjectLibraryEntry
 import org.jetbrains.intellij.build.io.copyDir
-import org.jetbrains.intellij.build.io.copyFileToDir
 import org.jetbrains.intellij.build.kotlin.CommunityKotlinPluginBuilder
 import org.jetbrains.intellij.build.python.PythonCommunityPluginModules
 import org.jetbrains.intellij.build.telemetry.TraceManager.spanBuilder
@@ -59,6 +59,9 @@ object CommunityRepositoryModules {
       spec.withResource("lib/libwebp/linux", "lib/libwebp/linux")
       spec.withResource("lib/libwebp/mac", "lib/libwebp/mac")
       spec.withResource("lib/libwebp/win", "lib/libwebp/win")
+    },
+    pluginAuto("intellij.platform.ui.webview") { spec ->
+      spec.withResource("lib/webview-native/win", "lib/webview-native/win")
     },
     plugin("intellij.laf.win10") { spec ->
       spec.bundlingRestrictions.supportedOs = persistentListOf(OsFamily.WINDOWS)
@@ -174,6 +177,8 @@ object CommunityRepositoryModules {
       spec.withModule("intellij.gradle.toolingProxy", "gradle-tooling-proxy.jar")
       spec.withModule("intellij.gradle.toolingExtension", "gradle-tooling-extension-api.jar")
       spec.withModule("intellij.gradle.toolingExtension.impl", "gradle-tooling-extension-impl.jar")
+      spec.withModule("intellij.libraries.groovy", "groovy.jar")
+      spec.withModule("intellij.libraries.groovy.ant", "groovy-ant.jar")
       spec.withProjectLibrary("Gradle", LibraryPackMode.STANDALONE_SEPARATE)
       spec.withProjectLibrary("Ant", "ant", LibraryPackMode.STANDALONE_SEPARATE)
     },
@@ -205,9 +210,6 @@ object CommunityRepositoryModules {
       // explicitly pack JaCoCo as a separate JAR
       spec.withModuleLibrary(libraryName = "JaCoCo", moduleName = "intellij.java.coverage", relativeOutputPath = "jacoco.jar")
     },
-    pluginAuto("intellij.featuresTrainer") { spec ->
-      spec.withModuleLibrary(libraryName = "assertJ", moduleName = "intellij.libraries.assertj.core", relativeOutputPath = "assertj.jar")
-    },
     plugin("intellij.java.decompiler") { spec ->
       spec.directoryName = "java-decompiler"
       spec.mainJarName = "java-decompiler.jar"
@@ -229,7 +231,12 @@ object CommunityRepositoryModules {
     pluginAuto(listOf("intellij.statsCollector")) { spec ->
       spec.bundlingRestrictions.includeInDistribution = PluginDistribution.NOT_FOR_RELEASE
     },
-    pluginAuto(listOf("intellij.lombok", "intellij.lombok.generated")),
+    pluginAuto(listOf("intellij.findUsagesMl")) { spec ->
+      spec.bundlingRestrictions.includeInDistribution = PluginDistribution.NOT_FOR_RELEASE
+    },
+    pluginAutoWithCustomDirName("intellij.lombok.plugin") { spec ->
+      spec.directoryName = "lombok"
+    },
     pluginAuto(listOf("intellij.performanceTesting.ui")),
     pluginAuto(listOf("intellij.vcs.github")),
     pluginAuto(listOf("intellij.vcs.gitlab")),
@@ -243,6 +250,7 @@ object CommunityRepositoryModules {
       spec.withModule("intellij.java.jshell.protocol", "jshell-protocol.jar")
       spec.withModuleLibrary("jshell-frontend", "intellij.java.jshell.execution", "jshell-frontend.jar")
     },
+    pluginAuto(listOf("intellij.tipsOfTheDay.plugin")),
     *allJcefPlugins()
   )
 
@@ -337,16 +345,7 @@ object CommunityRepositoryModules {
       fun downloadUrlFor(os: OsFamily, arch: JvmArchitecture, build: String): String =
         "https://cache-redirector.jetbrains.com/intellij-jbr/${jcefArchiveName(os, arch, build)}"
 
-      spec.withRawPluginXmlPatcher { text, _ ->
-        checkedReplace(
-          oldText = text,
-          regex = " <!-- OS/ARCH-DEPENDENCY-PLACEHOLDER -->",
-          newText = """
-          |<plugin id="com.intellij.modules.os.${os.osId}"/>
-          |<plugin id="com.intellij.modules.arch.${arch.marketplaceName}"/>
-        """.trimMargin(),
-        )
-      }
+      patchOsSpecificPluginXml(spec, os, arch)
 
       spec.withCustomVersion { _, ideBuildNumber, _ ->
         // be careful, Marketplace expects linux/macos/windows for os and x86_64/x86/arm64/arm32 for arch
@@ -365,7 +364,7 @@ object CommunityRepositoryModules {
 
         BuildDependenciesDownloader.extractFile(archivePath, subDir, communityRoot, BuildDependenciesExtractOptions.STRIP_ROOT)
 
-        // unix ZIP does not have root `jcef` directory
+        // Unix ZIP does not have root `jcef` directory
         val jcefOutputDir = if (Files.exists(subDir.resolve("jcef"))) subDir.resolve("jcef") else subDir
         Files.move(jcefOutputDir, targetDir.resolve("jcef"), StandardCopyOption.REPLACE_EXISTING)
         Files.deleteIfExists(subDir)
@@ -378,10 +377,13 @@ object CommunityRepositoryModules {
   fun androidPlugin(
     additionalModulesToJars: Map<String, String> = emptyMap(),
     mainModuleName: String = "intellij.android.plugin.descriptor",
-    allPlatforms: Boolean = false,
     addition: ((PluginLayout.PluginLayoutSpec) -> Unit)? = null,
-  ): PluginLayout {
-    return createAndroidPluginLayout(mainModuleName, additionalModulesToJars, allPlatforms, addition)
+  ): Array<PluginLayout> {
+    return SUPPORTED_DISTRIBUTIONS.asSequence().map { (os, arch, _) ->
+      createAndroidPluginLayout(mainModuleName, additionalModulesToJars, os, arch, addition)
+    }
+      .plus(createAndroidPluginLayout(mainModuleName, additionalModulesToJars, null, null, addition))
+      .toList().toTypedArray()
   }
 
   val supportedFfmpegPresets: PersistentList<SupportedDistribution> = persistentListOf(
@@ -394,19 +396,32 @@ object CommunityRepositoryModules {
   private fun createAndroidPluginLayout(
     mainModuleName: String,
     additionalModulesToJars: Map<String, String> = emptyMap(),
-    allPlatforms: Boolean,
+    os: OsFamily?,
+    arch: JvmArchitecture?,
     addition: ((PluginLayout.PluginLayoutSpec) -> Unit)?,
   ): PluginLayout =
     pluginAutoWithCustomDirName(mainModuleName, "android") { spec ->
-      spec.withCustomVersion { pluginXmlSupplier, ideBuildVersion, _ ->
-        val pluginXml = pluginXmlSupplier()
-        if (pluginXml.indexOf("<version>") != -1) {
-          val declaredVersion = pluginXml.substring(pluginXml.indexOf("<version>") + "<version>".length, pluginXml.indexOf("</version>"))
-          PluginVersionEvaluatorResult(pluginVersion = "$declaredVersion.$ideBuildVersion")
+      if (os != null && arch != null) {
+        spec.bundlingRestrictions.supportedOs = persistentListOf(os)
+        spec.bundlingRestrictions.supportedArch = persistentListOf(arch)
+
+        patchOsSpecificPluginXml(spec, os, arch)
+
+        spec.withCustomVersion { pluginXmlSupplier, ideBuildVersion, _ ->
+          // be careful, Marketplace expects linux/macos/windows for os and x86_64/x86/arm64/arm32 for arch
+          val osArchSuffix = "-${os.osId}-${arch.marketplaceName}"
+          val pluginXml = pluginXmlSupplier()
+          if (pluginXml.indexOf("<version>") != -1) {
+            val declaredVersion = pluginXml.substring(pluginXml.indexOf("<version>") + "<version>".length, pluginXml.indexOf("</version>"))
+            PluginVersionEvaluatorResult(pluginVersion = "$declaredVersion.$ideBuildVersion$osArchSuffix")
+          }
+          else {
+            PluginVersionEvaluatorResult(pluginVersion = "$ideBuildVersion$osArchSuffix")
+          }
         }
-        else {
-          PluginVersionEvaluatorResult(pluginVersion = ideBuildVersion)
-        }
+      }
+      else {
+        spec.bundlingRestrictions.includeInDistribution = PluginDistribution.CROSS_PLATFORM_DIST_ONLY
       }
 
       spec.excludeProjectLibrary("Gradle")
@@ -505,6 +520,7 @@ object CommunityRepositoryModules {
       spec.withModule("intellij.android.layout-inspector.gradle", "android.jar")
       spec.withModule("intellij.android.layout-ui", "android.jar")
       spec.withModule("intellij.android.logcat", "android.jar")
+      spec.withModule("intellij.android.logcat.gradle", "android.jar")
       spec.withModule("intellij.android.mlkit", "android.jar")
       spec.withModule("intellij.android.nav.safeargs", "android.jar")
       spec.withModule("intellij.android.nav.safeargs.common", "android.jar")
@@ -605,32 +621,24 @@ object CommunityRepositoryModules {
 
       val ffmpegVersion = "6.0-1.5.9"
       val javacppVersion = "1.5.9"
+      val streamingModuleName = "intellij.android.streaming"
 
       // Add ffmpeg and javacpp
-      spec.withModuleLibrary("ffmpeg", "intellij.android.streaming", "ffmpeg-$ffmpegVersion.jar")
-      spec.withModuleLibrary("ffmpeg-javacpp", "intellij.android.streaming", "javacpp-$javacppVersion.jar")
+      spec.withModuleLibrary("ffmpeg", streamingModuleName, "ffmpeg-$ffmpegVersion.jar")
+      spec.withModuleLibrary("ffmpeg-javacpp", streamingModuleName, "javacpp-$javacppVersion.jar")
 
-      // include only required as platform-dependent binaries
-      for ((supportedOs, supportedArch, supportedLibc) in supportedFfmpegPresets) {
-        val osName = supportedOs.osName.lowercase(Locale.ENGLISH)
+      // include only the platform-dependent binaries matching this layout's (os, arch);
+      // exclude the rest so the streaming module's RUNTIME deps on other platform libraries don't leak in.
+      for ((supportedOs, supportedArch, _) in supportedFfmpegPresets) {
+        val osName = supportedOs.osName.lowercase(Locale.ROOT)
         val ffmpegLibraryName = "ffmpeg-$osName-$supportedArch"
         val javacppLibraryName = "javacpp-$osName-$supportedArch"
 
-        if (allPlatforms) {
-          // for the Marketplace we include all binaries
-          spec.withModuleLibrary(ffmpegLibraryName, "intellij.android.streaming", "${ffmpegLibraryName}-$ffmpegVersion.jar")
-          spec.withModuleLibrary(javacppLibraryName, "intellij.android.streaming", "${javacppLibraryName}-$javacppVersion.jar")
+        if (supportedOs == os && supportedArch == arch || os == null && arch == null) {
+          spec.withModuleLibrary(ffmpegLibraryName, streamingModuleName, "${ffmpegLibraryName}-$ffmpegVersion.jar")
+          spec.withModuleLibrary(javacppLibraryName, streamingModuleName, "${javacppLibraryName}-$javacppVersion.jar")
         }
         else {
-          val streamingModuleName = "intellij.android.streaming"
-
-          spec.withGeneratedPlatformResources(supportedOs, supportedArch, supportedLibc) { targetDir, context ->
-            val libDir = targetDir.resolve("lib")
-
-            copyFileToDir(context.outputProvider.findLibraryRoots(ffmpegLibraryName, moduleLibraryModuleName = streamingModuleName).single(), libDir)
-            copyFileToDir(context.outputProvider.findLibraryRoots(javacppLibraryName, moduleLibraryModuleName = streamingModuleName).single(), libDir)
-          }
-
           spec.excludeModuleLibrary(ffmpegLibraryName, streamingModuleName)
           spec.excludeModuleLibrary(javacppLibraryName, streamingModuleName)
         }
@@ -714,8 +722,8 @@ object CommunityRepositoryModules {
 
       // here go some differences from original Android Studio layout
 
-      for (entry in additionalModulesToJars.entries) {
-        spec.withModule(entry.key, entry.value)
+      for ((key, value) in additionalModulesToJars) {
+        spec.withModule(key, value)
       }
 
       addition?.invoke(spec)
@@ -730,14 +738,13 @@ object CommunityRepositoryModules {
   }
 
   fun groovyPlugin(additionalModules: List<String> = emptyList(), addition: ((PluginLayout.PluginLayoutSpec) -> Unit)? = null): PluginLayout {
-    return plugin("intellij.groovy") { spec ->
+    return pluginAutoWithCustomDirName("intellij.groovy") { spec ->
       spec.directoryName = "Groovy"
       spec.mainJarName = "Groovy.jar"
       spec.withModules(
         listOf(
           "intellij.groovy.psi",
           "intellij.groovy.structuralSearch",
-          "intellij.groovy.git",
         )
       )
       spec.withModule("intellij.groovy.jps", "groovy-jps.jar")

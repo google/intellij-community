@@ -1,0 +1,106 @@
+load("@community//build:tests-options.bzl", "jps_test")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
+
+### auto-generated section `build intellij.python.terminal.backend` start
+jvm_library(
+    name = "backend",
+    srcs = glob(
+        [
+            "src/**/*.kt",
+            "src/**/*.java",
+            "src/**/*.form",
+        ],
+        allow_empty = True,
+    ),
+    module_name = "intellij.python.terminal.backend",
+    resource_strip_prefix = "resources",
+    resources = glob(
+        ["resources/**/*"],
+    ),
+    visibility = ["//visibility:public"],
+    deps = [
+        # do not sort,
+        "//platform/kernel/rpc.backend",
+        "//python:python-community-impl",
+        "//plugins/terminal",
+        "//platform/core-api:core",
+        "//platform/execution",
+        "//platform/projectModel-api:projectModel",
+        "//platform/backend/workspace",
+        "//platform/workspace/storage",
+        "//platform/workspace/jps",
+        "@lib//:kotlin-stdlib",
+        "//python/python-sdk:sdk",
+        "//platform/lang-api:lang",
+        "//platform/analysis-api:analysis",
+        "//platform/eel-provider",
+        "//platform/ide-core",
+        "//platform/platform-impl:ide-impl",
+        "//python/terminal/shared",
+        "//platform/project/shared:project",
+    ],
+)
+
+jvm_library(
+    name = "backend_test_lib",
+    testonly = True,
+    srcs = glob(
+        [],
+        allow_empty = True,
+    ),
+    module_name = "intellij.python.terminal.backend",
+    visibility = ["//visibility:public"],
+    runtime_deps = [
+        # do not sort,
+        ":backend",
+        "//platform/kernel/rpc.backend:rpc.backend_test_lib",
+        "//python:python-community-impl_test_lib",
+        "//plugins/terminal:terminal_test_lib",
+        "//libraries/mockito",
+        "//libraries/mockito:mockito_test_lib",
+        "//platform/core-api:core_test_lib",
+        "//platform/execution:execution_test_lib",
+        "//platform/projectModel-api:projectModel_test_lib",
+        "//platform/backend/workspace:workspace_test_lib",
+        "//platform/workspace/storage:storage_test_lib",
+        "//platform/workspace/jps:jps_test_lib",
+        "//python/python-sdk:sdk_test_lib",
+        "//platform/lang-api:lang_test_lib",
+        "//platform/analysis-api:analysis_test_lib",
+        "//python/junit5Tests-framework:community-junit5Tests-framework",
+        "//python/junit5Tests-framework:community-junit5Tests-framework_test_lib",
+        "//libraries/junit5",
+        "//libraries/junit5:junit5_test_lib",
+        "//platform/testFramework/junit5",
+        "//platform/testFramework/junit5:junit5_test_lib",
+        "//python/testFramework",
+        "//python/testFramework:testFramework_test_lib",
+        "//platform/eel-provider:eel-provider_test_lib",
+        "//libraries/hamcrest",
+        "//libraries/hamcrest:hamcrest_test_lib",
+        "//python/python-venv:venv",
+        "//python/python-venv:venv_test_lib",
+        "//libraries/junit5-params",
+        "//libraries/junit5-params:junit5-params_test_lib",
+        "//libraries/junit5-pioneer",
+        "//libraries/junit5-pioneer:junit5-pioneer_test_lib",
+        "//platform/testFramework/common",
+        "//platform/testFramework/common:common_test_lib",
+        "//platform/ide-core:ide-core_test_lib",
+        "//platform/platform-impl:ide-impl_test_lib",
+        "//python/python-test-env/junit5",
+        "//python/python-test-env/junit5:junit5_test_lib",
+        "//python/terminal/shared:shared_test_lib",
+        "//platform/project/shared:project_test_lib",
+    ],
+)
+### auto-generated section `build intellij.python.terminal.backend` end
+
+### auto-generated section `iml intellij.python.terminal.backend` start
+exports_files(
+    [
+        "intellij.python.terminal.backend.iml",
+    ],
+    visibility = ["//visibility:public"],
+)
+### auto-generated section `iml intellij.python.terminal.backend` end

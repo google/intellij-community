@@ -16,7 +16,6 @@ import com.intellij.ui.components.DialogPanel
 import com.jetbrains.python.PyBundle
 import com.jetbrains.python.sdk.DialogAction
 import com.jetbrains.python.sdk.ModuleOrProject
-import com.jetbrains.python.sdk.add.PyAddSdkDialog.Companion.show
 import com.jetbrains.python.sdk.collectAddInterpreterActions
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
@@ -38,7 +37,7 @@ import kotlin.coroutines.cancellation.CancellationException
  * Use [show] to instantiate and show the dialog.
  *
  */
-class PyAddSdkDialog private constructor(
+internal class PyAddSdkDialog private constructor(
   private val project: Project,
   private val module: Module?,
   private val sdkAddedCallback: Consumer<Sdk>,

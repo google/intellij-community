@@ -4,11 +4,15 @@ package com.jetbrains.python;
 import com.intellij.codeInsight.CodeInsightSettings;
 import com.intellij.codeInsight.completion.impl.CamelHumpMatcher;
 import com.intellij.idea.TestFor;
+import com.jetbrains.python.allure.Layers;
+import com.jetbrains.python.allure.Subsystems;
 import com.jetbrains.python.fixtures.PyTestCase;
 import com.jetbrains.python.psi.LanguageLevel;
 
 import java.util.List;
 
+@Subsystems.CodeCompletion
+@Layers.Functional
 public class PythonKeywordCompletionTest extends PyTestCase {
   @Override
   protected void setUp() throws Exception {
@@ -313,6 +317,59 @@ public class PythonKeywordCompletionTest extends PyTestCase {
     runWithLanguageLevel(LanguageLevel.PYTHON39, this::doTest);
   }
 
+  // PY-90073
+  public void testNoTrueAsTypeParameterName() {
+    List<String> variants = doTestByTestName();
+    assertDoesntContain(variants, PyNames.TRUE);
+  }
+
+  // PY-90073
+  public void testNoExpressionKeywordsAsTypeParameterName() {
+    List<String> variants = doTestByTestName();
+    assertDoesntContain(variants, PyNames.TRUE, PyNames.FALSE, PyNames.NONE, PyNames.NOT, PyNames.LAMBDA);
+  }
+
+  // PY-90073
+  public void testExpressionKeywordsAllowedInTypeParameterBound() {
+    List<String> variants = doTestByTestName();
+    assertContainsElements(variants, PyNames.TRUE, PyNames.FALSE, PyNames.NONE, PyNames.NOT, PyNames.LAMBDA);
+  }
+
+  // PY-90073
+  public void testExpressionKeywordsAllowedInTypeParameterDefault() {
+    List<String> variants = doTestByTestName();
+    assertContainsElements(variants, PyNames.TRUE, PyNames.FALSE, PyNames.NONE, PyNames.NOT, PyNames.LAMBDA);
+  }
+
+  // PY-90832
+  public void testTrueFalseInParameterAnnotation() {
+    List<String> variants = doTestByTestName();
+    assertContainsElements(variants, PyNames.TRUE, PyNames.FALSE);
+  }
+
+  // PY-90832
+  public void testTrueFalseInReturnAnnotation() {
+    List<String> variants = doTestByTestName();
+    assertContainsElements(variants, PyNames.TRUE, PyNames.FALSE);
+  }
+
+  public void testTrueFalseInVariableAnnotation() {
+    List<String> variants = doTestByTestName();
+    assertContainsElements(variants, PyNames.TRUE, PyNames.FALSE);
+  }
+
+  // PY-90834
+  public void testNoExpressionKeywordsAsClassName() {
+    List<String> variants = doTestByText("class <caret>");
+    assertDoesntContain(variants, PyNames.TRUE, PyNames.FALSE, PyNames.NONE, PyNames.NOT, PyNames.LAMBDA);
+  }
+
+  // PY-90834
+  public void testNoExpressionKeywordsAsTypeAliasName() {
+    List<String> variants = doTestByText("type <caret> = int");
+    assertDoesntContain(variants, PyNames.TRUE, PyNames.FALSE, PyNames.NONE, PyNames.NOT, PyNames.LAMBDA);
+  }
+
   // PY-48039
   public void testNoCaseOutsideMatchStatement() {
     CodeInsightSettings.runWithTemporarySettings(settings -> {
@@ -339,7 +396,7 @@ public class PythonKeywordCompletionTest extends PyTestCase {
 
   // PY-49728
   public void testNonLiteralExpressionKeywordsInGuardCondition() {
-    assertContainsElements(doTestByTestName(), PyNames.ASYNC, PyNames.NOT, PyNames.LAMBDA);
+    assertContainsElements(doTestByTestName(), PyNames.NOT, PyNames.LAMBDA);
   }
 
   // PY-49728
@@ -351,6 +408,18 @@ public class PythonKeywordCompletionTest extends PyTestCase {
   public void testLiteralsInDecoratorArgumentList() {
     List<String> variants = doTestByTestName();
     assertContainsElements(variants, PyNames.TRUE);
+  }
+
+  // PY-89724
+  public void testLambdaAndNotInAnnotatedParameterAnnotation() {
+    List<String> variants = doTestByTestName();
+    assertContainsElements(variants, PyNames.LAMBDA, PyNames.NOT);
+  }
+
+  // PY-89724
+  public void testLambdaAndNotInDecoratorArguments() {
+    List<String> variants = doTestByTestName();
+    assertContainsElements(variants, PyNames.LAMBDA, PyNames.NOT);
   }
 
   // PY-52547
@@ -385,5 +454,88 @@ public class PythonKeywordCompletionTest extends PyTestCase {
       PyNames.ASYNC + " " + PyNames.FOR,
       PyNames.ASYNC + " " + PyNames.WITH
     );
+  }
+
+  // PY-90809
+  public void testAsyncKeywordNotSuggestedInsideArbitraryExpressions() {
+    List<String> variants = doTestByText("""
+                                           def f(asset):
+                                               if as<caret>
+                                           """);
+    assertDoesntContain(variants, PyNames.ASYNC);
+  }
+
+  // PY-88664
+  public void testLazyOnTopLevel() {
+    runWithLanguageLevel(LanguageLevel.PYTHON315, () ->
+      assertContainsElements(doTestByText("<caret>"), PyNames.LAZY));
+  }
+
+  // PY-88664
+  public void testNoLazyInsideFunction() {
+    runWithLanguageLevel(LanguageLevel.PYTHON315, () ->
+      assertDoesntContain(doTestByText("""
+                                         def f():
+                                             <caret>
+                                         """), PyNames.LAZY));
+  }
+
+  // PY-88664
+  public void testNoLazyInsideClass() {
+    runWithLanguageLevel(LanguageLevel.PYTHON315, () ->
+      assertDoesntContain(doTestByText("""
+                                         class C:
+                                             <caret>
+                                         """), PyNames.LAZY));
+  }
+
+  // PY-88664
+  public void testNoLazyInsideTry() {
+    runWithLanguageLevel(LanguageLevel.PYTHON315, () ->
+      assertDoesntContain(doTestByText("""
+                                         try:
+                                             <caret>
+                                         except ImportError:
+                                             pass
+                                         """), PyNames.LAZY));
+  }
+
+  // PY-88664
+  public void testNoLazyInsideExcept() {
+    runWithLanguageLevel(LanguageLevel.PYTHON315, () ->
+      assertDoesntContain(doTestByText("""
+                                         try:
+                                             pass
+                                         except ImportError:
+                                             <caret>
+                                         """), PyNames.LAZY));
+  }
+
+  // PY-88664
+  public void testNoLazyInsideFinally() {
+    runWithLanguageLevel(LanguageLevel.PYTHON315, () ->
+      assertDoesntContain(doTestByText("""
+                                         try:
+                                             pass
+                                         finally:
+                                             <caret>
+                                         """), PyNames.LAZY));
+  }
+
+  // PY-88664
+  public void testNoLazyInsideMatch() {
+    runWithLanguageLevel(LanguageLevel.PYTHON315, () ->
+      assertDoesntContain(doTestByText("""
+                                         x = 1
+                                         match x:
+                                             case 1:
+                                                 <caret>
+                                         """), PyNames.LAZY));
+  }
+
+  // PY-88664
+  public void testNoLazyBefore315() {
+    runWithLanguageLevel(LanguageLevel.PYTHON314, () ->
+      assertDoesntContain(doTestByText("<caret>"), PyNames.LAZY));
   }
 }

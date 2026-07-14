@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.lookup.impl
 
 import com.intellij.codeInsight.lookup.Lookup
@@ -179,6 +179,7 @@ class LookupCellRenderer(
     }
   }
 
+  @ApiStatus.Internal
   companion object {
     private val CUSTOM_NAME_FONT = Key.create<Font>("CustomLookupElementNameFont")
     private val CUSTOM_TAIL_FONT = Key.create<Font>("CustomLookupElementTailFont")
@@ -1011,7 +1012,8 @@ fun createSeparator(@NlsContexts.Separator title: String): LookupElement {
   return SeparatorLookupElement(title)
 }
 
-internal class SeparatorLookupElement(
+@ApiStatus.Internal
+class SeparatorLookupElement(
   @NlsContexts.Separator val title: String,
 ) : LookupElement() {
   override fun getLookupString(): String {

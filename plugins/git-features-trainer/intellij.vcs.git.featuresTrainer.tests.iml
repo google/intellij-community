@@ -24,7 +24,7 @@
     <orderEntry type="module" module-name="intellij.platform.vcs" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.vcs.log.impl" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.vcs.log" scope="TEST" />
-    <orderEntry type="module" module-name="intellij.vcs.git" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.vcs.git.backend" scope="TEST" />
     <orderEntry type="module" module-name="intellij.vcs.git.shared" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.lang.impl" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.testFramework" scope="TEST" />
@@ -32,6 +32,7 @@
     <orderEntry type="module" module-name="intellij.platform.vcs.impl.shared" scope="TEST" />
     <orderEntry type="module" module-name="intellij.vcs.git.featuresTrainer" scope="TEST" />
     <orderEntry type="module" module-name="intellij.featuresTrainer.tests" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.libraries.junit4" scope="TEST" />
   </component>
   <component name="TestModuleProperties" production-module="intellij.vcs.git.featuresTrainer" />
 </module>

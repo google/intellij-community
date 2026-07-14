@@ -24,8 +24,8 @@ import com.intellij.openapi.actionSystem.impl.Utils
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.UiWithModelAccess
 import com.intellij.openapi.application.asContextElement
-import com.intellij.openapi.application.writeIntentReadAction
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.getOrLogException
 import com.intellij.openapi.diagnostic.logger
@@ -104,7 +104,8 @@ internal sealed class IdeMenuBarHelper(@JvmField val flavor: IdeMenuFlavor,
       presentationFactory.reset()
       updateMenuActions(forceRebuild = true)
     })
-    var context = Dispatchers.EDT + ModalityState.any().asContextElement()
+    // we must not acquire write-intent lock here -- otherwise the fast-track action update could freeze for 1 second becuase of background write actions
+    var context = Dispatchers.UiWithModelAccess + ModalityState.any().asContextElement()
     if (StartUpMeasurer.isEnabled()) {
       context += rootTask() + CoroutineName("ide menu bar actions init")
     }
@@ -128,7 +129,7 @@ internal sealed class IdeMenuBarHelper(@JvmField val flavor: IdeMenuFlavor,
     coroutineScope.launch {
       initJob.join()
 
-      withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+      withContext(Dispatchers.UiWithModelAccess + ModalityState.any().asContextElement()) {
         updateRequests.throttle(500).collectLatest { forceRebuild ->
           runCatching {
             if (canUpdate()) {
@@ -192,7 +193,7 @@ private suspend fun expandMainActionGroup(mainActionGroup: ActionGroup,
   val dataManager = serviceAsync<DataManager>()
   return withContext(CoroutineName("expandMainActionGroup")) {
     val targetComponent = windowManager.getFocusedComponent(frame) ?: menuBar
-    val dataContext =  writeIntentReadAction { dataManager.getDataContext(targetComponent) }
+    val dataContext =  withContext(Dispatchers.EDT) { dataManager.getDataContext(targetComponent) }
     Utils.expandActionGroupSuspend(
       group = mainActionGroup,
       presentationFactory = presentationFactory,

@@ -4,25 +4,35 @@ package org.jetbrains.kotlin.idea.completion.impl.k2.contributors.commands
 import com.intellij.codeInsight.completion.command.CommandCompletionFactory
 import com.intellij.codeInsight.completion.command.commands.IntentionCommandOffsetProvider
 import com.intellij.lang.injection.InjectedLanguageManager
+import com.intellij.modcommand.ModCommandService
 import com.intellij.openapi.project.DumbAware
+import com.intellij.openapi.util.Key
+import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiLanguageInjectionHost
 import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.util.parentsOfType
 import com.intellij.testFramework.LightVirtualFile
+import com.intellij.util.asSafely
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
-import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
 import org.jetbrains.kotlin.analysis.api.projectStructure.contextModule
+import org.jetbrains.kotlin.analysis.api.projectStructure.copyOrigin
 import org.jetbrains.kotlin.idea.base.codeInsight.handlers.fixers.range
 import org.jetbrains.kotlin.idea.base.projectStructure.getKaModule
 import org.jetbrains.kotlin.idea.base.psi.copied
+import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtContainerNode
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtForExpression
+import org.jetbrains.kotlin.psi.KtLambdaArgument
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtStringTemplateEntryWithExpression
 import org.jetbrains.kotlin.psi.KtStringTemplateExpression
 import org.jetbrains.kotlin.psi.psiUtil.isAncestor
+import org.jetbrains.kotlin.psi.psiUtil.referenceExpression
+
+private val ktCommandCompletionCopy: Key<Boolean> = Key.create("ktCommandCompletionCopy")
 
 internal class KotlinCommandCompletionFactory : CommandCompletionFactory, DumbAware {
     override fun isApplicable(psiFile: PsiFile, offset: Int): Boolean {
@@ -32,6 +42,7 @@ internal class KotlinCommandCompletionFactory : CommandCompletionFactory, DumbAw
         if (psiFile !is KtFile) return false
         if (isInsideFor(psiFile, offset)) return false
         if (isInsideStringLiteral(psiFile, offset)) return false
+        if (isDisabledForGradle(psiFile, offset)) return false
         return true
     }
 
@@ -73,17 +84,8 @@ internal class KotlinCommandCompletionFactory : CommandCompletionFactory, DumbAw
             virtualFile.originalFile = originalVirtualFile
             virtualFile.fileType = originalVirtualFile.fileType
         }
+        ktCommandCompletionCopy.set(newFile, true)
         return newFile
-    }
-
-    private fun createCopyOfScript(originalFile: PsiFile, newFile: KtFile): KtFile? {
-        // We copy the original file, which retains the correct script context
-        val newFileCopy = originalFile.copied() as KtFile
-        // replace the old script block with the new script block
-        val copyOfOriginalBlockExpression = newFileCopy.script?.blockExpression ?: return null
-        val copiedNewBlockExpression = newFile.script?.blockExpression ?: return null
-        copyOfOriginalBlockExpression.replace(copiedNewBlockExpression.copy())
-        return newFileCopy
     }
 
     class KotlinIntentionCommandOffsetProvider : IntentionCommandOffsetProvider {
@@ -104,5 +106,32 @@ internal class KotlinCommandCompletionFactory : CommandCompletionFactory, DumbAw
             }
             return offsets
         }
+    }
+
+    class KotlinCommandCompletionModCommandPsiCopyHandler : ModCommandService.ModCommandPsiCopyHandler {
+        @OptIn(KaExperimentalApi::class)
+        override fun createCopy(file: PsiFile): PsiFile? {
+            if (file !is KtFile) return null
+            if (ktCommandCompletionCopy.get(file) != true) return null
+            val copyOrigin = file.copyOrigin ?: return null
+            val copied = copyOrigin.copied()
+            val copyFileDocument = copied.fileDocument
+            copyFileDocument.replaceString(0, copyFileDocument.text.length, file.fileDocument.text)
+            PsiDocumentManager.getInstance(file.project).commitDocument(copyFileDocument)
+            return copied
+
+        }
+    }
+
+    private fun isDisabledForGradle(psiFile: KtFile, offset: Int): Boolean {
+        if (psiFile.name != "build.gradle.kts") return false
+        val element = psiFile.findElementAt(offset) ?: return false
+        val isInsideDependenciesBlock = element.parentsOfType(KtLambdaArgument::class.java)
+            .any {
+                it.parent.asSafely<KtCallExpression>()
+                    ?.referenceExpression()
+                    ?.text == "dependencies"
+            }
+        return isInsideDependenciesBlock
     }
 }

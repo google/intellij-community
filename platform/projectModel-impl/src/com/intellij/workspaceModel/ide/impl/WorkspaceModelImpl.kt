@@ -3,8 +3,11 @@ package com.intellij.workspaceModel.ide.impl
 
 import com.intellij.concurrency.ThreadContextAwareReentrantLock
 import com.intellij.diagnostic.StartUpMeasurer
+import com.intellij.diagnostic.ThreadDumper
+import com.intellij.diagnostic.dumpCoroutines
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.backgroundWriteAction
 import com.intellij.openapi.components.serviceIfCreated
 import com.intellij.openapi.diagnostic.ControlFlowException
@@ -27,7 +30,7 @@ import com.intellij.platform.backend.workspace.WorkspaceModelTopics
 import com.intellij.platform.backend.workspace.impl.WorkspaceModelInternal
 import com.intellij.platform.diagnostic.telemetry.helpers.Milliseconds
 import com.intellij.platform.diagnostic.telemetry.helpers.MillisecondsMeasurer
-import com.intellij.platform.eel.provider.LocalEelMachine
+import com.intellij.platform.eel.provider.getEelMachine
 import com.intellij.platform.workspace.storage.EntityChange
 import com.intellij.platform.workspace.storage.EntityStorage
 import com.intellij.platform.workspace.storage.ImmutableEntityStorage
@@ -46,6 +49,7 @@ import com.intellij.project.ProjectStoreOwner
 import com.intellij.serviceContainer.AlreadyDisposedException
 import com.intellij.util.concurrency.ThreadingAssertions
 import com.intellij.util.messages.impl.MessageBusImpl
+import com.intellij.util.ui.EDT
 import com.intellij.workspaceModel.core.fileIndex.EntityStorageKind
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileIndex
 import com.intellij.workspaceModel.core.fileIndex.impl.WorkspaceFileIndexImpl
@@ -63,9 +67,11 @@ import kotlinx.coroutines.launch
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
 import org.jetbrains.annotations.TestOnly
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.io.path.writeText
 import kotlin.system.measureTimeMillis
-import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.minutes
 
 private val EP_NAME: ExtensionPointName<BridgeInitializer> = ExtensionPointName("com.intellij.workspace.bridgeInitializer")
 
@@ -84,7 +90,7 @@ open class WorkspaceModelImpl : WorkspaceModelInternal {
   private val reactive = WmReactive(this)
 
   final override val entityStorage: VersionedEntityStorageImpl
-  private val unloadedEntitiesStorage: VersionedEntityStorageImpl
+  final override val unloadedEntitiesStorage: VersionedEntityStorageImpl
   private val lock = ThreadContextAwareReentrantLock()
 
   /** replay = 1 is needed to send the very first state when the subscription fo the flow happens.
@@ -478,25 +484,51 @@ open class WorkspaceModelImpl : WorkspaceModelInternal {
   override suspend fun <T> flowOfNewElements(query: CollectionQuery<T>): Flow<T> = reactive.flowOfNewElements(query)
   override suspend fun <T> flowOfDiff(query: CollectionQuery<T>): Flow<Diff<T>> = reactive.flowOfDiff(query)
 
+  private val waitingTimedOut = AtomicBoolean(false)
+
   override suspend fun awaitSynchronizationWithJpsModel() {
-    if (ModalityState.current() != ModalityState.nonModal()) {
+    if (EDT.isCurrentThreadEdt() && ModalityState.current() != ModalityState.nonModal()) {
       throw IllegalStateException("awaitSynchronizationWithJpsModel() can only be called in non-modal context. Current context: ${ModalityState.current()}")
     }
-    GlobalWorkspaceModel.getInstance(LocalEelMachine).awaitSynchronizationWithJpsModel()
+    GlobalWorkspaceModel.getInstance(project.getEelMachine()).awaitSynchronizationWithJpsModel()
 
     CompletableDeferred<Unit>().also { deferred ->
       JpsProjectLoadingManager.getInstance(project).jpsProjectLoaded { deferred.complete(Unit) }
 
-      if (!deferred.isCompleted && ApplicationManager.getApplication().isUnitTestMode) {
-        ProjectSynchronizerUtil.getInstance(project).applyJpsModelToProjectModel()
+      if (deferred.isCompleted) {
+        return@also
       }
 
-      // Safety net: if the callback is never invoked (e.g. due to a platform bug), unblock waiters after a timeout.
-      coroutineScope.launch {
-        // JpsGlobalModelSynchronizerImpl has a 5-second delay and ModuleManagerComponentBridgeInitializer has a 1-second delay;
-        delay(10.seconds)
-        if (deferred.complete(Unit)) {
-          thisLogger().error("JPS project loaded callback was not called within 10 seconds, proceeding anyway. Project: ${project.name} (locationHash=${project.locationHash}).")
+      if (!deferred.isCompleted && ApplicationManager.getApplication().isUnitTestMode) {
+        // Startup activities including DelayedProjectSynchronizer are skipped in unit tests unless it's explicitly specified
+        // that they have to be run. So we need to trigger synchronization manually.
+        ProjectSynchronizerUtil.getInstance(project).applyJpsModelToProjectModel()
+        deferred.complete(Unit)
+      }
+      else if (waitingTimedOut.get()) {
+        deferred.complete(Unit) // don't wait again
+      }
+      else {
+        // Safety net: if the callback is never invoked (e.g. due to a platform bug), unblock waiters after a timeout.
+        coroutineScope.launch {
+          // JpsGlobalModelSynchronizerImpl has a 5-second delay and ModuleManagerComponentBridgeInitializer has a 1-second delay;
+          val timeout = 1.minutes
+          delay(timeout)
+          if (deferred.complete(Unit) && !waitingTimedOut.getAndSet(true)) {
+            val threadDump = buildString {
+              appendLine(ThreadDumper.dumpThreadsToString())
+              appendLine()
+              appendLine("Coroutines dump:")
+              appendLine(dumpCoroutines())
+            }
+            val logFile = PathManager.getLogDir().resolve("jps-project-loaded-timeout-${System.currentTimeMillis()}.txt")
+            logFile.writeText(threadDump)
+            thisLogger().warn(
+              "JPS project loaded callback was not called within $timeout, proceeding anyway. " +
+              "Thread dump saved to ${logFile}. " +
+              "Project: ${project.name} (locationHash=${project.locationHash})."
+            )
+          }
         }
       }
     }.await()

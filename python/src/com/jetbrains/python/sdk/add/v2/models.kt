@@ -1,7 +1,6 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.sdk.add.v2
 
-import com.intellij.execution.target.FullPathOnTarget
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.observable.properties.AtomicProperty
@@ -9,18 +8,12 @@ import com.intellij.openapi.observable.properties.ObservableMutableProperty
 import com.intellij.openapi.observable.properties.PropertyGraph
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.vfs.toNioPathOrNull
-import com.intellij.python.community.services.shared.PythonInfoHolder
-import com.intellij.python.community.services.shared.PythonInfoWithUiComparator
-import com.intellij.python.community.services.shared.UiHolder
 import com.intellij.python.pyproject.PyProjectToml
-import com.intellij.util.concurrency.annotations.RequiresEdt
+import com.intellij.python.pytools.Version
 import com.jetbrains.python.PyBundle.message
-import com.jetbrains.python.PyToolUIInfo
-import com.jetbrains.python.PythonInfo
 import com.jetbrains.python.TraceContext
 import com.jetbrains.python.errorProcessing.PyResult
 import com.jetbrains.python.newProjectWizard.projectPath.ProjectPathFlows
-import com.jetbrains.python.sdk.PySdkToInstall
 import com.jetbrains.python.sdk.add.v2.conda.CondaViewModel
 import com.jetbrains.python.sdk.add.v2.hatch.HatchViewModel
 import com.jetbrains.python.sdk.add.v2.pipenv.PipenvViewModel
@@ -31,7 +24,6 @@ import com.jetbrains.python.sdk.baseDir
 import com.jetbrains.python.target.ui.TargetPanelExtension
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -48,36 +40,34 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
 import java.nio.file.Path
-import kotlin.io.path.pathString
 
-interface PythonToolViewModel {
+internal interface PythonToolViewModel {
   fun initialize(scope: CoroutineScope)
 }
 
-@OptIn(ExperimentalCoroutinesApi::class)
 abstract class PythonAddInterpreterModel<P : PathHolder>(
   val projectPathFlows: ProjectPathFlows,
   val fileSystem: FileSystem<P>,
 ) {
-  val modificationCounter: AtomicProperty<Int> = AtomicProperty(0)
+  internal val modificationCounter: AtomicProperty<Int> = AtomicProperty(0)
 
-  val propertyGraph: PropertyGraph = PropertyGraph()
-  val navigator: PythonNewEnvironmentDialogNavigator = PythonNewEnvironmentDialogNavigator()
+  internal val propertyGraph: PropertyGraph = PropertyGraph()
+  internal val navigator: PythonNewEnvironmentDialogNavigator = PythonNewEnvironmentDialogNavigator()
   open val state: AddInterpreterState<P> = AddInterpreterState(propertyGraph)
 
   val condaViewModel: CondaViewModel<P> = CondaViewModel(fileSystem, propertyGraph, projectPathFlows)
-  val uvViewModel: UvViewModel<P> = UvViewModel(fileSystem, propertyGraph, projectPathFlows)
-  val pipenvViewModel: PipenvViewModel<P> = PipenvViewModel(fileSystem, propertyGraph)
-  val poetryViewModel: PoetryViewModel<P> = PoetryViewModel(fileSystem, propertyGraph)
-  val hatchViewModel: HatchViewModel<P> = HatchViewModel(fileSystem, propertyGraph, projectPathFlows)
+  internal val uvViewModel: UvViewModel<P> = UvViewModel(fileSystem, propertyGraph, projectPathFlows)
+  internal val pipenvViewModel: PipenvViewModel<P> = PipenvViewModel(fileSystem, propertyGraph)
+  internal val poetryViewModel: PoetryViewModel<P> = PoetryViewModel(fileSystem, propertyGraph)
+  internal val hatchViewModel: HatchViewModel<P> = HatchViewModel(fileSystem, propertyGraph, projectPathFlows)
   val venvViewModel: VenvViewModel<P> = VenvViewModel(fileSystem, propertyGraph, projectPathFlows)
 
-  internal val knownInterpreters: MutableStateFlow<List<PythonSelectableInterpreter<P>>?> = MutableStateFlow(null)
+  private val knownInterpreters: MutableStateFlow<List<PythonSelectableInterpreter<P>>?> = MutableStateFlow(null)
   private val detectedInterpretersUnfiltered: MutableStateFlow<List<DetectedSelectableInterpreter<P>>?> = MutableStateFlow(null)
   lateinit var detectedInterpreters: StateFlow<List<DetectedSelectableInterpreter<P>>?>
-  val manuallyAddedInterpreters: MutableStateFlow<List<ManuallyAddedSelectableInterpreter<P>>> = MutableStateFlow(emptyList())
+  internal val manuallyAddedInterpreters: MutableStateFlow<List<ManuallyAddedSelectableInterpreter<P>>> = MutableStateFlow(emptyList())
   private var installable: List<InstallableSelectableInterpreter<P>> = emptyList()
-  lateinit var allInterpreters: StateFlow<List<PythonSelectableInterpreter<P>>?>
+  internal lateinit var allInterpreters: StateFlow<List<PythonSelectableInterpreter<P>>?>
   lateinit var baseInterpreters: StateFlow<List<PythonSelectableInterpreter<P>>?>
 
   @TestOnly
@@ -172,13 +162,6 @@ abstract class PythonAddInterpreterModel<P : PathHolder>(
     return PyResult.success(interpreter)
   }
 
-
-  @RequiresEdt
-  internal fun addInstalledInterpreter(homePath: P, pythonInfo: PythonInfo): DetectedSelectableInterpreter<P> {
-    val installedInterpreter = DetectedSelectableInterpreter(homePath, pythonInfo, true)
-    detectedInterpretersUnfiltered.value = (detectedInterpretersUnfiltered.value ?: emptyList()) + installedInterpreter
-    return installedInterpreter
-  }
 }
 
 abstract class PythonMutableTargetAddInterpreterModel<P : PathHolder>(projectPathFlows: ProjectPathFlows, fileSystem: FileSystem<P>) :
@@ -203,83 +186,9 @@ class PythonLocalAddInterpreterModel<P : PathHolder>(projectPathFlows: ProjectPa
   }
 }
 
-internal interface MaybeSystemPython {
-  /**
-   * System python can be used as a base python for other envs
-   */
-  val isBase: Boolean
-}
 
-sealed class PythonSelectableInterpreter<P : PathHolder> : Comparable<PythonSelectableInterpreter<*>>, UiHolder, PythonInfoHolder {
-  companion object {
-    private val comparator = PythonInfoWithUiComparator<PythonSelectableInterpreter<*>>()
-  }
 
-  abstract val homePath: P?
-  abstract override val pythonInfo: PythonInfo
-  override val ui: PyToolUIInfo? = null
-  override fun toString(): String = "PythonSelectableInterpreter(homePath='$homePath')"
 
-  override fun compareTo(other: PythonSelectableInterpreter<*>): Int = comparator.compare(this, other)
-}
-
-class ExistingSelectableInterpreter<P : PathHolder>(
-  val sdkWrapper: SdkWrapper<P>,
-  override val pythonInfo: PythonInfo,
-  val isSystemWide: Boolean,
-) : PythonSelectableInterpreter<P>() {
-  override val homePath: P
-    get() = sdkWrapper.homePath
-
-  override fun toString(): String {
-    return "ExistingSelectableInterpreter(sdk=${sdkWrapper.sdk}, pythonInfo=$pythonInfo, isSystemWide=$isSystemWide, homePath='$homePath')"
-  }
-}
-
-/**
- * [isBase] is a system interpreter (aka system python)
- */
-class DetectedSelectableInterpreter<P : PathHolder>(
-  override val homePath: P,
-  override val pythonInfo: PythonInfo,
-  override val isBase: Boolean,
-  override val ui: PyToolUIInfo? = null,
-) : PythonSelectableInterpreter<P>(), MaybeSystemPython {
-  override fun toString(): String {
-    return "DetectedSelectableInterpreter(homePath='$homePath', pythonInfo=$pythonInfo, isBase=$isBase, uiCustomization=$ui)"
-  }
-}
-
-class ManuallyAddedSelectableInterpreter<P : PathHolder>(
-  override val homePath: P,
-  override val pythonInfo: PythonInfo,
-  override val isBase: Boolean,
-) : PythonSelectableInterpreter<P>(), MaybeSystemPython {
-  override fun toString(): String {
-    return "ManuallyAddedSelectableInterpreter(homePath='$homePath', pythonInfo=$pythonInfo)"
-  }
-}
-
-class InstallableSelectableInterpreter<P : PathHolder>(
-  override val pythonInfo: PythonInfo,
-  val sdk: PySdkToInstall,
-) : PythonSelectableInterpreter<P>() {
-  override val homePath: P? = null
-}
-
-sealed interface PathHolder {
-  data class Eel(val path: Path) : PathHolder {
-    override fun toString(): String {
-      return path.pathString
-    }
-  }
-
-  data class Target(val pathString: FullPathOnTarget) : PathHolder {
-    override fun toString(): String {
-      return pathString
-    }
-  }
-}
 
 sealed interface ValidatedPath<T, P : PathHolder> {
   val pathHolder: P?

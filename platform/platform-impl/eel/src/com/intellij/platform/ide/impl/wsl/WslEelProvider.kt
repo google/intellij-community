@@ -11,6 +11,7 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.platform.core.nio.fs.MultiRoutingFileSystemProvider
 import com.intellij.platform.eel.EelDescriptor
+import com.intellij.platform.eel.EelDescriptorWithoutNativeFileChooserSupport
 import com.intellij.platform.eel.EelMachine
 import com.intellij.platform.eel.EelOsFamily
 import com.intellij.platform.eel.EelPathBoundDescriptor
@@ -35,7 +36,6 @@ import java.nio.file.FileSystem
 import java.nio.file.FileSystemAlreadyExistsException
 import java.nio.file.FileSystemNotFoundException
 import java.nio.file.FileSystems.getDefault
-import java.nio.file.InvalidPathException
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.path.Path
@@ -78,8 +78,7 @@ class EelWslMrfsBackend(private val coroutineScope: CoroutineScope) : MultiRouti
       }
     }
 
-    val key = if (useNewFileSystem) wslRoot else distributionId
-    return providersCache.computeIfAbsent(key) {
+    return providersCache.computeIfAbsent(wslRoot) {
       val ijentUri = URI("ijent", "wsl", "/$distributionId", null, null)
 
       val ijentFsProvider = IjentNioFileSystemProvider.getInstance()
@@ -173,7 +172,7 @@ class EelWslMrfsBackend(private val coroutineScope: CoroutineScope) : MultiRouti
 @ApiStatus.Internal
 @VisibleForTesting
 class WslEelEnvironmentInitializer : EelEnvironmentInitializer {
-  override suspend fun tryInitialize(@MultiRoutingFileSystemPath path: String): EelMachine? {
+  override suspend fun tryInitialize(eelDescriptor: EelDescriptor): EelMachine? {
     if (!WslIjentAvailabilityService.getInstance().useIjentForWslNioFileSystem()) {
       return null
     }
@@ -182,23 +181,10 @@ class WslEelEnvironmentInitializer : EelEnvironmentInitializer {
       return null
     }
 
-    val nioPath = try {
-      Path.of(path)
-    }
-    catch (_: IllegalArgumentException) {  // TODO What throws it?
-      return null
-    }
-
-    val descriptor = nioPath.getEelDescriptor() as? WslEelDescriptor ?: return null
+    val descriptor = eelDescriptor as? WslEelDescriptor ?: return null
 
     val project = ProjectManager.getInstance().openProjects.find { project ->
-      try {
-        val basePath = project.basePath?.let(Path::of)
-        basePath != null && nioPath.startsWith(basePath)
-      }
-      catch (_: InvalidPathException) {
-        false
-      }
+      project.getEelDescriptor() == descriptor
     }
 
     WslIjentManager.instanceAsync().getIjentApi(descriptor, descriptor.distribution, project, false)
@@ -244,7 +230,7 @@ object WslPathParser {
   }
 }
 
-class WslEelDescriptor internal constructor(val distribution: WSLDistribution, fsRoot: String) : EelPathBoundDescriptor {
+class WslEelDescriptor internal constructor(val distribution: WSLDistribution, fsRoot: String) : EelPathBoundDescriptor, EelDescriptorWithoutNativeFileChooserSupport {
   internal val fsRoot = fsRoot.replace('/', '\\')
 
   constructor(distribution: WSLDistribution) : this(distribution, distribution.getUNCRootPath().pathString)

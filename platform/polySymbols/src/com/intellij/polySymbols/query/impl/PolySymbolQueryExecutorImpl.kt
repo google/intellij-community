@@ -37,6 +37,7 @@ import com.intellij.polySymbols.utils.nameSegments
 import com.intellij.polySymbols.utils.qualifiedName
 import com.intellij.polySymbols.utils.withMatchedName
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiInvalidElementAccessException
 import com.intellij.psi.createSmartPointer
 import com.intellij.util.PlatformUtils
 import com.intellij.util.SmartList
@@ -51,12 +52,14 @@ import kotlin.math.min
 class PolySymbolQueryExecutorImpl(
   override val location: PsiElement?,
   rootScope: List<PolySymbolScope>,
+  scopeOrigin: Map<PolySymbolScope, Any>,
   override val namesProvider: PolySymbolNamesProvider,
   override val resultsCustomizer: PolySymbolQueryResultsCustomizer,
   override val context: PolyContext,
   allowResolve: Boolean,
 ) : PolySymbolQueryExecutor {
 
+  private val scopeOrigin: MutableMap<PolySymbolScope, Any> = scopeOrigin.toMutableMap()
   override val allowResolve: Boolean = if (PlatformUtils.isJetBrainsClient()) false else allowResolve
 
   internal val rootScope: List<PolySymbolScope> = initializeCompoundScopes(rootScope)
@@ -90,10 +93,11 @@ class PolySymbolQueryExecutorImpl(
     val scopePtr = this.resultsCustomizer.createPointer()
     val rootScopePointers = this.rootScope.map { it.createPointer() }
     return Pointer<PolySymbolQueryExecutor> {
-      @Suppress("UNCHECKED_CAST")
-      val rootScope = rootScopePointers.map { it.dereference() }
-                        .takeIf { it.all { c -> c != null } } as? List<PolySymbolScope>
-                      ?: return@Pointer null
+      val rootScope =
+        rootScopePointers
+          .mapNotNull { it.dereference() }
+          .takeIf { it.size == rootScopePointers.size }
+        ?: return@Pointer null
 
       val namesProvider = namesProviderPtr.dereference()
                           ?: return@Pointer null
@@ -101,7 +105,7 @@ class PolySymbolQueryExecutorImpl(
       val scope = scopePtr.dereference()
                   ?: return@Pointer null
       val location = locationPtr?.let { it.dereference() ?: return@Pointer null }
-      PolySymbolQueryExecutorImpl(location, rootScope, namesProvider, scope, context, allowResolve)
+      PolySymbolQueryExecutorImpl(location, rootScope, emptyMap(), namesProvider, scope, context, allowResolve)
     }
   }
 
@@ -213,7 +217,13 @@ class PolySymbolQueryExecutorImpl(
     if (rules.isEmpty())
       this
     else
-      PolySymbolQueryExecutorImpl(location, rootScope, namesProvider.withRules(rules), resultsCustomizer, context, allowResolve)
+      PolySymbolQueryExecutorImpl(location,
+                                  rootScope,
+                                  scopeOrigin,
+                                  namesProvider.withRules(rules),
+                                  resultsCustomizer,
+                                  context,
+                                  allowResolve)
 
   override fun hasExclusiveScopeFor(kind: PolySymbolKind, scope: List<PolySymbolScope>): Boolean {
     return buildQueryScope(scope).any { it.isExclusiveFor(kind) }
@@ -224,14 +234,18 @@ class PolySymbolQueryExecutorImpl(
       val compoundScopeQueryExecutor = PolySymbolQueryExecutorImpl(
         location,
         rootScope.filter { it !is PolySymbolCompoundScope },
-        namesProvider, resultsCustomizer, context, allowResolve
+        scopeOrigin, namesProvider, resultsCustomizer, context, allowResolve
       )
-      return rootScope.flatMap {
-        if (it is PolySymbolCompoundScope) {
-          it.getScopes(compoundScopeQueryExecutor)
+      return rootScope.flatMap { scope ->
+        if (scope is PolySymbolCompoundScope) {
+          scope.getScopes(compoundScopeQueryExecutor).also {
+            it.forEach { subScope ->
+              scopeOrigin[subScope] = scope to scopeOrigin[scope]
+            }
+          }
         }
         else {
-          listOf(it)
+          listOf(scope)
         }
       }
     }
@@ -269,6 +283,7 @@ class PolySymbolQueryExecutorImpl(
           keepUnresolvedTopLevelReferences = false
           try {
             scope.getMatchingSymbols(qualifiedName, params, PolySymbolQueryStack(finalContext))
+              .filterSymbolsWithInvalidPsiContext(scope)
           }
           finally {
             keepUnresolvedTopLevelReferences = prev
@@ -486,6 +501,23 @@ class PolySymbolQueryExecutorImpl(
     else {
       ProgressManager.checkCanceled()
       resultsCustomizer.apply(this, strict, qualifiedName)
+    }
+
+  private fun List<PolySymbol>.filterSymbolsWithInvalidPsiContext(scope: PolySymbolScope): List<PolySymbol> =
+    filter {
+      val psi = it.psiContext
+      if (psi != null && !psi.isValid) {
+        val ex = try {
+          throw PsiInvalidElementAccessException(psi)
+        }
+        catch (e: Throwable) {
+          e
+        }
+        thisLogger().error("Invalid psi element ${psi} for symbol: ${it.qualifiedName} [$it] in scope: $scope.\n" +
+                           "Scope origin: ${scopeOrigin[scope]}.", ex)
+        false
+      }
+      else true
     }
 
   private val PolySymbolQueryParams.recursionKey: List<Any>

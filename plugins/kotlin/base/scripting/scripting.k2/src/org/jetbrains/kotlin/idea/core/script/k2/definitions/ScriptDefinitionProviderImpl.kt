@@ -5,10 +5,11 @@ import com.intellij.ide.highlighter.JavaFileType
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ProjectRootModificationTracker
 import com.intellij.openapi.util.SimpleModificationTracker
 import org.jetbrains.kotlin.caches.project.cacheByClass
 import org.jetbrains.kotlin.idea.KotlinFileType
-import org.jetbrains.kotlin.idea.core.script.k2.settings.ScriptDefinitionSettingsPersistentStateComponent
+import org.jetbrains.kotlin.idea.core.script.k2.settings.ScriptDefinitionSettingsStateComponent
 import org.jetbrains.kotlin.idea.core.script.shared.SCRIPT_DEFINITIONS_SOURCES
 import org.jetbrains.kotlin.scripting.definitions.ScriptDefinition
 import org.jetbrains.kotlin.scripting.definitions.ScriptDefinitionProvider
@@ -26,7 +27,7 @@ class ScriptDefinitionsModificationTracker : SimpleModificationTracker() {
 class ScriptDefinitionProviderImpl(val project: Project) : ScriptDefinitionProvider {
     override val currentDefinitions: Sequence<ScriptDefinition>
         get() {
-            val settingsProvider = ScriptDefinitionSettingsPersistentStateComponent.getInstance(project)
+            val settingsProvider = ScriptDefinitionSettingsStateComponent.getInstance(project)
 
             return definitionsFromSources.asSequence()
                 .filter { settingsProvider.isScriptDefinitionEnabled(it) }
@@ -53,7 +54,8 @@ class ScriptDefinitionProviderImpl(val project: Project) : ScriptDefinitionProvi
     companion object {
         private fun computeOrGetDefinitions(project: Project): List<ScriptDefinition> = project.cacheByClass(
             ScriptDefinitionProviderImpl::class.java,
-            ScriptDefinitionsModificationTracker.getInstance(project)
+            ScriptDefinitionsModificationTracker.getInstance(project),
+            ProjectRootModificationTracker.getInstance(project),
         ) {
             SCRIPT_DEFINITIONS_SOURCES.getExtensions(project).flatMap { it.definitions }
         }

@@ -22,7 +22,7 @@ import javax.swing.Icon
 /**
  * A pill-shaped badge [Icon] that renders [text] over a colored background.
  *
- * Use the predefined fields [new], [alpha], [beta], [trial]
+ * Use the predefined fields [new], [alpha], [beta], [trial], [free]
  * for common badge types, or construct directly with a custom [text] and [colorType].
  *
  * Colors are resolved from `Badge.*` theme keys (see `IntelliJPlatform.themeMetadata.json`).
@@ -32,36 +32,46 @@ import javax.swing.Icon
  * @param text the localized label displayed inside the badge
  * @param colorType the color variant to use (default: [ColorType.BLUE_SECONDARY])
  */
-@ApiStatus.Internal
 class Badge(
   var text: @NlsContexts.Label String,
   var colorType: ColorType = ColorType.BLUE_SECONDARY,
 ) : Icon {
 
   companion object {
-    @JvmStatic
+    @JvmField
     val new: Icon = ImmutableBadge(IdeBundle.message("badge.text.new"), ColorType.BLUE)
 
-    @JvmStatic
+    @JvmField
+    @ApiStatus.Internal
+    @Deprecated("For Java only, because `new` is a keyword. In Kotlin, use `Badge.new` instead.", level = DeprecationLevel.HIDDEN)
+    val newBadge: Icon = new
+
+    @JvmField
     val newDisabled: Icon = ImmutableBadge(IdeBundle.message("badge.text.new"), ColorType.BLUE, false)
 
-    @JvmStatic
+    @JvmField
     val alpha: Icon = ImmutableBadge(IdeBundle.message("badge.text.alpha"), ColorType.GREEN_SECONDARY)
 
-    @JvmStatic
+    @JvmField
     val alphaDisabled: Icon = ImmutableBadge(IdeBundle.message("badge.text.alpha"), ColorType.GREEN_SECONDARY, false)
 
-    @JvmStatic
+    @JvmField
     val beta: Icon = ImmutableBadge(IdeBundle.message("badge.text.beta"), ColorType.PURPLE_SECONDARY)
 
-    @JvmStatic
+    @JvmField
     val betaDisabled: Icon = ImmutableBadge(IdeBundle.message("badge.text.beta"), ColorType.PURPLE_SECONDARY, false)
 
-    @JvmStatic
+    @JvmField
     val trial: Icon = ImmutableBadge(IdeBundle.message("badge.text.trial"), ColorType.GREEN_SECONDARY)
 
-    @JvmStatic
+    @JvmField
     val trialDisabled: Icon = ImmutableBadge(IdeBundle.message("badge.text.trial"), ColorType.GREEN_SECONDARY, false)
+
+    @JvmField
+    val free: Icon = ImmutableBadge(IdeBundle.message("badge.text.free"), ColorType.GREEN)
+
+    @JvmField
+    val freeDisabled: Icon = ImmutableBadge(IdeBundle.message("badge.text.free"), ColorType.GREEN, false)
   }
 
   /**
@@ -70,7 +80,6 @@ class Badge(
    * Each type maps to a pair of background/foreground theme colors
    * resolved via `Badge.*` UI keys (e.g. `Badge.blueBackground`).
    */
-  @ApiStatus.Internal
   enum class ColorType {
     BLUE,
     BLUE_SECONDARY,

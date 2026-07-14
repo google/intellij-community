@@ -37,9 +37,9 @@ import com.jetbrains.python.codeInsight.controlflow.ScopeOwner;
 import com.jetbrains.python.codeInsight.dataflow.scope.ScopeUtil;
 import com.jetbrains.python.codeInsight.mlcompletion.PyCompletionMlElementInfo;
 import com.jetbrains.python.codeInsight.mlcompletion.PyCompletionMlElementKind;
-import com.jetbrains.python.documentation.doctest.PyDocstringFile;
+import com.jetbrains.python.documentation.doctest.PyDoctestFile;
+import com.jetbrains.python.inspections.PyLazyImportInspection;
 import com.jetbrains.python.psi.LanguageLevel;
-import com.jetbrains.python.psi.PyAnnotation;
 import com.jetbrains.python.psi.PyArgumentList;
 import com.jetbrains.python.psi.PyAssignmentStatement;
 import com.jetbrains.python.psi.PyAugAssignmentStatement;
@@ -47,8 +47,6 @@ import com.jetbrains.python.psi.PyCaseClause;
 import com.jetbrains.python.psi.PyClass;
 import com.jetbrains.python.psi.PyConditionalExpression;
 import com.jetbrains.python.psi.PyConditionalStatementPart;
-import com.jetbrains.python.psi.PyDecorator;
-import com.jetbrains.python.psi.PyDocStringOwner;
 import com.jetbrains.python.psi.PyElement;
 import com.jetbrains.python.psi.PyElsePart;
 import com.jetbrains.python.psi.PyExceptPart;
@@ -77,6 +75,8 @@ import com.jetbrains.python.psi.PyStringLiteralExpression;
 import com.jetbrains.python.psi.PyTargetExpression;
 import com.jetbrains.python.psi.PyTryExceptStatement;
 import com.jetbrains.python.psi.PyTryPart;
+import com.jetbrains.python.psi.PyTypeAliasStatement;
+import com.jetbrains.python.psi.PyTypeParameter;
 import com.jetbrains.python.psi.PyWithItem;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -250,38 +250,6 @@ public final class PyKeywordCompletionContributor extends CompletionContributor 
   }
 
 
-  private static class NotParameterOrDefaultValue implements ElementFilter {
-
-    @Override
-    public boolean isAcceptable(Object element, PsiElement context) {
-      if (!(element instanceof PsiElement psiElement)) {
-        return false;
-      }
-      PsiElement definition = PsiTreeUtil.getParentOfType(psiElement, PyDocStringOwner.class, false, PyStatementList.class);
-      if (definition != null) {
-        if (PsiTreeUtil.getParentOfType(psiElement, PyParameterList.class) == null) {
-          return true;
-        }
-        PyParameter param = PsiTreeUtil.getParentOfType(psiElement, PyParameter.class);
-        if (param != null) {
-          PyExpression defaultValue = param.getDefaultValue();
-          if (defaultValue != null && PsiTreeUtil.isAncestor(defaultValue, psiElement, false)) {
-            return true;
-          }
-        }
-        return false;
-      }
-      return true;
-    }
-
-    @Override
-    public boolean isClassAcceptable(Class hintClass) {
-      return true;
-    }
-  }
-
-  private static final ElementPattern NOT_PARAMETER_OR_DEFAULT_VALUE = new FilterPattern(new NotParameterOrDefaultValue());
-
   // ====== conditions
 
   private static final PsiElementPattern.Capture<PsiElement> IN_COMMENT =
@@ -289,12 +257,13 @@ public final class PyKeywordCompletionContributor extends CompletionContributor 
 
   private static final PsiElementPattern.Capture<PsiElement> IN_STRING_LITERAL =
     psiElement().inside(PyStringLiteralExpression.class).andNot(
-      psiElement().inFile(psiFile(PyDocstringFile.class)));
+      psiElement().inFile(psiFile(PyDoctestFile.class)));
 
-  private static final ElementPattern<PsiElement> IN_FUNCTION_HEADER =
-    psiElement().inside(PyFunction.class)
-      .andNot(or(psiElement().inside(false, psiElement(PyStatementList.class), psiElement(PyFunction.class)),
-                 psiElement().inside(false, psiElement(PyParameterList.class), psiElement(PyFunction.class))));
+  private static final ElementPattern<PsiElement> IS_DECLARATION_NAME = or(
+    psiElement().withElementType(PyTokenTypes.IDENTIFIER).withParent(PyFunction.class),
+    psiElement().withElementType(PyTokenTypes.IDENTIFIER).withParent(PyClass.class),
+    psiElement().withElementType(PyTokenTypes.IDENTIFIER).withParent(PyTypeAliasStatement.class)
+  );
 
   public static final PsiElementPattern.Capture<PsiElement> AFTER_QUALIFIER =
     psiElement().afterLeaf(psiElement().withText(".").inside(PyReferenceExpression.class));
@@ -360,8 +329,6 @@ public final class PyKeywordCompletionContributor extends CompletionContributor 
 
   private static final PsiElementPattern.Capture<PsiElement> IN_PARAM_LIST = psiElement().inside(PyParameterList.class);
   private static final PsiElementPattern.Capture<PsiElement> IN_ARG_LIST = psiElement().inside(PyArgumentList.class);
-  private static final PsiElementPattern.Capture<PsiElement> IN_DECORATOR_ARG_LIST =
-    psiElement().inside(PyArgumentList.class).inside(PyDecorator.class);
 
   private static final PsiElementPattern.Capture<PsiElement> IN_DEF_BODY =
     psiElement().inside(false, psiElement(PyFunction.class), psiElement(PyClass.class));
@@ -374,9 +341,6 @@ public final class PyKeywordCompletionContributor extends CompletionContributor 
 
   private static final PsiElementPattern.Capture<PsiElement> IN_ELSE_BODY_OF_TRY =
     psiElement().inside(psiElement(PyStatementList.class).inside(psiElement(PyElsePart.class).inside(PyTryExceptStatement.class)));
-
-  private static final PsiElementPattern.Capture<PsiElement> IN_ANNOTATION =
-    psiElement().inside(psiElement(PyAnnotation.class));
 
   public static final ElementPattern<PsiElement> IN_PATTERN =
     or(psiElement().inside(false, psiElement(PyPattern.class), psiElement(PyStatement.class)),
@@ -416,6 +380,13 @@ public final class PyKeywordCompletionContributor extends CompletionContributor 
 
   private static final FilterPattern IN_BEGIN_STMT = new FilterPattern(new StatementFitFilter());
 
+  private static final PsiElementPattern.Capture<PsiElement> IS_TYPE_PARAMETER_NAME =
+    psiElement().withElementType(PyTokenTypes.IDENTIFIER).withParent(PyTypeParameter.class);
+
+  private static final ElementPattern<PsiElement> IS_PARAMETER_NAME =
+    psiElement().withElementType(PyTokenTypes.IDENTIFIER).withParent(PyParameter.class);
+
+
   /*
   private static final FilterPattern INSIDE_EXPR = new FilterPattern(new PrecededByFilter(
     psiElement(PyExpression.class)
@@ -430,6 +401,26 @@ public final class PyKeywordCompletionContributor extends CompletionContributor 
     new FilterPattern(new PyKeywordCompletionContributor.LanguageLevelAtLeastFilter(LanguageLevel.PYTHON30));
   private static final FilterPattern PY35 = new FilterPattern(new LanguageLevelAtLeastFilter(LanguageLevel.PYTHON35));
   private static final FilterPattern PY310 = new FilterPattern(new LanguageLevelAtLeastFilter(LanguageLevel.PYTHON310));
+  private static final FilterPattern PY315 = new FilterPattern(new LanguageLevelAtLeastFilter(LanguageLevel.PYTHON315));
+
+  /**
+   * Matches places where a {@code lazy} import (PEP 810) is allowed: outside of any function, class,
+   * try/except/finally body, or match statement.
+   */
+  private static class ValidLazyImportContextFilter implements ElementFilter {
+    @Override
+    public boolean isAcceptable(Object element, PsiElement context) {
+      if (!(element instanceof PsiElement p)) return false;
+      return PsiTreeUtil.getParentOfType(p, PyLazyImportInspection.FORBIDDEN_LAZY_IMPORT_CONTAINERS) == null;
+    }
+
+    @Override
+    public boolean isClassAcceptable(Class hintClass) {
+      return true;
+    }
+  }
+
+  private static final FilterPattern VALID_LAZY_IMPORT_CONTEXT = new FilterPattern(new ValidLazyImportContextFilter());
 
   // ======
 
@@ -570,6 +561,22 @@ public final class PyKeywordCompletionContributor extends CompletionContributor 
       new PyKeywordCompletionProvider(TailTypes.noneType(), PyNames.CASE));
   }
 
+  private void addLazy() {
+    extend(
+      CompletionType.BASIC, psiElement()
+        .withLanguage(PythonLanguage.getInstance())
+        .and(PY315)
+        .and(IN_BEGIN_STMT)
+        .and(VALID_LAZY_IMPORT_CONTEXT)
+        .andNot(IN_IMPORT_STMT)
+        .andNot(IN_PARAM_LIST)
+        .andNot(IN_ARG_LIST)
+        .andNot(BEFORE_COND)
+        .andNot(AFTER_QUALIFIER)
+        .andNot(IN_STRING_LITERAL),
+      new PyKeywordCompletionProvider(TailTypes.spaceType(), PyNames.LAZY));
+  }
+
   private void addWithinFuncs() {
     extend(
       CompletionType.BASIC, psiElement()
@@ -701,8 +708,9 @@ public final class PyKeywordCompletionContributor extends CompletionContributor 
         .withLanguage(PythonLanguage.getInstance())
         .andNot(IN_COMMENT)
         .andNot(IN_IMPORT_STMT)
-        .andNot(IN_PARAM_LIST)
-        .andNot(IN_FUNCTION_HEADER)
+        .andNot(IS_PARAMETER_NAME)
+        .andNot(IS_TYPE_PARAMETER_NAME)
+        .andNot(IS_DECLARATION_NAME)
         .andNot(AFTER_QUALIFIER).andNot(IN_STRING_LITERAL)
         .andNot(AFTER_QUALIFIER).andNot(IN_STRING_LITERAL).andNot(TARGET_AFTER_QUALIFIER)
         .andNot(IN_PATTERN)
@@ -718,28 +726,14 @@ public final class PyKeywordCompletionContributor extends CompletionContributor 
         .withLanguage(PythonLanguage.getInstance())
         .andNot(IN_COMMENT)
         .andNot(IN_IMPORT_STMT)
-        .and(NOT_PARAMETER_OR_DEFAULT_VALUE)
+        .andNot(IS_PARAMETER_NAME)
+        .andNot(IS_TYPE_PARAMETER_NAME)
+        .andNot(IS_DECLARATION_NAME)
         .andNot(AFTER_QUALIFIER)
-        .andNot(IN_FUNCTION_HEADER)
         .andNot(IN_STRING_LITERAL)
         .andNot(TARGET_AFTER_QUALIFIER)
       ,
       new PyKeywordCompletionProvider(TailTypes.noneType(), PyNames.TRUE, PyNames.FALSE, PyNames.NONE));
-
-    // Add literals specifically in decorator argument lists
-    extend(
-      CompletionType.BASIC, psiElement()
-        .withLanguage(PythonLanguage.getInstance())
-        .and(IN_DECORATOR_ARG_LIST)
-        .andNot(IN_COMMENT)
-        .andNot(IN_STRING_LITERAL)
-      ,
-      new PyKeywordCompletionProvider(TailTypes.noneType(), PyNames.TRUE, PyNames.FALSE, PyNames.NONE));
-    extend(CompletionType.BASIC,
-           psiElement()
-             .withLanguage(PythonLanguage.getInstance())
-             .and(IN_ANNOTATION),
-           new PyKeywordCompletionProvider(TailTypes.noneType(), PyNames.NONE));
   }
 
   private void addAsync() {
@@ -767,11 +761,11 @@ public final class PyKeywordCompletionContributor extends CompletionContributor 
                putKeyword(PyNames.ASYNC + " " + PyNames.WITH, TRAILING_SPACE_INSERT_HANDLER, TailTypes.noneType(), result);
              }
            });
-
     extend(CompletionType.BASIC,
            psiElement()
              .withLanguage(PythonLanguage.getInstance())
              .and(PY35)
+             .and(IN_BEGIN_STMT)
              .andNot(IN_COMMENT)
              .andNot(IN_IMPORT_STMT)
              .andNot(IN_PARAM_LIST)
@@ -904,6 +898,7 @@ public final class PyKeywordCompletionContributor extends CompletionContributor 
     addBreak();
     addContinue();
     addCase();
+    addLazy();
     addWithinFuncs();
     addWithinTry();
     addInfixOperators();

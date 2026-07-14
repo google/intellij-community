@@ -1,9 +1,9 @@
 // COMPILER_ARGUMENTS: -Xcontext-parameters -XXLanguage:+ExplicitContextArguments
 // IS_APPLICABLE: false
-// IGNORE_K1
-// K2_ERROR: Argument already passed for this parameter.
-// K2_ERROR: Argument type mismatch: actual type is 'List<Int>', but 'String' was expected.
-// K2_ERROR: No context argument for 'x: List<String>' found.
+// K2_ERROR: ARGUMENT_PASSED_TWICE
+// K2_ERROR: ARGUMENT_TYPE_MISMATCH
+// K2_ERROR: NO_CONTEXT_ARGUMENT
+
 
 context(x: List<String>)
 fun foo(a: String): String = a

@@ -6,6 +6,7 @@ import com.intellij.codeInsight.lookup.Lookup
 import com.intellij.codeInsight.lookup.LookupElement
 import kotlinx.serialization.Serializable
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.components.KaScopeContext
 import org.jetbrains.kotlin.analysis.api.components.KaScopeKind
 import org.jetbrains.kotlin.analysis.api.components.resolveToCallCandidates
 import org.jetbrains.kotlin.analysis.api.components.upperBoundIfFlexible
@@ -18,6 +19,7 @@ import org.jetbrains.kotlin.idea.base.analysis.api.utils.isPossiblySubTypeOf
 import org.jetbrains.kotlin.idea.completion.api.serialization.SerializableInsertHandler
 import org.jetbrains.kotlin.idea.completion.impl.k2.K2CompletionSectionContext
 import org.jetbrains.kotlin.idea.completion.impl.k2.K2CompletionSetupScope
+import org.jetbrains.kotlin.idea.completion.impl.k2.K2ContributorSectionPriority
 import org.jetbrains.kotlin.idea.completion.impl.k2.K2SimpleCompletionContributor
 import org.jetbrains.kotlin.idea.completion.impl.k2.handlers.K2SmartCompletionTailOffsetProviderImpl
 import org.jetbrains.kotlin.idea.completion.impl.k2.handlers.Tail
@@ -38,7 +40,8 @@ import org.jetbrains.kotlin.psi.KtValueArgumentList
  * The contributor only generates items if at least 2 arguments could be matched (single variables already appear in regular completion).
  */
 internal class K2MultipleArgumentContributor : K2SimpleCompletionContributor<KotlinNameReferencePositionContext>(
-    KotlinNameReferencePositionContext::class
+    positionContextClass = KotlinNameReferencePositionContext::class,
+    priority = K2ContributorSectionPriority.HEURISTIC,
 ) {
 
     override fun K2CompletionSetupScope<KotlinNameReferencePositionContext>.isAppropriatePosition(): Boolean {
@@ -110,27 +113,6 @@ internal class K2MultipleArgumentContributor : K2SimpleCompletionContributor<Kot
         return signatures
     }
 
-    /**
-     * Returns local variables (i.e., from the same file) with the names from [allNamesToFind].
-     * Note that shadowing is taken into account properly, and only the closest variable that is available is returned
-     * for each name.
-     */
-    context(_: KaSession, context: K2CompletionSectionContext<KotlinNameReferencePositionContext>)
-    private fun getVariablesForNames(allNamesToFind: Set<Name>): Map<Name, KaVariableSymbol> {
-        // We do not want to consider variables that are imported
-        val scopes = context.weighingContext.scopeContext.scopes.filterNot { it.kind is KaScopeKind.ImportingScope }
-
-        // We reverse the scopes to correctly perform shadowing.
-        // Innermost scopes appear first in `scopes` so for their variables to win, we need to reverse the list.
-        val variables = scopes.reversed().flatMap { scopeWithKind ->
-            scopeWithKind.scope.callables(allNamesToFind)
-                .filterIsInstance<KaVariableSymbol>()
-                .map { it.name to it }
-        }.toMap()
-
-        return variables
-    }
-
     data class MultiArgumentSignatureData(
         val completesAllArguments: Boolean,
         val tail: Tail,
@@ -180,7 +162,7 @@ internal class K2MultipleArgumentContributor : K2SimpleCompletionContributor<Kot
         if (signatures.isEmpty()) return
 
         val allNamesToFind = signatures.flatMapTo(mutableSetOf()) { it.missingArguments.keys }
-        val variables = getVariablesForNames(allNamesToFind)
+        val variables = getNonImportedAvailableVariables(allNamesToFind, context.weighingContext.scopeContext)
 
         val matchedNames = mutableMapOf<List<Name>, MultiArgumentSignatureData>()
         for (signature in signatures) {
@@ -225,4 +207,26 @@ internal class MultipleArgumentsInsertHandler : SerializableInsertHandler {
         }
     }
 
+}
+
+
+/**
+ * Returns variables with the names from [allNamesToFind] that are available without coming from imports.
+ * Note that shadowing is taken into account properly, and only the closest variable that is available is returned
+ * for each name.
+ */
+context(_: KaSession)
+internal fun getNonImportedAvailableVariables(allNamesToFind: Set<Name>, scopeContext: KaScopeContext): Map<Name, KaVariableSymbol> {
+    // We do not want to consider variables that are imported
+    val scopes = scopeContext.scopes.filterNot { it.kind is KaScopeKind.ImportingScope }
+
+    // We reverse the scopes to correctly perform shadowing.
+    // Innermost scopes appear first in `scopes` so for their variables to win, we need to reverse the list.
+    val variables = scopes.reversed().flatMap { scopeWithKind ->
+        scopeWithKind.scope.callables(allNamesToFind)
+            .filterIsInstance<KaVariableSymbol>()
+            .map { it.name to it }
+    }.toMap()
+
+    return variables
 }

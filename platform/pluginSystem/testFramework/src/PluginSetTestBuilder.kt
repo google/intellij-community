@@ -3,6 +3,7 @@ package com.intellij.platform.pluginSystem.testFramework
 
 import com.intellij.ide.plugins.DiscoveredPluginsList
 import com.intellij.ide.plugins.PluginDescriptorLoadingContext
+import com.intellij.ide.plugins.PluginInitContextFactory
 import com.intellij.ide.plugins.PluginInitializationContext
 import com.intellij.ide.plugins.PluginLoadingErrorReportingPolicy
 import com.intellij.ide.plugins.PluginMainDescriptor
@@ -12,7 +13,7 @@ import com.intellij.ide.plugins.PluginSet
 import com.intellij.ide.plugins.PluginsDiscoveryResult
 import com.intellij.ide.plugins.PluginsSourceContext
 import com.intellij.ide.plugins.loadDescriptorFromFileOrDir
-import com.intellij.ide.plugins.withInitContextForLoadingRuleDetermination
+import com.intellij.ide.plugins.withCustomFactoryInUnitTests
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.util.BuildNumber
 import com.intellij.platform.ide.bootstrap.ZipFilePoolImpl
@@ -100,10 +101,10 @@ class PluginSetTestBuilder private constructor(
     return loadingContext to PluginsDiscoveryResult.build(listOf(pluginList))
   }
 
-  fun buildState(): PluginManagerState {
+  fun buildState(configureClassLoaders: Boolean = true): PluginManagerState {
     val initContext = buildInitContext()
     val loadingContext = PluginDescriptorLoadingContext(getBuildNumberForDefaultDescriptorVersion = { productBuildNumber })
-    val pluginList = withInitContextForLoadingRuleDetermination(initContext) { // FIXME this should not exist
+    val pluginList = PluginInitContextFactory.withCustomFactoryInUnitTests(TestPluginInitContextFactory(initContext)) { // FIXME this should not exist
       DiscoveredPluginsList(pluginDescriptorLoader(loadingContext), PluginsSourceContext.Custom)
     }
     val discoveredPlugins = PluginsDiscoveryResult.build(listOf(pluginList))
@@ -113,6 +114,7 @@ class PluginSetTestBuilder private constructor(
       discoveredPlugins = discoveredPlugins,
       coreLoader = customCoreLoader ?: UrlClassLoader.build().get(),
       parentActivity = null,
+      configureClassLoaders = configureClassLoaders,
       reportingPolicy = PluginLoadingErrorReportingPolicy.TEST,
     )
   }

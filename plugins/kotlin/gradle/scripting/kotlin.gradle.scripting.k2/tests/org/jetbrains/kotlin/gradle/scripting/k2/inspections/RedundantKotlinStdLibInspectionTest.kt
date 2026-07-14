@@ -1,12 +1,13 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.gradle.scripting.k2.inspections
 
-import com.intellij.gradle.java.properties.codeInspection.GradleRedundantKotlinStdLibInspection
 import org.gradle.util.GradleVersion
 import org.jetbrains.kotlin.gradle.K2GradleCodeInsightTestCase
+import org.jetbrains.plugins.gradle.codeInspection.GradleRedundantKotlinStdLibInspection
 import org.jetbrains.plugins.gradle.frameworkSupport.GradleDsl
 import org.jetbrains.plugins.gradle.testFramework.GradleTestFixtureBuilder
 import org.jetbrains.plugins.gradle.testFramework.annotations.AllGradleVersionsSource
+import org.jetbrains.plugins.gradle.testFramework.util.KOTLIN_DSL_DELEGATING_PROPERTY_SUPPORTED_VERSIONS
 import org.jetbrains.plugins.gradle.testFramework.util.KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS
 import org.jetbrains.plugins.gradle.testFramework.util.VERSION_CATALOGS_SUPPORTED_VERSIONS
 import org.jetbrains.plugins.gradle.testFramework.util.assertThatKotlinDslScriptsModelImportIsSupported
@@ -191,7 +192,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
-    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS, KOTLIN_DSL_DELEGATING_PROPERTY_SUPPORTED_VERSIONS)
     fun testCustomConfigurationString(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -208,7 +209,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
-    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS, KOTLIN_DSL_DELEGATING_PROPERTY_SUPPORTED_VERSIONS)
     fun testCustomConfiguration(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -360,7 +361,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
-    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS)
+    @TargetVersions(KOTLIN_DSL_SCRIPTS_MODEL_IMPORT_SUPPORTED_VERSIONS, KOTLIN_DSL_DELEGATING_PROPERTY_SUPPORTED_VERSIONS)
     fun testCompileOnlyCustomSourceSet(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_FIXTURE) {
             testHighlighting(
@@ -491,7 +492,7 @@ class RedundantKotlinStdLibInspectionTest : K2GradleCodeInsightTestCase() {
 
     @ParameterizedTest
     @AllGradleVersionsSource
-    @TargetVersions(VERSION_CATALOGS_SUPPORTED_VERSIONS)
+    @TargetVersions(VERSION_CATALOGS_SUPPORTED_VERSIONS, KOTLIN_DSL_DELEGATING_PROPERTY_SUPPORTED_VERSIONS)
     fun testCustomConfigurationVersionCatalog(gradleVersion: GradleVersion) {
         runTest(gradleVersion, WITH_CUSTOM_CONFIGURATIONS_AND_VERSION_CATALOGS_FIXTURE) {
             testHighlighting(

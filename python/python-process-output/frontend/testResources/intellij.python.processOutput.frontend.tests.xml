@@ -16,8 +16,12 @@
     <module name="intellij.python.community"/>
     <module name="intellij.python.community.execService"/>
     <module name="intellij.python.processOutput.common"/>
+    <module name="intellij.libraries.junit4"/>
+    <module name="intellij.libraries.junit5"/>
     <module name="intellij.libraries.kotlin.reflect"/>
     <module name="intellij.libraries.kotlinTest"/>
+    <module name="intellij.libraries.mockk"/>
+    <module name="intellij.libraries.mockk.jvm"/>
     <module name="intellij.platform.core"/>
     <module name="intellij.platform.core.ui"/>
     <module name="intellij.platform.editor.ui"/>

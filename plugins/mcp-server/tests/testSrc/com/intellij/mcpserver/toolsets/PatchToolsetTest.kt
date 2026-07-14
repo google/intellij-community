@@ -6,14 +6,21 @@ import com.intellij.mcpserver.GeneralMcpToolsetTestBase
 import com.intellij.mcpserver.toolsets.general.FileToolset
 import com.intellij.mcpserver.toolsets.general.PatchToolset
 import com.intellij.mcpserver.toolsets.general.ReadToolset
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAndEdtWriteAction
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
+import com.intellij.testFramework.EditorTestUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import java.nio.file.Files
+import java.nio.file.Path
 
 class PatchToolsetTest : GeneralMcpToolsetTestBase() {
   @Test
@@ -32,7 +39,7 @@ class PatchToolsetTest : GeneralMcpToolsetTestBase() {
       buildJsonObject {
         put("input", JsonPrimitive(patch))
       },
-      "Applied patch to 1 file."
+      "1 out of 1 operations applied."
     )
 
     testMcpTool(
@@ -42,6 +49,8 @@ class PatchToolsetTest : GeneralMcpToolsetTestBase() {
       },
       renderNumberedText("alpha\nbeta\n")
     )
+    assertThat(Files.readString(projectFilePath(pathInProject))).isEqualTo("alpha\nbeta\n")
+    Unit
   }
 
   @Test
@@ -61,7 +70,7 @@ class PatchToolsetTest : GeneralMcpToolsetTestBase() {
       buildJsonObject {
         put("input", JsonPrimitive(patch))
       },
-      "Applied patch to 1 file."
+      "1 out of 1 operations applied."
     )
 
     testMcpTool(
@@ -71,6 +80,34 @@ class PatchToolsetTest : GeneralMcpToolsetTestBase() {
       },
       renderNumberedText("updated content")
     )
+    assertThat(Files.readString(projectFilePath(pathInProject))).isEqualTo("updated content")
+    Unit
+  }
+
+  @Test
+  fun apply_patch_updates_after_external_disk_change() = runBlocking(Dispatchers.Default) {
+    val pathInProject = "src/Test.java"
+    Files.writeString(projectFilePath(pathInProject), "external content\n")
+
+    val patch = buildPatch(
+      "*** Begin Patch",
+      "*** Update File: $pathInProject",
+      "@@",
+      "-external content",
+      "+updated external",
+      "*** End Patch",
+    )
+
+    testMcpTool(
+      PatchToolset::apply_patch.name,
+      buildJsonObject {
+        put("input", JsonPrimitive(patch))
+      },
+      "1 out of 1 operations applied."
+    )
+
+    assertThat(Files.readString(projectFilePath(pathInProject))).isEqualTo("updated external\n")
+    Unit
   }
 
   @Test
@@ -100,7 +137,7 @@ class PatchToolsetTest : GeneralMcpToolsetTestBase() {
       buildJsonObject {
         put("input", JsonPrimitive(patch))
       },
-      "Applied patch to 1 file."
+      "1 out of 1 operations applied."
     )
 
     testMcpTool(
@@ -129,7 +166,7 @@ class PatchToolsetTest : GeneralMcpToolsetTestBase() {
       buildJsonObject {
         put("input", JsonPrimitive(patch))
       },
-      "Applied patch to 1 file."
+      "1 out of 1 operations applied."
     )
 
     testMcpTool(
@@ -166,7 +203,7 @@ class PatchToolsetTest : GeneralMcpToolsetTestBase() {
       buildJsonObject {
         put("input", JsonPrimitive(patch))
       },
-      "Applied patch to 1 file."
+      "1 out of 1 operations applied."
     )
 
     testMcpTool(
@@ -176,6 +213,45 @@ class PatchToolsetTest : GeneralMcpToolsetTestBase() {
       },
       renderNumberedText("updated from unsaved\n")
     )
+    assertThat(Files.readString(projectFilePath(pathInProject))).isEqualTo("updated from unsaved\n")
+    Unit
+  }
+
+  @Test
+  fun apply_patch_updates_open_editor() = runBlocking(Dispatchers.Default) {
+    val pathInProject = "src/Test.java"
+    withContext(Dispatchers.EDT) {
+      val editor = FileEditorManager.getInstance(project).openTextEditor(OpenFileDescriptor(project, testJavaFile), true)
+                   ?: throw AssertionError("Could not open editor for $pathInProject")
+      EditorTestUtil.waitForLoading(editor)
+    }
+
+    val patch = buildPatch(
+      "*** Begin Patch",
+      "*** Update File: $pathInProject",
+      "@@",
+      "-Test.java content",
+      "+updated in open editor",
+      "*** End Patch",
+    )
+
+    testMcpTool(
+      PatchToolset::apply_patch.name,
+      buildJsonObject {
+        put("input", JsonPrimitive(patch))
+      },
+      "1 out of 1 operations applied."
+    )
+
+    testMcpTool(
+      ReadToolset::read_file.name,
+      buildJsonObject {
+        put("file_path", JsonPrimitive(pathInProject))
+      },
+      renderNumberedText("updated in open editor")
+    )
+    assertThat(Files.readString(projectFilePath(pathInProject))).isEqualTo("updated in open editor")
+    Unit
   }
 
   @Test
@@ -201,7 +277,7 @@ class PatchToolsetTest : GeneralMcpToolsetTestBase() {
       buildJsonObject {
         put("input", JsonPrimitive(patch))
       },
-      "Applied patch to 1 file."
+      "1 out of 1 operations applied."
     )
 
     assertReadFails(pathInProject)
@@ -236,7 +312,7 @@ class PatchToolsetTest : GeneralMcpToolsetTestBase() {
       buildJsonObject {
         put("input", JsonPrimitive(patch))
       },
-      "Applied patch to 1 file."
+      "1 out of 1 operations applied."
     )
 
     testMcpTool(
@@ -279,7 +355,7 @@ class PatchToolsetTest : GeneralMcpToolsetTestBase() {
       buildJsonObject {
         put("input", JsonPrimitive(patch))
       },
-      "Applied patch to 1 file."
+      "1 out of 1 operations applied."
     )
 
     testMcpTool(
@@ -311,7 +387,7 @@ class PatchToolsetTest : GeneralMcpToolsetTestBase() {
       buildJsonObject {
         put("input", JsonPrimitive(patch))
       },
-      "Applied patch to 1 file."
+      "1 out of 1 operations applied."
     )
 
     testMcpTool(
@@ -342,7 +418,7 @@ class PatchToolsetTest : GeneralMcpToolsetTestBase() {
       buildJsonObject {
         put("input", JsonPrimitive(patch))
       },
-      "Applied patch to 1 file."
+      "1 out of 1 operations applied."
     )
 
     testMcpTool(
@@ -380,7 +456,7 @@ class PatchToolsetTest : GeneralMcpToolsetTestBase() {
       buildJsonObject {
         put("input", JsonPrimitive(patch))
       },
-      "Applied patch to 1 file."
+      "1 out of 1 operations applied."
     )
 
     testMcpTool(
@@ -409,7 +485,7 @@ class PatchToolsetTest : GeneralMcpToolsetTestBase() {
       buildJsonObject {
         put("patch", JsonPrimitive(patch))
       },
-      "Applied patch to 1 file."
+      "1 out of 1 operations applied."
     )
 
     testMcpTool(
@@ -448,6 +524,10 @@ class PatchToolsetTest : GeneralMcpToolsetTestBase() {
   private fun renderNumberedText(text: String): String {
     val lines = text.replace("\r\n", "\n").replace("\r", "\n").split('\n')
     return lines.mapIndexed { index, line -> "L${index + 1}: $line" }.joinToString("\n")
+  }
+
+  private fun projectFilePath(pathInProject: String): Path {
+    return Path.of(project.basePath ?: error("Project base path is not available")).resolve(pathInProject)
   }
 
   private fun buildPatch(vararg lines: String): String {

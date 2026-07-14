@@ -81,6 +81,7 @@ class MavenProjectResolver(private val myProject: Project) {
     incrementally: Boolean,
     mavenProjects: Collection<MavenProject>,
     tree: MavenProjectsTree,
+    explicitProfiles: MavenExplicitProfiles,
     workspaceMap: MavenWorkspaceMap,
     effectiveRepositoryPath: Path,
     updateSnapshots: Boolean,
@@ -94,12 +95,6 @@ class MavenProjectResolver(private val myProject: Project) {
       val embedder = mavenEmbedderWrappers.getEmbedder(Path.of(baseDir))
       try {
         val userProperties = Properties()
-        for (mavenProject in mavenProjectsInBaseDir) {
-          @Suppress("DEPRECATION")
-          for (mavenImporter in org.jetbrains.idea.maven.importing.MavenImporter.getSuitableImporters(mavenProject)) {
-            mavenImporter.customizeUserProperties(myProject, mavenProject, userProperties)
-          }
-        }
         val pomToDependencyHash = mavenProjectsInBaseDir.associate { it.file to if (incrementally) it.dependencyHash else null }
         val projectsWithUnresolvedPluginsChunk = tracer.spanBuilder("doResolveMavenProject")
           .useWithScope {
@@ -107,6 +102,7 @@ class MavenProjectResolver(private val myProject: Project) {
               pomToDependencyHash,
               mavenProjectsInBaseDir,
               tree,
+              explicitProfiles,
               effectiveRepositoryPath,
               embedder,
               progressReporter,
@@ -154,6 +150,7 @@ class MavenProjectResolver(private val myProject: Project) {
     pomToDependencyHash: Map<VirtualFile, String?>,
     mavenProjects: Collection<MavenProject>,
     tree: MavenProjectsTree,
+    explicitProfiles: MavenExplicitProfiles,
     effectiveRepositoryPath: Path,
     embedder: MavenEmbedderWrapper,
     progressReporter: RawProgressReporter,
@@ -168,7 +165,6 @@ class MavenProjectResolver(private val myProject: Project) {
     val names = mavenProjects.map { it.displayName }
     val text = StringUtil.shortenPathWithEllipsis(StringUtil.join(names, ", "), 200)
     progressReporter.text(MavenProjectBundle.message("maven.resolving.pom", text))
-    val explicitProfiles = tree.explicitProfiles
     val projects = tree.projects
     val filesToResolve = mavenProjects.map { tree.findRootProject(it) }.map { it.file }.distinct()
     val pomDependencies = projects

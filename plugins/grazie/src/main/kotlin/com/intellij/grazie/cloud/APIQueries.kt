@@ -36,15 +36,14 @@ import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.util.runWithCheckCanceled
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
-import com.intellij.openapi.util.IntellijInternalApi
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
 import java.io.IOException
 import com.intellij.openapi.util.TextRange as IJTextRange
@@ -100,21 +99,20 @@ object APIQueries {
     }
   }
 
-  @JvmOverloads
-  suspend fun correctText(paragraphs: List<Paragraph>, project: Project,
-                          services: Set<CorrectionServiceType>,
-                          userSettings: UserSettings? = null,
-                          clientAbilities: Set<ClientAbility>? = null): List<Problem>? {
-    val actualClientAbilities = if (CorrectionServiceType.MLEC in services) {
-      val abilities = clientAbilities?.toMutableSet() ?: mutableSetOf()
-      abilities.add(ClientAbility.closeMlecMerging)
-      abilities
-    } else {
-      clientAbilities
-    }
+  suspend fun correctText(paragraphs: List<Paragraph>, project: Project, services: Set<CorrectionServiceType>): List<Problem>? {
+    val langs = paragraphs.asSequence()
+      .mapNotNull { it.forcedLanguage }
+      .mapNotNull { findInstalledLang(it) }
+      .toSet()
+    if (langs.isEmpty()) return emptyList()
+
     return handleExceptions(project, BackgroundCloudService.GEC) {
       withContext(Dispatchers.IO) {
-        GrazieCloudConnector.api()?.gec()?.correctText(paragraphs, services, userSettings, actualClientAbilities)?.corrections
+        GrazieCloudConnector.api()?.gec()?.correctText(
+          paragraphs, services,
+          getUserSettingsWithLanguageVariant(langs),
+          setOf(ClientAbility.closeMlecMerging)
+        )?.corrections
       }
     }
   }
@@ -150,34 +148,39 @@ object APIQueries {
     return handleExceptions(project, BackgroundCloudService.GEC) {
       withContext(Dispatchers.IO) {
         GrazieCloudConnector.api()?.gec()?.problemsWithExclusions(
-          language, sentences, setOf(CorrectionServiceType.SPELL), getLanguageVariant(lang)
+          language, sentences, setOf(CorrectionServiceType.SPELL), getUserSettingsWithLanguageVariant(listOf(lang))
         )
       }
     }
   }
 
 
-  private fun getLanguageVariant(lang: Lang): UserSettings? {
-    val variant = TreeRuleChecker.getLanguageVariant(lang) ?: return null
-    val prefix = lang.iso.toString().capitalize()
+  private fun getUserSettingsWithLanguageVariant(langs: Collection<Lang>): UserSettings? {
+    val paramValues = langs.mapNotNull { lang ->
+      val variant = TreeRuleChecker.getLanguageVariant(lang)
+      if (variant == null) return@mapNotNull null
+      val prefix = lang.iso.toString().capitalize()
+      StyleProfile.ParamValue("$prefix.variant", variant)
+    }
+    if (paramValues.isEmpty()) return null
     return UserSettings(
       customProfiles = arrayOf(
         StyleProfile(
           id = TextStyle.Unspecified.id,
-          paramValues = arrayOf(StyleProfile.ParamValue("$prefix.variant", variant))
+          paramValues = paramValues.toTypedArray()
         )
       )
     )
   }
 
-  @OptIn(IntellijInternalApi::class, DelicateCoroutinesApi::class)
   private fun <T> request(project: Project, service: BackgroundCloudService?, compute: suspend () -> T?): T? {
     return runWithCheckCanceled {
       handleExceptions<T>(project, service, compute)
     }
   }
 
-  private suspend fun <T> handleExceptions(project: Project, service: BackgroundCloudService?, compute: suspend () -> T?): T? =
+  @ApiStatus.Internal
+  suspend fun <T> handleExceptions(project: Project, service: BackgroundCloudService? = null, compute: suspend () -> T?): T? =
     try {
       val result = compute()
       GrazieCloudNotifications.Connection.connectionStable(project, service)

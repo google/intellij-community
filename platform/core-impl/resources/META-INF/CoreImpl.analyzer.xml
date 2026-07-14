@@ -31,6 +31,9 @@
     <extensionPoint qualifiedName="com.intellij.elementsToHighlightFilter"
                     interface="com.intellij.openapi.util.Condition"
                     dynamic="true"/>
+    <extensionPoint name="psi.referenceContributor" beanClass="com.intellij.psi.impl.source.resolve.reference.PsiReferenceContributorEP" dynamic="true">
+      <with attribute="implementation" implements="com.intellij.psi.PsiReferenceContributor"/>
+    </extensionPoint>
   </extensionPoints>
   <extensions defaultExtensionNs="com.intellij">
     <applicationService serviceInterface="com.intellij.lang.PsiBuilderFactory"
@@ -49,10 +52,10 @@
                     serviceImplementation="com.intellij.codeInsight.multiverse.CodeInsightContextManagerImpl"/>
     <projectService serviceInterface="com.intellij.psi.util.PsiModificationTracker"
                     serviceImplementation="com.intellij.psi.impl.PsiModificationTrackerImpl"/>
-    <projectService serviceInterface="com.intellij.psi.PsiFileFactory"
-                    serviceImplementation="com.intellij.psi.impl.PsiFileFactoryImpl"/>
     <projectService serviceInterface="com.intellij.psi.impl.file.PsiDirectoryFactory" open="true"
                     serviceImplementation="com.intellij.psi.impl.file.PsiDirectoryFactoryImpl"/>
+    <projectService serviceInterface="com.intellij.psi.PsiFileFactory"
+                    serviceImplementation="com.intellij.psi.impl.PsiFileFactoryImpl"/>
     <applicationService serviceInterface="com.intellij.openapi.vfs.VirtualFileSetFactory"
                         serviceImplementation="com.intellij.openapi.vfs.CompactVirtualFileSetFactory"/>
     <applicationService serviceInterface="com.intellij.diagnostic.PluginProblemReporter"

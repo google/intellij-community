@@ -5,7 +5,7 @@ import com.intellij.concurrency.ConcurrentCollectionFactory;
 import com.intellij.ide.util.treeView.AbstractTreeNode;
 import com.intellij.ide.util.treeView.AbstractTreeStructure;
 import com.intellij.lang.LangBundle;
-import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -20,6 +20,7 @@ import com.intellij.util.PairProcessor;
 import com.intellij.util.WalkingState;
 import com.intellij.util.containers.ConcurrentFactoryMap;
 import com.intellij.util.containers.HashingStrategy;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -29,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+@ApiStatus.Internal
 public final class SliceLeafAnalyzer {
   private static final Logger LOG = Logger.getInstance(SliceLeafAnalyzer.class);
 
@@ -165,6 +167,7 @@ public final class SliceLeafAnalyzer {
     return ConcurrentFactoryMap.create(function, ConcurrentCollectionFactory::createConcurrentIdentityMap);
   }
 
+  @ApiStatus.Internal
   public static final class SliceNodeGuide implements WalkingState.TreeGuide<SliceNode> {
     private final AbstractTreeStructure myTreeStructure;
     // use tree structure because it's setting 'parent' fields in the process
@@ -227,7 +230,7 @@ public final class SliceLeafAnalyzer {
           node(element, map).addAll(node(duplicate, map));
         }
         else {
-          ApplicationManager.getApplication().runReadAction(() -> {
+          ReadAction.runBlocking(() -> {
             final SliceUsage sliceUsage = element.getValue();
 
             Collection<SliceNode> children = element.getChildren();

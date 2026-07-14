@@ -8,13 +8,11 @@ import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.idea.maven.model.MavenRepoArtifactInfo
 import java.util.function.Consumer
 
-/**
- * Encapsulates [org.jetbrains.idea.reposearch.DependencySearchService] for Maven plugin.
- * Other classes in the Maven plugin should depend on this service instead of DependencySearchService.
- */
 @ApiStatus.Experimental
 @Service(Service.Level.PROJECT)
-class MavenDependencySearchService(private val project: Project) {
+@ApiStatus.Obsolete
+// Prefer using DependencyCompletionService
+internal class MavenDependencySearchService(private val project: Project) {
 
   private val providers: List<MavenDependencySearchContributor>
     get() = MavenDependencySearchContributor.EP_NAME.extensionList
@@ -26,16 +24,6 @@ class MavenDependencySearchService(private val project: Project) {
       consumer: Consumer<MavenRepoArtifactInfo>
   ) {
     providers.forEach { it.fulltextSearch(project, searchString, useCache, useLocalOnly, consumer) }
-  }
-
-  suspend fun suggestPrefix(
-      groupId: String,
-      artifactId: String,
-      useCache: Boolean,
-      useLocalOnly: Boolean,
-      consumer: Consumer<MavenRepoArtifactInfo>
-  ) {
-    providers.forEach { it.suggestPrefix(project, groupId, artifactId, useCache, useLocalOnly, consumer) }
   }
 
   suspend fun getGroupIds(pattern: String?): Set<String> {

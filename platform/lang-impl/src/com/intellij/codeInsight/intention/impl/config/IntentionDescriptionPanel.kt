@@ -47,8 +47,8 @@ class IntentionDescriptionPanel {
   private val myAfterPanel = JPanel()
   private val myBeforePanel = JPanel()
   private val myDescriptionBrowser = DescriptionEditorPane()
-  private val myBeforeUsagePanels: MutableList<IntentionUsagePanel> = ArrayList()
-  private val myAfterUsagePanels: MutableList<IntentionUsagePanel> = ArrayList()
+  private val myBeforeUsagePanels: MutableList<ActionUsagePanel> = ArrayList()
+  private val myAfterUsagePanels: MutableList<ActionUsagePanel> = ArrayList()
   private lateinit var myBeforeWrapperRow: Row
   private lateinit var myAfterWrapperRow: Row
 
@@ -141,17 +141,22 @@ class IntentionDescriptionPanel {
     }
   }
 
-  fun reset(intentionCategory: String) {
-    try {
+  fun reset(intentionCategory: String?) {
+    if (intentionCategory == null) {
+      myDescriptionBrowser.text = ""
+      myBeforeWrapperRow.visible(false)
+      myAfterWrapperRow.visible(false)
+    }
+    else try {
       myDescriptionBrowser.readHTML(CodeInsightBundle.message("intention.settings.category.text", intentionCategory))
 
       val beforeTemplate =
         PlainTextDescriptor(CodeInsightBundle.message("templates.intention.settings.category.before"), "before.java.template")
-      showUsages(myBeforePanel, myBeforeUsagePanels, arrayOf(beforeTemplate))
       val afterTemplate =
         PlainTextDescriptor(CodeInsightBundle.message("templates.intention.settings.category.after"), "after.java.template")
       myBeforeWrapperRow.visible(true)
       myAfterWrapperRow.visible(true)
+      showUsages(myBeforePanel, myBeforeUsagePanels, arrayOf(beforeTemplate))
       showUsages(myAfterPanel, myAfterUsagePanels, arrayOf(afterTemplate))
     }
     catch (e: IOException) {
@@ -171,7 +176,7 @@ class IntentionDescriptionPanel {
     @Throws(IOException::class)
     private fun showUsages(
       panel: JPanel,
-      usagePanels: MutableList<IntentionUsagePanel>,
+      usagePanels: MutableList<ActionUsagePanel>,
       exampleUsages: Array<TextDescriptor>?
     ) {
       var gb: GridBagConstraints? = null
@@ -202,12 +207,12 @@ class IntentionDescriptionPanel {
           val extension = fileTypeManager.getExtension(name)
           val fileType = fileTypeManager.getFileTypeByExtension(extension)
 
-          val usagePanel: IntentionUsagePanel
+          val usagePanel: ActionUsagePanel
           if (reuse) {
-            usagePanel = panel.getComponent(i) as IntentionUsagePanel
+            usagePanel = panel.getComponent(i) as ActionUsagePanel
           }
           else {
-            usagePanel = IntentionUsagePanel()
+            usagePanel = ActionUsagePanel()
             usagePanels.add(usagePanel)
           }
           usagePanel.reset(exampleUsage.getText(), fileType)
@@ -222,7 +227,7 @@ class IntentionDescriptionPanel {
       panel.repaint()
     }
 
-    private fun disposeUsagePanels(usagePanels: MutableList<out IntentionUsagePanel>) {
+    private fun disposeUsagePanels(usagePanels: MutableList<out ActionUsagePanel>) {
       for (usagePanel in usagePanels) {
         Disposer.dispose(usagePanel)
       }

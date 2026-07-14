@@ -21,17 +21,30 @@
     <module name="intellij.groovy.copyright"/>
     <module name="intellij.groovy.byteCodeViewer"/>
   </content>
+  <content>
+    <module name="intellij.libraries.hamcrest" loading="embedded"/>
+    <module name="intellij.libraries.junit4" loading="embedded"/>
+  </content>
   <dependencies>
     <plugin id="com.intellij.properties"/>
+    <plugin id="com.intellij.groovy.scripting"/>
     <module name="intellij.java.backend"/>
     <module name="intellij.properties.backend.psi"/>
     <module name="intellij.regexp"/>
     <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+    <module name="intellij.java.debugger.impl"/>
+    <module name="intellij.java.execution.impl"/>
     <module name="intellij.java.frontback.psi"/>
+    <module name="intellij.java.langInjection"/>
     <module name="intellij.java.psi"/>
     <module name="intellij.java.syntax"/>
+    <module name="intellij.java.ui"/>
     <module name="intellij.java.unscramble"/>
+    <module name="intellij.platform.jps.build"/>
     <module name="intellij.platform.jps.build.javac.rt"/>
+    <module name="intellij.platform.smRunner"/>
+    <module name="intellij.platform.structureView"/>
+    <module name="intellij.platform.testRunner"/>
     <module name="intellij.properties.backend"/>
     <module name="intellij.properties.psi"/>
     <module name="intellij.spellchecker"/>

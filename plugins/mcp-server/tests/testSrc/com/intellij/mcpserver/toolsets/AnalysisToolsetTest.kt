@@ -10,10 +10,13 @@ import com.intellij.mcpserver.toolsets.general.prepareLintFiles
 import com.intellij.mcpserver.toolsets.general.prepareRequestedLintFiles
 import com.intellij.mcpserver.toolsets.general.withLintFilesCollectorOverride
 import com.intellij.mcpserver.util.attachJarLibrary
+import com.intellij.mcpserver.util.INDEXING_PARTIAL_RESULT_REASON
 import com.intellij.mcpserver.util.projectDirectory
 import com.intellij.mcpserver.util.relativizeIfPossible
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.project.DumbService
+import com.intellij.testFramework.DumbModeTestUtils
 import com.intellij.testFramework.junit5.fixture.fileOrDirInProjectFixture
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
@@ -128,6 +131,31 @@ class AnalysisToolsetTest : GeneralMcpToolsetTestBase() {
       assertThat(result.isError).isFalse()
       assertThat(text).contains("… and 1 more")
       assertThat(text).contains("childOffset=1")
+    }
+  }
+
+  @Test
+  fun analyze_calls_prepends_partial_result_note_during_indexing() = runBlocking(Dispatchers.Default) {
+    assumeTrue(isJavaPluginInstalled(), "Java plugin is required for this test")
+    DumbService.getInstance(project).waitForSmartMode()
+
+    val token = DumbModeTestUtils.startEternalDumbModeTask(project)
+    try {
+      testMcpTool(
+        AnalysisToolset::analyze_calls.name,
+        buildJsonObject {
+          put("symbolFqn", JsonPrimitive("calls.CallGraph.root"))
+          put("analysisKind", JsonPrimitive(AnalysisToolset.AnalysisKind.OUTGOING_CALLS.name))
+          put("depth", JsonPrimitive(1))
+        },
+      ) { result ->
+        val text = result.textContent.text
+        assertThat(result.isError).isFalse()
+        assertThat(text).startsWith("> Note: $INDEXING_PARTIAL_RESULT_REASON")
+      }
+    }
+    finally {
+      DumbModeTestUtils.endEternalDumbModeTaskAndWaitForSmartMode(project, token)
     }
   }
 
@@ -408,7 +436,7 @@ class AnalysisToolsetTest : GeneralMcpToolsetTestBase() {
     testMcpTool(
       AnalysisToolset::lint_files.name,
       buildJsonObject {
-        put("file_paths", buildJsonArray {
+        put("files", buildJsonArray {
           add(JsonPrimitive(project.projectDirectory.relativizeIfPossible(mainJavaFile)))
           add(JsonPrimitive(project.projectDirectory.relativizeIfPossible(mainJavaFile)))
           add(JsonPrimitive(project.projectDirectory.relativizeIfPossible(testJavaFile)))
@@ -428,7 +456,7 @@ class AnalysisToolsetTest : GeneralMcpToolsetTestBase() {
     testMcpTool(
       AnalysisToolset::lint_files.name,
       buildJsonObject {
-        put("file_paths", buildJsonArray {
+        put("files", buildJsonArray {
           add(JsonPrimitive(project.projectDirectory.relativizeIfPossible(mainJavaFile)))
         })
         put("timeout", JsonPrimitive(0))
@@ -472,7 +500,7 @@ class AnalysisToolsetTest : GeneralMcpToolsetTestBase() {
       testMcpTool(
         AnalysisToolset::lint_files.name,
         buildJsonObject {
-          put("file_paths", buildJsonArray {
+          put("files", buildJsonArray {
             add(JsonPrimitive(mainPath))
             add(JsonPrimitive(classPath))
           })
@@ -500,7 +528,7 @@ class AnalysisToolsetTest : GeneralMcpToolsetTestBase() {
       testMcpTool(
         AnalysisToolset::lint_files.name,
         buildJsonObject {
-          put("file_paths", buildJsonArray {
+          put("files", buildJsonArray {
             add(JsonPrimitive(mainPath))
             add(JsonPrimitive(classPath))
           })
@@ -527,7 +555,7 @@ class AnalysisToolsetTest : GeneralMcpToolsetTestBase() {
       testMcpTool(
         AnalysisToolset::lint_files.name,
         buildJsonObject {
-          put("file_paths", buildJsonArray {
+          put("files", buildJsonArray {
             add(JsonPrimitive(mainPath))
             add(JsonPrimitive(classPath))
           })
@@ -557,7 +585,7 @@ class AnalysisToolsetTest : GeneralMcpToolsetTestBase() {
       testMcpTool(
         AnalysisToolset::lint_files.name,
         buildJsonObject {
-          put("file_paths", buildJsonArray {
+          put("files", buildJsonArray {
             add(JsonPrimitive(mainPath))
             add(JsonPrimitive(classPath))
           })
@@ -609,7 +637,7 @@ class AnalysisToolsetTest : GeneralMcpToolsetTestBase() {
       testMcpTool(
         AnalysisToolset::lint_files.name,
         buildJsonObject {
-          put("file_paths", buildJsonArray {
+          put("files", buildJsonArray {
             add(JsonPrimitive(mainPath))
             add(JsonPrimitive(classPath))
             add(JsonPrimitive(testPath))
@@ -641,6 +669,82 @@ class AnalysisToolsetTest : GeneralMcpToolsetTestBase() {
       assertThat(text).contains(""""filePath":"src/Main.java"""")
       assertThat(text).contains(""""errors":[]""")
       assertThat(text).contains(""""timedOut":true""")
+    }
+  }
+
+  @Test
+  fun lint_files_includes_not_analyzed_files() = runBlocking(Dispatchers.Default) {
+    val mainPath = project.projectDirectory.relativizeIfPossible(mainJavaFile)
+    val classPath = project.projectDirectory.relativizeIfPossible(classJavaFile)
+
+    withLintFilesCollector(
+      collector = { _, onFileResult ->
+        onFileResult(lintFileResultWithProblem(mainPath))
+        onFileResult(AnalysisToolset.LintFileResult(filePath = classPath, notAnalyzedReason = "File is outside project content roots or in an excluded directory"))
+      },
+    ) {
+      testMcpTool(
+        AnalysisToolset::lint_files.name,
+        buildJsonObject {
+          put("files", buildJsonArray {
+            add(JsonPrimitive(mainPath))
+            add(JsonPrimitive(classPath))
+          })
+        },
+      ) { result ->
+        val text = result.textContent.text
+        assertThat(text).containsOnlyOnce(""""filePath":"src/Main.java"""")
+        assertThat(text).containsOnlyOnce(""""filePath":"src/Class.java"""")
+        assertThat(text).contains(""""notAnalyzedReason":"File is outside project content roots or in an excluded directory"""")
+      }
+    }
+  }
+
+  @Test
+  fun lint_files_omits_not_analyzed_fields_for_clean_files() = runBlocking(Dispatchers.Default) {
+    val mainPath = project.projectDirectory.relativizeIfPossible(mainJavaFile)
+
+    withLintFilesCollector(
+      collector = { _, onFileResult ->
+        onFileResult(lintFileResultWithProblem(mainPath))
+      },
+    ) {
+      testMcpTool(
+        AnalysisToolset::lint_files.name,
+        buildJsonObject {
+          put("files", buildJsonArray {
+            add(JsonPrimitive(mainPath))
+          })
+        },
+      ) { result ->
+        val text = result.textContent.text
+        assertThat(text).containsOnlyOnce(""""filePath":"src/Main.java"""")
+        assertThat(text).doesNotContain(""""notAnalyzed"""")
+        assertThat(text).doesNotContain(""""notAnalyzedReason"""")
+      }
+    }
+  }
+
+  @Test
+  fun get_file_problems_fails_for_not_analyzed_file() = runBlocking(Dispatchers.Default) {
+    val mainPath = project.projectDirectory.relativizeIfPossible(mainJavaFile)
+
+    withLintFilesCollector(
+      collector = { _, onFileResult ->
+        onFileResult(AnalysisToolset.LintFileResult(filePath = mainPath, notAnalyzedReason = "File is outside project content roots or in an excluded directory"))
+      },
+    ) {
+      testMcpTool(
+        AnalysisToolset::get_file_problems.name,
+        buildJsonObject {
+          put("filePath", JsonPrimitive(mainPath))
+          put("errorsOnly", JsonPrimitive(false))
+        },
+      ) { result ->
+        assertThat(result.isError).isTrue()
+        assertThat(result.textContent.text).contains("File cannot be analyzed")
+        assertThat(result.textContent.text).contains("File is outside project content roots or in an excluded directory")
+      }
     }
   }
 

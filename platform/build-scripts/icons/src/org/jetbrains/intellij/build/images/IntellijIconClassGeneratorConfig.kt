@@ -34,6 +34,9 @@ class IntellijIconClassGeneratorConfig : IconClasses() {
         className = "DockerIcons",
         packageName = "com.intellij.docker"
       )
+      "intellij.cidr.debugger.dap" -> IntellijIconClassGeneratorModuleConfig(
+        packageName = "com.jetbrains.cidr.execution.debugger.backend.dap",
+      )
       "intellij.clouds.docker.gateway" -> IntellijIconClassGeneratorModuleConfig(
         className = "DockerGatewayIcons",
         packageName = "com.intellij.clouds.docker.gateway"
@@ -162,6 +165,11 @@ class IntellijIconClassGeneratorConfig : IconClasses() {
         packageName = "com.pestphp.pest"
       )
 
+      "intellij.vcs.git.backend" -> IntellijIconClassGeneratorModuleConfig(
+        className = "GitIcons",
+        packageName = "com.intellij.vcs.git.icons"
+      )
+
       "intellij.vcs.github" -> IntellijIconClassGeneratorModuleConfig(
         className = "GithubIcons",
         packageName = "org.jetbrains.plugins.github"
@@ -224,6 +232,11 @@ class IntellijIconClassGeneratorConfig : IconClasses() {
         className = "PlatformDebuggerImplIcons",
         packageName = "icons",
         iconDirectory = "icons"
+      )
+
+      "intellij.postcss.paid" -> IntellijIconClassGeneratorModuleConfig(
+        className = "PostCssIcons",
+        packageName = "org.intellij.plugins.postcss",
       )
 
       else -> super.getConfigForModule(moduleName)

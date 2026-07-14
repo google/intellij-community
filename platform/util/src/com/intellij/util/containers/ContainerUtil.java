@@ -137,7 +137,7 @@ public final class ContainerUtil {
   /**
    * @deprecated Use {@link LinkedList#LinkedList()}<br>
    *
-   * DO NOT REMOVE this method until {@link ContainerUtil#newLinkedList(Object[])} is removed.
+   * DO NOT REMOVE this method until {@link newLinkedList(Object[])} is removed.
    * The former method is here to highlight incorrect usages of the latter.
    */
   @ApiStatus.Internal
@@ -159,7 +159,7 @@ public final class ContainerUtil {
   /**
    * @deprecated Use {@link ArrayList#ArrayList()}<br>
    *
-   * DO NOT REMOVE this method until {@link ContainerUtil#newArrayList(Object[])} is removed.
+   * DO NOT REMOVE this method until {@link newArrayList(Object[])} is removed.
    * The former method is here to highlight incorrect usages of the latter.
    */
   @Deprecated
@@ -181,7 +181,7 @@ public final class ContainerUtil {
   /**
    * @deprecated Use {@link ArrayList#ArrayList(Collection)} instead<br>
    *
-   * DO NOT REMOVE this method until {@link ContainerUtil#newArrayList(Iterable)} is removed.
+   * DO NOT REMOVE this method until {@link newArrayList(Iterable)} is removed.
    * The former method is here to highlight incorrect usages of the latter.
    */
   @Deprecated
@@ -288,6 +288,7 @@ public final class ContainerUtil {
   /**
    * @deprecated Use {@link SmartList#SmartList()}
    */
+  @ApiStatus.ScheduledForRemoval
   @Deprecated
   public static @NotNull <T> List<T> newSmartList() {
     return new SmartList<>();
@@ -296,7 +297,7 @@ public final class ContainerUtil {
   /**
    * @deprecated Use {@link HashSet#HashSet()}<br>
    *
-   * DO NOT REMOVE this method until {@link ContainerUtil#newHashSet(Object[])} is removed.
+   * DO NOT REMOVE this method until {@link newHashSet(Object[])} is removed.
    * The former method is here to highlight incorrect usages of the latter.
    */
   @Contract(pure = true)
@@ -361,7 +362,7 @@ public final class ContainerUtil {
   /**
    * @deprecated Use {@link LinkedHashSet#LinkedHashSet()}<br>
    *
-   * DO NOT REMOVE this method until {@link ContainerUtil#newLinkedHashSet(Object[])} is removed.
+   * DO NOT REMOVE this method until {@link newLinkedHashSet(Object[])} is removed.
    * The former method is here to highlight incorrect usages of the latter.
    */
   @Contract(pure = true)
@@ -495,7 +496,7 @@ public final class ContainerUtil {
   /**
    * @deprecated use {@link Collections#emptyList()}<br>
    *
-   * DO NOT REMOVE this method until {@link ContainerUtil#immutableList(Object[])} is removed.
+   * DO NOT REMOVE this method until {@link immutableList(Object[])} is removed.
    * The former method is here to highlight incorrect usages of the latter.
    */
   @ApiStatus.Internal
@@ -509,7 +510,7 @@ public final class ContainerUtil {
   /**
    * @deprecated use more standard/memory-conscious alternatives {@link List#of(Object)} or {@link Collections#singletonList(Object)} instead.<br>
    *
-   * DO NOT REMOVE this method until {@link ContainerUtil#immutableList(Object[])} is removed.
+   * DO NOT REMOVE this method until {@link immutableList(Object[])} is removed.
    * The former method is here to highlight incorrect usages of the latter.
    */
   @Contract(pure = true)
@@ -883,6 +884,7 @@ public final class ContainerUtil {
    * @return true if all {@link Processor#process(Object)} returned true; false otherwise
    */
   public static <T> boolean process(@NotNull List<? extends T> list, @NotNull Processor<? super T> processor) {
+    //noinspection ForLoopReplaceableByForEach
     for (int i = 0, size = list.size(); i < size; i++) {
       T t = list.get(i);
       if (!processor.process(t)) {
@@ -1165,13 +1167,31 @@ public final class ContainerUtil {
   }
 
   @Contract(pure=true)
-  public static <T> T @NotNull [] findAllAsArray(T @NotNull [] collection, @NotNull Condition<? super T> condition) {
-    List<? extends T> list = findAll(collection, condition);
-    if (list.size() == collection.length) {
-      return collection;
+  public static <T> T @NotNull [] findAllAsArray(T @NotNull [] array, @NotNull Condition<? super T> condition) {
+    int i;
+    for (i = 0; i < array.length; i++) {
+      T t = array[i];
+      if (!condition.value(t)) {
+        break;
+      }
     }
-    T[] array = ArrayUtil.newArray(ArrayUtil.getComponentType(collection), list.size());
-    return list.toArray(array);
+    if (i == array.length) {
+      return array;
+    }
+    ArrayList<T> result = new ArrayList<>(array.length-1);
+    //noinspection ManualArrayToCollectionCopy
+    for (int k = 0; k<i; k++) {
+      T t = array[k];
+      result.add(t);
+    }
+    for (i++; i < array.length; i++) {
+      T t = array[i];
+      if (condition.value(t)) {
+        result.add(t);
+      }
+    }
+    T[] resultArray = ArrayUtil.newArray(ArrayUtil.getComponentType(array), result.size());
+    return result.toArray(resultArray);
   }
 
   public static <T> boolean all(T @NotNull [] array, @NotNull Condition<? super T> condition) {
@@ -1363,6 +1383,16 @@ public final class ContainerUtil {
       modified |= collection.remove(element);
     }
     return modified;
+  }
+
+  @Contract(pure = true)
+  public static <T> @NotNull @Unmodifiable List<T> remove(@NotNull @Unmodifiable List<T> list, T element) {
+    int i = list.indexOf(element);
+    return i==-1 ? list : remove(list, i);
+  }
+  @Contract(pure = true)
+  public static <T> @NotNull @Unmodifiable List<T> remove(@NotNull @Unmodifiable List<? extends T> list, int indexToRemove) {
+    return concat(list.subList(0,indexToRemove), list.subList(indexToRemove+1, list.size()));
   }
 
   // returns true if the collection was modified
@@ -1678,7 +1708,7 @@ public final class ContainerUtil {
    * @return read-only list consisting of the lists (made by listGenerator) added together
    */
   @Contract(pure = true)
-  public static @Unmodifiable @NotNull <T, V> List<V> concat(@NotNull Iterable<? extends T> list, @NotNull Function<? super T, ? extends Collection<? extends V>> listGenerator) {
+  public static @Unmodifiable @NotNull <T, V> List<V> concat(@NotNull Iterable<? extends T> list, @NotNull Function<? super T, ? extends @Unmodifiable Collection<? extends V>> listGenerator) {
     FreezableArrayList<V> result = new FreezableArrayList<>();
     for (T v : list) {
       result.addAll(listGenerator.fun(v));
@@ -1687,7 +1717,7 @@ public final class ContainerUtil {
   }
 
   @Contract(pure=true)
-  public static <T> boolean intersects(@NotNull Collection<? extends T> collection1, @NotNull Collection<? extends T> collection2) {
+  public static <T> boolean intersects(@NotNull @Unmodifiable Collection<? extends T> collection1, @NotNull @Unmodifiable Collection<? extends T> collection2) {
     if (collection1.size() <= collection2.size()) {
       for (T t : collection1) {
         if (collection2.contains(t)) {
@@ -1723,7 +1753,7 @@ public final class ContainerUtil {
     return result.emptyOrFrozen();
   }
 
-  private static <K,V> @NotNull Map<K,V> emptyOrFrozen(@NotNull FreezableHashMap<? extends K, ? extends V> result) {
+  private static <K,V> @NotNull @Unmodifiable Map<K,V> emptyOrFrozen(@NotNull FreezableHashMap<? extends K, ? extends V> result) {
     //noinspection unchecked
     return result.isEmpty() ? Collections.emptyMap() :
            Options.RETURN_REALLY_UNMODIFIABLE_COLLECTION_FROM_METHODS_MARKED_UNMODIFIABLE ? (Map<K,V>)result.freeze()
@@ -1744,12 +1774,12 @@ public final class ContainerUtil {
     return result;
   }
 
-  @Contract(pure=true)
+  @Contract(value = "null -> null", pure=true)
   public static <T> @UnknownNullability T getFirstItem(@Nullable Collection<? extends T> items) {
     return getFirstItem(items, null);
   }
 
-  @Contract(pure=true)
+  @Contract(value = "null -> null", pure=true)
   public static <T> @UnknownNullability T getFirstItem(@Nullable List<? extends T> items) {
     return items == null || items.isEmpty() ? null : items.get(0);
   }
@@ -1766,7 +1796,7 @@ public final class ContainerUtil {
    * @param <T> type of collection element
    * @return the only collection element or null
    */
-  @Contract(pure=true)
+  @Contract(value = "null -> null", pure=true)
   public static <T> @UnknownNullability T getOnlyItem(@Nullable Collection<? extends T> items) {
     return getOnlyItem(items, null);
   }
@@ -1890,7 +1920,7 @@ public final class ContainerUtil {
     return isEmpty(list) ? def : list.get(list.size() - 1);
   }
 
-  @Contract(pure=true)
+  @Contract(value = "null -> null", pure=true)
   public static <T>  @UnknownNullability T getLastItem(@Nullable List<? extends T> list) {
     return getLastItem(list, null);
   }
@@ -2254,7 +2284,7 @@ public final class ContainerUtil {
   /**
    * @deprecated use {@link Collections#emptySet()} or {@link Set#of()} instead<br>
    *
-   * DO NOT REMOVE this method until {@link ContainerUtil#set(Object[])} is removed.
+   * DO NOT REMOVE this method until {@link set(Object[])} is removed.
    * The former method is here to highlight incorrect usages of the latter.
    */
   @ApiStatus.Internal
@@ -2268,7 +2298,7 @@ public final class ContainerUtil {
   /**
    * @deprecated use {@link Collections#singleton(Object)} or {@link Set#of} instead<br>
    *
-   * DO NOT REMOVE this method until {@link ContainerUtil#set(Object[])} is removed.
+   * DO NOT REMOVE this method until {@link set(Object[])} is removed.
    * The former method is here to highlight incorrect usages of the latter.
    */
   @ApiStatus.Internal
@@ -2528,6 +2558,7 @@ public final class ContainerUtil {
     List<@NotNull T> result = null;
     for (int i = 0; i < list.size(); i++) {
       T t = list.get(i);
+      //noinspection ConstantValue
       if (t == null) {
         throw new IllegalArgumentException("get(" + i + ") = null");
       }
@@ -2751,11 +2782,11 @@ public final class ContainerUtil {
   }
 
   /**
-   * Creates List, which is thread-safe to modify and iterate.
-   * It differs from the java.util.concurrent.CopyOnWriteArrayList in the following:
-   * - faster modification in the uncontended case
-   * - less memory
-   * - slower modification in highly contented case (which is the kind of situation you shouldn't use COWAL anyway)<br>
+   * Creates {@link List} which is thread-safe to modify and iterate.
+   * It differs from the {@link java.util.concurrent.CopyOnWriteArrayList} in the following:
+   * - faster modification in the uncontended case (there's no synchronization inside)
+   * - less memory (no `lock` field)
+   * - slower modification in highly contented case (CAS could fail leading to multiple retries) (which is the kind of situation you shouldn't use COWAL anyway)<br>
    *
    * N.B. Avoid using {@code list.toArray(new T[list.size()])} on this list because it is inherently race-prone and
    * therefore can return an array with null elements at the end.
@@ -3054,7 +3085,7 @@ public final class ContainerUtil {
     return list.size() >= prefix.size() && list.subList(0, prefix.size()).equals(prefix);
   }
 
-  @Contract(pure = true)
+  @Contract(value = "null -> null", pure = true)
   public static @Nullable <C extends Collection<?>> C nullize(@Nullable C collection) {
     return isEmpty(collection) ? null : collection;
   }

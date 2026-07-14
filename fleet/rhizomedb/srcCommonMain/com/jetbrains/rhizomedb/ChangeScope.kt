@@ -4,8 +4,8 @@ package com.jetbrains.rhizomedb
 import com.jetbrains.rhizomedb.add
 import com.jetbrains.rhizomedb.impl.entity
 import com.jetbrains.rhizomedb.impl.generateSeed
-import fleet.util.openmap.Key
-import fleet.util.openmap.MutableOpenMap
+import fleet.openmap.Key
+import fleet.openmap.MutableOpenMap
 import com.jetbrains.rhizomedb.add as add_cs
 import com.jetbrains.rhizomedb.clear as clear_cs
 import com.jetbrains.rhizomedb.delete as delete_cs
@@ -276,6 +276,9 @@ fun effect(f: ChangeScope.() -> Unit) {
  * */
 context(cs: ChangeScope)
 fun <E : Entity> EntityType<E>.new(builder: EntityBuilder<E> = EntityBuilder {}): E = let { entityType ->
+  if (cs.context.impl.registerEntityTypeOnEntityCreation) {
+    register(entityType)
+  }
   require(entity(entityType.eid) != null) {
     "Entity type '${entityType.entityTypeIdent}' is not registered.\nRegister it in your Plugin implementation, or use ChangeScope.register as mitigation"
   }

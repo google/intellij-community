@@ -10,7 +10,7 @@ const MERGE_TOOL_NAMES = new Set([
 ])
 
 const SPLIT_MERGE_TOOL_NAMES = new Set([
-  'lint_files'
+  'lint_files', 'reformat_file'
 ])
 
 // --- Routing decisions ---
@@ -99,7 +99,7 @@ export function isRiderPath(filePath: string, projectRoot: string): boolean {
 export function splitPathListArgsByIde(
   args: Record<string, unknown>,
   projectRoot: string,
-  argName: string = 'file_paths'
+  argName: string = 'files'
 ): {ideaArgs?: Record<string, unknown>; riderArgs?: Record<string, unknown>} {
   const rawPaths = args[argName]
   if (!Array.isArray(rawPaths)) {

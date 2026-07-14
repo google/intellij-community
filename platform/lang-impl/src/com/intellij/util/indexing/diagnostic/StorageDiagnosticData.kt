@@ -16,6 +16,7 @@ import com.intellij.platform.diagnostic.telemetry.Indexes
 import com.intellij.platform.diagnostic.telemetry.Storage
 import com.intellij.platform.diagnostic.telemetry.TelemetryManager
 import com.intellij.platform.diagnostic.telemetry.impl.helpers.ReentrantReadWriteLockUsageMonitor
+import com.intellij.platform.util.io.storages.circular.WriteAheadLogOverCircularBuffer
 import com.intellij.serviceContainer.AlreadyDisposedException
 import com.intellij.util.SystemProperties
 import com.intellij.util.concurrency.AppExecutorUtil
@@ -32,7 +33,9 @@ import com.intellij.util.io.stats.FilePageCacheStatistics
 import com.intellij.util.io.stats.PersistentEnumeratorStatistics
 import com.intellij.util.io.stats.PersistentHashMapStatistics
 import com.intellij.util.io.stats.StorageStatsRegistrar
+import com.intellij.util.io.writeaheadlog.FileChannelWithWAL
 import io.opentelemetry.api.metrics.Meter
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -115,7 +118,7 @@ object StorageDiagnosticData {
       val file = getDumpFile(sessionLocalDateTime, onShutdown)
       IndexDiagnosticDumperUtils.writeValue(file, stats)
     }
-    catch (e: AlreadyDisposedException) {
+    catch (@Suppress("IncorrectCancellationExceptionHandling") e: AlreadyDisposedException) {
       //e.g. IDEA-313757
       thisLogger().info("Can't collect storage statistics: ${e.message} -- probably, already a shutdown?")
     }
@@ -290,6 +293,7 @@ object StorageDiagnosticData {
     }
 
     setupFilePageCacheReporting(storageOtelMeter)
+    setupWriteAheadLogReporting(storageOtelMeter)
 
     if (PageCacheUtils.LOCK_FREE_PAGE_CACHE_ENABLED) {
       setupFilePageCacheLockFreeReporting(storageOtelMeter)
@@ -322,6 +326,7 @@ object StorageDiagnosticData {
     var writesQueuedMin: Long = Long.MAX_VALUE
     var writesQueuedSum: Long = 0
     var writesQueuedMeasurements: Int = 0
+    @OptIn(DelicateCoroutinesApi::class)
     GlobalScope.launch {
       while (true) {
         val writesQueued = defaultParallelWriter.writesQueued().toLong()
@@ -433,8 +438,7 @@ object StorageDiagnosticData {
             housekeeperTimeSpentMs.record(it.housekeeperTimeSpent(MILLISECONDS))
           }
         }
-        catch (_: AlreadyDisposedException) {
-
+        catch (@Suppress("IncorrectCancellationExceptionHandling") _: AlreadyDisposedException) {
         }
       },
       totalNativeBytesAllocated, totalNativeBytesReclaimed,
@@ -456,6 +460,41 @@ object StorageDiagnosticData {
 
   }
 
+  private fun setupWriteAheadLogReporting(otelMeter: Meter) {
+    val bytesQueued = otelMeter.counterBuilder("FilePageCache.WAL.bytesQueued")
+      .setUnit("bytes")
+      .buildObserver()
+    val flushesForcedByOverflow = otelMeter.counterBuilder("FilePageCache.WAL.flushesForcedByOverflow").buildObserver()
+    val totalEntriesFlushed = otelMeter.counterBuilder("FilePageCache.WAL.entriesFlushed").buildObserver()
+    val bytesCopiedByApplyUnfinished = otelMeter.counterBuilder("FilePageCache.WAL.bytesCopiedByApplyUnfinished")
+      .setUnit("bytes")
+      .buildObserver()
+
+    val entriesFlushedOnRead = otelMeter.counterBuilder("FilePageCache.WAL.entriesFlushedOnRead").buildObserver()
+    val entriesFlushedOnForce = otelMeter.counterBuilder("FilePageCache.WAL.entriesFlushedOnForce").buildObserver()
+    val entriesFlushedOnTruncate = otelMeter.counterBuilder("FilePageCache.WAL.entriesFlushedOnTruncate").buildObserver()
+    val entriesFlushedOnClose = otelMeter.counterBuilder("FilePageCache.WAL.entriesFlushedOnClose").buildObserver()
+
+    otelMeter.batchCallback(
+      {
+        val statistics = WriteAheadLogOverCircularBuffer.getAggregatedStatistics()
+        bytesQueued.record(statistics.bytesQueued)
+        flushesForcedByOverflow.record(statistics.flushesForcedByOverflow)
+        totalEntriesFlushed.record(statistics.entriesFlushed)
+        bytesCopiedByApplyUnfinished.record(statistics.bytesCopiedByApplyUnfinished)
+
+        val flushStatistics = FileChannelWithWAL.getFlushStatistics()
+        entriesFlushedOnRead.record(flushStatistics.entriesFlushedOnRead)
+        entriesFlushedOnForce.record(flushStatistics.entriesFlushedOnForce)
+        entriesFlushedOnTruncate.record(flushStatistics.entriesFlushedOnTruncate)
+        entriesFlushedOnClose.record(flushStatistics.entriesFlushedOnClose)
+
+      },
+      bytesQueued, flushesForcedByOverflow, totalEntriesFlushed, bytesCopiedByApplyUnfinished,
+      entriesFlushedOnRead, entriesFlushedOnTruncate, entriesFlushedOnForce, entriesFlushedOnClose
+    )
+  }
+
   private fun setupFilePageCacheReporting(otelMeter: Meter) {
     val uncachedFileAccess = otelMeter.counterBuilder("FilePageCache.uncachedFileAccess").buildObserver()
     val maxRegisteredFiles = otelMeter.gaugeBuilder("FilePageCache.maxRegisteredFiles").ofLongs().buildObserver()
@@ -468,6 +507,10 @@ object StorageDiagnosticData {
       .setUnit("us").buildObserver()
     val totalPageDisposalsUs = otelMeter.counterBuilder("FilePageCache.totalPageDisposalsUs")
       .setUnit("us").buildObserver()
+
+    val totalPageStoresUs = otelMeter.counterBuilder("FilePageCache.totalPageStoresUs")
+      .setUnit("us").buildObserver()
+    val totalBytesStoredUs = otelMeter.counterBuilder("FilePageCache.totalBytesStored").buildObserver()
 
     val disposedBuffers = otelMeter.counterBuilder("FilePageCache.disposedBuffers").buildObserver()
 
@@ -501,7 +544,7 @@ object StorageDiagnosticData {
       {
         try {
           val pageCacheStats = StorageLockContext.getStatistics()
-          uncachedFileAccess.record(pageCacheStats.uncachedFileAccess.toLong())
+          uncachedFileAccess.record(pageCacheStats.cachedChannelsStatistics.bypassedCache.toLong())
           maxRegisteredFiles.record(pageCacheStats.maxRegisteredFiles.toLong())
 
           maxCacheSizeInBytes.record(pageCacheStats.maxCacheSizeInBytes)
@@ -517,6 +560,9 @@ object StorageDiagnosticData {
           totalPageLoadsUs.record(pageCacheStats.totalPageLoadUs)
           totalPageDisposalsUs.record(pageCacheStats.totalPageDisposalUs)
 
+          totalPageStoresUs.record(pageCacheStats.totalPageStoreUs)
+          totalBytesStoredUs.record(pageCacheStats.totalBytesStored)
+
           disposedBuffers.record(pageCacheStats.disposedBuffers.toLong())
 
           val bufferAllocatorStats = DirectByteBufferAllocator.ALLOCATOR.statistics
@@ -528,13 +574,14 @@ object StorageDiagnosticData {
           directBufferAllocatorTotalSizeCached.record(bufferAllocatorStats.totalSizeOfBuffersCachedInBytes)
           directBufferAllocatorTotalSizeAllocated.record(bufferAllocatorStats.totalSizeOfBuffersAllocatedInBytes)
         }
-        catch (_: AlreadyDisposedException) {
+        catch (@Suppress("IncorrectCancellationExceptionHandling") _: AlreadyDisposedException) {
 
         }
       },
       uncachedFileAccess, maxRegisteredFiles, maxCacheSizeInBytes,
       pageHits, pageFastCacheHit, pageLoadsAboveSizeThreshold, pageLoads,
       totalPageLoadsUs, totalPageDisposalsUs,
+      totalPageStoresUs, totalBytesStoredUs,
       disposedBuffers, capacityInBytes,
 
       directBufferAllocatorHits, directBufferAllocatorMisses,

@@ -18,7 +18,7 @@ import com.intellij.execution.process.OSProcessHandler;
 import com.intellij.execution.process.ProcessEvent;
 import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.process.ProcessListener;
-import com.intellij.execution.process.ProcessOutputTypes;
+import com.intellij.execution.process.ProcessOutputType;
 import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.execution.ui.RunContentDescriptor;
 import com.intellij.execution.ui.RunContentManager;
@@ -29,6 +29,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.PathManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
@@ -111,7 +112,7 @@ public final class JShellHandler {
     processHandler.addProcessListener(new ProcessListener() {
       @Override
       public void onTextAvailable(@NotNull ProcessEvent event, @NotNull Key outputType) {
-        if (outputType == ProcessOutputTypes.STDOUT) {
+        if (ProcessOutputType.isStdout(outputType)) {
           try {
             readerSink.write(event.getText());
             readerSink.flush();
@@ -121,7 +122,7 @@ public final class JShellHandler {
           }
         }
         else {
-          myConsoleView.print(event.getText(), outputType == ProcessOutputTypes.STDERR? ConsoleViewContentType.ERROR_OUTPUT : ConsoleViewContentType.SYSTEM_OUTPUT);
+          myConsoleView.print(event.getText(), ProcessOutputType.isStderr(outputType)? ConsoleViewContentType.ERROR_OUTPUT : ConsoleViewContentType.SYSTEM_OUTPUT);
         }
       }
 
@@ -175,7 +176,7 @@ public final class JShellHandler {
     final Computable<OrderEnumerator> orderEnumerator = module != null ?
                                                         () -> ModuleRootManager.getInstance(module).orderEntries() :
                                                         () -> ProjectRootManager.getInstance(project).orderEntries();
-    ApplicationManager.getApplication().runReadAction(() -> {
+    ReadAction.runBlocking(() -> {
       cp.addAll(orderEnumerator.compute().recursively().withoutSdk().getPathsList().getPathList());
     });
     if (!cp.isEmpty()) {

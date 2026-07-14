@@ -1,14 +1,15 @@
-<idea-plugin visibility="public" package="org.jetbrains.kotlin.idea.completion.impl.k2">
+<idea-plugin visibility="public">
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
     <module name="intellij.java.psi"/>
-    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
     <module name="intellij.java.frontback.psi"/>
     <module name="intellij.java.impl"/>
     <module name="intellij.java.indexing"/>
     <module name="intellij.java.psi.impl"/>
+    <module name="intellij.kotlin.codeInsight.shared"/>
     <module name="intellij.kotlin.searching"/>
-    <!-- endregion -->
   </dependencies>
+  <!-- endregion -->
   <extensions defaultExtensionNs="com.intellij">
     <completion.contributor language="kotlin"
                             id="KotlinCompletionContributor"
@@ -23,6 +24,22 @@
                             id="KotlinCompanionMemberContributor"
                             order="first"
                             implementationClass="org.jetbrains.kotlin.idea.completion.impl.k2.java.KotlinCompanionMemberContributor"/>
+
+
+    <completion.contributor language="JAVA"
+                            id="KotlinExtensionContributor"
+                            order="first"
+                            implementationClass="org.jetbrains.kotlin.idea.completion.impl.k2.java.KotlinExtensionContributor"/>
+
+    <weigher key="completion"
+             implementationClass="org.jetbrains.kotlin.idea.completion.impl.k2.java.DeprioritizeSuspendWeigher"
+             id="deprioritizeSuspend"
+             order="first"/>
+
+    <weigher key="completion"
+             implementationClass="org.jetbrains.kotlin.idea.completion.impl.k2.java.DeprioritizeComponentWeigher"
+             id="deprioritizeComponent"
+             order="first"/>
 
     <statistician key="completion" implementationClass="org.jetbrains.kotlin.idea.completion.impl.k2.KotlinCompletionStatistician"/>
     <lookup.charFilter implementation="org.jetbrains.kotlin.idea.completion.impl.k2.K2CompletionCharFilter"/>
@@ -57,13 +74,23 @@
                  description="Allows completion of top level packages"
                  defaultValue="true"
                  restartRequired="false"/>
+
+    <registryKey key="kotlin.java.completion.companion.members"
+                 description="Shows Kotlin companion members in Java files during completion"
+                 defaultValue="true"
+                 restartRequired="false"/>
+
+    <registryKey key="kotlin.java.completion.extensions"
+                 description="Shows Kotlin extension members in Java files during completion"
+                 defaultValue="true"
+                 restartRequired="false"/>
   </extensions>
 
   <!-- Command Completion -->
   <extensions defaultExtensionNs="com.intellij">
     <codeInsight.completion.intention.offset.provider language="kotlin"
                                                       implementationClass="org.jetbrains.kotlin.idea.completion.impl.k2.contributors.commands.KotlinCommandCompletionFactory$KotlinIntentionCommandOffsetProvider"/>
-
+    <modCommandCopyHandler implementation="org.jetbrains.kotlin.idea.completion.impl.k2.contributors.commands.KotlinCommandCompletionFactory$KotlinCommandCompletionModCommandPsiCopyHandler"/>
     <codeInsight.completion.command.factory language="kotlin"
                                             implementationClass="org.jetbrains.kotlin.idea.completion.impl.k2.contributors.commands.KotlinCommandCompletionFactory"/>
     <codeInsight.completion.command.provider language="kotlin"
@@ -92,6 +119,7 @@
     <codeInsight.completion.command.provider language="kotlin" implementationClass="org.jetbrains.kotlin.idea.completion.impl.k2.contributors.commands.KotlinExtractParameterCompletionCommandProvider" order="last"/>
     <codeInsight.completion.command.provider language="kotlin" implementationClass="org.jetbrains.kotlin.idea.completion.impl.k2.contributors.commands.KotlinExtractMethodCompletionCommandProvider" order="last"/>
     <codeInsight.completion.command.provider language="kotlin" implementationClass="org.jetbrains.kotlin.idea.completion.impl.k2.contributors.commands.KotlinInlineMethodCompletionCommandProvider" order="last"/>
+    <codeInsight.completion.command.provider language="kotlin" implementationClass="org.jetbrains.kotlin.idea.completion.impl.k2.contributors.commands.KotlinInlinePropertyCompletionCommandProvider" order="last"/>
     <codeInsight.completion.command.provider language="kotlin" implementationClass="org.jetbrains.kotlin.idea.completion.impl.k2.contributors.commands.KotlinMoveCompletionCommandProvider" order="last"/>
     <codeInsight.completion.command.provider language="kotlin" implementationClass="org.jetbrains.kotlin.idea.completion.impl.k2.contributors.commands.KotlinCopyCompletionCommandProvider" order="last"/>
     <codeInsight.completion.command.provider language="kotlin" implementationClass="org.jetbrains.kotlin.idea.completion.impl.k2.contributors.commands.KotlinTypeHierarchyCompletionCommandProvider" order="last"/>

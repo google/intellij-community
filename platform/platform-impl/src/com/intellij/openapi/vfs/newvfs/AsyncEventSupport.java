@@ -1,9 +1,8 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vfs.newvfs;
 
-import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.diagnostic.ControlFlowException;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.ExtensionPointName;
 import com.intellij.openapi.progress.ProcessCanceledException;
@@ -36,6 +35,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
+import static com.intellij.openapi.diagnostic.LoggerKt.rethrowControlFlowException;
+
 @ApiStatus.Internal
 public final class AsyncEventSupport {
   private static final Logger LOG = Logger.getInstance(AsyncEventSupport.class);
@@ -49,26 +50,30 @@ public final class AsyncEventSupport {
 
   // VFS events could be fired with any unpredictable nesting.
   // One may fire new events (for example, using `syncPublisher()`) while processing current events in `before()` or `after()`.
-  // So, we cannot rely on listener's execution and nesting order in this case and have to explicitly mark events
+  // So, we cannot rely on the listener's execution and nesting order in this case and have to explicitly mark events
   // that are supposed to be processed asynchronously.
   private static final @NotNull Set<List<? extends VFileEvent>> asyncProcessedEvents =
     CollectionFactory.createCustomHashingStrategySet(HashingStrategy.identity());
-  private static final @NotNull Map<List<? extends VFileEvent>, ChangeAppliers> appliers =
+  private static final @NotNull Map<List<? extends VFileEvent>, ChangeAppliers> earlyAppliers =
+    CollectionFactory.createSmallMemoryFootprintMap(1);
+  private static final @NotNull Map<List<? extends VFileEvent>, ChangeAppliers> lateAppliers =
     CollectionFactory.createSmallMemoryFootprintMap(1);
 
   public static void startListening() {
-    Application app = ApplicationManager.getApplication();
+    var app = ApplicationManager.getApplication();
     Disposer.register(app, AsyncEventSupport::ensureAllEventsProcessed);
 
-    app.getMessageBus().simpleConnect().subscribe(VirtualFileManager.VFS_CHANGES, new BulkFileListener() {
+    app.getMessageBus().simpleConnect().subscribe(VirtualFileManager.VFS_CHANGES_BG, new BulkFileListenerBackgroundable() {
       @Override
       public void before(@NotNull List<? extends @NotNull VFileEvent> events) {
         if (asyncProcessedEvents.contains(events)) {
           return;
         }
-        ChangeAppliers appliers = runAsyncListeners(events);
-        AsyncEventSupport.appliers.put(events, appliers);
-        beforeVfsChange(appliers);
+        var appliersPair = runAsyncListeners(events).split(applier -> applier instanceof AfterEventShouldBeFiredBeforeOtherListeners);
+        earlyAppliers.put(events, appliersPair.getFirst());
+        lateAppliers.put(events, appliersPair.getSecond());
+        beforeVfsChange(appliersPair.getFirst());
+        beforeVfsChange(appliersPair.getSecond());
       }
 
       @Override
@@ -76,18 +81,32 @@ public final class AsyncEventSupport {
         if (asyncProcessedEvents.contains(events)) {
           return;
         }
-        ChangeAppliers appliers = AsyncEventSupport.appliers.remove(events);
-        if (appliers == null || (appliers.edtAppliers.isEmpty() && appliers.backgroundAppliers.isEmpty())) {
-          return;
-        }
-        afterVfsChange(appliers);
+        drainAppliers(earlyAppliers, events);
+        drainAppliers(lateAppliers, events);
       }
     });
   }
 
+  public static void drainEarlyAppliers(@NotNull List<? extends VFileEvent> events) {
+    if (asyncProcessedEvents.contains(events)) {
+      return;
+    }
+    drainAppliers(earlyAppliers, events);
+  }
+
+  private static void drainAppliers(@NotNull Map<List<? extends VFileEvent>, ChangeAppliers> appliers, @NotNull List<? extends VFileEvent> events) {
+    var actualAppliers = appliers.remove(events);
+
+    if (actualAppliers != null && !(actualAppliers.edtAppliers.isEmpty() && actualAppliers.backgroundAppliers.isEmpty())) {
+      afterVfsChange(actualAppliers);
+    }
+  }
+
+
   private static void ensureAllEventsProcessed() {
     LOG.assertTrue(asyncProcessedEvents.isEmpty(), "Some VFS events were not properly processed " + asyncProcessedEvents);
-    LOG.assertTrue(appliers.isEmpty(), "Some VFS events were not processed after VFS change performed " + appliers);
+    LOG.assertTrue(earlyAppliers.isEmpty(), "Some VFS events were not processed after VFS change performed " + earlyAppliers);
+    LOG.assertTrue(lateAppliers.isEmpty(), "Some VFS events were not processed after VFS change performed " + lateAppliers);
   }
 
   @ApiStatus.Internal
@@ -95,7 +114,6 @@ public final class AsyncEventSupport {
     @NotNull List<AsyncFileListener.ChangeApplier> edtAppliers,
     @NotNull List<AsyncFileListener.ChangeApplier> backgroundAppliers
   ) {
-
     public static final ChangeAppliers EMPTY = new ChangeAppliers(Collections.emptyList(), Collections.emptyList());
 
     /**
@@ -108,7 +126,10 @@ public final class AsyncEventSupport {
       }
       var edtPartition = CollectionsKt.partition(edtAppliers, predicate::test);
       var bgPartition = CollectionsKt.partition(backgroundAppliers, predicate::test);
-      return new Pair<>(new ChangeAppliers(edtPartition.getFirst(), bgPartition.getFirst()), new ChangeAppliers(edtPartition.getSecond(), bgPartition.getSecond()));
+      return new Pair<>(
+        new ChangeAppliers(edtPartition.getFirst(), bgPartition.getFirst()),
+        new ChangeAppliers(edtPartition.getSecond(), bgPartition.getSecond())
+      );
     }
   }
 
@@ -119,26 +140,25 @@ public final class AsyncEventSupport {
       LOG.debug("Processing " + events);
     }
 
-    List<AsyncFileListener.ChangeApplier> appliersEdt = new ArrayList<>();
-    List<AsyncFileListener.ChangeApplier> appliersBackgroundable = new ArrayList<>();
-    List<AsyncFileListener> allListeners =
-      ((VirtualFileManagerImpl)VirtualFileManager.getInstance()).withAsyncFileListeners(EP_NAME.getExtensionList());
-    List<AsyncFileListener> allListenersBackgroundable =
-      ((VirtualFileManagerImpl)VirtualFileManager.getInstance()).withAsyncFileListenersBackgroundable(EP_NAME_BACKGROUNDABLE.getExtensionList());
-    collectAppliers(events, allListeners, appliersEdt);
-    collectAppliers(events, allListenersBackgroundable, appliersBackgroundable);
+    var appliersEdt = new ArrayList<AsyncFileListener.ChangeApplier>();
+    var appliersBackgroundable = new ArrayList<AsyncFileListener.ChangeApplier>();
+    var vfm = (VirtualFileManagerImpl)VirtualFileManager.getInstance();
+    collectAppliers(events, vfm.withAsyncFileListeners(EP_NAME.getExtensionList()), appliersEdt);
+    collectAppliers(events, vfm.withAsyncFileListenersBackgroundable(EP_NAME_BACKGROUNDABLE.getExtensionList()), appliersBackgroundable);
     return new ChangeAppliers(appliersEdt, appliersBackgroundable);
   }
 
-  private static void collectAppliers(@NotNull List<? extends VFileEvent> events,
-                                 List<AsyncFileListener> allListeners,
-                                 List<AsyncFileListener.ChangeApplier> appliers) {
-    for (AsyncFileListener listener : allListeners) {
+  private static void collectAppliers(
+    List<? extends VFileEvent> events,
+    List<AsyncFileListener> listeners,
+    List<AsyncFileListener.ChangeApplier> appliers
+  ) {
+    for (var listener : listeners) {
       ProgressManager.checkCanceled();
-      long startNs = System.nanoTime();
-      boolean canceled = false;
+      var startNs = System.nanoTime();
+      var canceled = false;
       try {
-        ApplicationManager.getApplication().runReadAction(() -> ContainerUtil.addIfNotNull(appliers, listener.prepareChange(events)));
+        ReadAction.runBlocking(() -> ContainerUtil.addIfNotNull(appliers, listener.prepareChange(events)));
       }
       catch (ProcessCanceledException e) {
         canceled = true;
@@ -148,7 +168,7 @@ public final class AsyncEventSupport {
         LOG.error(e);
       }
       finally {
-        long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
+        var elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
         if (elapsedMs > 10_000) {
           LOG.warn(listener + " took too long (" + elapsedMs + "ms) on " + events.size() + " events" + (canceled ? ", canceled" : ""));
         }
@@ -171,7 +191,7 @@ public final class AsyncEventSupport {
   private static void invokeAppliers(ChangeAppliers appliers, Consumer<AsyncFileListener.ChangeApplier> consumer) {
     if (!appliers.edtAppliers.isEmpty()) {
       VfsThreadingUtil.runActionOnEdtRegardlessOfCurrentThread(() -> {
-        for (AsyncFileListener.ChangeApplier applier : appliers.edtAppliers) {
+        for (var applier : appliers.edtAppliers) {
           PingProgress.interactWithEdtProgress();
           try {
             consumer.accept(applier);
@@ -187,7 +207,7 @@ public final class AsyncEventSupport {
     }
     if (!appliers.backgroundAppliers.isEmpty()) {
       VfsThreadingUtil.runActionOnBackgroundRegardlessOfCurrentThread(() -> {
-        for (AsyncFileListener.ChangeApplier applier : appliers.backgroundAppliers) {
+        for (var applier : appliers.backgroundAppliers) {
           try {
             consumer.accept(applier);
           }
@@ -207,20 +227,20 @@ public final class AsyncEventSupport {
   }
 
   @RequiresWriteLock
-  static void processEventsFromRefresh(@NotNull List<CompoundVFileEvent> events,
-                                       @NotNull AsyncEventSupport.ChangeAppliers appliers,
-                                       boolean excludeAsyncListeners) {
+  static void processEventsFromRefresh(
+    @NotNull List<CompoundVFileEvent> events,
+    @NotNull AsyncEventSupport.ChangeAppliers appliers,
+    boolean excludeAsyncListeners
+  ) {
     beforeVfsChange(appliers);
-    Pair<ChangeAppliers, ChangeAppliers> splitted = appliers.split(applier -> applier instanceof AfterEventShouldBeFiredBeforeOtherListeners);
-    ChangeAppliers earlyAfterEventChangeAppliers = splitted.getFirst();
-    ChangeAppliers normalAfterEventChangeAppliers = splitted.getSecond();
+    var split = appliers.split(applier -> applier instanceof AfterEventShouldBeFiredBeforeOtherListeners);
+    var earlyAfterEventChangeAppliers = split.getFirst();
+    var normalAfterEventChangeAppliers = split.getSecond();
     try {
       ((PersistentFSImpl)PersistentFS.getInstance()).processEventsImpl(events, earlyAfterEventChangeAppliers, excludeAsyncListeners);
     }
     catch (Throwable e) {
-      if (e instanceof ControlFlowException) {
-        throw e;
-      }
+      rethrowControlFlowException(e);
       LOG.error(e);
     }
     finally {

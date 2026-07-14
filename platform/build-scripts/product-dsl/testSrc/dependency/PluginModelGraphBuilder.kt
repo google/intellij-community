@@ -10,6 +10,8 @@ import com.intellij.platform.pluginGraph.EDGE_BUNDLES
 import com.intellij.platform.pluginGraph.EDGE_BUNDLES_TEST
 import com.intellij.platform.pluginGraph.EDGE_CONTAINS_CONTENT
 import com.intellij.platform.pluginGraph.EDGE_CONTAINS_CONTENT_TEST
+import com.intellij.platform.pluginGraph.EDGE_CONTAINS_CONTENT_TEST_WITH_NAMESPACE
+import com.intellij.platform.pluginGraph.EDGE_CONTAINS_CONTENT_WITH_NAMESPACE
 import com.intellij.platform.pluginGraph.EDGE_CONTAINS_MODULE
 import com.intellij.platform.pluginGraph.EDGE_CONTENT_MODULE_DEPENDS_ON
 import com.intellij.platform.pluginGraph.EDGE_CONTENT_MODULE_DEPENDS_ON_TEST
@@ -22,6 +24,7 @@ import com.intellij.platform.pluginGraph.PLUGIN_DEP_LEGACY_MASK
 import com.intellij.platform.pluginGraph.PLUGIN_DEP_MODERN_MASK
 import com.intellij.platform.pluginGraph.PluginGraph
 import com.intellij.platform.pluginGraph.PluginId
+import com.intellij.platform.pluginGraph.PluginModuleId
 import com.intellij.platform.pluginGraph.TargetDependencyScope
 import com.intellij.platform.pluginGraph.TargetName
 import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleLoadingRuleValue
@@ -76,6 +79,8 @@ internal class TestPluginGraphBuilder {
   }
 
   internal fun getOrCreateModule(name: ContentModuleName): Int = delegate.markContentModuleHasDescriptor(name)
+
+  internal fun getOrCreateModule(moduleId: PluginModuleId): Int = delegate.markContentModuleHasDescriptor(moduleId)
 
   internal fun getOrCreateProduct(name: String): Int = delegate.addProduct(name)
 
@@ -288,6 +293,22 @@ internal class GraphProductBuilder(
   }
 
   /**
+   * Include a content module directly in this product.
+   */
+  fun content(name: String, loading: ModuleLoadingRuleValue = ModuleLoadingRuleValue.REQUIRED) {
+    val moduleId = builder.getOrCreateModule(ContentModuleName(name))
+    builder.addEdgeWithLoadingMode(productId, moduleId, EDGE_CONTAINS_CONTENT, loading)
+    builder.addEdgeWithLoadingMode(
+      productId,
+      builder.getOrCreateModule(PluginModuleId(name, PluginModuleId.DEFAULT_NAMESPACE)),
+      EDGE_CONTAINS_CONTENT_WITH_NAMESPACE,
+      loading,
+    )
+    val targetId = builder.getOrCreateTarget(TargetName(name))
+    builder.addEdge(moduleId, targetId, EDGE_BACKED_BY)
+  }
+
+  /**
    * Allow a module to be missing in validation.
    */
   fun allowsMissing(moduleName: String) {
@@ -321,17 +342,21 @@ internal class GraphPluginBuilder(
   /**
    * Add a content module to this plugin.
    */
-  fun content(module: String, loading: ModuleLoadingRuleValue = ModuleLoadingRuleValue.OPTIONAL) {
+  fun content(module: String, namespace: String? = PluginModuleId.DEFAULT_NAMESPACE, loading: ModuleLoadingRuleValue = ModuleLoadingRuleValue.OPTIONAL) {
     val moduleId = builder.getOrCreateModule(ContentModuleName(module))
     builder.addEdgeWithLoadingMode(pluginId, moduleId, EDGE_CONTAINS_CONTENT, loading)
+    val moduleIdWithNamespace = builder.getOrCreateModule(PluginModuleId(module, namespace))
+    builder.addEdgeWithLoadingMode(pluginId, moduleIdWithNamespace, EDGE_CONTAINS_CONTENT_WITH_NAMESPACE, loading)
   }
 
   /**
    * Add a test content module to this plugin.
    */
-  fun testContent(module: String, loading: ModuleLoadingRuleValue = ModuleLoadingRuleValue.OPTIONAL) {
+  fun testContent(module: String, namespace: String? = PluginModuleId.DEFAULT_NAMESPACE, loading: ModuleLoadingRuleValue = ModuleLoadingRuleValue.OPTIONAL) {
     val moduleId = builder.getOrCreateModule(ContentModuleName(module))
     builder.addEdgeWithLoadingMode(pluginId, moduleId, EDGE_CONTAINS_CONTENT_TEST, loading)
+    val moduleIdWithNamespace = builder.getOrCreateModule(PluginModuleId(module, namespace))
+    builder.addEdgeWithLoadingMode(pluginId, moduleIdWithNamespace, EDGE_CONTAINS_CONTENT_TEST_WITH_NAMESPACE, loading)
   }
 
   /**
@@ -422,6 +447,11 @@ internal class GraphTargetBuilder(
   fun dependsOn(name: String) {
     val depId = builder.getOrCreateTarget(TargetName(name))
     builder.addTargetDependencyEdge(targetId, depId, null)
+  }
+
+  fun dependsOn(name: String, scope: TargetDependencyScope) {
+    val depId = builder.getOrCreateTarget(TargetName(name))
+    builder.addTargetDependencyEdge(targetId, depId, scope)
   }
 }
 

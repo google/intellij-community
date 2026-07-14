@@ -1,6 +1,7 @@
 // Copyright 2000-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.execution.ui;
 
+import com.intellij.diagnostic.logging.LogsGroupFragment;
 import com.intellij.execution.ExecutionBundle;
 import com.intellij.execution.Executor;
 import com.intellij.execution.configuration.RunConfigurationExtensionBase;
@@ -25,6 +26,7 @@ import com.intellij.util.concurrency.NonUrgentExecutor;
 import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 import javax.swing.JComponent;
 import javax.swing.JPanel;
@@ -40,7 +42,8 @@ import java.util.List;
  * A {@link FragmentedSettingsEditor} for a run configuration,
  * where the {@code Settings} type parameter is a subclass of {@link RunConfigurationBase}.
  */
-public abstract class RunConfigurationFragmentedEditor<Settings extends RunConfigurationBase<?>> extends FragmentedSettingsEditor<Settings> {
+public abstract class RunConfigurationFragmentedEditor<Settings extends RunConfigurationBase<?>> extends FragmentedSettingsEditor<Settings>
+  implements RunnerAndConfigurationAwareSettingsEditor {
   private static final Logger LOG = Logger.getInstance(RunConfigurationFragmentedEditor.class);
   private final @Nullable RunConfigurationExtensionsManager<RunConfigurationBase<?>, RunConfigurationExtensionBase<RunConfigurationBase<?>>> myExtensionsManager;
   private boolean myDefaultSettings;
@@ -55,6 +58,7 @@ public abstract class RunConfigurationFragmentedEditor<Settings extends RunConfi
     this(runConfiguration, null);
   }
 
+  @Override
   public boolean isInplaceValidationSupported() {
     return false;
   }
@@ -158,6 +162,11 @@ public abstract class RunConfigurationFragmentedEditor<Settings extends RunConfi
    */
   protected abstract List<SettingsEditorFragment<Settings, ?>> createRunFragments();
 
+  protected final LogsGroupFragment<Settings> createLogGroupFragment() {
+    return new LogsGroupFragment<>(mySettings.getProject());
+  }
+
+  @Override
   public void resetEditorFrom(@NotNull RunnerAndConfigurationSettingsImpl s) {
     myDefaultSettings = s.isTemplate();
     for (RunConfigurationEditorFragment<?,?> fragment : getRunFragments()) {
@@ -165,19 +174,21 @@ public abstract class RunConfigurationFragmentedEditor<Settings extends RunConfi
     }
   }
 
+  @Override
   public void applyEditorTo(@NotNull RunnerAndConfigurationSettingsImpl s) {
     for (RunConfigurationEditorFragment<?, ?> fragment : getRunFragments()) {
       fragment.applyEditorTo(s);
     }
   }
 
-  private @NotNull List<@NotNull RunConfigurationEditorFragment<?,?>> getRunFragments() {
+  private @NotNull @Unmodifiable List<@NotNull RunConfigurationEditorFragment<?,?>> getRunFragments() {
     return ContainerUtil.mapNotNull(getFragments(),
                                     fragment -> fragment instanceof RunConfigurationEditorFragment
                                                 ? (RunConfigurationEditorFragment<?,?>)fragment
                                                 : null);
   }
 
+  @Override
   public void targetChanged(String targetName) {
     SettingsEditorFragment<Settings, ?> targetPathFragment =
       ContainerUtil.find(getFragments(), fragment -> TargetPathFragment.ID.equals(fragment.getId()));

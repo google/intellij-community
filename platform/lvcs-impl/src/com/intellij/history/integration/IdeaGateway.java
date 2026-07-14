@@ -11,6 +11,7 @@ import com.intellij.history.core.tree.RootEntry;
 import com.intellij.ide.scratch.ScratchFileService;
 import com.intellij.openapi.application.AccessToken;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
@@ -42,6 +43,7 @@ import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.io.URLUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -244,12 +246,12 @@ public class IdeaGateway {
     return f;
   }
 
-  public static @NotNull Iterable<VirtualFile> iterateDBChildren(VirtualFile f) {
+  public static @NotNull @Unmodifiable Iterable<VirtualFile> iterateDBChildren(VirtualFile f) {
     if (!(f instanceof NewVirtualFile nf) || !f.isValid()) return Collections.emptyList();
     return nf.iterInDbChildrenWithoutLoadingVfsFromOtherProjects();
   }
 
-  public static @NotNull Iterable<VirtualFile> loadAndIterateChildren(VirtualFile f) {
+  public static @NotNull @Unmodifiable Iterable<VirtualFile> loadAndIterateChildren(VirtualFile f) {
     if (!(f instanceof NewVirtualFile nf) || !f.isValid()) return Collections.emptyList();
     return Arrays.asList(nf.getChildren());
   }
@@ -487,7 +489,7 @@ public class IdeaGateway {
   }
 
   public void registerUnsavedDocuments(final @NotNull LocalHistoryFacade vcs) {
-    ApplicationManager.getApplication().runReadAction(() -> {
+    ReadAction.runBlocking(() -> {
       vcs.beginChangeSet();
       for (Document d : FileDocumentManager.getInstance().getUnsavedDocuments()) {
         VirtualFile f = getFile(d);

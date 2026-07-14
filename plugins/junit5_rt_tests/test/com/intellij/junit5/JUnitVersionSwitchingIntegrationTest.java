@@ -170,7 +170,8 @@ public class JUnitVersionSwitchingIntegrationTest extends AbstractTestFrameworkC
   }
 
   public void testRunnerIgnoresJUnit6FromRuntimeScopeOnlyLib() throws Exception {
-    Collection<File> junit6Files = getRepoManager().resolveDependency("org.junit.jupiter", "junit-jupiter-api", "6.0.0", false, List.of());
+    Collection<File> junit6Files =
+      getRepoManager().resolveDependency("org.junit.jupiter", "junit-jupiter-api", "6.0.0", false, List.of());
 
     LocalFileSystem localFileSystem = LocalFileSystem.getInstance();
     JarFileSystem jarFileSystem = JarFileSystem.getInstance();

@@ -2,11 +2,13 @@
   <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
     <module name="intellij.community.wintools"/>
+    <module name="intellij.libraries.hamcrest"/>
     <module name="intellij.libraries.junit4"/>
     <module name="intellij.libraries.junit5"/>
     <module name="intellij.libraries.junit5.jupiter"/>
     <module name="intellij.libraries.junit5.params"/>
     <module name="intellij.libraries.junit5.pioneer"/>
+    <module name="intellij.libraries.mockk.jvm"/>
     <module name="intellij.libraries.sshd.osgi"/>
     <module name="intellij.libraries.system.stubs.jupiter"/>
     <module name="intellij.libraries.testcontainers"/>

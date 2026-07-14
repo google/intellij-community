@@ -3,7 +3,6 @@
 package org.jetbrains.kotlin.idea.fir.completion;
 
 import com.intellij.testFramework.TestDataPath;
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode;
 import org.jetbrains.kotlin.idea.base.test.TestRoot;
 import org.jetbrains.kotlin.idea.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils;
@@ -23,12 +22,6 @@ public abstract class K2KotlinInJavaCompletionTestGenerated extends AbstractK2Ko
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../completion/testData/inJava/companionObject")
     public static class CompanionObject extends AbstractK2KotlinInJavaCompletionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -51,6 +44,21 @@ public abstract class K2KotlinInJavaCompletionTestGenerated extends AbstractK2Ko
         @TestMetadata("HideSuspendFunction.java")
         public void testHideSuspendFunction() throws Exception {
             runTest("../../completion/testData/inJava/companionObject/HideSuspendFunction.java");
+        }
+
+        @TestMetadata("InheritedDefaultMethod.java")
+        public void testInheritedDefaultMethod() throws Exception {
+            runTest("../../completion/testData/inJava/companionObject/InheritedDefaultMethod.java");
+        }
+
+        @TestMetadata("InheritedFromAbstractClass.java")
+        public void testInheritedFromAbstractClass() throws Exception {
+            runTest("../../completion/testData/inJava/companionObject/InheritedFromAbstractClass.java");
+        }
+
+        @TestMetadata("InheritedProperty.java")
+        public void testInheritedProperty() throws Exception {
+            runTest("../../completion/testData/inJava/companionObject/InheritedProperty.java");
         }
 
         @TestMetadata("JvmField.java")
@@ -83,6 +91,11 @@ public abstract class K2KotlinInJavaCompletionTestGenerated extends AbstractK2Ko
             runTest("../../completion/testData/inJava/companionObject/PrivateOuterClass.java");
         }
 
+        @TestMetadata("PrivateSetter.java")
+        public void testPrivateSetter() throws Exception {
+            runTest("../../completion/testData/inJava/companionObject/PrivateSetter.java");
+        }
+
         @TestMetadata("PropertyAccessors.java")
         public void testPropertyAccessors() throws Exception {
             runTest("../../completion/testData/inJava/companionObject/PropertyAccessors.java");
@@ -91,6 +104,11 @@ public abstract class K2KotlinInJavaCompletionTestGenerated extends AbstractK2Ko
         @TestMetadata("ProtectedMember.java")
         public void testProtectedMember() throws Exception {
             runTest("../../completion/testData/inJava/companionObject/ProtectedMember.java");
+        }
+
+        @TestMetadata("ProtectedSetter.java")
+        public void testProtectedSetter() throws Exception {
+            runTest("../../completion/testData/inJava/companionObject/ProtectedSetter.java");
         }
 
         @TestMetadata("SimpleMethod.java")
@@ -110,14 +128,392 @@ public abstract class K2KotlinInJavaCompletionTestGenerated extends AbstractK2Ko
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
-    @TestMetadata("../../completion/testData/inJava")
-    public static class Uncategorized extends AbstractK2KotlinInJavaCompletionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
+    @TestMetadata("../../completion/testData/inJava/component")
+    public static class Component extends AbstractK2KotlinInJavaCompletionTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
+        @TestMetadata("ComponentFunctionBelowNonTypeMatch.java")
+        public void testComponentFunctionBelowNonTypeMatch() throws Exception {
+            runTest("../../completion/testData/inJava/component/ComponentFunctionBelowNonTypeMatch.java");
+        }
+
+        @TestMetadata("ComponentFunctionDeprioritized.java")
+        public void testComponentFunctionDeprioritized() throws Exception {
+            runTest("../../completion/testData/inJava/component/ComponentFunctionDeprioritized.java");
+        }
+
+        @TestMetadata("ComponentFunctionsMultiple.java")
+        public void testComponentFunctionsMultiple() throws Exception {
+            runTest("../../completion/testData/inJava/component/ComponentFunctionsMultiple.java");
+        }
+
+        @TestMetadata("NonDataClassComponentNotDeprioritized.java")
+        public void testNonDataClassComponentNotDeprioritized() throws Exception {
+            runTest("../../completion/testData/inJava/component/NonDataClassComponentNotDeprioritized.java");
+        }
+
+        @TestMetadata("TripleComponentFunctions.java")
+        public void testTripleComponentFunctions() throws Exception {
+            runTest("../../completion/testData/inJava/component/TripleComponentFunctions.java");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../completion/testData/inJava/extensions")
+    public static class Extensions extends AbstractK2KotlinInJavaCompletionTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("BooleanIsPropertyGetterPrefix.java")
+        public void testBooleanIsPropertyGetterPrefix() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/BooleanIsPropertyGetterPrefix.java");
+        }
+
+        @TestMetadata("BooleanIsPropertySetterPrefix.java")
+        public void testBooleanIsPropertySetterPrefix() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/BooleanIsPropertySetterPrefix.java");
+        }
+
+        @TestMetadata("CrossinlineParameter.java")
+        public void testCrossinlineParameter() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/CrossinlineParameter.java");
+        }
+
+        @TestMetadata("DefaultParameters.java")
+        public void testDefaultParameters() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/DefaultParameters.java");
+        }
+
+        @TestMetadata("ExtensionOnArray.java")
+        public void testExtensionOnArray() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/ExtensionOnArray.java");
+        }
+
+        @TestMetadata("ExtensionOnInterface.java")
+        public void testExtensionOnInterface() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/ExtensionOnInterface.java");
+        }
+
+        @TestMetadata("ExtensionOnJavaClass.java")
+        public void testExtensionOnJavaClass() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/ExtensionOnJavaClass.java");
+        }
+
+        @TestMetadata("ExtensionOnList.java")
+        public void testExtensionOnList() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/ExtensionOnList.java");
+        }
+
+        @TestMetadata("ExtensionOnMutableList.java")
+        public void testExtensionOnMutableList() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/ExtensionOnMutableList.java");
+        }
+
+        @TestMetadata("ExtensionOnNullableReceiver.java")
+        public void testExtensionOnNullableReceiver() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/ExtensionOnNullableReceiver.java");
+        }
+
+        @TestMetadata("ExtensionOnString.java")
+        public void testExtensionOnString() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/ExtensionOnString.java");
+        }
+
+        @TestMetadata("ExtensionOnSupertype.java")
+        public void testExtensionOnSupertype() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/ExtensionOnSupertype.java");
+        }
+
+        @TestMetadata("ExtensionProperty.java")
+        public void testExtensionProperty() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/ExtensionProperty.java");
+        }
+
+        @TestMetadata("FunctionMismatchGetPrefixAbsent.java")
+        public void testFunctionMismatchGetPrefixAbsent() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/FunctionMismatchGetPrefixAbsent.java");
+        }
+
+        @TestMetadata("FunctionMismatchSetPrefixAbsent.java")
+        public void testFunctionMismatchSetPrefixAbsent() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/FunctionMismatchSetPrefixAbsent.java");
+        }
+
+        @TestMetadata("FunctionNamedGetWithGetPrefix.java")
+        public void testFunctionNamedGetWithGetPrefix() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/FunctionNamedGetWithGetPrefix.java");
+        }
+
+        @TestMetadata("GetterPartialAccessorPrefix.java")
+        public void testGetterPartialAccessorPrefix() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/GetterPartialAccessorPrefix.java");
+        }
+
+        @TestMetadata("GetterPrefixNoUnrelatedMatch.java")
+        public void testGetterPrefixNoUnrelatedMatch() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/GetterPrefixNoUnrelatedMatch.java");
+        }
+
+        @TestMetadata("GetterPrefixValProperty.java")
+        public void testGetterPrefixValProperty() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/GetterPrefixValProperty.java");
+        }
+
+        @TestMetadata("GetterPrefixVarProperty.java")
+        public void testGetterPrefixVarProperty() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/GetterPrefixVarProperty.java");
+        }
+
+        @TestMetadata("GetterShortPrefix.java")
+        public void testGetterShortPrefix() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/GetterShortPrefix.java");
+        }
+
+        @TestMetadata("HideSuspendFunction.java")
+        public void testHideSuspendFunction() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/HideSuspendFunction.java");
+        }
+
+        @TestMetadata("InlineFunction.java")
+        public void testInlineFunction() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/InlineFunction.java");
+        }
+
+        @TestMetadata("JvmName.java")
+        public void testJvmName() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/JvmName.java");
+        }
+
+        @TestMetadata("JvmNameAlongsidePlainExtension.java")
+        public void testJvmNameAlongsidePlainExtension() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/JvmNameAlongsidePlainExtension.java");
+        }
+
+        @TestMetadata("JvmNameCamelHumpMatch.java")
+        public void testJvmNameCamelHumpMatch() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/JvmNameCamelHumpMatch.java");
+        }
+
+        @TestMetadata("JvmNameDuplicateAccessorsDeduped.java")
+        public void testJvmNameDuplicateAccessorsDeduped() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/JvmNameDuplicateAccessorsDeduped.java");
+        }
+
+        @TestMetadata("JvmNameFunctionRenamed.java")
+        public void testJvmNameFunctionRenamed() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/JvmNameFunctionRenamed.java");
+        }
+
+        @TestMetadata("JvmNameGetterRenamed.java")
+        public void testJvmNameGetterRenamed() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/JvmNameGetterRenamed.java");
+        }
+
+        @TestMetadata("JvmNameNestedExtensionHidden.java")
+        public void testJvmNameNestedExtensionHidden() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/JvmNameNestedExtensionHidden.java");
+        }
+
+        @TestMetadata("JvmNameNoUnrelatedMatch.java")
+        public void testJvmNameNoUnrelatedMatch() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/JvmNameNoUnrelatedMatch.java");
+        }
+
+        @TestMetadata("JvmNameOnAccessorBlock.java")
+        public void testJvmNameOnAccessorBlock() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/JvmNameOnAccessorBlock.java");
+        }
+
+        @TestMetadata("JvmNameOriginalNameHidden.java")
+        public void testJvmNameOriginalNameHidden() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/JvmNameOriginalNameHidden.java");
+        }
+
+        @TestMetadata("JvmNamePrivateHidden.java")
+        public void testJvmNamePrivateHidden() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/JvmNamePrivateHidden.java");
+        }
+
+        @TestMetadata("JvmNameRedundantSameName.java")
+        public void testJvmNameRedundantSameName() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/JvmNameRedundantSameName.java");
+        }
+
+        @TestMetadata("JvmNameSetterRenamed.java")
+        public void testJvmNameSetterRenamed() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/JvmNameSetterRenamed.java");
+        }
+
+        @TestMetadata("JvmNameSetterRenamedGetterDefault.java")
+        public void testJvmNameSetterRenamedGetterDefault() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/JvmNameSetterRenamedGetterDefault.java");
+        }
+
+        @TestMetadata("JvmNameSuspendHidden.java")
+        public void testJvmNameSuspendHidden() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/JvmNameSuspendHidden.java");
+        }
+
+        @TestMetadata("LambdaParameter.java")
+        public void testLambdaParameter() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/LambdaParameter.java");
+        }
+
+        @TestMetadata("MemberExtensionHidden.java")
+        public void testMemberExtensionHidden() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/MemberExtensionHidden.java");
+        }
+
+        @TestMetadata("MultipleParams.java")
+        public void testMultipleParams() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/MultipleParams.java");
+        }
+
+        @TestMetadata("MutableExtensionProperty.java")
+        public void testMutableExtensionProperty() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/MutableExtensionProperty.java");
+        }
+
+        @TestMetadata("NoExtensionWrongType.java")
+        public void testNoExtensionWrongType() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/NoExtensionWrongType.java");
+        }
+
+        @TestMetadata("NoInstanceMethodDuplicate.java")
+        public void testNoInstanceMethodDuplicate() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/NoInstanceMethodDuplicate.java");
+        }
+
+        @TestMetadata("NoinlineParameter.java")
+        public void testNoinlineParameter() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/NoinlineParameter.java");
+        }
+
+        @TestMetadata("OperatorExtension.java")
+        public void testOperatorExtension() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/OperatorExtension.java");
+        }
+
+        @TestMetadata("PreferJava.java")
+        public void testPreferJava() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/PreferJava.java");
+        }
+
+        @TestMetadata("PreferJavaWithPrefix.java")
+        public void testPreferJavaWithPrefix() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/PreferJavaWithPrefix.java");
+        }
+
+        @TestMetadata("PrivateExtension.java")
+        public void testPrivateExtension() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/PrivateExtension.java");
+        }
+
+        @TestMetadata("PrivateSetterGetterStillShown.java")
+        public void testPrivateSetterGetterStillShown() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/PrivateSetterGetterStillShown.java");
+        }
+
+        @TestMetadata("PrivateSetterHidden.java")
+        public void testPrivateSetterHidden() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/PrivateSetterHidden.java");
+        }
+
+        @TestMetadata("SetterPartialAccessorPrefix.java")
+        public void testSetterPartialAccessorPrefix() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/SetterPartialAccessorPrefix.java");
+        }
+
+        @TestMetadata("SetterPrefixNoUnrelatedMatch.java")
+        public void testSetterPrefixNoUnrelatedMatch() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/SetterPrefixNoUnrelatedMatch.java");
+        }
+
+        @TestMetadata("SetterPrefixValAbsent.java")
+        public void testSetterPrefixValAbsent() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/SetterPrefixValAbsent.java");
+        }
+
+        @TestMetadata("SetterPrefixVarProperty.java")
+        public void testSetterPrefixVarProperty() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/SetterPrefixVarProperty.java");
+        }
+
+        @TestMetadata("SimpleFunction.java")
+        public void testSimpleFunction() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/SimpleFunction.java");
+        }
+
+        @TestMetadata("SimpleFunctionAtTop.java")
+        public void testSimpleFunctionAtTop() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/SimpleFunctionAtTop.java");
+        }
+
+        @TestMetadata("SimpleFunctionWithPrefix.java")
+        public void testSimpleFunctionWithPrefix() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/SimpleFunctionWithPrefix.java");
+        }
+
+        @TestMetadata("SmartCompletionMatchingReturn.java")
+        public void testSmartCompletionMatchingReturn() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/SmartCompletionMatchingReturn.java");
+        }
+
+        @TestMetadata("SmartCompletionMethodArgument.java")
+        public void testSmartCompletionMethodArgument() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/SmartCompletionMethodArgument.java");
+        }
+
+        @TestMetadata("SmartCompletionPropertyReturn.java")
+        public void testSmartCompletionPropertyReturn() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/SmartCompletionPropertyReturn.java");
+        }
+
+        @TestMetadata("ThisReceiver.java")
+        public void testThisReceiver() throws Exception {
+            runTest("../../completion/testData/inJava/extensions/ThisReceiver.java");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../completion/testData/inJava/suspend")
+    public static class Suspend extends AbstractK2KotlinInJavaCompletionTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("SuspendFunctionAlwaysLast.java")
+        public void testSuspendFunctionAlwaysLast() throws Exception {
+            runTest("../../completion/testData/inJava/suspend/SuspendFunctionAlwaysLast.java");
+        }
+
+        @TestMetadata("SuspendFunctionBelowNonTypeMatch.java")
+        public void testSuspendFunctionBelowNonTypeMatch() throws Exception {
+            runTest("../../completion/testData/inJava/suspend/SuspendFunctionBelowNonTypeMatch.java");
+        }
+
+        @TestMetadata("SuspendFunctionDeprioritized.java")
+        public void testSuspendFunctionDeprioritized() throws Exception {
+            runTest("../../completion/testData/inJava/suspend/SuspendFunctionDeprioritized.java");
+        }
+
+        @TestMetadata("SuspendFunctionWithProperty.java")
+        public void testSuspendFunctionWithProperty() throws Exception {
+            runTest("../../completion/testData/inJava/suspend/SuspendFunctionWithProperty.java");
+        }
+
+        @TestMetadata("SuspendFunctionsMultiple.java")
+        public void testSuspendFunctionsMultiple() throws Exception {
+            runTest("../../completion/testData/inJava/suspend/SuspendFunctionsMultiple.java");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../completion/testData/inJava")
+    public static class Uncategorized extends AbstractK2KotlinInJavaCompletionTest {
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }

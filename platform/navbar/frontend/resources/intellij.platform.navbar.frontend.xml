@@ -1,4 +1,5 @@
-<idea-plugin visibility="public" package="com.intellij.platform.navbar.frontend">
+<!--suppress MissingFrontendOrBackendRuntimeDependency -->
+<idea-plugin visibility="public">
   <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
     <module name="intellij.platform.analysis"/>

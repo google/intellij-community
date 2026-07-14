@@ -1,19 +1,16 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-package com.intellij.gradle.completion.kotlin
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+package com.intellij.gradle.completion.kotlin.tests.integration
 
 import com.intellij.testFramework.TestDataPath
 import org.gradle.util.GradleVersion
 import org.jetbrains.kotlin.idea.base.test.TestRoot
-import org.jetbrains.kotlin.idea.test.AssertKotlinPluginMode
-import org.jetbrains.kotlin.idea.test.UseK2PluginMode
 import org.jetbrains.kotlin.test.TestMetadata
 import org.jetbrains.plugins.gradle.testFramework.annotations.BaseGradleVersionSource
 import org.jetbrains.plugins.gradle.testFramework.fixtures.application.GradleProjectTestApplication
 import org.junit.jupiter.params.ParameterizedTest
 
-@UseK2PluginMode
+
 @GradleProjectTestApplication
-@AssertKotlinPluginMode
 @TestDataPath($$"$CONTENT_ROOT/testData")
 @TestRoot("completion/kotlin/tests/testData")
 @TestMetadata("buildGradleKts/plugins")

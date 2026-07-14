@@ -5,22 +5,23 @@ import com.intellij.openapi.observable.properties.AtomicProperty
 import com.intellij.openapi.options.SearchableConfigurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.setEmptyState
-import com.intellij.platform.ide.progress.withBackgroundProgress
+import com.intellij.platform.ide.progress.ModalTaskOwner
+import com.intellij.platform.ide.progress.TaskCancellation
+import com.intellij.platform.ide.progress.runWithModalProgressBlocking
 import com.intellij.ui.ToolbarDecorator
+import com.intellij.ui.components.fields.ExpandableTextField
 import com.intellij.ui.dsl.builder.Align
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.table.TableView
+import com.intellij.util.Function
 import com.intellij.util.ui.UIUtil
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle.message
 import org.jetbrains.kotlin.idea.configuration.KOTLIN_SCRIPTING_SETTINGS_ID
+import org.jetbrains.kotlin.idea.core.script.k2.definitions.DefinitionFromDependenciesProvider
 import org.jetbrains.kotlin.idea.core.script.k2.definitions.ScriptDefinitionProviderImpl
-import org.jetbrains.kotlin.idea.core.script.k2.definitions.ScriptTemplatesFromDependenciesDefinitionSource
 import org.jetbrains.kotlin.idea.core.script.shared.KotlinBaseScriptingBundle
-import org.jetbrains.kotlin.idea.core.script.shared.scriptDefinitionsSourceOfType
 import org.jetbrains.kotlin.scripting.definitions.ScriptDefinition
 import java.awt.Font
 import java.util.Objects.hash
@@ -28,7 +29,7 @@ import javax.swing.JComponent
 import javax.swing.ListSelectionModel
 import javax.swing.table.TableCellRenderer
 
-internal class KotlinScriptingSettingsConfigurable(val project: Project, val coroutineScope: CoroutineScope) : SearchableConfigurable {
+internal class KotlinScriptingSettingsConfigurable(val project: Project) : SearchableConfigurable {
     private val definitionsFromClassPathTitle = AtomicProperty("")
     private val explicitTemplateClassNamesProperty = AtomicProperty("")
     private val explicitTemplateClasspathProperty = AtomicProperty("")
@@ -51,25 +52,34 @@ internal class KotlinScriptingSettingsConfigurable(val project: Project, val cor
         }
     }
 
+    private val templateInputParser = Function<String, List<String>> { parseExplicitTemplateInput(it) }
+    private val templateInputJoiner = Function<List<String>, String> { it.joinToString("\n") }
+
     private val currentModels: List<ScriptDefinitionTableModel>
         get() = tableView.items.toList()
 
     override fun isModified(): Boolean = previousModificationStamp != currentModificationStamp
 
-    private fun initFromPersistedState() {
-        val state = ScriptDefinitionSettingsPersistentStateComponent.getInstance(project).state.copy()
+    private fun reloadTable() {
+        val state = ScriptDefinitionSettingsStateComponent.getInstance(project).state.copy()
 
-        val models = ScriptDefinitionProviderImpl.getInstance(project).definitionsFromSources.sortedBy {
-            state.getScriptDefinitionOrder(it)
-        }.map {
-            ScriptDefinitionTableModel(
-                id = it.definitionId,
-                name = it.name,
-                pattern = (it as? ScriptDefinition.FromConfigurationsBase)?.fileNamePattern
-                    ?: (it as? ScriptDefinition.FromConfigurationsBase)?.filePathPattern ?: ("." + it.fileExtension),
-                canBeSwitchedOff = it.canDefinitionBeSwitchedOff,
-                isEnabled = state.isScriptDefinitionEnabled(it)
-            )
+        val models = runWithModalProgressBlocking(
+            ModalTaskOwner.guess(),
+            KotlinBaseScriptingBundle.message("looking.for.script.definitions.in.classpath"),
+            TaskCancellation.cancellable()
+        ) {
+            ScriptDefinitionProviderImpl.getInstance(project).definitionsFromSources.sortedBy {
+                state.getScriptDefinitionOrder(it)
+            }.map {
+                ScriptDefinitionTableModel(
+                    id = it.definitionId,
+                    name = it.name,
+                    pattern = (it as? ScriptDefinition.FromConfigurationsBase)?.fileNamePattern
+                        ?: (it as? ScriptDefinition.FromConfigurationsBase)?.filePathPattern ?: ("." + it.fileExtension),
+                    canBeSwitchedOff = it.canDefinitionBeSwitchedOff,
+                    isEnabled = state.isScriptDefinitionEnabled(it)
+                )
+            }
         }
 
         tableView.stopEditing()
@@ -84,114 +94,81 @@ internal class KotlinScriptingSettingsConfigurable(val project: Project, val cor
     }
 
     override fun reset() {
-        initFromPersistedState()
+        reloadTable()
     }
 
     override fun createComponent(): JComponent {
-        initFromPersistedState()
+        reloadTable()
 
         return panel {
             group(message("kotlin.script.definitions.title"), false) {
                 row {
-                    cell(ToolbarDecorator.createDecorator(tableView).disableAddAction().disableRemoveAction().createPanel()).align(Align.FILL)
+                    cell(
+                        ToolbarDecorator.createDecorator(tableView).disableAddAction().disableRemoveAction().createPanel()
+                    ).align(Align.FILL)
                     rowComment(message("text.first.definition.that.matches.script.pattern.extension.applied.starting.from.top"))
                 }
             }
 
-            collapsibleGroup(KotlinBaseScriptingBundle.message("border.title.custom.scripting.loading"), false) {
+            group(KotlinBaseScriptingBundle.message("border.title.custom.scripting.loading"), false) {
                 val labelGroup = "custom-definition-labels"
 
                 row {
                     label(KotlinBaseScriptingBundle.message("script.definition.template.classes.to.load.explicitly")).widthGroup(labelGroup)
-                    textField().align(AlignX.FILL).bindText(explicitTemplateClassNamesProperty).applyToComponent {
-                        emptyText.text = "com.example.MyDefinition"
-                    }
+                    cell(ExpandableTextField(templateInputParser, templateInputJoiner))
+                        .align(AlignX.FILL)
+                        .bindText(explicitTemplateClassNamesProperty)
+                        .applyToComponent { emptyText.text = "com.example.CustomScript" }
                 }
 
                 row {
                     label(KotlinBaseScriptingBundle.message("classpath.required.for.loading.script.definition.template.classes")).widthGroup(
                         labelGroup
                     )
-                    textField().align(AlignX.FILL).bindText(explicitTemplateClasspathProperty)
+                    cell(ExpandableTextField(templateInputParser, templateInputJoiner))
+                        .align(AlignX.FILL)
+                        .bindText(explicitTemplateClasspathProperty)
                         .applyToComponent { emptyText.text = "/path/to/script-definition.jar" }
                 }
 
                 row {
-                    button(KotlinBaseScriptingBundle.message("button.search.definitions")) {
-                        coroutineScope.launch {
-                            searchDefinitions()
-                        }
-                    }
-                }
-
-                row {
                     label("").bindText(definitionsFromClassPathTitle)
-                    rowComment(KotlinBaseScriptingBundle.message("text.searches.project.classpath.for.known.script.definition.classes.or.marker.files"))
+                    rowComment(KotlinBaseScriptingBundle.message("info.text.kotlin.scripting.update.definitions.on.apply"))
                 }
             }
         }
-    }
-
-    private suspend fun searchDefinitions() {
-        val explicitTemplateClassNames = explicitTemplateClassNamesProperty.get()
-        val explicitTemplateClasspath = explicitTemplateClasspathProperty.get()
-
-        val templateClassNames: List<String> = explicitTemplateClassNames.split(*delimeters).map { it.trim() }.filter { it.isNotEmpty() }
-        val classpath: List<String> = explicitTemplateClasspath.split(*delimeters).map { it.trim() }.filter { it.isNotEmpty() }
-
-        val definitionsFromClassPath = withBackgroundProgress(
-            project, title = KotlinBaseScriptingBundle.message("looking.for.script.definitions.in.classpath")
-        ) {
-            project.scriptDefinitionsSourceOfType<ScriptTemplatesFromDependenciesDefinitionSource>()
-                ?.searchForDefinitions(templateClassNames, classpath)
-        } ?: emptyList()
-
-        definitionsFromClassPathTitle.set(
-            definitionsFromClassPath.joinToString(
-                prefix = "<html>${
-                    KotlinBaseScriptingBundle.message(
-                        "label.kotlin.script.one.definitions.found", definitionsFromClassPath.size
-                    )
-                }<br>", separator = "<br>", postfix = "</html>"
-            ) {
-                "<code>${it.baseClassType.typeName}</code>"
-            })
-
-        ScriptDefinitionSettingsPersistentStateComponent.getInstance(project).updateSettings {
-            it.copy(
-                explicitTemplateClassNames = explicitTemplateClassNames, explicitTemplateClasspath = explicitTemplateClasspath
-            )
-        }
-
-        val newModels = (definitionsFromClassPath.map {
-            ScriptDefinitionTableModel(
-                id = it.definitionId,
-                name = it.name,
-                pattern = (it as? ScriptDefinition.FromConfigurationsBase)?.fileNamePattern
-                    ?: (it as? ScriptDefinition.FromConfigurationsBase)?.filePathPattern
-                    ?: ("." + it.fileExtension),
-                canBeSwitchedOff = it.canDefinitionBeSwitchedOff,
-                isEnabled = true
-            )
-        } + currentModels).distinct()
-
-        tableView.stopEditing()
-        tableView.listTableModel.setItems(newModels)
-        tableView.visibleRowCount = newModels.size + 1
-        tableView.tableViewModel.fireTableDataChanged()
     }
 
     override fun apply() {
         if (isModified) {
-            ScriptDefinitionSettingsPersistentStateComponent.getInstance(project).updateSettings {
-                ScriptDefinitionSettingsPersistentStateComponent.State(
-                    currentModels.map {
-                        ScriptDefinitionSettingsPersistentStateComponent.DefinitionSetting(it.name, it.id, it.isEnabled)
+            val explicitTemplateClassNames = explicitTemplateClassNamesProperty.get()
+            val explicitTemplateClasspath = explicitTemplateClasspathProperty.get()
+
+            ScriptDefinitionSettingsStateComponent.getInstance(project).update {
+                ScriptDefinitionSettingsStateComponent.State(
+                    currentModels.map { model ->
+                        ScriptDefinitionSettingsStateComponent.DefinitionSetting(model.name, model.id, model.isEnabled)
                     },
-                    explicitTemplateClassNamesProperty.get(),
-                    explicitTemplateClasspathProperty.get(),
+                    explicitTemplateClassNames,
+                    explicitTemplateClasspath,
                 )
             }
+
+            reloadTable()
+            val currentDefinitionIds = currentModels.map { it.id }
+            val foundFqns = DefinitionFromDependenciesProvider(project).getDefinitionClasses()
+                .filter { it in currentDefinitionIds }.toList()
+
+            definitionsFromClassPathTitle.set(
+                foundFqns.joinToString(
+                    prefix = "<html>${
+                        KotlinBaseScriptingBundle.message(
+                            "label.kotlin.script.one.definitions.found", foundFqns.size
+                        )
+                    }<br>", separator = "<br>", postfix = "</html>"
+                ) {
+                    "<code>$it</code>"
+                })
 
             previousModificationStamp = currentModificationStamp
         }
@@ -200,6 +177,4 @@ internal class KotlinScriptingSettingsConfigurable(val project: Project, val cor
     override fun getDisplayName(): String = message("script.name.kotlin.scripting")
 
     override fun getId(): String = KOTLIN_SCRIPTING_SETTINGS_ID
-
-    private val delimeters = arrayOf(":", ",", ";", "\n", "\t", " ")
 }

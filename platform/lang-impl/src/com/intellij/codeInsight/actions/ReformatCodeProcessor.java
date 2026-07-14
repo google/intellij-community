@@ -35,6 +35,7 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.codeStyle.ChangedRangesInfo;
 import com.intellij.psi.codeStyle.CodeStyleManager;
+import com.intellij.psi.codeStyle.CodeStyleSettings;
 import com.intellij.psi.impl.source.codeStyle.CodeFormatterFacade;
 import com.intellij.psi.impl.source.codeStyle.CodeFormattingData;
 import com.intellij.util.IncorrectOperationException;
@@ -160,11 +161,8 @@ public class ReformatCodeProcessor extends AbstractLayoutCodeProcessor {
     }
 
     boolean doNotKeepLineBreaks = confirmSecondReformat(psiFile);
-    // Resolve file settings outside the WriteCommandAction. CodeStyleCachedValueProvider
-    // computes settings asynchronously when first requested from EDT/under a write
-    // action, so a cold lookup inside the FutureTask body would return stale defaults
-    // and skip .editorconfig modifiers.
-    final var fileSettings = CodeStyle.getSettings(fileToProcess);
+
+    CodeStyleSettings fileSettings = awaitFileCodeStyleSettings(fileToProcess);
     return new FutureTask<>(() -> {
       Ref<Boolean> result = new Ref<>();
       if (LOG.isDebugEnabled()) {

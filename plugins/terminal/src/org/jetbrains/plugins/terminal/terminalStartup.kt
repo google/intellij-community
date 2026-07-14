@@ -37,13 +37,12 @@ import com.jediterm.core.util.TermSize
 import com.jediterm.terminal.TtyConnector
 import com.pty4j.PtyProcess
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.plugins.terminal.startup.ShellExecCommand
 import org.jetbrains.plugins.terminal.startup.ShellExecCommandImpl
 import org.jetbrains.plugins.terminal.startup.WslShellExecCommand
 import org.jetbrains.plugins.terminal.util.ShellNameUtil
-import org.jetbrains.plugins.terminal.util.terminalApplicationScope
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
@@ -92,7 +91,7 @@ internal fun startProcess(
 internal fun buildStartupEelContext(workingDir: Path, shellCommand: List<String>): TerminalStartupEelContext {
   if (!shouldUseEelApi()) {
     return TerminalStartupEelContext(
-      workingDirectory = workingDir.asEelPath(LocalEelDescriptor),
+      workingDirectory = workingDir.asEelPath(),
       shellCommand = ShellExecCommandImpl(shellCommand),
       platform = localEel.platform,
     )
@@ -104,7 +103,7 @@ internal fun buildStartupEelContext(workingDir: Path, shellCommand: List<String>
     catch (e: Exception) {
       log.warn("Cannot find EelDescriptor", e)
       TerminalStartupEelContext(
-        workingDirectory = workingDir.asEelPath(LocalEelDescriptor),
+        workingDirectory = workingDir.asEelPath(),
         shellCommand = ShellExecCommandImpl(shellCommand),
         platform = localEel.platform,
       )
@@ -255,60 +254,8 @@ internal class ShellProcessHolder(
   val isPosix: Boolean get() = eelApi.platform.isPosix
 
   val ptyProcess: PtyProcess = eelProcess.convertToJavaProcess() as PtyProcess
-  private val shellPid: EelApi.Pid = eelProcess.pid
 
   val descriptor: EelDescriptor get() = eelApi.descriptor
-
-  fun terminatePosixShell() {
-    terminalApplicationScope().launch(Dispatchers.IO) {
-      if (!ptyProcess.isAlive) {
-        log.debug { "Shell process ${processInfo(ptyProcess)} is already terminated" }
-        return@launch
-      }
-      log.debug { "Sending SIGHUP to shell process ${processInfo(ptyProcess)}" }
-      val killProcess = try {
-        eelApi.exec.spawnProcess("kill").args("-HUP", shellPid.value.toString()).eelIt()
-      }
-      catch (e: ExecuteProcessException) {
-        log.warn("Unable to send SIGHUP to ${processInfo(ptyProcess)}", e)
-        return@launch
-      }
-      if (ptyProcess.awaitExit(5.seconds) == null) {
-        val killProcessResult = withTimeoutOrNull(1.seconds) {
-          killProcess.awaitProcessResult()
-        }
-        if (ptyProcess.isAlive) {
-          log.info("Shell process ${processInfo(ptyProcess)} hasn't been terminated by SIGHUP, performing forceful termination. " +
-                   "\"kill -HUP $shellPid\" => ${killProcessResult?.stringify()}")
-          ptyProcess.destroyForcibly()
-        }
-      }
-      val exitCode = ptyProcess.awaitExit(2.seconds)
-      if (exitCode != null) {
-        log.debug { "Shell process ${processInfo(ptyProcess)} has been terminated with exit code $exitCode" }
-      }
-      else {
-        log.warn("Shell process ${processInfo(ptyProcess)} has not been terminated!")
-      }
-    }
-  }
-
-  /**
-   * @return The exit value of the process if it exits within the timeout or null otherwise.
-   */
-  private suspend fun Process.awaitExit(timeout: kotlin.time.Duration): Int? {
-    return withTimeoutOrNull(timeout) {
-      this@awaitExit.awaitExit()
-    }
-  }
-
-  private fun processInfo(process: PtyProcess): String {
-    return "${process::class.java.name}($shellPid)"
-  }
-
-  private fun EelProcessExecutionResult.stringify(): String {
-    return "(exitCode=$exitCode, stdout=$stdoutString, stderr=$stderrString)"
-  }
 }
 
 private val log: Logger = logger<AbstractTerminalRunner<*>>()

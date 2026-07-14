@@ -6,6 +6,7 @@
     <module name="intellij.libraries.junit5"/>
     <module name="intellij.libraries.kotlinx.collections.immutable"/>
     <module name="intellij.libraries.kotlinx.coroutines.core"/>
+    <module name="intellij.libraries.semver"/>
     <module name="intellij.platform.analysis"/>
     <module name="intellij.platform.codeStyle"/>
     <module name="intellij.platform.core"/>
@@ -14,6 +15,7 @@
     <module name="intellij.platform.editor.ui"/>
     <module name="intellij.platform.execution"/>
     <module name="intellij.platform.execution.impl"/>
+    <module name="intellij.platform.experiment"/>
     <module name="intellij.platform.ide.core"/>
     <module name="intellij.platform.ide.impl"/>
     <module name="intellij.platform.indexing"/>

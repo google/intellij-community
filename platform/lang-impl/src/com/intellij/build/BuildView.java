@@ -10,7 +10,6 @@ import com.intellij.execution.actions.StopProcessAction;
 import com.intellij.execution.configurations.RunConfiguration;
 import com.intellij.execution.configurations.RunProfile;
 import com.intellij.execution.console.ConsoleViewWrapperBase;
-import com.intellij.execution.dashboard.RunDashboardManager;
 import com.intellij.execution.filters.Filter;
 import com.intellij.execution.filters.HyperlinkInfo;
 import com.intellij.execution.impl.ConsoleViewImpl;
@@ -20,9 +19,11 @@ import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.execution.runners.RunContentActionsContributor;
 import com.intellij.execution.ui.ConsoleView;
 import com.intellij.execution.ui.ConsoleViewContentType;
+import com.intellij.execution.ui.ConsoleViewWithDelegateKt;
 import com.intellij.execution.ui.ExecutionConsole;
 import com.intellij.execution.ui.ObservableConsoleView;
 import com.intellij.execution.ui.RunContentDescriptor;
+import com.intellij.execution.ui.RunContentManagerExtension;
 import com.intellij.ide.IdeBundle;
 import com.intellij.ide.OccurenceNavigator;
 import com.intellij.openapi.Disposable;
@@ -200,7 +201,7 @@ public class BuildView extends CompositeView<ExecutionConsole>
         ExecutionConsole consoleView =
           executionConsole instanceof ConsoleView ? wrapWithToolbar((ConsoleView)executionConsole) : executionConsole;
         addViewAndShowIfNeeded(consoleView, CONSOLE_VIEW_NAME, myViewManager.isConsoleEnabledByDefault(), false);
-        if (executionConsole instanceof ConsoleViewImpl consoleViewImpl) {
+        if (ConsoleViewWithDelegateKt.unwrapDelegate(executionConsole) instanceof ConsoleViewImpl consoleViewImpl) {
           consoleViewImpl.getEditor().setBorder(IdeBorderFactory.createBorder(SideBorder.RIGHT));
         }
         buildTree = false;
@@ -463,6 +464,9 @@ public class BuildView extends CompositeView<ExecutionConsole>
     BuildTreeConsoleView eventView = getEventView();
     if (eventView != null) return eventView;
     ExecutionConsole executionConsole = getConsoleView();
+    if (executionConsole != null) {
+      executionConsole = ConsoleViewWithDelegateKt.unwrapDelegate(executionConsole);
+    }
     if (executionConsole instanceof OccurenceNavigator) {
       return (OccurenceNavigator)executionConsole;
     }
@@ -503,7 +507,7 @@ public class BuildView extends CompositeView<ExecutionConsole>
     ExecutionEnvironment environment = myBuildDescriptor.getExecutionEnvironment();
     RunProfile runProfile = environment != null ? environment.getRunProfile() : null;
     return runProfile instanceof RunConfiguration configuration &&
-           RunDashboardManager.getInstance(myProject).isShowInDashboard(configuration) &&
+           RunContentManagerExtension.isShownInServicesIfAvailable(myProject, configuration) &&
            ExecutionManagerImpl.getDelegatedRunProfile(configuration) instanceof RunConfiguration;
   }
 

@@ -49,6 +49,7 @@ class PlatformReadWriteActionSupport : ReadWriteActionSupport {
   private val retryMarker: Any = ObjectUtils.sentinel("rw action")
 
   private val backgroundWriteActionDispatcher = Dispatchers.IO.limitedParallelism(1, "Background write action dispatcher")
+  private val backgroundWriteActionDumpDispatcher = Dispatchers.IO.limitedParallelism(1, "Dispatcher for dumping threads and coroutines for background write action")
 
   init {
     // init the write action counter listener
@@ -75,10 +76,21 @@ class PlatformReadWriteActionSupport : ReadWriteActionSupport {
     return InternalReadAction(constraints, undispatched, blocking, action).runReadAction()
   }
 
-  override fun <X, E : Throwable> computeCancellable(action: ThrowableComputable<X, E>): X {
+  override fun <X, E : Throwable> computeCancellableUnsafe(action: ThrowableComputable<X, E>): X {
     return cancellableReadAction {
       action.compute()
     }
+  }
+
+
+  private sealed interface ReadResultImpl<out R> : ReadResult<R> {
+    class WriteAction<out V>(val action: () -> V) : ReadResultImpl<V>
+    class Value<out V>(val value: V) : ReadResultImpl<V>
+  }
+
+  private object ReadAndWriteScopeImpl : ReadAndWriteScope {
+    override fun <R> value(value: R): ReadResultImpl<R> = ReadResultImpl.Value(value)
+    override fun <R> writeAction(action: () -> R): ReadResultImpl<R> = ReadResultImpl.WriteAction(action)
   }
 
   override suspend fun <X> executeReadAndWriteAction(
@@ -89,13 +101,16 @@ class PlatformReadWriteActionSupport : ReadWriteActionSupport {
   ): X {
     while (true) {
       val (readResult: ReadResult<X>, stamp: Long) = executeReadAction(constraints.toList(), undispatched = undispatched, blocking = false) {
-        Pair(ReadResult.Companion.action(), AsyncExecutionServiceImpl.getWriteActionCounter())
+        Pair(ReadAndWriteScopeImpl.action(), AsyncExecutionServiceImpl.getWriteActionCounter())
+      }
+      require(readResult is ReadResultImpl<X>) {
+        "Unexpected implementation of `ReadResult`: Expected ReadResultImpl, got ${readResult::class.simpleName}"
       }
       when (readResult) {
-        is ReadResult.Value -> {
+        is ReadResultImpl.Value -> {
           return readResult.value
         }
-        is ReadResult.WriteAction -> {
+        is ReadResultImpl.WriteAction -> {
           val lock = application.threadingSupport
           val writeResult = if (runWriteActionOnEdt || lock == null) {
             executeWriteActionOnEdt(stamp, readResult.action)
@@ -165,7 +180,7 @@ class PlatformReadWriteActionSupport : ReadWriteActionSupport {
     }
 
     return withContext(context) {
-      val dumpJob = if (useBackgroundWriteAction) launch {
+      val dumpJob = if (useBackgroundWriteAction) launch(backgroundWriteActionDumpDispatcher) {
         delay(10.seconds)
         val dump = ThreadDumper.getThreadDumpInfo(ThreadDumper.getThreadInfos(), false)
         val dumpDir = PathManager.getLogDir().resolve("bg-wa")

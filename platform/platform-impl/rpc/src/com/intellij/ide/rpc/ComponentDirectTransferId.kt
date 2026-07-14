@@ -2,8 +2,10 @@
 package com.intellij.ide.rpc
 
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.util.Disposer
+import com.intellij.ui.components.panels.Wrapper
 import com.intellij.util.concurrency.annotations.RequiresEdt
-import fleet.util.openmap.SerializedValue
+import fleet.openmap.SerializedValue
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import org.jetbrains.annotations.ApiStatus
@@ -25,8 +27,8 @@ import javax.swing.JComponent
 @ApiStatus.Internal
 @RequiresEdt
 fun JComponent.setupTransfer(disposable: Disposable): ComponentDirectTransferId {
-  val serializedValue = serializeToRpc(ComponentWithDisposable(this, disposable))
-  return ComponentDirectTransferId(serializedValue, this)
+  val localValue = ComponentWithDisposable(this, disposable)
+  return ComponentDirectTransferId(serializeToRpc(localValue), localValue)
 }
 
 /**
@@ -39,18 +41,24 @@ fun JComponent.setupTransfer(disposable: Disposable): ComponentDirectTransferId 
 @ApiStatus.Internal
 @RequiresEdt
 fun ComponentDirectTransferId.getComponent(): JComponent? {
-  return localComponent ?: deserializeFromRpc(serializedValue)
+  return localValue?.let {
+    Wrapper().apply {
+      if (Disposer.tryRegister(it.disposable) { setContent(null) }) {
+        setContent(it.component)
+      }
+    }
+  } ?: deserializeFromRpc(serializedValue)
 }
 
 /**
- * Id of the component that is created on the backend, but needs to be displayed on the frontend side.
+ * An id of the component that is created on the backend but needs to be displayed on the frontend side.
  *
  * @see JComponent.setupTransfer
  * @see ComponentDirectTransferId.getComponent
  */
 @ApiStatus.Internal
 @Serializable
-data class ComponentDirectTransferId(val serializedValue: SerializedValue?, @Transient val localComponent: JComponent? = null)
+data class ComponentDirectTransferId(val serializedValue: SerializedValue?, @Transient val localValue: ComponentWithDisposable? = null)
 
 @ApiStatus.Internal
 class ComponentWithDisposable(val component: JComponent, val disposable: Disposable)

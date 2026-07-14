@@ -7,6 +7,7 @@
     <module name="intellij.platform.backend"/>
     <module name="intellij.platform.vcs.shared"/>
     <module name="fleet.rhizomedb"/>
+    <module name="intellij.libraries.caffeine"/>
     <module name="intellij.libraries.fastutil"/>
     <module name="intellij.libraries.gson"/>
     <module name="intellij.libraries.guava"/>
@@ -14,6 +15,8 @@
     <module name="intellij.libraries.kotlinx.serialization.core"/>
     <module name="intellij.libraries.kotlinx.serialization.json"/>
     <module name="intellij.libraries.microba"/>
+    <module name="intellij.libraries.opentelemetry"/>
+    <module name="intellij.libraries.opentelemetry.semconv"/>
     <module name="intellij.platform.analysis"/>
     <module name="intellij.platform.analysis.impl"/>
     <module name="intellij.platform.builtInServer"/>
@@ -24,14 +27,18 @@
     <module name="intellij.platform.core.ui"/>
     <module name="intellij.platform.credentialStore"/>
     <module name="intellij.platform.diagnostic.telemetry"/>
+    <module name="intellij.platform.diff"/>
+    <module name="intellij.platform.diff.impl"/>
     <module name="intellij.platform.editor.ex"/>
     <module name="intellij.platform.editor.ui"/>
     <module name="intellij.platform.execution"/>
     <module name="intellij.platform.ide"/>
+    <module name="intellij.platform.ide.concurrency"/>
     <module name="intellij.platform.ide.core"/>
     <module name="intellij.platform.ide.core.plugins"/>
     <module name="intellij.platform.ide.impl"/>
     <module name="intellij.platform.indexing"/>
+    <module name="intellij.platform.kernel"/>
     <module name="intellij.platform.kernel.backend"/>
     <module name="intellij.platform.lang"/>
     <module name="intellij.platform.lang.core"/>
@@ -39,6 +46,7 @@
     <module name="intellij.platform.lvcs"/>
     <module name="intellij.platform.projectModel"/>
     <module name="intellij.platform.projectModel.impl"/>
+    <module name="intellij.platform.rpc.topics"/>
     <module name="intellij.platform.statistics"/>
     <module name="intellij.platform.util.coroutines"/>
     <module name="intellij.platform.util.diff"/>

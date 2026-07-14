@@ -1,6 +1,7 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.gradle.statistics.v2.flow
 
+import com.intellij.openapi.application.PathManager
 import org.junit.Test
 import java.io.File
 import java.security.MessageDigest
@@ -14,11 +15,11 @@ class KotlinBuildToolsFusEvenListTest {
         assert(duplicates.isEmpty()) { "Found duplicate event names: $duplicates" }
     }
 
-    private val GROUP_EXPECTED_VERSION_AND_HASH = Pair(9, "35777aa7d0ecfa0d6e02b8c301f710ec")
+    private val GROUP_EXPECTED_VERSION_AND_HASH = Pair(14, "e8ba220715accb9c7fba3a3cfb1efcfd")
 
     @Test
     fun checkGroupVersionVersion() {
-        val file = File("../src/org/jetbrains/kotlin/idea/gradle/statistics/v2/flow/kotlinBuildToolEvents.kt").normalize()
+        val file = File(PathManager.getCommunityHomePath() + "/plugins/kotlin/gradle/gradle/src/org/jetbrains/kotlin/idea/gradle/statistics/v2/flow/kotlinBuildToolEvents.kt").normalize()
         val actualGroupVersionAndHash =
             Pair(
                 KotlinBuildToolFusFlowCollector.group.version,

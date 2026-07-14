@@ -14,6 +14,7 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.editor.Caret;
 import com.intellij.openapi.editor.CaretModel;
@@ -529,6 +530,7 @@ public final class FindUtil {
     return replace(project, editor, offset, model, (range, replace) -> true);
   }
 
+  @ApiStatus.Internal
   public static boolean replace(@NotNull Project project, @NotNull Editor editor, int offset, @NotNull FindModel model, ReplaceDelegate delegate) {
     Document document = editor.getDocument();
 
@@ -939,6 +941,7 @@ public final class FindUtil {
     editor.getScrollingModel().scrollToCaret(scrollType);
   }
 
+  @ApiStatus.Internal
   @FunctionalInterface
   public interface ReplaceDelegate {
     boolean shouldReplace(TextRange range, String replace);
@@ -968,7 +971,7 @@ public final class FindUtil {
         UsageViewImpl impl = (view instanceof UsageViewImpl) ? (UsageViewImpl)view : null;
         for (T pointer : targets) {
           if (impl != null && impl.isDisposed()) break;
-          ApplicationManager.getApplication().runReadAction(() -> {
+          ReadAction.runBlocking(() -> {
             Usage usage = usageConverter.fun(pointer);
             if (usage != null) {
               view.appendUsage(usage);

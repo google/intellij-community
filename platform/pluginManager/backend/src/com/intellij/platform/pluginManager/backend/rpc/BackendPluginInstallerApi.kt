@@ -36,7 +36,7 @@ internal class BackendPluginInstallerApi : PluginInstallerApi {
 
   override suspend fun unloadDynamicPlugin(pluginId: PluginId, isUpdate: Boolean): Boolean {
     val pluginDescriptor = PluginManagerCore.findPlugin(pluginId)?.getMainDescriptor() ?: return false
-    return PluginInstaller.unloadDynamicPlugin(null, pluginDescriptor, isUpdate)
+    return PluginInstaller.unloadDynamicPlugin(pluginDescriptor)
   }
 
   override suspend fun resetSession(sessionId: String, removeSession: Boolean): Map<PluginId, Boolean> {
@@ -55,9 +55,9 @@ internal class BackendPluginInstallerApi : PluginInstallerApi {
     return channelFlow {
       withContext(Dispatchers.EDT) {
         val project = projectId?.findProjectOrNull()
-        InstallFromDiskAction.installPluginFromDisk(null, project, InstalledPluginsTableModel(project), PluginEnabler.HEADLESS, null) {
+        InstallFromDiskAction.installPluginFromDisk(null, project, InstalledPluginsTableModel(project), PluginEnabler.HEADLESS, null, {
           trySend(PluginInstalledFromDiskResult(PluginDescriptorConverter.toPluginDto(it.pluginDescriptor), it.restartNeeded))
-        }
+        }, { _, _ -> })
       }
     }
   }
@@ -134,12 +134,6 @@ internal class BackendPluginInstallerApi : PluginInstallerApi {
   override suspend fun allowLoadUnloadSynchronously(pluginId: PluginId): Boolean {
     val pluginDescriptor = PluginManagerCore.findPlugin(pluginId) ?: return false
     return DynamicPlugins.allowLoadUnloadSynchronously(pluginDescriptor)
-  }
-
-
-  override suspend fun allowLoadUnloadWithoutRestart(pluginId: String): Boolean {
-    val pluginDescriptor = PluginManagerCore.findPlugin(PluginId.getId(pluginId)) ?: return false
-    return DynamicPlugins.allowLoadUnloadWithoutRestart(pluginDescriptor)
   }
 }
 

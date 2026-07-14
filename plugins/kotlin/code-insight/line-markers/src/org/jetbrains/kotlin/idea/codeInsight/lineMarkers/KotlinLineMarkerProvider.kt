@@ -3,6 +3,7 @@
 package org.jetbrains.kotlin.idea.codeInsight.lineMarkers
 
 import com.intellij.codeInsight.daemon.DaemonBundle
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzerSettings
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler
 import com.intellij.codeInsight.daemon.LineMarkerInfo
 import com.intellij.codeInsight.daemon.NavigateAction
@@ -10,12 +11,17 @@ import com.intellij.codeInsight.daemon.impl.GutterTooltipBuilder
 import com.intellij.codeInsight.daemon.impl.InheritorsLineMarkerNavigator
 import com.intellij.codeInsight.navigation.GotoTargetHandler
 import com.intellij.openapi.actionSystem.IdeActions
+import com.intellij.openapi.editor.colors.CodeInsightColors
+import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.markup.GutterIconRenderer
+import com.intellij.openapi.editor.markup.SeparatorPlacement
+import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi.LambdaUtil
 import com.intellij.psi.PsiElement
 import com.intellij.psi.impl.source.tree.LeafPsiElement
 import com.intellij.psi.search.searches.FunctionalExpressionSearch
 import com.intellij.psi.search.searches.ReferencesSearch
+import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.ui.awt.RelativePoint
 import com.intellij.util.Function
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
@@ -27,8 +33,6 @@ import org.jetbrains.kotlin.asJava.toLightClass
 import org.jetbrains.kotlin.idea.base.psi.isEffectivelyActual
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeInsight.lineMarkers.dsl.collectHighlightingDslMarkers
-import org.jetbrains.kotlin.idea.codeInsight.lineMarkers.shared.AbstractKotlinLineMarkerProvider
-import org.jetbrains.kotlin.idea.codeInsight.lineMarkers.shared.LineMarkerInfos
 import org.jetbrains.kotlin.idea.findUsages.KotlinFindUsagesSupport
 import org.jetbrains.kotlin.idea.highlighter.markers.InheritanceMergeableLineMarkerInfo
 import org.jetbrains.kotlin.idea.highlighter.markers.KotlinGutterTooltipHelper
@@ -43,21 +47,59 @@ import org.jetbrains.kotlin.idea.searching.inheritors.hasAnyOverridings
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtCallableDeclaration
 import org.jetbrains.kotlin.psi.KtClass
+import org.jetbrains.kotlin.psi.KtClassInitializer
 import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.psi.KtDeclarationWithBody
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.psi.KtFunction
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
 import org.jetbrains.kotlin.psi.KtNamedFunction
+import org.jetbrains.kotlin.psi.KtObjectDeclaration
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
 import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
+import org.jetbrains.kotlin.psi.psiUtil.getPrevSiblingIgnoringWhitespaceAndComments
 import org.jetbrains.kotlin.psi.psiUtil.hasBody
 import org.jetbrains.kotlin.psi.psiUtil.isExpectDeclaration
 import java.awt.event.MouseEvent
 import java.util.concurrent.atomic.AtomicReference
 
 class KotlinLineMarkerProvider : AbstractKotlinLineMarkerProvider() {
+
+    override fun getName(): String = KotlinLineMarkersBundle.message("highlighter.name.kotlin.line.markers")
+
+    override fun getLineMarkerInfo(element: PsiElement): LineMarkerInfo<PsiElement>? {
+        if (DaemonCodeAnalyzerSettings.getInstance().SHOW_METHOD_SEPARATORS) {
+            if (element.canHaveSeparator()) {
+                val prevSibling = element.getPrevSiblingIgnoringWhitespaceAndComments()
+                if (prevSibling.canHaveSeparator() &&
+                    (element.wantsSeparator() || prevSibling?.wantsSeparator() == true)
+                ) {
+                    return createLineSeparatorByElement(element)
+                }
+            }
+        }
+
+        return null
+    }
+
+    private fun PsiElement?.canHaveSeparator(): Boolean =
+        this is KtFunction
+                || this is KtClassInitializer
+                || (this is KtProperty && !isLocal)
+                || ((this is KtObjectDeclaration && this.isCompanion()))
+
+    private fun PsiElement.wantsSeparator(): Boolean = this is KtFunction || StringUtil.getLineBreakCount(text) > 0
+
+    private fun createLineSeparatorByElement(element: PsiElement): LineMarkerInfo<PsiElement> {
+        val anchor = PsiTreeUtil.getDeepestFirst(element)
+
+        val info = LineMarkerInfo(anchor, anchor.textRange)
+        info.separatorColor = EditorColorsManager.getInstance().globalScheme.getColor(CodeInsightColors.METHOD_SEPARATORS_COLOR)
+        info.separatorPlacement = SeparatorPlacement.TOP
+        return info
+    }
 
     override fun doCollectSlowLineMarkers(elements: List<PsiElement>, result: LineMarkerInfos) {
         for (element in elements) {
@@ -208,18 +250,20 @@ private fun comparator(): Comparator<PsiElement> = Comparator.comparing { el ->
     presentation.presentableText + (if (containerText != null) " $containerText" else "")
 }
 
+private const val TOOLTIPS_LIMIT = 5
+
 object ClassInheritorsTooltip : Function<PsiElement, String> {
     override fun `fun`(element: PsiElement): String? {
         val ktClass = element.parent as? KtClass ?: return null
-        var inheritors = KotlinFindUsagesSupport.searchInheritors(ktClass, ktClass.useScope).take(5).toList()
+        var inheritors = KotlinFindUsagesSupport.searchInheritors(ktClass, ktClass.useScope).take(TOOLTIPS_LIMIT).toList()
         if (inheritors.isEmpty()) {
-            inheritors = if (ktClass.isExpectDeclaration()) ktClass.actualsForExpect().take(5).toList() else emptyList()
+            inheritors = if (ktClass.isExpectDeclaration()) ktClass.actualsForExpect().take(TOOLTIPS_LIMIT).toList() else emptyList()
         }
         if (inheritors.isEmpty()) {
             inheritors = findFunctionalExpressions(ktClass)
         }
         val isInterface = ktClass.isInterface()
-        if (inheritors.size == 5) {
+        if (inheritors.size == TOOLTIPS_LIMIT) {
             return if (isInterface) DaemonBundle.message("method.is.implemented.too.many") else DaemonBundle.message("class.is.subclassed.too.many")
         }
         val start =
@@ -235,7 +279,7 @@ object ClassInheritorsTooltip : Function<PsiElement, String> {
 private fun findFunctionalExpressions(ktClass: KtClass): List<PsiElement> {
     val lightClass = ktClass.toLightClass()
     if (lightClass != null && LambdaUtil.isFunctionalClass(lightClass)) {
-        return FunctionalExpressionSearch.search(lightClass, ktClass.useScope).asIterable().asSequence().take(5).toList()
+        return FunctionalExpressionSearch.search(lightClass, ktClass.useScope).asIterable().asSequence().take(TOOLTIPS_LIMIT).toList()
     }
     return emptyList()
 }
@@ -244,15 +288,15 @@ object CallableOverridingsTooltip : Function<PsiElement, String> {
     override fun `fun`(element: PsiElement): String? {
         val declaration = element.getParentOfType<KtCallableDeclaration>(false) ?: return null
         val klass = declaration.containingClassOrObject as? KtClass ?: return null
-        var overridings = KotlinFindUsagesSupport.searchOverriders(declaration, declaration.useScope).take(5).toList()
+        var overridings = KotlinFindUsagesSupport.searchOverriders(declaration, declaration.useScope).take(TOOLTIPS_LIMIT).toList()
         if (overridings.isEmpty()) {
-            overridings = declaration.actualsForExpect().take(5).toList()
+            overridings = declaration.actualsForExpect().take(TOOLTIPS_LIMIT).toList()
         }
         if (overridings.isEmpty()) {
             overridings = findFunctionalExpressions(klass)
         }
         val isAbstract = isAbstract(declaration, klass) || declaration.isExpectDeclaration()
-        if (overridings.size == 5) {
+        if (overridings.size == TOOLTIPS_LIMIT) {
             return if (isAbstract) DaemonBundle.message("method.is.implemented.too.many") else DaemonBundle.message("method.is.overridden.too.many")
         }
         else {

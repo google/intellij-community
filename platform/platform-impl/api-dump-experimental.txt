@@ -107,25 +107,6 @@ f:com.intellij.ide.plugins.PluginNode
 - f:getPROJECT_EP_NAME():com.intellij.openapi.extensions.ExtensionPointName
 f:com.intellij.ide.startup.StartupActionScriptManager
 - *s:addActionCommandsToBeginning(java.util.List):V
-*:com.intellij.ide.trustedProjects.TrustedProjectsListener
-- *sf:Companion:com.intellij.ide.trustedProjects.TrustedProjectsListener$Companion
-- sf:TOPIC:com.intellij.util.messages.Topic
-- onProjectTrusted(com.intellij.ide.trustedProjects.TrustedProjectsLocator$LocatedProject):V
-- onProjectTrusted(com.intellij.openapi.project.Project):V
-- onProjectTrustedFromNotification(com.intellij.openapi.project.Project):V
-- onProjectUntrusted(com.intellij.ide.trustedProjects.TrustedProjectsLocator$LocatedProject):V
-- onProjectUntrusted(com.intellij.openapi.project.Project):V
-- s:onceWhenProjectTrusted(com.intellij.openapi.Disposable,java.util.function.Consumer):V
-- s:onceWhenProjectTrusted(com.intellij.openapi.Disposable,kotlin.jvm.functions.Function1):V
-- s:onceWhenProjectTrusted(java.util.function.Consumer):V
-- s:onceWhenProjectTrusted(kotlin.jvm.functions.Function1):V
-*f:com.intellij.ide.trustedProjects.TrustedProjectsListener$Companion
-- f:onceWhenProjectTrusted(com.intellij.openapi.Disposable,java.util.function.Consumer):V
-- f:onceWhenProjectTrusted(com.intellij.openapi.Disposable,kotlin.jvm.functions.Function1):V
-- f:onceWhenProjectTrusted(java.util.function.Consumer):V
-- f:onceWhenProjectTrusted(kotlin.jvm.functions.Function1):V
-- bs:onceWhenProjectTrusted$default(com.intellij.ide.trustedProjects.TrustedProjectsListener$Companion,com.intellij.openapi.Disposable,java.util.function.Consumer,I,java.lang.Object):V
-- bs:onceWhenProjectTrusted$default(com.intellij.ide.trustedProjects.TrustedProjectsListener$Companion,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function1,I,java.lang.Object):V
 *f:com.intellij.ide.ui.PopupLocationTracker
 - <init>():V
 - s:canRectangleBeUsed(java.awt.Component,java.awt.Rectangle,com.intellij.ide.ui.ScreenAreaConsumer):Z
@@ -211,9 +192,6 @@ f:com.intellij.openapi.editor.ComponentInlayKt
 - f:paint(com.intellij.openapi.editor.Inlay,java.awt.Graphics,java.awt.Rectangle,com.intellij.openapi.editor.markup.TextAttributes):V
 f:com.intellij.openapi.editor.FileDropManagerKt
 - *sf:containsFileDropTargets(java.awt.datatransfer.DataFlavor[]):Z
-com.intellij.openapi.editor.ex.EditorEx
-- com.intellij.openapi.editor.Editor
-- *:getStickyLinesPanelHeight():I
 a:com.intellij.openapi.editor.ex.EditorGutterComponentEx
 - javax.swing.JComponent
 - com.intellij.openapi.editor.EditorGutter
@@ -327,6 +305,21 @@ f:com.intellij.openapi.editor.toolbar.floating.FloatingToolbarProvider$DefaultIm
 - setCaretPosition(I):V
 - setText(java.lang.String):V
 - setTextToFile(com.intellij.openapi.fileChooser.ex.FileLookup$LookupFile):V
+f:com.intellij.openapi.fileChooser.universal.FileBrowser
+- *sf:builder(com.intellij.openapi.fileChooser.FileChooserDescriptor,com.intellij.openapi.Disposable):com.intellij.openapi.fileChooser.universal.FileBrowser$Builder
+*f:com.intellij.openapi.fileChooser.universal.FileBrowser$Builder
+- f:build():com.intellij.openapi.fileChooser.universal.FileBrowserPanel
+- f:contributors(java.util.Collection):com.intellij.openapi.fileChooser.universal.FileBrowser$Builder
+- f:forProject(com.intellij.openapi.project.Project):V
+- f:onDefaultAction(java.lang.Runnable):com.intellij.openapi.fileChooser.universal.FileBrowser$Builder
+- f:popupActions(com.intellij.openapi.actionSystem.ActionGroup):com.intellij.openapi.fileChooser.universal.FileBrowser$Builder
+- f:root(java.nio.file.Path):Z
+- f:toolbarActions(com.intellij.openapi.actionSystem.ActionGroup):com.intellij.openapi.fileChooser.universal.FileBrowser$Builder
+*:com.intellij.openapi.fileChooser.universal.FileBrowserPanel
+- a:getSelectedFiles():java.util.List
+a:com.intellij.openapi.fileEditor.TextEditorWithPreviewProvider
+- com.intellij.openapi.fileEditor.AsyncFileEditorProvider
+- *p:createSplitEditorAsync(com.intellij.openapi.project.Project,com.intellij.openapi.fileEditor.TextEditor,com.intellij.openapi.fileEditor.FileEditor,kotlin.coroutines.Continuation):java.lang.Object
 a:com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
 - com.intellij.openapi.fileEditor.FileEditorManager
 - *f:openFile(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.fileEditor.ex.FileEditorOpenRequest):com.intellij.openapi.fileEditor.FileEditorComposite
@@ -389,29 +382,12 @@ c:com.intellij.openapi.options.ex.ConfigurableWrapper
 - a:openInChildProcess(java.nio.file.Path,kotlin.coroutines.Continuation):java.lang.Object
 f:com.intellij.openapi.project.impl.P3SupportKt
 - *sf:processPerProjectSupport():com.intellij.openapi.project.impl.P3Support
-*f:com.intellij.openapi.updateSettings.PluginUpdateCheckService
-- *sf:Companion:com.intellij.openapi.updateSettings.PluginUpdateCheckService$Companion
-- <init>():V
-- sf:getInstance():com.intellij.openapi.updateSettings.PluginUpdateCheckService
-- f:getPluginUpdate(com.intellij.openapi.extensions.PluginId,com.intellij.openapi.progress.ProgressIndicator):com.intellij.openapi.updateSettings.PluginUpdateInfo
-- bs:getPluginUpdate$default(com.intellij.openapi.updateSettings.PluginUpdateCheckService,com.intellij.openapi.extensions.PluginId,com.intellij.openapi.progress.ProgressIndicator,I,java.lang.Object):com.intellij.openapi.updateSettings.PluginUpdateInfo
-*f:com.intellij.openapi.updateSettings.PluginUpdateCheckService$Companion
-- f:getInstance():com.intellij.openapi.updateSettings.PluginUpdateCheckService
-*:com.intellij.openapi.updateSettings.PluginUpdateInfo
-*f:com.intellij.openapi.updateSettings.PluginUpdateInfo$CheckFailed
-- com.intellij.openapi.updateSettings.PluginUpdateInfo
-- f:getErrors():java.util.Map
-*f:com.intellij.openapi.updateSettings.PluginUpdateInfo$NoUpdate
-- com.intellij.openapi.updateSettings.PluginUpdateInfo
-*f:com.intellij.openapi.updateSettings.PluginUpdateInfo$UpdateAvailable
-- com.intellij.openapi.updateSettings.PluginUpdateInfo
-- f:getUpdate():com.intellij.openapi.updateSettings.impl.PluginDownloader
 *f:com.intellij.openapi.util.io.CancellableComputation
 - java.util.function.Function
 - *sf:Companion:com.intellij.openapi.util.io.CancellableComputation$Companion
 - apply(java.lang.Object):java.lang.Object
-- sf:computeCancellable(com.intellij.openapi.util.ThrowableComputable):java.lang.Object
-- sf:wrapAsCancellable(java.util.function.Function):java.util.function.Function
+- *sf:computeCancellable(com.intellij.openapi.util.ThrowableComputable):java.lang.Object
+- *sf:wrapAsCancellable(java.util.function.Function):java.util.function.Function
 *f:com.intellij.openapi.util.io.CancellableComputation$Companion
 - f:computeCancellable(com.intellij.openapi.util.ThrowableComputable):java.lang.Object
 - f:wrapAsCancellable(java.util.function.Function):java.util.function.Function
@@ -444,7 +420,7 @@ c:com.intellij.openapi.wm.impl.welcomeScreen.TabbedWelcomeScreen
 - <init>():V
 - a:assignTo(com.intellij.openapi.actionSystem.Presentation,kotlin.jvm.functions.Function2):V
 - a:canShow():Z
-- sf:followToolbarComponent(com.intellij.openapi.actionSystem.Presentation,javax.swing.JComponent,javax.swing.JComponent):V
+- *sf:followToolbarComponent(com.intellij.openapi.actionSystem.Presentation,javax.swing.JComponent,javax.swing.JComponent):V
 - p:followToolbarComponent(javax.swing.JComponent,javax.swing.JComponent,kotlin.jvm.functions.Function2):V
 - pf:getPointProvider():kotlin.jvm.functions.Function2
 - a:hideOrRepaint(javax.swing.JComponent):V
@@ -580,12 +556,15 @@ f:com.intellij.ui.dsl.builder.components.ValidationTooltipKt
 - s:getEntries():kotlin.enums.EnumEntries
 - s:valueOf(java.lang.String):com.intellij.ui.dsl.builder.components.ValidationType
 - s:values():com.intellij.ui.dsl.builder.components.ValidationType[]
+c:com.intellij.ui.popup.list.PopupListElementRenderer
+- com.intellij.ui.popup.list.GroupedItemsListRenderer
+- *p:isShowingTooltipForExtraButton():Z
 *f:com.intellij.util.ui.RestartDialogImpl
 - *sf:Companion:com.intellij.util.ui.RestartDialogImpl$Companion
 - <init>():V
-- sf:restartWithConfirmation():V
+- *sf:restartWithConfirmation():V
 - showRestartRequired():V
-- sf:showRestartRequired(Z,Z):I
+- *sf:showRestartRequired(Z,Z):I
 *f:com.intellij.util.ui.RestartDialogImpl$Companion
 - f:restartWithConfirmation():V
 - f:showRestartRequired(Z,Z):I

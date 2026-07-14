@@ -5,8 +5,8 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleLoadingRuleValue
 import com.intellij.platform.pluginSystem.testFramework.PluginSetTestBuilder
-import com.intellij.platform.testFramework.plugins.buildDir
 import com.intellij.platform.testFramework.plugins.content
+import com.intellij.platform.testFramework.plugins.installAt
 import com.intellij.platform.testFramework.plugins.module
 import com.intellij.platform.testFramework.plugins.plugin
 import com.intellij.platform.testFramework.plugins.pluginAlias
@@ -58,7 +58,7 @@ class PluginSetBuildersTest {
     fun `single plugin with no aliases succeeds`() {
       plugin("foo") {
         version = "1.0"
-      }.buildDir(pluginsDirPath.resolve("foo"))
+      }.installAt(pluginsDirPath)
 
       val plugins = discoverPlugins()
       val result = UnambiguousPluginSet.tryBuild(plugins)
@@ -81,7 +81,7 @@ class PluginSetBuildersTest {
       plugin("foo") {
         version = "1.0"
         pluginAliases = listOf("foo-alias-1", "foo-alias-2")
-      }.buildDir(pluginsDirPath.resolve("foo"))
+      }.installAt(pluginsDirPath)
 
       val plugins = discoverPlugins()
       val result = UnambiguousPluginSet.tryBuild(plugins)
@@ -107,9 +107,9 @@ class PluginSetBuildersTest {
 
     @Test
     fun `multiple plugins with unique IDs succeed`() {
-      plugin("foo") { version = "1.0" }.buildDir(pluginsDirPath.resolve("foo"))
-      plugin("bar") { version = "1.0" }.buildDir(pluginsDirPath.resolve("bar"))
-      plugin("baz") { version = "1.0" }.buildDir(pluginsDirPath.resolve("baz"))
+      plugin("foo") { version = "1.0" }.installAt(pluginsDirPath)
+      plugin("bar") { version = "1.0" }.installAt(pluginsDirPath)
+      plugin("baz") { version = "1.0" }.installAt(pluginsDirPath)
 
       val plugins = discoverPlugins()
       val result = UnambiguousPluginSet.tryBuild(plugins)
@@ -137,7 +137,7 @@ class PluginSetBuildersTest {
             // no alias
           }
         }
-      }.buildDir(pluginsDirPath.resolve("foo"))
+      }.installAt(pluginsDirPath)
 
       val plugins = discoverPlugins()
       val result = UnambiguousPluginSet.tryBuild(plugins)
@@ -166,8 +166,8 @@ class PluginSetBuildersTest {
 
     @Test
     fun `two plugins with same main ID return null`() {
-      plugin("foo") { version = "1.0" }.buildDir(pluginsDirPath.resolve("foo1"))
-      plugin("foo") { version = "2.0" }.buildDir(pluginsDirPath.resolve("foo2"))
+      plugin("foo") { version = "1.0" }.installAt(pluginsDirPath)
+      plugin("foo") { version = "2.0" }.installAt(pluginsDirPath)
 
       val plugins = discoverPlugins()
       val result = UnambiguousPluginSet.tryBuild(plugins)
@@ -180,12 +180,12 @@ class PluginSetBuildersTest {
       plugin("foo") {
         version = "1.0"
         pluginAliases = listOf("shared-alias")
-      }.buildDir(pluginsDirPath.resolve("foo"))
+      }.installAt(pluginsDirPath)
       
       plugin("bar") {
         version = "1.0"
         pluginAliases = listOf("shared-alias")
-      }.buildDir(pluginsDirPath.resolve("bar"))
+      }.installAt(pluginsDirPath)
 
       val plugins = discoverPlugins()
       val result = UnambiguousPluginSet.tryBuild(plugins)
@@ -195,12 +195,12 @@ class PluginSetBuildersTest {
 
     @Test
     fun `plugin main ID conflicts with another plugin alias returns null`() {
-      plugin("foo") { version = "1.0" }.buildDir(pluginsDirPath.resolve("foo"))
+      plugin("foo") { version = "1.0" }.installAt(pluginsDirPath)
       
       plugin("bar") {
         version = "1.0"
         pluginAliases = listOf("foo")
-      }.buildDir(pluginsDirPath.resolve("bar"))
+      }.installAt(pluginsDirPath)
 
       val plugins = discoverPlugins()
       val result = UnambiguousPluginSet.tryBuild(plugins)
@@ -213,7 +213,7 @@ class PluginSetBuildersTest {
       plugin("foo") {
         version = "1.0"
         pluginAliases = listOf("duplicate", "duplicate")
-      }.buildDir(pluginsDirPath.resolve("foo"))
+      }.installAt(pluginsDirPath)
 
       val plugins = discoverPlugins()
       val result = UnambiguousPluginSet.tryBuild(plugins)
@@ -228,14 +228,14 @@ class PluginSetBuildersTest {
         content(namespace = "shared") {
           module("shared.module", loadingRule = ModuleLoadingRuleValue.REQUIRED) {}
         }
-      }.buildDir(pluginsDirPath.resolve("foo"))
+      }.installAt(pluginsDirPath)
       
       plugin("bar") {
         version = "1.0"
         content(namespace = "shared") {
           module("shared.module", loadingRule = ModuleLoadingRuleValue.REQUIRED) {}
         }
-      }.buildDir(pluginsDirPath.resolve("bar"))
+      }.installAt(pluginsDirPath)
 
       val plugins = discoverPlugins()
       val result = UnambiguousPluginSet.tryBuild(plugins)
@@ -252,7 +252,7 @@ class PluginSetBuildersTest {
             pluginAlias("shared-alias")
           }
         }
-      }.buildDir(pluginsDirPath.resolve("foo"))
+      }.installAt(pluginsDirPath)
       
       plugin("bar") {
         version = "1.0"
@@ -261,7 +261,7 @@ class PluginSetBuildersTest {
             pluginAlias("shared-alias")
           }
         }
-      }.buildDir(pluginsDirPath.resolve("bar"))
+      }.installAt(pluginsDirPath)
 
       val plugins = discoverPlugins()
       val result = UnambiguousPluginSet.tryBuild(plugins)
@@ -271,7 +271,7 @@ class PluginSetBuildersTest {
 
     @Test
     fun `content module alias conflicts with plugin ID returns null`() {
-      plugin("foo") { version = "1.0" }.buildDir(pluginsDirPath.resolve("foo"))
+      plugin("foo") { version = "1.0" }.installAt(pluginsDirPath)
       
       plugin("bar") {
         version = "1.0"
@@ -280,7 +280,7 @@ class PluginSetBuildersTest {
             pluginAlias("foo")
           }
         }
-      }.buildDir(pluginsDirPath.resolve("bar"))
+      }.installAt(pluginsDirPath)
 
       val plugins = discoverPlugins()
       val result = UnambiguousPluginSet.tryBuild(plugins)
@@ -307,7 +307,7 @@ class PluginSetBuildersTest {
       plugin("foo") {
         version = "1.0"
         pluginAliases = listOf("foo-alias")
-      }.buildDir(pluginsDirPath.resolve("foo"))
+      }.installAt(pluginsDirPath)
 
       val plugins = discoverPlugins()
       val result = AmbiguousPluginSet.build(plugins)
@@ -329,8 +329,8 @@ class PluginSetBuildersTest {
 
     @Test
     fun `two plugins with same ID succeed - resolvePluginId returns both`() {
-      plugin("foo") { version = "1.0" }.buildDir(pluginsDirPath.resolve("foo1"))
-      plugin("foo") { version = "2.0" }.buildDir(pluginsDirPath.resolve("foo2"))
+      plugin("foo") { version = "1.0" }.installAt(pluginsDirPath)
+      plugin("foo") { version = "2.0" }.installAt(pluginsDirPath)
 
       val plugins = discoverPlugins()
       val result = AmbiguousPluginSet.build(plugins)
@@ -353,12 +353,12 @@ class PluginSetBuildersTest {
       plugin("foo") {
         version = "1.0"
         pluginAliases = listOf("shared-alias")
-      }.buildDir(pluginsDirPath.resolve("foo"))
+      }.installAt(pluginsDirPath)
       
       plugin("bar") {
         version = "1.0"
         pluginAliases = listOf("shared-alias")
-      }.buildDir(pluginsDirPath.resolve("bar"))
+      }.installAt(pluginsDirPath)
 
       val plugins = discoverPlugins()
       val result = AmbiguousPluginSet.build(plugins)
@@ -383,14 +383,14 @@ class PluginSetBuildersTest {
         content(namespace = "shared") {
           module("shared.module", loadingRule = ModuleLoadingRuleValue.REQUIRED) {}
         }
-      }.buildDir(pluginsDirPath.resolve("foo"))
+      }.installAt(pluginsDirPath)
       
       plugin("bar") {
         version = "1.0"
         content(namespace = "shared") {
           module("shared.module", loadingRule = ModuleLoadingRuleValue.REQUIRED) {}
         }
-      }.buildDir(pluginsDirPath.resolve("bar"))
+      }.installAt(pluginsDirPath)
 
       val plugins = discoverPlugins()
       val result = AmbiguousPluginSet.build(plugins)
@@ -413,22 +413,22 @@ class PluginSetBuildersTest {
       plugin("foo") {
         version = "1.0"
         pluginAliases = listOf("alias1", "shared")
-        content(namespace = "test") {
+        content(namespace = "custom") {
           module("foo.module", loadingRule = ModuleLoadingRuleValue.REQUIRED) {
             pluginAlias("module-alias")
           }
         }
-      }.buildDir(pluginsDirPath.resolve("foo"))
+      }.installAt(pluginsDirPath)
       
       plugin("bar") {
         version = "1.0"
         pluginAliases = listOf("alias2", "shared")
-        content(namespace = "test") {
+        content(namespace = "custom") {
           module("bar.module", loadingRule = ModuleLoadingRuleValue.REQUIRED) {
             pluginAlias("module-alias")
           }
         }
-      }.buildDir(pluginsDirPath.resolve("bar"))
+      }.installAt(pluginsDirPath)
 
       val plugins = discoverPlugins()
       val result = AmbiguousPluginSet.build(plugins)
@@ -452,19 +452,19 @@ class PluginSetBuildersTest {
       assertThat(pluginMapping[PluginId.getId("module-alias")]).hasSize(2)
       
       val contentMapping = result.buildFullContentModuleIdMapping()
-      assertThat(contentMapping[PluginModuleId("foo.module", "test")]).hasSize(1)
-      assertThat(contentMapping[PluginModuleId("bar.module", "test")]).hasSize(1)
+      assertThat(contentMapping[PluginModuleId("foo.module", "custom")]).hasSize(1)
+      assertThat(contentMapping[PluginModuleId("bar.module", "custom")]).hasSize(1)
     }
 
     @Test
     fun `resolve unknown ID returns empty sequence`() {
-      plugin("foo") { version = "1.0" }.buildDir(pluginsDirPath.resolve("foo"))
+      plugin("foo") { version = "1.0" }.installAt(pluginsDirPath)
 
       val plugins = discoverPlugins()
       val result = AmbiguousPluginSet.build(plugins)
 
       assertThat(result.resolvePluginId(PluginId.getId("unknown")).toList()).isEmpty()
-      assertThat(result.resolveContentModuleId(PluginModuleId("unknown", "test")).toList()).isEmpty()
+      assertThat(result.resolveContentModuleId(PluginModuleId("unknown", "custom")).toList()).isEmpty()
     }
 
     @Test
@@ -472,7 +472,7 @@ class PluginSetBuildersTest {
       plugin("foo") {
         version = "1.0"
         pluginAliases = listOf("duplicate", "duplicate")
-      }.buildDir(pluginsDirPath.resolve("foo"))
+      }.installAt(pluginsDirPath)
 
       val plugins = discoverPlugins()
       val result = AmbiguousPluginSet.build(plugins)

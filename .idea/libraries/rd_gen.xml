@@ -1,20 +1,20 @@
 <component name="libraryTable">
   <library name="rd-gen" type="repository">
-    <properties include-transitive-deps="false" maven-id="com.jetbrains.rd:rd-gen:2026.1.3">
+    <properties include-transitive-deps="false" maven-id="com.jetbrains.rd:rd-gen:2026.2.5">
       <verification>
-        <artifact url="file://$MAVEN_REPOSITORY$/com/jetbrains/rd/rd-gen/2026.1.3/rd-gen-2026.1.3.jar">
-          <sha256sum>f28d50ac7b687abf2e9759f4657daaf361c82be813365b5985a86c82d1b1ba8c</sha256sum>
+        <artifact url="file://$MAVEN_REPOSITORY$/com/jetbrains/rd/rd-gen/2026.2.5/rd-gen-2026.2.5.jar">
+          <sha256sum>b28993c1d9f286fac70d98f6dc19c4b0935e27547991bc1a3533befc84ef5e0a</sha256sum>
         </artifact>
       </verification>
     </properties>
     <CLASSES>
-      <root url="jar://$MAVEN_REPOSITORY$/com/jetbrains/rd/rd-gen/2026.1.3/rd-gen-2026.1.3.jar!/" />
+      <root url="jar://$MAVEN_REPOSITORY$/com/jetbrains/rd/rd-gen/2026.2.5/rd-gen-2026.2.5.jar!/" />
     </CLASSES>
     <JAVADOC>
-      <root url="jar://$MAVEN_REPOSITORY$/com/jetbrains/rd/rd-gen/2026.1.3/rd-gen-2026.1.3-javadoc.jar!/" />
+      <root url="jar://$MAVEN_REPOSITORY$/com/jetbrains/rd/rd-gen/2026.2.5/rd-gen-2026.2.5-javadoc.jar!/" />
     </JAVADOC>
     <SOURCES>
-      <root url="jar://$MAVEN_REPOSITORY$/com/jetbrains/rd/rd-gen/2026.1.3/rd-gen-2026.1.3-sources.jar!/" />
+      <root url="jar://$MAVEN_REPOSITORY$/com/jetbrains/rd/rd-gen/2026.2.5/rd-gen-2026.2.5-sources.jar!/" />
     </SOURCES>
   </library>
 </component>

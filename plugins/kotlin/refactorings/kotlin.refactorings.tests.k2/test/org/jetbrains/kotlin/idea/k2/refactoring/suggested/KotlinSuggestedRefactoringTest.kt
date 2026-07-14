@@ -10,29 +10,21 @@ import com.intellij.refactoring.suggested.SuggestedRefactoringExecution
 import com.intellij.refactoring.suggested.SuggestedRefactoringProviderImpl
 import com.intellij.refactoring.suggested._suggestedChangeSignatureNewParameterValuesForTests
 import org.jetbrains.kotlin.idea.KotlinFileType
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode
-import org.jetbrains.kotlin.idea.test.ExpectedPluginModeProvider
 import org.jetbrains.kotlin.idea.test.KotlinWithJdkAndRuntimeLightProjectDescriptor
-import org.jetbrains.kotlin.idea.test.setUpWithKotlinPlugin
 import org.jetbrains.kotlin.idea.test.withCustomCompilerOptions
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtFunction
 import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.resolve.ImportPath
 
-class KotlinSuggestedRefactoringTest : BaseSuggestedRefactoringTest(), ExpectedPluginModeProvider {
+class KotlinSuggestedRefactoringTest : BaseSuggestedRefactoringTest() {
     override val fileType: LanguageFileType
         get() = KotlinFileType.INSTANCE
 
-    override val pluginMode: KotlinPluginMode
-        get() = KotlinPluginMode.K2
-
     override fun setUp() {
-        setUpWithKotlinPlugin {
-            super.setUp()
-            _suggestedChangeSignatureNewParameterValuesForTests = {
-                SuggestedRefactoringExecution.NewParameterValue.Expression(KtPsiFactory(project).createExpression("default$it"))
-            }
+        super.setUp()
+        _suggestedChangeSignatureNewParameterValuesForTests = {
+            SuggestedRefactoringExecution.NewParameterValue.Expression(KtPsiFactory(project).createExpression("default$it"))
         }
     }
 
@@ -43,11 +35,13 @@ class KotlinSuggestedRefactoringTest : BaseSuggestedRefactoringTest(), ExpectedP
 
     override fun getProjectDescriptor() = KotlinWithJdkAndRuntimeLightProjectDescriptor.getInstance()
 
-    private fun doTestContextParameters(initialText: String,
-                                        expectedTextAfter: String,
-                                        usagesName: String,
-                                        expectedPresentation: String? = null,
-                                        editingActions: () -> Unit,) {
+    private fun doTestContextParameters(
+        initialText: String,
+        expectedTextAfter: String,
+        usagesName: String,
+        expectedPresentation: String? = null,
+        editingActions: () -> Unit,
+    ) {
         withCustomCompilerOptions("// COMPILER_ARGUMENTS: -Xcontext-parameters", project, module) {
             doTestChangeSignature(initialText, expectedTextAfter, usagesName, expectedPresentation, editingActions)
         }
@@ -128,14 +122,14 @@ class KotlinSuggestedRefactoringTest : BaseSuggestedRefactoringTest(), ExpectedP
                 context(p1: Int, p2: Any)
                 fun foo() {
                     with(1) {
-                        with(default0) {
+                        context(default0) {
                             foo()
                         }
                     }
                 }
                 context(p1: Int)
                 fun bar() {
-                    with(default0) {
+                    context(default0) {
                         foo()
                     }
                 }
@@ -184,6 +178,37 @@ class KotlinSuggestedRefactoringTest : BaseSuggestedRefactoringTest(), ExpectedP
             "usages",
         ) {
             deleteTextBeforeCaret(", p2: Any")
+        }
+    }
+
+    fun testRenameContextParameter() {
+        withCustomCompilerOptions("// COMPILER_ARGUMENTS: -Xcontext-parameters", this.project, this.module) {
+            doTestRename(
+                initialText = """
+                                abstract class Foo {
+                                    context(b<caret>: String)
+                                    abstract fun foo(a: String)
+                                }
+                
+                                class Bar : Foo() {
+                                    context(b: String) override fun foo(a: String) {}
+                                }
+                            """.trimIndent(),
+                textAfterRefactoring = """
+                                abstract class Foo {
+                                    context(bc: String)
+                                    abstract fun foo(a: String)
+                                }
+                                
+                                class Bar : Foo() {
+                                    context(bc: String) override fun foo(a: String) {}
+                                }
+                            """.trimIndent(),
+                oldName = "b",
+                newName = "bc"
+            ) {
+                type("c")
+            }
         }
     }
 
@@ -338,7 +363,7 @@ class KotlinSuggestedRefactoringTest : BaseSuggestedRefactoringTest(), ExpectedP
             "expect fun foo(p: <caret>Any)",
             "actual declarations",
 
-        ) {
+            ) {
             replaceTextAtCaret("String", "Any")
         }
     }
@@ -1224,113 +1249,113 @@ class KotlinSuggestedRefactoringTest : BaseSuggestedRefactoringTest(), ExpectedP
     }
 
     //TODO
-/*
-    fun testAddVarargModifier() {
-        doTestChangeSignature(
-            """
-                interface I {
-                    fun foo(<caret>p: Int)
-                }
-                    
-                class C : I {
-                    override fun foo(p: Int) {
+    /*
+        fun testAddVarargModifier() {
+            doTestChangeSignature(
+                """
+                    interface I {
+                        fun foo(<caret>p: Int)
                     }
-                }
-            """.trimIndent(),
-            """
-                interface I {
-                    fun foo(vararg <caret>p: Int)
-                }
-                    
-                class C : I {
-                    override fun foo(vararg p: Int) {
-                    }
-                }
-            """.trimIndent(),
-            { type("vararg ") },
-            expectedPresentation = """
-                Old:
-                  'fun '
-                  'foo'
-                  '('
-                  LineBreak('', true)
-                  Group:
-                    'p'
-                    ': '
-                    'Int'
-                  LineBreak('', false)
-                  ')'
-                New:
-                  'fun '
-                  'foo'
-                  '('
-                  LineBreak('', true)
-                  Group:
-                    'vararg' (added)
-                    ' '
-                    'p'
-                    ': '
-                    'Int'
-                  LineBreak('', false)
-                  ')'
-            """.trimIndent()
-        )
-    }
 
-    fun testRemoveVarargModifier() {
-        doTestChangeSignature(
-            """
-                interface I {
-                    fun foo(<caret>vararg p: Int)
-                }
-                    
-                class C : I {
-                    override fun foo(vararg p: Int) {
+                    class C : I {
+                        override fun foo(p: Int) {
+                        }
                     }
-                }
-            """.trimIndent(),
-            """
-                interface I {
-                    fun foo(<caret>p: Int)
-                }
-                    
-                class C : I {
-                    override fun foo(p: Int) {
+                """.trimIndent(),
+                """
+                    interface I {
+                        fun foo(vararg <caret>p: Int)
                     }
-                }
-            """.trimIndent(),
-            {
-                deleteStringAtCaret("vararg ")
-            },
-            expectedPresentation = """
-                Old:
-                  'fun '
-                  'foo'
-                  '('
-                  LineBreak('', true)
-                  Group:
-                    'vararg' (removed)
-                    ' '
-                    'p'
-                    ': '
-                    'Int'
-                  LineBreak('', false)
-                  ')'
-                New:
-                  'fun '
-                  'foo'
-                  '('
-                  LineBreak('', true)
-                  Group:
-                    'p'
-                    ': '
-                    'Int'
-                  LineBreak('', false)
-                  ')'
-            """.trimIndent()
-        )
-    }
-*/
+
+                    class C : I {
+                        override fun foo(vararg p: Int) {
+                        }
+                    }
+                """.trimIndent(),
+                { type("vararg ") },
+                expectedPresentation = """
+                    Old:
+                      'fun '
+                      'foo'
+                      '('
+                      LineBreak('', true)
+                      Group:
+                        'p'
+                        ': '
+                        'Int'
+                      LineBreak('', false)
+                      ')'
+                    New:
+                      'fun '
+                      'foo'
+                      '('
+                      LineBreak('', true)
+                      Group:
+                        'vararg' (added)
+                        ' '
+                        'p'
+                        ': '
+                        'Int'
+                      LineBreak('', false)
+                      ')'
+                """.trimIndent()
+            )
+        }
+
+        fun testRemoveVarargModifier() {
+            doTestChangeSignature(
+                """
+                    interface I {
+                        fun foo(<caret>vararg p: Int)
+                    }
+
+                    class C : I {
+                        override fun foo(vararg p: Int) {
+                        }
+                    }
+                """.trimIndent(),
+                """
+                    interface I {
+                        fun foo(<caret>p: Int)
+                    }
+
+                    class C : I {
+                        override fun foo(p: Int) {
+                        }
+                    }
+                """.trimIndent(),
+                {
+                    deleteStringAtCaret("vararg ")
+                },
+                expectedPresentation = """
+                    Old:
+                      'fun '
+                      'foo'
+                      '('
+                      LineBreak('', true)
+                      Group:
+                        'vararg' (removed)
+                        ' '
+                        'p'
+                        ': '
+                        'Int'
+                      LineBreak('', false)
+                      ')'
+                    New:
+                      'fun '
+                      'foo'
+                      '('
+                      LineBreak('', true)
+                      Group:
+                        'p'
+                        ': '
+                        'Int'
+                      LineBreak('', false)
+                      ')'
+                """.trimIndent()
+            )
+        }
+    */
 
     fun testSwapConstructorParameters() {
         doTestChangeSignature(
@@ -1432,7 +1457,7 @@ class KotlinSuggestedRefactoringTest : BaseSuggestedRefactoringTest(), ExpectedP
             type(", p1: Int")
         }
     }
-    
+
     fun testAddParameterWithFullyQualifiedType() {
         doTestChangeSignature(
             """
@@ -1684,7 +1709,8 @@ class KotlinSuggestedRefactoringTest : BaseSuggestedRefactoringTest(), ExpectedP
                     foo(2, 2 * 2)
                 }
             """.trimIndent(),
-            "usages")
+            "usages"
+        )
         {
             type(", p2: Int")
         }

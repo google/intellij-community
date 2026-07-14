@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.python.junit5Tests.framework.metaInfo
 
+import com.intellij.python.junit5Tests.framework.TestResourcePathResolver
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.TestDataPath
 import org.junit.jupiter.api.extension.BeforeAllCallback
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtensionContext
 import org.junit.jupiter.api.extension.ExtensionContext.Namespace
 import org.junit.jupiter.api.extension.ParameterContext
 import org.junit.jupiter.api.extension.ParameterResolver
+import org.junit.platform.commons.support.AnnotationSupport
 import java.nio.file.Path
 import kotlin.io.path.relativeTo
 import kotlin.jvm.optionals.getOrNull
@@ -27,7 +29,7 @@ internal fun ExtensionContext.resolveTestName(): String {
  * - Injects [TestClassInfoData] and [TestMethodInfoData] as parameters into test methods for easy use.
  * - Supports deriving test resource paths based on naming conventions and annotations.
  */
-internal class TestMetaInfoExtension : BeforeAllCallback, BeforeEachCallback, Extension, ParameterResolver {
+class TestMetaInfoExtension : BeforeAllCallback, BeforeEachCallback, Extension, ParameterResolver {
   companion object {
     fun ExtensionContext.getTestClassInfo(): TestClassInfoData {
       val store = getStore(Namespace.GLOBAL)
@@ -85,18 +87,44 @@ internal class TestMetaInfoExtension : BeforeAllCallback, BeforeEachCallback, Ex
   override fun beforeEach(context: ExtensionContext) {
     val explicitPath = context.getTestCaseFilePath()
 
-    val testCaseFilePath = if (explicitPath != null) explicitPath
+    val testCaseFilePath = if (explicitPath != null) {
+      explicitPath
+    }
     else {
       val testClassInfo = context.getTestClassInfo()
+      val testMethod = context.testMethod.get()
+      val testMetaInfo = AnnotationSupport
+        .findAnnotation(testMethod, TestMetaInfo::class.java)
+        .getOrNull()
+
+      if (testMetaInfo != null && testClassInfo.testDataPath == null) {
+        error(
+          "@TestMetaInfo on ${testMethod.declaringClass.name}#${testMethod.name} " +
+          "requires @TestDataPath on the test class to resolve '${testMetaInfo.resourcePath}'."
+        )
+      }
+
       testClassInfo.testDataPath?.let { testDataPath ->
         val testName = context.resolveTestName()
-        testClassInfo.getTestResourcePath(testName)?.relativeTo(testDataPath)
+
+        if (testMetaInfo != null) {
+          val resourceRaw = testMetaInfo.resourcePath
+          val resolvers = getCustomResolversOtherwiseDefault(context)
+          val substitutedPath = resolvers.fold(resourceRaw) { acc, r ->
+            r.resolve(acc, context, testName, testClassInfo)
+          }
+
+          val resolved = testDataPath.resolve(substitutedPath)
+                         ?: error("Test file $substitutedPath not found under $testDataPath")
+          resolved.relativeTo(testDataPath)
+        }
+        else {
+          testClassInfo.getTestResourcePath(testName)?.relativeTo(testDataPath)
+        }
       }
     }
 
-    val data = TestMethodInfoData(
-      testCaseRelativePath = testCaseFilePath
-    )
+    val data = TestMethodInfoData(testCaseRelativePath = testCaseFilePath)
     context.setTestMethodInfo(data)
   }
 
@@ -118,4 +146,43 @@ internal class TestMetaInfoExtension : BeforeAllCallback, BeforeEachCallback, Ex
 
     error("Not supported parameter received ${parameterContext.parameter.type}")
   }
+
+  private fun getCustomResolversOtherwiseDefault(context: ExtensionContext): List<TestResourcePathResolver> {
+    val testClass = context.testClass.orElse(null)
+    val testMethod = context.testMethod.orElse(null)
+
+    val chain = mutableListOf<TestResourcePathResolver>()
+
+    fun addResolver(anno: WithCustomTestResourcePathResolver?) {
+      anno?.let {
+        val constructor = it.value.java.getDeclaredConstructor()
+        constructor.isAccessible = true
+        chain += constructor.newInstance() as TestResourcePathResolver
+      }
+    }
+
+    addResolver(testClass?.let {
+      AnnotationSupport.findAnnotation(it, WithCustomTestResourcePathResolver::class.java).getOrNull()
+    })
+    addResolver(testMethod?.let {
+      AnnotationSupport.findAnnotation(it, WithCustomTestResourcePathResolver::class.java).getOrNull()
+    })
+
+    if (chain.isEmpty()) {
+      chain += DefaultTestNameResolver
+    }
+
+    return chain
+  }
+}
+
+internal object DefaultTestNameResolver : TestResourcePathResolver {
+  private const val TEST_NAME_TOKEN = $$"$TEST_NAME"
+
+  override fun resolve(
+    resourcePath: String,
+    context: ExtensionContext,
+    testName: String,
+    classInfo: TestClassInfoData,
+  ): String = resourcePath.replace(TEST_NAME_TOKEN, testName)
 }

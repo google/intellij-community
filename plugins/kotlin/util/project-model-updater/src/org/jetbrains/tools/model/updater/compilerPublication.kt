@@ -16,9 +16,10 @@ internal fun publishCompiler(preferences: GeneratorPreferences) {
     println("Publishing Kotlin compiler...")
 
     val exitCode = ProcessBuilder(
-        gradleWrapperExecutable,
+        *gradleWrapperExecutable,
         "publishIdeArtifacts",
         ":prepare:ide-plugin-dependencies:kotlin-dist-for-ide:publish",
+        "publishGradlePluginArtifacts",
         "-Ppublish.ide.plugin.dependencies=true",
         "-PdeployVersion=$BOOTSTRAP_VERSION",
         "-Pbuild.number=$BOOTSTRAP_VERSION",
@@ -58,8 +59,8 @@ internal val GeneratorPreferences.kotlinCompilerRepositoryRoot: Path
             .normalize()
     }
 
-private val gradleWrapperExecutable: String
+private val gradleWrapperExecutable: Array<String>
     get() {
         val isWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
-        return if (isWindows) "gradlew.bat" else "./gradlew"
+        return if (isWindows) arrayOf("cmd", "/c", "gradlew.bat") else arrayOf("./gradlew")
     }

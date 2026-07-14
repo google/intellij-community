@@ -11,10 +11,12 @@ import com.intellij.platform.workspace.storage.WorkspaceEntityBuilder
 import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceList
 import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceSet
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
+import org.jetbrains.kotlin.idea.core.script.k2.modules.impl.KotlinScriptLibraryEntityImpl
 
 @GeneratedCodeApiVersion(3)
 interface KotlinScriptLibraryEntityBuilder : WorkspaceEntityBuilder<KotlinScriptLibraryEntity> {
     override var entitySource: EntitySource
+    var scope: String
     var classes: MutableList<VirtualFileUrl>
     var usedInScripts: MutableSet<VirtualFileUrl>
     var sources: MutableSet<VirtualFileUrl>
@@ -22,13 +24,16 @@ interface KotlinScriptLibraryEntityBuilder : WorkspaceEntityBuilder<KotlinScript
 
 internal object KotlinScriptLibraryEntityType : EntityType<KotlinScriptLibraryEntity, KotlinScriptLibraryEntityBuilder>() {
     override val entityClass: Class<KotlinScriptLibraryEntity> get() = KotlinScriptLibraryEntity::class.java
+    override val entityImplBuilderClass: Class<*> get() = KotlinScriptLibraryEntityImpl.Builder::class.java
     operator fun invoke(
+        scope: String,
         classes: List<VirtualFileUrl>,
         usedInScripts: Set<VirtualFileUrl>,
         entitySource: EntitySource,
         init: (KotlinScriptLibraryEntityBuilder.() -> Unit)? = null,
     ): KotlinScriptLibraryEntityBuilder {
         val builder = builder()
+        builder.scope = scope
         builder.classes = classes.toMutableWorkspaceList()
         builder.usedInScripts = usedInScripts.toMutableWorkspaceSet()
         builder.entitySource = entitySource
@@ -45,8 +50,9 @@ fun MutableEntityStorage.modifyKotlinScriptLibraryEntity(
 @JvmOverloads
 @JvmName("createKotlinScriptLibraryEntity")
 fun KotlinScriptLibraryEntity(
+    scope: String,
     classes: List<VirtualFileUrl>,
     usedInScripts: Set<VirtualFileUrl>,
     entitySource: EntitySource,
     init: (KotlinScriptLibraryEntityBuilder.() -> Unit)? = null,
-): KotlinScriptLibraryEntityBuilder = KotlinScriptLibraryEntityType(classes, usedInScripts, entitySource, init)
+): KotlinScriptLibraryEntityBuilder = KotlinScriptLibraryEntityType(scope, classes, usedInScripts, entitySource, init)

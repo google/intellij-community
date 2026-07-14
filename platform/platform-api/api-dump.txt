@@ -382,8 +382,6 @@ f:com.intellij.featureStatistics.FeatureDescriptor
 - getUtilityScore():I
 - isNeedToBeShownInGuide():Z
 - isUnused():Z
-f:com.intellij.featureStatistics.FeatureStatisticsBundle
-- s:message(java.lang.String,java.lang.Object[]):java.lang.String
 c:com.intellij.featureStatistics.FeatureStatisticsBundleEP
 - com.intellij.serviceContainer.LazyExtensionInstance
 - com.intellij.openapi.extensions.PluginAware
@@ -582,10 +580,6 @@ pc:com.intellij.ide.HelpTooltip$OverTipMouseListener
 - mouseExited(java.awt.event.MouseEvent):V
 f:com.intellij.ide.HelpTooltipKt
 - sf:setToolTipText(javax.swing.JComponent,com.intellij.openapi.util.text.HtmlChunk):V
-f:com.intellij.ide.IdeBundle
-- sf:BUNDLE:java.lang.String
-- s:message(java.lang.String,java.lang.Object[]):java.lang.String
-- s:messagePointer(java.lang.String,java.lang.Object[]):java.util.function.Supplier
 f:com.intellij.ide.NewProjectWizardLegacy
 - <init>():V
 - s:isAvailable():Z
@@ -638,6 +632,7 @@ f:com.intellij.ide.Prefs
 - s:putInt(java.lang.String,I):V
 - s:putLong(java.lang.String,J):V
 - s:remove(java.lang.String):V
+- s:sync(java.lang.String):V
 a:com.intellij.ide.RemoteDesktopService
 - <init>():V
 - s:getInstance():com.intellij.ide.RemoteDesktopService
@@ -1394,13 +1389,6 @@ f:com.intellij.ide.wizard.AbstractWizard$TallImageComponent
 - getPreferredSize():java.awt.Dimension
 - paintIcon(java.awt.Graphics):V
 - setIcon(javax.swing.Icon):V
-f:com.intellij.idea.ActionsBundle
-- sf:IDEA_ACTIONS_BUNDLE:java.lang.String
-- s:actionDescription(java.lang.String):java.lang.String
-- s:actionText(java.lang.String):java.lang.String
-- s:groupText(java.lang.String):java.lang.String
-- s:message(java.lang.String,java.lang.Object[]):java.lang.String
-- s:messagePointer(java.lang.String,java.lang.Object[]):java.util.function.Supplier
 f:com.intellij.internal.inspector.PropertyBean
 - sf:Companion:com.intellij.internal.inspector.PropertyBean$Companion
 - <init>(java.lang.String,java.lang.Object):V
@@ -1441,18 +1429,17 @@ com.intellij.internal.inspector.UiInspectorTableRendererContextProvider
 - a:getUiInspectorContext(javax.swing.JTable,java.lang.Object,I,I):java.util.List
 com.intellij.internal.inspector.UiInspectorTreeRendererContextProvider
 - a:getUiInspectorContext(javax.swing.JTree,java.lang.Object,I):java.util.List
-c:com.intellij.internal.performanceTests.DummyProjectInitializationDiagnosticService
-- com.intellij.internal.performanceTests.ProjectInitializationDiagnosticService
-- <init>():V
-- isProjectInitializationAndIndexingFinished():Z
-- registerBeginningOfInitializationActivity(java.util.function.Supplier):com.intellij.internal.performanceTests.ProjectInitializationDiagnosticService$ActivityTracker
-com.intellij.internal.performanceTests.ProjectInitializationDiagnosticService
-- s:getInstance(com.intellij.openapi.project.Project):com.intellij.internal.performanceTests.ProjectInitializationDiagnosticService
-- a:isProjectInitializationAndIndexingFinished():Z
-- a:registerBeginningOfInitializationActivity(java.util.function.Supplier):com.intellij.internal.performanceTests.ProjectInitializationDiagnosticService$ActivityTracker
-- s:registerTracker(com.intellij.openapi.project.Project,java.lang.String):com.intellij.internal.performanceTests.ProjectInitializationDiagnosticService$ActivityTracker
-com.intellij.internal.performanceTests.ProjectInitializationDiagnosticService$ActivityTracker
+f:com.intellij.internal.performanceTests.ProjectInitializationDiagnostic
+- s:isProjectInitializationAndIndexingFinished(com.intellij.openapi.project.Project):Z
+- s:registerTracker(com.intellij.openapi.project.Project,java.lang.String):com.intellij.internal.performanceTests.ProjectInitializationDiagnostic$ActivityTracker
+com.intellij.internal.performanceTests.ProjectInitializationDiagnostic$ActivityTracker
 - a:activityFinished():V
+com.intellij.internal.performanceTests.ProjectInitializationDiagnosticHandler
+- sf:Companion:com.intellij.internal.performanceTests.ProjectInitializationDiagnosticHandler$Companion
+- a:isProjectInitializationAndIndexingFinished(com.intellij.openapi.project.Project):Z
+- a:registerBeginningOfInitializationActivity(com.intellij.openapi.project.Project,java.util.function.Supplier):com.intellij.internal.performanceTests.ProjectInitializationDiagnostic$ActivityTracker
+f:com.intellij.internal.performanceTests.ProjectInitializationDiagnosticHandler$Companion
+- f:getEP_NAME():com.intellij.openapi.extensions.ExtensionPointName
 f:com.intellij.lang.StdLanguages
 - sf:JAVA:com.intellij.lang.Language
 - sf:XML:com.intellij.lang.Language
@@ -2033,10 +2020,6 @@ c:com.intellij.openapi.editor.DocumentFragment
 - getDocument():com.intellij.openapi.editor.Document
 - getTextRange():com.intellij.openapi.util.TextRange
 - hashCode():I
-f:com.intellij.openapi.editor.EditorBundle
-- sf:BUNDLE:java.lang.String
-- s:message(java.lang.String,java.lang.Object[]):java.lang.String
-- s:messagePointer(java.lang.String,java.lang.Object[]):java.util.function.Supplier
 a:com.intellij.openapi.editor.EditorCopyPasteHelper
 - sf:TRIM_TEXT_ON_PASTE_KEY:java.lang.String
 - <init>():V
@@ -2411,10 +2394,6 @@ com.intellij.openapi.ide.SmartSelectProvider
 - a:getSource(com.intellij.openapi.actionSystem.DataContext):java.lang.Object
 - a:increaseSelection(java.lang.Object):V
 - isEnabled(com.intellij.openapi.actionSystem.DataContext):Z
-f:com.intellij.openapi.keymap.KeyMapBundle
-- sf:BUNDLE:java.lang.String
-- s:message(java.lang.String,java.lang.Object[]):java.lang.String
-- s:messagePointer(java.lang.String,java.lang.Object[]):java.util.function.Supplier
 com.intellij.openapi.keymap.Keymap
 - com.intellij.openapi.options.Scheme
 - a:addShortcut(java.lang.String,com.intellij.openapi.actionSystem.Shortcut):V
@@ -4058,6 +4037,7 @@ c:com.intellij.openapi.ui.Messages$InputDialog
 - com.intellij.openapi.ui.messages.MessageDialog
 - sf:INPUT_DIALOG_COLUMNS:I
 - p:myField:javax.swing.text.JTextComponent
+- <init>(com.intellij.openapi.project.Project,java.awt.Component,java.lang.String,java.lang.String,javax.swing.Icon,java.lang.String,com.intellij.openapi.ui.InputValidator,java.lang.String[],I,java.lang.String):V
 - <init>(com.intellij.openapi.project.Project,java.lang.String,java.lang.String,javax.swing.Icon,java.lang.String,com.intellij.openapi.ui.InputValidator):V
 - <init>(com.intellij.openapi.project.Project,java.lang.String,java.lang.String,javax.swing.Icon,java.lang.String,com.intellij.openapi.ui.InputValidator,java.lang.String[],I):V
 - <init>(com.intellij.openapi.project.Project,java.lang.String,java.lang.String,javax.swing.Icon,java.lang.String,com.intellij.openapi.ui.InputValidator,java.lang.String[],I,java.lang.String):V
@@ -4429,6 +4409,7 @@ c:com.intellij.openapi.ui.messages.MessageDialog
 - <init>(com.intellij.openapi.project.Project,java.awt.Component,java.lang.String,java.lang.String,java.lang.String[],I,I,javax.swing.Icon,com.intellij.openapi.ui.DoNotAskOption,Z):V
 - <init>(com.intellij.openapi.project.Project,java.awt.Component,java.lang.String,java.lang.String,java.lang.String[],I,I,javax.swing.Icon,com.intellij.openapi.ui.DoNotAskOption,Z,java.lang.String):V
 - <init>(com.intellij.openapi.project.Project,java.awt.Component,java.lang.String,java.lang.String,java.lang.String[],I,I,javax.swing.Icon,com.intellij.openapi.ui.DoNotAskOption,Z,java.lang.String,java.lang.String,com.intellij.openapi.ui.ExitActionType[]):V
+- p:<init>(com.intellij.openapi.project.Project,java.awt.Component,Z):V
 - <init>(com.intellij.openapi.project.Project,java.lang.String,java.lang.String,java.lang.String[],I,javax.swing.Icon,Z):V
 - <init>(com.intellij.openapi.project.Project,Z):V
 - <init>(java.lang.String,java.lang.String,java.lang.String[],I,javax.swing.Icon):V
@@ -4621,6 +4602,7 @@ com.intellij.openapi.ui.popup.ComponentPopupBuilder
 - a:setDimensionServiceKey(com.intellij.openapi.project.Project,java.lang.String,Z):com.intellij.openapi.ui.popup.ComponentPopupBuilder
 - a:setFocusOwners(java.awt.Component[]):com.intellij.openapi.ui.popup.ComponentPopupBuilder
 - a:setFocusable(Z):com.intellij.openapi.ui.popup.ComponentPopupBuilder
+- a:setHeaderAlwaysFocusable(Z):com.intellij.openapi.ui.popup.ComponentPopupBuilder
 - a:setKeyEventHandler(com.intellij.util.BooleanFunction):com.intellij.openapi.ui.popup.ComponentPopupBuilder
 - a:setKeyboardActions(java.util.List):com.intellij.openapi.ui.popup.ComponentPopupBuilder
 - a:setLocateByContent(Z):com.intellij.openapi.ui.popup.ComponentPopupBuilder
@@ -5429,11 +5411,13 @@ com.intellij.platform.ide.productMode.IdeProductMode
 - s:getInstance():com.intellij.platform.ide.productMode.IdeProductMode
 - s:isBackend():Z
 - s:isFrontend():Z
+- s:isLight():Z
 - s:isMonolith():Z
 f:com.intellij.platform.ide.productMode.IdeProductMode$Companion
 - f:getInstance():com.intellij.platform.ide.productMode.IdeProductMode
 - f:isBackend():Z
 - f:isFrontend():Z
+- f:isLight():Z
 - f:isMonolith():Z
 a:com.intellij.pom.NavigatableAdapter
 - com.intellij.pom.Navigatable
@@ -6251,6 +6235,7 @@ c:com.intellij.ui.GroupedElementsRenderer$MyComponent
 - <init>(com.intellij.ui.GroupedElementsRenderer):V
 - getAccessibleContext():javax.accessibility.AccessibleContext
 - getPreferredSize():java.awt.Dimension
+- getToolTipText():java.lang.String
 - getUiInspectorContext():java.util.List
 - setPreferredWidth(I):V
 a:com.intellij.ui.GroupedElementsRenderer$Tree
@@ -6276,6 +6261,7 @@ f:com.intellij.ui.GuiUtils
 - s:getSizeByChars(I,javax.swing.JComponent):java.awt.Dimension
 - s:getTextWithoutMnemonicEscaping(java.lang.String):java.lang.String
 - s:installVisibilityReferent(javax.swing.JComponent,javax.swing.JComponent):V
+- s:installVisibilityReferents(javax.swing.JComponent,javax.swing.JComponent[]):V
 - s:invokeLaterIfNeeded(java.lang.Runnable,com.intellij.openapi.application.ModalityState):V
 - s:iterateChildren(java.awt.Component,java.util.function.Consumer,javax.swing.JComponent[]):V
 - s:removePotentiallyLeakingReferences(java.awt.Container):V
@@ -6475,6 +6461,7 @@ c:com.intellij.ui.InplaceButton
 - setMouseDeadzone(com.intellij.util.ui.TimedDeadzone$Length):V
 - setPainting(Z):V
 - setTransform(I,I):V
+- p:shouldPaintHover():Z
 pc:com.intellij.ui.InplaceButton$AccessibleInplaceButton
 - javax.swing.JComponent$AccessibleJComponent
 - javax.accessibility.AccessibleAction
@@ -6798,6 +6785,7 @@ a:com.intellij.ui.PopupHandler
 - s:installPopupMenu(javax.swing.JComponent,com.intellij.openapi.actionSystem.ActionGroup,java.lang.String):com.intellij.ui.PopupHandler
 - s:installPopupMenu(javax.swing.JComponent,com.intellij.openapi.actionSystem.ActionGroup,java.lang.String,javax.swing.event.PopupMenuListener):com.intellij.ui.PopupHandler
 - s:installPopupMenu(javax.swing.JComponent,java.lang.String,java.lang.String):com.intellij.ui.PopupHandler
+- s:installPopupMenu(javax.swing.JComponent,javax.swing.JComponent,java.lang.String,java.lang.String):com.intellij.ui.PopupHandler
 - s:installRowSelectionTablePopup(javax.swing.JTable,com.intellij.openapi.actionSystem.ActionGroup,java.lang.String):com.intellij.ui.PopupHandler
 - s:installSelectionListPopup(javax.swing.JList,com.intellij.openapi.actionSystem.ActionGroup,java.lang.String):com.intellij.ui.PopupHandler
 - s:installUnknownPopupHandler(javax.swing.JComponent,com.intellij.openapi.actionSystem.ActionGroup,com.intellij.openapi.actionSystem.ActionManager):java.awt.event.MouseListener
@@ -7819,7 +7807,6 @@ c:com.intellij.ui.components.JBScrollBar
 - <init>(I,I,I,I,I):V
 - p:addImpl(java.awt.Component,java.lang.Object,I):V
 - canBePreprocessed(java.awt.event.MouseEvent):Z
-- s:createDefaultUI():javax.swing.plaf.ScrollBarUI
 - s:createUI(javax.swing.JComponent):javax.swing.plaf.ScrollBarUI
 - s:createUI(javax.swing.JComponent,Z):javax.swing.plaf.ScrollBarUI
 - getBlockIncrement(I):I
@@ -8520,28 +8507,6 @@ f:com.intellij.ui.components.panels.VerticalLayout
 - minimumLayoutSize(java.awt.Container):java.awt.Dimension
 - preferredLayoutSize(java.awt.Container):java.awt.Dimension
 - removeLayoutComponent(java.awt.Component):V
-c:com.intellij.ui.components.panels.Wrapper
-- javax.swing.JPanel
-- com.intellij.openapi.ui.NullableComponent
-- <init>():V
-- <init>(java.awt.LayoutManager):V
-- <init>(java.awt.LayoutManager,javax.swing.JComponent):V
-- <init>(java.awt.LayoutManager,Z):V
-- <init>(javax.swing.JComponent):V
-- <init>(Z):V
-- getPreferredSize():java.awt.Dimension
-- getTargetComponent():javax.swing.JComponent
-- isNull():Z
-- requestFocus():V
-- f:requestFocus(Z):Z
-- requestFocusInWindow():Z
-- requestFocusInternal():V
-- setContent(javax.swing.JComponent):V
-- f:setHorizontalSizeReferent(javax.swing.JComponent):com.intellij.ui.components.panels.Wrapper
-- f:setVerticalSizeReferent(javax.swing.JComponent):com.intellij.ui.components.panels.Wrapper
-f:com.intellij.ui.components.panels.Wrapper$North
-- com.intellij.ui.components.panels.Wrapper
-- <init>(javax.swing.JComponent):V
 c:com.intellij.ui.content.ContentManagerAdapter
 - com.intellij.ui.content.ContentManagerListener
 - <init>():V
@@ -8740,22 +8705,6 @@ f:com.intellij.ui.dsl.builder.VerticalComponentGap
 - f:getTop():java.lang.Boolean
 - hashCode():I
 f:com.intellij.ui.dsl.builder.VerticalComponentGap$Companion
-f:com.intellij.ui.dsl.gridLayout.Gaps
-- <init>():V
-- <init>(I,I,I,I):V
-- b:<init>(I,I,I,I,I,kotlin.jvm.internal.DefaultConstructorMarker):V
-- f:component1():I
-- f:component2():I
-- f:component3():I
-- f:component4():I
-- f:copy(I,I,I,I):com.intellij.ui.dsl.gridLayout.Gaps
-- bs:copy$default(com.intellij.ui.dsl.gridLayout.Gaps,I,I,I,I,I,java.lang.Object):com.intellij.ui.dsl.gridLayout.Gaps
-- equals(java.lang.Object):Z
-- f:getBottom():I
-- f:getLeft():I
-- f:getRight():I
-- f:getTop():I
-- hashCode():I
 com.intellij.ui.dsl.gridLayout.Grid
 - a:getColumnsGaps():java.util.List
 - a:getResizableColumns():java.util.Set
@@ -9059,6 +9008,9 @@ a:com.intellij.ui.popup.HintUpdateSupply
 - registerHint(com.intellij.openapi.ui.popup.JBPopup):V
 - shouldUpdateHint():Z
 - updateHint(com.intellij.psi.PsiElement):V
+com.intellij.ui.popup.PopupOwner
+- a:getBestPopupPosition():java.awt.Point
+- getPopupComponent():javax.swing.JComponent
 a:com.intellij.ui.popup.PopupUpdateProcessorBase
 - com.intellij.openapi.ui.popup.JBPopupListener
 - <init>():V
@@ -9420,6 +9372,7 @@ pc:com.intellij.ui.table.JBTable$AccessibleJBTable
 - getAccessibleAt(I,I):javax.accessibility.Accessible
 - getAccessibleAt(java.awt.Point):javax.accessibility.Accessible
 - getAccessibleChild(I):javax.accessibility.Accessible
+- valueChanged(javax.swing.event.ListSelectionEvent):V
 pc:com.intellij.ui.table.JBTable$AccessibleJBTable$AccessibleJBTableCell
 - javax.swing.JTable$AccessibleJTable$AccessibleJTableCell
 - <init>(com.intellij.ui.table.JBTable$AccessibleJBTable,javax.swing.JTable,I,I,I):V
@@ -10594,16 +10547,10 @@ c:com.intellij.util.config.ValueProperty
 - copy(java.lang.Object):java.lang.Object
 - getDefault(com.intellij.util.config.AbstractProperty$AbstractPropertyContainer):java.lang.Object
 - getName():java.lang.String
-c:com.intellij.util.net.AuthenticationDialog
+f:com.intellij.util.net.AuthenticationDialog
 - com.intellij.openapi.ui.DialogWrapper
-- <init>(java.awt.Component,java.lang.String,java.lang.String,java.lang.String,java.lang.String,Z):V
-- p:createCenterPanel():javax.swing.JComponent
-- getPanel():com.intellij.util.net.AuthenticationPanel
-- getPreferredFocusedComponent():javax.swing.JComponent
-c:com.intellij.util.net.AuthenticationPanel
-- javax.swing.JPanel
-- $$$getRootComponent$$$():javax.swing.JComponent
-- <init>(java.lang.String,java.lang.String,java.lang.String,java.lang.Boolean):V
+- <init>(com.intellij.openapi.project.Project,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.Boolean):V
+- <init>(java.awt.Component,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.Boolean):V
 - getLogin():java.lang.String
 - getPassword():C[]
 - getPreferredFocusedComponent():javax.swing.JComponent

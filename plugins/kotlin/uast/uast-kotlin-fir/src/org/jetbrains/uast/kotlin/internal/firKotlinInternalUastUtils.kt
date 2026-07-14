@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.uast.kotlin.internal
 
@@ -48,8 +48,6 @@ import org.jetbrains.kotlin.analysis.api.symbols.KaFunctionSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaNamedClassSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaParameterSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaPropertyGetterSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaPropertySetterSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolOrigin
 import org.jetbrains.kotlin.analysis.api.symbols.KaTypeParameterSymbol
@@ -61,7 +59,6 @@ import org.jetbrains.kotlin.analysis.api.types.KaClassType
 import org.jetbrains.kotlin.analysis.api.types.KaErrorType
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.analysis.api.types.KaTypeMappingMode
-import org.jetbrains.kotlin.analysis.api.types.KaTypeNullability
 import org.jetbrains.kotlin.analysis.api.types.KaTypeParameterType
 import org.jetbrains.kotlin.analysis.api.types.KaTypePointer
 import org.jetbrains.kotlin.asJava.classes.lazyPub
@@ -71,9 +68,6 @@ import org.jetbrains.kotlin.asJava.getAccessorLightMethods
 import org.jetbrains.kotlin.asJava.getRepresentativeLightMethod
 import org.jetbrains.kotlin.asJava.toLightClass
 import org.jetbrains.kotlin.asJava.toLightElements
-import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget
-import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget.PROPERTY_GETTER
-import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget.PROPERTY_SETTER
 import org.jetbrains.kotlin.idea.KotlinLanguage
 import org.jetbrains.kotlin.light.classes.symbol.annotations.annotateByKtType
 import org.jetbrains.kotlin.name.ClassId
@@ -93,6 +87,7 @@ import org.jetbrains.uast.UDeclaration
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.UastErrorType
 import org.jetbrains.uast.UastLanguagePlugin
+import org.jetbrains.uast.analysis.UNullability
 import org.jetbrains.uast.getParentOfType
 import org.jetbrains.uast.kotlin.FirKotlinUastLanguagePlugin
 import org.jetbrains.uast.kotlin.PsiTypeConversionConfiguration
@@ -329,17 +324,7 @@ private fun toPsiMethodForDeserialized(
             if (functionSymbol is KaConstructorSymbol)
                 constructors.filter { it.parameterList.parameters.size == functionSymbol.valueParameters.size }
             else {
-                val jvmName = when (functionSymbol) {
-                    is KaPropertyGetterSymbol -> {
-                        functionSymbol.getJvmNameFromAnnotation(allowedUseSiteTargets = setOf(PROPERTY_GETTER, null))
-                    }
-                    is KaPropertySetterSymbol -> {
-                        functionSymbol.getJvmNameFromAnnotation(allowedUseSiteTargets = setOf(PROPERTY_SETTER, null))
-                    }
-                    else -> {
-                        functionSymbol.getJvmNameFromAnnotation()
-                    }
-                }
+                val jvmName = functionSymbol.getJvmNameFromAnnotation()
                 val id = jvmName
                     ?: functionSymbol.callableId?.callableName?.identifierOrNullIfSpecial
                     ?: psi?.name
@@ -406,18 +391,14 @@ private fun KaCallInfo?.typeArgumentsMappingOrEmptyMap(): Map<KaSymbolPointer<Ka
 
 /**
  * Returns a `JvmName` annotation value.
- *
- * @param allowedUseSiteTargets If non-empty, only annotations with the specified use-site targets are checked.
  */
-private fun KaAnnotatedSymbol.getJvmNameFromAnnotation(allowedUseSiteTargets: Set<AnnotationUseSiteTarget?> = emptySet()): String? {
+private fun KaAnnotatedSymbol.getJvmNameFromAnnotation(): String? {
     for (annotation in annotations[JvmStandardClassIds.JVM_NAME_CLASS_ID]) {
-        if (allowedUseSiteTargets.isEmpty() || annotation.useSiteTarget in allowedUseSiteTargets) {
-            val firstArgumentExpression = annotation.arguments.firstOrNull()?.expression
-            if (firstArgumentExpression is KaAnnotationValue.ConstantValue) {
-                return firstArgumentExpression.value.value as? String
-            }
-            break
+        val firstArgumentExpression = annotation.arguments.firstOrNull()?.expression
+        if (firstArgumentExpression is KaAnnotationValue.ConstantValue) {
+            return firstArgumentExpression.value.value as? String
         }
+        break
     }
 
     return null
@@ -524,18 +505,18 @@ internal fun isInheritedGenericType(ktType: KaType?): Boolean {
         // explicitly nullable, e.g., T?
         !ktType.isMarkedNullable &&
         // non-null upper bound, e.g., T : Any
-        nullability(ktType) != KaTypeNullability.NON_NULLABLE
+        nullability(ktType) != UNullability.NOT_NULL
 }
 
 context(_: KaSession)
-internal fun nullability(ktType: KaType?): KaTypeNullability? {
+internal fun nullability(ktType: KaType?): UNullability? {
     if (ktType == null) return null
     if (ktType is KaErrorType) return null
     val expanded = ktType.fullyExpandedType
     return when {
-        expanded.hasFlexibleNullability -> KaTypeNullability.UNKNOWN
-        expanded.isNullable -> KaTypeNullability.NULLABLE
-        else -> KaTypeNullability.NON_NULLABLE
+        expanded.hasFlexibleNullability -> UNullability.UNKNOWN
+        expanded.isNullable -> UNullability.NULLABLE
+        else -> UNullability.NOT_NULL
     }
 }
 

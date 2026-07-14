@@ -4,15 +4,17 @@ package com.intellij.python.hatch
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsSafe
-import com.intellij.platform.eel.fs.EelFsError
 import com.intellij.python.hatch.cli.HatchEnvironment
 import com.intellij.python.hatch.service.CliBasedHatchService
+import com.intellij.python.pytools.runtime.WorkingDirectoryNotFoundError
 import com.jetbrains.python.PythonBinary
 import com.jetbrains.python.PythonHomePath
 import com.jetbrains.python.PythonInfo
 import com.jetbrains.python.Result
 import com.jetbrains.python.errorProcessing.MessageError
 import com.jetbrains.python.errorProcessing.PyResult
+import com.jetbrains.python.sdk.add.v2.FileSystem
+import com.jetbrains.python.sdk.add.v2.PathHolder
 import com.jetbrains.python.sdk.baseDir
 import java.nio.file.Path
 
@@ -26,12 +28,6 @@ class HatchExecutableNotFoundHatchError(path: Path?) : HatchError(
 
 class BasePythonExecutableNotFoundHatchError(pathString: String?) : HatchError(
   PyHatchBundle.message("python.hatch.error.base.python.executable.is.not.found", pathString.toString())
-) {
-  constructor(path: Path?) : this(path.toString())
-}
-
-class WorkingDirectoryNotFoundHatchError(pathString: String?) : HatchError(
-  PyHatchBundle.message("python.hatch.error.working.directory.is.not.found", pathString.toString())
 ) {
   constructor(path: Path?) : this(path.toString())
 }
@@ -110,8 +106,13 @@ interface HatchService {
 /**
  * Hatch Service for working directory (where hatch.toml / pyproject.toml is usually placed)
  */
-suspend fun Path?.getHatchService(hatchExecutablePath: Path? = null, hatchEnvironmentName: String? = null): PyResult<HatchService> {
-  return CliBasedHatchService(hatchExecutablePath = hatchExecutablePath,
+suspend fun Path?.getHatchService(
+  fileSystem: FileSystem<PathHolder.Eel>,
+  hatchExecutablePath: Path? = null,
+  hatchEnvironmentName: String? = null,
+): PyResult<HatchService> {
+  return CliBasedHatchService(fileSystem = fileSystem,
+                              hatchExecutablePath = hatchExecutablePath,
                               workingDirectoryPath = this,
                               hatchEnvironmentName = hatchEnvironmentName)
 }
@@ -120,21 +121,19 @@ suspend fun Path?.getHatchService(hatchExecutablePath: Path? = null, hatchEnviro
  * Hatch Service for Module.
  * Working directory considered as the module base path.
  */
-suspend fun Module.getHatchService(hatchExecutablePath: Path? = null): PyResult<HatchService> {
+suspend fun Module.getHatchService(
+  fileSystem: FileSystem<PathHolder.Eel>,
+  hatchExecutablePath: Path? = null,
+): PyResult<HatchService> {
   val workingDirectoryPath = resolveHatchWorkingDirectory(this.project, this).getOr { return it }
-  return workingDirectoryPath.getHatchService(hatchExecutablePath = hatchExecutablePath)
+  return workingDirectoryPath.getHatchService(fileSystem = fileSystem, hatchExecutablePath = hatchExecutablePath)
 }
-
-/**
- * ../hatch/env/virtual/{normalized-project-name}/{hash}/{python-home}
- */
-fun PythonHomePath.getHatchEnvVirtualProjectPath(): Path = this.parent.parent
 
 fun resolveHatchWorkingDirectory(project: Project, module: Module?): PyResult<Path> {
   val pathString = module?.baseDir?.path ?: project.basePath
 
   return when (val path = pathString?.let { Path.of(it) }) {
-    null -> Result.failure(WorkingDirectoryNotFoundHatchError(pathString))
+    null -> Result.failure(WorkingDirectoryNotFoundError(pathString))
     else -> Result.success(path)
   }
 }

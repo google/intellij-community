@@ -10,7 +10,6 @@ import org.jetbrains.kotlin.gradle.multiplatformTests.testFeatures.LibraryKindsC
 import org.jetbrains.kotlin.gradle.multiplatformTests.testFeatures.checkers.ReferenceTargetChecker
 import org.jetbrains.kotlin.gradle.multiplatformTests.testFeatures.checkers.ReferenceTargetCheckerDsl
 import org.jetbrains.kotlin.gradle.multiplatformTests.testFeatures.checkers.highlighting.HighlightingChecker
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode
 import org.jetbrains.kotlin.idea.base.projectStructure.getKaModule
 import org.jetbrains.kotlin.idea.base.projectStructure.getKotlinLibraries
 import org.jetbrains.kotlin.idea.core.util.toPsiFile
@@ -60,7 +59,7 @@ class K2MppRegressionTests : AbstractKotlinMppGradleImportingTest(), ReferenceTa
     }
 
     @Test
-    @PluginTargetVersions(gradleVersion = "7.6.3+")
+    @PluginTargetVersions(pluginVersion = "2.1.0+", gradleVersion = "7.6.3+")
     fun testComposeApp() {
         doTest {
             onlyCheckers(LibraryKindsChecker)

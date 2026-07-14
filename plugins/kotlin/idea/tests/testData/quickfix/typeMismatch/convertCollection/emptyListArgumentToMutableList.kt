@@ -1,7 +1,7 @@
 // "Replace 'emptyList()' with 'mutableListOf()'" "true"
 // PRIORITY: HIGH
-// K2_ERROR: Argument type mismatch: actual type is 'List<uninferred T (of fun <T> emptyList)>', but 'MutableList<Int>' was expected.
-// K2_ERROR: Cannot infer type for type parameter 'T'. Specify it explicitly.
+// K2_ERROR: ARGUMENT_TYPE_MISMATCH
+// K2_ERROR: CANNOT_INFER_PARAMETER_TYPE
 
 fun bar(list: MutableList<Int>) {}
 
@@ -9,5 +9,5 @@ fun foo() {
     bar(emptyList<caret>())
 }
 
-// IGNORE_K1
+
 // FUS_K2_QUICKFIX_NAME: org.jetbrains.kotlin.idea.k2.codeinsight.fixes.ReplaceWithMutableCollectionFactoryFix

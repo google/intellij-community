@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.impl.compiled;
 
 import com.intellij.codeInsight.multiverse.CodeInsightContext;
@@ -9,6 +9,7 @@ import com.intellij.ide.plugins.PluginManager;
 import com.intellij.lang.Language;
 import com.intellij.lang.java.JavaLanguage;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.extensions.PluginDescriptor;
@@ -280,7 +281,7 @@ public class ClsFileImpl extends PsiBinaryFileImpl
         ClsElementImpl.setMirror(pkg, mirrorPkg);
         ClsElementImpl.setMirrorIfPresent(classes[0].getModifierList(), mirrorPkg.getAnnotationList());
       }
-      else if (pkg == null || !CORRUPTED_CLASS_PACKAGE.equals(pkg.getPackageName())) {
+      else if (pkg == null || (!CORRUPTED_CLASS_PACKAGE.equals(pkg.getPackageName())) && !pkg.getPackageName().contains("-")) {
         ClsElementImpl.setMirrorIfPresent(pkg, mirrorPkg);
         ClsElementImpl.setMirrors(classes, mirrors);
       }
@@ -538,7 +539,7 @@ public class ClsFileImpl extends PsiBinaryFileImpl
     PsiManager manager = PsiManager.getInstance(DefaultProjectFactory.getInstance().getDefaultProject());
     ClsFileImpl clsFile = new ClsFileImpl(new ClassFileViewProvider(manager, file), true);
     StringBuilder buffer = new StringBuilder();
-    ApplicationManager.getApplication().runReadAction(() -> clsFile.appendMirrorText(buffer));
+    ReadAction.runBlocking(() -> clsFile.appendMirrorText(buffer));
     return buffer;
   }
 

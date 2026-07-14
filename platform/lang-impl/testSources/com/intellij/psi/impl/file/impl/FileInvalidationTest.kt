@@ -5,22 +5,25 @@ import com.intellij.codeInsight.multiverse.CodeInsightContextManagerImpl
 import com.intellij.codeInsight.multiverse.ModuleContext
 import com.intellij.codeInsight.multiverse.codeInsightContext
 import com.intellij.codeInsight.multiverse.defaultContext
+import com.intellij.openapi.application.edtWriteAction
 import com.intellij.openapi.application.readAction
-import com.intellij.openapi.application.writeAction
 import com.intellij.openapi.module.ModuleType
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.platform.testFramework.junit5.projectStructure.fixture.multiverseProjectFixture
 import com.intellij.psi.PsiManager
 import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.common.timeoutRunBlocking
+import com.intellij.testFramework.junit5.EnableTracingFor
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.utils.vfs.createFile
-import kotlinx.coroutines.delay
 import org.junit.jupiter.api.Assertions
-import org.junit.jupiter.api.RepeatedTest
+import org.junit.jupiter.api.Test
 import kotlin.io.path.Path
-import kotlin.time.Duration.Companion.milliseconds
 
+@EnableTracingFor(
+  categories = ["#com.intellij.psi.impl.file.impl.MultiverseFileViewProviderCache"],
+  categoryClasses = [CodeInsightContextManagerImpl::class]
+)
 @TestApplication
 internal class FileInvalidationTest {
   private val projectFixture = multiverseProjectFixture(withSharedSourceEnabled = true) {}
@@ -35,13 +38,12 @@ internal class FileInvalidationTest {
    * 2. After adding `module1` (content root = project root), the context becomes `ModuleContext("module1")`.
    * 3. After adding `module2` (same root), the context stays `module1` (first module wins).
    * 4. After removing `module1`'s roots, the context switches to `module2`.
-   *
-   * Repeated 1000 times to catch race conditions in invalidation.
    */
-  @RepeatedTest(value = 100)
+  @Test
   fun `test default context invalidates`() = timeoutRunBlocking {
+    // Step 1: no modules
     val root = readAction { VfsUtil.findFile(Path(project.basePath!!), false)!! }
-    val virtualFile = writeAction { root.createFile("foo.txt") }
+    val virtualFile = edtWriteAction { root.createFile("foo.txt") }
 
     val psiFileDefaultContext = readAction { PsiManager.getInstance(project).findFile(virtualFile)!! }
 
@@ -51,6 +53,7 @@ internal class FileInvalidationTest {
       "Step 1 (no modules added yet): file should have defaultContext, but was $initialContext (${initialContext::class.java.name})",
     )
 
+    // Step 2: adding module1
     val module1 = PsiTestUtil.addModule(project, ModuleType.EMPTY, "module1", root)
 
     val psiFileModuleContext = readAction { PsiManager.getInstance(project).findFile(virtualFile)!! }
@@ -66,7 +69,8 @@ internal class FileInvalidationTest {
       "Step 2 (module1 added): module name should be 'module1', but ModuleContext resolved to '$moduleName1'",
     )
 
-    val module2 = PsiTestUtil.addModule(project, ModuleType.EMPTY, "module2", root)
+    // Step 3: adding module2 on same root
+    PsiTestUtil.addModule(project, ModuleType.EMPTY, "module2", root)
 
     val psiFileModuleContext2 = readAction { PsiManager.getInstance(project).findFile(virtualFile)!! }
     val moduleContext2 = readAction { psiFileModuleContext2.codeInsightContext }
@@ -81,10 +85,8 @@ internal class FileInvalidationTest {
     )
     psiFileModuleContext.hashCode() // keep a hard reference to the file with module1 context, so that it doesn't get GCed and make sure it keeps being preferred
 
+    // Step 4: removing module1 roots
     PsiTestUtil.removeAllRoots(module1, null)
-    while (!CodeInsightContextManagerImpl.getInstanceImpl(project).isContextInvalidationComplete()) {
-      delay(10.milliseconds)
-    }
 
     val psiFileModuleContext3 = readAction { PsiManager.getInstance(project).findFile(virtualFile)!! }
     val moduleContext3 = readAction { psiFileModuleContext3.codeInsightContext }

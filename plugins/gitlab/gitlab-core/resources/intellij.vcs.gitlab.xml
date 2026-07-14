@@ -5,7 +5,11 @@
   <dependencies>
     <plugin id="Git4Idea"/>
     <module name="intellij.platform.collaborationTools"/>
+    <module name="intellij.platform.vcs.impl"/>
+    <module name="intellij.platform.vcs.impl.shared"/>
     <module name="intellij.platform.vcs.log"/>
+    <module name="intellij.platform.vcs.log.impl"/>
+    <module name="intellij.vcs.git.backend"/>
     <module name="intellij.vcs.git.shared"/>
   </dependencies>
   <!-- endregion -->
@@ -67,6 +71,7 @@
     <completion.contributor language="any"
                             implementationClass="org.jetbrains.plugins.gitlab.ui.GitlabMarkdownCompletionContributor"/>
     <typedHandler implementation="org.jetbrains.plugins.gitlab.ui.GitlabMarkdownTypedHandler"/>
+    <backspaceHandlerDelegate implementation="org.jetbrains.plugins.gitlab.ui.GitlabMarkdownBackspaceHandler"/>
 
     <registryKey key="vcs.gitlab.connect.silently"
                  description="Connect to GitLab repository without an explicit user action"
@@ -231,9 +236,7 @@
            class="org.jetbrains.plugins.gitlab.mergerequest.ui.diff.action.GitLabMergeRequestDiffReviewDiscussionsToggleAction"
            icon="AllIcons.Actions.Show"
            popup="true">
-      <add-to-group group-id="Diff.EditorGutterPopupMenu.EditorSettings"
-                    relative-to-action="Vcs.Diff.ToggleDiffAligningMode"
-                    anchor="before"/>
+      <add-to-group group-id="Diff.ViewerSettings"/>
     </group>
     <action id="GitLab.MergeRequest.Review.Submit"
             class="org.jetbrains.plugins.gitlab.mergerequest.diff.action.GitLabMergeRequestDiffSubmitReviewAction"/>
@@ -243,7 +246,7 @@
       <override-text place="EditorTabPopup"/>
       <override-text place="ProjectViewPopup" use-text-of-place="EditorTabPopup"/>
       <override-text place="EditorPopup" use-text-of-place="EditorTabPopup"/>
-      <override-text place="FavoritesPopup" use-text-of-place="EditorTabPopup"/>
+      <override-text place="BookmarksPopup" use-text-of-place="EditorTabPopup"/>
       <add-to-group group-id="Git.Hosting.Open.In.Browser.Group"/>
     </group>
 

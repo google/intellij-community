@@ -2,6 +2,9 @@
 package com.intellij.ide.plugins
 
 import com.intellij.ide.plugins.DisabledPluginsState.Companion.saveDisabledPluginsAndInvalidate
+import com.intellij.ide.plugins.ProductPluginInitContext.Companion.configureProductModeModules
+import com.intellij.idea.AppMode
+import com.intellij.idea.WellKnownCommand
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.util.BuildNumber
 import com.intellij.openapi.util.NlsSafe
@@ -9,10 +12,10 @@ import com.intellij.openapi.util.Ref
 import com.intellij.openapi.util.io.IoTestUtil
 import com.intellij.platform.pluginSystem.parser.impl.LoadedXIncludeReference
 import com.intellij.platform.pluginSystem.parser.impl.PluginDescriptorBuilder
-import com.intellij.platform.pluginSystem.parser.impl.PluginDescriptorFromXmlStreamConsumer
 import com.intellij.platform.pluginSystem.parser.impl.PluginDescriptorReaderContext
-import com.intellij.platform.pluginSystem.parser.impl.consume
+import com.intellij.platform.pluginSystem.parser.impl.parsePluginXml
 import com.intellij.platform.pluginSystem.testFramework.PseudoProductTestPluginInitContext
+import com.intellij.platform.pluginSystem.testFramework.ValidationPluginDescriptorReaderContext
 import com.intellij.platform.runtime.product.ProductMode
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.TestDataPath
@@ -21,7 +24,6 @@ import com.intellij.testFramework.rules.TempDirectory
 import com.intellij.util.TriConsumer
 import com.intellij.util.system.CpuArch
 import com.intellij.util.system.OS
-import com.intellij.util.xml.dom.NoOpXmlInterner
 import com.intellij.util.xml.dom.XmlElement
 import com.intellij.util.xml.dom.readXmlAsModel
 import org.assertj.core.api.Assertions.assertThat
@@ -189,6 +191,80 @@ class PluginManagerTest {
       DisabledPluginsState.DISABLED_PLUGINS_FILENAME)).hasContent("a" + System.lineSeparator())
   }
 
+  @Test
+  fun `remote development plugin is essential only in remote dev host mode`() {
+    val remoteDevelopmentPlugin = PluginId.getId("com.jetbrains.remoteDevelopment")
+    try {
+      AppMode.setFlags(listOf(WellKnownCommand.SERVER_MODE))
+      assertThat(ProductPluginInitContext().essentialPlugins).contains(remoteDevelopmentPlugin)
+
+      AppMode.setFlags(emptyList())
+      assertThat(ProductPluginInitContext().essentialPlugins).doesNotContain(remoteDevelopmentPlugin)
+    }
+    finally {
+      AppMode.setFlags(emptyList())
+    }
+  }
+
+  @Test
+  fun `product mode modules match the gold data`() {
+    val modes = listOf(
+      ProductMode.MONOLITH to listOf(
+        "+ intellij.platform.backend",
+        "+ intellij.platform.frontend",
+        "- intellij.platform.frontend.split",
+        "+ intellij.platform.jps.build",
+        "+ intellij.platform.jps.build.dependencyGraph",
+      ),
+      ProductMode.BACKEND to listOf(
+        "+ intellij.platform.backend",
+        "- intellij.platform.frontend",
+        "- intellij.platform.frontend.split",
+        "+ intellij.platform.jps.build",
+        "+ intellij.platform.jps.build.dependencyGraph",
+      ),
+      ProductMode.FRONTEND to listOf(
+        "- intellij.platform.backend",
+        "+ intellij.platform.frontend",
+        "+ intellij.platform.frontend.split",
+        "- intellij.platform.jps.build",
+        "- intellij.platform.jps.build.dependencyGraph",
+      ),
+      ProductMode.LIGHT to listOf(
+        "- intellij.cwm.plugin.common",
+        "- intellij.platform.backend",
+        "+ intellij.platform.frontend",
+        "- intellij.platform.frontend.split",
+        "+ intellij.platform.frontend.split.base",
+        "- intellij.platform.jps.build",
+        "- intellij.platform.jps.build.dependencyGraph",
+        "- intellij.platform.split",
+        "- intellij.platform.split.connection",
+        "- intellij.rd.client",
+      ),
+      ProductMode.LIGHT_WITH_RD_CONNECTION to listOf(
+        "- intellij.cwm.plugin.common",
+        "- intellij.platform.backend",
+        "+ intellij.platform.frontend",
+        "- intellij.platform.frontend.split",
+        "+ intellij.platform.frontend.split.base",
+        "- intellij.platform.jps.build",
+        "- intellij.platform.jps.build.dependencyGraph",
+        "- intellij.platform.split",
+        "+ intellij.platform.split.connection",
+        "- intellij.rd.client",
+      ))
+    for ((currentMode, expectedValues) in modes) {
+      val map = buildMap {
+        configureProductModeModules(currentMode.id)
+      }
+      val actual = map.map { it.key.name to it.value.isAvailable }.sortedBy { it.first }
+        .joinToString("\n") { (if (it.second) "+ " else "- ") + it.first }
+      val expected = expectedValues.joinToString("\n")
+      assertEquals("Product modules for '${currentMode.id}' do not match gold data", expected, actual)
+    }
+  }
+
   // TODO probably should be moved elsewhere
   @Test
   fun `unfulfilled os requirement triggers only on required dependencies`() {
@@ -203,6 +279,56 @@ class PluginManagerTest {
       assertThat(PluginManagerCore.getUnfulfilledOsRequirement(required)).isEqualTo(module.takeIf { !module.isHostOs() })
       assertThat(PluginManagerCore.getUnfulfilledOsRequirement(optional)).isEqualTo(null)
     }
+  }
+
+  @Test
+  fun `unfulfilled os requirement is inferred from version when dependencies are empty`() {
+    fun descriptor(version: String?) = object : TestIdeaPluginDescriptor() {
+      override fun getDependencies(): List<IdeaPluginDependency> = emptyList()
+      override fun getVersion(): String? = version
+      override fun getPluginId(): PluginId = PluginId.getId("test.plugin")
+    }
+    fun assertInferred(version: String?, expected: IdeaPluginOsRequirement?) {
+      assertThat(PluginManagerCore.getUnfulfilledOsRequirement(descriptor(version)))
+        .isEqualTo(expected?.takeIf { !it.isHostOs() })
+    }
+
+    assertInferred("1.0.0-windows-amd64", IdeaPluginOsRequirement.Windows)
+    assertInferred("1.0.0-mac-arm64", IdeaPluginOsRequirement.Mac)
+    assertInferred("1.0.0-linux-amd64", IdeaPluginOsRequirement.Linux)
+    assertInferred("1.0.0-freebsd-amd64", IdeaPluginOsRequirement.FreeBSD)
+    // unrecognized OS tag maps to OS.Other and is filtered out
+    assertInferred("1.0.0-solaris-amd64", null)
+    // versions that do not match the <version>-<os>-<arch> pattern infer nothing
+    assertInferred("1.0.0", null)
+    assertInferred("241.SNAPSHOT", null)
+    // a missing version must not throw and infers nothing
+    assertInferred(null, null)
+  }
+
+  @Test
+  fun `unfulfilled cpu arch requirement is inferred from version when dependencies are empty`() {
+    fun descriptor(version: String?) = object : TestIdeaPluginDescriptor() {
+      override fun getDependencies(): List<IdeaPluginDependency> = emptyList()
+      override fun getVersion(): String? = version
+      override fun getPluginId(): PluginId = PluginId.getId("test.plugin")
+    }
+    fun assertInferred(version: String?, expected: PluginCpuArchRequirement?) {
+      assertThat(PluginManagerCore.getUnfulfilledCpuArchRequirement(descriptor(version)))
+        .isEqualTo(expected?.takeIf { !it.isHostArch() })
+    }
+
+    assertInferred("1.0.0-windows-amd64", PluginCpuArchRequirement.X86_64)
+    assertInferred("1.0.0-windows-x86_64", PluginCpuArchRequirement.X86_64)
+    assertInferred("1.0.0-windows-x86", PluginCpuArchRequirement.X86)
+    assertInferred("1.0.0-windows-arm64", PluginCpuArchRequirement.ARM64)
+    assertInferred("1.0.0-windows-aarch64", PluginCpuArchRequirement.ARM64)
+    // unrecognized arch tag maps to CpuArch.OTHER/UNKNOWN and is filtered out
+    assertInferred("1.0.0-windows-sparc", null)
+    // versions that do not match the <version>-<os>-<arch> pattern infer nothing
+    assertInferred("1.0.0", null)
+    // a missing version must not throw and infers nothing
+    assertInferred(null, null)
   }
 
   companion object {
@@ -224,11 +350,7 @@ class PluginManagerTest {
       for (html in loadPluginResult.loadingErrors) {
         text.append(html.htmlMessage.toString().replace("<br/>", "\n").replace("&#39;", "")).append('\n')
       }
-      val expectedResultFilename = if (PluginManagerCore.fallbackToOldPluginSetResolution()) {
-        "$testDataName.txt"
-      } else {
-        "$testDataName.txt.2"
-      }
+      val expectedResultFilename = "$testDataName.txt"
       UsefulTestCase.assertSameLinesWithFile(File(testDataPath, expectedResultFilename).path, text.toString())
     }
 
@@ -339,6 +461,7 @@ class PluginManagerTest {
         coreLoader = PluginManagerTest::class.java.getClassLoader(),
         parentActivity = null,
         reportingPolicy = PluginLoadingErrorReportingPolicy.TEST,
+        configureClassLoaders = true,
       )
     }
 
@@ -360,9 +483,7 @@ class PluginManagerTest {
             val url = child.getAttributeValue("descriptor-url")!!
             if (url.endsWith("/$relativePath")) {
               try {
-                val reader = PluginDescriptorFromXmlStreamConsumer(readContext, createXIncludeLoader(this, dataLoader))
-                reader.consume(elementAsBytes(child), null)
-                return reader.getBuilder()
+                return parsePluginXml(elementAsBytes(child), null, readContext, createXIncludeLoader(this, dataLoader))
               }
               catch (e: XMLStreamException) {
                 throw RuntimeException(e)
@@ -421,14 +542,9 @@ class PluginManagerTest {
 }
 
 private fun readModuleDescriptorForTest(input: ByteArray): PluginDescriptorBuilder {
-  return PluginDescriptorFromXmlStreamConsumer(readContext = object : PluginDescriptorReaderContext {
-    override val interner = NoOpXmlInterner
-    override val isMissingIncludeIgnored = false
-  }, xIncludeLoader = createXIncludeLoader(PluginXmlPathResolver.DEFAULT_PATH_RESOLVER, object : DataLoader {
+  val xIncludeLoader = createXIncludeLoader(PluginXmlPathResolver.DEFAULT_PATH_RESOLVER, object : DataLoader {
     override fun load(path: String, pluginDescriptorSourceOnly: Boolean) = throw UnsupportedOperationException()
     override fun toString() = ""
-  })).let {
-    it.consume(input, null)
-    it.getBuilder()
-  }
+  })
+  return parsePluginXml(input, null, readContext = ValidationPluginDescriptorReaderContext, xIncludeLoader = xIncludeLoader)
 }

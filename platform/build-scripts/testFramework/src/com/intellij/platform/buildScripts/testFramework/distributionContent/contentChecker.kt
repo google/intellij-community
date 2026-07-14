@@ -16,7 +16,6 @@ import org.assertj.core.util.diff.DiffUtils
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.jps.model.JpsProject
 import org.jetbrains.jps.util.JpsPathUtil
-import org.opentest4j.MultipleFailuresError
 import java.nio.file.Files
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
@@ -136,15 +135,6 @@ fun collectPluginContentFailures(
   }
 }
 
-@Internal
-fun assertNoPackagingCheckFailures(problemMessage: String, failures: List<PackagingCheckFailure>) {
-  when (failures.size) {
-    0 -> return
-    1 -> throw failures.single().error
-    else -> throw MultipleFailuresError(problemMessage, failures.map { wrapFailureWithName(it) })
-  }
-}
-
 private fun collectPluginContentCategoryFailures(
   fileEntries: Sequence<PluginContentReport>,
   project: JpsProject,
@@ -155,14 +145,26 @@ private fun collectPluginContentCategoryFailures(
   testName: (key: String) -> String,
 ): List<PackagingCheckFailure> {
   val failures = ArrayList<PackagingCheckFailure>()
-  for (item in fileEntries) {
-    val module = project.findModuleByName(item.mainModule) ?: continue
+  val groupedAllOs = fileEntries.groupBy { it.mainModule }
+
+  for ((mainModule, items) in groupedAllOs) {
+    val module = project.findModuleByName(mainModule) ?: continue
     val contentRoot = Path.of(JpsPathUtil.urlToPath(module.contentRootsList.urls.first()))
     val expectedFile = contentRoot.resolve(contentFileName)
-    val key = getPluginContentKey(item)
+    val key = getPluginContentKey(items.first())
     try {
+      val itemFileEntries = if (items.size == 1) {
+        items.first().content
+      }
+      else { // superset for report, android plugin excludes module libraries depending on OS/arch
+        items
+          .flatMap { item -> normalizeContentReport(item.content, short = false) }
+          .distinct()
+          .toList()
+      }
+
       checkThatContentIsNotChanged(
-        actualFileEntries = item.content,
+        actualFileEntries = itemFileEntries,
         expectedFile = expectedFile,
         projectHome = projectHome,
         isBundled = nonBundled != null,
@@ -174,7 +176,7 @@ private fun collectPluginContentCategoryFailures(
       }
 
       val nonBundledVersion = nonBundled[key] ?: continue
-      val bundledContent = normalizeContentReport(fileEntries = item.content, short = true)
+      val bundledContent = normalizeContentReport(fileEntries = itemFileEntries, short = true)
       val nonBundledContent = normalizeContentReport(fileEntries = nonBundledVersion.content, short = true)
       if (bundledContent != nonBundledContent) {
         throw AssertionError(
@@ -189,10 +191,6 @@ private fun collectPluginContentCategoryFailures(
     }
   }
   return failures
-}
-
-private fun wrapFailureWithName(failure: PackagingCheckFailure): Throwable {
-  return AssertionError(failure.name, failure.error)
 }
 
 private fun toPluginContentMap(contentList: List<PluginContentReport>): Map<String, PluginContentReport> {

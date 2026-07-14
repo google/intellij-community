@@ -1,19 +1,43 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
+import {AsyncLocalStorage} from 'node:async_hooks'
 import {Client} from '@modelcontextprotocol/sdk/client/index.js'
 import {ResultSchema} from '@modelcontextprotocol/sdk/types.js'
 import {createProjectPathManager} from './project-path'
-import {resolveAnalysisCapabilities, resolveReadCapabilities, resolveSearchCapabilities} from './proxy-tools/tooling'
+import {
+  resolveAnalysisCapabilities,
+  resolveFormattingCapabilities,
+  resolveReadCapabilities,
+  resolveSearchCapabilities
+} from './proxy-tools/tooling'
 import {extractTextFromResult} from './proxy-tools/shared'
 import type {McpStreamTransport} from './stream-transport'
-import type {AnalysisCapabilities, ReadCapabilities, SearchCapabilities, ToolArgs, ToolSpecLike} from './proxy-tools/types'
+import type {
+  AnalysisCapabilities,
+  FormattingCapabilities,
+  ReadCapabilities,
+  SearchCapabilities,
+  ToolArgs,
+  ToolSpecLike
+} from './proxy-tools/types'
+
+export interface RequestContext {
+  /**
+   * Per-call MCP-RPC timeout (ms) supplied by the agent via tools/call
+   * arguments.timeout. 0 disables the deadline. undefined → fall back to env defaults.
+   */
+  clientTimeoutMs?: number
+}
+
+export const requestContext = new AsyncLocalStorage<RequestContext>()
 
 export interface UpstreamConnectionOptions {
   transport: McpStreamTransport
   projectPath: string
-  defaultProjectPathKey: 'project_path' | 'projectPath'
+  defaultProjectPathKey: 'project_path' | 'projectPath' | 'rootFolder'
+  connectTimeoutMs: number
   /**
-   * When true, `project_path` / `projectPath` is injected into every upstream tool call —
+   * When true, `project_path` / `projectPath` / `rootFolder` is injected into every upstream tool call —
    * including container-scoped tools that carry their own `sessionId` — so the IDE MCP
    * server's project dispatcher can bind the request to a specific open project. Used
    * in container mode where `.container-sessions.jsonl` is the source of truth.
@@ -45,8 +69,9 @@ export class UpstreamConnection {
   readonly client: Client
   private readonly _transport: McpStreamTransport
   private _projectPathManager: ReturnType<typeof createProjectPathManager>
-  private readonly _defaultProjectPathKey: 'project_path' | 'projectPath'
+  private readonly _defaultProjectPathKey: 'project_path' | 'projectPath' | 'rootFolder'
   private _forceInjectProjectPath: boolean
+  private readonly _connectTimeoutMs: number
   private readonly _toolCallTimeoutMs: number
   private readonly _buildTimeoutMs: number
   private readonly _warn: (message: string) => void
@@ -56,6 +81,7 @@ export class UpstreamConnection {
 
   searchCapabilities: SearchCapabilities = resolveSearchCapabilities([]).capabilities
   analysisCapabilities: AnalysisCapabilities = resolveAnalysisCapabilities([]).capabilities
+  formattingCapabilities: FormattingCapabilities = resolveFormattingCapabilities([]).capabilities
   readCapabilities: ReadCapabilities = resolveReadCapabilities([]).capabilities
   ideVersion: string | null = null
 
@@ -64,6 +90,7 @@ export class UpstreamConnection {
 
   constructor(options: UpstreamConnectionOptions) {
     this._transport = options.transport
+    this._connectTimeoutMs = options.connectTimeoutMs
     this._toolCallTimeoutMs = options.toolCallTimeoutMs
     this._buildTimeoutMs = options.buildTimeoutMs
     this._warn = options.warn
@@ -105,7 +132,7 @@ export class UpstreamConnection {
   }
 
   /**
-   * Re-run the `project_path` / `projectPath` tool-schema scan on the already-known
+   * Re-run the `project_path` / `projectPath` / `rootFolder` tool-schema scan on the already-known
    * tool list. Recreating the project-path manager loses its scan state, which would
    * otherwise force every injection to fall back to `defaultProjectPathKey` even when
    * the upstream IDE has been observed to use the other key on specific tools.
@@ -122,7 +149,8 @@ export class UpstreamConnection {
       this._tools = null
     }
     if (this._connectedPromise) return this._connectedPromise
-    this._connectedPromise = this.client.connect(this._transport).catch((error) => {
+    const options = this._connectTimeoutMs > 0 ? {timeout: this._connectTimeoutMs} : undefined
+    this._connectedPromise = this.client.connect(this._transport, options).catch((error) => {
       this._connectedPromise = null
       throw error
     })
@@ -137,6 +165,7 @@ export class UpstreamConnection {
     this._tools = null
     this.searchCapabilities = resolveSearchCapabilities([]).capabilities
     this.analysisCapabilities = resolveAnalysisCapabilities([]).capabilities
+    this.formattingCapabilities = resolveFormattingCapabilities([]).capabilities
     this.readCapabilities = resolveReadCapabilities([]).capabilities
     this.ideVersion = null
     this.onStateChange?.()
@@ -169,6 +198,7 @@ export class UpstreamConnection {
       this._tools = tools
       this.searchCapabilities = resolveSearchCapabilities(tools).capabilities
       this.analysisCapabilities = resolveAnalysisCapabilities(tools).capabilities
+      this.formattingCapabilities = resolveFormattingCapabilities(tools).capabilities
       this.readCapabilities = resolveReadCapabilities(tools).capabilities
       this.onStateChange?.()
       return tools
@@ -262,9 +292,13 @@ export class UpstreamConnection {
     })
   }
 
-  private static readonly _LONG_TIMEOUT_TOOLS = new Set(['build_project', 'lint_files', 'open_file_in_editor', 'container_exec'])
+  private static readonly _LONG_TIMEOUT_TOOLS = new Set(['build_project', 'lint_files', 'reformat_file', 'open_file_in_editor', 'container_exec'])
 
   private _resolveTimeoutMs(toolName: string): number {
+    const ctx = requestContext.getStore()
+    if (ctx?.clientTimeoutMs !== undefined) {
+      return ctx.clientTimeoutMs
+    }
     return UpstreamConnection._LONG_TIMEOUT_TOOLS.has(toolName) ? this._buildTimeoutMs : this._toolCallTimeoutMs
   }
 

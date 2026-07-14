@@ -3,7 +3,6 @@
 package com.intellij.ide.projectView.impl;
 
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
 import org.jdom.Element;
 import org.jetbrains.annotations.ApiStatus;
@@ -15,6 +14,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * This class is used only for converting old 'favorites' settings to bookmarks, shouldn't be used in new code.
+ */
+@ApiStatus.Internal
 @ApiStatus.NonExtendable
 public abstract class AbstractUrl {
   @ApiStatus.Internal
@@ -58,8 +61,6 @@ public abstract class AbstractUrl {
     element.setAttribute("type", myType);
   }
 
-  public abstract Object @Nullable [] createPath(Project project);
-
   public @Nullable("return null if cannot recognize the element") AbstractUrl createUrl(String type, String moduleName, String url){
     if (type.equals(myType)) {
       return createUrl(moduleName, url);
@@ -67,7 +68,6 @@ public abstract class AbstractUrl {
     return null;
   }
   protected abstract AbstractUrl createUrl(String moduleName, String url);
-  public abstract AbstractUrl createUrlByElement(Object element);
 
 
   @Override

@@ -17,7 +17,8 @@ import com.intellij.spellchecker.dictionary.Dictionary.LookupStatus.Present
 class MarkdownSupportTest : GrazieTestBase() {
   override val additionalEnabledRules: Set<String> = setOf(
     "LanguageTool.EN.COMMA_COMPOUND_SENTENCE",
-    "LanguageTool.EN.EN_QUOTES"
+    "LanguageTool.EN.EN_QUOTES",
+    "LanguageTool.EN.DASH_RULE"
   )
 
   fun `test grammar check in file`() {
@@ -28,6 +29,10 @@ class MarkdownSupportTest : GrazieTestBase() {
   fun `test grazie spellchecker in file`() {
     enableProofreadingFor(setOf(Lang.GERMANY_GERMAN))
     runHighlightTestForFile("ide/language/markdown/Spellcheck.md")
+  }
+
+  fun `test no false positives in test links`() {
+    runHighlightTestForFile("ide/language/markdown/TestLink.md")
   }
 
   fun `test replacement with markup inside`() {
@@ -55,6 +60,22 @@ class MarkdownSupportTest : GrazieTestBase() {
 
   fun `test html entity excluded before grazie checks`() {
     myFixture.configureByText("a.md", "You&#39;re here.")
+    myFixture.checkHighlighting()
+  }
+
+  fun `test no LT article warning before number starting with a vowel`() {
+    myFixture.configureByText("a.md", "Extract an 8x8 pixel square from an 11x11 square from an 18432x18432 square from an 11000.")
+    myFixture.checkHighlighting()
+  }
+
+  fun `test no em dash warning for list bullet in injected markdown`() {
+    myFixture.configureByText("a.md", """
+      Something
+      ```markdown
+      ## Goals
+      - Primary outcomes the feature must deliver.
+      ```
+    """.trimIndent())
     myFixture.checkHighlighting()
   }
 
@@ -118,6 +139,13 @@ class MarkdownSupportTest : GrazieTestBase() {
     myFixture.configureByText("a.md", mixedText + """
 
       <!-- 将文本粘贴在此，或者检测以下文本 我和她去看了<GRAMMAR_ERROR descr="wa5">二部</GRAMMAR_ERROR>电影。-->
+    """.trimIndent())
+    myFixture.checkHighlighting()
+  }
+
+  fun `test grammar check in html comment`() {
+    myFixture.configureByText("a.md", """
+      <!-- It is <GRAMMAR_ERROR <TYPO descr="Typo: In word 'descr'">descr</TYPO>=\"EN_A_VS_AN\">an</GRAMMAR_ERROR> friend there -->
     """.trimIndent())
     myFixture.checkHighlighting()
   }

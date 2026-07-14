@@ -24,12 +24,15 @@ public final class KotlinBaseResourcesIcons {
   /** 16x16 */ public static final @NotNull Icon ClassInitializerKotlin = load("org/jetbrains/kotlin/idea/icons/expui/classInitializerKotlin.svg", "org/jetbrains/kotlin/idea/icons/classInitializerKotlin.svg", -456547642, 0);
   /** 16x16 */ public static final @NotNull Icon ClassKotlin = load("org/jetbrains/kotlin/idea/icons/expui/classKotlin.svg", "org/jetbrains/kotlin/idea/icons/classKotlin.svg", 690890608, 0);
   /** 16x16 */ public static final @NotNull Icon ConvertJavaToKotlin = load("org/jetbrains/kotlin/idea/icons/expui/convertJavaToKotlin.svg", -1127139003, 2);
-  /** 12x12 */ public static final @NotNull Icon DslMarkerAnnotation = load("org/jetbrains/kotlin/idea/icons/dslMarkerAnnotation.svg", -2069578249, 2);
+  /** 12x12 */ public static final @NotNull Icon DslMarkerAnnotation = load("org/jetbrains/kotlin/idea/icons/expui/dslMarkerAnnotation.svg", "org/jetbrains/kotlin/idea/icons/dslMarkerAnnotation.svg", -2069578249, 2);
   /** 16x16 */ public static final @NotNull Icon EnumKotlin = load("org/jetbrains/kotlin/idea/icons/expui/enumKotlin.svg", "org/jetbrains/kotlin/idea/icons/enumKotlin.svg", 1217910627, 0);
   /** 16x16 */ public static final @NotNull Icon Expect = load("org/jetbrains/kotlin/idea/icons/expui/expect.svg", "org/jetbrains/kotlin/idea/icons/expect.svg", 1795044928, 1);
   /** 16x16 */ public static final @NotNull Icon Field_value = load("org/jetbrains/kotlin/idea/icons/expui/fieldValue.svg", "org/jetbrains/kotlin/idea/icons/field_value.svg", -1378196441, 0);
   /** 16x16 */ public static final @NotNull Icon Field_variable = load("org/jetbrains/kotlin/idea/icons/expui/fieldVariable.svg", "org/jetbrains/kotlin/idea/icons/field_variable.svg", -1400471294, 0);
+  /** 16x16 */ public static final @NotNull Icon FieldValueKotlin = load("org/jetbrains/kotlin/idea/icons/expui/fieldValueKotlin.svg", 527926445, 2);
+  /** 16x16 */ public static final @NotNull Icon FieldVariableKotlin = load("org/jetbrains/kotlin/idea/icons/expui/fieldVariableKotlin.svg", -29703950, 2);
   /** 16x16 */ public static final @NotNull Icon Fir = load("org/jetbrains/kotlin/idea/icons/fir.svg", -254012352, 2);
+  /** 16x16 */ public static final @NotNull Icon FunctionKotlin = load("org/jetbrains/kotlin/idea/icons/expui/functionKotlin.svg", -43076221, 2);
   /** 16x16 */ public static final @NotNull Icon InterfaceKotlin = load("org/jetbrains/kotlin/idea/icons/expui/interfaceKotlin.svg", "org/jetbrains/kotlin/idea/icons/interfaceKotlin.svg", 1126906525, 1);
   /** 16x16 */ public static final @NotNull Icon Kotlin = load("org/jetbrains/kotlin/idea/icons/expui/kotlin.svg", "org/jetbrains/kotlin/idea/icons/kotlin.svg", -1516606366, 0);
   /** 13x13 */ public static final @NotNull Icon Kotlin13 = load("org/jetbrains/kotlin/idea/icons/expui/kotlinToolWindow.svg", "org/jetbrains/kotlin/idea/icons/kotlin13.svg", -1715287910, 0);

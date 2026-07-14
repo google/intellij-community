@@ -9,12 +9,14 @@
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="25" />
-            <stringArg name="apiVersion" arg="2.3" />
-            <stringArg name="languageVersion" arg="2.3" />
+            <stringArg name="apiVersion" arg="2.4" />
+            <stringArg name="languageVersion" arg="2.4" />
           </stringArguments>
           <arrayArguments>
             <arrayArg name="pluginClasspaths">
-              <args>$MAVEN_REPOSITORY$/org/jetbrains/kotlin/kotlin-compose-compiler-plugin/2.3.21-RC2/kotlin-compose-compiler-plugin-2.3.21-RC2.jar</args>
+              <args>
+                <arg>$KOTLIN_COMPOSE_COMPILER_PLUGIN$</arg>
+              </args>
             </arrayArg>
           </arrayArguments>
         </compilerArguments>
@@ -42,5 +44,7 @@
     <orderEntry type="module" module-name="intellij.platform.jewel.foundation" />
     <orderEntry type="module" module-name="intellij.libraries.jbr" />
     <orderEntry type="library" name="jna" level="project" />
+    <orderEntry type="module" module-name="intellij.platform.icons.api" />
+    <orderEntry type="module" module-name="intellij.platform.icons.impl" />
   </component>
 </module>

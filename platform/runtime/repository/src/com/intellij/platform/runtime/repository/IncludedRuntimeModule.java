@@ -2,16 +2,13 @@
 package com.intellij.platform.runtime.repository;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-/**
- * Describes a module included in the product as part of some {@link com.intellij.platform.runtime.product.RuntimeModuleGroup}.
- */
+/// Represents a module included in [RuntimePluginHeader]
 public interface IncludedRuntimeModule {
-  @NotNull
-  RuntimeModuleDescriptor getModuleDescriptor();
+  @NotNull RuntimeModuleId getModuleId();
 
-  /**
-   * Returns instance describing conditions under which the module is loaded. 
-   */
   @NotNull RuntimeModuleLoadingRule getLoadingRule();
+
+  @Nullable RuntimeModuleId getRequiredIfAvailableId();
 }

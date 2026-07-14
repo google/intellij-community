@@ -21,24 +21,24 @@ import java.util.Set;
 
 /**
  * Class implements most of {@link FileChannel} operations so that each operation is either completed
- * successfully, or not started -- but operation (e.g. read or write) couldn't be partially applied.
- * Basically, it just reopens the underlying FileChannel, and repeats each operation on it until the
- * operation succeeds. Implementation mostly relies on already existing {@link FileChannelInterruptsRetryer}
- * machinery for that -- read {@link FileChannelInterruptsRetryer} description for implementation details
- * and discussions.
+ * successfully or not started -- but an operation (e.g. read or write) couldn't be partially applied.
+ * Basically, it just reopens the underlying FileChannel and repeats each operation on it until the
+ * operation succeeds.
+ * Implementation mostly relies on already existing {@link FileChannelInterruptsRetryer} machinery for
+ * that: read {@link FileChannelInterruptsRetryer} description for implementation details and discussions.
  * <p/>
- * This class could be seen as a counterpart for {@link FileChannelInterruptsRetryer} in following sense:
- * {@link FileChannelInterruptsRetryer} implements 'atomicity' (all-or-nothing) for logical unit of work
- * ({@link FileChannelIdempotentOperation}), while this class implements same 'atomicity' in relation to
- * elementary operations like read and write.
+ * This class could be seen as a counterpart for {@link FileChannelInterruptsRetryer} in the following
+ * sense: {@link FileChannelInterruptsRetryer} implements 'atomicity' (all-or-nothing) for logical unit
+ * of work ({@link FileChannelIdempotentOperation}), while this class implements the same 'atomicity' for
+ * the elementary operations like read and write.
  * <p/>
  * All relative-positioned methods are guarded by 'this' lock -- this means that they are not concurrent
  * even if underlying FileChannel implementation and hardware allow parallel access. Use absolute
- * positioned methods if you're sure underlying impl support parallel access, and you want piggyback
+ * positioned methods if you're sure underlying impl supports parallel access, and you want to piggyback
  * on it.
  */
 @ApiStatus.Internal
-public final class ResilientFileChannel extends FileChannel {
+public final class ResilientFileChannel extends FileChannel implements Resilient {
 
   private final FileChannelInterruptsRetryer fileChannelHandle;
   /**
@@ -49,8 +49,8 @@ public final class ResilientFileChannel extends FileChannel {
   //@GuardedBy("this")
   private long position = 0;
 
-  public ResilientFileChannel(final @NotNull Path path,
-                              final OpenOption @NotNull ... openOptions) throws IOException {
+  public ResilientFileChannel(@NotNull Path path,
+                              OpenOption @NotNull ... openOptions) throws IOException {
     Set<OpenOption> openOptionsSet;
     if (openOptions.length == 0) {
       openOptionsSet = Collections.emptySet();
@@ -62,12 +62,13 @@ public final class ResilientFileChannel extends FileChannel {
     fileChannelHandle = new FileChannelInterruptsRetryer(path, openOptionsSet);
   }
 
-  public ResilientFileChannel(final @NotNull Path path,
-                              final Set<? extends @NotNull OpenOption> openOptions) throws IOException {
+  public ResilientFileChannel(@NotNull Path path,
+                              Set<? extends @NotNull OpenOption> openOptions) throws IOException {
     fileChannelHandle = new FileChannelInterruptsRetryer(path, openOptions);
   }
 
-  public <T> T executeOperation(final @NotNull FileChannelIdempotentOperation<T> operation) throws IOException {
+  @Override
+  public <T> T executeOperation(@NotNull FileChannelIdempotentOperation<T> operation) throws IOException {
     return fileChannelHandle.retryIfInterrupted(operation);
   }
 
@@ -76,7 +77,7 @@ public final class ResilientFileChannel extends FileChannel {
   // 1. Some operations are naturally idempotent (i.e. size)
   // 2. Absolute-position methods of FileChannel are also naturally idempotent
   // 3. All relative-position methods themselves are not idempotent -> to circumvent it, we keep .position
-  //    in a local field (i.e. it is _detached_ from underlying FileChannel.position), and call apt absolute
+  //    in a local field (i.e. it is _detached_ from underlying FileChannel.position) and call apt absolute
   //    -positioned method instead
 
   @Override
@@ -85,7 +86,7 @@ public final class ResilientFileChannel extends FileChannel {
   }
 
   @Override
-  public FileChannel truncate(final long size) throws IOException {
+  public FileChannel truncate(long size) throws IOException {
     synchronized (this) {
       this.position = Math.min(position, size);
     }
@@ -93,7 +94,7 @@ public final class ResilientFileChannel extends FileChannel {
   }
 
   @Override
-  public void force(final boolean metaData) throws IOException {
+  public void force(boolean metaData) throws IOException {
     fileChannelHandle.retryIfInterrupted(ch -> {
       ch.force(metaData);
       return null;
@@ -101,16 +102,16 @@ public final class ResilientFileChannel extends FileChannel {
   }
 
 
-  //RC: Could buffer.position/limit be 'corrupted' if operation is interrupted? It seems they could:
-  //    i.e. it seems FileChannel operation interrupted in the middle could actually read all bytes
-  //    in the buffer, and update position, but throw exception on the exit path (and tests seem to
+  //RC: Could buffer.position/limit be 'corrupted' if an operation is interrupted? It seems they could:
+  //    i.e., it seems FileChannel operation interrupted in the middle could actually read all bytes
+  //    in the buffer and update position, but throw exception on the exit path (and tests seem to
   //    confirm such a behavior). This means we must store buffer.position before each .retryIfInterrupted()
   //    call and restore it inside lambda.
 
   @Override
-  public int read(final ByteBuffer target,
-                  final long offset) throws IOException {
-    final int bufferPos = target.position();
+  public int read(ByteBuffer target,
+                  long offset) throws IOException {
+    int bufferPos = target.position();
     return fileChannelHandle.retryIfInterrupted(ch -> {
       target.position(bufferPos);
       return ch.read(target, offset);
@@ -118,9 +119,9 @@ public final class ResilientFileChannel extends FileChannel {
   }
 
   @Override
-  public int write(final ByteBuffer source,
-                   final long offset) throws IOException {
-    final int bufferPos = source.position();
+  public int write(ByteBuffer source,
+                   long offset) throws IOException {
+    int bufferPos = source.position();
     return fileChannelHandle.retryIfInterrupted(ch -> {
       source.position(bufferPos);
       return ch.write(source, offset);
@@ -128,9 +129,9 @@ public final class ResilientFileChannel extends FileChannel {
   }
 
   @Override
-  public MappedByteBuffer map(final MapMode mapMode,
-                              final long mapRegionOffset,
-                              final long mapRegionSize) throws IOException {
+  public MappedByteBuffer map(MapMode mapMode,
+                              long mapRegionOffset,
+                              long mapRegionSize) throws IOException {
     return fileChannelHandle.retryIfInterrupted(ch -> ch.map(mapMode, mapRegionOffset, mapRegionSize));
   }
 
@@ -148,21 +149,21 @@ public final class ResilientFileChannel extends FileChannel {
 
 
   @Override
-  public synchronized FileChannel position(final long newPosition) throws IOException {
+  public synchronized FileChannel position(long newPosition) throws IOException {
     this.position = newPosition;
     return this;
   }
 
   @Override
-  public synchronized int read(final ByteBuffer target) throws IOException {
-    final int bytesRead = read(target, position);
+  public synchronized int read(ByteBuffer target) throws IOException {
+    int bytesRead = read(target, position);
     position += Math.max(0, bytesRead);
     return bytesRead;
   }
 
   @Override
-  public synchronized int write(final ByteBuffer src) throws IOException {
-    final int bytesWritten = write(src, position);
+  public synchronized int write(ByteBuffer src) throws IOException {
+    int bytesWritten = write(src, position);
     position += Math.max(0, bytesWritten);
     return bytesWritten;
   }

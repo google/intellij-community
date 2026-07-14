@@ -3,12 +3,10 @@ package com.intellij.platform.runtime.product.serialization
 
 import com.intellij.platform.runtime.repository.RuntimeModuleId
 import com.intellij.platform.runtime.repository.RuntimeModuleRepository
-import com.intellij.platform.runtime.repository.serialization.RawIncludedRuntimeModule
 import java.io.IOException
 import java.io.InputStream
 
 class RawProductModules internal constructor(
-  val mainGroupModules: List<RawIncludedRuntimeModule>,
   val bundledPluginMainModules: List<RuntimeModuleId>,
   val includedFrom: List<RawIncludedFromData>,
 )
@@ -33,7 +31,7 @@ interface ResourceFileResolver {
     fun createDefault(moduleRepository: RuntimeModuleRepository): ResourceFileResolver {
       return object : ResourceFileResolver {
         override fun readResourceFile(moduleId: RuntimeModuleId, relativePath: String): InputStream? {
-          return moduleRepository.getModule(moduleId).readFile(relativePath)
+          return moduleRepository.findModuleHeader(moduleId)?.readFile(relativePath)
         }
 
         override fun toString(): String {

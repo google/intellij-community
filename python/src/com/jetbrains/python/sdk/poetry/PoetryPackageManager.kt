@@ -4,6 +4,8 @@ package com.jetbrains.python.sdk.poetry
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.Sdk
+import com.intellij.openapi.vfs.VirtualFile
+import com.jetbrains.python.sdk.associatedModuleDir
 import com.intellij.python.pyproject.PyProjectTomlFile
 import com.jetbrains.python.PyBundle
 import com.jetbrains.python.errorProcessing.PyResult
@@ -18,7 +20,6 @@ import com.jetbrains.python.packaging.management.PyWorkspaceMember
 import com.jetbrains.python.packaging.management.PythonPackageInstallRequest
 import com.jetbrains.python.packaging.management.PythonPackageManager
 import com.jetbrains.python.packaging.management.PythonRepositoryManager
-import com.jetbrains.python.packaging.management.resolvePyProjectToml
 import com.jetbrains.python.packaging.packageRequirements.CachedDependencyTreeProvider
 import com.jetbrains.python.packaging.packageRequirements.PackageCollectionPackageStructureNode
 import com.jetbrains.python.packaging.packageRequirements.PackageTreeNode
@@ -27,18 +28,22 @@ import com.jetbrains.python.packaging.packageRequirements.TreeParser
 import com.jetbrains.python.packaging.packageRequirements.collectAllNames
 import com.jetbrains.python.packaging.pip.PipRepositoryManager
 import com.jetbrains.python.packaging.pyRequirement
-import com.jetbrains.python.sdk.associatedModulePath
+import com.intellij.python.pyproject.PY_PROJECT_TOML
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
 import java.nio.file.Path
 
 @ApiStatus.Internal
-class PoetryPackageManager(project: Project, sdk: Sdk) : PythonPackageManager(project, sdk) {
+internal class PoetryPackageManager(project: Project, sdk: Sdk) : PythonPackageManager(project, sdk) {
   override val installedPackagesIncludeTransitive: Boolean = true
   override val repositoryManager: PythonRepositoryManager = PipRepositoryManager.getInstance(project)
   override val treeProvider = CachedDependencyTreeProvider {
     runPoetryWithSdk(sdk, "show", "--tree").getOrNull()
   }
+  override val dependenciesFilesRelativePaths: List<Path>
+    get() = listOf(
+      Path.of(PY_PROJECT_TOML),
+    )
 
   override suspend fun syncLockedCommand(): PyResult<Unit> {
     return runPoetryWithSdk(sdk, "install").mapSuccess { }
@@ -75,7 +80,7 @@ class PoetryPackageManager(project: Project, sdk: Sdk) : PythonPackageManager(pr
     }
 
   override suspend fun updatePackageCommand(vararg specifications: PythonRepositoryPackageSpecification): PyResult<Unit> {
-    return addPackages(specifications.map { it.copy(requirement = pyRequirement(it.name, null)) }, emptyList())
+    return addPackages(specifications.toList(), emptyList())
   }
 
   override suspend fun uninstallPackageCommand(vararg pythonPackages: String, workspaceMember: PyWorkspaceMember?): PyResult<Unit> {
@@ -217,12 +222,6 @@ class PoetryPackageManager(project: Project, sdk: Sdk) : PythonPackageManager(pr
       .map { PackageTreeNode(PyPackageName.from(it.name)) }
 
     return PackageCollectionPackageStructureNode(declared, undeclared + standalonePackages)
-  }
-
-  override fun getDependencyFile(): PyProjectTomlFile? {
-    val projectPathStr = sdk.associatedModulePath ?: return null
-    val projectPath = Path.of(projectPathStr)
-    return resolvePyProjectToml(projectPath)
   }
 
   override suspend fun addDependencyImpl(requirement: PyRequirement): Boolean {

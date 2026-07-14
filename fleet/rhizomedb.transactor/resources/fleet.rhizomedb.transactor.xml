@@ -4,12 +4,12 @@
     <module name="fleet.bifurcan"/>
     <module name="fleet.fastutil"/>
     <module name="fleet.multiplatform.shims"/>
+    <module name="fleet.openmap"/>
     <module name="fleet.reporting.api"/>
     <module name="fleet.reporting.shared"/>
     <module name="fleet.rhizomedb"/>
     <module name="fleet.rpc"/>
     <module name="fleet.util.core"/>
-    <module name="intellij.libraries.fastutil"/>
     <module name="intellij.libraries.kotlinx.coroutines.core"/>
     <module name="intellij.libraries.kotlinx.serialization.core"/>
     <module name="intellij.libraries.kotlinx.serialization.json"/>

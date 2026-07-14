@@ -36,9 +36,16 @@ import com.intellij.platform.util.progress.RawProgressReporter
 import com.intellij.platform.util.progress.reportRawProgress
 import com.intellij.util.ExceptionUtil
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Runnable
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import org.jetbrains.annotations.TestOnly
@@ -50,7 +57,6 @@ import org.jetbrains.idea.maven.buildtool.MavenSyncSession
 import org.jetbrains.idea.maven.buildtool.MavenSyncSpec
 import org.jetbrains.idea.maven.buildtool.incrementalMode
 import org.jetbrains.idea.maven.importing.MavenImportStats
-import org.jetbrains.idea.maven.statistics.MavenToolchainCollector
 import org.jetbrains.idea.maven.importing.MavenProjectImporter
 import org.jetbrains.idea.maven.importing.importActivityStarted
 import org.jetbrains.idea.maven.importing.runMavenConfigurationTask
@@ -58,13 +64,20 @@ import org.jetbrains.idea.maven.model.MavenArtifact
 import org.jetbrains.idea.maven.model.MavenExplicitProfiles
 import org.jetbrains.idea.maven.project.preimport.MavenProjectStaticImporter
 import org.jetbrains.idea.maven.project.preimport.SimpleStructureProjectVisitor
-import org.jetbrains.idea.maven.server.*
-import org.jetbrains.idea.maven.server.MavenArtifactEvent.ArtifactEventType.*
+import org.jetbrains.idea.maven.server.MavenArtifactEvent
+import org.jetbrains.idea.maven.server.MavenArtifactEvent.ArtifactEventType.DOWNLOAD_FAILED
+import org.jetbrains.idea.maven.server.MavenDistributionsCache
+import org.jetbrains.idea.maven.server.MavenServerConsoleEvent
+import org.jetbrains.idea.maven.server.MavenServerConsoleIndicator
+import org.jetbrains.idea.maven.server.MavenWrapperDownloader
+import org.jetbrains.idea.maven.server.showUntrustedProjectNotification
+import org.jetbrains.idea.maven.statistics.MavenToolchainCollector
 import org.jetbrains.idea.maven.telemetry.tracer
 import org.jetbrains.idea.maven.utils.MavenActivityKey
 import org.jetbrains.idea.maven.utils.MavenLog
 import org.jetbrains.idea.maven.utils.MavenUtil
 import org.jetbrains.idea.maven.utils.withLazyProgressIndicator
+import java.nio.file.Path
 import kotlin.time.Duration
 
 
@@ -73,13 +86,15 @@ private interface MavenSyncFileReader {
 }
 
 private class MavenFullSyncFileReader(
+  val managedFiles: List<String>,
   val projectsTree: MavenProjectsTree,
   val spec: MavenSyncSpec,
   val generalSettings: MavenGeneralSettings,
+  val explicitProfiles: MavenExplicitProfiles,
 ) : MavenSyncFileReader {
   override suspend fun invoke(wrappers: MavenEmbedderWrappers): MavenProjectsTreeUpdateResult {
     return reportRawProgress { reporter ->
-      projectsTree.updateAll(spec.forceReading(), generalSettings, wrappers, reporter)
+      projectsTree.updateAllFiles(managedFiles, spec.forceReading(), generalSettings, explicitProfiles, wrappers, reporter)
     }
   }
 }
@@ -88,13 +103,14 @@ private class MavenPartialSyncFileReader(
   val projectsTree: MavenProjectsTree,
   val spec: MavenSyncSpec,
   val generalSettings: MavenGeneralSettings,
+  val explicitProfiles: MavenExplicitProfiles,
   val filesToUpdate: List<VirtualFile>,
   val filesToDelete: List<VirtualFile>,
 ) : MavenSyncFileReader {
   override suspend fun invoke(wrappers: MavenEmbedderWrappers): MavenProjectsTreeUpdateResult {
     return reportRawProgress { reporter ->
-      val deleted = projectsTree.delete(filesToDelete, generalSettings, wrappers, reporter)
-      val updated = projectsTree.update(filesToUpdate, spec.forceReading(), generalSettings, wrappers, reporter)
+      val deleted = projectsTree.delete(filesToDelete, generalSettings, explicitProfiles, wrappers, reporter)
+      val updated = projectsTree.update(filesToUpdate, spec.forceReading(), generalSettings, explicitProfiles, wrappers, reporter)
       deleted + updated
     }
   }
@@ -216,6 +232,11 @@ class MavenDownloadSourcesRequest private constructor(
 }
 
 open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineScope) : MavenProjectsManager(project, cs) {
+
+  private val existingManagedFiles: List<VirtualFile>
+    get() {
+      return state.originalFiles.mapNotNull { VirtualFileManager.getInstance().findFileByNioPath(Path.of(it)) }
+    }
 
   @TestOnly
   protected override fun runInBackgroundBlocking(r: Runnable) {
@@ -375,7 +396,7 @@ open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineSco
     val mavenEmbedderWrappers = project.service<MavenEmbedderWrappersManager>().createMavenEmbedderWrappers()
     mavenEmbedderWrappers.use {
       return doUpdateMavenProjects(tree, spec, null, mavenEmbedderWrappers, MavenPartialSyncFileReader(
-        tree, spec, generalSettings, filesToUpdate, filesToDelete))
+        tree, spec, generalSettings, explicitProfiles, filesToUpdate, filesToDelete))
     }
   }
 
@@ -457,7 +478,7 @@ open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineSco
       return doUpdateMavenProjects(treeToSync, spec,
                                    modelsProvider,
                                    mavenEmbedderWrappers,
-                                   MavenFullSyncFileReader(treeToSync, spec, generalSettings))
+                                   MavenFullSyncFileReader(state.originalFiles, treeToSync, spec, generalSettings, explicitProfiles))
     }
   }
 
@@ -485,7 +506,7 @@ open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineSco
             MavenProjectStaticImporter.getInstance(myProject)
               .syncStatic(
                 session,
-                tree.existingManagedFiles,
+                existingManagedFiles,
                 modelsProvider,
                 importingSettings,
                 generalSettings,
@@ -528,6 +549,7 @@ open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineSco
           edtWriteAction { it.finish() }
         }
         console.finishTransaction(spec.resolveIncrementally())
+        console.awaitAllEventsProcessed()
         syncActivity.finished {
           listOf(
             ProjectImportCollector.LINKED_PROJECTS.with(tree.rootProjects.count()),
@@ -543,7 +565,7 @@ open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineSco
   }
 
   private suspend fun checkMavenEnvironment(tree: MavenProjectsTree, spec: MavenSyncSpec): Boolean {
-    return MavenEnvironmentChecker(syncConsole, project).checkEnvironment(tree.existingManagedFiles)
+    return MavenEnvironmentChecker(syncConsole, project).checkEnvironment(existingManagedFiles)
   }
 
   private suspend fun doDynamicSync(
@@ -657,6 +679,7 @@ open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineSco
               resolver.resolve(spec.resolveIncrementally(),
                                projectsToResolve,
                                tree,
+                               explicitProfiles,
                                tree.workspaceMap,
                                repositoryPath,
                                updateSnapshots,
@@ -674,8 +697,15 @@ open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineSco
   }
 
   override suspend fun onProjectStartup() {
-    if (!isNormalProject) return
-    if (!wasMavenized()) return
+    MavenLog.LOG.debug("onProjectStartup")
+
+    val normalProject = isNormalProject
+    MavenLog.LOG.debug("isNormalProject: $normalProject")
+    if (!normalProject) return
+
+    val wasMavenized = wasMavenized()
+    MavenLog.LOG.debug("wasMavenized: $wasMavenized")
+    if (!wasMavenized) return
 
     MavenSettingsCache.getInstance(myProject).reloadAsync()
     initOnProjectStartup()
@@ -748,7 +778,7 @@ open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineSco
       return
     }
     val baseDir = readAction {
-      if (tree.existingManagedFiles.size != 1) null else MavenUtil.getBaseDir(tree.existingManagedFiles[0])
+      if (existingManagedFiles.size != 1) null else MavenUtil.getBaseDir(existingManagedFiles[0])
     }
     if (null == baseDir) return
     withContext(Dispatchers.IO) {

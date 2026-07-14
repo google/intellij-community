@@ -18,6 +18,8 @@
     <module name="intellij.platform.projectModel"/>
     <module name="intellij.platform.usageView"/>
     <module name="intellij.platform.util.ui"/>
+    <module name="intellij.regexp"/>
+    <module name="intellij.xml.impl"/>
     <module name="intellij.xml.parser"/>
     <module name="intellij.xml.psi"/>
   </dependencies>
@@ -30,6 +32,9 @@
                     dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.structuralsearch.filterProvider"
                     interface="com.intellij.structuralsearch.plugin.ui.filters.FilterProvider"
+                    dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.structuralsearch.scriptEngine"
+                    interface="com.intellij.structuralsearch.StructuralSearchScriptEngine"
                     dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.structuralsearch.specialXmlTagExtractor"
                     interface="com.intellij.structuralsearch.SpecialElementExtractor"
@@ -63,7 +68,7 @@
     <applicationSettings service="com.intellij.structuralsearch.plugin.ui.UIState"/>
   </extensions>
 
-  <actions>
+  <actions resource-bundle="messages.ActionsBundle">
     <group id="StructuralSearchActions">
       <add-to-group group-id="FindMenuGroup" anchor="after" relative-to-action="ReplaceInPath"/>
 

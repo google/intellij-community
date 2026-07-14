@@ -36,10 +36,10 @@ class RepositoryTest {
     val foo = repository.getModule(fooId)
     assertEquals(listOf(foo), bar.dependencies)
 
-    val fooHeader = repository.findHeader(fooId)
+    val fooHeader = repository.findModuleHeader(fooId)
     assertNotNull(fooHeader)
     assertEquals("ij.foo", fooHeader.moduleId.name)
-    val barHeader = repository.findHeader(barId)
+    val barHeader = repository.findModuleHeader(barId)
     assertEquals(emptyList<RuntimeModuleId>(), fooHeader.dependencies)
     assertNotNull(barHeader)
     assertEquals("ij.bar", barHeader.moduleId.name)
@@ -54,23 +54,16 @@ class RepositoryTest {
       createModuleDescriptor("ij.bar", emptyList(), listOf("ij.foo", "unresolved")),
       createModuleDescriptor("ij.baz", emptyList(), listOf("ij.bar")),
     )
-    fun RuntimeModuleId.assertUnresolved(vararg pathToFailed: RuntimeModuleId) {
-      val result = repository.resolveModule(this)
-      assertNull(result.resolvedModule)
-      assertEquals(pathToFailed.toList(), result.failedDependencyPath)
-    }
     val unresolvedId = moduleId("unresolved")
     val barId = moduleId("ij.bar")
     val bazId = moduleId("ij.baz")
-    unresolvedId.assertUnresolved(unresolvedId)
-    barId.assertUnresolved(barId, unresolvedId)
-    bazId.assertUnresolved(bazId, barId, unresolvedId)
-    
+    assertNull(repository.findModuleHeader(unresolvedId))
+
     val exception = assertThrows(MalformedRepositoryException::class.java) {
       repository.getModule(bazId)
     }
     assertEquals("Cannot resolve module 'ij.baz': module 'unresolved' (<- 'ij.bar' <- 'ij.baz') is not found", exception.message)
-    assertEquals("ij.bar", repository.findHeader(barId)?.moduleId?.name)
+    assertEquals("ij.bar", repository.findModuleHeader(barId)?.moduleId?.name)
   }
 
   @Test
@@ -109,7 +102,7 @@ class RepositoryTest {
       createModuleDescriptor("ij.foo", listOf("foo.jar"), listOf("unresolved")),
     )
     assertEquals(listOf(tempDirectory.rootPath.resolve("foo.jar")), 
-                 repository.getModuleResourcePaths(moduleId("ij.foo")))
+                 repository.findModuleHeader(moduleId("ij.foo"))!!.ownClasspath)
   }
 
   @Test
@@ -163,7 +156,7 @@ class RepositoryTest {
       createModuleDescriptor("ij.baz", listOf("baz.jar"), listOf("ij.foo")),
       createModuleDescriptor("ij.main", emptyList(), listOf("ij.bar", "ij.baz")),
     )
-    val classpath = repository.getModule(moduleId("ij.main")).moduleClasspath
+    val classpath = repository.computeModuleClasspath(moduleId("ij.main"))
     assertEquals(listOf("bar.jar", "foo.jar", "baz.jar").map { tempDirectory.rootPath.resolve(it) }, classpath)
   }
 
@@ -172,10 +165,10 @@ class RepositoryTest {
     @CartesianTest.Values(strings = ["", "ij.foo", "ij.bar"]) storedBootstrapModule: String, 
     @CartesianTest.Values(booleans = [true, false]) loadFromCompact: Boolean
   ) {
-    val fooId = raw("ij.foo", RuntimeModuleId.LEGACY_JPS_MODULE_NAMESPACE)
+    val fooId = raw("ij.foo", RuntimeModuleId.LEGACY_JPS_MODULE_NAMESPACE_SUFFIX)
     val descriptors = arrayOf(
       create(fooId, listOf("foo.jar"), emptyList()),
-      create(raw("ij.bar", RuntimeModuleId.LEGACY_JPS_MODULE_NAMESPACE), listOf("bar.jar"),
+      create(raw("ij.bar", RuntimeModuleId.LEGACY_JPS_MODULE_NAMESPACE_SUFFIX), listOf("bar.jar"),
       listOf(fooId)),
     )
     val basePath = tempDirectory.rootPath

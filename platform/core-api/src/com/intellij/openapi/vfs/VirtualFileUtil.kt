@@ -16,6 +16,7 @@ import com.intellij.openapi.util.io.PathPrefixTree
 import com.intellij.openapi.util.io.relativizeToClosestAncestor
 import com.intellij.openapi.vfs.VirtualFilePrefixTree.VirtualFileElement
 import com.intellij.openapi.vfs.limits.FileSizeLimit
+import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 import com.intellij.testFramework.LightVirtualFileBase
@@ -65,9 +66,16 @@ fun VirtualFile.isTooLargeForIntellijSense(): Boolean {
   return length > maxFileSize
 }
 
-fun VirtualFile.toNioPathOrNull(): Path? {
-  return runCatching { toNioPath() }.getOrNull()
-}
+/**
+ * Works as [VirtualFile.toNioPath] but returns `null` instead of throwing [UnsupportedOperationException]
+ */
+fun VirtualFile.toNioPathOrNull(): Path? =
+  try {
+    toNioPath()
+  }
+  catch (_: UnsupportedOperationException) {
+    null
+  }
 
 @RequiresReadLock
 fun VirtualFile.findDocument(): Document? {
@@ -77,6 +85,16 @@ fun VirtualFile.findDocument(): Document? {
 @RequiresReadLock
 fun VirtualFile.findPsiFile(project: Project): PsiFile? {
   return PsiManager.getInstance(project).findFile(this)
+}
+
+/**
+ * Finds the [PsiDirectory] that encapsulates current [VirtualFile].
+ * If the [VirtualFile] is a directory itself, the method will return null.
+ *
+ */
+@RequiresReadLock
+fun VirtualFile.findPsiDirectory(project: Project): PsiDirectory? {
+  return PsiManager.getInstance(project).findDirectory(this)
 }
 
 /**
@@ -207,9 +225,17 @@ fun VirtualFile.findOrCreateDirectory(relativePath: @SystemIndependent String): 
   return directory
 }
 
+/**
+ * Find [VirtualFile] by [Path] without refreshing the file system.
+ */
+fun Path.findVirtualFileOrDirectory(): VirtualFile? {
+  val fileManager = VirtualFileManager.getInstance()
+  return fileManager.findFileByNioPath(this.normalize())
+}
+
 fun Path.refreshAndFindVirtualFileOrDirectory(): VirtualFile? {
   val fileManager = VirtualFileManager.getInstance()
-  return fileManager.refreshAndFindFileByNioPath(this)
+  return fileManager.refreshAndFindFileByNioPath(this.normalize())
 }
 
 fun Path.refreshAndFindVirtualFile(): VirtualFile? {

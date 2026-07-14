@@ -2,11 +2,11 @@
 package org.jetbrains.kotlin.idea.base.fir.analysisApiPlatform.sessions
 
 import com.intellij.psi.PsiManager
+import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
 import org.jetbrains.kotlin.analysis.api.platform.projectStructure.KotlinProjectStructureProvider
 import org.jetbrains.kotlin.analysis.low.level.api.fir.LLFirInternals
 import org.jetbrains.kotlin.analysis.low.level.api.fir.LLResolutionFacadeService
 import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSession
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode
 import org.jetbrains.kotlin.idea.base.test.ensureFilesResolved
 import org.jetbrains.kotlin.idea.test.AbstractMultiModuleTest
 import org.jetbrains.kotlin.idea.util.application.executeWriteCommand
@@ -23,12 +23,9 @@ import java.io.File
  * [DanglingFileModuleInvalidationTest] tests fake dangling file session invalidation because the Analysis API test infrastructure doesn't
  * support fake files yet.
  */
+@OptIn(KaImplementationDetail::class)
 class DanglingFileModuleInvalidationTest : AbstractMultiModuleTest() {
-
     override fun getTestDataDirectory(): File = error("Should not be called")
-
-    override val pluginMode: KotlinPluginMode
-        get() = KotlinPluginMode.K2
 
     fun testCodeFragmentChangeInsideFakeFile() {
         val srcModule = createModuleInTmpDir("src") {

@@ -1,14 +1,14 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.pom.java
 
 import com.intellij.java.syntax.JavaSyntaxBundle
 import com.intellij.java.syntax.JavaSyntaxBundle.message
+import com.intellij.util.ThreadLocalKmp
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Contract
 import org.jetbrains.annotations.Nls
 import org.jetbrains.annotations.NonNls
 import org.jetbrains.annotations.PropertyKey
-import com.intellij.util.ThreadLocalKmp
-import org.jetbrains.annotations.ApiStatus
 import kotlin.jvm.JvmStatic
 
 /**
@@ -33,6 +33,11 @@ enum class JavaFeature {
   STRING_SWITCH(LanguageLevel.JDK_1_7, "feature.string.switch"),
   OBJECTS_CLASS(LanguageLevel.JDK_1_7, "feature.objects.class"),
   STREAM_OPTIONAL(LanguageLevel.JDK_1_8, "feature.stream.and.optional.api", true),
+
+  /**
+   * `javadoc` tool has a different resolution behavior past JDK1.8, it now supports imports
+   */
+  PACKAGE_INFO_DOC_IMPORTS(LanguageLevel.JDK_1_8, "feature.package.info.imports"),
 
   /**
    * java.util.Arrays.setAll, java.util.Collection#removeIf, java.util.List.sort(Comparator),
@@ -149,7 +154,16 @@ enum class JavaFeature {
     }
   },
 
+  /**
+   * JEP 525
+   */
   STRUCTURED_CONCURRENCY_TASK_SCOPE_STATIC_FACTORY_METHODS(LanguageLevel.JDK_25_PREVIEW, "feature.structured.concurrency.static.factory.methods"),
+
+
+  /**
+   * JEP 533
+   */
+  STRUCTURED_CONCURRENCY_TASK_SCOPE_STATIC_FACTORY_METHODS_WITH_EXEC_EXCEPTION(LanguageLevel.JDK_27_PREVIEW, "feature.structured.concurrency.static.factory.methods.with.execution.exception"),
 
   PEM_API(LanguageLevel.JDK_25_PREVIEW, "feature.pem.api"),
 
@@ -263,7 +277,7 @@ enum class JavaFeature {
     override fun isSufficient(useSiteLevel: LanguageLevel): Boolean {
       return super.isSufficient(useSiteLevel) ||
              useSiteLevel.isAtLeast(LanguageLevel.JDK_25) ||
-             LanguageLevel.JDK_24_PREVIEW == useSiteLevel; //jep 494
+             LanguageLevel.JDK_24_PREVIEW == useSiteLevel //jep 494
     }
 
     override val standardLevel: LanguageLevel = LanguageLevel.JDK_25
@@ -294,14 +308,14 @@ enum class JavaFeature {
   JAVA_LANG_IO(LanguageLevel.JDK_25, "feature.java.lang.io"),
 
   /**
-   * JEP 502,
-   * JEP 526
+   * JEP 502, JEP 526, JEP 531
    * @see STABLE_VALUES
    */
   LAZY_CONSTANTS(LanguageLevel.JDK_26_PREVIEW, "feature.lazy.constants"),
 
   /**
    * JEP 530
+   * JEP 532 (without any changes)
    * @see PRIMITIVE_TYPES_IN_PATTERNS
    */
   PATTERNS_WITH_TIGHTENED_DOMINANCE(LanguageLevel.JDK_26_PREVIEW, "feature.patterns.with.tightened.dominance"),

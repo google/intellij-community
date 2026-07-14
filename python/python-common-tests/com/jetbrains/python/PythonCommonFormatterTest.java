@@ -68,6 +68,11 @@ public abstract class PythonCommonFormatterTest extends PythonCommonTestCase {
     doTest();
   }
 
+  // PEP 810: `lazy` keyword in `import`/`from ... import` must keep a single space around it after reformat.
+  public void testLazyImport() {
+    runWithLanguageLevel(LanguageLevel.PYTHON315, this::doTest);
+  }
+
   public void testBlankLineBeforeFunction() {
     doTest();
   }
@@ -351,6 +356,11 @@ public abstract class PythonCommonFormatterTest extends PythonCommonTestCase {
 
   public void testIndentInComprehensions() {  // PY-8516
     getPythonCodeStyleSettings().ALIGN_COLLECTIONS_AND_COMPREHENSIONS = false;
+    doTest();
+  }
+
+  // PEP 798: unpacking (* and **) in comprehensions and generator expressions
+  public void testUnpackingInComprehensions() {
     doTest();
   }
 

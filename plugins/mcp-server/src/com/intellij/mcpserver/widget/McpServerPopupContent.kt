@@ -37,7 +37,6 @@ import androidx.compose.ui.window.rememberComponentRectPositionProvider
 import com.intellij.mcpserver.McpServerBundle
 import com.intellij.mcpserver.clients.McpClientInfo
 import com.intellij.ui.dsl.builder.IntelliJSpacingConfiguration
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -53,6 +52,7 @@ import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.theme.popupContainerStyle
 import org.jetbrains.jewel.ui.theme.tooltipStyle
+import kotlin.time.Duration.Companion.seconds
 
 private val spacing = IntelliJSpacingConfiguration()
 
@@ -99,6 +99,13 @@ internal fun McpServerPopupContent(
 @Composable
 private fun EnabledMcpSettings(model: McpServerPopupModel) {
   var isBraveMode by remember { mutableStateOf(model.braveMode) }
+
+  Link(
+    text = McpServerBundle.message("mcp.server.status.bar.popup.active.connections", model.activeConnectionCount),
+    onClick = { model.showInServiceView() },
+  )
+
+  Spacer(Modifier.height(spacing.verticalSmallGap.dp))
 
   if (model.sseUrl != null || model.streamUrl != null) Row(horizontalArrangement = Arrangement.spacedBy(spacing.horizontalSmallGap.dp)) {
     model.sseUrl?.let { sseUrl -> ExternalLink(text = sseUrl, onClick = { model.browseUrl(sseUrl) }) }
@@ -287,6 +294,7 @@ fun McpPanelPreview() {
       detectedClientNames.take(2).joinToString(", "),
     )
     override val helpLink = "https://www.jetbrains.com/help/idea/mcp-server.html#supported-tools"
+    override val activeConnectionCount = 3
 
     override fun tryEnable() = true
     override fun disable() {}
@@ -296,6 +304,7 @@ fun McpPanelPreview() {
     override fun copyStreamConfig() = true
     override fun browseUrl(url: String) {}
     override fun onSettingsClick() {}
+    override fun showInServiceView() {}
   }
 
   var sizeText by remember { mutableStateOf("") }

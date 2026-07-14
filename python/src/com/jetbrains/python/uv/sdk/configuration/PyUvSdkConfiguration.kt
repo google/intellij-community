@@ -2,15 +2,15 @@
 package com.jetbrains.python.uv.sdk.configuration
 
 import com.intellij.openapi.module.Module
-import com.intellij.python.common.tools.ToolId
-import com.intellij.python.community.impl.uv.common.UV_TOOL_ID
+import com.intellij.python.community.common.tools.ToolId
+import com.intellij.python.uv.backend.setUvExecutableLocal
+import com.intellij.python.uv.common.UV_TOOL_ID
 import com.jetbrains.python.PyBundle
 import com.jetbrains.python.PythonBinary
 import com.jetbrains.python.sdk.configuration.CreateSdkInfo
 import com.jetbrains.python.sdk.configuration.EnvCheckerResult
 import com.jetbrains.python.sdk.configuration.PyProjectTomlConfigurationExtension
 import com.jetbrains.python.sdk.configuration.prepareSdkCreator
-import com.jetbrains.python.sdk.uv.impl.setUvExecutableLocal
 import com.jetbrains.python.uv.findUvLock
 import java.nio.file.Path
 
@@ -42,7 +42,7 @@ internal class PyUvSdkConfiguration : PyProjectTomlConfigurationExtension {
         EnvCheckerResult.SuggestToolInstallation(
           toolToInstall = toolName,
           pathPersister = pathPersister,
-          intentionName = PyBundle.message("sdk.create.custom.venv.install.fix.title.using.pip", toolName)
+          intentionName = PyBundle.message("sdk.create.custom.venv.install.fix.title", toolName)
         )
       } else baseCheckResult
     }

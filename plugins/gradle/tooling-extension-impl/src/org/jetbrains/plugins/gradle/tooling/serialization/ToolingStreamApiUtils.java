@@ -8,7 +8,6 @@ import com.amazon.ion.system.IonBinaryWriterBuilder;
 import com.intellij.util.ThrowableConsumer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.plugins.gradle.tooling.serialization.internal.adapter.Supplier;
 
 import java.io.File;
 import java.io.IOException;
@@ -20,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Supplier;
 
 public final class ToolingStreamApiUtils {
 
@@ -112,6 +112,32 @@ public final class ToolingStreamApiUtils {
     reader.next();
     assertFieldName(reader, fieldName);
     return reader.booleanValue();
+  }
+
+  public static void writeBooleanNullable(
+    @NotNull IonWriter writer,
+    @NotNull String fieldName,
+    @Nullable Boolean value
+  ) throws IOException {
+    writer.setFieldName(fieldName);
+    if (value == null) {
+      writer.writeNull(IonType.BOOL);
+    } else {
+      writer.writeBool(value);
+    }
+  }
+
+  public static @Nullable Boolean readBooleanNullable(
+    @NotNull IonReader reader,
+    @Nullable String fieldName
+  ) {
+    reader.next();
+    assertFieldName(reader, fieldName);
+    if (reader.isNullValue()) {
+      return null;
+    } else {
+      return reader.booleanValue();
+    }
   }
 
   public static void writeString(

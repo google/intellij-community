@@ -19,7 +19,7 @@ import com.intellij.mcpserver.toolsets.Constants
 import com.intellij.mcpserver.util.RunPoint
 import com.intellij.mcpserver.util.collectRunPoints
 import com.intellij.mcpserver.util.executeRunConfiguration
-import com.intellij.mcpserver.util.resolveInProject
+import com.intellij.mcpserver.util.projectDirectory
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -28,14 +28,12 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
-import kotlin.io.path.exists
-import kotlin.io.path.isRegularFile
 import kotlin.io.path.pathString
 
 class ExecutionToolset : McpToolset {
 
   @McpToolHints(readOnlyHint = TRUE, openWorldHint = FALSE)
-  @McpTool
+  @McpTool(name = ExecutionToolNames.GET_RUN_CONFIGURATIONS)
   @McpDescription("""
     |Returns either project run configurations or executable code locations, depending on the input.
     |
@@ -60,9 +58,7 @@ class ExecutionToolset : McpToolset {
     if (filePath != null) {
       currentCoroutineContext().reportToolActivity(McpServerBundle.message("tool.activity.discovering.run.points", filePath))
 
-      val resolvedPath = project.resolveInProject(filePath)
-      if (!resolvedPath.exists()) mcpFail("File not found: $filePath")
-      if (!resolvedPath.isRegularFile()) mcpFail("Not a file: $filePath")
+      val resolvedPath = resolveExistingRegularFileInProject(pathInProject = filePath, projectDirectory = project.projectDirectory)
 
       val runPoints = readAction {
         val virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(resolvedPath)
@@ -99,10 +95,10 @@ class ExecutionToolset : McpToolset {
     return GetRunConfigurationsResult(configurations = configurations)
   }
 
-  @McpTool
+  @McpTool(name = ExecutionToolNames.EXECUTE_RUN_CONFIGURATION)
   @McpDescription("""
-    |Run either an existing run configuration by name or a temporary run configuration created from a code location
-    |(`filePath` + `line`) in the current project, then wait up to specified timeout for it to finish.
+    |Run either an existing run configuration by name or a temporary run configuration created from a code location (`filePath` + `line`) in the current project, then wait up to specified timeout for it to finish.
+    |
     |Use this tool with either a configuration name returned by `get_run_configurations`, or with a run point
     |(`filePath` + `line`) returned by `get_run_configurations(filePath = ...)`.
     |

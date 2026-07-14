@@ -11,7 +11,6 @@ import com.intellij.openapi.application.ex.ApplicationInfoEx
 import com.intellij.openapi.components.service
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.updateSettings.impl.PluginDownloader
 import com.intellij.openapi.util.text.HtmlChunk
 import com.intellij.platform.ide.CoreUiCoroutineScopeHolder
 import kotlinx.coroutines.CoroutineScope
@@ -30,6 +29,7 @@ internal object PluginModelAsyncOperationsExecutor {
     descriptor: PluginUiModel,
     customizer: PluginManagerCustomizer?,
     component: JComponent,
+    pluginUpdateSourceApplier: PluginUpdateSourceApplier,
   ) {
     cs.launch(Dispatchers.IO) {
       val stateForComponent = ModalityState.stateForComponent(component)
@@ -40,9 +40,10 @@ internal object PluginModelAsyncOperationsExecutor {
           customAction()
           return@withContext
         }
-        modelFacade.installOrUpdatePlugin(component, descriptor, null, stateForComponent)
+        val result = modelFacade.installOrUpdatePlugin(component, descriptor, null, stateForComponent)
+        pluginUpdateSourceApplier.applyPluginUpdateSourcesBasedOnResult(result)
       }
-    }
+    }.invokeOnCompletion (pluginUpdateSourceApplier::revertIfNeeded)
   }
 
   suspend fun performMarketplaceSearch(
@@ -63,7 +64,7 @@ internal object PluginModelAsyncOperationsExecutor {
 
   suspend fun loadUpdates(): List<PluginUiModel> {
     return withContext(Dispatchers.IO) {
-      UiPluginManager.getInstance().getUpdateModels()
+      PluginUpdatesService.getInstance().awaitUpdates().toList()
     }
   }
 
@@ -104,6 +105,7 @@ internal object PluginModelAsyncOperationsExecutor {
     pluginManagerCustomizer: PluginManagerCustomizer?,
     modalityState: ModalityState,
     component: JComponent?,
+    pluginUpdateSourceApplier: PluginUpdateSourceApplier,
   ) {
     cs.launch(Dispatchers.IO) {
       val model = pluginManagerCustomizer?.getUpdateButtonCustomizationModel(modelFacade, plugin, updateDescriptor, modalityState)
@@ -112,10 +114,11 @@ internal object PluginModelAsyncOperationsExecutor {
           model.action()
         }
         else {
-          modelFacade.installOrUpdatePlugin(component, plugin, updateDescriptor, modalityState)
+          val result = modelFacade.installOrUpdatePlugin(component, plugin, updateDescriptor, modalityState)
+          pluginUpdateSourceApplier.applyPluginUpdateSourcesBasedOnResult(result)
         }
       }
-    }
+    }.invokeOnCompletion(pluginUpdateSourceApplier::revertIfNeeded)
   }
 
   fun loadPopupMenuActions(
@@ -141,10 +144,10 @@ internal object PluginModelAsyncOperationsExecutor {
     }
   }
 
-  fun findPlugins(downloaders: Collection<PluginDownloader>, callback: Function<Map<PluginId, PluginUiModel>, Unit>) {
+  fun findPlugins(pluginIds: Collection<PluginId>, callback: Function<Map<PluginId, PluginUiModel>, Unit>) {
     val coroutineScope = service<CoreUiCoroutineScopeHolder>().coroutineScope
     coroutineScope.launch(Dispatchers.IO) {
-      val pluginModels = UiPluginManager.getInstance().findInstalledPlugins(downloaders.map(PluginDownloader::getId).toSet())
+      val pluginModels = UiPluginManager.getInstance().findInstalledPlugins(pluginIds.toSet())
       withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
         callback.apply(pluginModels)
       }

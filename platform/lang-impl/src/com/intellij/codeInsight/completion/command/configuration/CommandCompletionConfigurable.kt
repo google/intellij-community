@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.completion.command.configuration
 
 import com.intellij.codeInsight.CodeInsightBundle
@@ -16,7 +16,6 @@ import com.intellij.ui.dsl.builder.selected
 import com.intellij.util.PlatformUtils
 import org.jetbrains.annotations.ApiStatus
 
-@ApiStatus.Experimental
 @ApiStatus.Internal
 class CommandCompletionConfigurableProvider : ConfigurableProvider() {
 
@@ -42,7 +41,7 @@ class CommandCompletionConfigurableProvider : ConfigurableProvider() {
                           { r -> settings.state.setEnabled(r) })
             .contextHelp(CodeInsightBundle.message("options.command.completion.display.comment"))
         }
-        if (GroupedCompletionContributor.isGroupEnabledInApp()) {
+        if (GroupedCompletionContributor.isGroupEnabled(null)) {
           indent {
             row {
               checkBox(CodeInsightBundle.message("options.command.completion.show.group"))

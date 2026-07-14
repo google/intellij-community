@@ -2,6 +2,7 @@
 package org.jetbrains.idea.maven.wizards
 
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.runReadActionBlocking
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.externalSystem.model.ExternalSystemDataKeys
@@ -9,6 +10,7 @@ import com.intellij.openapi.externalSystem.service.project.IdeUIModifiableModels
 import com.intellij.openapi.externalSystem.service.project.manage.ExternalProjectsManagerImpl
 import com.intellij.openapi.module.ModifiableModuleModel
 import com.intellij.openapi.module.Module
+import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
@@ -23,18 +25,30 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.packaging.artifacts.ModifiableArtifactModel
+import com.intellij.platform.util.progress.RawProgressReporter
 import com.intellij.projectImport.DeprecatedProjectBuilderForImport
 import com.intellij.projectImport.ProjectImportBuilder
 import com.intellij.projectImport.ProjectOpenProcessor
 import icons.OpenapiIcons
 import org.jetbrains.idea.maven.model.MavenExplicitProfiles
-import org.jetbrains.idea.maven.project.*
+import org.jetbrains.idea.maven.project.MavenEmbedderWrappersManager
+import org.jetbrains.idea.maven.project.MavenGeneralSettings
+import org.jetbrains.idea.maven.project.MavenImportingSettings
+import org.jetbrains.idea.maven.project.MavenProject
+import org.jetbrains.idea.maven.project.MavenProjectBundle
+import org.jetbrains.idea.maven.project.MavenProjectsTree
+import org.jetbrains.idea.maven.project.MavenWorkspaceSettings
+import org.jetbrains.idea.maven.project.MavenWorkspaceSettingsComponent
 import org.jetbrains.idea.maven.project.actions.LookForNestedToggleAction
-import org.jetbrains.idea.maven.utils.*
+import org.jetbrains.idea.maven.utils.FileFinder
+import org.jetbrains.idea.maven.utils.MavenProcessCanceledException
+import org.jetbrains.idea.maven.utils.MavenProgressIndicator
+import org.jetbrains.idea.maven.utils.MavenTask
+import org.jetbrains.idea.maven.utils.MavenUtil
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.util.*
+import java.util.Objects
 import javax.swing.Icon
 
 private val LOG = Logger.getInstance(MavenProjectBuilder::class.java)
@@ -172,14 +186,21 @@ internal class MavenProjectBuilder : ProjectImportBuilder<MavenProject>(), Depre
     })
   }
 
+  private fun toRawProgressReporter(progressIndicator: ProgressIndicator): RawProgressReporter {
+    return object : RawProgressReporter {
+      override fun text(text: @NlsContexts.ProgressText String?) {
+        progressIndicator.text = text
+      }
+    }
+  }
+
   private fun readMavenProjectTree(process: MavenProgressIndicator) {
     val tree = MavenProjectsTree(projectOrDefault)
-    tree.addManagedFilesWithProfiles(parameters.myFiles!!, MavenExplicitProfiles.NONE)
 
     runBlockingMaybeCancellable {
       val mavenEmbedderWrappers = projectOrDefault.service<MavenEmbedderWrappersManager>().createMavenEmbedderWrappers()
       mavenEmbedderWrappers.use {
-        tree.updateAll(false, generalSettings, mavenEmbedderWrappers, process.indicator)
+        tree.updateAll(parameters.myFiles!!, false, generalSettings, MavenExplicitProfiles.NONE, mavenEmbedderWrappers, toRawProgressReporter(process.indicator))
       }
     }
 
@@ -231,7 +252,7 @@ internal class MavenProjectBuilder : ProjectImportBuilder<MavenProject>(), Depre
   val importingSettings: MavenImportingSettings?
     get() {
       if (parameters.myImportingSettingsCache == null) {
-        ApplicationManager.getApplication().runReadAction {
+        runReadActionBlocking {
           parameters.myImportingSettingsCache = directProjectsSettings.importingSettings.clone()
         }
       }

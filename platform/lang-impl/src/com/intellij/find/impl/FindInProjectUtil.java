@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.find.impl;
 
 import com.intellij.find.EditorSearchSession;
@@ -79,6 +79,7 @@ import com.intellij.usages.UsageView;
 import com.intellij.usages.UsageViewPresentation;
 import com.intellij.util.PatternUtil;
 import com.intellij.util.Processor;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -338,6 +339,8 @@ public final class FindInProjectUtil {
     FindManager findManager = FindManager.getInstance(project);
     int count = 0;
     while (offset < textLength) {
+      ProgressManager.checkCanceled();
+
       FindResult result = findManager.findString(text, offset, findModel, psiFile.getVirtualFile());
       if (!result.isStringFound()) break;
 
@@ -514,6 +517,7 @@ public final class FindInProjectUtil {
     }
   }
 
+  @ApiStatus.Internal
   public static class StringUsageTarget implements ConfigurableUsageTarget, ItemPresentation, UiDataProvider {
     protected final @NotNull Project myProject;
     protected final @NotNull FindModel myFindModel;

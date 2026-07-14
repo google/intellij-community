@@ -3,7 +3,6 @@
 package org.jetbrains.kotlin.idea.fir.completion;
 
 import com.intellij.testFramework.TestDataPath;
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode;
 import org.jetbrains.kotlin.idea.base.test.TestRoot;
 import org.jetbrains.kotlin.idea.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils;
@@ -20,12 +19,6 @@ import org.junit.runner.RunWith;
 @RunWith(JUnit3RunnerWithInners.class)
 @TestMetadata("../../completion/testData/keywords")
 public class FirKeywordCompletionTestGenerated extends AbstractFirKeywordCompletionTest {
-    @java.lang.Override
-    @org.jetbrains.annotations.NotNull
-    public final KotlinPluginMode getPluginMode() {
-        return KotlinPluginMode.K2;
-    }
-
     private void runTest(String testDataFilePath) throws Exception {
         KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
@@ -138,6 +131,16 @@ public class FirKeywordCompletionTestGenerated extends AbstractFirKeywordComplet
     @TestMetadata("CommaExpected.kt")
     public void testCommaExpected() throws Exception {
         runTest("../../completion/testData/keywords/CommaExpected.kt");
+    }
+
+    @TestMetadata("CompanionBlockDisabled.kt")
+    public void testCompanionBlockDisabled() throws Exception {
+        runTest("../../completion/testData/keywords/CompanionBlockDisabled.kt");
+    }
+
+    @TestMetadata("CompanionBlockNotInFunctionBody.kt")
+    public void testCompanionBlockNotInFunctionBody() throws Exception {
+        runTest("../../completion/testData/keywords/CompanionBlockNotInFunctionBody.kt");
     }
 
     @TestMetadata("CompanionObjectBeforeObject.kt")
@@ -308,6 +311,11 @@ public class FirKeywordCompletionTestGenerated extends AbstractFirKeywordComplet
     @TestMetadata("InIf.kt")
     public void testInIf() throws Exception {
         runTest("../../completion/testData/keywords/InIf.kt");
+    }
+
+    @TestMetadata("InInterfaceCompanionBlockScope.kt")
+    public void testInInterfaceCompanionBlockScope() throws Exception {
+        runTest("../../completion/testData/keywords/InInterfaceCompanionBlockScope.kt");
     }
 
     @TestMetadata("InInterfaceScope.kt")

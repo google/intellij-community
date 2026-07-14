@@ -20,10 +20,10 @@ import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.startup.ProjectActivity
-import com.intellij.openapi.util.IntellijInternalApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import org.jetbrains.annotations.VisibleForTesting
@@ -32,7 +32,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.measureTimedValue
 
 @ApiStatus.Internal
-@IntellijInternalApi
 @Service(Service.Level.APP)
 class DynamicPaidPluginsService(private val cs: CoroutineScope) {
   internal class LoadPaidPluginsProjectActivity : ProjectActivity {
@@ -71,26 +70,27 @@ class DynamicPaidPluginsService(private val cs: CoroutineScope) {
     }
   }
 
-  private fun doLoadPaidPlugins(project: Project?) {
+  private suspend fun doLoadPaidPlugins(project: Project?) {
     if (PluginEnabler.getInstance().isDisabled(ULTIMATE_PLUGIN_ID)) {
       logger.info("Ultimate plugin is disabled. Paid plugins will not be enabled.")
       return
     }
+    val (loadablePlugins, requireRestartPlugins) = withContext(Dispatchers.Default) {
+      val pluginSet = PluginManagerCore.getPluginSetOrNull()
+      if (pluginSet == null) {
+        logger.info("Plugin set is not initialized. Paid plugins will not be enabled.")
+        return@withContext null
+      }
 
-    val pluginSet = PluginManagerCore.getPluginSetOrNull()
-    if (pluginSet == null) {
-      logger.info("Plugin set is not initialized. Paid plugins will not be enabled.")
-      return
-    }
+      val disabledPlugins = DisabledPluginsState.getDisabledIds()
+      val pluginsToEnable = getPluginsToEnable(pluginSet, disabledPlugins)
+      if (pluginsToEnable.isEmpty()) {
+        logger.debug("No plugins found to be enabled.")
+        return@withContext null
+      }
 
-    val disabledPlugins = DisabledPluginsState.getDisabledIds()
-    val pluginsToEnable = getPluginsToEnable(pluginSet, disabledPlugins)
-    if (pluginsToEnable.isEmpty()) {
-      logger.debug("No plugins found to be enabled.")
-      return
-    }
-
-    val (loadablePlugins, requireRestartPlugins) = pluginsToEnable.splitPlugins()
+      pluginsToEnable.splitPlugins()
+    } ?: return
     val pluginEnabler = PluginEnabler.getInstance()
 
     if (loadablePlugins.isNotEmpty()) {
@@ -175,29 +175,12 @@ class DynamicPaidPluginsService(private val cs: CoroutineScope) {
    * Tries including transitive dependencies as loadable without a restart when possible.
    *
    * @param this The list of plugins to analyze for determining loadability without requiring a restart.
-   * Acts as a context in [DynamicPlugins.allowLoadUnloadWithoutRestart]
+   * Acts as a context in [DynamicPlugins.findMaxLoadableSubsetApproximation]
    */
-  private fun List<IdeaPluginDescriptorImpl>.splitPlugins(): Pair<List<IdeaPluginDescriptorImpl>, List<IdeaPluginDescriptorImpl>> {
-    tailrec fun doSplit(
-      pluginsToLoad: List<IdeaPluginDescriptorImpl>,
-      loadablePlugins: List<IdeaPluginDescriptorImpl>,
-      requireRestartPlugins: List<IdeaPluginDescriptorImpl>,
-    ): Pair<List<IdeaPluginDescriptorImpl>, List<IdeaPluginDescriptorImpl>> {
-      if (pluginsToLoad.isEmpty()) return loadablePlugins to requireRestartPlugins
-
-      val (loadable, requireRestart) = pluginsToLoad.partition {
-        DynamicPlugins.allowLoadUnloadWithoutRestart(it, context = pluginsToLoad)
-      }
-
-      return if (requireRestart.isEmpty()) {
-        // loadablePlugins.all { allowLoadUnloadWithoutRestart(it, context = loadablePlugins) } == true at this point
-        // we can load all of them safely
-        loadablePlugins + loadable to requireRestartPlugins
-      }
-      else doSplit(pluginsToLoad = loadable, loadablePlugins = loadablePlugins, requireRestartPlugins = requireRestartPlugins + requireRestart)
-    }
-
-    return doSplit(this, emptyList(), emptyList())
+  private suspend fun List<PluginMainDescriptor>.splitPlugins(): Pair<List<PluginMainDescriptor>, List<PluginMainDescriptor>> {
+    val loadablePluginIds = DynamicPlugins.findMaxLoadableSubsetApproximation(this.map { it.pluginId }).toSet()
+    val (loadablePlugins, requireRestart) = this.partition { it.pluginId in loadablePluginIds }
+    return loadablePlugins to requireRestart
   }
 }
 

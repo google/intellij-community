@@ -1,6 +1,6 @@
 // "Replace with 'withContext(this, block)'" "true"
-// K2_ERROR: Missing return statement.
-// K2_AFTER_ERROR: Missing return statement.
+// K2_AFTER_ERROR: NO_RETURN_IN_FUNCTION_WITH_BLOCK_BODY
+// K2_ERROR: NO_RETURN_IN_FUNCTION_WITH_BLOCK_BODY
 
 interface Context
 class MyClass: Context
@@ -24,4 +24,3 @@ suspend fun hhh(d: MyClass) {
 }
 
 // FUS_K2_QUICKFIX_NAME: org.jetbrains.kotlin.idea.k2.codeinsight.fixes.replaceWith.DeprecatedSymbolUsageFix
-// IGNORE_K1

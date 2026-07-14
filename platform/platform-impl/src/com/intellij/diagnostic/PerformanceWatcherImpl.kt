@@ -23,6 +23,7 @@ import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.getOrLogException
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.extensions.ExtensionPointName
+import com.intellij.openapi.progress.util.SuvorovProgress
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.util.io.FileUtilRt
@@ -226,6 +227,8 @@ internal class PerformanceWatcherImpl(providedScope: CoroutineScope) : Performan
   }
 
   override suspend fun processUnfinishedFreeze(consumer: suspend (Path, Int) -> Unit) {
+    LOG.debug("Looking for unfinished freeze dumps in $logDir")
+
     val files = try {
       withContext(Dispatchers.IO) {
         Files.newDirectoryStream(logDir) { it.fileName.toString().startsWith(THREAD_DUMPS_PREFIX) }.use { it.sorted() }
@@ -268,14 +271,17 @@ internal class PerformanceWatcherImpl(providedScope: CoroutineScope) : Performan
     }
     jitWatcher.checkJitState()
     LOG.trace("Scheduling EDT sample")
+    val freezePopupStampBeforeMeasurement = SuvorovProgress.currentFreezePopupStamp()
     val latencyMs = withContext(RawSwingDispatcher) {
       LOG.trace("Processing EDT sample")
       TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - current)
     }
+    val freezePopupStampAfterMeasurement = SuvorovProgress.currentFreezePopupStamp()
     swingApdex = swingApdex.withEvent(TOLERABLE_LATENCY, latencyMs)
 
+    val data = PerformanceListener.UiLagData(latencyMs, freezePopupStampAfterMeasurement.wasShownSince(freezePopupStampBeforeMeasurement))
     EP_NAME.forEachExtensionSafe {
-      it.uiResponded(latencyMs)
+      it.uiResponded(data)
     }
   }
 
@@ -765,7 +771,7 @@ private suspend fun reportCrashesIfAny() {
       val event = LogMessage(JBRCrash(), message, attachments)
       event.appInfo = Files.readString(appInfoFile)
 
-      IdeaFreezeReporter.report(event)
+      reportToIndicator(event)
       LifecycleUsageTriggerCollector.onCrashDetected()
     }
   }

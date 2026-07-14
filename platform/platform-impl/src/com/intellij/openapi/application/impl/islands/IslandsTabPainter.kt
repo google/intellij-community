@@ -115,6 +115,8 @@ private class IslandsTabTheme : TabTheme {
     get() = JBColor.namedColor("EditorTabs.underlinedTabInactiveForeground", JBColor(0x000000, 0xFFFFFF))
 }
 
+private const val COLOR_TAB_ALPHA = 0.4
+
 internal open class IslandsTabPainter(isDefault: Boolean, isToolWindow: Boolean) : JBTabPainter {
   private val myTheme = when {
     isToolWindow -> object : DefaultTabTheme() {
@@ -178,18 +180,26 @@ internal open class IslandsTabPainter(isDefault: Boolean, isToolWindow: Boolean)
     val width = rect.width - hOffset * 2.0
     val height = rect.height - vOffset
 
-    if (tabColor != null) {
-      g.color = ColorUtil.withAlpha(tabColor, 0.9)
-      RectanglePainter2D.FILL.paint(g, x, y, width, height, arc)
-    }
-
-    val (fill, draw) = getColors(active, hovered, selected)
+    val (fill, draw) = getColors(tabColor, active, hovered, selected)
 
     g.color = fill
     RectanglePainter2D.FILL.paint(g, x, y, width, height, arc)
 
+    if (selected && tabColor != null) {
+      val offset = JBUIScale.scale(if (compactMode) 2f else 3f).toDouble()
+      val offset2 = offset * 2
+      val innerArc = (arc - offset - JBUIScale.scale(2f)).coerceAtLeast(0.0)
+
+      g.color = getColoredTabBackground(tabColor, active)
+      RectanglePainter2D.FILL.paint(g, x + offset, y + offset, width - offset2, height - offset2, innerArc)
+    }
+
     g.color = draw
     RectanglePainter2D.DRAW.paint(g, x, y, width, height, arc)
+  }
+
+  private fun getColoredTabBackground(tabColor: Color, active: Boolean): Color {
+    return if (active) tabColor else ColorUtil.withAlpha(tabColor, COLOR_TAB_ALPHA)
   }
 
   /**
@@ -203,16 +213,15 @@ internal open class IslandsTabPainter(isDefault: Boolean, isToolWindow: Boolean)
     hovered: Boolean,
     selected: Boolean,
   ): Color {
-    var result = if (myFillBackground) getBackgroundColor() else UIUtil.getBgFillColor(component)
+    val backgroud = if (myFillBackground) getBackgroundColor() else UIUtil.getBgFillColor(component)
+
+    var (fill, _) = getColors(active, hovered, selected)
 
     if (tabColor != null) {
-      result = ColorUtil.alphaBlending(ColorUtil.withAlpha(tabColor, 0.9), result)
+      fill = if (selected) getColoredTabBackground(tabColor, active) else ColorUtil.alphaBlending(fill, tabColor)
     }
 
-    val (fill, _) = getColors(active, hovered, selected)
-    result = ColorUtil.alphaBlending(fill, result)
-
-    return result
+    return ColorUtil.alphaBlending(fill, backgroud)
   }
 
   private val hoverBackground = JBColor("EditorTabs.hoverBackground", JBColor(Color(0xE5, 0xEE, 0xFF, 0x80), Color(0x34, 0x3E, 0x51, 0x80)))
@@ -230,6 +239,17 @@ internal open class IslandsTabPainter(isDefault: Boolean, isToolWindow: Boolean)
   private val selectedInactiveColors = JBColor("EditorTabs.inactiveUnderlinedTabBackground", null) to inactiveBorderColor
 
   private val selectedHoveredInactiveColors = hoverBackground to inactiveBorderColor
+
+  private fun getColors(tabColor: Color?, active: Boolean, hovered: Boolean, selected: Boolean): Pair<Color, Color> {
+    val info = getColors(active, hovered, selected)
+
+    if (tabColor != null) {
+      val fill = if (selected) getBackgroundColor() else ColorUtil.alphaBlending(info.first, ColorUtil.withAlpha(tabColor, COLOR_TAB_ALPHA))
+      return fill to info.second
+    }
+
+    return info
+  }
 
   private fun getColors(active: Boolean, hovered: Boolean, selected: Boolean): Pair<Color, Color> {
     if (selected) {

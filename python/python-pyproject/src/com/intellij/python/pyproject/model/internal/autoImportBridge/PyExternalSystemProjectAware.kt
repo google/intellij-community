@@ -1,8 +1,7 @@
 package com.intellij.python.pyproject.model.internal.autoImportBridge
 
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.writeAction
+import com.intellij.openapi.application.edtWriteAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.fileLogger
@@ -26,7 +25,6 @@ import com.intellij.python.pyproject.model.internal.workspaceBridge.collectExclu
 import com.intellij.python.pyproject.model.internal.workspaceBridge.rebuildProjectModel
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.messages.Topic
-import com.intellij.util.ui.EDT
 import com.jetbrains.python.sdk.baseDir
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -60,24 +58,16 @@ class PyExternalSystemProjectAware private constructor(
 
   @get:RequiresBackgroundThread
   override val settingsFiles: Set<String>
-    get() {
-      if (EDT.isCurrentThreadEdt() && ApplicationManager.getApplication().isUnitTestMode) {
-        // Some tests are broken and access it from EDT.
-        // Since `@RequiresBackgroundThread` doesn't work for Kotlin, we can't check it in advance.
-        // This part will be rewritten soon anyway, so for now enjoy workaround
-        log.warn("Access from EDT, settingsFiles are empty")
-        return emptySet()
-      }
-      return runBlockingMaybeCancellable {
+    get() =
+      runBlockingMaybeCancellable {
         // We do not need file content: only names here.
         val fsInfo = walkFileSystemNoTomlContent(getRootPaths()).getOr {
           // Dir can't be accessed
           log.trace(it.error)
           return@runBlockingMaybeCancellable emptySet()
         }
-        return@runBlockingMaybeCancellable fsInfo.rawTomlFiles.map { it.pathString }.toSet()
+        fsInfo.rawTomlFiles.map { it.pathString }.toSet()
       }
-    }
 
   override fun subscribe(listener: ExternalSystemProjectListener, parentDisposable: Disposable) {
     project.messageBus.connect(parentDisposable).subscribe(PROJECT_AWARE_TOPIC, listener)
@@ -92,7 +82,7 @@ class PyExternalSystemProjectAware private constructor(
   @ApiStatus.Internal
   @VisibleForTesting
   suspend fun reloadProjectImpl() {
-    writeAction {
+    edtWriteAction {
       // We might get stale files otherwise
       FileDocumentManager.getInstance().saveAllDocuments()
     }

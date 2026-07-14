@@ -10,7 +10,6 @@ import com.intellij.openapi.actionSystem.ActionToolbar
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
-import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.DumbAwareToggleAction
@@ -18,6 +17,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.MessageDialogBuilder
 import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.vcs.VcsBundle
 import com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode
@@ -26,13 +26,14 @@ import com.intellij.openapi.vcs.changes.ui.ChangesGroupingPolicyFactory
 import com.intellij.openapi.vcs.changes.ui.TreeModelBuilder
 import com.intellij.openapi.vcs.merge.MergeConflictIterativeDataHolder
 import com.intellij.openapi.vcs.merge.MergeConflictsTreeTable
-import com.intellij.openapi.vcs.merge.MergeDialogContext
 import com.intellij.openapi.vcs.merge.MergeDialogCustomizer
+import com.intellij.openapi.vcs.merge.MergeResolveActionContext
 import com.intellij.openapi.vcs.merge.MergeSession
 import com.intellij.openapi.vcs.merge.MergeUIUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.AnimatedIcon
 import com.intellij.ui.ColorUtil
+import com.intellij.ui.DoubleClickListener
 import com.intellij.ui.JBColor
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.SimpleTextAttributes
@@ -94,19 +95,21 @@ internal class IterativeMergeFlowDelegate(
   private val rootPane: JRootPane,
   private val files: List<VirtualFile>,
   private val onClose: () -> Unit,
-  private val acceptForResolution: (MergeSession.Resolution) -> Unit,
+  private val onAcceptAndFinish: () -> Unit,
+  acceptForResolution: (MergeSession.Resolution) -> Unit,
   private val showMergeDialog: () -> Unit,
   private val toggleGroupByDirectory: (Boolean) -> Unit,
   private val resolveAutomatically: () -> Unit,
   private val getGroupByDirectory: () -> Boolean,
   private val updateTable: () -> Unit,
-  private val getMergeDialogContext: () -> MergeDialogContext?,
 ) : MergeFlowDelegate {
 
   private lateinit var descriptionLabel: JLabel
   private lateinit var resolveAutomaticallyButton: JButton
+  private lateinit var resolveStatusLabel: JLabel
   private lateinit var reviewOrResolveButton: JButton
   private lateinit var acceptAndFinishButton: JButton
+  private var resolveActionControllers: List<MergeResolveActionComponentController> = emptyList()
   private var wasResolveAutomaticallyPressedOnce = false
   private var isResolveAutomaticallyPressed = false
   private var isResolvingConflicts = false
@@ -114,8 +117,17 @@ internal class IterativeMergeFlowDelegate(
   @Nls
   private var currentDescription: String = VcsBundle.message("merge.loading.merge.details")
 
+  private val acceptForResolution: (MergeSession.Resolution) -> Unit = { resolution ->
+    acceptForResolution(resolution)
+    clearAutoResolveStatus()
+  }
+
   override fun createCenterPanel(): JComponent {
     table.changeHeaderColor()
+    table.installDoubleClickListener { _ ->
+      clearAutoResolveStatus()
+      return@installDoubleClickListener false
+    }
     table.installButtonRenderer(iterativeDataHolder, getSelectedFiles = { state.selectedFiles }) { _, column ->
       val resolution = when (column) {
         1 -> MergeSession.Resolution.AcceptedYours
@@ -142,6 +154,13 @@ internal class IterativeMergeFlowDelegate(
                       foreground = if (isModified) BADGE_MODIFIED_FOREGROUND else BADGE_FOREGROUND)
       }
     }
+    val defaultSpacingConfiguration = IntelliJSpacingConfiguration()
+    val mergeContext = MergeResolveActionContext(
+      project = project,
+      selectionHintFilesProvider = { if (::state.isInitialized) state.selectedFiles else emptyList() },
+      closeSourceUiHandler = onAcceptAndFinish,
+    )
+    resolveActionControllers = createMergeResolveActionComponentControllers(mergeContext, ITERATIVE_MERGE_DIALOG_ACTION_PLACE)
     return panel {
       row {
         descriptionLabel = label(currentDescription).component.apply {
@@ -163,7 +182,14 @@ internal class IterativeMergeFlowDelegate(
             icon = AllIcons.Diff.MagicResolve
           }.align(AlignX.LEFT).component
 
-        cell(createResolveActionsToolbar())
+        for (controller in resolveActionControllers) {
+          cell(controller.component)
+            .customize(UnscaledGaps(left = defaultSpacingConfiguration.segmentedButtonHorizontalGap))
+        }
+
+        resolveStatusLabel = label("")
+          .resizableColumn()
+          .component
         cell(createViewOptionsToolbar().component)
           .align(AlignX.RIGHT)
       }
@@ -176,7 +202,7 @@ internal class IterativeMergeFlowDelegate(
       // If the width is smaller than this, then buttons don't render properly
       minimumSize = JBUI.size(550, 240)
 
-      preferredSize = JBUI.size(preferredSize.width, if (files.size <= 6) 400 else 500)
+      preferredSize = JBUI.size(850, if (files.size <= 6) 400 else 500)
     }
   }
 
@@ -191,7 +217,7 @@ internal class IterativeMergeFlowDelegate(
             model.getResolvedChanges().isNotEmpty() && model.getUnresolvedChanges().isNotEmpty()
           }
           if (!hasPartiallyResolvedFiles || MessageDialogBuilder.yesNo(VcsBundle.message("multiple.file.iterative.merge.close.confirmation.title"),
-                                                        VcsBundle.message("multiple.file.iterative.merge.close.confirmation.message"))
+                                                                       VcsBundle.message("multiple.file.iterative.merge.close.confirmation.message"))
               .yesText(VcsBundle.message("multiple.file.iterative.merge.close.confirmation.yes"))
               .noText(VcsBundle.message("multiple.file.iterative.merge.close.confirmation.no"))
               .ask(project)) {
@@ -204,7 +230,7 @@ internal class IterativeMergeFlowDelegate(
 
       val acceptAndFinishAction = object : AbstractAction(VcsBundle.message("multiple.file.iterative.merge.accept.finish")) {
         override fun actionPerformed(e: ActionEvent) {
-          onClose()
+          onAcceptAndFinish()
         }
       }
       acceptAndFinishButton = DialogWrapper.createJButtonForAction(acceptAndFinishAction, rootPane)
@@ -213,6 +239,7 @@ internal class IterativeMergeFlowDelegate(
 
       val reviewOrResolveAction = object : AbstractAction(VcsBundle.message("multiple.file.iterative.merge.resolve.manually")) {
         override fun actionPerformed(e: ActionEvent) {
+          clearAutoResolveStatus()
           showMergeDialog()
         }
       }
@@ -220,23 +247,6 @@ internal class IterativeMergeFlowDelegate(
       cell(reviewOrResolveButton)
         .customize(UnscaledGaps(left = defaultSpacingConfiguration.segmentedButtonHorizontalGap))
     }.customize(UnscaledGapsY(top = 32))
-  }
-
-  private fun createResolveActionsToolbar(): JComponent {
-    val group = ActionManager.getInstance().getAction("Merge.Dialog.Iterative.ResolveActions") as? DefaultActionGroup
-                ?: return ActionManager.getInstance().createActionToolbar(ActionPlaces.TOOLBAR, DefaultActionGroup(), true).apply {
-                  setTargetComponent(table)
-                }.component
-    val mergeDialogContext = getMergeDialogContext()
-                             ?: return ActionManager.getInstance().createActionToolbar(ActionPlaces.TOOLBAR, DefaultActionGroup(), true).apply {
-                               setTargetComponent(table)
-                             }.component
-    val toolbar = ActionManager.getInstance()
-      .createActionToolbar("Merge.Dialog.Iterative", group, true)
-      .apply { setTargetComponent(table) }
-    return UiDataProvider.wrapComponent(toolbar.component) { sink ->
-      sink[MergeDialogContext.KEY] = mergeDialogContext
-    }
   }
 
   private fun createViewOptionsToolbar(): ActionToolbar {
@@ -268,9 +278,16 @@ internal class IterativeMergeFlowDelegate(
   override fun createActions(): List<Action> = emptyList()
 
   private lateinit var state: IterativeMergeDialogState
-  override fun onTreeChanged(selectedFiles: List<VirtualFile>, unmergeableFileSelected: Boolean, unacceptableFileSelected: Boolean) {
+  override fun onTreeChanged(
+    selectedFiles: List<VirtualFile>,
+    processedFiles: List<VirtualFile>,
+    unmergeableFileSelected: Boolean,
+    unacceptableFileSelected: Boolean,
+  ) {
+    val iterativeFiles = files - processedFiles.toSet()
     state = IterativeMergeDialogState(
       selectedFiles = selectedFiles,
+      filesThatShouldBeResolvedIteratively = iterativeFiles,
       unmergeableFileSelected = unmergeableFileSelected,
       unacceptableFileSelected = unacceptableFileSelected,
       resolvedFilesSelected = selectedFiles.any { iterativeDataHolder.isFileResolved(it) },
@@ -278,13 +295,15 @@ internal class IterativeMergeFlowDelegate(
       onlyRevertableFilesSelected = selectedFiles.isNotEmpty() && selectedFiles.all {
         iterativeDataHolder.getMergeConflictModel(it)?.getResolvedChanges()?.isNotEmpty() == true
       },
-      allFilesResolvedAndReviewed = files.all {
+      allFilesResolvedAndReviewed = iterativeFiles.all {
         val model = iterativeDataHolder.getMergeConflictModel(it)
         model?.wasReviewed == true && model.getUnresolvedChanges().isEmpty()
       })
     updateButtonsState()
+    resolveActionControllers.forEach { it.update() }
   }
 
+  private val animatedIcon = AnimatedIcon.Default()
   private fun updateButtonsState() {
     val autoResolvableFiles =
       files.any { iterativeDataHolder.getMergeConflictModel(it)?.getAutoResolvableChanges()?.isNotEmpty() == true }
@@ -299,7 +318,8 @@ internal class IterativeMergeFlowDelegate(
         isResolvingConflicts -> false
         else -> true
       }
-      icon = if (isResolvingConflicts) AnimatedIcon.Default() else AllIcons.Diff.MagicResolve
+      icon = if (isResolvingConflicts) animatedIcon else AllIcons.Diff.MagicResolve
+      disabledIcon = if (isResolvingConflicts) animatedIcon else IconLoader.getDisabledIcon(AllIcons.Diff.MagicResolve)
       text = if (isResolvingConflicts) VcsBundle.message("multiple.file.merge.dialog.progress.title.resolving.conflicts")
       else VcsBundle.message("multiple.file.iterative.merge.resolve.automatically")
 
@@ -318,7 +338,8 @@ internal class IterativeMergeFlowDelegate(
       else VcsBundle.message("multiple.file.iterative.merge.resolve.manually")
     }
 
-    acceptAndFinishButton.isEnabled = table.isEnabled && files.all { iterativeDataHolder.isFileResolved(it) }
+    acceptAndFinishButton.isEnabled =
+      table.isEnabled && state.filesThatShouldBeResolvedIteratively.all { iterativeDataHolder.isFileResolved(it) }
 
     if (state.allFilesResolvedAndReviewed) {
       reviewOrResolveButton.isVisible = false
@@ -339,7 +360,7 @@ internal class IterativeMergeFlowDelegate(
     grouping: ChangesGroupingPolicyFactory,
     unresolvedFiles: List<VirtualFile>,
   ): DefaultTreeModel {
-    val resolvedFiles = iterativeDataHolder.getResolvedFiles()
+    val resolvedFiles = iterativeDataHolder.getResolvedFilesAndModels().keys
     val unresolvedFiles = unresolvedFiles - resolvedFiles
     val unresolvedNode = ConflictsGroupNode(ConflictsNodeType.UNRESOLVED)
     val resolvedNode = ConflictsGroupNode(ConflictsNodeType.RESOLVED)
@@ -358,7 +379,8 @@ internal class IterativeMergeFlowDelegate(
 
   private fun TreeTable.installTableContextMenu() {
     val group = DefaultActionGroup().apply {
-      add(object : DumbAwareAction(VcsBundle.message("multiple.file.iterative.merge.accept", columnNames[1])) {
+      val (yoursLabel, theirsLabel) = MergeUIUtil.getYoursAndTheirsLabes(columnNames)
+      add(object : DumbAwareAction(VcsBundle.message("multiple.file.iterative.merge.accept", yoursLabel)) {
         override fun actionPerformed(e: AnActionEvent) {
           acceptForResolution(MergeSession.Resolution.AcceptedYours)
         }
@@ -370,7 +392,7 @@ internal class IterativeMergeFlowDelegate(
 
         override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
       })
-      add(object : DumbAwareAction(VcsBundle.message("multiple.file.iterative.merge.accept", columnNames[2])) {
+      add(object : DumbAwareAction(VcsBundle.message("multiple.file.iterative.merge.accept", theirsLabel)) {
         override fun actionPerformed(e: AnActionEvent) {
           acceptForResolution(MergeSession.Resolution.AcceptedTheirs)
         }
@@ -395,6 +417,7 @@ internal class IterativeMergeFlowDelegate(
             .icon(Messages.getQuestionIcon())
             .ask(project)
           if (confirmed) {
+            clearAutoResolveStatus()
             iterativeDataHolder.removeFiles(state.selectedFiles)
             isResolveAutomaticallyPressed = false
             updateTable()
@@ -412,11 +435,19 @@ internal class IterativeMergeFlowDelegate(
     PopupHandler.installPopupMenu(this, group, ActionPlaces.POPUP)
   }
 
+  private fun clearAutoResolveStatus() {
+    resolveStatusLabel.text = ""
+    resolveStatusLabel.isVisible = false
+  }
+
   private fun onResolveAutomaticallyClick() {
     wasResolveAutomaticallyPressedOnce = true
     isResolveAutomaticallyPressed = true
     isResolvingConflicts = true
+    clearAutoResolveStatus()
     updateButtonsState()
+
+    val resolvedBefore = files.sumOf { iterativeDataHolder.getMergeConflictModel(it)?.getResolvedChanges()?.size ?: 0 }
     try {
       resolveAutomatically()
     }
@@ -426,6 +457,19 @@ internal class IterativeMergeFlowDelegate(
     }
     finally {
       isResolvingConflicts = false
+      val resolvedAfter = files.sumOf { iterativeDataHolder.getMergeConflictModel(it)?.getResolvedChanges()?.size ?: 0 }
+      val resolvedByAutoResolve = resolvedAfter - resolvedBefore
+      val totalUnresolved = files.sumOf { iterativeDataHolder.getMergeConflictModel(it)?.getUnresolvedChanges()?.size ?: 0 }
+      val filesWithUnresolved = files.count { iterativeDataHolder.getMergeConflictModel(it)?.getUnresolvedChanges()?.isNotEmpty() == true }
+      resolveStatusLabel.text = when {
+        resolvedByAutoResolve == 0 -> VcsBundle.message("multiple.file.iterative.merge.status.none.resolved")
+        totalUnresolved == 0 -> VcsBundle.message("multiple.file.iterative.merge.status.all.resolved")
+        else -> VcsBundle.message("multiple.file.iterative.merge.status.partially.resolved",
+                                  resolvedByAutoResolve,
+                                  totalUnresolved,
+                                  filesWithUnresolved)
+      }
+      resolveStatusLabel.isVisible = true
       updateButtonsState()
     }
   }
@@ -465,6 +509,12 @@ private fun TreeTable.changeHeaderColor() {
       foreground = UIUtil.getLabelInfoForeground()
     }
   }
+}
+
+private fun TreeTable.installDoubleClickListener(onDoubleClick: (MouseEvent) -> Boolean) {
+  object : DoubleClickListener() {
+    override fun onDoubleClick(event: MouseEvent) = onDoubleClick(event)
+  }.installOn(this)
 }
 
 private val BADGE_FOREGROUND = JBColor.namedColor("VersionControl.Merge.Badge.infoForeground", 0x5A5D6B, 0xB4B8BF)
@@ -528,6 +578,7 @@ private data class ColoredString(val value: @Nls String, val background: JBColor
 private data class ButtonRectKey(val row: Int, val column: Int)
 
 private const val ROW_HEIGHT = 28
+private const val MIN_COLUMN_WIDTH = 160
 
 private fun MergeConflictsTreeTable.installButtonRenderer(
   iterativeDataHolder: MergeConflictIterativeDataHolder,
@@ -536,8 +587,6 @@ private fun MergeConflictsTreeTable.installButtonRenderer(
 ) {
   // Default is 22, need to make it a tiny bit bigger so the button is nicely shown
   tree.rowHeight = JBUI.scale(ROW_HEIGHT)
-  // If smaller than this, the buttons are not rendered properly
-  minimumColumnWidth = JBUI.scale(188)
 
   val inlineButtonRects = mutableMapOf<ButtonRectKey, Rectangle>()
   val table = this
@@ -549,8 +598,15 @@ private fun MergeConflictsTreeTable.installButtonRenderer(
                                             inlineButtonRects,
                                             getHoveredRow = { TableHoverListener.getHoveredRow(table) })
   val colCount = table.columnModel.columnCount
-  if (colCount > 1) table.columnModel.getColumn(1).cellRenderer = inlineRenderer
-  if (colCount > 2) table.columnModel.getColumn(2).cellRenderer = inlineRenderer
+  val minColumnWidth = JBUI.scale(MIN_COLUMN_WIDTH)
+  if (colCount > 1) table.columnModel.getColumn(1).apply {
+    cellRenderer = inlineRenderer
+    minWidth = minColumnWidth
+  }
+  if (colCount > 2) table.columnModel.getColumn(2).apply {
+    cellRenderer = inlineRenderer
+    minWidth = minColumnWidth
+  }
 
   // Click handler: trigger only if the click is inside the cached button rect
   table.addMouseListener(object : MouseAdapter() {
@@ -620,6 +676,8 @@ private class InlineButtonRenderer(
         putClientProperty("ActionToolbar.smallVariant", true)
       }.component
     }
+  }.apply {
+    border = JBUI.Borders.emptyLeft(6)
   }
 
   override fun getTableCellRendererComponent(
@@ -659,6 +717,10 @@ private class InlineButtonRenderer(
 
 private data class IterativeMergeDialogState(
   val selectedFiles: List<VirtualFile>,
+  // The `files` param contains ALL the files in the merge conflict,
+  // which may include files that are binary or using external tools for resolving.
+  // Those files will not trigger an iterative merge and will not have a model.
+  val filesThatShouldBeResolvedIteratively: List<VirtualFile>,
   val unmergeableFileSelected: Boolean,
   val unacceptableFileSelected: Boolean,
   val resolvedFilesSelected: Boolean,

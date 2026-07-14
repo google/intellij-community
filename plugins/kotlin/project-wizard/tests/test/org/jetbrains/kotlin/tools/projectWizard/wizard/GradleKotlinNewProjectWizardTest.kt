@@ -20,16 +20,18 @@ import com.intellij.testFramework.junit5.RegistryKey
 import com.intellij.testFramework.withProjectAsync
 import com.intellij.util.asDisposable
 import kotlinx.coroutines.runBlocking
-import org.jetbrains.kotlin.idea.base.plugin.useK2Plugin
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils.getCurrentProcessJdkHome
 import org.jetbrains.kotlin.tools.projectWizard.gradle.isLessOrEqualToMaxJvmTarget
 import org.jetbrains.plugins.gradle.frameworkSupport.GradleDsl
 import org.jetbrains.plugins.gradle.testFramework.annotations.CsvCrossProductSource
+import org.jetbrains.plugins.gradle.testFramework.projectInfo.buildFile
+import org.jetbrains.plugins.gradle.testFramework.projectInfo.file
+import org.jetbrains.plugins.gradle.testFramework.projectInfo.settingsFile
+import org.jetbrains.plugins.gradle.testFramework.projectInfo.simpleJavaRootModuleInfo
 import org.jetbrains.plugins.gradle.util.GradleConstants.SYSTEM_ID
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
@@ -39,12 +41,6 @@ import kotlin.io.path.pathString
 import kotlin.io.path.walk
 
 class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() {
-    @BeforeEach
-    override fun setUp() {
-        super.setUp()
-        assertTrue(useK2Plugin != false)
-    }
-
     private fun Project.compileModules(vararg moduleNames: String) {
         assertModules(this, *moduleNames)
         compileModules(this, true, *moduleNames)
@@ -69,8 +65,8 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
             setGradleWizardData("project", gradleDsl = gradleDsl)
         }.withProjectAsync { project ->
             assertProjectState(project, projectInfo("project", gradleDsl) {
-                withKotlinBuildFile()
-                withKotlinSettingsFile()
+                simpleKotlinSettingsFile()
+                simpleKotlinRootModuleInfo()
             })
             project.compileModules("project", "project.main", "project.test")
         }.closeProjectAsync()
@@ -85,8 +81,8 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
             lookupAndRegisterExternalSystemJdk(project)
 
             assertProjectState(project, projectInfo("project", GradleDsl.KOTLIN) {
-                withKotlinBuildFile()
-                withKotlinSettingsFile()
+                simpleKotlinSettingsFile()
+                simpleKotlinRootModuleInfo()
             })
             assertDaemonJvmProperties(project)
             project.compileModules("project", "project.main", "project.test")
@@ -102,10 +98,18 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
             assertProjectState(project, projectInfo("project", gradleDsl) {
                 assertEquals(GradleDsl.KOTLIN, gradleDsl, "only Kotlin DSL multi-module project is supported")
 
-                modulesPerSourceSet.clear() // no build script for a root module
-                moduleInfo("project.app", "app")
-                moduleInfo("project.utils", "utils")
-                moduleInfo("project.buildSrc", "buildSrc")
+                moduleInfo("project.app", "app") {
+                    sourceSetInfo("main")
+                    sourceSetInfo("test")
+                }
+                moduleInfo("project.utils", "utils") {
+                    sourceSetInfo("main")
+                    sourceSetInfo("test")
+                }
+                moduleInfo("project.buildSrc", "buildSrc") {
+                    sourceSetInfo("main")
+                    sourceSetInfo("test")
+                }
             })
             project.compileModules(
                 "project",
@@ -135,8 +139,8 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
             setGradleWizardData("project", gradleDsl = gradleDsl, addSampleCode = true)
         }.withProjectAsync { project ->
             assertProjectState(project, projectInfo("project", gradleDsl) {
-                withKotlinBuildFile()
-                withKotlinSettingsFile()
+                simpleKotlinSettingsFile()
+                simpleKotlinRootModuleInfo()
             })
             project.compileModules("project", "project.main", "project.test")
         }.withProjectAsync {
@@ -156,8 +160,8 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
     @CsvCrossProductSource("KOTLIN,GROOVY", "KOTLIN,GROOVY")
     fun testNewModuleInJavaProject(gradleDslInJava: GradleDsl, gradleDslInKotlin: GradleDsl): Unit = runBlocking {
         initProject(projectInfo("project", gradleDslInJava) {
-            withJavaBuildFile()
-            withKotlinSettingsFile()
+            simpleKotlinSettingsFile()
+            simpleJavaRootModuleInfo()
         })
         openProject("project").withProjectAsync { project ->
             createModuleByWizard(project, KOTLIN) {
@@ -166,11 +170,11 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
             }
         }.withProjectAsync { project ->
             assertProjectState(project, projectInfo("project", gradleDslInJava) {
-                withJavaBuildFile()
-                withKotlinSettingsFile { include("module") }
-                moduleInfo("project.module", "module", gradleDslInKotlin) {
-                    withKotlinBuildFile()
+                simpleKotlinSettingsFile {
+                    include("module")
                 }
+                simpleJavaRootModuleInfo()
+                simpleKotlinModuleInfo("project.module", "module", gradleDslInKotlin)
             })
             project.compileModules(
                 "project", "project.main", "project.test",
@@ -187,8 +191,8 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
     @EnumSource(GradleDsl::class)
     fun testNewModuleInKotlinProject(gradleDsl: GradleDsl): Unit = runBlocking {
         initProject(projectInfo("project", gradleDsl) {
-            withKotlinBuildFile()
-            withKotlinSettingsFile()
+            simpleKotlinSettingsFile()
+            simpleKotlinRootModuleInfo()
         })
         openProject("project").withProjectAsync { project ->
             createModuleByWizard(project, KOTLIN) {
@@ -197,11 +201,11 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
             }
         }.withProjectAsync { project ->
             assertProjectState(project, projectInfo("project", gradleDsl) {
-                withKotlinBuildFile()
-                withKotlinSettingsFile { include("module") }
-                moduleInfo("project.module", "module") {
-                    withKotlinBuildFile(kotlinJvmPluginVersion = null)
+                simpleKotlinSettingsFile {
+                    include("module")
                 }
+                simpleKotlinRootModuleInfo()
+                simpleKotlinModuleInfo("project.module", "module", kotlinJvmPluginVersion = null)
             })
             project.compileModules(
                 "project", "project.main", "project.test",
@@ -218,8 +222,8 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
     @EnumSource(GradleDsl::class)
     fun testNewModuleInKotlinProjectIndependentHierarchy(gradleDsl: GradleDsl): Unit = runBlocking {
         initProject(projectInfo("project", gradleDsl) {
-            withKotlinBuildFile()
-            withKotlinSettingsFile()
+            simpleKotlinSettingsFile()
+            simpleKotlinRootModuleInfo()
         })
         openProject("project").withProjectAsync { project ->
             createModuleByWizard(project, KOTLIN) {
@@ -227,11 +231,11 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
             }
         }.withProjectAsync { project ->
             assertProjectState(project, projectInfo("project", gradleDsl) {
-                withKotlinBuildFile()
-                withKotlinSettingsFile()
+                simpleKotlinRootModuleInfo()
+                simpleKotlinSettingsFile()
             }, projectInfo("project/module", gradleDsl) {
-                withKotlinBuildFile()
-                withKotlinSettingsFile()
+                simpleKotlinRootModuleInfo()
+                simpleKotlinSettingsFile()
             })
             project.compileModules(
                 "project", "project.main", "project.test",
@@ -244,8 +248,8 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
     @EnumSource(GradleDsl::class)
     fun testNoMultiModuleProjectForNewModules(gradleDsl: GradleDsl): Unit = runBlocking {
         initProject(projectInfo("project", gradleDsl) {
-            withKotlinBuildFile()
-            withKotlinSettingsFile()
+            simpleKotlinRootModuleInfo()
+            simpleKotlinSettingsFile()
         })
         openProject("project").withProjectAsync { project ->
             createModuleByWizard(project, KOTLIN) {
@@ -254,11 +258,11 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
             }
         }.withProjectAsync { project ->
             assertProjectState(project, projectInfo("project", gradleDsl) {
-                withKotlinBuildFile()
-                withKotlinSettingsFile { include("module") }
-                moduleInfo("project.module", "module") {
-                    withKotlinBuildFile(kotlinJvmPluginVersion = null)
+                simpleKotlinRootModuleInfo()
+                simpleKotlinSettingsFile {
+                    include("module")
                 }
+                simpleKotlinModuleInfo("project.module", "module", kotlinJvmPluginVersion = null)
             })
             project.compileModules(
                 "project", "project.main", "project.test",
@@ -272,13 +276,11 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
     fun testOtherKotlinModule(gradleDsl: GradleDsl): Unit = runBlocking {
         val kotlinJvmPluginVersion = "1.9.25"
         initProject(projectInfo("project", gradleDsl) {
-            withJavaBuildFile()
-            withKotlinSettingsFile {
+            simpleKotlinSettingsFile {
                 include("other_module")
             }
-            moduleInfo("project.other_module", "other_module") {
-                withKotlinBuildFile(kotlinJvmPluginVersion)
-            }
+            simpleJavaRootModuleInfo()
+            simpleKotlinModuleInfo("project.other_module", "other_module", kotlinJvmPluginVersion = kotlinJvmPluginVersion)
         })
         openProject("project").withProjectAsync { project ->
             createModuleByWizard(project, KOTLIN) {
@@ -287,17 +289,13 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
             }
         }.withProjectAsync { project ->
             assertProjectState(project, projectInfo("project", gradleDsl) {
-                withJavaBuildFile()
-                withKotlinSettingsFile {
+                simpleKotlinSettingsFile {
                     include("other_module")
                     include("module")
                 }
-                moduleInfo("project.other_module", "other_module") {
-                    withKotlinBuildFile(kotlinJvmPluginVersion)
-                }
-                moduleInfo("project.module", "module") {
-                    withKotlinBuildFile(kotlinJvmPluginVersion)
-                }
+                simpleJavaRootModuleInfo()
+                simpleKotlinModuleInfo("project.other_module", "other_module", kotlinJvmPluginVersion = kotlinJvmPluginVersion)
+                simpleKotlinModuleInfo("project.module", "module", kotlinJvmPluginVersion = kotlinJvmPluginVersion)
             })
             project.compileModules(
                 "project", "project.main", "project.test",
@@ -311,6 +309,7 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
     @CsvCrossProductSource("KOTLIN,GROOVY", "true,false")
     fun testNewModuleWithVersionCatalog(gradleDsl: GradleDsl, addBuildSrcVersionCatalogDependency: Boolean): Unit = runBlocking {
         val kotlinJvmPluginVersion = when {
+            GradleVersionUtil.isGradleAtLeast(gradleVersion, "9.6.0") -> "2.3.21"
             GradleVersionUtil.isGradleAtLeast(gradleVersion, "9.5.0") -> "2.3.20"
             GradleVersionUtil.isGradleAtLeast(gradleVersion, "9.4.0") -> "2.3.0"
             else -> "2.2.21"
@@ -340,20 +339,21 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
             |}
         """.trimMargin()
         initProject(projectInfo("project") {
-            withFile("gradle/libs.versions.toml", versionTomlContent)
+            file("gradle/libs.versions.toml", versionTomlContent)
             moduleInfo("project.buildSrc", "buildSrc") {
-                withBuildFile {
+                settingsFile {
+                    addCode(versionCatalogContent)
+                }
+                sourceSetInfo("main")
+                sourceSetInfo("test")
+                buildFile {
                     withKotlinDsl()
                     if (addBuildSrcVersionCatalogDependency) {
                         addImplementationDependency(code("libs.kotlinGradlePlugin"))
                     }
                 }
-                withSettingsFile {
-                    addCode(versionCatalogContent)
-                }
             }
-            modulesPerSourceSet.clear() // no build script for a root module
-            withKotlinSettingsFile()
+            simpleKotlinSettingsFile()
         })
         openProject("project").withProjectAsync { project ->
             createModuleByWizard(project, KOTLIN) {
@@ -362,27 +362,28 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
             }
         }.withProjectAsync { project ->
             assertProjectState(project, projectInfo("project") {
-                withFile("gradle/libs.versions.toml", versionTomlContent)
+                file("gradle/libs.versions.toml", versionTomlContent)
                 moduleInfo("project.buildSrc", "buildSrc") {
-                    withSettingsFile {
+                    settingsFile {
                         addCode(versionCatalogContent)
                     }
-                    withBuildFile {
+                    sourceSetInfo("main")
+                    sourceSetInfo("test")
+                    buildFile {
                         withKotlinDsl()
                         if (addBuildSrcVersionCatalogDependency) {
                             addImplementationDependency(code("libs.kotlinGradlePlugin"))
                         }
                     }
                 }
-                modulesPerSourceSet.clear() // no build script for a root module
-                withKotlinSettingsFile { include("module") }
-                moduleInfo("project.module", "module", gradleDsl) {
-                    if (addBuildSrcVersionCatalogDependency) {
-                        // It should not specify an explicit version because it is defined in the version catalog
-                        withKotlinBuildFile(kotlinJvmPluginVersion = null)
-                    } else {
-                        withKotlinBuildFile(kotlinJvmPluginVersion = kotlinJvmPluginVersion)
-                    }
+                simpleKotlinSettingsFile {
+                    include("module")
+                }
+                if (addBuildSrcVersionCatalogDependency) {
+                    // It should not specify an explicit version because it is defined in the version catalog
+                    simpleKotlinModuleInfo("project.module", "module", gradleDsl, kotlinJvmPluginVersion = null)
+                } else {
+                    simpleKotlinModuleInfo("project.module", "module", gradleDsl, kotlinJvmPluginVersion = kotlinJvmPluginVersion)
                 }
             })
             project.compileModules(
@@ -400,6 +401,6 @@ class GradleKotlinNewProjectWizardTest : GradleKotlinNewProjectWizardTestCase() 
 
     @Test
     fun testSdkFilterForUnsupportedVersion() {
-        assertFalse(JavaSdkVersion.JDK_26.isLessOrEqualToMaxJvmTarget())
+        assertFalse(JavaSdkVersion.JDK_27.isLessOrEqualToMaxJvmTarget())
     }
 }

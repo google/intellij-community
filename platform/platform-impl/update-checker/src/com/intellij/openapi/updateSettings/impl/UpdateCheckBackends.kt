@@ -10,7 +10,6 @@ import com.intellij.ide.plugins.newui.PluginUiModel
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.progress.ProgressIndicator
-import com.intellij.openapi.updateSettings.impl.PluginDownloader.compareVersionsSkipBrokenAndIncompatible
 import com.intellij.openapi.updateSettings.impl.UpdateChecker.allowedDowngrade
 import com.intellij.openapi.updateSettings.impl.UpdateChecker.allowedUpgrade
 import com.intellij.openapi.updateSettings.impl.UpdateChecker.checkAndPrepareToInstall
@@ -38,7 +37,7 @@ internal abstract class RemotePluginRepository(val id: String) {
   ): PreparedPluginUpdates
 }
 
-internal open class MarketplacePluginRepository : RemotePluginRepository("default-host") {
+internal open class MarketplaceLikePluginRepository : RemotePluginRepository("default-host") {
   override fun findUpdates(
     buildNumber: BuildNumber?,
     state: InstalledPluginsState,
@@ -59,7 +58,7 @@ internal open class MarketplacePluginRepository : RemotePluginRepository("defaul
       val descriptor = installedDescriptors[id]
 
       if (lastUpdate != null &&
-          (descriptor == null || compareVersionsSkipBrokenAndIncompatible(lastUpdate.version, descriptor, buildNumber) > 0)) {
+          (descriptor == null || PluginDownloader.compareVersionsSkipBrokenAndIncompatible(lastUpdate.version, descriptor, buildNumber) > 0)) {
         runCatching { MarketplaceRequests.loadPluginModel(id.idString, lastUpdate, indicator) }
           .onFailure {
             if (!isNetworkError(it)) throw it
@@ -90,7 +89,7 @@ internal open class MarketplacePluginRepository : RemotePluginRepository("defaul
 /**
  * Special backend for checking updates of plugins that passes additional analytics ID.
  */
-internal class MarketplaceUpdateCheckPluginRepository : MarketplacePluginRepository() {
+internal class MarketplaceUpdateCheckPluginRepository : MarketplaceLikePluginRepository() {
   override fun findUpdates(idsToUpdate: Set<PluginId>, buildNumber: BuildNumber?): List<IdeCompatibleUpdate> {
     return MarketplaceRequests.checkInstalledPluginUpdate(idsToUpdate, buildNumber, true)
   }

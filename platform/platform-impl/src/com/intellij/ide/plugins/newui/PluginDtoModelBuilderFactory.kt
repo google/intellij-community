@@ -7,13 +7,11 @@ import com.intellij.ide.plugins.marketplace.ModuleDependency
 import com.intellij.ide.plugins.marketplace.PluginContentModule
 import com.intellij.ide.plugins.marketplace.PluginModule
 import com.intellij.openapi.extensions.PluginId
-import com.intellij.openapi.util.IntellijInternalApi
 import org.jetbrains.annotations.ApiStatus
 import java.text.SimpleDateFormat
 import java.util.Locale
 
 @ApiStatus.Internal
-@IntellijInternalApi
 class PluginDtoModelBuilder(pluginId: PluginId) : PluginUiModelBuilder {
   private val resultDto = PluginDto(null, pluginId)
 
@@ -115,8 +113,7 @@ class PluginDtoModelBuilder(pluginId: PluginId) : PluginUiModelBuilder {
   }
 
   override fun setDependencies(dependencies: List<PluginDependencyModel>): PluginUiModelBuilder {
-    resultDto.dependencies.clear()
-    resultDto.dependencies.addAll(dependencies)
+    resultDto.dependencies = dependencies.toList()
     return this
   }
 
@@ -210,7 +207,6 @@ class PluginDtoModelBuilder(pluginId: PluginId) : PluginUiModelBuilder {
 }
 
 @ApiStatus.Internal
-@IntellijInternalApi
 object PluginDtoModelBuilderFactory : PluginUiModelBuilderFactory {
   override fun createBuilder(id: PluginId): PluginUiModelBuilder {
     return PluginDtoModelBuilder(id)

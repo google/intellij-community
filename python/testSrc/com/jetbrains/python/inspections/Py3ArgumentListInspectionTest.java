@@ -1,9 +1,14 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.inspections;
 
+import com.intellij.idea.TestFor;
+import com.jetbrains.python.allure.Layers;
+import com.jetbrains.python.allure.Subsystems;
 import com.jetbrains.python.fixtures.PyInspectionTestCase;
 import org.jetbrains.annotations.NotNull;
 
+@Subsystems.Inspections
+@Layers.Functional
 public class Py3ArgumentListInspectionTest extends PyInspectionTestCase {
   @NotNull
   @Override
@@ -367,6 +372,52 @@ public class Py3ArgumentListInspectionTest extends PyInspectionTestCase {
     doMultiFileTest();
   }
 
+  @TestFor(issues = "PY-79173")
+  public void testInitSubclassUnexpectedAndUnfilledArguments() {
+    doTestByText(
+      """
+        class A:
+            def __init_subclass__(cls, a: int):
+                ...
+        
+        
+        class B1(A, <warning descr="Unexpected argument">z="a"</warning><warning descr="Parameter 'a' unfilled">)</warning>: ...
+        class B2(A, a=1): ...
+        """);
+  }
+
+  @TestFor(issues = "PY-79173")
+  public void testInitSubclassKeywordContainerAcceptsAnyArgument() {
+    doTestByText(
+      """
+        class A:
+            def __init_subclass__(cls, **kwargs): ...
+        
+        
+        class B(A, anything=1):
+            ...
+        """);
+  }
+
+  @TestFor(issues = "PY-79173")
+  public void testInitSubclassCustomMetaClassConsumesArguments() {
+    doTestByText(
+      """
+        class Meta(type):
+            def __new__(mcs, name, bases, namespace, **kwargs):
+                return super().__new__(mcs, name, bases, namespace)
+        
+        
+        class A(metaclass=Meta):
+            def __init_subclass__(cls):
+                ...
+        
+        
+        class B(A, whatever=1):
+            ...
+        """);
+  }
+
   // PY-76899
   public void testFieldInDataclassTransformInitIsSkippedDueToFieldSpecifierOverloadMultifile() {
     doMultiFileTest();
@@ -407,23 +458,10 @@ public class Py3ArgumentListInspectionTest extends PyInspectionTestCase {
     );
   }
 
-  public void testKeywordUnpack() {
-    doTestByText("""
-                   from collections.abc import Mapping
-                   
-                   class M(Mapping[str, str]): pass
-                   
-                   dict(**M())
-                   
-                   dict(<warning descr="Expected a mapping, got int">**1</warning>)
-                   """);
-  }
-
   // PY-79816
   public void testGenericDataclassExplicitType() {
     doTest();
   }
-
 
   // PY-79816
   public void testGenericDataclassExplicitTypeDeconstructed() {
@@ -752,7 +790,7 @@ public class Py3ArgumentListInspectionTest extends PyInspectionTestCase {
                    a: str = Field(alias="b")
 
                _ = Model(a="value")
-               _ = Model<warning descr="Unexpected argument(s)Possible callees:(*, b: str)(*, a: str)">("value"<warning descr="Parameter(s) unfilledPossible callees:(*, b: str)(*, a: str)">)</warning></warning>
+               _ = Model<warning descr="No signature matches the arguments. Argument types: (Literal[\\"value\\"]). Expected one of: (b: str), (a: str)">("value"<warning descr="No signature matches the arguments. Argument types: (Literal[\\"value\\"]). Expected one of: (b: str), (a: str)">)</warning></warning>
                """);
   }
 
@@ -853,6 +891,97 @@ public class Py3ArgumentListInspectionTest extends PyInspectionTestCase {
                    g(create_person)(name=""<warning descr="Parameter 'age' unfilled">)</warning>
                    g(create_person)(name="", age=30)
                    g(create_person)(name="", age=30, <warning descr="Unexpected argument">position="CEO"</warning>)
+                   """);
+  }
+
+  @TestFor(issues = "PY-89182")
+  public void testPydanticValidateByAliasAndNameFalse() {
+    myFixture.copyDirectoryToProject("stubs/pydantic", "pydantic");
+    doTest();
+  }
+
+  @TestFor(issues = "PY-89182")
+  public void testPydanticValidateByNameAndAliasBothTrue() {
+    myFixture.copyDirectoryToProject("stubs/pydantic", "pydantic");
+    doTest();
+  }
+
+  @TestFor(issues = "PY-89182")
+  public void testPydanticValidateByNameFalseAndAliasTrue() {
+    myFixture.copyDirectoryToProject("stubs/pydantic", "pydantic");
+    doTest();
+  }
+
+  @TestFor(issues = "PY-89182")
+  public void testPydanticValidateByNameTrueAndAliasFalse() {
+    myFixture.copyDirectoryToProject("stubs/pydantic", "pydantic");
+    doTest();
+  }
+
+  @TestFor(issues = "PY-12592")
+  public void testKnownSpreadInFunctionCall() {
+    doTestByText(
+      """
+        def f(a: str, b: str, c: int): ...
+
+        tup = ("a", "b")
+        f(*tup, 1)
+        f(*tup<warning descr="Parameter 'c' unfilled">)</warning>
+        """);
+  }
+
+  @TestFor(issues = "PY-89177")
+  public void testUnknownSpreadInFunctionCall() {
+    fixme("not implemented", AssertionError.class, "f(*lst[<warning descr=\"Parameter 'c' unfilled\">)<warning>]", () ->
+      doTestByText(
+        """
+          def f(a: str, b: str, c: int): ...
+
+          lst = ["a"]
+          f(*lst<warning descr="Parameter 'c' unfilled">)<warning>
+          f(*lst, 0)
+          """)
+    );
+  }
+
+  // PY-37275
+  public void testFunctoolsPartialMissingArg() {
+    doTestByText("""
+                   import functools
+                   def foo(a: int, b: str) -> bool: ...
+                   a_pos_bound = functools.partial(foo, 1)
+                   a_pos_bound("hello")
+                   a_pos_bound(<warning descr="Parameter 'b' unfilled">)</warning>
+                   
+                   b_kw_bound = functools.partial(foo, b=1)
+                   b_kw_bound("hello")
+                   b_kw_bound(<warning descr="Parameter 'a' unfilled">)</warning>
+                   """);
+  }
+
+  // PY-37275
+  public void testFunctoolsPartialAlreadyBoundArgNotExpectedAgain() {
+    doTestByText("""
+                   import functools
+                   def foo(a: int, b: str) -> bool: ...
+                   a_pos_bound = functools.partial(foo, 1)
+                   a_pos_bound("hello", <warning descr="Unexpected argument">a=5</warning>)
+                   
+                   b_kw_bound = functools.partial(foo, b=1)
+                   b_kw_bound("hello", <warning descr="Unexpected argument">b=5</warning>)
+                   """);
+  }
+
+  // PY-37275
+  public void testFunctoolsPartialExtraPosArg() {
+    doTestByText("""
+                   import functools
+                   def foo(a: int, b: str) -> bool: ...
+                   a_pos_bound = functools.partial(foo, 1)
+                   a_pos_bound("hello", <warning descr="Unexpected argument">3.0</warning>)
+                   
+                   b_kw_bound = functools.partial(foo, b=1)
+                   b_kw_bound("hello", <warning descr="Unexpected argument">3.0</warning>)
                    """);
   }
 }

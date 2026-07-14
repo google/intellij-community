@@ -4,6 +4,7 @@ package org.jetbrains.intellij.build.productLayout.dependency
 import com.intellij.platform.pluginGraph.ContentModuleName
 import com.intellij.platform.pluginGraph.PluginGraph
 import com.intellij.platform.pluginGraph.PluginId
+import com.intellij.platform.pluginGraph.PluginModuleId
 import com.intellij.platform.pluginGraph.TargetName
 import com.intellij.platform.pluginGraph.aliasNodeName
 import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleLoadingRuleValue
@@ -269,7 +270,10 @@ class PluginDependencyGraphTest {
   fun `discovered plugin content is added to graph`() {
     runBlocking(Dispatchers.Default) {
       val targetModule = TargetName("plugin.b")
-      val moduleInfo = ContentModuleInfo(ContentModuleName("plugin.b.module"), ModuleLoadingRuleValue.REQUIRED)
+      val moduleInfo = ContentModuleInfo(
+        moduleId = PluginModuleId("plugin.b.module", PluginModuleId.DEFAULT_NAMESPACE),
+        loadingMode = ModuleLoadingRuleValue.REQUIRED,
+      )
       val info = pluginInfo(
         pluginId = "com.b",
         contentModules = listOf(moduleInfo),
@@ -315,17 +319,22 @@ class PluginDependencyGraphTest {
   @Test
   fun `module set wrapper flag survives extraction merge`() {
     runBlocking(Dispatchers.Default) {
-      val pluginModule = TargetName("intellij.moduleSet.plugin.recentFiles")
+      val pluginModule = TargetName("intellij.platform.recentFiles.plugin")
       val info = pluginInfo(
-        pluginId = "com.intellij.moduleSet.recentFiles",
-        contentModules = listOf(ContentModuleInfo(ContentModuleName("intellij.platform.recentFiles.frontend"), ModuleLoadingRuleValue.OPTIONAL)),
+        pluginId = "intellij.recentFiles.plugin",
+        contentModules = listOf(
+          ContentModuleInfo(
+            moduleId = PluginModuleId("intellij.platform.recentFiles.frontend", PluginModuleId.DEFAULT_NAMESPACE),
+            loadingMode = ModuleLoadingRuleValue.OPTIONAL,
+          )
+        ),
       )
 
       val builder = PluginGraphBuilder()
       builder.addPlugin(
         name = pluginModule,
         isTest = false,
-        pluginId = PluginId("com.intellij.moduleSet.recentFiles"),
+        pluginId = PluginId("intellij.recentFiles.plugin"),
         isModuleSetWrapper = true,
       )
       builder.addPluginWithContent(pluginModule, info, emptySet())
@@ -347,7 +356,10 @@ class PluginDependencyGraphTest {
   fun `discovered plugin id resolves to content node`() {
     runBlocking(Dispatchers.Default) {
       val discoveredModule = TargetName("plugin.b.module")
-      val discoveredContent = ContentModuleInfo(ContentModuleName("plugin.b.content"), ModuleLoadingRuleValue.REQUIRED)
+      val discoveredContent = ContentModuleInfo(
+        moduleId = PluginModuleId("plugin.b.content", PluginModuleId.DEFAULT_NAMESPACE),
+        loadingMode = ModuleLoadingRuleValue.REQUIRED,
+      )
       val discoveredInfo = pluginInfo(
         pluginId = "com.b",
         contentModules = listOf(discoveredContent),

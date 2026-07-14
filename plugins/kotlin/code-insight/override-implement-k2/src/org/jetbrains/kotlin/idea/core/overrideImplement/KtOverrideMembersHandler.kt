@@ -7,17 +7,17 @@ import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.components.KaCallableImplementationState
 import org.jetbrains.kotlin.analysis.api.components.containingSymbol
 import org.jetbrains.kotlin.analysis.api.components.directlyOverriddenSymbols
 import org.jetbrains.kotlin.analysis.api.components.fakeOverrideOriginal
-import org.jetbrains.kotlin.analysis.api.components.getImplementationStatus
+import org.jetbrains.kotlin.analysis.api.components.implementationState
 import org.jetbrains.kotlin.analysis.api.components.intersectionOverriddenSymbols
 import org.jetbrains.kotlin.analysis.api.components.isAnyType
 import org.jetbrains.kotlin.analysis.api.components.isVisibleInClass
 import org.jetbrains.kotlin.analysis.api.components.memberScope
 import org.jetbrains.kotlin.analysis.api.lifetime.KaLifetimeOwner
 import org.jetbrains.kotlin.analysis.api.lifetime.KaLifetimeToken
-import org.jetbrains.kotlin.analysis.api.lifetime.validityAsserted
 import org.jetbrains.kotlin.analysis.api.lifetime.withValidityAssertion
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassKind
@@ -87,8 +87,15 @@ private fun collectMembers(classOrObject: KtClassOrObject): List<KtClassMember> 
         return buildList {
             classOrObjectSymbol.memberScope.callables.forEach { symbol ->
                 if (!symbol.isVisibleInClass(classOrObjectSymbol)) return@forEach
-                val implementationStatus = symbol.getImplementationStatus(classOrObjectSymbol) ?: return@forEach
-                if (!implementationStatus.isOverridable) return@forEach
+
+                val isImplementable = when (val implementationState = symbol.implementationState(classOrObjectSymbol)) {
+                    null -> false
+                    is KaCallableImplementationState.Explicit -> !implementationState.isComplete
+                    is KaCallableImplementationState.Inherited -> implementationState.isOverridable
+                    else -> true
+                }
+
+                if (!isImplementable) return@forEach
 
                 val intersectionSymbols = symbol.intersectionOverriddenSymbols
                 val symbolsToProcess = if (intersectionSymbols.size <= 1) {
@@ -144,14 +151,14 @@ private fun collectMembers(classOrObject: KtClassOrObject): List<KtClassMember> 
 
     private class OverrideMember(
         private val backingSymbol: KaCallableSymbol,
-        bodyType: BodyType,
-        containingSymbol: KaClassSymbol?,
+        private val backingBodyType: BodyType,
+        private val backingContainingSymbol: KaClassSymbol?,
     ) : KaLifetimeOwner {
         override val token: KaLifetimeToken get() = backingSymbol.token
 
         val symbol: KaCallableSymbol get() = withValidityAssertion { backingSymbol }
-        val bodyType: BodyType by validityAsserted(bodyType)
-        val containingSymbol: KaClassSymbol? by validityAsserted(containingSymbol)
+        val bodyType: BodyType get() = withValidityAssertion { backingBodyType }
+        val containingSymbol: KaClassSymbol? get() = withValidityAssertion { backingContainingSymbol }
     }
 
     override fun getChooserTitle() = KotlinIdeaCoreBundle.message("override.members.handler.title")

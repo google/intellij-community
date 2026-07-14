@@ -3,7 +3,6 @@ package com.intellij.openapi.progress;
 
 import com.intellij.concurrency.ThreadContext;
 import com.intellij.openapi.application.AccessToken;
-import com.intellij.openapi.util.IntellijInternalApi;
 import com.intellij.openapi.util.ThrowableComputable;
 import com.intellij.util.DebugAttachDetectorArgs;
 import com.intellij.util.progress.JfrCancellationEventsCallbackHolder;
@@ -24,19 +23,19 @@ public final class Cancellation {
 
   private Cancellation() { }
 
-  @IntellijInternalApi // requires opt-in in Kotlin, must not be used in applied code
   public static @Nullable Job currentJob() {
     return ThreadContext.currentThreadContext().get(Job.Key);
   }
 
   public static void checkCancelled() {
-    if (isInNonCancelableSection()) {
+    Job job = currentJob();
+    if (isInNonCancelableSection(job)) {
       JfrCancellationEventsCallbackHolder.nonCancellableSectionInvoked();
       return;
     }
 
     try {
-      ensureActive();
+      ensureActive(job);
       JfrCancellationEventsCallbackHolder.cancellableSectionInvoked(false);
     }
     catch (ProcessCanceledException e) {
@@ -54,14 +53,20 @@ public final class Cancellation {
    */
   @ApiStatus.Internal
   public static void ensureActive() {
-    ThreadContext.warnAccidentalCancellation();
+    ensureActive(currentJob());
+  }
 
-    Job currentJob = currentJob();
+  /**
+   * {@link #ensureActive()} for an already-resolved {@link Job}, sparing the caller a second thread-context walk.
+   */
+  @ApiStatus.Internal
+  public static void ensureActive(@Nullable Job job) {
+    ThreadContext.warnAccidentalCancellation();
     // sometimes it is possible to violate structured concurrency and obtain the successfully completed Job in the context, like in the completion handler of `Job`s.
     // We shall not check cancellation in this case
-    if (currentJob != null && !(isJobCompletedSuccessfully(currentJob))) {
+    if (job != null && !isJobCompletedSuccessfully(job)) {
       try {
-        JobKt.ensureActive(currentJob);
+        JobKt.ensureActive(job);
       }
       catch (ProcessCanceledException pce) {
         throw pce;
@@ -101,7 +106,15 @@ public final class Cancellation {
    */
   @ApiStatus.Obsolete
   public static boolean isInNonCancelableSection() {
-    if (isInNonCancelableSectionInternal()) return true;
+    return isInNonCancelableSection(currentJob());
+  }
+
+  /**
+   * {@link #isInNonCancelableSection()} for an already-resolved {@link Job}, sparing the caller a second thread-context walk.
+   */
+  @ApiStatus.Internal
+  public static boolean isInNonCancelableSection(@Nullable Job job) {
+    if (job != null && checkIfCurrentJobIsNonCancellable(job)) return true;
     // Avoid thread-local access when the debugger is not enabled.
     if (!DebugNonCancellableState.isDebugEnabled) return false;
     // Check whether is still attached in case debugger connection is lost before cleanup

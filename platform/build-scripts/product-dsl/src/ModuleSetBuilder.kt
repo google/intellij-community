@@ -38,6 +38,8 @@ package org.jetbrains.intellij.build.productLayout
 
 import com.intellij.platform.pluginGraph.ContentModuleName
 import com.intellij.platform.pluginGraph.PluginId
+import com.intellij.platform.pluginGraph.PluginModuleId
+import com.intellij.platform.pluginGraph.contentName
 import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleLoadingRuleValue
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -60,16 +62,19 @@ import java.nio.file.Path
 /**
  * Represents a content module with optional loading attribute.
  *
- * @param name JPS module name (e.g., "intellij.platform.vcs.impl")
+ * @param moduleId Plugin module id (e.g., "intellij.platform.vcs.impl" in the "jetbrains" namespace)
  * @param loading Optional loading mode (e.g., ModuleLoadingRule.EMBEDDED)
  */
 @Serializable
 data class ContentModule(
-  val name: ContentModuleName,
+  @JvmField val moduleId: PluginModuleId,
   @JvmField val loading: ModuleLoadingRuleValue = ModuleLoadingRuleValue.OPTIONAL,
+  @JvmField val requiredIfAvailable: PluginModuleId? = null,
   @JvmField val includeDependencies: Boolean = false,
   @Transient @JvmField val allowedMissingPluginIds: List<PluginId> = emptyList(),
 )
+
+internal fun ContentModule.contentName(): ContentModuleName = moduleId.contentName()
 
 /**
  * Represents a named collection of content modules.
@@ -91,7 +96,6 @@ data class ModuleSet(
   val alias: PluginId? = null,
   @Transient val outputModule: ContentModuleName? = null,
   @JvmField val selfContained: Boolean = false,
-  @JvmField val pluginSpec: ModuleSetPluginSpec? = null,
 )
 
 /**
@@ -101,21 +105,23 @@ data class ModuleSet(
 class ModuleSetBuilder(private val defaultIncludeDependencies: Boolean = false) {
   private val modules = ArrayList<ContentModule>()
   private val nestedSets = ArrayList<ModuleSet>()
-  private var pluginSpec: ModuleSetPluginSpec? = null
 
   /**
    * Add a single module.
    */
   fun module(
     name: String,
+    namespace: String? = PluginModuleId.DEFAULT_NAMESPACE,
     loading: ModuleLoadingRuleValue = ModuleLoadingRuleValue.OPTIONAL,
+    requiredIfAvailable: PluginModuleId? = null,
     allowedMissingPluginIds: List<String> = emptyList(),
   ) {
     modules.add(
       ContentModule(
-        ContentModuleName(name),
-        loading,
-        defaultIncludeDependencies,
+        moduleId = PluginModuleId(name, namespace),
+        loading = loading,
+        requiredIfAvailable = requiredIfAvailable,
+        includeDependencies = defaultIncludeDependencies,
         allowedMissingPluginIds = allowedMissingPluginIds.map { PluginId(it) },
       )
     )
@@ -124,12 +130,12 @@ class ModuleSetBuilder(private val defaultIncludeDependencies: Boolean = false) 
   /**
    * Add a single module with EMBEDDED loading.
    */
-  fun embeddedModule(name: String, allowedMissingPluginIds: List<String> = emptyList()) {
+  fun embeddedModule(name: String, namespace: String? = PluginModuleId.DEFAULT_NAMESPACE, allowedMissingPluginIds: List<String> = emptyList()) {
     modules.add(
       ContentModule(
-        ContentModuleName(name),
-        ModuleLoadingRuleValue.EMBEDDED,
-        defaultIncludeDependencies,
+        moduleId = PluginModuleId(name, namespace),
+        loading = ModuleLoadingRuleValue.EMBEDDED,
+        includeDependencies = defaultIncludeDependencies,
         allowedMissingPluginIds = allowedMissingPluginIds.map { PluginId(it) },
       )
     )
@@ -138,12 +144,12 @@ class ModuleSetBuilder(private val defaultIncludeDependencies: Boolean = false) 
   /**
    * Add a single module with REQUIRED loading.
    */
-  fun requiredModule(name: String, allowedMissingPluginIds: List<String> = emptyList()) {
+  fun requiredModule(name: String, namespace: String? = PluginModuleId.DEFAULT_NAMESPACE, allowedMissingPluginIds: List<String> = emptyList()) {
     modules.add(
       ContentModule(
-        ContentModuleName(name),
-        ModuleLoadingRuleValue.REQUIRED,
-        defaultIncludeDependencies,
+        moduleId = PluginModuleId(name, namespace),
+        loading = ModuleLoadingRuleValue.REQUIRED,
+        includeDependencies = defaultIncludeDependencies,
         allowedMissingPluginIds = allowedMissingPluginIds.map { PluginId(it) },
       )
     )
@@ -157,22 +163,10 @@ class ModuleSetBuilder(private val defaultIncludeDependencies: Boolean = false) 
   }
 
   @PublishedApi
-  internal fun configurePluginSpec(pluginId: String? = null, addToMainModule: Boolean = true) {
-    check(pluginSpec == null) {
-      "module set plugin specification can be configured only once"
-    }
-    pluginSpec = ModuleSetPluginSpec(
-      pluginIdOverride = pluginId?.let(::PluginId),
-      addToMainModule = addToMainModule,
-    )
-  }
-
-  @PublishedApi
-  internal fun build(): Triple<List<ContentModule>, List<ModuleSet>, ModuleSetPluginSpec?> {
-    return Triple(
+  internal fun build(): Pair<List<ContentModule>, List<ModuleSet>> {
+    return Pair(
       java.util.List.copyOf(modules),
       java.util.List.copyOf(nestedSets),
-      pluginSpec,
     )
   }
 }
@@ -182,10 +176,10 @@ class ModuleSetBuilder(private val defaultIncludeDependencies: Boolean = false) 
  *
  * Example:
  * ```
- * fun ssh() = moduleSet("ssh") {
- *   embeddedModule("intellij.platform.ssh.core")
- *   embeddedModule("intellij.platform.ssh")
- *   module("intellij.platform.ssh.ui")
+ * fun lsp() = moduleSet("lsp") {
+ *   embeddedModule("intellij.platform.lsp")
+ *   embeddedModule("intellij.platform.lsp.impl")
+ *   module("intellij.platform.lsp.impl.structureView")
  * }
  *
  * // With module alias:
@@ -220,7 +214,7 @@ inline fun moduleSet(
   includeDependencies: Boolean = false,
   block: ModuleSetBuilder.() -> Unit,
 ): ModuleSet {
-  val (modules, nestedSets, pluginSpec) = ModuleSetBuilder(defaultIncludeDependencies = includeDependencies).apply(block).build()
+  val (modules, nestedSets) = ModuleSetBuilder(defaultIncludeDependencies = includeDependencies).apply(block).build()
   return ModuleSet(
     name = name,
     modules = modules,
@@ -228,39 +222,14 @@ inline fun moduleSet(
     alias = alias?.let { PluginId(it) },
     outputModule = outputModule?.let { ContentModuleName(it) },
     selfContained = selfContained,
-    pluginSpec = pluginSpec,
   )
-}
-
-/**
- * Creates a module set that is materialized as a standalone bundled plugin wrapper.
- *
- * This is sugar for `moduleSet(name, ...) { configurePluginSpec(pluginId, addToMainModule); ... }`.
- */
-fun plugin(
-  name: String,
-  pluginId: String? = null,
-  outputModule: String? = null,
-  addToMainModule: Boolean = true,
-  block: ModuleSetBuilder.() -> Unit,
-): ModuleSet {
-  return moduleSet(
-    name = name,
-    alias = null,
-    outputModule = outputModule,
-    selfContained = false,
-    includeDependencies = false,
-  ) {
-    this.configurePluginSpec(pluginId = pluginId, addToMainModule = addToMainModule)
-    block()
-  }
 }
 
 /**
  * Appends a single module XML element to the StringBuilder.
  */
 private fun appendModuleXml(sb: StringBuilder, module: ContentModule) {
-  sb.append("    <module name=\"${module.name.value}\"")
+  sb.append("    <module name=\"${module.moduleId.name}\"")
   if (module.loading == ModuleLoadingRuleValue.EMBEDDED) {
     sb.append(" loading=\"embedded\"")
   }
@@ -277,16 +246,10 @@ private fun appendModuleSetContent(
   moduleSet: ModuleSet,
   indent: String = "    ",
   breadcrumb: String = "",
-  skipPluginizedNestedSets: Boolean = false,
 ) {
   // Get direct modules (not from nested sets)
   val directModules = moduleSet.modules
-  val nestedSets = if (skipPluginizedNestedSets) {
-    moduleSet.nestedSets.filter { it.pluginSpec == null }
-  }
-  else {
-    moduleSet.nestedSets
-  }
+  val nestedSets = moduleSet.nestedSets
 
   // Recursively append nested sets first
   for (nestedSet in nestedSets) {
@@ -304,7 +267,6 @@ private fun appendModuleSetContent(
         moduleSet = nestedSet,
         indent = indent,
         breadcrumb = nestedBreadcrumb,
-        skipPluginizedNestedSets = skipPluginizedNestedSets,
       )
     }
     sb.append("\n")
@@ -355,12 +317,11 @@ internal fun buildModuleSetXml(moduleSet: ModuleSet, label: String): ModuleSetBu
     }
 
     // Generate content blocks with source-file attributes for tracking
-    val hasNestedSets = if (moduleSet.pluginSpec == null) moduleSet.nestedSets.any { it.pluginSpec == null } else moduleSet.nestedSets.isNotEmpty()
-    val hasAnyModules = hasNestedSets || moduleSet.modules.isNotEmpty()
+    val hasAnyModules = moduleSet.nestedSets.isNotEmpty() || moduleSet.modules.isNotEmpty()
     if (hasAnyModules) {
       append("  <content namespace=\"jetbrains\">")
       append("\n")
-      appendModuleSetContent(this, moduleSet, skipPluginizedNestedSets = moduleSet.pluginSpec == null)
+      appendModuleSetContent(this, moduleSet)
       append("  </content>")
       append("\n")
     }
@@ -461,8 +422,7 @@ internal suspend fun doGenerateAllModuleSetsInternal(
   return coroutineScope {
     Files.createDirectories(outputDir)
 
-    val moduleSets = discoverModuleSets(obj)
-    val moduleSetsToGenerate = moduleSets.filter { it.pluginSpec == null }
+    val moduleSetsToGenerate = discoverModuleSets(obj)
 
     // Generate all module set XML files first (in parallel)
     val fileResults = moduleSetsToGenerate.map { moduleSet ->

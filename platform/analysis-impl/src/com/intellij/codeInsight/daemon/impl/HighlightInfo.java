@@ -11,6 +11,7 @@ import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.codeInsight.intention.IntentionActionDelegate;
 import com.intellij.codeInsight.intention.IntentionActionWithOptions;
 import com.intellij.codeInsight.intention.IntentionManager;
+import com.intellij.codeInsight.quickfix.LazyQuickFixUpdater;
 import com.intellij.codeInsight.quickfix.UnresolvedReferenceQuickFixProvider;
 import com.intellij.codeInspection.CustomSuppressableInspectionTool;
 import com.intellij.codeInspection.ExternalSourceProblemGroup;
@@ -110,6 +111,7 @@ import static com.intellij.openapi.util.NlsContexts.Tooltip;
 @ApiStatus.NonExtendable
 public class HighlightInfo implements Segment {
   private static final Logger LOG = Logger.getInstance(HighlightInfo.class);
+  public static final HighlightInfo[] EMPTY_ARRAY = new HighlightInfo[0];
   /**
    * Short name of the {@link com.intellij.codeInsight.daemon.impl.HighlightVisitorBasedInspection} tool, which needs to be treated differently from other inspections:
    * it doesn't have "disable" or "suppress" quickfixes
@@ -284,6 +286,7 @@ public class HighlightInfo implements Segment {
       if (future != null && future.isDone()) {
         try {
           List<IntentionActionDescriptor> coll = future.get();
+          //noinspection ConstantValue
           assert coll != null : future +"; "+future.getClass()+"; desc="+desc;
           return List.copyOf(coll);
         }
@@ -519,13 +522,10 @@ public class HighlightInfo implements Segment {
     if (forcedTextAttributes != null) {
       return forcedTextAttributes;
     }
-
-    EditorColorsScheme colorsScheme = getColorsScheme(editorColorsScheme);
-
+    EditorColorsScheme colorsScheme = notNullScheme(editorColorsScheme);
     if (forcedTextAttributesKey != null) {
       return colorsScheme.getAttributes(forcedTextAttributesKey);
     }
-
     return getAttributesByType(element, type, colorsScheme);
   }
 
@@ -543,12 +543,11 @@ public class HighlightInfo implements Segment {
 
   @Nullable
   final Color getErrorStripeMarkColor(@NotNull PsiElement element,
-                                @Nullable("when null, the global scheme will be used") EditorColorsScheme colorsScheme) {
+                                      @Nullable("when null, the global scheme will be used") EditorColorsScheme colorsScheme) {
     if (forcedTextAttributes != null) {
       return forcedTextAttributes.getErrorStripeColor();
     }
-
-    EditorColorsScheme scheme = getColorsScheme(colorsScheme);
+    EditorColorsScheme scheme = notNullScheme(colorsScheme);
     if (forcedTextAttributesKey != null) {
       TextAttributes forcedTextAttributes = scheme.getAttributes(forcedTextAttributesKey);
       if (forcedTextAttributes != null) {
@@ -582,7 +581,7 @@ public class HighlightInfo implements Segment {
     return attributes == null ? null : attributes.getErrorStripeColor();
   }
 
-  private static @NotNull EditorColorsScheme getColorsScheme(@Nullable EditorColorsScheme customScheme) {
+  private static @NotNull EditorColorsScheme notNullScheme(@Nullable EditorColorsScheme customScheme) {
     return customScheme != null ? customScheme : EditorColorsManager.getInstance().getGlobalScheme();
   }
 
@@ -617,7 +616,7 @@ public class HighlightInfo implements Segment {
   }
 
   @ApiStatus.Internal
-  public final @NonNls String toStringCompact(boolean showFullQualifiedClassNames) {
+  public final @NonNls String toStringCompact(boolean showFullQualifiedClassNames, boolean showIntentionDescriptors) {
     String s = "HighlightInfo(" + getStartOffset() + "," + getEndOffset() + ")";
     if (isFileLevelAnnotation()) {
       s+=" (file level)";
@@ -637,10 +636,14 @@ public class HighlightInfo implements Segment {
       s += ", description='" + getDescription() + "'";
     }
     s += "; severity=" + getSeverity();
-    List<IntentionActionDescriptor> descriptors = getIntentionActionDescriptors(store);
-    if (!descriptors.isEmpty()) {
-      s += "; quickFixes: " + StringUtil.join(descriptors, ", ");
+
+    if (showIntentionDescriptors) {
+      List<IntentionActionDescriptor> descriptors = getIntentionActionDescriptors(store);
+      if (!descriptors.isEmpty()) {
+        s += "; quickFixes: " + StringUtil.join(descriptors, ", ");
+      }
     }
+
     if (gutterIconRenderer != null) {
       s += "; gutter: " + gutterIconRenderer;
     }
@@ -662,7 +665,7 @@ public class HighlightInfo implements Segment {
 
   @Override
   public @NonNls String toString() {
-    return toStringCompact(true);
+    return toStringCompact(true, true);
   }
 
   public static @NotNull Builder newHighlightInfo(@NotNull HighlightInfoType type) {
@@ -911,7 +914,7 @@ public class HighlightInfo implements Segment {
     /**
      * @deprecated use {@link #IntentionActionDescriptor(IntentionAction, List, String, Icon, HighlightDisplayKey, ProblemGroup, HighlightSeverity, Segment)}
      */
-    @Deprecated
+    @Deprecated(forRemoval = true)
     public IntentionActionDescriptor(@NotNull IntentionAction action,
                                      @Nullable @Unmodifiable List<? extends IntentionAction> options,
                                      @Nullable @Nls String displayName,
@@ -1468,7 +1471,6 @@ public class HighlightInfo implements Segment {
         // recompute only if necessary
         List<IntentionActionDescriptor> result =
           computerToResult.computeIfAbsent(computer, _ -> doComputeLazyQuickFixes(document, project, desc.psiModificationStamp(), computer));
-        assert result != null;
         future = CompletableFuture.completedFuture(result);
         return new LazyFixDescription(desc.fixesComputer(), desc.psiModificationStamp(), future);
       });
@@ -1483,8 +1485,7 @@ public class HighlightInfo implements Segment {
                                                                   @NotNull Consumer<? super QuickFixActionRegistrar> computation) {
     if (project.isDisposed()
         || PsiDocumentManager.getInstance(project).isUncommited(document)
-        || PsiManager.getInstance(project).getModificationTracker().getModificationCount() != oldPsiModificationStamp
-    ) {
+        || PsiManager.getInstance(project).getModificationTracker().getModificationCount() != oldPsiModificationStamp) {
       return List.of();
     }
     assertIntentionActionDescriptorsAreRangeMarkerBased(getIntentionActionDescriptors(offsetStore));
@@ -1509,6 +1510,11 @@ public class HighlightInfo implements Segment {
     };
     computation.accept(registrarDelegate);
     assertIntentionActionDescriptorsAreRangeMarkerBased(getIntentionActionDescriptors(offsetStore));
+    if (!lazyDescriptors.isEmpty()) {
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("computeQuickFixesSynchronously finished: " + lazyDescriptors);
+      }
+    }
     return lazyDescriptors;
   }
 
@@ -1528,12 +1534,12 @@ public class HighlightInfo implements Segment {
     assertIntentionActionDescriptorsAreRangeMarkerBased(getIntentionActionDescriptors(offsetStore));
     ThreadingAssertions.assertBackgroundThread();
     ThreadingAssertions.assertReadAccess();
-    AtomicReference<ProgressIndicator> progressIndicator = new AtomicReference<>(new DaemonProgressIndicator());
+    AtomicReference<ProgressIndicator> progressIndicator = new AtomicReference<>();
     updateOffsetStore(oldStore -> {
-      if (!progressIndicator.get().isCanceled()) {
-        progressIndicator.get().cancel(); // cancel the previous computations started before but not stored in the "future" field because the CAS failed
+      ProgressIndicator oldIndicator = progressIndicator.getAndSet(new DaemonProgressIndicator());
+      if (oldIndicator != null && !oldIndicator.isCanceled()) {
+        oldIndicator.cancel(); // cancel the previous computations started before but not stored in the "future" field because the CAS failed
       }
-      progressIndicator.set(new DaemonProgressIndicator());
       if (oldStore == TOMB) {
         return oldStore;
       }
@@ -1541,13 +1547,22 @@ public class HighlightInfo implements Segment {
         Future<List<IntentionActionDescriptor>> future = description.future();
         if (future == null) {
           Consumer<? super QuickFixActionRegistrar> computer = description.fixesComputer();
-          future = ReadAction.nonBlocking(() -> doComputeLazyQuickFixes(document, project, description.psiModificationStamp(), computer)).wrapProgress(progressIndicator.get()).submit(ForkJoinPool.commonPool());
+          future = ReadAction.nonBlocking(() -> doComputeLazyQuickFixes(document, project, description.psiModificationStamp(), computer)).wrapProgress(progressIndicator.get()).submit(ForkJoinPool.commonPool())
+            .onSuccess(descriptors -> fireQuickFixesAvailable(descriptors, project, document));
           return new LazyFixDescription(computer, PsiManager.getInstance(project).getModificationTracker().getModificationCount(), future);
         }
         return description;
       });
       return oldStore.withLazyQuickFixes(newLazyFixes);
     });
+  }
+
+  private void fireQuickFixesAvailable(@NotNull List<IntentionActionDescriptor> descriptors,
+                                       @NotNull Project project,
+                                       @NotNull Document document) {
+    if (!descriptors.isEmpty() && !project.isDisposed()) {
+      project.getMessageBus().syncPublisher(LazyQuickFixUpdater.TOPIC).quickFixesAvailable(this, document);
+    }
   }
 
   final void copyComputedLazyFixesTo(@NotNull HighlightInfo newInfo, @NotNull Document document) {

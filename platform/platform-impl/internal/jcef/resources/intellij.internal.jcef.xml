@@ -1,0 +1,23 @@
+<idea-plugin>
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+  <dependencies>
+    <module name="intellij.libraries.jcef"/>
+    <module name="intellij.platform.ui.jcef"/>
+  </dependencies>
+  <!-- endregion -->
+
+  <actions>
+    <!--suppress PluginXmlI18n -->
+    <action id="JBCefTestApp" text="JBCef TestApp" class="com.intellij.internal.jcef.test.JBCefTestApp" internal="true">
+      <add-to-group group-id="Internal.UI.Demos"/>
+    </action>
+    <!--suppress PluginXmlI18n -->
+    <action id="ShowGotItDemo" text="Show GotIt Demo" internal="true" class="com.intellij.internal.ui.ShowGotItDemoAction">
+      <add-to-group group-id="Internal.UI.Demos"/>
+    </action>
+    <!--suppress PluginXmlI18n -->
+    <action id="JBCefOsrMeasureFps" text="JBCef OSR Measure FPS" class="com.intellij.internal.jcef.JBCefOsrBrowserMeasureFpsAction" internal="true">
+      <add-to-group group-id="Internal.UI"/>
+    </action>
+  </actions>
+</idea-plugin>

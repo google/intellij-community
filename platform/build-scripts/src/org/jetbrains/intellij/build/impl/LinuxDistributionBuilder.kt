@@ -24,6 +24,7 @@ import org.jetbrains.intellij.build.impl.OsSpecificDistributionBuilder.Companion
 import org.jetbrains.intellij.build.impl.client.getAdditionalEmbeddedClientVmOptions
 import org.jetbrains.intellij.build.impl.productInfo.PRODUCT_INFO_FILE_NAME
 import org.jetbrains.intellij.build.impl.productInfo.generateEmbeddedFrontendLaunchData
+import org.jetbrains.intellij.build.impl.productInfo.generateIjLightLaunchData
 import org.jetbrains.intellij.build.impl.productInfo.generateProductInfoJson
 import org.jetbrains.intellij.build.impl.productInfo.resolveProductInfoJsonSibling
 import org.jetbrains.intellij.build.impl.productInfo.validateProductJson
@@ -402,10 +403,12 @@ class LinuxDistributionBuilder(
           stdioRedirectArg = context.productProperties.stdioRedirectArg,
           startupWmClass = getLinuxFrameClass(context),
           customCommands = run {
+            val vmOptionsFilePath: (BuildContext) -> String = {
+              "bin/${it.add64IfNeeded(it.productProperties.baseFileName)}.vmoptions"
+            }
             val base = listOfNotNull(
-              generateEmbeddedFrontendLaunchData(arch, OsFamily.LINUX, context) {
-                "bin/${it.add64IfNeeded(it.productProperties.baseFileName)}.vmoptions"
-              },
+              generateEmbeddedFrontendLaunchData(arch, OsFamily.LINUX, context, vmOptionsFilePath),
+              generateIjLightLaunchData(arch, OsFamily.LINUX, context, vmOptionsFilePath),
               generateQodanaLaunchData(context, arch, OsFamily.LINUX),
               generateStdioMcpRunnerLaunchData(context, OsFamily.LINUX)
             )
@@ -509,20 +512,15 @@ class LinuxDistributionBuilder(
   }
 
   private fun writeLinuxVmOptions(distBinDir: Path, context: BuildContext): Path {
-    val vmOptionsPath = distBinDir.resolve("${context.add64IfNeeded(context.productProperties.baseFileName)}.vmoptions")
-    val vmOptions = generateVmOptions(
-      context, listOfNotNull(
-        "-Dsun.tools.attach.tmp.only=true",
-        "-Dawt.lock.fair=true",
-        when (context.productProperties.platformPrefix) {
-          "Gateway" -> null // disabled for Gateway until system tray will be supported in Wayland toolkit in JBR (IJPL-231661/JBR-9966)
-          "Rider" -> null // until the issues with SkikoLayer are resolved (RIDER-132169, SKIKO-28)
-          else -> "-Dawt.toolkit.name=auto"
-        }
-      )
-    )
-    writeVmOptions(vmOptionsPath, vmOptions, separator = "\n")
-    return vmOptionsPath
+    val vmOptionsFile = distBinDir.resolve("${context.add64IfNeeded(context.productProperties.baseFileName)}.vmoptions")
+    val vmOptions = generateVmOptions(context, extra = listOfNotNull(
+      "-Dsun.tools.attach.tmp.only=true",
+      "-Dawt.lock.fair=true",
+      // disabled for Gateway until JBR supports system tray in the Wayland toolkit (IJPL-231661/JBR-9966)
+      "-Dawt.toolkit.name=auto".takeIf { context.productProperties.platformPrefix != "Gateway" },
+    ))
+    writeVmOptions(vmOptionsFile, vmOptions, separator = "\n")
+    return vmOptionsFile
   }
 
   private fun suffix(arch: JvmArchitecture, targetLibcImpl: LinuxLibcImpl): String = suffix(arch) + if (targetLibcImpl == LinuxLibcImpl.MUSL) "-musl" else ""

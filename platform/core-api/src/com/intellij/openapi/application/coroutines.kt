@@ -4,7 +4,6 @@ package com.intellij.openapi.application
 import com.intellij.openapi.application.CoroutineSupport.UiDispatcherKind
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Computable
-import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.ThrowableComputable
 import com.intellij.util.ThrowableRunnable
 import com.intellij.util.ui.EDT
@@ -13,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.withContext
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.ApiStatus.Experimental
 import org.jetbrains.annotations.ApiStatus.Internal
 import kotlin.coroutines.CoroutineContext
@@ -73,7 +73,6 @@ suspend fun <T> constrainedReadAction(vararg constraints: ReadConstraint, action
  *
  * @see readAction
  */
-@IntellijInternalApi
 @Internal
 suspend fun <T> readActionUndispatched(action: () -> T): T {
   return constrainedReadActionUndispatched(action = action)
@@ -88,7 +87,6 @@ suspend fun <T> readActionUndispatched(action: () -> T): T {
  *
  * Use with care. This method should not be used to compute CPU-heavy stuff.
  */
-@IntellijInternalApi
 @Internal
 suspend fun <T> constrainedReadActionUndispatched(vararg constraints: ReadConstraint, action: () -> T): T {
   return readWriteActionSupport().executeReadAction(constraints.toList(), undispatched = true, action = action)
@@ -135,26 +133,17 @@ suspend fun <T> constrainedReadActionBlocking(vararg constraints: ReadConstraint
   return readWriteActionSupport().executeReadAction(constraints.toList(), blocking = true, action = action)
 }
 
-sealed interface ReadResult<out R> {
+/**
+ * Use [ReadAndWriteScope.value] or [ReadAndWriteScope.writeAction] to get an instance of this class
+ */
+@ApiStatus.NonExtendable
+interface ReadResult<out R>
 
-  @Internal
-  class Value<out V> internal constructor(val value: V) : ReadResult<V>
-
-  @Internal
-  class WriteAction<out V> internal constructor(val action: () -> V) : ReadResult<V>
-
-  @Internal
-  companion object : ReadAndWriteScope {
-
-    @JvmStatic
-    override fun <R> value(value: R): ReadResult<R> = Value(value)
-
-    @JvmStatic
-    override fun <R> writeAction(action: () -> R): ReadResult<R> = WriteAction(action)
-  }
-}
-
-sealed interface ReadAndWriteScope {
+/**
+ * DSL for building results of [readAndEdtWriteAction] or [readAndBackgroundWriteAction]
+ */
+@ApiStatus.NonExtendable
+interface ReadAndWriteScope {
   fun <R> value(value: R): ReadResult<R>
   fun <R> writeAction(action: () -> R): ReadResult<R>
 }
@@ -382,31 +371,20 @@ fun <T> getComputationClassForListener(computation: () -> T): Class<*> {
 }
 
 /**
- * Runs [action] under [write lock][com.intellij.openapi.application.Application.runWriteAction].
- *
- * This function is deprecated in favor of [edtWriteAction]. This deprecation is needed to free the name [writeAction], as we are
- * planning to schedule all write actions to background by default.
- *
- * NB This function is an API stub. The implementation will change once running write actions would be allowed on other threads. This
- * function exists to make it possible to use it in suspending contexts before the platform is ready to handle write actions differently.
- */
-@Experimental
-suspend fun <T> writeAction(action: () -> T): T {
-  return withContext(Dispatchers.EDT) {
-    ApplicationManager.getApplication().runWriteAction(lambdaToComputable<T>(action))
-  }
-}
-
-/**
  * Runs given [action] under [write lock][com.intellij.openapi.application.Application.runWriteAction].
  *
- * This function dispatches the [action] by [Dispatchers.Default] within the [context modality state][asContextElement].
+ * This function dispatches the [action] by [Dispatchers.Default],
  * The lock is acquired in a suspending manner, so the calling coroutine will be suspended during the acquisition.
  *
  * A pending background write action can be diagnosed by an inspection of _coroutine dumps_.
  *
  * @see readAndBackgroundWriteAction
  * @see com.intellij.openapi.command.writeCommandAction
+ */
+suspend fun <T> writeAction(action: () -> T): T = backgroundWriteAction(action)
+
+/**
+ * @see [writeAction]
  */
 suspend fun <T> backgroundWriteAction(action: () -> T): T {
   return readWriteActionSupport().runWriteAction(action)
@@ -493,7 +471,7 @@ fun Dispatchers.ui(kind: UiDispatcherKind = UiDispatcherKind.STRICT, immediate: 
  * ### Locking Behavior
  * This dispatcher is different from [Dispatchers.EDT] in the aspect of handling the Read/Write lock:
  * the computations scheduled by this dispatcher **are not protected by the Write-Intent lock** (see [Application]),
- * and it is forbidden to initiate read or write actions inside.
+ * and initiating read or write actions inside is reported as an error.
  *
  * ### Ordering Guarantees
  * This dispatcher is fair: two `launch(Dispatchers.UI)` are executed in the order of their scheduling.

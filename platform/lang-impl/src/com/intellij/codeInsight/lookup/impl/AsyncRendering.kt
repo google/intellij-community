@@ -1,6 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:OptIn(ExperimentalCoroutinesApi::class)
-
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.lookup.impl
 
 import com.intellij.codeInsight.lookup.LookupElement
@@ -11,7 +9,6 @@ import com.intellij.openapi.application.readAction
 import com.intellij.openapi.util.Key
 import com.intellij.util.indexing.DumbModeAccessType
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.job
@@ -68,41 +65,50 @@ class AsyncRendering(
    * The new value will overwrite the previously cached presentation.
    */
   fun scheduleRendering(element: LookupElement) {
-    val renderer = element.expensiveRendererImpl ?: return
+    coroutineScope.launch {
+      val renderer = readAction { element.expensiveRendererImpl } ?: return@launch
 
-    synchronized(LAST_COMPUTATION) {
-      cancelRendering(element)
+      synchronized(LAST_COMPUTATION) {
+        cancelRendering(element)
 
-      if (!coroutineScope.isActive) {
-        return
+        if (!coroutineScope.isActive) {
+          return@launch
+        }
+
+        val job = coroutineScope.launch {
+          computeExpensivePresentation(renderer, element)
+        }
+        element.putUserData(LAST_COMPUTATION, job)
       }
+    }
+  }
 
-      val job = coroutineScope.launch {
-        // If we use a limited dispatcher, `readAction` (and other calls) would redirect the coroutine to the `Dispatcher.default`
-        // (or other dispatchers), leaving the limited dispatcher free. The next coroutine would then be processed on the limited dispatcher
-        // and so on. Ultimately, this could spin a new dispatcher worker thread for almost each item on the list overloading the coroutine
-        // scheduler and coroutine pool. To mitigate this issue, we can use a semaphore, which will allow for a maximum of three concurrent
-        // rendering jobs.
+  private suspend fun CoroutineScope.computeExpensivePresentation(
+    renderer: LookupElementRenderer<LookupElement>,
+    element: LookupElement,
+  ) {
+    // If we use a limited dispatcher, `readAction` (and other calls) would redirect the coroutine to the `Dispatcher.default`
+    // (or other dispatchers), leaving the limited dispatcher free. The next coroutine would then be processed on the limited dispatcher
+    // and so on. Ultimately, this could spin a new dispatcher worker thread for almost each item on the list overloading the coroutine
+    // scheduler and coroutine pool. To mitigate this issue, we can use a semaphore, which will allow for a maximum of three concurrent
+    // rendering jobs.
 
-        renderersSemaphore.withPermit {
-          val job = coroutineContext.job
+    renderersSemaphore.withPermit {
+      val job = coroutineContext.job
 
-          if (renderer is SuspendingLookupElementRenderer<LookupElement>) {
-            renderInBackgroundSuspending(element, renderer)
-          }
-          else {
-            readAction {
-              if (element.isValid) {
-                renderInBackground(element, renderer)
-              }
-            }
-          }
-          synchronized(LAST_COMPUTATION) {
-            element.replace(LAST_COMPUTATION, job, null)
+      if (renderer is SuspendingLookupElementRenderer<LookupElement>) {
+        renderInBackgroundSuspending(element, renderer)
+      }
+      else {
+        readAction {
+          if (element.isValid) {
+            renderInBackground(element, renderer)
           }
         }
       }
-      element.putUserData(LAST_COMPUTATION, job)
+      synchronized(LAST_COMPUTATION) {
+        element.replace(LAST_COMPUTATION, job, null)
+      }
     }
   }
 
@@ -122,7 +128,7 @@ class AsyncRendering(
 
   private inline fun doRender(
     element: LookupElement,
-    computation: (presentation: LookupElementPresentation) -> Unit
+    computation: (presentation: LookupElementPresentation) -> Unit,
   ) {
     val presentation = LookupElementPresentation()
     computation(presentation)

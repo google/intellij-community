@@ -13,6 +13,8 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.AbstractFileViewProvider
 import com.intellij.psi.FileViewProvider
 import com.intellij.psi.impl.smartPointers.SmartPointerManagerEx
+import com.intellij.psi.impl.source.tree.mvcc.ConcurrentWeakVersionedValueHashMap
+import com.intellij.psi.impl.source.tree.mvcc.InternalPsiVersioning
 import com.intellij.testFramework.LightVirtualFile
 import com.intellij.util.AtomicMapCache
 import com.intellij.util.concurrency.annotations.RequiresReadLock
@@ -23,8 +25,6 @@ import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import java.util.function.Consumer
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.measureTime
 
 /**
  * Stores mapping (file -> FileProviderMap(context -> Weak(FileViewProvider)))
@@ -42,7 +42,7 @@ internal class MultiverseFileViewProviderCache(
 
   // todo IJPL-339 don't store map for a single item
   private val cache = AtomicMapCache<VirtualFile, FileProviderMap> {
-    CollectionFactory.createConcurrentWeakValueMap()
+    ConcurrentWeakVersionedValueHashMap()
   }
 
   // todo IJPL-339 do clear only under write lock
@@ -143,12 +143,18 @@ internal class MultiverseFileViewProviderCache(
       return null
     }
 
-    val contextMapping = reassignProvidersWithOutdatedContextToActualContexts(vFile, fileMap)
-    if (contextMapping.isNotEmpty()) {
-      SmartPointerManagerEx.getInstanceEx(project).getTracker(vFile)?.pushContextMapping(contextMapping)
+    // we intentionally do not perform lazy reassignment of code insight contexts to virtual files
+    // reassignment of code insight contexts is a complex operation that involves complicated concurrency invariants
+    // hence, we defer reassignment until this view provider is accessed under read lock
+    // for quick access inside psi versioning transaction, we allow ourselves to observe a not-yet-assigned context
+    if (!InternalPsiVersioning.isInsideVersioningButNotLocks()) {
+      val contextMapping = reassignProvidersWithOutdatedContextToActualContexts(vFile, fileMap)
+      if (contextMapping.isNotEmpty()) {
+        SmartPointerManagerEx.getInstanceEx(project).getTracker(vFile)?.pushContextMapping(contextMapping)
+      }
+      dropPossibleInvalidation(fileMap)
     }
 
-    dropPossibleInvalidation(fileMap)
 
     return fileMap
   }
@@ -251,31 +257,16 @@ internal class MultiverseFileViewProviderCache(
 
   @RequiresWriteLock
   override fun markPossiblyInvalidated() {
-    val pointersInvalidationDuration = measureTime {
-      SmartPointerManagerEx.getInstanceEx(project).possiblyInvalidate()
-    }
-
-    if (pointersInvalidationDuration >= 1.seconds) {
-      log.error("Too long pointer invalidation: $pointersInvalidationDuration")
-    }
-
-    var mapSize = 0
-    val providersInvalidationDuration = measureTime {
-      doIfInitialized { map ->
-        map.forEach { (_, map: FileProviderMap?) ->
-          if (map != null) {
-            map.isPossiblyInvalidated = true
-            map.forEach { _, provider ->
-              provider.markPossiblyInvalidated()
-              mapSize++
-            }
+    SmartPointerManagerEx.getInstanceEx(project).possiblyInvalidationModCounter.incModificationCount()
+    doIfInitialized { map ->
+      map.forEach { (_, map: FileProviderMap?) ->
+        if (map != null) {
+          map.isPossiblyInvalidated = true
+          map.forEach { _, provider ->
+            provider.markPossiblyInvalidated()
           }
         }
       }
-    }
-
-    if (providersInvalidationDuration >= 1.seconds) {
-      log.error("Too long providers invalidation: $providersInvalidationDuration. Providers: $mapSize")
     }
   }
 
@@ -348,27 +339,15 @@ private fun FileViewProvider.getRawContext(): CodeInsightContext =
 
 private class CancellableSynchronizer {
   private val lockMap = CollectionFactory.createConcurrentWeakValueMap<FileProviderMap, ReentrantLock>()
-  private val deadlockPrevention = ThreadLocal<FileProviderMap?>()
 
   fun <T> cancellableSynchronized(fileMap: FileProviderMap, block: () -> T): T {
-    val alreadyTaken = deadlockPrevention.get()
-    if (alreadyTaken != null && alreadyTaken !== fileMap) {
-      throw IllegalStateException("Already taken lock for $fileMap, cannot take it again for $alreadyTaken")
-    }
-
-    deadlockPrevention.set(fileMap)
+    val lock = lockMap.computeIfAbsent(fileMap) { ReentrantLock() }
+    lock.awaitWithCheckCanceled()
     try {
-      val lock = lockMap.computeIfAbsent(fileMap) { ReentrantLock() }
-      lock.awaitWithCheckCanceled()
-      try {
-        return block()
-      }
-      finally {
-        lock.unlock()
-      }
+      return block()
     }
     finally {
-      deadlockPrevention.remove()
+      lock.unlock()
     }
   }
 }

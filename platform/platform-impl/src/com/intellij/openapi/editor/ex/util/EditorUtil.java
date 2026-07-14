@@ -692,7 +692,7 @@ public final class EditorUtil {
   }
 
   public static int getNotFoldedLineStartOffset(@NotNull Editor editor, int startOffset, boolean stopAtInvisibleFoldRegions) {
-    return EditorThreading.compute(() -> getNotFoldedLineStartOffset(editor.getElfDocument(), editor.getFoldingModel(), startOffset, stopAtInvisibleFoldRegions));
+    return EditorThreading.compute(() -> getNotFoldedLineStartOffset(editor.getDocument(), editor.getFoldingModel(), startOffset, stopAtInvisibleFoldRegions));
   }
 
   @ApiStatus.Internal
@@ -719,7 +719,7 @@ public final class EditorUtil {
   }
 
   public static int getNotFoldedLineEndOffset(@NotNull Editor editor, int startOffset, boolean stopAtInvisibleFoldRegions) {
-    return EditorThreading.compute(() -> getNotFoldedLineEndOffset(editor.getElfDocument(), editor.getFoldingModel(), startOffset, stopAtInvisibleFoldRegions));
+    return EditorThreading.compute(() -> getNotFoldedLineEndOffset(editor.getDocument(), editor.getFoldingModel(), startOffset, stopAtInvisibleFoldRegions));
   }
 
   @ApiStatus.Internal
@@ -929,7 +929,8 @@ public final class EditorUtil {
   }
 
   @ApiStatus.Internal
-  public static @NotNull BreakpointArea yToLogicalLineWithInterLineDetection(@NotNull Editor editor, int y) {
+  public static @NotNull BreakpointArea yToLogicalLineWithInterLineDetection(@NotNull Editor editor, @NotNull MouseEvent event) {
+    int y = event.getY();
     if (!(editor instanceof EditorImpl editorImpl)) {
       int logicalLine = yToLogicalLineNoCustomRenderers(editor, y);
       if (logicalLine < 0) {
@@ -954,7 +955,8 @@ public final class EditorUtil {
       int nextLogicalLine = logicalLine + (hitAboveLineNumber ? 0 : 1);
       int configurationLine = !hitAboveLineNumber && nextLogicalLine >= documentLineCount ? logicalLine : nextLogicalLine;
 
-      InterLineBreakpointConfiguration configuration = InterLineBreakpointConfigurationProvider.findConfigurationForLine(editor, configurationLine);
+      InterLineBreakpointConfiguration configuration =
+        InterLineBreakpointConfigurationProvider.findConfigurationForLine(editor, configurationLine);
       if (configuration == null) {
         // no interline configuration -- proceed with the standard logic
         if (y < visualLineStartY || y >= visualLineStartY + lineHeight) {
@@ -974,22 +976,22 @@ public final class EditorUtil {
       // (i.e., inter-line hits don't take more space than on-line hits)
       int totalPadding = Math.min(padding, lineHeight / 4);
 
+      BreakpointArea.CursorSuggestion cursorSuggestion;
       if (y >= visualLineStartY + totalPadding && y <= visualLineStartY + lineHeight - totalPadding) {
-        return new BreakpointArea.OnLine(logicalLine);
+        cursorSuggestion = BreakpointArea.CursorSuggestion.ON_LINE;
+      }
+      else {
+        cursorSuggestion = hitAboveLineNumber ? BreakpointArea.CursorSuggestion.ABOVE_LINE : BreakpointArea.CursorSuggestion.BELOW_LINE;
       }
 
-      if (hitAboveLineNumber && logicalLine > 0) {
-        return new BreakpointArea.InterLine(logicalLine, configuration);
-      }
-
-      if (!hitAboveLineNumber) {
-        if (nextLogicalLine >= documentLineCount) {
-          return BreakpointArea.INVALID;
-        }
-        return new BreakpointArea.InterLine(nextLogicalLine, configuration);
-      }
-
-      return BreakpointArea.INVALID;
+      return BreakpointArea.from(
+        logicalLine,
+        nextLogicalLine,
+        documentLineCount,
+        event.getModifiersEx(),
+        cursorSuggestion,
+        configuration
+      );
     });
   }
 

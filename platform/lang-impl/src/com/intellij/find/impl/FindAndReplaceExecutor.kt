@@ -37,6 +37,8 @@ interface FindAndReplaceExecutor {
     onUpdateModelCallback: Consumer<UsageInfoAdapter>,
     onResult: (UsageInfoAdapter) -> Boolean,
     onFinish: () -> Unit?,
+    maxUsages: Int,
+    isLoadMore: Boolean = false,
   )
 
   /**

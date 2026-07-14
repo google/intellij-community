@@ -18,7 +18,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.PlatformCoreDataKeys;
 import com.intellij.openapi.actionSystem.Presentation;
 import com.intellij.openapi.actionSystem.ex.ActionUtil;
-import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
@@ -47,6 +47,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.function.Consumer;
 
+@ApiStatus.Internal
 public final class TopHitSEContributor implements SearchEverywhereContributor<Object> {
 
   public static final int TOP_HIT_ELEMENT_PRIORITY = 15000;
@@ -217,7 +218,7 @@ public final class TopHitSEContributor implements SearchEverywhereContributor<Ob
     protected void customizeCellRenderer(@NotNull JList list, final Object value, int index, final boolean selected, boolean hasFocus) {
       setPaintFocusBorder(false);
       setIcon(EmptyIcon.ICON_16);
-      ApplicationManager.getApplication().runReadAction(() -> {
+      ReadAction.runBlocking(() -> {
         if (isActionValue(value)) {
           final AnAction anAction = (AnAction)value;
           final Presentation templatePresentation = anAction.getTemplatePresentation();
@@ -295,6 +296,7 @@ public final class TopHitSEContributor implements SearchEverywhereContributor<Ob
     return text;
   }
 
+  @ApiStatus.Internal
   public static final class Factory implements SearchEverywhereContributorFactory<Object> {
     @Override
     public @NotNull SearchEverywhereContributor<Object> createContributor(@NotNull AnActionEvent initEvent) {

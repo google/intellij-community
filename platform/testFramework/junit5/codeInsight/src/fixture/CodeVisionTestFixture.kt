@@ -4,8 +4,6 @@ package com.intellij.platform.testFramework.junit5.codeInsight.fixture
 import com.intellij.codeInsight.codeVision.CodeVisionHost
 import com.intellij.codeInsight.codeVision.CodeVisionInitializer
 import com.intellij.codeInsight.codeVision.settings.CodeVisionSettings
-import com.intellij.codeInsight.codeVision.ui.model.CodeVisionListData
-import com.intellij.codeInsight.codeVision.ui.renderers.CodeVisionInlayRenderer
 import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.codeInsight.hints.InlayDumpUtil
 import com.intellij.codeInsight.multiverse.CodeInsightContext
@@ -28,6 +26,7 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase.assertEquals
 import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl
 import com.intellij.testFramework.junit5.fixture.TestFixture
 import com.intellij.testFramework.junit5.fixture.testFixture
+import com.intellij.testFramework.utils.codeVision.CodeVisionTestCase
 import com.intellij.util.ArrayUtilRt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -76,7 +75,7 @@ class CodeVisionTestFixture(
         }
         val newFile = requireNotNull(PsiDocumentManager.getInstance(project).getPsiFile(document, context))
         doHighlighting(newFile)
-        codeVisionHost.calculateCodeVisionSync(editor, disposable)
+        CodeVisionTestCase.waitForCodeVisionSync(editor, codeVisionHost, disposable)
       }
     }
     assertText(expectedText)
@@ -94,18 +93,7 @@ class CodeVisionTestFixture(
 
 
   private fun dumpCodeVisionHints(sourceText: String): String {
-    return InlayDumpUtil.dumpInlays(
-      sourceText, editor,
-      filter = {
-        val rendererSupported = it.renderer is CodeVisionInlayRenderer
-        if (onlyCodeVisionHintsAllowed && !rendererSupported) error("renderer not supported")
-        rendererSupported
-      },
-      renderer = { _, inlay ->
-        inlay.getUserData(CodeVisionListData.KEY)!!.visibleLens.joinToString(prefix = "[",
-                                                                             postfix = "]",
-                                                                             separator = "   ") { it.longPresentation }
-      })
+    return CodeVisionTestCase.dumpCodeVisionHints(sourceText, editor, onlyCodeVisionHintsAllowed)
   }
 }
 

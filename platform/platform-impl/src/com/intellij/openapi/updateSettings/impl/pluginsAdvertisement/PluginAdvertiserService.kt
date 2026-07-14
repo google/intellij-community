@@ -17,6 +17,7 @@ import com.intellij.ide.plugins.advertiser.PluginFeatureCacheService
 import com.intellij.ide.plugins.advertiser.PluginFeatureMap
 import com.intellij.ide.plugins.isBrokenPlugin
 import com.intellij.ide.plugins.marketplace.MarketplaceRequests
+import com.intellij.ide.plugins.newui.PluginDependencyModel
 import com.intellij.ide.plugins.newui.PluginUiModel
 import com.intellij.ide.plugins.newui.PluginUiModelBuilderFactory
 import com.intellij.ide.ui.PluginBooleanOptionDescriptor
@@ -36,7 +37,6 @@ import com.intellij.openapi.updateSettings.impl.PluginDownloader
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.PluginAdvertiserService.Companion.DEPENDENCY_SUPPORT_TYPE
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.PluginAdvertiserService.Companion.EXECUTABLE_DEPENDENCY_KIND
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.PluginAdvertiserService.Companion.ideaUltimate
-import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.NlsContexts.NotificationContent
 import com.intellij.openapi.vfs.VirtualFile
@@ -59,7 +59,6 @@ import org.jetbrains.annotations.Nls
 import kotlin.coroutines.coroutineContext
 
 @ApiStatus.Internal
-@IntellijInternalApi
 sealed interface PluginAdvertiserService {
 
   companion object {
@@ -162,8 +161,8 @@ sealed interface PluginAdvertiserService {
   fun rescanDependencies(block: suspend CoroutineScope.() -> Unit = {})
 }
 
-@OptIn(IntellijInternalApi::class, DelicateCoroutinesApi::class)
-@IntellijInternalApi
+@OptIn(DelicateCoroutinesApi::class)
+@ApiStatus.Internal
 open class PluginAdvertiserServiceImpl(
   private val project: Project,
   private val cs: CoroutineScope,
@@ -367,16 +366,15 @@ open class PluginAdvertiserServiceImpl(
     }
 
     val builder = builderFactory.createBuilder(descriptor.pluginId)
-    .setName(descriptor.name)
-    .setSize("0")
-    .setDescription(descriptor.description)
-    .setChangeNotes(descriptor.changeNotes)
-    .setVersion(descriptor.version)
-    .setVendor(descriptor.vendor)
-    .setVendorDetails(descriptor.organization)
-    .setIsConverted(true)
-
-    descriptor.dependencies.forEach { builder.addDependency(it.pluginId.idString, it.isOptional) }
+      .setName(descriptor.name)
+      .setSize("0")
+      .setDescription(descriptor.description)
+      .setChangeNotes(descriptor.changeNotes)
+      .setVersion(descriptor.version)
+      .setVendor(descriptor.vendor)
+      .setVendorDetails(descriptor.organization)
+      .setIsConverted(true)
+      .setDependencies(descriptor.dependencies.map { PluginDependencyModel(it.pluginId, it.isOptional) })
     return builder.build()
   }
 
@@ -624,7 +622,6 @@ open class PluginAdvertiserServiceImpl(
 }
 
 @ApiStatus.Internal
-@IntellijInternalApi
 open class HeadlessPluginAdvertiserServiceImpl : PluginAdvertiserService {
 
   final override suspend fun run(

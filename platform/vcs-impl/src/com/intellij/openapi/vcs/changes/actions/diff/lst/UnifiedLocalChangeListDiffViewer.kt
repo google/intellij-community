@@ -20,7 +20,7 @@ import com.intellij.diff.util.TextDiffType
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.runReadAction
+import com.intellij.openapi.application.runReadActionBlocking
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.ex.RangeHighlighterEx
 import com.intellij.openapi.editor.markup.HighlighterTargetArea
@@ -93,14 +93,15 @@ class UnifiedLocalChangeListDiffViewer(context: DiffContext,
   override fun createTitles(): JComponent {
     val titles = super.createTitles()
 
-    val titleWithCheckbox = JBUI.Panels.simplePanel()
+    val titleWithCheckbox = JBUI.Panels.simplePanel().andTransparent()
+    titleWithCheckbox.setName("Unified Local Change List Diff Editor Title Panel")
     if (titles != null) titleWithCheckbox.addToCenter(titles)
     titleWithCheckbox.addToLeft(excludeAllCheckboxPanel)
     return titleWithCheckbox
   }
 
-  override fun createEditorPopupActions(): List<AnAction> {
-    return super.createEditorPopupActions() +
+  override fun createEditorPopupChangesActions(): List<AnAction> {
+    return super.createEditorPopupChangesActions() +
            createTrackerEditorPopupActions(trackerActionProvider)
   }
 
@@ -166,7 +167,7 @@ class UnifiedLocalChangeListDiffViewer(context: DiffContext,
                       areVCSBoundedActionsDisabled: Boolean,
                       texts: Array<CharSequence>,
                       toggleableLineRanges: List<ToggleableLineRange>): Runnable {
-      val builder = runReadAction {
+      val builder = runReadActionBlocking {
         progressIndicator.checkCanceled()
         UnifiedLocalFragmentBuilder(document1, document2, myMasterSide, isAllowExcludeChangesFromCommit).exec(toggleableLineRanges)
       }

@@ -1,10 +1,12 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.tests;
 
+import com.intellij.platform.bazel.runfiles.BazelRunfilesManifest;
 import com.intellij.tests.bazel.BazelJUnitOutputListener;
 import com.intellij.tests.bazel.IjSmTestExecutionListener;
+import com.intellij.tests.bazel.TestExecutionOutputDecorator;
 import com.intellij.tests.bazel.bucketing.BucketsPostDiscoveryFilter;
-import com.intellij.platform.bazel.runfiles.BazelRunfilesManifest;
+import com.intellij.util.ArrayUtil;
 import org.junit.platform.engine.DiscoverySelector;
 import org.junit.platform.engine.Filter;
 import org.junit.platform.engine.FilterResult;
@@ -27,9 +29,6 @@ import org.junit.vintage.engine.descriptor.VintageTestDescriptor;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -51,13 +50,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
-import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.platform.engine.discovery.DiscoverySelectors.selectClass;
 import static org.junit.platform.engine.discovery.DiscoverySelectors.selectMethod;
+import static org.junit.platform.launcher.LauncherConstants.CAPTURE_STDERR_PROPERTY_NAME;
+import static org.junit.platform.launcher.LauncherConstants.CAPTURE_STDOUT_PROPERTY_NAME;
 
 @SuppressWarnings("UseOfSystemOutOrSystemErr")
 public final class JUnit5BazelRunner {
@@ -96,6 +96,9 @@ public final class JUnit5BazelRunner {
   // Allow test target to specify test jar explicitly. Android Studio runs tests from a external targets so SELF_LOCATION can't be used
   private static final String jbEnvTestJar = "JB_TEST_JAR";
 
+  // Test-only escape hatch for runner self-tests: build the real request while ignoring filters inherited from the outer Bazel run.
+  private static final String intellijBuildTestRunnerIgnoreInheritedFilters = "intellij.build.test.runner.ignore.inherited.filters";
+
   private static final String intellijBuildTestGroups = "intellij.build.test.groups";
   private static final String intellijBuildTestGroupRoots = "test.group.roots";
   private static final String commonTestGroupsResourceName = "tests/testGroups.properties";
@@ -106,6 +109,7 @@ public final class JUnit5BazelRunner {
   private static final BucketsPostDiscoveryFilter bucketingPostDiscoveryFilter = new BucketsPostDiscoveryFilter();
   private static final PostDiscoveryFilter performancePostDiscoveryFilter = new JUnit5TeamCityRunner.PerformancePostDiscoveryFilter();
   private static final PostDiscoveryFilter ignorePostDiscoveryFilter = new JUnit5TeamCityRunner.IgnorePostDiscoveryFilter();
+  private static final PostDiscoveryFilter headlessPostDiscoveryFilter = new JUnit5TeamCityRunner.HeadlessPostDiscoveryFilter();
   private static final PostDiscoveryFilter shardFilter = ShardFilter.create();
 
   private static LauncherDiscoveryRequest getDiscoveryRequest() throws Throwable {
@@ -114,12 +118,22 @@ public final class JUnit5BazelRunner {
   }
 
   public static LauncherDiscoveryRequest createDiscoveryRequest(List<? extends DiscoverySelector> bazelTestSelectors, String engineVintage) {
+    boolean ignoreInheritedFilters = Boolean.getBoolean(intellijBuildTestRunnerIgnoreInheritedFilters);
     LauncherDiscoveryRequestBuilder builder = LauncherDiscoveryRequestBuilder.request()
       .configurationParameter("junit.jupiter.extensions.autodetection.enabled", "true")
-      .selectors(bazelTestSelectors)
-      .filters(getTestFilters(bazelTestSelectors))
-      .filters(generateFiltersFromJbEnv().toArray(new Filter[0]))
-      .filters(getEngineFilters(engineVintage));
+      .selectors(bazelTestSelectors);
+    if (!ignoreInheritedFilters) {
+      builder
+        .filters(getTestFilters(bazelTestSelectors))
+        .filters(generateFiltersFromJbEnv().toArray(new Filter[0]));
+    }
+    builder.filters(getEngineFilters(engineVintage));
+
+    if (!"true".equals(System.getenv(jbEnvIdeSmRun))) {
+      builder
+        .configurationParameter(CAPTURE_STDOUT_PROPERTY_NAME, "true")
+        .configurationParameter(CAPTURE_STDERR_PROPERTY_NAME, "true");
+    }
 
     if (!"false".equals(engineVintage)) {
       builder = builder.filters(ignorePostDiscoveryFilter);
@@ -192,6 +206,8 @@ public final class JUnit5BazelRunner {
 
       Path ideaHome;
       Path tempDir = getBazelTempDir();
+
+      ShardFilter.writeShardStatus();
 
       String jbEnvSandboxValue = System.getenv(jbEnvSandbox);
       if (jbEnvSandboxValue == null) {
@@ -266,7 +282,6 @@ public final class JUnit5BazelRunner {
         Stream<InterceptingTestExecutionListener> listeners =
           testExecutionListeners.stream().map(it -> new InterceptingTestExecutionListener(it, interceptor));
 
-        ShardFilter.writeShardStatus();
         launcher.registerTestExecutionListeners(listeners.toArray(TestExecutionListener[]::new));
         launcher.execute(testPlan);
       }
@@ -317,6 +332,8 @@ public final class JUnit5BazelRunner {
       } else {
         myListeners.add(new ConsoleTestLogger());
       }
+    } else {
+      myListeners.add(new TestExecutionOutputDecorator(System.out));
     }
     return myListeners;
   }
@@ -367,6 +384,7 @@ public final class JUnit5BazelRunner {
   private static List<Filter<?>> generateFiltersFromJbEnv() {
     List<Filter<?>> out = new ArrayList<>();
     String junitFilters = System.getenv(jbEnvJunit5TestFilter);
+    Map<JUnit5FilterOption, List<String>> junitFilterOptionToFilterStringsMap = new HashMap<>();
     if (junitFilters != null && !junitFilters.isBlank()) {
       for (String filter : junitFilters.split(";")) {
         String[] parts = filter.split("=");
@@ -375,9 +393,16 @@ public final class JUnit5BazelRunner {
         }
         JUnit5FilterOption filterOption = JUnit5FilterOption.fromString(parts[0]);
         String filterString = parts[1];
-        out.add(filterOption.toJunitFilter(filterString));
+
+        List<String> filterStrings = junitFilterOptionToFilterStringsMap.computeIfAbsent(filterOption, _ -> new ArrayList<>());
+        filterStrings.add(filterString);
       }
     }
+
+    junitFilterOptionToFilterStringsMap.forEach((filterOption, filterStrings) -> {
+      out.add(filterOption.toJunitFilter(ArrayUtil.toStringArray(filterStrings)));
+    });
+
     return out;
   }
 
@@ -393,6 +418,7 @@ public final class JUnit5BazelRunner {
     }
     filters.add(bucketingPostDiscoveryFilter);
     filters.add(performancePostDiscoveryFilter);
+    filters.add(headlessPostDiscoveryFilter);
     if (shardFilter != null) {
       filters.add(shardFilter);
     }

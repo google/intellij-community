@@ -1,7 +1,9 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diff.impl.ui
 
 import com.intellij.diff.DiffTool
+import com.intellij.diff.FrameDiffTool
+import com.intellij.diff.tools.combined.CombinedDiffTool
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.Presentation
@@ -18,7 +20,7 @@ import javax.swing.JComponent
 @ApiStatus.Experimental
 @Suppress("DialogTitleCapitalization")
 abstract class DiffToolChooser(private val project: Project?) : DumbAwareAction(), CustomComponentAction {
-  private val segmentedButton = SegmentedButtonComponent { diffTool: DiffTool -> SegmentedButton.createPresentation(text = diffTool.name) }
+  private val segmentedButton = createComponent()
 
   override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
 
@@ -55,10 +57,28 @@ abstract class DiffToolChooser(private val project: Project?) : DumbAwareAction(
 
   override fun createCustomComponent(presentation: Presentation, place: String): JComponent {
     segmentedButton.items = getTools()
-    segmentedButton.spacing = IntelliJSpacingConfiguration()
     segmentedButton.selectedItem = getActiveTool()
     segmentedButton.whenItemSelected { if (project != null) onSelected(project, it) }
     return segmentedButton
   }
-}
 
+  companion object {
+    @JvmStatic
+    @ApiStatus.Internal
+    fun createComponent(): SegmentedButtonComponent<DiffTool> {
+      return SegmentedButtonComponent { diffTool: DiffTool ->
+        val icon = when (diffTool) {
+          is FrameDiffTool -> diffTool.icon
+          is CombinedDiffTool -> diffTool.getIcon()
+          else -> null
+        }
+        if (icon != null)
+          SegmentedButton.createPresentation(icon = icon, toolTipText = diffTool.name)
+        else
+          SegmentedButton.createPresentation(text = diffTool.name)
+      }.apply {
+        spacing = IntelliJSpacingConfiguration()
+      }
+    }
+  }
+}

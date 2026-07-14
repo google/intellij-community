@@ -4,8 +4,8 @@
  */
 package com.intellij.platform.eel
 
+import com.intellij.platform.eel.EelExecApi.EnvironmentVariablesOptions
 import com.intellij.platform.eel.EelExecApi.ExecuteProcessOptions
-import com.intellij.platform.eel.EelExecPosixApi.PosixEnvironmentVariablesOptions
 import com.intellij.platform.eel.channels.EelDelicateApi
 import com.intellij.platform.eel.path.EelPath
 import kotlinx.coroutines.CoroutineScope
@@ -44,24 +44,30 @@ object EelExecPosixApiHelpers {
   class SpawnProcess(
     private val owner: EelExecPosixApi,
     private var exe: String,
-  ) : OwnedBuilder<EelPosixProcess> {
+  ) : EelOwnedBuilder<EelPosixProcess> {
     private var args: List<String> = listOf()
 
     private var env: Map<String, String> = mapOf()
 
     private var interactionOptions: EelExecApi.InteractionOptions? = null
 
-    private var ptyOrStdErrSettings: EelExecApi.PtyOrStdErrSettings? = interactionOptions
+    private var ptyOrStdErrSettings: EelExecApi.InteractionOptions? = interactionOptions
 
     private var scope: CoroutineScope? = null
 
     private var workingDirectory: EelPath? = null
 
+    /**
+     * Command-line arguments passed to the process, not including the executable itself.
+     */
     @ApiStatus.Experimental
     fun args(arg: List<String>): SpawnProcess = apply {
       this.args = arg
     }
 
+    /**
+     * Command-line arguments passed to the process, not including the executable itself.
+     */
     fun args(vararg arg: String): SpawnProcess = apply {
       this.args = listOf(*arg)
     }
@@ -100,7 +106,7 @@ object EelExecPosixApiHelpers {
 
     @Deprecated("Switch to interactionOptions", replaceWith = ReplaceWith("interactionOptions"))
     @ApiStatus.Internal
-    fun ptyOrStdErrSettings(arg: EelExecApi.PtyOrStdErrSettings?): SpawnProcess = apply {
+    fun ptyOrStdErrSettings(arg: EelExecApi.InteractionOptions?): SpawnProcess = apply {
       this.ptyOrStdErrSettings = arg
     }
 
@@ -137,6 +143,8 @@ object EelExecPosixApiHelpers {
           workingDirectory = workingDirectory,
         )
       )
+
+    override val eelDescriptor: EelDescriptor get() = owner.descriptor
   }
 
   /**
@@ -146,80 +154,84 @@ object EelExecPosixApiHelpers {
   @ApiStatus.Experimental
   class EnvironmentVariables(
     private val owner: EelExecPosixApi,
-  ) : OwnedBuilder<EelExecApi.EnvironmentVariablesDeferred> {
-    private var mode: PosixEnvironmentVariablesOptions.Mode = PosixEnvironmentVariablesOptions.Mode.DEFAULT
+  ) : EelOwnedBuilder<EelExecApi.EnvironmentVariablesDeferred> {
+    private var mode: EnvironmentVariablesOptions.Mode = EnvironmentVariablesOptions.Mode.DEFAULT
 
     private var onlyActual: Boolean = false
 
-    fun mode(arg: PosixEnvironmentVariablesOptions.Mode): EnvironmentVariables = apply {
+    fun mode(arg: EnvironmentVariablesOptions.Mode): EnvironmentVariables = apply {
       this.mode = arg
     }
 
     /**
-     * * On remote Eel it works like [LOGIN_NON_INTERACTIVE], but in case of an error it returns [MINIMAL] instead of throwing an exception.
-     * * On local Windows and Linux it always works like [MINIMAL]
-     *   because historically the IDE haven't called the shell for environment variables in most cases.
-     * * On local macOS it works like [LOGIN_NON_INTERACTIVE] + [MINIMAL], but it returns values cached at start
-     *   with no effect from the [onlyActual] option. This is the historical behaviour too.
+     * Platform-defined fallback, never throws [EnvironmentVariablesException].
      *
-     * In this mode [EelExecApi.EnvironmentVariablesException] is not thrown.
+     * * On remote POSIX Eel — like [LOGIN_NON_INTERACTIVE], but on error returns [MINIMAL] instead of throwing.
+     * * On remote Windows Eel — registry view (like [LOGIN_NON_INTERACTIVE]).
+     * * On local Windows/Linux — like [MINIMAL] (historical: the IDE rarely called the shell for env).
+     * * On local macOS — like [LOGIN_NON_INTERACTIVE] + [MINIMAL], with values cached at start (historical).
      */
     fun default(): EnvironmentVariables =
-      mode(PosixEnvironmentVariablesOptions.Mode.DEFAULT)
+      mode(EnvironmentVariablesOptions.Mode.DEFAULT)
 
     /**
      *  **Use with caution, avoid when possible.**
      *
-     * This mode executes a shell process supposed to load various profile scripts:
-     * `~/.profile`, `~/.bashrc`, `~/.zshrc`, `/etc/profile` and so on.
+     * Full interactive shell session.
      *
-     * The implementation launches an interactive shell session, so it reads all environment variables unlike [LOGIN_NON_INTERACTIVE].
+     * * On POSIX — interactive shell loading `~/.profile`, `~/.bashrc`, `~/.zshrc`, `/etc/profile` etc.
+     *   Reads all environment variables unlike [LOGIN_NON_INTERACTIVE], but interactive shells aren't meant
+     *   to run without a user. Real-world cases that broke users:
+     *   * `ssh-add` in `~/.bashrc` waits for a passphrase — the shell hangs forever, IDE becomes unusable.
+     *   * `~/.bashrc` starts `screen` or `tmux` — the shell hangs forever.
+     *   * `~/.bashrc` starts `ssh-agent` — the OS gets polluted with unused agents.
+     *   * `~/.bashrc` calls `curl` for weather/news/jokes — CPU usage grows, IDE slows down.
+     * * On Windows — PowerShell with the user's `$PROFILE` loaded.
+     *   Falls back to the registry view if PowerShell is unavailable or fails within the timeout.
      *
-     * However, it's not conventional to run interactive shells without having an actual user interaction.
-     * And no way for user interaction is provided.
-     *
-     * Here are some real cases reported by our users. They're not exceptional cases but rather usual things.
-     * In these cases this mode led to inability to fetch environment variables or high CPU consumption:
-     * * `ssh-add` in `~/.bashrc` waits for a key passphrase, and the shell process hangs forever, IDE becomes unusable.
-     * * `~/.bashrc` starts `screen` or `tmux`, the shell process hangs forever.
-     * * `~/.bashrc` starts `ssh-agent`, and the operating system quickly becomes polluted with lots of unused SSH agents.
-     * * `~/.bashrc` calls `curl` to write the current weather, news, jokes, etc. CPU consumption grows, IDE works slower.
-     *
-     * **Notice:** In this mode [EelExecApi.EnvironmentVariablesException] MAY be thrown.
+     * **Notice:** MAY throw [EnvironmentVariablesException].
      */
     @EelDelicateApi
     fun loginInteractive(): EnvironmentVariables =
-      mode(PosixEnvironmentVariablesOptions.Mode.LOGIN_INTERACTIVE)
+      mode(EnvironmentVariablesOptions.Mode.LOGIN_INTERACTIVE)
 
     /**
-     * This mode executes a shell process supposed to load various profile scripts:
-     * `~/.profile`, `~/.bashrc`, `~/.zshrc`, `/etc/profile` and so on.
+     * Like [LOGIN_INTERACTIVE], but uses the unified [LoginShellSpawner.spawnLoginShell] pipeline.
      *
-     * This mode may load not all environment variables, depending on what's written in user's configs
-     * because default `~/.bashrc` files in some distros like Debian and Ubuntu contain strings like `[ -z "$PS1" ] && return`.
-     * Often people put their adjustments at the bottom of the profile file, and therefore their code is not executed in the non-interactive mode.
+     * **Notice:** MAY throw [EnvironmentVariablesException].
+     */
+    @ApiStatus.Internal
+    fun loginInteractiveViaShell(): EnvironmentVariables =
+      mode(EnvironmentVariablesOptions.Mode.LOGIN_INTERACTIVE_VIA_SHELL)
+
+    /**
+     * Fresh-logon snapshot.
      *
-     * **Notice:** In this mode [EelExecApi.EnvironmentVariablesException] MAY be thrown.
+     * * On POSIX — non-interactive shell loading `~/.profile`, `~/.bashrc`, `~/.zshrc`, `/etc/profile` etc.
+     *   May skip parts of `~/.bashrc` (e.g. `[ -z "$PS1" ] && return` early-exits).
+     * * On Windows — registry view: `HKLM\...\Session Manager\Environment` merged with `HKCU\Environment`.
+     *   No shell profile.
+     *
+     * **Notice:** MAY throw [EnvironmentVariablesException].
      */
     fun loginNonInteractive(): EnvironmentVariables =
-      mode(PosixEnvironmentVariablesOptions.Mode.LOGIN_NON_INTERACTIVE)
+      mode(EnvironmentVariablesOptions.Mode.LOGIN_NON_INTERACTIVE)
 
     /**
-     * The fastest way to get environment variables. It doesn't call shell scripts written by users.
-     * At least, the environment variable `PATH` exists, but it may differ from what the user has in their `~/.profile` written.
-     * No guarantee for other environment variables.
+     * Fastest path: inherited environment of the IJent process, no shell, no registry.
+     * `PATH` is guaranteed; nothing else is.
      *
-     * In this mode [EelExecApi.EnvironmentVariablesException] is not thrown.
+     * Never throws [EnvironmentVariablesException].
      */
     fun minimal(): EnvironmentVariables =
-      mode(PosixEnvironmentVariablesOptions.Mode.MINIMAL)
+      mode(EnvironmentVariablesOptions.Mode.MINIMAL)
 
     /**
      * The implementation MAY cache the environment variables by default because they rarely change in real life.
      * By setting this value to `true`, the cache will be refreshed, and the result will contain the freshest environment variables.
      *
      * Makes sense only for remote Eels (via IJent)
-     * or with such [EelExecPosixApi.PosixEnvironmentVariablesOptions.mode] that invoke a shell.
+     * or with such [mode] that invoke a shell.
      * In other cases this option has no effect.
      */
     fun onlyActual(arg: Boolean): EnvironmentVariables = apply {
@@ -237,5 +249,7 @@ object EelExecPosixApiHelpers {
           onlyActual = onlyActual,
         )
       )
+
+    override val eelDescriptor: EelDescriptor get() = owner.descriptor
   }
 }

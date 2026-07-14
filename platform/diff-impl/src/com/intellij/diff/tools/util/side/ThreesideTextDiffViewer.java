@@ -25,9 +25,12 @@ import com.intellij.diff.util.DiffUtil;
 import com.intellij.diff.util.LineCol;
 import com.intellij.diff.util.Side;
 import com.intellij.diff.util.ThreeSide;
+import com.intellij.openapi.actionSystem.ActionGroup;
+import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.DataSink;
+import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.LogicalPosition;
 import com.intellij.openapi.editor.ScrollType;
@@ -44,6 +47,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.JComponent;
+import java.util.ArrayList;
 import java.util.List;
 
 public abstract class ThreesideTextDiffViewer extends ThreesideDiffViewer<TextEditorHolder> implements EditorDiffViewer {
@@ -125,6 +129,9 @@ public abstract class ThreesideTextDiffViewer extends ThreesideDiffViewer<TextEd
   @RequiresEdt
   protected void installEditorListeners() {
     new TextDiffViewerUtil.EditorActionsPopup(createEditorPopupActions()).install(getEditors(), myPanel);
+    ActionGroup gutterActionGroup =
+      TextDiffViewerUtil.createEditorGutterActionGroup(myEditorSettingsAction, createAdditionalEditorGutterActions());
+    TextDiffViewerUtil.installGutterPopup(getEditors(), gutterActionGroup);
 
     new TextDiffViewerUtil.EditorFontSizeSynchronizer(getEditors()).install(this);
 
@@ -167,8 +174,16 @@ public abstract class ThreesideTextDiffViewer extends ThreesideDiffViewer<TextEd
     return TextDiffViewerUtil.getTextSettings(myContext);
   }
 
+  protected @NotNull List<@NotNull AnAction> createAdditionalEditorGutterActions() {
+    List<AnAction> actions = new ArrayList<>();
+    actions.add(new MyToggleAutoScrollAction());
+    return actions;
+  }
+
   protected @NotNull List<AnAction> createEditorPopupActions() {
-    return TextDiffViewerUtil.createEditorPopupActions();
+    List<AnAction> result = new ArrayList<>();
+    result.add(ActionManager.getInstance().getAction(IdeActions.GROUP_DIFF_EDITOR_POPUP));
+    return result;
   }
 
   @Override

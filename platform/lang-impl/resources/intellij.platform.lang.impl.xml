@@ -22,6 +22,8 @@
     <module name="intellij.libraries.kotlinx.serialization.protobuf"/>
     <module name="intellij.libraries.lz4"/>
     <module name="intellij.libraries.miglayout.swing"/>
+    <module name="intellij.libraries.opentelemetry"/>
+    <module name="intellij.libraries.opentelemetry.semconv"/>
     <module name="intellij.libraries.oro.matcher"/>
     <module name="intellij.libraries.pty4j"/>
     <module name="intellij.libraries.rd.core"/>
@@ -29,7 +31,6 @@
     <module name="intellij.libraries.stream"/>
     <module name="intellij.libraries.swingx"/>
     <module name="intellij.libraries.velocity"/>
-    <module name="intellij.libraries.xstream"/>
     <module name="intellij.libraries.xz"/>
     <module name="intellij.platform.analysis"/>
     <module name="intellij.platform.analysis.impl"/>
@@ -46,6 +47,8 @@
     <module name="intellij.platform.editor.ui"/>
     <module name="intellij.platform.execution"/>
     <module name="intellij.platform.execution.impl"/>
+    <module name="intellij.platform.experiment"/>
+    <module name="intellij.platform.feedback"/>
     <module name="intellij.platform.ide.concurrency"/>
     <module name="intellij.platform.ide.core"/>
     <module name="intellij.platform.ide.core.plugins"/>
@@ -62,6 +65,8 @@
     <module name="intellij.platform.projectModel.impl"/>
     <module name="intellij.platform.rd.community"/>
     <module name="intellij.platform.statistics"/>
+    <module name="intellij.platform.testIntegration"/>
+    <module name="intellij.platform.testIntegration.ui"/>
     <module name="intellij.platform.usageView"/>
     <module name="intellij.platform.usageView.impl"/>
     <module name="intellij.platform.util.coroutines"/>
@@ -84,6 +89,12 @@
                     dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.runInspectionDialogExtension"
                     interface="com.intellij.codeInspection.actions.RunInspectionDialogExtension"
+                    dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.problemsViewBridge"
+                    interface="com.intellij.codeInsight.daemon.impl.ProblemsViewBridge"
+                    dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.vfsUrlImageSourceRemapper"
+                    interface="com.intellij.codeInsight.documentation.VfsUrlImageSourceRemapper"
                     dynamic="true"/>
   </extensionPoints>
 
@@ -136,10 +147,11 @@
     <applicationSettings service="com.intellij.refactoring.rename.impl.TextOptionsService"/>
     <applicationSettings service="com.intellij.ide.actions.searcheverywhere.footer.ActionHistoryManager"/>
     <applicationSettings service="com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallerStore"/>
-    <projectSettings service="com.intellij.analysis.problemsView.toolWindow.ProblemsViewStateManager"/>
     <projectSettings service="com.intellij.ui.tabs.PerUserFileColorModelStorageManager"/>
     <projectSettings service="com.intellij.ui.tabs.PerTeamFileColorModelStorageManager"/>
     <applicationSettings service="com.intellij.codeInsight.hints.chain.DeclarativeCallChainInlaySettings"/>
     <registryKey key="hyperlink.ide.decompiler.open.file" defaultValue="true" description="Load binary files in hyperlink on background thread"/>
+    <registryKey key="project.structure.source.roots.editable.limit" defaultValue="20"
+                 description="Maximum number of source roots under a content root to be editable"/>
   </extensions>
 </idea-plugin>

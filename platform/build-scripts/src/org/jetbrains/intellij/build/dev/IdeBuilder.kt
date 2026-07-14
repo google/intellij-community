@@ -52,7 +52,7 @@ import org.jetbrains.intellij.build.impl.copyDistFiles
 import org.jetbrains.intellij.build.impl.createCompilationContext
 import org.jetbrains.intellij.build.impl.createIdeaPropertyFile
 import org.jetbrains.intellij.build.impl.createPlatformLayout
-import org.jetbrains.intellij.build.impl.generateRuntimeModuleRepositoryForDevBuild
+import org.jetbrains.intellij.build.impl.moduleRepository.generateRuntimeModuleRepositoryForDevBuild
 import org.jetbrains.intellij.build.impl.getOsDistributionBuilder
 import org.jetbrains.intellij.build.impl.layoutPlatformDistribution
 import org.jetbrains.intellij.build.impl.normalizeCompilationContextForBuild
@@ -83,6 +83,7 @@ import kotlin.Unit
 import kotlin.also
 import kotlin.checkNotNull
 import kotlin.io.path.createDirectories
+import kotlin.io.path.exists
 import kotlin.io.path.moveTo
 import kotlin.let
 import kotlin.text.StringBuilder
@@ -222,7 +223,10 @@ internal suspend fun buildProduct(request: BuildRequest, createBuildContext: sus
     coroutineScope {
       val context = createBuildContext(buildDir)
       contextToClose = context
-      launch(Dispatchers.IO + CoroutineName("cleanup jar cache")) {
+      // Must precede layout: dev mode uses cache payload paths directly on the classpath,
+      // so a concurrent cleanup can delete a payload after layout captures its path,
+      // crashing the JVM at the first class lookup into that jar.
+      withContext(Dispatchers.IO + CoroutineName("cleanup jar cache")) {
         context.cleanupJarCache()
       }
       if (request.os != OsFamily.currentOs) {
@@ -409,7 +413,9 @@ internal suspend fun buildProduct(request: BuildRequest, createBuildContext: sus
             out.write(mainData)
             additionalData?.let { out.write(it) }
             out.close()
-            Files.write(runDir.resolve(PLUGIN_CLASSPATH), byteOut.toByteArray())
+            val pluginClasspath = runDir.resolve(PLUGIN_CLASSPATH)
+            pluginClasspath.parent.createDirectories()
+            Files.write(pluginClasspath, byteOut.toByteArray())
           }
         }
         if (context.generateRuntimeModuleRepository) {
@@ -642,7 +648,7 @@ internal suspend fun createProductProperties(
   productConfiguration: ProductConfiguration,
   outputProvider: ModuleOutputProvider,
   projectDir: Path,
-  platformPrefix: String?,
+  platformPrefix: String,
 ): ProductProperties {
   val classPathFiles = getBuildModules(productConfiguration)
     .flatMap { outputProvider.getModuleOutputRoots(outputProvider.findRequiredModule(it)) }
@@ -675,7 +681,7 @@ private fun doCreateProductProperties(
   className: String,
   classPathFiles: List<Path>,
   projectDir: Path,
-  platformPrefix: String?,
+  platformPrefix: String,
 ): ProductProperties {
   val productPropertiesClass = try {
     classLoader.loadClass(className)
@@ -694,7 +700,7 @@ private fun doCreateProductProperties(
   catch (_: NoSuchMethodException) {
     lookup
       .findConstructor(productPropertiesClass, MethodType.methodType(Void.TYPE, Path::class.java))
-      .invoke(if (platformPrefix == "Idea") getCommunityHomePath(projectDir) else projectDir)
+      .invoke(if (platformPrefix == "Idea" || platformPrefix == "PyCharmCore") getCommunityHomePath(projectDir) else projectDir)
   } as ProductProperties
 }
 

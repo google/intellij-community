@@ -68,6 +68,16 @@ interface UniversalFileChooserContributor {
   fun getDesktopPath(): Path? = null
 
   fun getCustomLoadingText(): @Nls String? = null
+
+  fun getNoEntriesText(): @Nls String? = null
+}
+
+@ApiStatus.Internal
+class SingleRootContributor(
+  private val delegate: UniversalFileChooserContributor,
+  private val rootPath: Path,
+) : UniversalFileChooserContributor by delegate {
+  override suspend fun getRoots(): List<UniversalFileChooserContributor.Root> = delegate.getFilteredRoots(rootPath)
 }
 
 

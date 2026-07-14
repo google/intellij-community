@@ -16,6 +16,7 @@ import com.intellij.openapi.vfs.WritingAccessProvider
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
+import com.intellij.psi.codeStyle.CodeStyleManager
 import com.intellij.psi.xml.XmlFile
 import org.jetbrains.idea.maven.dom.MavenDomUtil
 import org.jetbrains.idea.maven.dom.model.MavenDomPlugin
@@ -81,13 +82,6 @@ abstract class KotlinMavenConfigurator protected constructor(
                 return logErrorAndReturnBrokenStatus(
                     module.project,
                     KotlinProjectConfigurationError.PSI_FOR_POM_IS_NOT_VALID
-                )
-            }
-
-            psi !is XmlFile -> {
-                return logErrorAndReturnBrokenStatus(
-                    module.project,
-                    KotlinProjectConfigurationError.POM_IS_NOT_XML
                 )
             }
 
@@ -212,7 +206,13 @@ abstract class KotlinMavenConfigurator protected constructor(
     protected abstract fun isKotlinModule(module: Module): Boolean
     protected abstract fun isRelevantGoal(goalName: String): Boolean
 
-    protected abstract fun createExecutions(pomFile: PomFile, kotlinPlugin: MavenDomPlugin, module: Module)
+    protected abstract fun createExecutions(
+        pomFile: PomFile,
+        kotlinPlugin: MavenDomPlugin,
+        module: Module,
+        kotlinVersion: String? = null
+    )
+
     protected abstract fun getStdlibArtifactId(module: Module, version: IdeKotlinVersion): String
 
     open fun configureModule(module: Module, file: PsiFile, version: IdeKotlinVersion, collector: NotificationMessageCollector): Boolean =
@@ -280,12 +280,18 @@ abstract class KotlinMavenConfigurator protected constructor(
             pom.addPluginRepository(repositoryDescription)
         }
 
-        val plugin = pom.addKotlinPlugin(version.kotlinVersion.toString(), usePlaceholderVersion = true)
-        createExecutions(pom, plugin, module)
+        val kotlinVersion = version.kotlinVersion.toString()
+        val plugin = pom.addKotlinPlugin(kotlinVersion, usePlaceholderVersion = true)
+        // Kotlin version already might be a placeholder in the `plugin`, so passing the real version separately
+        createExecutions(pom, plugin, module, kotlinVersion)
 
         configurePlugin(pom, plugin, module, version)
 
         CodeInsightUtilCore.forcePsiPostprocessAndRestoreElement<PsiFile>(file)
+        val codeStyleManager = CodeStyleManager.getInstance(project)
+        file.rootTag?.let {
+            codeStyleManager.reformat(it, true)
+        }
 
         return true
     }
@@ -299,9 +305,18 @@ abstract class KotlinMavenConfigurator protected constructor(
         executionId: String,
         goalName: String,
         module: Module,
-        isTest: Boolean
+        isTest: Boolean,
+        kotlinVersion: String? = null
     ) {
-        pomFile.addKotlinExecution(module, kotlinPlugin, executionId, PomFile.getPhase(false, isTest), isTest, listOf(goalName))
+        pomFile.addKotlinExecution(
+            module,
+            kotlinPlugin,
+            executionId,
+            PomFile.getPhase(false, isTest),
+            isTest,
+            listOf(goalName),
+            kotlinVersion
+        )
     }
 
     override fun updateLanguageVersion(
@@ -312,7 +327,7 @@ abstract class KotlinMavenConfigurator protected constructor(
         forTests: Boolean
     ) {
         fun doUpdateMavenLanguageVersion(): PsiElement? {
-            val psi = findModulePomFile(module) as? XmlFile ?: return null
+            val psi = findModulePomFile(module) ?: return null
             val pom = PomFile.forFileOrNull(psi) ?: return null
             return pom.changeLanguageVersion(
                 languageVersion,
@@ -379,7 +394,7 @@ abstract class KotlinMavenConfigurator protected constructor(
         state: LanguageFeature.State,
         @NlsContexts.DialogTitle messageTitle: String
     ): PsiElement? {
-        val psi = findModulePomFile(module) as? XmlFile ?: return null
+        val psi = findModulePomFile(module) ?: return null
         val pom = PomFile.forFileOrNull(psi) ?: return null
         val element = pom.changeFeatureConfiguration(feature, state)
         if (element == null) {
@@ -411,7 +426,7 @@ abstract class KotlinMavenConfigurator protected constructor(
         fun kotlinPluginId(version: String? = null): MavenId =
             MavenId(GROUP_ID, MAVEN_PLUGIN_ID, version)
 
-        fun findModulePomFile(module: Module): PsiFile? {
+        fun findModulePomFile(module: Module): XmlFile? {
             val project = module.project
             val files = MavenProjectsManager.getInstance(project).projectsFiles
             files

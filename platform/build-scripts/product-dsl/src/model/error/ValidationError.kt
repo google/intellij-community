@@ -17,9 +17,6 @@ enum class ErrorCategory {
   MISSING_MODULE_SETS,
   /** [SelfContainedValidationError] - hard failure, not suppressible */
   SELF_CONTAINED_VIOLATION,
-  /** [ModuleSetPluginizationError], [PluginizedModuleSetReferenceError], and related wrapper placement errors - hard failure, not suppressible */
-  MODULE_SET_PLUGINIZATION,
-
   // Plugin validation
   /** [PluginDependencyError] - hard failure, not suppressible */
   PLUGIN_DEPENDENCY_UNRESOLVED,
@@ -66,6 +63,8 @@ enum class ErrorCategory {
 
   /** [ImplicitEmbeddedContentModuleError] - hard failure, not suppressible */
   IMPLICIT_EMBEDDED_CONTENT_MODULE,
+  /** [EmbeddedContentModuleDependencyError] - hard failure, not suppressible */
+  EMBEDDED_CONTENT_MODULE_DEPENDENCY,
 }
 
 /**
@@ -109,10 +108,6 @@ fun ValidationError.errorId(): String {
     is MissingModuleSetsError -> "missing-sets:$context"
     is DuplicateModulesError -> "duplicates:$context"
     is SelfContainedValidationError -> "self-contained:$context"
-    is ModuleSetPluginizationError -> "module-set-pluginization:$context"
-    is PluginizedModuleSetReferenceError -> "pluginized-module-set-reference:${ownerKind.name.lowercase()}:$context:${pluginizedModuleSetName}"
-    is DuplicateModuleSetPluginWrapperError -> "module-set-plugin-wrapper-duplicate:$context"
-    is UltimateModuleSetMainModuleError -> "module-set-plugin-main-module:$context"
     is MissingContentModulePluginDependencyError -> "missing-plugin-dep:$context"
     is DuplicatePluginContentModulesError -> "plugin-content-dup:$context"
     is PluginDescriptorIdConflictError -> "plugin-descriptor-id-conflict:$context"
@@ -128,5 +123,6 @@ fun ValidationError.errorId(): String {
     is DuplicateDslTestPluginIdError -> "dsl-test-plugin-id-dup:${pluginId.value}"
     is MissingContentModuleBackingError -> "content-module-backing:$context"
     is ImplicitEmbeddedContentModuleError -> "implicit-embedded-content:$context"
+    is EmbeddedContentModuleDependencyError -> "embedded-content-dependency:$context"
   }
 }

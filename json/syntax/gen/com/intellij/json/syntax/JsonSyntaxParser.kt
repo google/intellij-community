@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 // This is a generated file. Not intended for manual editing.
 package com.intellij.json.syntax
 
@@ -20,7 +20,17 @@ object JsonSyntaxParser {
   }
 
   internal fun parse_root_(t: SyntaxElementType, s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
-    return json(s, l + 1)
+    var r: Boolean
+    if (t == JsonSyntaxElementTypes.OBJECT) {
+      r = object__(s, l + 1)
+    }
+    else if (t == JsonSyntaxElementTypes.ARRAY) {
+      r = array(s, l + 1)
+    }
+    else {
+      r = json(s, l + 1)
+    }
+    return r
   }
 
   val EXTENDS_SETS_: Array<SyntaxElementTypeSet> = arrayOf(
@@ -30,7 +40,7 @@ object JsonSyntaxParser {
   )
 
   /* ********************************************************** */
-  // '[' <<consumeArrayContentIfTooDeep>> array_element* ']'
+  // '[' <<consumeArrayContentIfTooDeep>> array_element* array_leftovers ']'
   fun array(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
     if (!s.recursion_guard_(l, "array")) return false
     if (!s.nextTokenIs(JsonSyntaxElementTypes.L_BRACKET)) return false
@@ -41,6 +51,7 @@ object JsonSyntaxParser {
     p = r // pin = 1
     r = r && s.report_error_(consumeArrayContentIfTooDeep(s, l + 1))
     r = p && s.report_error_(array_2(s, l + 1)) && r
+    r = p && s.report_error_(array_leftovers(s, l + 1)) && r
     r = p && s.consumeToken(JsonSyntaxElementTypes.R_BRACKET) && r
     s.exit_section_(l, m, r, p, null)
     return r || p
@@ -58,13 +69,13 @@ object JsonSyntaxParser {
   }
 
   /* ********************************************************** */
-  // value (','|&']')
+  // value_impl (','|&']')
   internal fun array_element(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
     if (!s.recursion_guard_(l, "array_element")) return false
     var r: Boolean
     var p: Boolean
     val m: Marker = s.enter_section_(l, Modifiers._NONE_)
-    r = value__(s, l + 1)
+    r = value_impl(s, l + 1)
     p = r // pin = 1
     r = r && array_element_1(s, l + 1)
     s.exit_section_(l, m, r, p, JsonSyntaxParser::not_bracket_or_next_value)
@@ -93,6 +104,51 @@ object JsonSyntaxParser {
   }
 
   /* ********************************************************** */
+  // &']' | <<eof>> | <<leftoverErrorInArray>> leftover_value_inside_array*
+  internal fun array_leftovers(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "array_leftovers")) return false
+    var r: Boolean
+    val m: Marker = s.enter_section_()
+    r = array_leftovers_0(s, l + 1)
+    if (!r) r = s.eof(l + 1)
+    if (!r) r = array_leftovers_2(s, l + 1)
+    s.exit_section_(m, null, r)
+    return r
+  }
+
+  // &']'
+  private fun array_leftovers_0(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "array_leftovers_0")) return false
+    var r: Boolean
+    val m: Marker = s.enter_section_(l, Modifiers._AND_)
+    r = s.consumeToken(JsonSyntaxElementTypes.R_BRACKET)
+    s.exit_section_(l, m, r, false, null)
+    return r
+  }
+
+  // <<leftoverErrorInArray>> leftover_value_inside_array*
+  private fun array_leftovers_2(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "array_leftovers_2")) return false
+    var r: Boolean
+    val m: Marker = s.enter_section_()
+    r = leftoverErrorInArray(s, l + 1)
+    r = r && array_leftovers_2_1(s, l + 1)
+    s.exit_section_(m, null, r)
+    return r
+  }
+
+  // leftover_value_inside_array*
+  private fun array_leftovers_2_1(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "array_leftovers_2_1")) return false
+    while (true) {
+      val c: Int = s.current_position_()
+      if (!leftover_value_inside_array(s, l + 1)) break
+      if (!s.empty_element_parsed_guard_("array_leftovers_2_1", c)) break
+    }
+    return true
+  }
+
+  /* ********************************************************** */
   // TRUE | FALSE
   fun boolean_literal(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
     if (!s.recursion_guard_(l, "boolean_literal")) return false
@@ -106,15 +162,77 @@ object JsonSyntaxParser {
   }
 
   /* ********************************************************** */
-  // value*
+  // top_level_value*
   internal fun json(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
     if (!s.recursion_guard_(l, "json")) return false
     while (true) {
       val c: Int = s.current_position_()
-      if (!value__(s, l + 1)) break
+      if (!top_level_value(s, l + 1)) break
       if (!s.empty_element_parsed_guard_("json", c)) break
     }
     return true
+  }
+
+  /* ********************************************************** */
+  // value_impl
+  internal fun leftover_value_inside_array(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "leftover_value_inside_array")) return false
+    var r: Boolean
+    val m: Marker = s.enter_section_(l, Modifiers._NONE_)
+    r = value_impl(s, l + 1)
+    s.exit_section_(l, m, r, false, JsonSyntaxParser::leftover_value_inside_array_recoverer)
+    return r
+  }
+
+  /* ********************************************************** */
+  // !(value_start | ']')
+  internal fun leftover_value_inside_array_recoverer(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "leftover_value_inside_array_recoverer")) return false
+    var r: Boolean
+    val m: Marker = s.enter_section_(l, Modifiers._NOT_)
+    r = !leftover_value_inside_array_recoverer_0(s, l + 1)
+    s.exit_section_(l, m, r, false, null)
+    return r
+  }
+
+  // value_start | ']'
+  private fun leftover_value_inside_array_recoverer_0(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "leftover_value_inside_array_recoverer_0")) return false
+    var r: Boolean
+    r = value_start(s, l + 1)
+    if (!r) r = s.consumeToken(JsonSyntaxElementTypes.R_BRACKET)
+    return r
+  }
+
+  /* ********************************************************** */
+  // value_impl
+  internal fun leftover_value_inside_object(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "leftover_value_inside_object")) return false
+    var r: Boolean
+    val m: Marker = s.enter_section_(l, Modifiers._NONE_)
+    r = value_impl(s, l + 1)
+    s.exit_section_(l, m, r, false, JsonSyntaxParser::leftover_value_inside_object_recoverer)
+    return r
+  }
+
+  /* ********************************************************** */
+  // !(value_start | '}')
+  internal fun leftover_value_inside_object_recoverer(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "leftover_value_inside_object_recoverer")) return false
+    var r: Boolean
+    val m: Marker = s.enter_section_(l, Modifiers._NOT_)
+    r = !leftover_value_inside_object_recoverer_0(s, l + 1)
+    s.exit_section_(l, m, r, false, null)
+    return r
+  }
+
+  // value_start | '}'
+  private fun leftover_value_inside_object_recoverer_0(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "leftover_value_inside_object_recoverer_0")) return false
+    var r: Boolean
+    r = value_start(s, l + 1)
+    if (!r) r = s.consumeToken(JsonSyntaxElementTypes.R_CURLY)
+    return r
   }
 
   /* ********************************************************** */
@@ -152,7 +270,7 @@ object JsonSyntaxParser {
   }
 
   /* ********************************************************** */
-  // !( ']' | value_start )
+  // !( ']' | '}' | value_start )
   internal fun not_bracket_or_next_value(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
     if (!s.recursion_guard_(l, "not_bracket_or_next_value")) return false
     var r: Boolean
@@ -162,11 +280,12 @@ object JsonSyntaxParser {
     return r
   }
 
-  // ']' | value_start
+  // ']' | '}' | value_start
   private fun not_bracket_or_next_value_0(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
     if (!s.recursion_guard_(l, "not_bracket_or_next_value_0")) return false
     var r: Boolean
     r = s.consumeToken(JsonSyntaxElementTypes.R_BRACKET)
+    if (!r) r = s.consumeToken(JsonSyntaxElementTypes.R_CURLY)
     if (!r) r = value_start(s, l + 1)
     return r
   }
@@ -196,7 +315,7 @@ object JsonSyntaxParser {
   }
 
   /* ********************************************************** */
-  // '{' <<consumeObjectContentIfTooDeep>> object_element* '}'
+  // '{' <<consumeObjectContentIfTooDeep>> object_element* object_leftovers '}'
   fun object__(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
     if (!s.recursion_guard_(l, "object__")) return false
     if (!s.nextTokenIs(JsonSyntaxElementTypes.L_CURLY)) return false
@@ -207,6 +326,7 @@ object JsonSyntaxParser {
     p = r // pin = 1
     r = r && s.report_error_(consumeObjectContentIfTooDeep(s, l + 1))
     r = p && s.report_error_(object_2(s, l + 1)) && r
+    r = p && s.report_error_(object_leftovers(s, l + 1)) && r
     r = p && s.consumeToken(JsonSyntaxElementTypes.R_CURLY) && r
     s.exit_section_(l, m, r, p, null)
     return r || p
@@ -259,6 +379,51 @@ object JsonSyntaxParser {
   }
 
   /* ********************************************************** */
+  // &'}' | <<eof>> | <<leftoverErrorInObject>> leftover_value_inside_object*
+  internal fun object_leftovers(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "object_leftovers")) return false
+    var r: Boolean
+    val m: Marker = s.enter_section_()
+    r = object_leftovers_0(s, l + 1)
+    if (!r) r = s.eof(l + 1)
+    if (!r) r = object_leftovers_2(s, l + 1)
+    s.exit_section_(m, null, r)
+    return r
+  }
+
+  // &'}'
+  private fun object_leftovers_0(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "object_leftovers_0")) return false
+    var r: Boolean
+    val m: Marker = s.enter_section_(l, Modifiers._AND_)
+    r = s.consumeToken(JsonSyntaxElementTypes.R_CURLY)
+    s.exit_section_(l, m, r, false, null)
+    return r
+  }
+
+  // <<leftoverErrorInObject>> leftover_value_inside_object*
+  private fun object_leftovers_2(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "object_leftovers_2")) return false
+    var r: Boolean
+    val m: Marker = s.enter_section_()
+    r = leftoverErrorInObject(s, l + 1)
+    r = r && object_leftovers_2_1(s, l + 1)
+    s.exit_section_(m, null, r)
+    return r
+  }
+
+  // leftover_value_inside_object*
+  private fun object_leftovers_2_1(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "object_leftovers_2_1")) return false
+    while (true) {
+      val c: Int = s.current_position_()
+      if (!leftover_value_inside_object(s, l + 1)) break
+      if (!s.empty_element_parsed_guard_("object_leftovers_2_1", c)) break
+    }
+    return true
+  }
+
+  /* ********************************************************** */
   // property_name (':' property_value)
   fun property__(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
     if (!s.recursion_guard_(l, "property__")) return false
@@ -296,9 +461,9 @@ object JsonSyntaxParser {
   }
 
   /* ********************************************************** */
-  // value
+  // value_impl
   internal fun property_value(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
-    return value__(s, l + 1)
+    return value_impl(s, l + 1)
   }
 
   /* ********************************************************** */
@@ -310,6 +475,52 @@ object JsonSyntaxParser {
     val m: Marker = s.enter_section_()
     r = s.consumeToken(JsonSyntaxElementTypes.IDENTIFIER)
     s.exit_section_(m, JsonSyntaxElementTypes.REFERENCE_EXPRESSION, r)
+    return r
+  }
+
+  /* ********************************************************** */
+  // &'[' <<shallowParseArray>>
+  internal fun shallow_array(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "shallow_array")) return false
+    if (!s.nextTokenIs(JsonSyntaxElementTypes.L_BRACKET)) return false
+    var r: Boolean
+    val m: Marker = s.enter_section_()
+    r = shallow_array_0(s, l + 1)
+    r = r && shallowParseArray(s, l + 1)
+    s.exit_section_(m, null, r)
+    return r
+  }
+
+  // &'['
+  private fun shallow_array_0(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "shallow_array_0")) return false
+    var r: Boolean
+    val m: Marker = s.enter_section_(l, Modifiers._AND_)
+    r = s.consumeToken(JsonSyntaxElementTypes.L_BRACKET)
+    s.exit_section_(l, m, r, false, null)
+    return r
+  }
+
+  /* ********************************************************** */
+  // &'{' <<shallowParseObject>>
+  internal fun shallow_object(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "shallow_object")) return false
+    if (!s.nextTokenIs(JsonSyntaxElementTypes.L_CURLY)) return false
+    var r: Boolean
+    val m: Marker = s.enter_section_()
+    r = shallow_object_0(s, l + 1)
+    r = r && shallowParseObject(s, l + 1)
+    s.exit_section_(m, null, r)
+    return r
+  }
+
+  // &'{'
+  private fun shallow_object_0(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "shallow_object_0")) return false
+    var r: Boolean
+    val m: Marker = s.enter_section_(l, Modifiers._AND_)
+    r = s.consumeToken(JsonSyntaxElementTypes.L_CURLY)
+    s.exit_section_(l, m, r, false, null)
     return r
   }
 
@@ -328,15 +539,52 @@ object JsonSyntaxParser {
 
   /* ********************************************************** */
   // object | array | literal | reference_expression
-  fun value__(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
-    if (!s.recursion_guard_(l, "value__")) return false
+  internal fun top_level_value(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "top_level_value")) return false
     var r: Boolean
-    val m: Marker = s.enter_section_(l, Modifiers._COLLAPSE_, JsonSyntaxElementTypes.VALUE, "<value>")
+    val m: Marker = s.enter_section_(l, Modifiers._NONE_)
     r = object__(s, l + 1)
     if (!r) r = array(s, l + 1)
     if (!r) r = literal(s, l + 1)
     if (!r) r = reference_expression(s, l + 1)
+    s.exit_section_(l, m, r, false, JsonSyntaxParser::top_level_value_recoverer)
+    return r
+  }
+
+  /* ********************************************************** */
+  // !value_start
+  internal fun top_level_value_recoverer(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "top_level_value_recoverer")) return false
+    var r: Boolean
+    val m: Marker = s.enter_section_(l, Modifiers._NOT_)
+    r = !value_start(s, l + 1)
     s.exit_section_(l, m, r, false, null)
+    return r
+  }
+
+  /* ********************************************************** */
+  // shallow_object | shallow_array | literal | reference_expression
+  fun value__(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "value__")) return false
+    var r: Boolean
+    val m: Marker = s.enter_section_(l, Modifiers._COLLAPSE_, JsonSyntaxElementTypes.VALUE, "<value>")
+    r = shallow_object(s, l + 1)
+    if (!r) r = shallow_array(s, l + 1)
+    if (!r) r = literal(s, l + 1)
+    if (!r) r = reference_expression(s, l + 1)
+    s.exit_section_(l, m, r, false, null)
+    return r
+  }
+
+  /* ********************************************************** */
+  // shallow_object | shallow_array | literal | reference_expression
+  internal fun value_impl(s: SyntaxGeneratedParserRuntime, l: Int): Boolean {
+    if (!s.recursion_guard_(l, "value_impl")) return false
+    var r: Boolean
+    r = shallow_object(s, l + 1)
+    if (!r) r = shallow_array(s, l + 1)
+    if (!r) r = literal(s, l + 1)
+    if (!r) r = reference_expression(s, l + 1)
     return r
   }
 

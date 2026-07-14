@@ -29,8 +29,9 @@
     <statistics.validation.customValidationRule
             implementation="org.jetbrains.kotlin.idea.debugger.evaluate.StandardExceptionNameRuleValidator"/>
     <internal.statistic.libraryUsageImportProcessor language="kotlin" implementationClass="org.jetbrains.kotlin.idea.statistics.KotlinLibraryUsageImportProcessor"/>
-    <statistics.applicationUsagesCollector implementation="org.jetbrains.kotlin.idea.statistics.K2MetricsFUSCollector"/>
 
     <statistics.projectUsagesCollector implementation="org.jetbrains.kotlin.idea.statistics.KotlinProjectOpenerCollector"/>
+
+    <statistics.validation.customValidationRule implementation="org.jetbrains.kotlin.idea.statistics.LanguageFeatureValidationRule"/>
   </extensions>
 </idea-plugin>

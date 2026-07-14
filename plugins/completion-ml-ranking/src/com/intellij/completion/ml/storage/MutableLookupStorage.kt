@@ -29,23 +29,31 @@ import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import org.jetbrains.annotations.TestOnly
 
+/**
+ * Mutable [LookupStorage] implementation: the single instance attached to a lookup that accumulates
+ * ML state (factors, scores, flags) over the course of one completion session.
+ */
 class MutableLookupStorage(
   override val startedTimestamp: Long,
   override val language: Language,
-  override val model: RankingModelWrapper?)
-  : LookupStorage {
+  override val model: RankingModelWrapper?,
+) : LookupStorage {
   private var _userFactors: Map<String, String>? = null
-  override val userFactors: Map<String, String>
-    get() = _userFactors ?: emptyMap()
-
   private var contextFeaturesStorage: ContextFeatures? = null
-  override val contextFactors: Map<String, String>
-    get() = contextFeaturesStorage?.asMap() ?: emptyMap()
 
   private var mlUsed: Boolean = false
   private var shouldReRank = model != null
 
   private var _loggingEnabled: Boolean = false
+
+  private val item2storage: MutableMap<String, MutableElementStorage> = mutableMapOf()
+
+  override val userFactors: Map<String, String>
+    get() = _userFactors ?: emptyMap()
+
+  override val contextFactors: Map<String, String>
+    get() = contextFeaturesStorage?.asMap() ?: emptyMap()
+
   override val performanceTracker: MLCompletionPerformanceTracker = MLCompletionPerformanceTracker()
 
   companion object {
@@ -55,6 +63,7 @@ class MutableLookupStorage(
     @Volatile
     private var alwaysComputeFeaturesInTests = true
 
+    /** Test-only override of whether features are always computed; restored when [parentDisposable] is disposed. */
     @TestOnly
     fun setComputeFeaturesAlways(value: Boolean, parentDisposable: Disposable) {
       val valueBefore = alwaysComputeFeaturesInTests
@@ -64,24 +73,27 @@ class MutableLookupStorage(
       })
     }
 
-    fun get(lookup: LookupImpl): MutableLookupStorage? {
+    /** Returns the storage attached to [lookup], or `null` if it has not been initialized yet. */
+    fun getMutableLookupStorage(lookup: LookupImpl): MutableLookupStorage? {
       return lookup.getUserData(LOOKUP_STORAGE)
     }
 
+    /** Returns the existing storage for [lookup], or creates and attaches a new one for [language]. */
     fun initOrGetLookupStorage(lookup: LookupImpl, language: Language): MutableLookupStorage {
-      val existed = get(lookup)
+      val existed = getMutableLookupStorage(lookup)
       if (existed != null) return existed
       val storage = MutableLookupStorage(System.currentTimeMillis(), language, RankingSupport.getRankingModel(language))
       lookup.putUserData(LOOKUP_STORAGE, storage)
       return storage
     }
 
-    fun get(parameters: BaseCompletionParameters): MutableLookupStorage? {
-      var storage = parameters.getUserData(LOOKUP_STORAGE)
+    /** Returns the storage for [parameters], falling back to (and caching from) the active lookup when needed. */
+    fun getMutableLookupStorage(parameters: BaseCompletionParameters): MutableLookupStorage? {
+      var storage = (parameters.process as? UserDataHolder)?.getUserData(LOOKUP_STORAGE)
       if (storage == null && parameters is CompletionParameters) {
         val activeLookup = LookupManager.getActiveLookup(parameters.editor) as? LookupImpl
         if (activeLookup != null) {
-          storage = get(activeLookup)
+          storage = getMutableLookupStorage(activeLookup)
           if (storage != null) {
             LOG.debug("Can't get storage from parameters. Fallback to storage from active lookup")
             saveAsUserData(parameters, storage)
@@ -91,28 +103,31 @@ class MutableLookupStorage(
       return storage
     }
 
+    /** Stores [storage] as user data on the completion process behind [parameters] for later retrieval. */
     fun saveAsUserData(parameters: BaseCompletionParameters, storage: MutableLookupStorage) {
       val completionProcess = parameters.process
       if (completionProcess is UserDataHolder) {
         completionProcess.putUserData(LOOKUP_STORAGE, storage)
       }
     }
-
-    private fun <T> BaseCompletionParameters.getUserData(key: Key<T>): T? {
-      return (process as? UserDataHolder)?.getUserData(key)
-    }
   }
 
   override val sessionFactors: LookupSessionFactorsStorage = LookupSessionFactorsStorage(startedTimestamp)
 
-  private val item2storage: MutableMap<String, MutableElementStorage> = mutableMapOf()
-
-  override fun getItemStorage(id: String): MutableElementStorage = item2storage.computeIfAbsent(id) {
-    MutableElementStorage()
-  }
+  override fun getItemStorage(id: String): MutableElementStorage =
+    try {
+      item2storage.computeIfAbsent(id) {
+        MutableElementStorage()
+      }
+    }
+    catch (e: ConcurrentModificationException) {
+      // send a exception with a unique message to make TC detect it separately
+      throw IllegalStateException("Concurrent modification of item storage", e)
+    }
 
   override fun mlUsed(): Boolean = mlUsed
 
+  /** Marks that ML scores were used to reorder items and records it in the performance tracker. */
   fun fireReorderedUsingMLScores() {
     mlUsed = true
     performanceTracker.reorderedByML()
@@ -124,16 +139,20 @@ class MutableLookupStorage(
 
   override fun shouldReRank(): Boolean = model != null && shouldReRank
 
+  /** Disables ML reranking for the rest of this session (features may still be computed for logging). */
   fun disableReRanking() {
     shouldReRank = false
   }
 
+  /** Returns `true` once [initContextFactors] has populated the context features. */
   fun isContextFactorsInitialized(): Boolean = contextFeaturesStorage != null
 
+  /** Records the computed [factors] and ML [mlScore] for the given [element]. */
   fun fireElementScored(element: LookupElement, factors: MutableMap<String, Any>, mlScore: Double?) {
     getItemStorage(element.idString()).fireElementScored(factors, mlScore)
   }
 
+  /** Lazily computes application- and project-level user factors for [project] (once per session). */
   @RequiresReadLock
   fun initUserFactors(project: Project) {
     if (_userFactors == null) {
@@ -151,26 +170,27 @@ class MutableLookupStorage(
 
   override fun contextProvidersResult(): ContextFeatures = contextFeaturesStorage ?: ContextFeaturesStorage.EMPTY
 
-  fun initContextFactors(contextFactors: MutableMap<String, MLFeatureValue>,
-                         environment: UserDataHolderBase) {
+  /** Initializes the context features from [contextFactors] and [environment]; must be called only once. */
+  fun initContextFactors(
+    contextFactors: Map<String, MLFeatureValue>,
+    environment: UserDataHolderBase,
+  ) {
     if (isContextFactorsInitialized()) {
       LOG.error("Context factors should be initialized only once")
+      return
     }
-    else {
-      val features = ContextFeaturesStorage(contextFactors)
-      environment.copyUserDataTo(features)
-      contextFeaturesStorage = features
-    }
+
+    val features = ContextFeaturesStorage(contextFactors)
+    environment.copyUserDataTo(features)
+    contextFeaturesStorage = features
   }
 
   private fun experimentWithoutComputingFeatures(): Boolean {
     val experimentInfo = ExperimentStatus.getInstance().forLanguage(language)
-    if (experimentInfo.inExperiment) {
-      return !experimentInfo.shouldCalculateFeatures
-    }
-    return false
+    return experimentInfo.inExperiment && !experimentInfo.shouldCalculateFeatures
   }
 
+  /** Enables logging of computed features/weights for this lookup. */
   fun markLoggingEnabled() {
     _loggingEnabled = true
   }

@@ -3,6 +3,7 @@
 
 package org.jetbrains.intellij.build.productLayout.discovery
 
+import com.intellij.platform.pluginGraph.TargetName
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.intellij.build.ModuleOutputProvider
@@ -14,6 +15,9 @@ import java.nio.file.Path
  * Path to the product registry JSON file.
  */
 const val PRODUCT_REGISTRY_PATH: String = "build/dev-build.json"
+
+/** Synthetic ProductConfiguration.className used for test product specs without a ProductProperties class. */
+internal const val TEST_PRODUCT_CLASS_NAME: String = "test-product"
 
 /**
  * Product registry containing all product configurations from dev-build.json.
@@ -46,6 +50,7 @@ data class DiscoveredProduct(
   @JvmField val properties: Any?, // ProductProperties or null
   @JvmField val spec: org.jetbrains.intellij.build.productLayout.ProductModulesContentSpec?,
   @JvmField val pluginXmlPath: String?,
+  @JvmField val bundledModuleSetPluginModules: List<TargetName> = emptyList(),
 )
 
 /**

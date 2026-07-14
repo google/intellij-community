@@ -37,6 +37,7 @@ import com.intellij.driver.sdk.wait
 import com.intellij.driver.sdk.waitFor
 import com.intellij.driver.sdk.waitNotNull
 import org.intellij.lang.annotations.Language
+import org.jetbrains.annotations.ApiStatus
 import java.awt.Color
 import java.awt.Point
 import java.awt.Rectangle
@@ -99,6 +100,12 @@ open class JEditorUiComponent(data: ComponentData) : UiComponent(data) {
     val inlayCenter = driver.withContext(OnDispatcher.EDT) { inlay.getBounds() }.center
     click(inlayCenter)
   }
+
+  fun inlaysOnLine(lineIndex: Int): List<Inlay> =
+    editor.getInlayModel().getInlineElementsInRange(
+      document.getLineStartOffset(lineIndex),
+      document.getLineEndOffset(lineIndex),
+    )
 
   fun getInlayHints(braceAround: Boolean = true): List<InlayHint> {
     val hints = mutableListOf<InlayHint>()
@@ -241,6 +248,7 @@ open class JEditorUiComponent(data: ComponentData) : UiComponent(data) {
   /**
    * @see shouldContainText For better readability
    */
+  @ApiStatus.ScheduledForRemoval
   @Deprecated("Use shouldContainText instead", ReplaceWith("shouldContainText(expectedText)"))
   fun containsText(expectedText: String) {
     step("Verify that editor contains text: $expectedText") {
@@ -358,6 +366,17 @@ interface EditorTextField : Component {
 }
 
 fun Finder.gutter(@Language("xpath") xpath: String = "//div[@class='EditorGutterComponentImpl']"): GutterUiComponent = x(xpath, GutterUiComponent::class.java)
+
+fun IdeaFrameUI.editorsSplitters(@Language("xpath") xpath: String? = null): EditorsSplittersUI =
+  x(xpath ?: "//div[@class='EditorsSplitters']", EditorsSplittersUI::class.java)
+
+class EditorsSplittersUI(data: ComponentData) : UiComponent(data) {
+  fun editor(@Language("xpath") xpath: String? = null): JEditorUiComponent =
+    x(xpath ?: "//div[@class='EditorComponentImpl']", JEditorUiComponent::class.java)
+
+  fun gutter(@Language("xpath") xpath: String? = null): GutterUiComponent =
+    x(xpath ?: "//div[@class='EditorGutterComponentImpl']", GutterUiComponent::class.java)
+}
 
 class GutterUiComponent(data: ComponentData) : UiComponent(data) {
 

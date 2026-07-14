@@ -7,13 +7,14 @@ package com.intellij.platform.ide.impl.wsl
 
 import com.intellij.execution.wsl.WSLCommandLineOptions
 import com.intellij.execution.wsl.WSLDistribution
+import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.ijent.IjentLogger.CONN_MGR_LOG
 import com.intellij.platform.ijent.IjentSession
 import com.intellij.platform.ijent.ParentOfIjentScopes
-import com.intellij.platform.ijent.community.impl.guessVmIdOfWsl
 import com.intellij.platform.ijent.currentCoroutineDispatcher
+import com.intellij.platform.ijent.utils.guessVmIdOfWsl
 import com.intellij.util.io.blockingDispatcher
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.launch
@@ -34,7 +35,7 @@ suspend fun WSLDistribution.createIjentSession(
     distribution = this,
     project = project,
     wslCommandLineOptionsModifier = wslCommandLineOptionsModifier
-  ).createIjentSession()
+  ).createIjentSession(serviceAsync())
 
   if (Registry.`is`("ijent.multiple.connections.mode")) {
     if (System.getProperty("ijent.wait.for.transport.initialization") == "true") {

@@ -43,6 +43,7 @@ kotlin {
   wasmJs {
     browser {}
   }
+  sourceSets.jvmTest.configure { resources.srcDir(layout.projectDirectory.dir("../resources")) }
   sourceSets.commonMain.configure { kotlin.srcDir(layout.projectDirectory.dir("../srcCommonMain")) }
   sourceSets.commonMain.configure { resources.srcDir(layout.projectDirectory.dir("../resourcesCommonMain")) }
   sourceSets.commonTest.configure { kotlin.srcDir(layout.projectDirectory.dir("../srcCommonTest")) }
@@ -64,17 +65,30 @@ kotlin {
     implementation(jps.org.jetbrains.intellij.deps.kotlinx.kotlinx.coroutines.core.jvm930800474.get().let { "${it.group}:kotlinx-coroutines-core:${it.version}" }) {
       isTransitive = false
     }
-    implementation(jps.org.jetbrains.kotlinx.kotlinx.io.core.jvm479158162.get().let { "${it.group}:kotlinx-io-core:${it.version}" }) {
-      exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
-    }
   }
   sourceSets.commonTest.dependencies {
     implementation(jps.org.jetbrains.intellij.deps.kotlinx.kotlinx.coroutines.test.jvm1610416103.get().let { "${it.group}:kotlinx-coroutines-test:${it.version}" }) {
       isTransitive = false
     }
+    implementation(jps.org.jetbrains.kotlinx.kotlinx.io.core.jvm479158162.get().let { "${it.group}:kotlinx-io-core:${it.version}" }) {
+      exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
+    }
+    implementation(jps.org.jetbrains.kotlinx.kotlinx.serialization.core.jvm1739247612.get().let { "${it.group}:kotlinx-serialization-core:${it.version}" }) {
+      isTransitive = false
+    }
+    implementation(jps.org.jetbrains.kotlinx.kotlinx.serialization.json.jvm231489733.get().let { "${it.group}:kotlinx-serialization-json:${it.version}" }) {
+      isTransitive = false
+    }
+    implementation(jps.org.slf4j.slf4j.jdk141933517271.get().let { "${it.group}:${it.name}:${it.version}" }) {
+      isTransitive = false
+      exclude(group = "org.slf4j", module = "slf4j-api")
+    }
     implementation(project(":fleet.ktor.client.core"))
     implementation(project(":fleet.lsp.protocol"))
     implementation(project(":fleet.test.runtime"))
+  }
+  sourceSets.jvmTest.dependencies {
+    implementation(project(":fleet.util.logging.slf4j"))
   }
   // KOTLIN__MARKER_END
 }

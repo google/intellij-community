@@ -5,20 +5,23 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.jetbrains.intellij.build.BuildPaths.Companion.COMMUNITY_ROOT
+import org.jetbrains.intellij.build.impl.DistributionBuilderState
 import org.jetbrains.intellij.build.impl.PluginLayout
 import org.jetbrains.intellij.build.impl.SupportedDistribution
-import org.jetbrains.intellij.build.impl.createBuildContext
-import org.jetbrains.intellij.build.impl.createDistributionBuilderState
+import org.jetbrains.intellij.build.impl.createTestDistributionBuilderState
 import org.jetbrains.intellij.build.impl.projectStructureMapping.DistributionFileEntry
 import org.jetbrains.intellij.build.impl.testBuildBundledPluginsForAllPlatforms
+import org.jetbrains.intellij.build.impl.testLayoutBundledPlugins
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import java.lang.reflect.Method
 import java.nio.file.Path
+import kotlin.time.Duration.Companion.seconds
 
 class BundledPluginBuilderTest {
   @Test
@@ -65,13 +68,11 @@ class BundledPluginBuilderTest {
 
   @Test
   fun failedPlatformJobIsPropagatedBeforePluginInfoIsWritten() {
-    val productProperties = IdeaCommunityProperties(COMMUNITY_ROOT.communityRoot)
     val failureMessage = "platform build failed"
 
     assertThatThrownBy {
       runBlocking(Dispatchers.Default) {
-        val context = createBuildContext(COMMUNITY_ROOT.communityRoot, productProperties)
-        val state = createDistributionBuilderState(context)
+        val (context, state) = createMinimalBundledPluginBuildState()
         val buildPlatformJob = CompletableDeferred<List<DistributionFileEntry>>().also {
           it.completeExceptionally(IllegalStateException(failureMessage))
         }
@@ -82,10 +83,84 @@ class BundledPluginBuilderTest {
           buildPlatformJob = buildPlatformJob,
           descriptorCacheContainer = state.platformLayout.descriptorCacheContainer,
           context = context,
+          includeAdditionalPlugins = false,
         )
       }
     }.isInstanceOf(IllegalStateException::class.java)
       .hasMessage(failureMessage)
+  }
+
+  @Test
+  fun layoutOnlyWithoutAdditionalPluginsCompletes() {
+    runBlocking(Dispatchers.Default) {
+      val (context, state) = createMinimalBundledPluginBuildState()
+
+      val result = withTimeout(5.seconds) {
+        testLayoutBundledPlugins(
+          state = state,
+          pluginLayouts = emptySet(),
+          descriptorCacheContainer = state.platformLayout.descriptorCacheContainer,
+          context = context,
+          includeAdditionalPlugins = false,
+        )
+      }
+
+      assertThat(result.descriptors).isEmpty()
+      assertThat(result.additionalPlugins).isNull()
+    }
+  }
+
+  @Test
+  fun `dev mode plugin applicability uses requested target os`() {
+    val macOnlyPlugin = PluginLayout.pluginAuto(listOf("mac.only.plugin")) {
+      it.bundlingRestrictions.supportedOs = persistentListOf(OsFamily.MACOS)
+    }
+    val applicationInfo = mock(ApplicationInfoProperties::class.java)
+    val context = mock(BuildContext::class.java)
+    `when`(applicationInfo.isEAP).thenReturn(false)
+    `when`(context.options).thenReturn(BuildOptions())
+    `when`(context.applicationInfo).thenReturn(applicationInfo)
+    `when`(context.isNightlyBuild).thenReturn(false)
+
+    assertThat(
+      isPluginApplicable(
+        bundledMainModuleNames = setOf(macOnlyPlugin.mainModule),
+        plugin = macOnlyPlugin,
+        osFamily = OsFamily.MACOS,
+        context = context,
+      )
+    ).isTrue()
+
+    assertThat(
+      isPluginApplicable(
+        bundledMainModuleNames = setOf(macOnlyPlugin.mainModule),
+        plugin = macOnlyPlugin,
+        osFamily = OsFamily.LINUX,
+        context = context,
+      )
+    ).isFalse()
+  }
+
+  private fun createMinimalBundledPluginBuildState(): Pair<BuildContext, DistributionBuilderState> {
+    val applicationInfo = mock(ApplicationInfoProperties::class.java)
+    val context = mock(BuildContext::class.java)
+    val tempDir = Path.of(System.getProperty("java.io.tmpdir"), "bundled-plugin-builder-test")
+    val paths = BuildPaths(
+      communityHomeDirRoot = COMMUNITY_ROOT,
+      buildOutputDir = tempDir.resolve("build-output"),
+      logDir = tempDir.resolve("log"),
+      projectHome = COMMUNITY_ROOT.communityRoot,
+      artifactDir = tempDir.resolve("artifact"),
+      tempDir = tempDir.resolve("temp"),
+    )
+
+    `when`(applicationInfo.majorReleaseDate).thenReturn("20260101")
+    `when`(context.applicationInfo).thenReturn(applicationInfo)
+    `when`(context.options).thenReturn(BuildOptions())
+    `when`(context.paths).thenReturn(paths)
+    `when`(context.proprietaryBuildTools).thenReturn(ProprietaryBuildTools.DUMMY)
+
+    return context to createTestDistributionBuilderState(context)
   }
 
   private fun collectOsSpecificTasks(
@@ -104,6 +179,15 @@ class BundledPluginBuilderTest {
     }
   }
 
+  private fun isPluginApplicable(
+    bundledMainModuleNames: Set<String>,
+    plugin: PluginLayout,
+    osFamily: OsFamily,
+    context: BuildContext,
+  ): Boolean {
+    return isPluginApplicableMethod.invoke(null, bundledMainModuleNames, plugin, osFamily, context) as Boolean
+  }
+
   private data class OsSpecificTaskDescription(
     val dist: SupportedDistribution,
     val pluginModules: List<String>,
@@ -113,5 +197,16 @@ class BundledPluginBuilderTest {
     private val collectOsSpecificBundledPluginBuildTasksMethod: Method = Class
       .forName("org.jetbrains.intellij.build.impl.plugins.BundledPluginBuilderKt")
       .getDeclaredMethod("collectOsSpecificBundledPluginBuildTasks", List::class.java, Collection::class.java, BuildContext::class.java)
+
+    private val isPluginApplicableMethod: Method = Class
+      .forName("org.jetbrains.intellij.build.dev.PluginBuilderKt")
+      .getDeclaredMethod(
+        "isPluginApplicable",
+        Set::class.java,
+        PluginLayout::class.java,
+        OsFamily::class.java,
+        BuildContext::class.java,
+      )
+      .apply { isAccessible = true }
   }
 }

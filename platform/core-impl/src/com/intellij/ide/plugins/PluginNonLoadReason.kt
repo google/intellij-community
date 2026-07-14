@@ -207,20 +207,32 @@ class PluginLoadingIsDisabledCompletely(
 
 @ApiStatus.Internal
 class PluginPackagePrefixConflict(
-  override val plugin: IdeaPluginDescriptorImpl,
-  val module: IdeaPluginDescriptorImpl,
-  val conflictingModule: IdeaPluginDescriptorImpl,
+  override val plugin: PluginModuleDescriptor,
+  val module: PluginModuleDescriptor,
+  val conflictingModule: PluginModuleDescriptor,
 ): PluginNonLoadReason {
   override val detailedMessage: @NlsContexts.DetailedDescription String
-    get() = CoreBundle.message("plugin.loading.error.long.package.prefix.conflict", plugin.name, conflictingModule.name, module.moduleId, conflictingModule.moduleId)
+    get() = CoreBundle.message(
+      "plugin.loading.error.long.package.prefix.conflict",
+      plugin.getMainDescriptor().name,
+      conflictingModule.getMainDescriptor().name,
+      getPackagePrefixConflictModuleId(module),
+      getPackagePrefixConflictNamespace(module),
+      getPackagePrefixConflictModuleId(conflictingModule),
+      getPackagePrefixConflictNamespace(conflictingModule),
+      module.packagePrefix ?: conflictingModule.packagePrefix ?: "<none>",
+    )
   override val shortMessage: @NlsContexts.Label String
-    get() = CoreBundle.message("plugin.loading.error.short.package.prefix.conflict", plugin.name, conflictingModule.name)
+    get() = CoreBundle.message(
+      "plugin.loading.error.short.package.prefix.conflict",
+      plugin.getMainDescriptor().name,
+      conflictingModule.getMainDescriptor().name,
+    )
   override val logMessage: @NonNls String
-    get() = "Plugin '${module.name}' conflicts with '${conflictingModule.name}' and may work incorrectly. " +
-            "Their respective modules '${module.moduleId}' and '${conflictingModule.moduleId}' declare the same package prefix"
+    get() = "Plugin '${module.getMainDescriptor().name}' conflicts with '${conflictingModule.getMainDescriptor().name}' and may work incorrectly. " +
+            "Their respective modules [${formatPackagePrefixConflictDetails(module)}] and " +
+            "[${formatPackagePrefixConflictDetails(conflictingModule)}] declare the same package prefix"
   override val shouldNotifyUser: Boolean = true
-
-  private val IdeaPluginDescriptorImpl.moduleId: String get() = contentModuleName ?: pluginId.idString
 }
 
 @ApiStatus.Internal
@@ -236,24 +248,6 @@ class PluginIsIncompatibleWithAnotherPlugin(
     get() = CoreBundle.message("plugin.loading.error.short.ide.contains.conflicting.module", incompatiblePlugin.pluginId)
   override val logMessage: @NonNls String
     get() = "Plugin '${plugin.name}' (${plugin.pluginId}) is incompatible with another plugin '${incompatiblePlugin.name}' (${incompatiblePlugin.pluginId})"
-}
-
-@ApiStatus.Internal
-class PluginModuleDependencyCannotBeLoadedOrMissing(
-  override val plugin: IdeaPluginDescriptor,
-  val moduleDependency: PluginModuleId,
-  val containingPlugin: PluginId?,
-  override val shouldNotifyUser: Boolean,
-): PluginNonLoadReason {
-  private val dependencyName: String
-    get() = containingPlugin?.idString ?: moduleDependency.name
-  // FIXME VERY confusing message
-  override val detailedMessage: @NlsContexts.DetailedDescription String
-    get() = CoreBundle.message("plugin.loading.error.long.depends.on.not.installed.plugin", plugin.name, dependencyName)
-  override val shortMessage: @NlsContexts.Label String
-    get() = CoreBundle.message("plugin.loading.error.short.depends.on.not.installed.plugin", dependencyName)
-  override val logMessage: @NonNls String
-    get() = "Plugin '${plugin.name}' (${plugin.pluginId}) has module dependency '${moduleDependency.name}' which cannot be loaded or missing"
 }
 
 @ApiStatus.Internal

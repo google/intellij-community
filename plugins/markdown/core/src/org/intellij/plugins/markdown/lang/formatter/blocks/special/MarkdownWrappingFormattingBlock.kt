@@ -38,14 +38,26 @@ internal open class MarkdownWrappingFormattingBlock(
     val result = ArrayList<Block>(filtered.size)
 
     filtered.forEachIndexed { index, child ->
-      val isAfterOpeningParenthesis = filtered.getOrNull(index - 1)?.elementType == MarkdownTokenTypes.LPAREN
+      val previous = filtered.getOrNull(index - 1)
+      val isAfterOpeningParenthesis = previous?.elementType == MarkdownTokenTypes.LPAREN
+      val isAdjacentToPreviousQuote = previous != null
+                                      && (previous.elementType == MarkdownTokenTypes.SINGLE_QUOTE
+                                          || previous.elementType == MarkdownTokenTypes.DOUBLE_QUOTE)
+                                      && previous.textRange.endOffset == child.textRange.startOffset
       when (child.elementType) {
         MarkdownTokenTypes.LPAREN -> {
           result.add(MarkdownFormattingBlock(child, settings, spacing, alignment, childWrap))
         }
 
         MarkdownTokenTypes.TEXT -> {
-          processTextElement(result, child, childWrap, !isAfterOpeningParenthesis)
+          processTextElement(result, child, childWrap, !isAfterOpeningParenthesis && !isAdjacentToPreviousQuote)
+        }
+
+        MarkdownTokenTypes.SINGLE_QUOTE, MarkdownTokenTypes.DOUBLE_QUOTE -> {
+          val isAttachedToPreviousText = previous?.elementType == MarkdownTokenTypes.TEXT
+                                         && previous.textRange.endOffset == child.textRange.startOffset
+          val wrap = if (isAttachedToPreviousText) Wrap.createWrap(WrapType.NONE, false) else childWrap
+          result.add(MarkdownFormattingBlock(child, settings, spacing, alignment, wrap))
         }
 
         in MarkdownTokenTypeSets.WHITE_SPACES -> {
@@ -99,7 +111,7 @@ private fun splitTextForWrapping(text: String): Sequence<TextRange> {
     var start = -1
     var length = -1
     for ((index, char) in text.withIndex()) {
-      if (char.isWhitespace()) {
+      if (char.isFormatterWhitespace()) {
         if (length > 0) {
           yield(TextRange.from(start, length))
         }
@@ -118,4 +130,8 @@ private fun splitTextForWrapping(text: String): Sequence<TextRange> {
       yield(TextRange.from(start, length))
     }
   }
+}
+
+private fun Char.isFormatterWhitespace(): Boolean {
+  return this == ' ' || this == '\t' || this == '\n'
 }

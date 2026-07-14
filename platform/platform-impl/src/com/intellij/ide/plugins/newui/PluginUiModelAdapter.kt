@@ -20,14 +20,12 @@ import com.intellij.ide.plugins.marketplace.PluginModule
 import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.FUSEventSource
-import com.intellij.openapi.util.IntellijInternalApi
 import org.jetbrains.annotations.ApiStatus
 
 /**
  * A temporary class used to eliminate "runtime" PluginDescriptor usages in the UI. It will later be replaced with frontend and backend implementations.
  */
 @ApiStatus.Internal
-@IntellijInternalApi
 class PluginUiModelAdapter(
   val pluginDescriptor: IdeaPluginDescriptor,
 ) : PluginUiModel {
@@ -163,10 +161,10 @@ class PluginUiModelAdapter(
     set(value) {
       if (pluginDescriptor is PluginNode) {
         if (value == null) {
-          pluginDescriptor.setReviewComments(PageContainer(0, 0))
+          pluginDescriptor.setReviewComments(PageContainer(0, true))
           return
         }
-        val container = PageContainer(value.myPageSize, value.myCurrentPage, value.items)
+        val container = PageContainer(value.currentPage, value.hasNextPage, value.items)
         pluginDescriptor.setReviewComments(container)
       }
     }
@@ -375,7 +373,6 @@ class PluginUiModelAdapter(
 
 
 @ApiStatus.Internal
-@IntellijInternalApi
 fun IdeaPluginDescriptor.toPluginContentModules(): List<PluginContentModule> {
   return when (this) {
     is PluginNode -> contentModules
@@ -390,7 +387,6 @@ fun IdeaPluginDescriptor.toPluginContentModules(): List<PluginContentModule> {
 }
 
 @ApiStatus.Internal
-@IntellijInternalApi
 fun IdeaPluginDescriptor.toPluginModules(): List<PluginModule> {
   return when (this) {
     is PluginNode -> modules
@@ -405,7 +401,6 @@ fun IdeaPluginDescriptor.toPluginModules(): List<PluginModule> {
 }
 
 @ApiStatus.Internal
-@IntellijInternalApi
 fun IdeaPluginDescriptor.toMainModuleDependencies(): List<ModuleDependency> {
   return when (this) {
     is PluginNode -> moduleDependencies

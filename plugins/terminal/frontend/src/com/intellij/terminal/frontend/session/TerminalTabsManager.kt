@@ -1,7 +1,5 @@
 package com.intellij.terminal.frontend.session
 
-import com.intellij.codeWithMe.ClientId
-import com.intellij.codeWithMe.ClientIdContextElement
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
@@ -17,10 +15,10 @@ import com.intellij.util.AwaitCancellationAndInvoke
 import com.intellij.util.asSafely
 import com.intellij.util.awaitCancellationAndInvoke
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import org.jetbrains.plugins.terminal.LocalTerminalTtyConnector
 import org.jetbrains.plugins.terminal.ShellStartupOptions
 import org.jetbrains.plugins.terminal.block.reworked.session.TerminalSessionTab
@@ -37,6 +35,7 @@ internal class TerminalTabsManager(private val project: Project, private val cor
   private val tabsMap: MutableMap<Int, TerminalSessionTab> = LinkedHashMap()
   private val tabsLock = Mutex()
   private val tabIdCounter = AtomicInteger(0)
+  private val detachedTabs: MutableSet<Int> = HashSet()
 
   init {
     val storedTabs = TerminalTabsStorage.getInstance(project).getStoredTabs()
@@ -48,8 +47,13 @@ internal class TerminalTabsManager(private val project: Project, private val cor
 
   suspend fun getTerminalTabs(): List<TerminalSessionTab> {
     return tabsLock.withLock {
-      tabsMap.values.toList()
+      getTerminalTabsNoLock()
     }
+  }
+
+  /** Caller must hold [tabsLock] */
+  private fun getTerminalTabsNoLock(): List<TerminalSessionTab> {
+    return tabsMap.values.filter { it.id !in detachedTabs }
   }
 
   suspend fun createNewTerminalTab(): TerminalSessionTab {
@@ -78,12 +82,14 @@ internal class TerminalTabsManager(private val project: Project, private val cor
         return@updateTabsAndStore tab
       }
 
-      // Create and emulate the terminal session under the local client ID.
-      // Because the session should be left active after the client disconnects.
-      val clientId = ClientId.localId
-      val scope = coroutineScope.childScope("TerminalSession#${tabId}", ClientIdContextElement(clientId))
-      val result = withContext(ClientIdContextElement(clientId)) {
-        TerminalSessionsManager.getInstance().startSession(options, project, scope)
+      val scope = coroutineScope.childScope("TerminalSession#${tabId}")
+      val result = try {
+        TerminalSessionsManager.getInstance(project).startSession(options, scope)
+      }
+      catch (t: Throwable) {
+        // Clean up allocated resources if session start failed or current coroutine was canceled externally.
+        scope.cancel()
+        throw t
       }
 
       val updatedTab = tab.copy(
@@ -102,6 +108,7 @@ internal class TerminalTabsManager(private val project: Project, private val cor
       scope.awaitCancellationAndInvoke {
         updateTabsAndStore { tabs ->
           tabs.remove(tabId)
+          detachedTabs -= tabId
         }
       }
 
@@ -114,7 +121,7 @@ internal class TerminalTabsManager(private val project: Project, private val cor
       val tab = tabs[tabId] ?: return@updateTabsAndStore  // Already removed or never existed
       val sessionId = tab.sessionId
       if (sessionId != null) {
-        val session = TerminalSessionsManager.getInstance().getSession(sessionId)
+        val session = TerminalSessionsManager.getInstance(project).getSession(sessionId)
         if (session == null) {
           // If the session is already removed, it means that close event was already sent to the session.
           // It's coroutine scope cancellation is in progress: we already removed the entity, but still not removed the tab.
@@ -133,6 +140,7 @@ internal class TerminalTabsManager(private val project: Project, private val cor
       else {
         // The session was not started - just remove the tab.
         tabs.remove(tabId)
+        detachedTabs -= tabId
       }
     }
   }
@@ -153,7 +161,7 @@ internal class TerminalTabsManager(private val project: Project, private val cor
    */
   private fun trackWorkingDirectory(tab: TerminalSessionTab, eelDescriptor: EelDescriptor?, coroutineScope: CoroutineScope) {
     val sessionId = tab.sessionId ?: error("This method should be called only for tabs with started sessions: $tab")
-    val session = TerminalSessionsManager.getInstance().getSession(sessionId) ?: error("No session for tab $tab")
+    val session = TerminalSessionsManager.getInstance(project).getSession(sessionId) ?: error("No session for tab $tab")
 
     coroutineScope.launch {
       val outputFlow = session.getOutputFlow()
@@ -203,7 +211,7 @@ internal class TerminalTabsManager(private val project: Project, private val cor
         action(tabsMap)
       }
       finally {
-        val persistedTabs = tabsMap.values.map { it.toPersistedTab() }
+        val persistedTabs = getTerminalTabsNoLock().map { it.toPersistedTab() }
         TerminalTabsStorage.getInstance(project).updateStoredTabs(persistedTabs)
       }
     }
@@ -231,6 +239,12 @@ internal class TerminalTabsManager(private val project: Project, private val cor
       processType = processType,
       sessionId = null,
     )
+  }
+
+  suspend fun detachTerminalTab(tabId: Int) {
+    updateTabsAndStore {
+      detachedTabs += tabId
+    }
   }
 
   companion object {

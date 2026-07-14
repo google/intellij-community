@@ -6,6 +6,7 @@ import com.intellij.ide.plugins.PluginManagerCore.isPlatformClass
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.extensions.PluginDescriptor
 import com.intellij.openapi.extensions.PluginId
+import com.intellij.util.io.sanitizeFileName
 import com.intellij.util.lang.UrlClassLoader
 import org.jetbrains.annotations.ApiStatus
 import java.io.File
@@ -32,8 +33,8 @@ object PluginUtils {
   }
 
   @JvmStatic
-  fun Iterable<PluginId>.joinedPluginIds(operation: String): String =
-    joinToString(prefix = "Plugins to $operation: [", postfix = "]") { it.idString }
+  fun Iterable<PluginId>.joinedPluginIds(state: String): String =
+    joinToString(prefix = "Marking plugins '$state': [", postfix = "]") { it.idString }
 
   /** don't expose user home in error messages */
   @JvmStatic
@@ -120,4 +121,6 @@ object PluginUtils {
     }
     return null
   }
+
+  fun PluginId.asSanitizedPathElement(): String = sanitizeFileName(idString)
 }

@@ -7,8 +7,6 @@ import com.intellij.driver.sdk.invokeAction
 import com.intellij.driver.sdk.ui.QueryBuilder
 import com.intellij.driver.sdk.ui.components.ComponentData
 import com.intellij.driver.sdk.ui.components.UiComponent
-import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.diagnostic.logger
 
 open class ToolWindowToolbarUi(data: ComponentData) : UiComponent(data) {
   fun stripeButton(locator: QueryBuilder.() -> String): StripeButtonUi = x(StripeButtonUi::class.java, locator)
@@ -24,7 +22,7 @@ class ToolWindowLeftToolbarUi(data: ComponentData) : ToolWindowToolbarUi(data) {
   val structureButton: StripeButtonUi = stripeButton("Structure")
   val servicesButton: StripeButtonUi = stripeButton("Services")
   val terminalButton: StripeButtonUi = stripeButton("Terminal")
-  val problemsButton: StripeButtonUi = stripeButton("Problems")
+  val problemsButton: StripeButtonUi = stripeButton("Problems View")
   val moreButton: StripeButtonUi = stripeButton("More")
   val debugButton: StripeButtonUi = stripeButton("Debug")
   val findButton: StripeButtonUi = stripeButton("Find")
@@ -34,7 +32,7 @@ class ToolWindowLeftToolbarUi(data: ComponentData) : ToolWindowToolbarUi(data) {
   val jpaButton: StripeButtonUi = stripeButton("JPA Console")
   val persistenceButton: StripeButtonUi = stripeButton("Persistence")
   val valgrindButton: StripeButtonUi = stripeButton("Run Valgrind Memcheck")
-
+  val vcpkg: StripeButtonUi = stripeButton("Vcpkg")
   fun openMoreToolWindow() { moreButton.click() }
 }
 
@@ -66,7 +64,7 @@ class StripeButtonUi(data: ComponentData) : UiComponent(data) {
       val toolWindowId = toolWindow.getId()
       val activateToolWindowAction = driver.utility(ActivateToolWindowActionManager::class)
         .getActionIdForToolWindow(toolWindowId)
-    driver.ideLogger.info("Calling action on window: id=$toolWindowId, action=$activateToolWindowAction, component=${component.javaClass.simpleName}")
+      driver.ideLogger.info("Calling action on window: id=$toolWindowId, action=$activateToolWindowAction, component=${component.javaClass.simpleName}")
       driver.invokeAction(activateToolWindowAction, component = component)
     }
   }

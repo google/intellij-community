@@ -4,8 +4,14 @@
 package com.intellij.platform.ijent
 
 import com.intellij.platform.eel.EelDescriptor
+import com.intellij.platform.eel.EelMachine
 import com.intellij.platform.eel.EelPlatform
 import kotlinx.coroutines.DelicateCoroutinesApi
+
+interface IjentMachine : EelMachine {
+  fun getCachedIjentSession(): IjentSession?
+  suspend fun getIjentSession(sessionScope: ParentOfIjentScopes): IjentSession
+}
 
 interface IjentSession {
   val isRunning: Boolean
@@ -23,6 +29,8 @@ interface IjentSession {
   fun close()
 
   fun getIjentInstance(descriptor: EelDescriptor): IjentApi
+
+  val eventBus: IjentEventBus
 
   enum class LogLevel {
     INFO, DEBUG, TRACE

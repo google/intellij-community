@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.refactoring.introduceVariable;
 
 import com.intellij.codeInsight.intention.impl.TypeExpression;
@@ -6,21 +6,25 @@ import com.intellij.codeInsight.template.TemplateBuilderImpl;
 import com.intellij.codeInsight.template.impl.TemplateManagerImpl;
 import com.intellij.codeInsight.template.impl.TemplateState;
 import com.intellij.java.JavaBundle;
+import com.intellij.java.refactoring.JavaRefactoringBundle;
 import com.intellij.openapi.actionSystem.Shortcut;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
-import com.intellij.openapi.command.CommandProcessor;
+import com.intellij.openapi.application.ex.ApplicationEx;
+import com.intellij.openapi.application.ex.ApplicationManagerEx;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.RangeMarker;
 import com.intellij.openapi.editor.ScrollType;
 import com.intellij.openapi.editor.impl.EditorImpl;
 import com.intellij.openapi.keymap.KeymapUtil;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.Pair;
+import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.LambdaUtil;
@@ -61,6 +65,7 @@ import com.intellij.psi.util.TypeConversionUtil;
 import com.intellij.refactoring.AbstractJavaInplaceIntroducer;
 import com.intellij.refactoring.IntroduceVariableUtil;
 import com.intellij.refactoring.RefactoringActionHandler;
+import com.intellij.refactoring.extractMethod.newImpl.inplace.EditorState;
 import com.intellij.refactoring.introduceField.ElementToWorkOn;
 import com.intellij.refactoring.rename.ResolveSnapshotProvider;
 import com.intellij.refactoring.rename.inplace.SelectableInlayPresentation;
@@ -92,6 +97,7 @@ public class JavaVariableInplaceIntroducer extends AbstractJavaInplaceIntroducer
   private boolean myDeleteSelf = true;
   private final boolean mySkipTypeExpressionOnStart;
   private final boolean myCanBeVarType;
+  private final EditorState myEditorState;
 
   public JavaVariableInplaceIntroducer(final Project project,
                                        IntroduceVariableSettings settings, PsiElement chosenAnchor, final Editor editor,
@@ -109,14 +115,11 @@ public class JavaVariableInplaceIntroducer extends AbstractJavaInplaceIntroducer
     myExpression = new TypeExpression(myProject, isReplaceAllOccurrences()
                                                  ? myTypeSelectorManager.getTypesForAll()
                                                  : myTypeSelectorManager.getTypesForOne());
-
-    final List<RangeMarker> rangeMarkers = getOccurrenceMarkers();
-    editor.putUserData(ReassignVariableUtil.OCCURRENCES_KEY,
-                       rangeMarkers.toArray(new RangeMarker[0]));
     PsiElement parent = myExpr.getParent();
     myReplaceSelf = parent instanceof PsiExpressionStatement && !(parent.getParent() instanceof PsiSwitchLabeledRuleStatement);
     mySkipTypeExpressionOnStart = !(myExpr instanceof PsiFunctionalExpression && myReplaceSelf);
     myCanBeVarType = IntroduceVariableBase.canBeExtractedWithoutExplicitType(myExpr);
+    myEditorState = new EditorState(project, editor);
   }
 
   @Override
@@ -129,8 +132,30 @@ public class JavaVariableInplaceIntroducer extends AbstractJavaInplaceIntroducer
       }
     }
     final ResolveSnapshotProvider resolveSnapshotProvider = VariableInplaceRenamer.INSTANCE.forLanguage(myScope.getLanguage());
-    myConflictResolver = resolveSnapshotProvider != null ? resolveSnapshotProvider.createSnapshot(myScope) : null;
+    myConflictResolver = resolveSnapshotProvider != null ? createSnapshotWithProgress(resolveSnapshotProvider) : null;
     super.beforeTemplateStart();
+  }
+
+  private @Nullable ResolveSnapshotProvider.ResolveSnapshot createSnapshotWithProgress(@NotNull ResolveSnapshotProvider provider) {
+    ApplicationEx app = ApplicationManagerEx.getApplicationEx();
+    if (!app.isDispatchThread()) {
+      return provider.createSnapshot(myScope);
+    }
+    if (app.isWriteAccessAllowed()) {
+      Ref<ResolveSnapshotProvider.ResolveSnapshot> ref = new Ref<>();
+      app.runWriteActionWithCancellableProgressInDispatchThread(
+        JavaRefactoringBundle.message("introduce.variable.resolving.conflicts"),
+        myProject,
+        null,
+        _ -> {
+          ref.set(provider.createSnapshot(myScope));
+        });
+      return ref.get();
+    }
+    return ProgressManager.getInstance().runProcessWithProgressSynchronously(
+      () -> ReadAction.computeCancellable(() -> provider.createSnapshot(myScope)),
+      JavaRefactoringBundle.message("introduce.variable.resolving.conflicts"),
+      true, myProject);
   }
 
   @Override
@@ -185,11 +210,7 @@ public class JavaVariableInplaceIntroducer extends AbstractJavaInplaceIntroducer
 
   @Override
   protected void performCleanup() {
-    super.performCleanup();
-    PsiVariable variable = getVariable();
-    if (variable != null) {
-      CommandProcessor.getInstance().executeCommand(myProject, () -> super.restoreState(variable), null, null);
-    }
+    myEditorState.revert();
   }
 
   @Override
@@ -488,9 +509,9 @@ public class JavaVariableInplaceIntroducer extends AbstractJavaInplaceIntroducer
       }
     }
 
-    SmartPsiElementPointer<PsiVariable> pointer = variable == null ? null : smartPointerManager.createSmartPsiElementPointer(variable);
+    SmartPsiElementPointer<PsiVariable> pointer = smartPointerManager.createSmartPsiElementPointer(variable);
     PsiDocumentManager.getInstance(myProject).doPostponedOperationsAndUnblockDocument(myEditor.getDocument());
-    return pointer == null ? null : pointer.getElement();
+    return pointer.getElement();
   }
 
   @Override

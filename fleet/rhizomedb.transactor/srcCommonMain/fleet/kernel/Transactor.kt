@@ -1,8 +1,19 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package fleet.kernel
 
-import com.jetbrains.rhizomedb.*
-import com.jetbrains.rhizomedb.impl.*
+import com.jetbrains.rhizomedb.Change
+import com.jetbrains.rhizomedb.ChangeScope
+import com.jetbrains.rhizomedb.ChangeScopeKey
+import com.jetbrains.rhizomedb.DB
+import com.jetbrains.rhizomedb.DbContext
+import com.jetbrains.rhizomedb.EID
+import com.jetbrains.rhizomedb.Entity
+import com.jetbrains.rhizomedb.EntityType
+import com.jetbrains.rhizomedb.Part
+import com.jetbrains.rhizomedb.Q
+import com.jetbrains.rhizomedb.asOf
+import com.jetbrains.rhizomedb.change
+import com.jetbrains.rhizomedb.get
 import fleet.multiplatform.shims.DispatcherPriority
 import fleet.multiplatform.shims.newSingleThreadCoroutineDispatcher
 import fleet.reporting.shared.runtime.currentSpan
@@ -10,22 +21,43 @@ import fleet.reporting.shared.tracing.completeWithResult
 import fleet.reporting.shared.tracing.span
 import fleet.reporting.shared.tracing.spannedScope
 import fleet.rpc.client.RpcClientDisconnectedException
-import fleet.tracing.*
 import fleet.tracing.runtime.Span
 import fleet.tracing.runtime.SpanInfo
-import fleet.util.*
+import fleet.util.UID
 import fleet.util.async.use
 import fleet.util.channels.channels
 import fleet.util.channels.consumeAll
 import fleet.util.channels.consumeEach
 import fleet.util.logging.KLogger
 import fleet.util.logging.KLoggers
-import fleet.util.openmap.Key
-import fleet.util.openmap.MutableOpenMap
-import fleet.util.openmap.OpenMap
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.*
-import kotlinx.coroutines.flow.*
+import fleet.openmap.Key
+import fleet.openmap.MutableOpenMap
+import fleet.openmap.OpenMap
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.coroutineContext
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.takeWhile
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.serializer
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration
@@ -44,12 +76,12 @@ interface Transactor : CoroutineContext.Element {
   val middleware: TransactorMiddleware
 
   /**
-   * Current db value
-   * Returns snapshot of last known db
+   * Source of the current db.
+   * [DbSource.latest] returns a snapshot of the last known db, [DbSource.flow] emits every new db version.
    *
-   * Be aware that [] and [ChangeScope] already carry db with them so this property may give you a db version that is different from context one
+   * Be aware that [change] and [ChangeScope] already carry db with them so this property may give you a db version that is different from context one
    */
-  val dbState: StateFlow<DB>
+  val dbSource: DbSource
 
   /**
    * Issues the change
@@ -77,7 +109,7 @@ interface Transactor : CoroutineContext.Element {
   val meta: MutableOpenMap<Transactor>
 
   companion object : CoroutineContext.Key<Transactor> {
-    val logger: KLogger = KLoggers.logger(Transactor::class)
+    val logger: KLogger by lazy { KLoggers.logger(Transactor::class) }
   }
 }
 
@@ -171,7 +203,7 @@ fun interface Subscriber<T> {
   suspend fun CoroutineScope.subscribed(initial: DB, changes: ReceiveChannel<Change>): T
 }
 
-val Transactor.lastKnownDb: DB get() = dbState.value
+val Transactor.lastKnownDb: DB get() = dbSource.latest
 
 object OnCompleteKey : ChangeScopeKey<MutableList<(Transactor) -> Unit>>
 object DeferredChangeKey : ChangeScopeKey<Deferred<Change>>
@@ -296,6 +328,7 @@ sealed interface SubscriptionEvent {
 @OptIn(ExperimentalForInheritanceCoroutinesApi::class)
 suspend fun <T> withTransactor(
   middleware: TransactorMiddleware = TransactorMiddleware.Identity,
+  registerEntityTypeOnEntityCreation: Boolean = false,
   defaultPart: Int = CommonPart,
   logBufferSize: Int = LogBufferSizeDefault,
   body: suspend CoroutineScope.(Transactor) -> T,
@@ -303,7 +336,8 @@ suspend fun <T> withTransactor(
   spannedScope("withKernel") {
     val kernelId: UID = UID.random()
     val initialDb = span("emptyDB") { DB.empty() }
-      .change(defaultPart = defaultPart) {
+      .change(defaultPart = defaultPart,
+              registerEntityTypeOnEntityCreation = registerEntityTypeOnEntityCreation) {
         span("load kernel module") {
           middleware.run {
             performChange {
@@ -337,7 +371,7 @@ suspend fun <T> withTransactor(
       extraBufferCapacity = logBufferSize,
       onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
-    val stateFlow = MutableStateFlow<DB>(initialDb)
+    val mutableDbSource = MutableDbSource(debugName = "kernel $kernelId", initial = initialDb)
     sharedFlow.emit(TransactorEvent.Init(timestamp = 0L, db = initialDb))
 
     val transactor = object : Transactor {
@@ -346,15 +380,18 @@ suspend fun <T> withTransactor(
       @Deprecated("will be removed")
       override val meta: MutableOpenMap<Transactor> = OpenMap<Transactor>().mutable()
 
-      override val dbState: StateFlow<DB>
-        get() = stateFlow
+      override val dbSource: DbSource = mutableDbSource.readOnly()
 
       override fun changeAsync(f: ChangeScope.() -> Unit): Deferred<Change> {
         val deferred = CompletableDeferred<Change>()
-        val result = priorityDispatchChannel.trySend(ChangeTask(f = f,
-                                                                rendezvous = CompletableDeferred(Unit),
-                                                                resultDeferred = deferred,
-                                                                causeSpan = currentSpan))
+        val result = priorityDispatchChannel.trySend(
+          ChangeTask(
+            f = f,
+            rendezvous = CompletableDeferred(Unit),
+            resultDeferred = deferred,
+            causeSpan = currentSpan,
+          ),
+        )
         if (!result.isSuccess) {
           if (result.isClosed) {
             deferred.cancel()
@@ -422,12 +459,13 @@ suspend fun <T> withTransactor(
                 // in a sense the cancellation is a rogue one, we should treat it as a simple change failure, and thus keep it INSIDE runCatching
                 changeTask.rendezvous.await()
                 val timedChange = measureTimedValue {
-                  val dbBefore = stateFlow.value
+                  val dbBefore = mutableDbSource.latest
                   span("change", {
                     set("ts", (dbBefore.timestamp + 1).toString())
                     cause = changeTask.causeSpan
                   }) {
-                    dbBefore.change(defaultPart) {
+                    dbBefore.change(defaultPart = defaultPart,
+                                    registerEntityTypeOnEntityCreation = registerEntityTypeOnEntityCreation) {
                       meta[DeferredChangeKey] = changeTask.resultDeferred
                       meta[SpanChangeKey] = currentSpan
                       middleware.run { performChange(changeTask.f) }
@@ -442,7 +480,7 @@ suspend fun <T> withTransactor(
                               location = changeTask.causeSpan)
                 val change = timedChange.value
                 Transactor.logger.trace { "[$transactor] broadcasting change [${change.dbBefore.timestamp} -> ${change.dbAfter.timestamp}] $change" }
-                stateFlow.value = change.dbAfter
+                mutableDbSource.set(change.dbAfter)
                 check(sharedFlow.tryEmit(
                   TransactorEvent.SequentialChange(
                     timestamp = ts++,
@@ -475,14 +513,16 @@ suspend fun <T> withTransactor(
       }.apply {
         invokeOnCompletion { x ->
           // TheEnd marks the flow as terminated in case someone is consuming the log out of scope
-          // not updating [stateFlow] here, because a database is always a database, it won't change anything
           check(sharedFlow.tryEmit(TransactorEvent.TheEnd(x))) {
             "changeFlow should have been created with drop-oldest"
           }
+          // poison the db source so that readers via [DbSource] fail after the transactor has stopped,
+          // instead of being handed a stale snapshot forever
+          mutableDbSource.close(x)
         }
       }.use {
         try {
-          withContext(transactor + DbSource.ContextElement(FlowDbSource(transactor.dbState, debugName = "kernel $transactor"))) {
+          withContext(transactor + DbSource.ContextElement(transactor.dbSource)) {
             body(transactor)
           }
         }
@@ -535,7 +575,7 @@ private fun logSubscription(sharedFlow: SharedFlow<TransactorEvent>): Flow<Subsc
               }
               is SubscriptionState.Overflow -> {
                 emit(SubscriptionEvent.Reset(event.change.dbAfter))
-               SubscriptionState.Active(event.timestamp)
+                SubscriptionState.Active(event.timestamp)
               }
             }
           }

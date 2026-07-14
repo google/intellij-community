@@ -21,6 +21,18 @@ private const val REGION_MARKER = "region Generated dependencies"
 // Legacy marker for backward compatibility with existing files
 private const val LEGACY_MARKER = "editor-fold desc=\"Generated dependencies"
 
+/**
+ * Returns true when the comment is one of the fold/region markers owned by the generator
+ * (region start/end or legacy editor-fold start/end). Such comments must not be treated as
+ * user-authored content to preserve when rewriting the `<dependencies>` section.
+ */
+private fun isFoldMarkerComment(commentText: String): Boolean {
+  return commentText.contains(REGION_MARKER) ||
+         commentText.contains(LEGACY_MARKER) ||
+         commentText.contains("endregion") ||
+         commentText.contains("end editor-fold")
+}
+
 private enum class RegionType { NONE, WRAPS_ENTIRE_SECTION, INSIDE_SECTION }
 
 private data class RemovalRange(
@@ -31,6 +43,7 @@ private data class RemovalRange(
 private sealed class DepEntry {
   data class Plugin(val id: String) : DepEntry()
   data class Module(val name: String) : DepEntry()
+  data class Comment(val text: String) : DepEntry()
 }
 
 private data class DepOccurrence(
@@ -180,6 +193,7 @@ internal fun buildUpdatedXmlDependenciesContent(
     when (val entry = occurrence.entry) {
       is DepEntry.Plugin -> preserveExistingPlugin?.invoke(entry.id) == true
       is DepEntry.Module -> preserveExistingModule?.invoke(entry.name) == true
+      is DepEntry.Comment -> true
     }
   }
 
@@ -335,6 +349,20 @@ private fun parseDependenciesInfo(content: String, allowInsideSectionRegion: Boo
             }
           }
         }
+        XMLStreamConstants.COMMENT -> if (depth > 0) {
+          val locOffset = reader.location.characterOffset
+          val startOffset = content.lastIndexOf("<!--", locOffset)
+          if (startOffset >= 0) {
+            val endIdx = content.indexOf("-->", startOffset)
+            if (endIdx >= 0) {
+              val fullText = content.substring(startOffset, endIdx + "-->".length)
+              if (!isFoldMarkerComment(fullText)) {
+                entries.add(DepEntry.Comment(fullText))
+                entryOffsets.add(startOffset)
+              }
+            }
+          }
+        }
         XMLStreamConstants.END_ELEMENT -> if (depth > 0) {
           depth--
           if (depth == 0) {
@@ -428,6 +456,7 @@ private fun dedupeOccurrencesKeepingFirst(
       is DepEntry.Plugin -> {
         if (entry.id in generatedPluginIds || !seenPlugins.add(entry.id)) continue
       }
+      is DepEntry.Comment -> Unit
     }
     result.add(entry)
   }
@@ -447,6 +476,7 @@ private fun collectDuplicateRemovalRanges(
     val shouldRemove = when (val entry = occurrence.entry) {
       is DepEntry.Module -> entry.name in generatedModuleNames || !seenModules.add(entry.name)
       is DepEntry.Plugin -> entry.id in generatedPluginIds || !seenPlugins.add(entry.id)
+      is DepEntry.Comment -> false
     }
     if (shouldRemove) {
       createEntryRemovalRange(content, occurrence)?.let(ranges::add)
@@ -459,6 +489,7 @@ private fun createEntryRemovalRange(content: String, occurrence: DepOccurrence):
   val tagName = when (occurrence.entry) {
     is DepEntry.Module -> "module"
     is DepEntry.Plugin -> "plugin"
+    is DepEntry.Comment -> return null
   }
   val startOffset = occurrence.startOffset
   if (startOffset < 0) return null
@@ -599,18 +630,25 @@ private fun buildFoldOnly(indent: String, autoModules: List<String>, autoPlugins
 
 /** Full region block with <dependencies> (for WRAPS_ENTIRE_SECTION - module descriptors) */
 private fun buildFullBlock(indent: String, manualEntries: List<DepEntry>, autoModules: List<String>, autoPlugins: List<String>): String {
-  val manualPlugins = manualEntries.filterIsInstance<DepEntry.Plugin>().map { it.id }
-  val manualModules = manualEntries.filterIsInstance<DepEntry.Module>().map { it.name }
   return StringBuilder().apply {
     append(indent).append(REGION_START).append("\n")
     append(indent).append("<dependencies>\n")
-    appendPlugins("$indent  ", manualPlugins)
+    for (entry in manualEntries) {
+      appendDependencyEntry("$indent  ", entry)
+    }
     appendPlugins("$indent  ", autoPlugins)
-    appendModules("$indent  ", manualModules)
     appendModules("$indent  ", autoModules)
     append(indent).append("</dependencies>\n")
     append(indent).append(REGION_END).append("\n")
   }.toString()
+}
+
+private fun StringBuilder.appendDependencyEntry(indent: String, entry: DepEntry) {
+  when (entry) {
+    is DepEntry.Plugin -> append(indent).append("<plugin id=\"").append(entry.id).append("\"/>\n")
+    is DepEntry.Module -> append(indent).append("<module name=\"").append(entry.name).append("\"/>\n")
+    is DepEntry.Comment -> append(indent).append(entry.text).append("\n")
+  }
 }
 
 /** Full <dependencies> section preserving original order of plugins and manual modules (for `NONE` case) */
@@ -618,10 +656,7 @@ private fun buildWithEntries(indent: String, manualEntries: List<DepEntry>, auto
   return StringBuilder().apply {
     append(indent).append("<dependencies>\n")
     for (entry in manualEntries) {
-      when (entry) {
-        is DepEntry.Plugin -> append(indent).append("  <plugin id=\"").append(entry.id).append("\"/>\n")
-        is DepEntry.Module -> append(indent).append("  <module name=\"").append(entry.name).append("\"/>\n")
-      }
+      appendDependencyEntry("$indent  ", entry)
     }
     if (autoPlugins.isNotEmpty() || autoModules.isNotEmpty()) {
       append(indent).append("  ").append(REGION_START).append("\n")

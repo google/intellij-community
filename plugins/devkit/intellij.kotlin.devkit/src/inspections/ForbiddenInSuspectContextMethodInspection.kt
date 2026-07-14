@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.idea.devkit.kotlin.inspections
 
 import com.intellij.codeInspection.IntentionAndQuickFixAction
@@ -20,17 +20,20 @@ import org.jetbrains.idea.devkit.kotlin.DevKitKotlinBundle
 import org.jetbrains.idea.devkit.util.isInspectionForBlockingContextAvailable
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotationValue
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.markers.KaAnnotatedSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
 import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.base.codeInsight.ShortenReferencesFacility
 import org.jetbrains.kotlin.idea.base.psi.imports.addImport
 import org.jetbrains.kotlin.idea.base.util.isImported
+import org.jetbrains.kotlin.idea.quickfix.replaceWith.ReplaceWithData
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtCallExpression
@@ -41,6 +44,7 @@ import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtQualifiedExpression
 import org.jetbrains.kotlin.psi.psiUtil.containingClass
+import org.jetbrains.kotlin.psi.psiUtil.getCallNameExpression
 import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
 import org.jetbrains.kotlin.psi.psiUtil.getQualifiedExpressionForSelector
 
@@ -67,7 +71,7 @@ private val restrictsSuspensionName = FqName(RESTRICTS_SUSPENSION)
 private val intelliJEdtDispatcher = FqName(INTELLIJ_EDT_DISPATCHER)
 private val coroutinesLaunch = FqName(LAUNCH)
 
-private const val COROUTINE_CHECK_CANCELED_FIX = "com.intellij.openapi.progress.checkCancelled"
+private const val COROUTINE_CHECK_CANCELED_FIX = "com.intellij.openapi.progress.checkCanceled"
 private const val WITH_CONTEXT = "kotlinx.coroutines.withContext"
 private const val DISPATCHERS = "kotlinx.coroutines.Dispatchers"
 private const val COROUTINE_SCOPE = "kotlinx.coroutines.CoroutineScope"
@@ -148,11 +152,18 @@ internal class ForbiddenInSuspectContextMethodInspection : LocalInspectionTool()
           }
           else -> {
             if (Registry.`is`("devkit.inspections.forbidden.method.in.suspend.context")) {
+              val replaceWithFix = getReplaceWithQuickFix(expression, calledSymbol)
+              val fixes = if (replaceWithFix != null) {
+                arrayOf(ifInSuspend { replaceWithFix })
+              }
+              else {
+                generalFixes()
+              }
               holder.registerProblem(
                 extractElementToHighlight(expression),
                 DevKitKotlinBundle.message("inspections.forbidden.method.in.suspend.context.text", calledSymbol.name.asString()),
                 ProblemHighlightType.GENERIC_ERROR_OR_WARNING,
-                *generalFixes()
+                *fixes
               )
             }
           }
@@ -185,6 +196,38 @@ internal class ForbiddenInSuspectContextMethodInspection : LocalInspectionTool()
 
     private fun generalFixes(): Array<LocalQuickFix> {
       return callingElement?.let { arrayOf(NavigateToCallInSuspendFunction(it)) } ?: LocalQuickFix.EMPTY_ARRAY
+    }
+
+    private fun KaSession.getReplaceWithQuickFix(expression: KtCallExpression, calledSymbol: KaAnnotatedSymbol): LocalQuickFix? {
+      val requiresBlockingContextAnnotation = calledSymbol.annotations[RequiresBlockingContextAnnotationId].firstOrNull()
+        ?: return null
+
+      val replaceWithArg = requiresBlockingContextAnnotation.arguments.find { it.name.asString() == "replaceWith" }
+        ?: return null
+
+      val replaceWithAnnotation = (replaceWithArg.expression as? KaAnnotationValue.NestedAnnotationValue)?.annotation
+        ?: return null
+
+      val expressionArg = replaceWithAnnotation.arguments.find { it.name.asString() == "expression" }
+      val replacementExpression = (expressionArg?.expression as? KaAnnotationValue.ConstantValue)
+        ?.value?.value as? String
+        ?: return null
+
+      if (replacementExpression.isEmpty()) return null
+
+      val importsArg = replaceWithAnnotation.arguments.find { it.name.asString() == "imports" }
+      val imports = when (val importsValue = importsArg?.expression) {
+        is KaAnnotationValue.ArrayValue -> {
+          importsValue.values.mapNotNull {
+            (it as? KaAnnotationValue.ConstantValue)?.value?.value as? String
+          }
+        }
+        else -> emptyList()
+      }
+
+      val callName = expression.getCallNameExpression() ?: return null
+
+      return ReplaceWithSuspendAlternativeFix(callName, ReplaceWithData(replacementExpression, imports, false))
     }
 
     private fun KaSession.provideFixesForInvokeLater(callExpression: KtCallExpression): Array<LocalQuickFix> {

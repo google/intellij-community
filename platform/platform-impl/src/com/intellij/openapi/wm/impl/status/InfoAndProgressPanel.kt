@@ -32,6 +32,7 @@ import com.intellij.openapi.ui.panel.ProgressPanel
 import com.intellij.openapi.ui.panel.ProgressPanelBuilder
 import com.intellij.openapi.ui.popup.Balloon
 import com.intellij.openapi.ui.popup.BalloonHandler
+import com.intellij.openapi.ui.popup.IconButton
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.NlsContexts
@@ -63,6 +64,7 @@ import com.intellij.util.ui.JBInsets
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.StartupUiUtil.getCenterPoint
 import com.intellij.util.ui.UIUtil
+import com.intellij.util.ui.accessibility.ScreenReader
 import it.unimi.dsi.fastutil.ints.IntArrays
 import it.unimi.dsi.fastutil.ints.IntComparator
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet
@@ -84,10 +86,16 @@ import java.awt.Container
 import java.awt.Dimension
 import java.awt.Graphics
 import java.awt.Point
+import java.awt.Rectangle
 import java.awt.event.ActionListener
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.lang.ref.WeakReference
+import javax.accessibility.AccessibleContext
+import javax.accessibility.AccessibleRole
+import javax.accessibility.AccessibleState
+import javax.accessibility.AccessibleStateSet
+import javax.accessibility.AccessibleValue
 import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.JLabel
@@ -139,6 +147,9 @@ class InfoAndProgressPanel internal constructor(
   internal val component: JPanel
     get() = mainPanel
 
+  internal val focusableComponents: List<JComponent>
+    get() = mainPanel.inlinePanel.getFocusableComponents()
+
   private val originals = ArrayList<ProgressModel>()
   private val infos = ArrayList<TaskInfo>()
   private var inlineToOriginal = UnmodifiableHashMap.empty<MyProgressComponent, ProgressModel>()
@@ -162,6 +173,8 @@ class InfoAndProgressPanel internal constructor(
   private val lifecycleDisposable = Disposer.newDisposable()
 
   init {
+    statusBar.registerFocusableWidget(mainPanel.inlinePanel, onActivate = ::triggerPopupShowing)
+
     val connection = ApplicationManager.getApplication().getMessageBus().connect(coroutineScope = coroutineScope)
     connection.subscribe(PowerSaveMode.TOPIC, PowerSaveMode.Listener {
       EdtInvocationManager.invokeLaterIfNeeded(::updateProgressIcon)
@@ -654,6 +667,7 @@ class InfoAndProgressPanel internal constructor(
 
     fun removeProgress(progress: MyProgressComponent, last: Boolean) {
       if (last) {
+        host.statusBar.focusNextWidgetAfter(inlinePanel)
         updateNavBarAutoscrollToSelectedLimit(AutoscrollLimit.UNLIMITED)
         inlinePanel.updateState(null)
         if (host.shouldClosePopupAndOnProcessFinish) {
@@ -725,6 +739,12 @@ class InfoAndProgressPanel internal constructor(
       suspendUpdateRunnable = createSuspendUpdateRunnable(suspendButton)
       processNameValue = task.getTitle()
 
+      if (ScreenReader.isActive()) {
+        progress.isFocusable = true
+      }
+      cancelButton.isFocusable = true
+      suspendButton.isFocusable = true
+
       // TODO: update javadoc for ProgressIndicator
     }
 
@@ -769,6 +789,7 @@ class InfoAndProgressPanel internal constructor(
   internal open inner class MyProgressComponent(compact: Boolean, task: TaskInfo, progressModel: ProgressModel)
     : ProgressComponent(compact, task, progressModel), TitledIndicator {
     private var original: ProgressModel?
+    private lateinit var focusableButtons: List<InplaceButton>
     internal val visibleInStatusBar: Boolean
       get() = indicatorModel.visibleInStatusBar
 
@@ -823,7 +844,16 @@ class InfoAndProgressPanel internal constructor(
     open fun canCheckPowerSaveMode(): Boolean = true
 
     override fun createEastButtons(): List<ProgressButton> {
-      return listOf(createSuspendButton()) + super.createEastButtons()
+      val buttons = listOf(createSuspendButton()) + super.createEastButtons()
+      focusableButtons = if (isCompact) buttons.map { it.button } else emptyList()
+      for (button in focusableButtons) {
+        statusBar.registerFocusableWidget(button, onActivate = { button.doClick() })
+      }
+      return buttons
+    }
+
+    fun getFocusableComponents(): List<JComponent> {
+      return if (::focusableButtons.isInitialized) focusableButtons else emptyList()
     }
 
     protected fun updateCancelButton(suspend: InplaceButton, cancel: InplaceButton) {
@@ -842,7 +872,8 @@ class InfoAndProgressPanel internal constructor(
     }
 
     private fun createSuspendButton(): ProgressButton {
-      val suspendButton = InplaceButton("", AllIcons.Actions.Pause, ActionListener { createSuspendRunnable().run() }).setFillBg(false)
+      val suspendButton = createInplaceButton(IconButton("", AllIcons.Actions.Pause, AllIcons.Actions.Pause),
+                                             ActionListener { createSuspendRunnable().run() })
       return ProgressButton(suspendButton, createSuspendUpdateRunnable(suspendButton))
     }
 
@@ -926,6 +957,7 @@ class InfoAndProgressPanel internal constructor(
       progress.isVisible = !PowerSaveMode.isEnabled() || !isPaintingIndeterminate
       super.updateProgressNow()
       if (presentationModeProgressPanel != null) presentationModeProgressPanel!!.update()
+      if (isCompact) mainPanel.inlinePanel.fireAccessibleValueChanged()
     }
 
     fun showInPresentationMode(): Boolean {
@@ -988,7 +1020,7 @@ class InfoAndProgressPanel internal constructor(
     }
   }
 
-  private class InlineProgressPanel(private val host: InfoAndProgressPanel) : NonOpaquePanel() {
+  private class InlineProgressPanel(private val host: InfoAndProgressPanel) : NonOpaquePanel(), WidgetEffectBoundsProvider {
     companion object {
       private val gap: Int
         get() = JBUI.scale(10)
@@ -1013,6 +1045,7 @@ class InfoAndProgressPanel internal constructor(
     private val multiProcessLink = TextPanel()
     private val counterComponent: CounterLabel
     private var isHovered = false
+
     init {
       border = JBUI.CurrentTheme.StatusBar.Widget.border()
       progressIcon.setOpaque(false)
@@ -1231,6 +1264,17 @@ class InfoAndProgressPanel internal constructor(
       counterComponent.isVisible = false
     }
 
+    fun getFocusableComponents(): List<JComponent> {
+      val ind = indicator?.takeIf { it.component.isVisible }
+      if (ind == null && !progressIcon.isVisible && !multiProcessLink.isVisible && !counterComponent.isVisible) {
+        return emptyList()
+      }
+      return buildList {
+        add(this@InlineProgressPanel)
+        ind?.let { addAll(it.getFocusableComponents()) }
+      }
+    }
+
     private fun updateProgressIconBorder() {
       if (showCounterInsteadOfMultiProcessLink) {
         progressIcon.setBorder(JBUI.Borders.empty())
@@ -1268,6 +1312,7 @@ class InfoAndProgressPanel internal constructor(
         doLayout()
         revalidate()
         repaint()
+        fireAccessibleValueChanged()
       }
       else {
         add(indicator.component)
@@ -1306,18 +1351,31 @@ class InfoAndProgressPanel internal constructor(
       val tooltip = ProgressComponent.computeTooltipText(if (isIndicatorVisible) currentIndicator.indicatorModel else null)
       progressIcon.toolTipText = tooltip
       counterComponent.toolTipText = tooltip
+      counterComponent.getAccessibleContext().accessibleDescription = "" // override tooltip
       doLayout()
       revalidate()
       repaint()
+      fireAccessibleValueChanged()
+    }
+
+    fun fireAccessibleValueChanged() {
+      getAccessibleContext().firePropertyChange(AccessibleContext.ACCESSIBLE_VALUE_PROPERTY,
+                                                null,
+                                                getAccessibleContext().accessibleValue.currentAccessibleValue)
+    }
+
+    override fun getWidgetEffectBounds(): Rectangle {
+      val result = bounds
+      result.setLocation(0, 0)
+      result.width -= counterComponent.getWidthAdditionForAlignmemt()
+      return result
     }
 
     override fun paintComponent(g: Graphics) {
       if (isHovered && indicator != null) {
         val statusBar = this.getParentOfType<StatusBar>()
         if (statusBar != null) {
-          val bounds = bounds
-          bounds.setLocation(0, 0)
-          bounds.width -= counterComponent.getWidthAdditionForAlignmemt()
+          val bounds = getWidgetEffectBounds()
           WidgetEffectRenderer.paintHover(g = g,
                                           component = this,
                                           highlightBounds = bounds,
@@ -1326,6 +1384,40 @@ class InfoAndProgressPanel internal constructor(
         }
       }
       super.paintComponent(g)
+    }
+
+    override fun getAccessibleContext(): AccessibleContext {
+      if (accessibleContext == null) {
+        accessibleContext = AccessibleInlineProgressPanel()
+      }
+      return accessibleContext
+    }
+
+    private inner class AccessibleInlineProgressPanel : AccessibleJComponent(), AccessibleValue {
+      override fun getAccessibleRole(): AccessibleRole = AccessibleRole.PROGRESS_BAR
+
+      override fun getAccessibleName(): @NlsContexts.Label String {
+        val baseName = IdeBundle.message("progress.accessible.name")
+        val ind = indicator ?: return baseName
+        val visibleCounterText = counterComponent.takeIf { it.isVisible }?.text?.takeIf(String::isNotEmpty)
+        val progressText = listOfNotNull(ind.textPanel.text, visibleCounterText)
+          .filter(String::isNotEmpty)
+          .joinToString(". ")
+
+        return if (progressText.isEmpty()) baseName
+        else IdeBundle.message("progress.accessible.name.with.progress", progressText)
+      }
+
+      override fun getAccessibleDescription(): @NlsContexts.Tooltip String = ProgressComponent.computeTooltipText(indicator?.indicatorModel)
+
+      override fun getAccessibleValue(): AccessibleValue = this
+      override fun getCurrentAccessibleValue(): Number = indicator?.progress?.value ?: 0
+      override fun getMinimumAccessibleValue(): Number = indicator?.progress?.minimum ?: 0
+      override fun getMaximumAccessibleValue(): Number = indicator?.progress?.maximum ?: 100
+      override fun setCurrentAccessibleValue(n: Number?): Boolean = false
+
+      override fun getAccessibleStateSet(): AccessibleStateSet =
+        super.getAccessibleStateSet().also { it.add(AccessibleState.HORIZONTAL) }
     }
   }
 }
@@ -1341,6 +1433,9 @@ private class CounterLabel : JPanel(), UISettingsListener {
 
   private var minimumSize: Dimension? = null
 
+  val text: String?
+    get() = textPanel.text
+
   init {
     textPanel = createTextPanel()
     layout = BorderLayout()
@@ -1353,6 +1448,7 @@ private class CounterLabel : JPanel(), UISettingsListener {
     val panel = TextPanel()
     panel.foreground = JBUI.CurrentTheme.StatusBar.Widget.FOREGROUND
     panel.border = JBUI.Borders.emptyLeft(4)
+    panel.isFocusable = false
     return panel
   }
 

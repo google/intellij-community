@@ -1,6 +1,9 @@
 // Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.jetbrains.python;
 
+import com.jetbrains.python.allure.Layers;
+import com.jetbrains.python.allure.Subsystems;
+
 import com.intellij.codeInsight.actions.OptimizeImportsAction;
 import com.intellij.ide.DataManager;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -15,6 +18,8 @@ import org.jetbrains.annotations.NotNull;
 import java.util.List;
 
 
+@Subsystems.QuickFixes
+@Layers.Functional
 public class PyOptimizeImportsTest extends PyTestCase {
   @NotNull
   private PyCodeStyleSettings getPythonCodeStyleSettings() {
@@ -367,6 +372,34 @@ public class PyOptimizeImportsTest extends PyTestCase {
   // PY-23475
   public void testImportFromFutureWithRegularImports() {
     doTest();
+  }
+
+  // PEP 810: lazy import that is used must be preserved as-is.
+  public void testLazyImportPreserved() {
+    runWithLanguageLevel(LanguageLevel.PYTHON315, this::doTest);
+  }
+
+  // PEP 810: unused lazy import is removed just like a regular one.
+  public void testLazyImportUnusedRemoved() {
+    runWithLanguageLevel(LanguageLevel.PYTHON315, this::doTest);
+  }
+
+  // PEP 810: splitting `lazy from X import a, b` preserves the lazy prefix on every produced statement.
+  public void testLazyFromImportSplit() {
+    getPythonCodeStyleSettings().OPTIMIZE_IMPORTS_ALWAYS_SPLIT_FROM_IMPORTS = true;
+    runWithLanguageLevel(LanguageLevel.PYTHON315, this::doTest);
+  }
+
+  // PEP 810: two `lazy from X import ...` with the same source may be joined into one lazy statement.
+  public void testLazyFromImportsJoined() {
+    getPythonCodeStyleSettings().OPTIMIZE_IMPORTS_JOIN_FROM_IMPORTS_WITH_SAME_SOURCE = true;
+    runWithLanguageLevel(LanguageLevel.PYTHON315, this::doTest);
+  }
+
+  // PEP 810: lazy and non-lazy `from X import ...` with the same source must NOT be joined (different semantics).
+  public void testLazyAndNonLazyNotJoined() {
+    getPythonCodeStyleSettings().OPTIMIZE_IMPORTS_JOIN_FROM_IMPORTS_WITH_SAME_SOURCE = true;
+    runWithLanguageLevel(LanguageLevel.PYTHON315, this::doTest);
   }
 
   private void doMultiFileTest() {

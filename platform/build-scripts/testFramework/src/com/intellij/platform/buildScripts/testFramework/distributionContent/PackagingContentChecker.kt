@@ -1,5 +1,5 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:Suppress("ReplaceGetOrSet")
+@file:Suppress("ReplaceGetOrSet", "DestructuringDeclaration")
 
 package com.intellij.platform.buildScripts.testFramework.distributionContent
 
@@ -14,14 +14,19 @@ import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.TracerProvider
 import io.opentelemetry.context.Context
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.selects.select
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.intellij.build.BuildContext
 import org.jetbrains.intellij.build.BuildPaths
@@ -31,7 +36,7 @@ import org.jetbrains.intellij.build.ModuleOutputProvider
 import org.jetbrains.intellij.build.OsFamily
 import org.jetbrains.intellij.build.ProductProperties
 import org.jetbrains.intellij.build.ProprietaryBuildTools
-import org.jetbrains.intellij.build.impl.MODULE_DESCRIPTORS_COMPACT_PATH
+import org.jetbrains.intellij.build.impl.moduleRepository.MODULE_DESCRIPTORS_COMPACT_PATH
 import org.jetbrains.intellij.build.impl.SUPPORTED_DISTRIBUTIONS
 import org.jetbrains.intellij.build.impl.asArchivedIfNeeded
 import org.jetbrains.intellij.build.impl.buildDistributions
@@ -47,6 +52,7 @@ import org.jetbrains.intellij.build.telemetry.use
 import org.jetbrains.jps.model.JpsProject
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.TestFactory
+import org.junit.jupiter.api.TestInstance
 import org.opentest4j.MultipleFailuresError
 import org.opentest4j.TestAbortedException
 import java.nio.file.Files
@@ -79,16 +85,51 @@ private data class ValidationTask(
 
 private data class TargetValidationTask(
   @JvmField val spec: PackagingTargetValidationSpec,
+  @JvmField val packagingTask: PackagingTask,
   @JvmField val resultDeferred: Deferred<TaskResult<List<PackagingCheckFailure>>>,
 )
 
 private data class PackagingTask(
   @JvmField val spec: PackagingTargetSpec,
+  @JvmField val startSignal: CompletableDeferred<Unit>?,
   @JvmField val resultDeferred: Deferred<TaskResult<PackageResult>>,
+) {
+  fun start() {
+    val startSignal = startSignal
+    if (startSignal == null) {
+      resultDeferred.start()
+    }
+    else {
+      startSignal.complete(Unit)
+    }
+  }
+}
+
+private data class PluginCheckTask(
+  @JvmField val packagingTask: PackagingTask,
+  @JvmField val resultDeferred: Deferred<TaskResult<List<PackagingCheckFailure>>>,
 )
+
+private inline fun <T> Iterable<T>.startAllDeferreds(getDeferred: (T) -> Deferred<*>?) {
+  for (item in this) {
+    getDeferred(item)?.start()
+  }
+}
+
+private fun Iterable<PackagingTask>.startAllPackagingTasks() {
+  for (task in this) {
+    task.start()
+  }
+}
 
 typealias PackagingSuiteValidator = suspend (context: PackagingSuiteContext) -> List<PackagingCheckFailure>
 typealias PackagingTargetValidator = suspend (context: PackagingTargetValidationContext) -> List<PackagingCheckFailure>
+
+@Internal
+enum class PackagingSuiteTaskScheduling {
+  LAZY_BY_FACTORY,
+  FULL_SUITE_OPTIMIZED,
+}
 
 @Internal
 data class PackagingSuiteContext(
@@ -152,6 +193,7 @@ data class PackagingSuiteSpec(
   @JvmField val targets: List<PackagingTargetSpec>,
   @JvmField val validations: List<PackagingSuiteValidationSpec> = emptyList(),
   @JvmField val targetValidations: List<PackagingTargetValidationSpec> = emptyList(),
+  @JvmField val taskScheduling: PackagingSuiteTaskScheduling = PackagingSuiteTaskScheduling.LAZY_BY_FACTORY,
 )
 
 @Internal
@@ -167,13 +209,14 @@ private val packagingSuiteNoopTracer = TracerProvider.noop().get("packaging-suit
 @Internal
 class PackagingSuiteFixture private constructor(
   private val spec: PackagingSuiteSpec,
-  private val scope: CoroutineScope,
+  private val scopeJob: Job,
   private val tempDir: Path,
   private val telemetry: PackagingSuiteTelemetry?,
   private val tracerOverride: AutoCloseable?,
   private val suiteContextDeferred: Deferred<PackagingSuiteContext>,
   private val validationTasks: List<ValidationTask>,
   private val packagingTasks: List<PackagingTask>,
+  private val pluginCheckTasks: List<PluginCheckTask>,
   private val targetValidationTasks: List<TargetValidationTask>,
 ) : AutoCloseable {
   companion object {
@@ -192,19 +235,23 @@ class PackagingSuiteFixture private constructor(
       val telemetry = createSuiteTelemetry(spec = spec, traceSettings = traceSettings)
       val tracerOverride = traceSettings.takeUnless { it.enabled }?.let { TraceManager.pushTracer(packagingSuiteNoopTracer) }
 
+      val scopeJob = SupervisorJob()
+
       @Suppress("RAW_SCOPE_CREATION")
-      val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+      val scope = CoroutineScope(scopeJob + Dispatchers.Default)
       var tempDirForCleanup: Path? = null
       try {
         val tempDir = Files.createTempDirectory("${spec.name}-packaging-suite-").also { tempDirForCleanup = it }
-        val suiteContextDeferred = scope.async {
-          PackagingSuiteContext(
-            projectHome = spec.homePath,
-            tempDir = tempDir,
-            compilationContext = createSharedCompilationContext(projectHome = spec.homePath, tempDir = tempDir, scope = scope),
-          )
+        val suiteContextDeferred = scope.async(start = CoroutineStart.LAZY) {
+          withTelemetrySpan(telemetry = telemetry, name = "create shared compilation context") {
+            PackagingSuiteContext(
+              projectHome = spec.homePath,
+              tempDir = tempDir,
+              compilationContext = createSharedCompilationContext(projectHome = spec.homePath, tempDir = tempDir, scope = scope),
+            )
+          }
         }
-        val compileProductionModulesDeferred = scope.async {
+        val compileProductionModulesDeferred = scope.async(start = CoroutineStart.LAZY) {
           withTelemetrySpan(
             telemetry = telemetry,
             name = "compile shared production modules",
@@ -216,6 +263,7 @@ class PackagingSuiteFixture private constructor(
           }
         }
 
+        val optimizedFullSuiteScheduling = spec.taskScheduling == PackagingSuiteTaskScheduling.FULL_SUITE_OPTIMIZED
         val validationTasks = createValidationTasks(
           scope = scope,
           spec = spec,
@@ -230,7 +278,9 @@ class PackagingSuiteFixture private constructor(
           compileProductionModulesDeferred = compileProductionModulesDeferred,
           validationTasks = validationTasks,
           telemetry = telemetry,
+          waitForScheduledStart = optimizedFullSuiteScheduling,
         )
+        val pluginCheckTasks = createPluginCheckTasks(scope = scope, packagingTasks = packagingTasks, telemetry = telemetry)
         val targetValidationTasks = createTargetValidationTasks(
           scope = scope,
           spec = spec,
@@ -238,21 +288,31 @@ class PackagingSuiteFixture private constructor(
           packagingTasks = packagingTasks,
           telemetry = telemetry,
         )
+        if (optimizedFullSuiteScheduling) {
+          scheduleFullSuiteWork(
+            scope = scope,
+            validationTasks = validationTasks,
+            packagingTasks = packagingTasks,
+            pluginCheckTasks = pluginCheckTasks,
+            targetValidationTasks = targetValidationTasks,
+          )
+        }
 
         return PackagingSuiteFixture(
           spec = spec,
-          scope = scope,
+          scopeJob = scopeJob,
           tempDir = tempDir,
           telemetry = telemetry,
           tracerOverride = tracerOverride,
           suiteContextDeferred = suiteContextDeferred,
           validationTasks = validationTasks,
           packagingTasks = packagingTasks,
+          pluginCheckTasks = pluginCheckTasks,
           targetValidationTasks = targetValidationTasks,
         )
       }
       catch (t: Throwable) {
-        scope.cancel()
+        runCatching { runBlocking { scopeJob.cancelAndJoin() } }
         runCatching { tracerOverride?.close() }
         telemetry?.rootSpan?.end()
         runCatching { runBlocking { TraceManager.flush() } }
@@ -263,6 +323,12 @@ class PackagingSuiteFixture private constructor(
   }
 
   fun createSuiteValidationTests(): List<DynamicTest> {
+    if (validationTasks.isEmpty()) {
+      return listOf(DynamicTest.dynamicTest("no suite validations") {})
+    }
+
+    validationTasks.startAllDeferreds { it.resultDeferred }
+
     val result = ArrayList<DynamicTest>()
     for (task in validationTasks) {
       val taskResult = runBlocking { task.resultDeferred.await() }
@@ -288,6 +354,11 @@ class PackagingSuiteFixture private constructor(
   }
 
   fun createBuildTests(): List<DynamicTest> {
+    if (!isOptimizedFullSuiteScheduling()) {
+      startBlockingValidationTasks()
+      packagingTasks.startAllPackagingTasks()
+    }
+
     val tests = ArrayList<DynamicTest>(packagingTasks.size)
     for (task in packagingTasks) {
       tests.add(DynamicTest.dynamicTest(task.spec.id) {
@@ -300,9 +371,15 @@ class PackagingSuiteFixture private constructor(
   }
 
   fun createPlatformTests(): List<DynamicTest> {
-    val tests = ArrayList<DynamicTest>(packagingTasks.size)
-    for (task in packagingTasks) {
-      val expectedContentYamlPath = task.spec.contentYamlPath ?: continue
+    val tasksWithContentChecks = packagingTasks.filter { it.spec.contentYamlPath != null }
+    if (!isOptimizedFullSuiteScheduling()) {
+      startBlockingValidationTasks()
+      tasksWithContentChecks.startAllPackagingTasks()
+    }
+
+    val tests = ArrayList<DynamicTest>(tasksWithContentChecks.size)
+    for (task in tasksWithContentChecks) {
+      val expectedContentYamlPath = requireNotNull(task.spec.contentYamlPath)
       tests.add(DynamicTest.dynamicTest(task.spec.id) {
         runBlocking {
           withTelemetrySpan(
@@ -328,42 +405,22 @@ class PackagingSuiteFixture private constructor(
   }
 
   fun createPluginTests(): List<DynamicTest> {
-    val checkResults = packagingTasks.map { task ->
-      scope.async(Dispatchers.Default) {
-        if (!task.spec.checkPlugins) {
-          return@async TaskResult(value = emptyList())
-        }
-
-        captureTaskResult {
-          withTelemetrySpan(
-            telemetry = telemetry,
-            name = "plugin content check: ${task.spec.id}",
-            configure = { span ->
-              span.setAttribute("packaging.target.id", task.spec.id)
-            },
-          ) {
-            val packageResult = task.resultDeferred.await().getOrAbort("Plugin content check for ${task.spec.id} skipped because packaging failed")
-            collectPluginContentFailures(
-              content = packageResult.content,
-              project = packageResult.jpsProject,
-              projectHome = packageResult.projectHome,
-              suggestedReviewer = task.spec.suggestedReviewer,
-              testName = { category, key -> "${task.spec.id} $category: $key" },
-            )
-          }
-        }
-      }
+    if (!isOptimizedFullSuiteScheduling()) {
+      startBlockingValidationTasks()
+      packagingTasks.filter { it.spec.checkPlugins }.startAllPackagingTasks()
     }
+    pluginCheckTasks.startAllDeferreds { it.resultDeferred }
 
     val tests = ArrayList<DynamicTest>(packagingTasks.size)
     val resolvedCheckResults = runBlocking {
-      checkResults.awaitAll()
+      pluginCheckTasks.map { it.resultDeferred }.awaitAll()
     }
-    for ((task, checkResult) in packagingTasks.zip(resolvedCheckResults)) {
+    for ((task, checkResult) in pluginCheckTasks.zip(resolvedCheckResults)) {
+      val packagingTask = task.packagingTask
       tests.addAll(
         createPluginContentDynamicTests(
-          targetId = task.spec.id,
-          checkPlugins = task.spec.checkPlugins,
+          targetId = packagingTask.spec.id,
+          checkPlugins = packagingTask.spec.checkPlugins,
           failures = checkResult.value.orEmpty(),
           failure = checkResult.failure,
         )
@@ -373,6 +430,16 @@ class PackagingSuiteFixture private constructor(
   }
 
   fun createTargetValidationTests(): List<DynamicTest> {
+    if (targetValidationTasks.isEmpty()) {
+      return listOf(DynamicTest.dynamicTest("no target validations") {})
+    }
+
+    startBlockingValidationTasks()
+    if (!isOptimizedFullSuiteScheduling()) {
+      targetValidationTasks.mapTo(LinkedHashSet()) { it.packagingTask }.startAllPackagingTasks()
+    }
+    targetValidationTasks.startAllDeferreds { it.resultDeferred }
+
     val tests = ArrayList<DynamicTest>()
     for (task in targetValidationTasks) {
       val taskResult = runBlocking { task.resultDeferred.await() }
@@ -395,8 +462,14 @@ class PackagingSuiteFixture private constructor(
     return tests
   }
 
+  private fun startBlockingValidationTasks() {
+    startBlockingValidationTasks(validationTasks)
+  }
+
+  private fun isOptimizedFullSuiteScheduling(): Boolean = spec.taskScheduling == PackagingSuiteTaskScheduling.FULL_SUITE_OPTIMIZED
+
   override fun close() {
-    scope.cancel()
+    runBlocking { scopeJob.cancelAndJoin() }
     try {
       if (suiteContextDeferred.isCompleted) {
         runCatching { runBlocking { suiteContextDeferred.await().compilationContext.messages.close() } }
@@ -414,7 +487,100 @@ class PackagingSuiteFixture private constructor(
   }
 }
 
+private fun startBlockingValidationTasks(validationTasks: List<ValidationTask>) {
+  for (task in validationTasks) {
+    if (task.spec.isBlocking) {
+      task.resultDeferred.start()
+    }
+  }
+}
+
+private fun scheduleFullSuiteWork(
+  scope: CoroutineScope,
+  validationTasks: List<ValidationTask>,
+  packagingTasks: List<PackagingTask>,
+  pluginCheckTasks: List<PluginCheckTask>,
+  targetValidationTasks: List<TargetValidationTask>,
+) {
+  startBlockingValidationTasks(validationTasks)
+  // Start non-blocking + source-only (no compile gate) validations immediately — they are independent
+  // of compilation and of blocking validations, so they should overlap with model-generation/compile.
+  validationTasks.startAllDeferreds { task ->
+    if (!task.spec.isBlocking && !task.spec.requiresCompilation) task.resultDeferred else null
+  }
+  val targetValidationPackagingTasks = targetValidationTasks.mapTo(LinkedHashSet()) { it.packagingTask }
+  targetValidationPackagingTasks.startAllPackagingTasks()
+  targetValidationTasks.startAllDeferreds { it.resultDeferred }
+  pluginCheckTasks.startAllDeferreds { task ->
+    if (task.packagingTask in targetValidationPackagingTasks && task.packagingTask.spec.checkPlugins) task.resultDeferred else null
+  }
+  val remainingPackagingTasks = packagingTasks.filter { it !in targetValidationPackagingTasks }
+  val pluginCheckTasksByPackagingTask = pluginCheckTasks.associateBy { it.packagingTask }
+
+  scope.launch(Dispatchers.Default) {
+    validationTasks.filter { it.spec.isBlocking }.map { it.resultDeferred }.awaitAll()
+    validationTasks.startAllDeferreds { task ->
+      // independent ones already started above
+      if (task.spec.isBlocking || !task.spec.requiresCompilation) null else task.resultDeferred
+    }
+  }
+  scope.launch(Dispatchers.Default) {
+    startRemainingTasksWithRollingReplenishment(
+      startedTasks = targetValidationPackagingTasks,
+      remainingTasks = remainingPackagingTasks,
+      getCompletion = { it.resultDeferred },
+      startTask = { packagingTask ->
+        packagingTask.start()
+        if (packagingTask.spec.checkPlugins) {
+          pluginCheckTasksByPackagingTask.get(packagingTask)?.resultDeferred?.start()
+        }
+      },
+    )
+  }
+}
+
+internal suspend fun <T> startRemainingTasksWithRollingReplenishment(
+  startedTasks: Collection<T>,
+  remainingTasks: Collection<T>,
+  getCompletion: (T) -> Deferred<*>,
+  startTask: (T) -> Unit,
+) {
+  val maxParallelTasks = maxOf(startedTasks.size, remainingTasks.size)
+  if (maxParallelTasks == 0) {
+    return
+  }
+
+  val activeTasks = LinkedHashSet<T>(maxParallelTasks)
+  activeTasks.addAll(startedTasks)
+  val tasksToStart = ArrayDeque<T>(remainingTasks.size)
+  tasksToStart.addAll(remainingTasks)
+
+  fun fillAvailableSlots() {
+    while (activeTasks.size < maxParallelTasks && tasksToStart.isNotEmpty()) {
+      val task = tasksToStart.removeFirst()
+      activeTasks.add(task)
+      startTask(task)
+    }
+  }
+
+  if (activeTasks.isEmpty()) {
+    fillAvailableSlots()
+    return
+  }
+
+  while (tasksToStart.isNotEmpty()) {
+    val completedTask = select {
+      for (task in activeTasks) {
+        getCompletion(task).onAwait { task }
+      }
+    }
+    activeTasks.remove(completedTask)
+    fillAvailableSlots()
+  }
+}
+
 @Internal
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 abstract class PackagingSuiteTestBase {
   protected abstract val packagingFixture: PackagingSuiteFixture
 
@@ -450,7 +616,7 @@ private fun createValidationTasks(
     blockingTasks.add(
       ValidationTask(
         spec = validation,
-        resultDeferred = scope.async {
+        resultDeferred = scope.async(start = CoroutineStart.LAZY) {
           captureTaskResult {
             withTelemetrySpan(
               telemetry = telemetry,
@@ -476,10 +642,14 @@ private fun createValidationTasks(
       continue
     }
 
+    // A "source-only" non-blocking validation (no compilation gate) is independent of blocking validations
+    // and can run in parallel with model-generation/compilation. It is scheduled immediately in
+    // scheduleFullSuiteWork and skips the ensureBlockingValidationsSucceededOrAbort gate here.
+    val runIndependently = !validation.requiresCompilation
     result.add(
       ValidationTask(
         spec = validation,
-        resultDeferred = scope.async {
+        resultDeferred = scope.async(start = CoroutineStart.LAZY) {
           captureTaskResult {
             withTelemetrySpan(
               telemetry = telemetry,
@@ -488,8 +658,10 @@ private fun createValidationTasks(
                 span.setAttribute("packaging.validation.name", validation.name)
               },
             ) {
-              ensureBlockingValidationsSucceededOrAbort(blockingTasks)
-              awaitPackagingSuiteValidationCompilationIfRequired(validation = validation, compileProductionModulesDeferred = compileProductionModulesDeferred)
+              if (!runIndependently) {
+                ensureBlockingValidationsSucceededOrAbort(blockingTasks)
+                awaitPackagingSuiteValidationCompilationIfRequired(validation = validation, compileProductionModulesDeferred = compileProductionModulesDeferred)
+              }
               validation.validator(suiteContextDeferred.await())
             }
           }
@@ -517,14 +689,19 @@ private fun createPackagingTasks(
   compileProductionModulesDeferred: Deferred<Unit>,
   validationTasks: List<ValidationTask>,
   telemetry: PackagingSuiteTelemetry?,
+  waitForScheduledStart: Boolean,
 ): List<PackagingTask> {
   val blockingTasks = validationTasks.filter { it.spec.isBlocking }
   val result = ArrayList<PackagingTask>(spec.targets.size)
   for (target in spec.targets) {
+    val startSignal = if (waitForScheduledStart) CompletableDeferred<Unit>() else null
+    val coroutineStart = if (waitForScheduledStart) CoroutineStart.DEFAULT else CoroutineStart.LAZY
     result.add(
       PackagingTask(
         spec = target,
-        resultDeferred = scope.async {
+        startSignal = startSignal,
+        resultDeferred = scope.async(start = coroutineStart) {
+          startSignal?.await()
           captureTaskResult {
             withTelemetrySpan(
               telemetry = telemetry,
@@ -552,6 +729,42 @@ private fun createPackagingTasks(
   return result
 }
 
+private fun createPluginCheckTasks(
+  scope: CoroutineScope,
+  packagingTasks: List<PackagingTask>,
+  telemetry: PackagingSuiteTelemetry?,
+): List<PluginCheckTask> {
+  return packagingTasks.map { task ->
+    PluginCheckTask(
+      packagingTask = task,
+      resultDeferred = scope.async(Dispatchers.Default, start = CoroutineStart.LAZY) {
+        if (!task.spec.checkPlugins) {
+          return@async TaskResult(value = emptyList())
+        }
+
+        captureTaskResult {
+          withTelemetrySpan(
+            telemetry = telemetry,
+            name = "plugin content check: ${task.spec.id}",
+            configure = { span ->
+              span.setAttribute("packaging.target.id", task.spec.id)
+            },
+          ) {
+            val packageResult = task.resultDeferred.await().getOrAbort("Plugin content check for ${task.spec.id} skipped because packaging failed")
+            collectPluginContentFailures(
+              content = packageResult.content,
+              project = packageResult.jpsProject,
+              projectHome = packageResult.projectHome,
+              suggestedReviewer = task.spec.suggestedReviewer,
+              testName = { category, key -> "${task.spec.id} $category: $key" },
+            )
+          }
+        }
+      },
+    )
+  }
+}
+
 private fun createTargetValidationTasks(
   scope: CoroutineScope,
   spec: PackagingSuiteSpec,
@@ -568,7 +781,8 @@ private fun createTargetValidationTasks(
     result.add(
       TargetValidationTask(
         spec = validation,
-        resultDeferred = scope.async {
+        packagingTask = packagingTask,
+        resultDeferred = scope.async(start = CoroutineStart.LAZY) {
           captureTaskResult {
             withTelemetrySpan(
               telemetry = telemetry,
@@ -581,22 +795,24 @@ private fun createTargetValidationTasks(
               val suiteContext = suiteContextDeferred.await()
               val packageResult = packagingTask.resultDeferred.await()
                 .getOrAbort("Target validation '${validation.name}' for ${validation.targetId} skipped because packaging failed")
-              val validationTempDir = suiteContext.tempDir
-                .resolve("target-validation")
-                .resolve(validation.targetId)
-                .resolve(validation.name)
-                .createDirectories()
-              validation.validator(
-                PackagingTargetValidationContext(
-                  target = packagingTask.spec,
-                  projectHome = packageResult.projectHome,
-                  tempDir = validationTempDir,
-                  project = packageResult.jpsProject,
-                  outputProvider = suiteContext.compilationContext.outputProvider,
-                  runtimeModuleRepository = packageResult.runtimeModuleRepository,
-                  content = packageResult.content,
+              spanBuilder("run target validation: ${validation.targetId} ${validation.name}").use {
+                val validationTempDir = suiteContext.tempDir
+                  .resolve("target-validation")
+                  .resolve(validation.targetId)
+                  .resolve(validation.name)
+                  .createDirectories()
+                validation.validator(
+                  PackagingTargetValidationContext(
+                    target = packagingTask.spec,
+                    projectHome = packageResult.projectHome,
+                    tempDir = validationTempDir,
+                    project = packageResult.jpsProject,
+                    outputProvider = suiteContext.compilationContext.outputProvider,
+                    runtimeModuleRepository = packageResult.runtimeModuleRepository,
+                    content = packageResult.content,
+                  )
                 )
-              )
+              }
             }
           }
         },
@@ -762,8 +978,12 @@ private suspend fun computePackageResult(context: BuildContext): PackageResult {
     build = { buildContext ->
       buildDistributions(buildContext)
       PackageResult(
-        content = readContentReportZip(buildContext.paths.artifactDir.resolve("content-report.zip")),
-        runtimeModuleRepository = readGeneratedRuntimeModuleRepository(buildContext),
+        content = spanBuilder("read content report").use {
+          readContentReportZip(buildContext.paths.artifactDir.resolve("content-report.zip"))
+        },
+        runtimeModuleRepository = spanBuilder("read runtime module repository").use {
+          readGeneratedRuntimeModuleRepository(buildContext)
+        },
         jpsProject = buildContext.project,
         projectHome = buildContext.paths.projectHome,
       )
@@ -775,7 +995,7 @@ private fun readGeneratedRuntimeModuleRepository(buildContext: BuildContext): Ru
   val repositoryPath = findGeneratedRuntimeModuleRepository(buildContext) ?: return null
   val repository = RuntimeModuleRepository.create(repositoryPath)
   //force RuntimeModuleRepository to parse the file, otherwise it'll fail because the artifacts are deleted by doRunTestBuild before the packaging tests start
-  repository.findHeader(RuntimeModuleId.contentModule("intellij.platform.frontend", RuntimeModuleId.DEFAULT_NAMESPACE))
+  repository.findModuleHeader(RuntimeModuleId.contentModule("intellij.platform.frontend", RuntimeModuleId.DEFAULT_NAMESPACE))
   return repository
 }
 
@@ -786,7 +1006,8 @@ private fun findGeneratedRuntimeModuleRepository(context: BuildContext): Path? {
   }
   //ideally, we should run separate checks for different OS, but for now let's check only for the current one
   val currentDistribution = SUPPORTED_DISTRIBUTIONS.find { it.os == OsFamily.currentOs && it.arch == JvmArchitecture.currentJvmArch } ?: return null
-  val osSpecificFile = getOsAndArchSpecificDistDirectory(currentDistribution.os, currentDistribution.arch, currentDistribution.libcImpl, context).resolve(MODULE_DESCRIPTORS_COMPACT_PATH)
+  val osSpecificFile =
+    getOsAndArchSpecificDistDirectory(currentDistribution.os, currentDistribution.arch, currentDistribution.libcImpl, context).resolve(MODULE_DESCRIPTORS_COMPACT_PATH)
   if (osSpecificFile.exists()) {
     return osSpecificFile
   }

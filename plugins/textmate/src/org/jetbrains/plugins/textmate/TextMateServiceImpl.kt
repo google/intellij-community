@@ -13,7 +13,6 @@ import com.intellij.openapi.application.PluginPathManager
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.fileTypes.impl.FileTypeManagerImpl
 import com.intellij.openapi.util.Disposer
-import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.util.text.Strings
 import com.intellij.util.progress.lockMaybeCancellable
@@ -50,9 +49,9 @@ import org.jetbrains.plugins.textmate.language.syntax.TextMateSyntaxTableCore
 import org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateTextAttributesAdapter
 import org.jetbrains.plugins.textmate.language.syntax.selector.TextMateSelectorWeigherImpl
 import org.jetbrains.plugins.textmate.language.syntax.selector.caching
-import org.jetbrains.plugins.textmate.plist.JsonOrXmlPlistReader
-import org.jetbrains.plugins.textmate.plist.JsonPlistReader
+import org.jetbrains.plugins.textmate.plist.JsonOrXmlOrYamlPlistReader
 import org.jetbrains.plugins.textmate.plist.XmlPlistReader
+import org.jetbrains.plugins.textmate.plist.YamlPlistReader
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
@@ -83,7 +82,6 @@ class TextMateServiceImpl(private val myScope: CoroutineScope) : TextMateService
     registerBundles(fireEvents = true)
   }
 
-  @OptIn(IntellijInternalApi::class)
   private fun registerBundles(fireEvents: Boolean) {
     registrationLock.lock()
     try {
@@ -244,7 +242,7 @@ class TextMateServiceImpl(private val myScope: CoroutineScope) : TextMateService
     if (directory != null) {
       val resourceReader = TextMateNioResourceReader(directory)
       val bundleType = detectBundleType(resourceReader, directory.name)
-      val plistReader = JsonOrXmlPlistReader(jsonReader = JsonPlistReader(), xmlReader = XmlPlistReader())
+      val plistReader = JsonOrXmlOrYamlPlistReader(xmlReader = XmlPlistReader(), yamlReader = YamlPlistReader())
       return when (bundleType) {
         BundleType.TEXTMATE -> readTextMateBundle(directory.name, plistReader, resourceReader)
         BundleType.SUBLIME -> readSublimeBundle(directory.name, plistReader, resourceReader)
@@ -255,7 +253,7 @@ class TextMateServiceImpl(private val myScope: CoroutineScope) : TextMateService
     return null
   }
 
-  private fun ensureInitialized() {
+  override fun ensureInitialized() {
     if (!isInitialized) {
       registrationLock.lockMaybeCancellable()
       try {

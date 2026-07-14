@@ -12,8 +12,21 @@
   <!-- endregion -->
   <extensions defaultExtensionNs="com.intellij">
     <completion.contributor language="kotlin"
-                            id="KotlinGradleScriptCompletionContributor"
+                            id="KotlinGradleCleanupCompletionContributor"
                             order="first, before KotlinCompletionContributor, before liveTemplates"
+                            implementationClass="com.intellij.gradle.completion.kotlin.KotlinGradleCleanupCompletionContributor"/>
+    <completion.contributor language="kotlin"
+                            id="KotlinGradleScriptCompletionContributor"
+                            order="first, after KotlinGradleCleanupCompletionContributor"
                             implementationClass="com.intellij.gradle.completion.kotlin.KotlinGradleScriptCompletionContributor"/>
+    <typedHandler implementation="com.intellij.gradle.completion.kotlin.KotlinGradleDependenciesAutoPopupHandler"
+                  id="KotlinGradleDependenciesAutoPopupHandler"/>
+    <typedHandler implementation="com.intellij.gradle.completion.kotlin.KotlinGradleTopLevelDependenciesAutoPopupHandler"
+                  id="KotlinGradleTopLevelDependenciesAutoPopupHandler"/>
+    <completion.confidence
+      language="kotlin"
+      implementationClass="com.intellij.gradle.completion.kotlin.EnableAutoPopupInKotlinGradleDependencyString"
+      id="kotlinGradleDoNotSkipAutoPopupInDependencyStrings"
+      order="before kotlinSkipAutopopupInStrings"/>
   </extensions>
 </idea-plugin>

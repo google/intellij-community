@@ -17,6 +17,20 @@ function assertExcludesAll(names, excluded) {
   }
 }
 
+async function findListedTool(proxyClient, name) {
+  const listResponse = await proxyClient.send('tools/list')
+  const tool = listResponse.result.tools.find((candidate) => candidate.name === name)
+  ok(tool)
+  return tool
+}
+
+function assertReformatFilesSchema(tool) {
+  const properties = tool.inputSchema?.properties ?? {}
+  ok('files' in properties)
+  ok(!('path' in properties))
+  ok(!('paths' in properties))
+}
+
 describe('ij MCP proxy tool list', {timeout: SUITE_TIMEOUT_MS}, () => {
   const defaultHasSearchSymbol = defaultUpstreamTools.some((tool) => tool.name === 'search_symbol')
   const readOnlyAnnotations = {readOnlyHint: true, openWorldHint: false}
@@ -48,10 +62,33 @@ describe('ij MCP proxy tool list', {timeout: SUITE_TIMEOUT_MS}, () => {
   ]
   const upstreamToolsWithLintFiles = [
     buildUpstreamTool('lint_files', {
+      files: {type: 'array', items: {type: 'string'}},
+      min_severity: {type: 'string'},
+      timeout: {type: 'number'}
+    }, ['files'])
+  ]
+  const upstreamToolsWithLegacyBatchLintFiles = [
+    buildUpstreamTool('lint_files', {
       file_paths: {type: 'array', items: {type: 'string'}},
       min_severity: {type: 'string'},
       timeout: {type: 'number'}
     }, ['file_paths'])
+  ]
+  const upstreamToolsWithLegacyReformatFile = [
+    buildUpstreamTool('reformat_file', {
+      path: {type: 'string'}
+    }, ['path'])
+  ]
+  const upstreamToolsWithLegacyReformatFilePaths = [
+    buildUpstreamTool('reformat_file', {
+      path: {type: 'string'},
+      paths: {type: 'array', items: {type: 'string'}}
+    })
+  ]
+  const upstreamToolsWithReformatFileFiles = [
+    buildUpstreamTool('reformat_file', {
+      files: {type: 'array', items: {type: 'string'}}
+    }, ['files'])
   ]
 
   it('exposes proxy tools and hides replaced/blocked upstream tools', async () => {
@@ -72,6 +109,22 @@ describe('ij MCP proxy tool list', {timeout: SUITE_TIMEOUT_MS}, () => {
     })
   })
 
+  it('declares timeout on every proxy tool inputSchema', async () => {
+    await withProxy({}, async ({proxyClient}) => {
+      const listResponse = await proxyClient.send('tools/list')
+      const proxyToolNames = new Set(getProxyToolNames())
+      const advertisedProxyTools = listResponse.result.tools.filter((tool) => proxyToolNames.has(tool.name))
+      ok(advertisedProxyTools.length > 0)
+      for (const tool of advertisedProxyTools) {
+        const properties = tool.inputSchema?.properties ?? {}
+        ok('timeout' in properties, `Expected timeout in inputSchema for ${tool.name}`)
+        const timeoutSchema = properties.timeout
+        ok(timeoutSchema && typeof timeoutSchema === 'object' && timeoutSchema.type === 'number',
+          `Expected timeout to be {type: 'number'} for ${tool.name}, got ${JSON.stringify(timeoutSchema)}`)
+      }
+    })
+  })
+
   it('hides upstream search tool and keeps proxy search tools', async () => {
     await withProxy({tools: upstreamToolsWithLegacySearch}, async ({proxyClient}) => {
       const listResponse = await proxyClient.send('tools/list')
@@ -81,6 +134,23 @@ describe('ij MCP proxy tool list', {timeout: SUITE_TIMEOUT_MS}, () => {
       ok(names.includes('search_text'))
       ok(names.includes('search_regex'))
       ok(names.includes('search_file'))
+    })
+  })
+
+  it('hides upstream skill_search tool', async () => {
+    await withProxy({
+      tools: [
+        buildUpstreamTool('skill_search', {
+          mode: {type: 'string'},
+          q: {type: 'string'},
+          project_path: {type: 'string'}
+        }, ['mode', 'q', 'project_path'])
+      ]
+    }, async ({proxyClient}) => {
+      const listResponse = await proxyClient.send('tools/list')
+      const names = listResponse.result.tools.map((tool) => tool.name)
+
+      ok(!names.includes('skill_search'))
     })
   })
 
@@ -154,12 +224,39 @@ describe('ij MCP proxy tool list', {timeout: SUITE_TIMEOUT_MS}, () => {
 
   it('passes through upstream lint_files schema when lint_files is available', async () => {
     await withProxy({tools: upstreamToolsWithLintFiles}, async ({proxyClient}) => {
-      const listResponse = await proxyClient.send('tools/list')
-      const lintTool = listResponse.result.tools.find((tool) => tool.name === 'lint_files')
-      ok(lintTool)
+      const lintTool = await findListedTool(proxyClient, 'lint_files')
       const properties = lintTool.inputSchema?.properties ?? {}
-      ok('file_paths' in properties)
+      ok('files' in properties)
       ok(!('filePath' in properties))
+    })
+  })
+
+  it('exposes files proxy schema for legacy upstream lint_files', async () => {
+    await withProxy({tools: upstreamToolsWithLegacyBatchLintFiles}, async ({proxyClient}) => {
+      const lintTool = await findListedTool(proxyClient, 'lint_files')
+      const properties = lintTool.inputSchema?.properties ?? {}
+      ok('files' in properties)
+      ok(!('file_paths' in properties))
+    })
+  })
+
+  it('exposes reformat_file files schema for legacy upstreams', async () => {
+    await withProxy({tools: upstreamToolsWithLegacyReformatFile}, async ({proxyClient}) => {
+      assertReformatFilesSchema(await findListedTool(proxyClient, 'reformat_file'))
+    })
+  })
+
+  it('exposes files proxy schema for legacy upstream reformat_file paths', async () => {
+    await withProxy({tools: upstreamToolsWithLegacyReformatFilePaths}, async ({proxyClient}) => {
+      assertReformatFilesSchema(await findListedTool(proxyClient, 'reformat_file'))
+    })
+  })
+
+  it('passes through upstream reformat_file schema when files is available', async () => {
+    await withProxy({tools: upstreamToolsWithReformatFileFiles}, async ({proxyClient}) => {
+      const reformatTool = await findListedTool(proxyClient, 'reformat_file')
+      const properties = reformatTool.inputSchema?.properties ?? {}
+      ok('files' in properties)
     })
   })
 
@@ -184,6 +281,19 @@ describe('ij MCP proxy tool list', {timeout: SUITE_TIMEOUT_MS}, () => {
       ok(response.result?.isError)
       const message = response.result?.content?.[0]?.text ?? ''
       ok(message.includes('apply_patch'))
+    })
+  })
+
+  it('rejects direct execute_tool calls', async () => {
+    await withProxy({}, async ({proxyClient}) => {
+      const response = await proxyClient.send('tools/call', {
+        name: 'execute_tool',
+        arguments: {command: 'read_file --file_path example.txt'}
+      })
+
+      ok(response.result?.isError)
+      const message = response.result?.content?.[0]?.text ?? ''
+      ok(message.includes("Tool 'execute_tool' is not exposed by ij-proxy"))
     })
   })
 

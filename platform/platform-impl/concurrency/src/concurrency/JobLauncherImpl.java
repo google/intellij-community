@@ -58,7 +58,7 @@ public final class JobLauncherImpl extends JobLauncher {
 
   @Override
   public <T> boolean invokeConcurrentlyUnderProgress(@NotNull List<? extends T> things,
-                                                     ProgressIndicator progress,
+                                                     @NotNull ProgressIndicator progress,
                                                      boolean runInReadAction,
                                                      boolean failFastOnAcquireReadAction,
                                                      @NotNull Processor<? super T> thingProcessor) throws ProcessCanceledException {
@@ -249,6 +249,7 @@ public final class JobLauncherImpl extends JobLauncher {
         }
       }, progress);
       if (runInReadAction) {
+        //noinspection UseRunReadActionBlockingShortcut
         ApplicationManager.getApplication().runReadAction(runnable);
       }
       else {
@@ -270,7 +271,7 @@ public final class JobLauncherImpl extends JobLauncher {
     private final Runnable myAction;
     private final ForkJoinPool myForkJoinPool;
     private final Consumer<? super Future<?>> myOnDoneCallback;
-    private enum Status { STARTED, EXECUTED } // null=not yet executed, STARTED=started execution, EXECUTED=finished
+    private enum Status { STARTED, EXECUTED, CANCELED } // null=not yet executed, STARTED=started execution, EXECUTED=finished, CANCELED=finished exceptionally
     private volatile Status myStatus;
     private final ForkJoinTask<Void> myForkJoinTask = new ForkJoinTask<>() {
       @Override
@@ -288,18 +289,28 @@ public final class JobLauncherImpl extends JobLauncher {
         try {
           myAction.run();
           complete(null); // complete manually before calling callback
+          myStatus = Status.EXECUTED;
         }
         catch (Throwable throwable) {
-          myStatus = Status.EXECUTED;
           completeExceptionally(throwable);
+          myStatus = Status.CANCELED;
         }
         finally {
-          myStatus = Status.EXECUTED;
           if (myOnDoneCallback != null) {
             myOnDoneCallback.accept(this);
           }
         }
         return true;
+      }
+
+      @Override
+      public String toString() {
+        State state = state();
+        return "ForkJoinTask: " + state + ":"+switch (state) {
+          case RUNNING, SUCCESS -> "";
+          case FAILED -> getException();
+          case CANCELLED -> getForkJoinTaskTag();
+        };
       }
     };
 
@@ -318,7 +329,7 @@ public final class JobLauncherImpl extends JobLauncher {
     public boolean isDone() {
       boolean wasCancelled = myForkJoinTask.isCancelled(); // must be before status check
       Status status = myStatus;
-      return status == Status.EXECUTED || status == null && wasCancelled;
+      return status == Status.EXECUTED || status == Status.CANCELED || status == null && wasCancelled;
     }
 
     @Override
@@ -363,6 +374,11 @@ public final class JobLauncherImpl extends JobLauncher {
       }
       return true;
     }
+
+    @Override
+    public String toString() {
+      return "VoidForkJoinTask: status:"+myStatus+"; task:"+myForkJoinTask;
+    }
   }
 
   /**
@@ -395,12 +411,17 @@ public final class JobLauncherImpl extends JobLauncher {
       @Override
       public Boolean call() {
         boolean[] result = new boolean[1];
+        return ThreadContext.installThreadContext(myContext, true, () -> {
         ProgressManager.getInstance().executeProcessUnderProgress(() -> {
+          T element = myFirstTask;
           try {
-            T element = myFirstTask;
             while (true) {
-              if (element == null) element = failedToProcess.poll();
-              if (element == null) element = things.take();
+              if (element == null) {
+                element = failedToProcess.poll();
+              }
+              if (element == null) {
+                element = things.take();
+              }
 
               if (element == tombStone) {
                 things.put(tombStone); // return just popped tombStone to the 'things' queue for everybody else to see it
@@ -408,25 +429,8 @@ public final class JobLauncherImpl extends JobLauncher {
                 result[0] = true;
                 break;
               }
-              try {
-                T finalElement = element;
-                boolean shouldBreak = ThreadContext.installThreadContext(myContext, true, () -> {
-                  ProgressManager.checkCanceled();
-                  if (!thingProcessor.process(finalElement)) {
-                    return true;
-                  }
-                  return false;
-                });
-                if (shouldBreak) {
-                  break;
-                }
-              }
-              catch (RuntimeException|Error e) {
-                if (logAllExceptions) {
-                  LOG.info("Failed to process " + element + ". Add too failed query.", e);
-                }
-                failedToProcess.add(element);
-                throw e;
+              if (!thingProcessor.process(element)) {
+                break;
               }
               element = null;
             }
@@ -434,9 +438,17 @@ public final class JobLauncherImpl extends JobLauncher {
           catch (InterruptedException e) {
             throw new RuntimeException(e);
           }
+          catch (RuntimeException|Error e) {
+            if (logAllExceptions && !Logger.shouldRethrow(e)) {
+              LOG.info("Failed to process " + element + ". Add too failed query.", e);
+            }
+            failedToProcess.add(element);
+            throw e;
+          }
         }, progress);
         return result[0];
-      }
+      });
+    }
 
       @Override
       public @NonNls String toString() {

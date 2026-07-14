@@ -12,6 +12,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.ex.temp.TempFileSystem;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl;
 import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.jsonSchema.ide.JsonSchemaService;
 import com.jetbrains.jsonSchema.remote.JsonFileResolver;
@@ -23,6 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 public abstract class JsonSchemaHeavyAbstractTest extends BasePlatformTestCase {
   private Map<String, UserDefinedJsonSchemaConfiguration> mySchemas;
@@ -32,6 +34,7 @@ public abstract class JsonSchemaHeavyAbstractTest extends BasePlatformTestCase {
   @Override
   public void setUp() throws Exception {
     super.setUp();
+    ((CodeInsightTestFixtureImpl)myFixture).canChangeDocumentDuringHighlighting(true);
     mySchemas = new HashMap<>();
     myDoCompletion = true;
   }
@@ -41,7 +44,7 @@ public abstract class JsonSchemaHeavyAbstractTest extends BasePlatformTestCase {
     myItems = null;
     try {
       final JsonSchemaMappingsProjectConfiguration instance = JsonSchemaMappingsProjectConfiguration.getInstance(getProject());
-      instance.setState(Collections.emptyMap());
+      instance.setState(new TreeMap<>());
     }
     catch (Throwable e) {
       addSuppressedException(e);

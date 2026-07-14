@@ -12,7 +12,7 @@ plugins {
   alias(libs.plugins.dokka)
   // GRADLE_PLUGINS__MARKER_START
   id("fleet-module")
-  alias(jps.plugins.expects)
+  id("fleet-multiplatform-expects-module")
   // GRADLE_PLUGINS__MARKER_END
 }
 
@@ -26,7 +26,7 @@ fleetModule {
 @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
 kotlin {
   sourceSets.wasmJsMain.dependencies {
-    implementation(libs.kotlin.wrappers.browser)
+    implementation(jps.kotlin.wrappers.browser)
   }
 
   // KOTLIN__MARKER_START

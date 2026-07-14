@@ -15,11 +15,11 @@ import org.jetbrains.annotations.ApiStatus
 import javax.swing.Icon
 import kotlin.collections.emptyList
 
-@ApiStatus.Internal
+@ApiStatus.Experimental
 @JvmInline
 value class PyDependencyGroupName(val name: String)
 
-@ApiStatus.Internal
+@ApiStatus.Experimental
 open class PythonPackage @JvmOverloads constructor(name: String, val version: String, val isEditableMode: Boolean, val dependencyGroup: PyDependencyGroupName? = null) {
   companion object {
     private const val HASH_MULTIPLIER = 31
@@ -189,16 +189,3 @@ data class PythonRepositoryPackageSpecification(
   )
 }
 
-@Deprecated(
-  "Use RepositoryPythonPackageSpecification instead",
-  replaceWith = ReplaceWith("RepositoryPythonPackageSpecification"),
-  level = DeprecationLevel.ERROR
-)
-interface PythonPackageSpecification
-
-@Deprecated(
-  "Use RepositoryPythonPackageSpecification instead",
-  replaceWith = ReplaceWith("RepositoryPythonPackageSpecification"),
-  level = DeprecationLevel.ERROR
-)
-interface PythonSimplePackageSpecification

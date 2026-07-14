@@ -121,6 +121,7 @@ f:com.intellij.execution.configurations.ParametersList
 - patchMacroWithEnvs(java.util.Map):V
 - prepend(java.lang.String):V
 - prependAll(java.lang.String[]):V
+- removeAt(I):V
 - removeParamsGroup(I):com.intellij.execution.configurations.ParamsGroup
 - replaceOrAppend(java.lang.String,java.lang.String):V
 - replaceOrPrepend(java.lang.String,java.lang.String):V
@@ -385,7 +386,6 @@ f:com.intellij.execution.process.ScriptRunnerUtil
 - s:getProcessOutput(com.intellij.execution.configurations.GeneralCommandLine,com.intellij.openapi.util.Condition,J):java.lang.String
 - s:getProcessOutput(com.intellij.execution.process.ProcessHandler,com.intellij.openapi.util.Condition,J):java.lang.String
 - s:terminateProcessHandler(com.intellij.execution.process.ProcessHandler,J,java.lang.String):V
-com.intellij.execution.process.SelfKiller
 f:com.intellij.execution.process.impl.ProcessListUtil
 - s:getProcessList():com.intellij.execution.process.ProcessInfo[]
 f:com.intellij.execution.util.ExecUtil

@@ -2,6 +2,7 @@
 package org.jetbrains.intellij.build.productLayout.generator
 
 import com.intellij.platform.pluginGraph.PluginId
+import com.intellij.platform.pluginGraph.TargetDependencyScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
@@ -21,6 +22,7 @@ import org.jetbrains.intellij.build.productLayout.util.DeferredFileUpdater
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Files
 import java.nio.file.Path
 
 @ExtendWith(TestFailureLogger::class)
@@ -80,7 +82,63 @@ class TestPluginXmlGeneratorTest {
     val xml = diffs.single().expectedContent
     assertThat(xml).contains("<dependencies>")
     assertThat(xml).contains("<plugin id=\"intellij.target.plugin\"/>")
+    assertThat(xml).contains("<!-- Source: platform/buildScripts/src/productLayout/UltimateModuleSets.kt: UltimateModuleSets.getTestProductSpecs()[\"TestProduct\"], testPlugin(pluginId = \"intellij.consumer.test.plugin\") -->")
     assertThat(xml).doesNotContain("Generated dependencies - run `Generate Product Layouts` to regenerate")
+    }
+  }
+
+  @Test
+  fun `does not render module dependency already declared as DSL test plugin content`(@TempDir tempDir: Path) {
+    runBlocking(Dispatchers.Default) {
+    val graph = pluginGraph {
+      testPlugin("intellij.consumer.test.plugin") {
+        pluginId("intellij.consumer.test.plugin")
+        content("intellij.consumer.module")
+      }
+      target("intellij.consumer.test.plugin") {
+        dependsOn("intellij.declared.dep")
+      }
+      linkPluginMainTarget("intellij.consumer.test.plugin")
+    }
+
+    val spec = TestPluginSpec(
+      pluginId = PluginId("intellij.consumer.test.plugin"),
+      name = "Consumer Test Plugin",
+      pluginXmlPath = "test-plugin/META-INF/plugin.xml",
+      spec = productModules {
+        requiredModule("intellij.consumer.module")
+        module("intellij.declared.dep")
+      }
+    )
+
+    val fileUpdater = DeferredFileUpdater(tempDir)
+    val baseModel = testGenerationModel(graph, fileUpdater = fileUpdater)
+    val discovery = baseModel.discovery.copy(
+      products = listOf(
+        DiscoveredProduct(
+          name = "TestProduct",
+          config = ProductConfiguration(modules = emptyList(), className = "TestProduct"),
+          properties = null,
+          spec = null,
+          pluginXmlPath = null,
+        )
+      )
+    )
+    val model = baseModel.copy(
+      discovery = discovery,
+      projectRoot = tempDir,
+      fileUpdater = fileUpdater,
+      dslTestPluginsByProduct = mapOf("TestProduct" to listOf(spec)),
+    )
+
+    val ctx = ComputeContextImpl(model)
+    runPlannerAndGenerator(ctx)
+
+    val diffs = fileUpdater.getDiffs()
+    assertThat(diffs).hasSize(1)
+    val xml = diffs.single().expectedContent
+    assertThat(xml).doesNotContain("<dependencies>")
+    assertThat(xml).contains("<module name=\"intellij.declared.dep\"/>")
     }
   }
 
@@ -280,7 +338,7 @@ class TestPluginXmlGeneratorTest {
   }
 
   @Test
-  fun `plugin-owned content dependency becomes plugin dependency in DSL test plugin`(@TempDir tempDir: Path) {
+  fun `compile plugin-owned content dependency becomes plugin dependency in DSL test plugin`(@TempDir tempDir: Path) {
     runBlocking(Dispatchers.Default) {
     val graph = pluginGraph {
       product("TestProduct") { bundlesPlugin("intellij.owner.plugin") }
@@ -293,7 +351,7 @@ class TestPluginXmlGeneratorTest {
         content("intellij.consumer.module")
       }
       target("intellij.consumer.test.plugin") {
-        dependsOn("intellij.owner.module")
+        dependsOn("intellij.owner.module", TargetDependencyScope.COMPILE)
       }
       linkPluginMainTarget("intellij.consumer.test.plugin")
     }
@@ -336,6 +394,133 @@ class TestPluginXmlGeneratorTest {
     assertThat(xml).contains("<dependencies>")
     assertThat(xml).contains("<plugin id=\"intellij.owner.plugin\"/>")
     assertThat(xml).doesNotContain("<module name=\"intellij.owner.module\"/>")
+    }
+  }
+
+  @Test
+  fun `runtime plugin-owned content dependency stays module dependency in DSL test plugin`(@TempDir tempDir: Path) {
+    runBlocking(Dispatchers.Default) {
+    val graph = pluginGraph {
+      product("TestProduct") { bundlesPlugin("intellij.owner.plugin") }
+      plugin("intellij.owner.plugin") {
+        pluginId("intellij.owner.plugin")
+        content("intellij.owner.module")
+      }
+      testPlugin("intellij.consumer.test.plugin") {
+        pluginId("intellij.consumer.test.plugin")
+        content("intellij.consumer.module")
+      }
+      target("intellij.consumer.test.plugin") {
+        dependsOn("intellij.owner.module", TargetDependencyScope.RUNTIME)
+      }
+      linkPluginMainTarget("intellij.consumer.test.plugin")
+    }
+
+    val spec = TestPluginSpec(
+      pluginId = PluginId("intellij.consumer.test.plugin"),
+      name = "Consumer Test Plugin",
+      pluginXmlPath = "test-plugin/META-INF/plugin.xml",
+      spec = productModules {
+        requiredModule("intellij.consumer.module")
+      }
+    )
+
+    val fileUpdater = DeferredFileUpdater(tempDir)
+    val baseModel = testGenerationModel(graph, fileUpdater = fileUpdater)
+    val discovery = baseModel.discovery.copy(
+      products = listOf(
+        DiscoveredProduct(
+          name = "TestProduct",
+          config = ProductConfiguration(modules = emptyList(), className = "TestProduct"),
+          properties = null,
+          spec = null,
+          pluginXmlPath = null,
+        )
+      )
+    )
+    val model = baseModel.copy(
+      discovery = discovery,
+      projectRoot = tempDir,
+      fileUpdater = fileUpdater,
+      dslTestPluginsByProduct = mapOf("TestProduct" to listOf(spec)),
+    )
+
+    val ctx = ComputeContextImpl(model)
+    runPlannerAndGenerator(ctx)
+
+    val diffs = fileUpdater.getDiffs()
+    assertThat(diffs).hasSize(1)
+    val xml = diffs.single().expectedContent
+    assertThat(xml).contains("<dependencies>")
+    assertThat(xml).contains("<module name=\"intellij.owner.module\"/>")
+    assertThat(xml).doesNotContain("<plugin id=\"intellij.owner.plugin\"/>")
+
+    val errors = ctx.getNodeErrors(TestPluginXmlGenerator.id)
+    assertThat(errors).isEmpty()
+    }
+  }
+
+  @Test
+  fun `runtime plugin-owned content dependency available from product stays module dependency in DSL test plugin`(@TempDir tempDir: Path) {
+    runBlocking(Dispatchers.Default) {
+    val graph = pluginGraph {
+      product("TestProduct") { includesModuleSet("test.product.modules") }
+      moduleSet("test.product.modules") { module("intellij.owner.module") }
+      plugin("intellij.owner.plugin") {
+        pluginId("intellij.owner.plugin")
+        content("intellij.owner.module")
+      }
+      testPlugin("intellij.consumer.test.plugin") {
+        pluginId("intellij.consumer.test.plugin")
+        content("intellij.consumer.module")
+      }
+      target("intellij.consumer.test.plugin") {
+        dependsOn("intellij.owner.module", TargetDependencyScope.RUNTIME)
+      }
+      linkPluginMainTarget("intellij.consumer.test.plugin")
+    }
+
+    val spec = TestPluginSpec(
+      pluginId = PluginId("intellij.consumer.test.plugin"),
+      name = "Consumer Test Plugin",
+      pluginXmlPath = "test-plugin/META-INF/plugin.xml",
+      spec = productModules {
+        requiredModule("intellij.consumer.module")
+      }
+    )
+
+    val fileUpdater = DeferredFileUpdater(tempDir)
+    val baseModel = testGenerationModel(graph, fileUpdater = fileUpdater)
+    val discovery = baseModel.discovery.copy(
+      products = listOf(
+        DiscoveredProduct(
+          name = "TestProduct",
+          config = ProductConfiguration(modules = emptyList(), className = "TestProduct"),
+          properties = null,
+          spec = null,
+          pluginXmlPath = null,
+        )
+      )
+    )
+    val model = baseModel.copy(
+      discovery = discovery,
+      projectRoot = tempDir,
+      fileUpdater = fileUpdater,
+      dslTestPluginsByProduct = mapOf("TestProduct" to listOf(spec)),
+    )
+
+    val ctx = ComputeContextImpl(model)
+    runPlannerAndGenerator(ctx)
+
+    val diffs = fileUpdater.getDiffs()
+    assertThat(diffs).hasSize(1)
+    val xml = diffs.single().expectedContent
+    assertThat(xml).contains("<dependencies>")
+    assertThat(xml).contains("<module name=\"intellij.owner.module\"/>")
+    assertThat(xml).doesNotContain("<plugin id=\"intellij.owner.plugin\"/>")
+
+    val errors = ctx.getNodeErrors(TestPluginXmlGenerator.id)
+    assertThat(errors).isEmpty()
     }
   }
 
@@ -398,6 +583,139 @@ class TestPluginXmlGeneratorTest {
 
     val errors = ctx.getNodeErrors(TestPluginXmlGenerator.id)
     assertThat(errors).isEmpty()
+    }
+  }
+
+  @Test
+  fun `preserved tests descriptor dependency does not add new test plugin plugin dependency`(@TempDir tempDir: Path) {
+    runBlocking(Dispatchers.Default) {
+    val graph = pluginGraph {
+      product("TestProduct") { bundlesPlugin("intellij.owner.plugin") }
+      plugin("intellij.owner.plugin") {
+        pluginId("intellij.owner.plugin")
+        content("intellij.owner.module")
+      }
+      testPlugin("intellij.consumer.test.plugin") {
+        pluginId("intellij.consumer.test.plugin")
+        content("intellij.consumer.tests")
+      }
+    }
+
+    val spec = TestPluginSpec(
+      pluginId = PluginId("intellij.consumer.test.plugin"),
+      name = "Consumer Test Plugin",
+      pluginXmlPath = "test-plugin/META-INF/plugin.xml",
+      spec = productModules {
+        module("intellij.consumer.tests")
+      }
+    )
+
+    val fileUpdater = DeferredFileUpdater(tempDir)
+    val baseModel = testGenerationModel(graph, fileUpdater = fileUpdater)
+    val discovery = baseModel.discovery.copy(
+      products = listOf(
+        DiscoveredProduct(
+          name = "TestProduct",
+          config = ProductConfiguration(modules = emptyList(), className = "TestProduct"),
+          properties = null,
+          spec = null,
+          pluginXmlPath = null,
+        )
+      )
+    )
+    val model = baseModel.copy(
+      discovery = discovery,
+      projectRoot = tempDir,
+      fileUpdater = fileUpdater,
+      dslTestPluginsByProduct = mapOf("TestProduct" to listOf(spec)),
+    )
+
+    val ctx = ComputeContextImpl(model)
+    runPlannerAndGenerator(
+      ctx,
+      contentModulePlans = listOf(
+        testContentModulePlan(
+          testDependencies = listOf("intellij.owner.module"),
+        )
+      )
+    )
+
+    val diffs = fileUpdater.getDiffs()
+    assertThat(diffs).hasSize(1)
+    val xml = diffs.single().expectedContent
+    assertThat(xml).doesNotContain("<plugin id=\"intellij.owner.plugin\"/>")
+    }
+  }
+
+  @Test
+  fun `preserved tests descriptor dependency keeps existing test plugin plugin dependency`(@TempDir tempDir: Path) {
+    runBlocking(Dispatchers.Default) {
+    val graph = pluginGraph {
+      product("TestProduct") { bundlesPlugin("intellij.owner.plugin") }
+      plugin("intellij.owner.plugin") {
+        pluginId("intellij.owner.plugin")
+        content("intellij.owner.module")
+      }
+      testPlugin("intellij.consumer.test.plugin") {
+        pluginId("intellij.consumer.test.plugin")
+        content("intellij.consumer.tests")
+      }
+    }
+
+    val spec = TestPluginSpec(
+      pluginId = PluginId("intellij.consumer.test.plugin"),
+      name = "Consumer Test Plugin",
+      pluginXmlPath = "test-plugin/META-INF/plugin.xml",
+      spec = productModules {
+        module("intellij.consumer.tests")
+      }
+    )
+    writePluginXml(tempDir, spec.pluginXmlPath, """
+      <idea-plugin>
+        <id>intellij.consumer.test.plugin</id>
+        <name>Consumer Test Plugin</name>
+        <vendor>JetBrains</vendor>
+
+        <dependencies>
+          <plugin id="intellij.owner.plugin"/>
+        </dependencies>
+      </idea-plugin>
+    """.trimIndent())
+
+    val fileUpdater = DeferredFileUpdater(tempDir)
+    val baseModel = testGenerationModel(graph, fileUpdater = fileUpdater)
+    val discovery = baseModel.discovery.copy(
+      products = listOf(
+        DiscoveredProduct(
+          name = "TestProduct",
+          config = ProductConfiguration(modules = emptyList(), className = "TestProduct"),
+          properties = null,
+          spec = null,
+          pluginXmlPath = null,
+        )
+      )
+    )
+    val model = baseModel.copy(
+      discovery = discovery,
+      projectRoot = tempDir,
+      fileUpdater = fileUpdater,
+      dslTestPluginsByProduct = mapOf("TestProduct" to listOf(spec)),
+    )
+
+    val ctx = ComputeContextImpl(model)
+    runPlannerAndGenerator(
+      ctx,
+      contentModulePlans = listOf(
+        testContentModulePlan(
+          testDependencies = listOf("intellij.owner.module"),
+        )
+      )
+    )
+
+    val diffs = fileUpdater.getDiffs()
+    assertThat(diffs).hasSize(1)
+    val xml = diffs.single().expectedContent
+    assertThat(xml).contains("<plugin id=\"intellij.owner.plugin\"/>")
     }
   }
 
@@ -540,5 +858,33 @@ class TestPluginXmlGeneratorTest {
     val nodeCtx = ctx.forNode(TestPluginXmlGenerator.id)
     TestPluginXmlGenerator.execute(nodeCtx)
     ctx.finalizeNodeErrors(TestPluginXmlGenerator.id)
+  }
+
+  private fun testContentModulePlan(
+    testDependencies: List<String>,
+  ): ContentModuleDependencyPlan {
+    val moduleName = "intellij.consumer.tests"
+    return ContentModuleDependencyPlan(
+      contentModuleName = com.intellij.platform.pluginGraph.ContentModuleName(moduleName),
+      descriptorPath = Path.of("$moduleName.xml").toAbsolutePath(),
+      descriptorContent = "",
+      moduleDependencies = emptyList(),
+      pluginDependencies = emptyList(),
+      testDependencies = testDependencies.map { com.intellij.platform.pluginGraph.ContentModuleName(it) },
+      existingXmlModuleDependencies = emptySet(),
+      existingXmlPluginDependencies = emptySet(),
+      preserveExistingPluginDependencies = emptySet(),
+      writtenPluginDependencies = emptyList(),
+      allJpsPluginDependencies = emptySet(),
+      suppressedModules = emptySet(),
+      suppressedPlugins = emptySet(),
+      suppressionUsages = emptyList(),
+    )
+  }
+
+  private fun writePluginXml(projectRoot: Path, relativePath: String, content: String) {
+    val path = projectRoot.resolve(relativePath)
+    Files.createDirectories(path.parent)
+    Files.writeString(path, content)
   }
 }

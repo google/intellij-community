@@ -1,19 +1,15 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diagnostic
 
-import com.intellij.openapi.util.IntellijInternalApi
 import org.jetbrains.annotations.ApiStatus
 import java.util.EventListener
 
 @ApiStatus.Internal
-@IntellijInternalApi
 interface MessagePoolAdvisor : EventListener {
   /**
-   * @return false to stop processing and do not add the message to the pool
+   * @return `false` to stop processing and do not add the message to the pool
    */
-  suspend fun beforeEntryAdded(e: BeforeEntryAddedEvent): Boolean {
-    return true
-  }
+  suspend fun beforeEntryAdded(e: BeforeEntryAddedEvent): Boolean = true
 
   suspend fun afterEntryAdded(e: AfterEntryAddedEvent) {}
 

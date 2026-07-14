@@ -55,6 +55,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.jdom.IllegalDataException
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import java.nio.CharBuffer
 import java.nio.charset.CodingErrorAction
@@ -72,6 +73,7 @@ import kotlin.io.path.forEachDirectoryEntry
  *
  * Pass `true` as the second parameter to have searchable options split by modules.
  */
+@ApiStatus.Internal
 @Suppress("UseOptimizedEelFunctions")
 class TraverseUIStarter : ModernApplicationStarter() {
   override suspend fun start(args: List<String>) {
@@ -236,7 +238,8 @@ class TraverseUIStarter : ModernApplicationStarter() {
         fileDescriptors
           .groupBy(keySelector = { it.module.moduleName ?: it.module.pluginId.idString })
           .mapValues { entry ->
-            val item = entry.value.single().item
+            val searchableOptionFile = entry.value.singleOrNull() ?: error("Expected exactly one file for module ${entry.key}, but got ${entry.value}")
+            val item = searchableOptionFile.item
             listOf(SearchableOptionSetIndexItem(item.file, item.hash, item.size))
           }
       ))

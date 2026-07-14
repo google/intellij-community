@@ -54,7 +54,6 @@ class MPSProperties : JetBrainsProductProperties() {
             "intellij.idea.community.customization",
             "intellij.java.ide.resources",
             "intellij.platform.buildData",
-            "intellij.platform.whatsNew",
             "intellij.platform.configurationStore.impl",
             "intellij.platform.diagnostic.startUpPerformanceReporter",
             "intellij.platform.jps.build.javac.rt",
@@ -80,7 +79,6 @@ class MPSProperties : JetBrainsProductProperties() {
             "intellij.mcpserver",
             "intellij.properties",
             "intellij.terminal",
-            "intellij.tasks.core",
             "intellij.vcs.git",
             "intellij.vcs.svn",
             "intellij.vcs.github",
@@ -88,6 +86,8 @@ class MPSProperties : JetBrainsProductProperties() {
             "intellij.ant",
             "intellij.sh.plugin",
             "intellij.markdown",
+            "intellij.mermaid",
+            "intellij.yaml",
             "intellij.grazie",
         )
 
@@ -115,9 +115,7 @@ class MPSProperties : JetBrainsProductProperties() {
 
             layout.withModule("intellij.java.rt", "idea_rt.jar")
             layout.withProjectLibrary("Eclipse", LibraryPackMode.MERGED)
-            layout.withProjectLibrary("JUnit4", LibraryPackMode.STANDALONE_MERGED)
             layout.withProjectLibrary("http-client", LibraryPackMode.MERGED)
-            layout.withProjectLibrary("hamcrest", LibraryPackMode.STANDALONE_MERGED)
             layout.withoutProjectLibrary("Ant")
             layout.withoutProjectLibrary("Gradle")
             layout.withProjectLibrary("maven-resolver-provider", LibraryPackMode.STANDALONE_MERGED)
@@ -191,7 +189,7 @@ class MPSProperties : JetBrainsProductProperties() {
 
         moduleSet(CommunityModuleSets.ideCommon())
 
-        module("intellij.platform.tips")
+        module("intellij.platform.whatsNew")
         module("intellij.ide.startup.importSettings")
 
         module("intellij.platform.customization.min")

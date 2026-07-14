@@ -18,6 +18,8 @@ import com.intellij.openapi.application.*
 import com.intellij.openapi.application.PathManager.getSystemDir
 import com.intellij.openapi.application.impl.ApplicationInfoImpl
 import com.intellij.openapi.application.impl.LaterInvocator
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
 import com.intellij.openapi.externalSystem.ExternalSystemModulePropertyManager.Companion.getInstance
 import com.intellij.openapi.externalSystem.model.ProjectSystemId
 import com.intellij.openapi.externalSystem.service.execution.ExternalSystemJdkException
@@ -379,12 +381,6 @@ object MavenUtil {
     return baseDir
   }
 
-  fun getProfilesXmlNioFile(pomFile: VirtualFile?): Path? {
-    if (pomFile == null) return null
-    val parent = pomFile.getParent()
-    if (parent == null) return null
-    return parent.toNioPath().resolve(MavenConstants.PROFILES_XML)
-  }
 
   @JvmStatic
   fun <T, U> collectFirsts(pairs: List<Pair<T, U>>): List<T> {
@@ -422,12 +418,12 @@ object MavenUtil {
     return (if (collection is MutableSet<*>) collection else HashSet<T?>(collection))
   }
 
-  fun <T, U> mapToList(map: MutableMap<T?, U?>): MutableList<Pair<T?, U?>?> {
-    return ContainerUtil.map<MutableMap.MutableEntry<T?, U?>?, Pair<T?, U?>?>(map.entries,
-                                                                              Function { tuEntry: MutableMap.MutableEntry<T?, U?>? ->
-                                                                                Pair.create<T?, U?>(
-                                                                                  tuEntry!!.key, tuEntry.value)
-                                                                              })
+  fun <T, U> mapToList(map: Map<T?, U?>): List<Pair<T?, U?>?> {
+    return ContainerUtil.map<Map.Entry<T?, U?>?, Pair<T?, U?>?>(map.entries,
+                                                                               Function { tuEntry: Map.Entry<T?, U?>? ->
+                                                                                 Pair.create<T?, U?>(
+                                                                                   tuEntry!!.key, tuEntry.value)
+                                                                               })
   }
 
   @JvmStatic
@@ -958,6 +954,7 @@ object MavenUtil {
     return emptySet()
   }
 
+  @ApiStatus.ScheduledForRemoval
   @Deprecated("")
   @JvmStatic
   fun getMavenConfFile(mavenHome: File?): File {
@@ -969,6 +966,7 @@ object MavenUtil {
     return mavenHome.resolve(BIN_DIR).resolve(M2_CONF_FILE)
   }
 
+  @ApiStatus.ScheduledForRemoval
   @Deprecated("")
   @JvmStatic
   fun getMavenHomeFile(mavenHome: StaticResolvedMavenHomeType): File? {
@@ -1094,6 +1092,7 @@ object MavenUtil {
     return resolveLocalRepository(null, overriddenLocalRepository, overriddenMavenHome, overriddenUserSettingsFile).toFile()
   }
 
+  @ApiStatus.ScheduledForRemoval
   @Deprecated(
     """do not use this method, it mixes path to maven home and labels like "Use bundled maven" in overriddenMavenHome variable
   use {@link MavenUtil#resolveLocalRepository(String, StaticResolvedMavenHomeType, String) resolveLocalRepository(String, StaticResolvedMavenHomeType, String)}
@@ -1348,8 +1347,39 @@ object MavenUtil {
   @Throws(IOException::class, JDOMException::class)
   private fun getDomRootElement(file: Path?): Element? {
     if (file == null) return null
-    val reader = InputStreamReader(Files.newInputStream(file), StandardCharsets.UTF_8)
-    return JDOMUtil.load(reader)
+    return MavenSettingsDomReader.getInstance().read(file)
+  }
+
+  @Service(Service.Level.APP)
+  private class MavenSettingsDomReader {
+    private val relay: DiskQueryRelay<Path, Element?> = DiskQueryRelay { file ->
+      Files.newInputStream(file).use { stream ->
+        JDOMUtil.load(InputStreamReader(stream, StandardCharsets.UTF_8))
+      }
+    }
+
+    @Throws(IOException::class, JDOMException::class)
+    fun read(file: Path): Element? {
+      try {
+        return relay.accessDiskWithCheckCanceled(file)
+      }
+      catch (e: RuntimeException) {
+        // accessDiskWithCheckCanceled propagates Future.get() failures via ExceptionUtil.rethrow,
+        // which wraps the ExecutionException in a RuntimeException. Restore the original cause
+        // so callers can match on IOException/JDOMException.
+        val cause = (e.cause as? ExecutionException)?.cause ?: throw e
+        ExceptionUtil.rethrowUnchecked(cause)
+        when (cause) {
+          is IOException -> throw cause
+          is JDOMException -> throw cause
+          else -> throw e
+        }
+      }
+    }
+
+    companion object {
+      fun getInstance(): MavenSettingsDomReader = service<MavenSettingsDomReader>()
+    }
   }
 
   private fun getElementWithRegardToNamespace(parent: Element?, childName: String?, namespaces: MutableList<String?>): Element? {

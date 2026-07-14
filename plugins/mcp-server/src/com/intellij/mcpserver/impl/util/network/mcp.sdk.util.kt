@@ -1,82 +1,143 @@
 package com.intellij.mcpserver.impl.util.network
 
+import com.intellij.mcpserver.toolwindow.McpDiagnosticService
+import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.trace
-import io.ktor.http.ContentType
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.PipelineCall
 import io.ktor.server.application.install
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.request.ApplicationRequest
-import io.ktor.server.request.receiveText
+import io.ktor.server.request.header
+import io.ktor.server.request.httpMethod
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
-import io.ktor.server.response.respondText
 import io.ktor.server.routing.RoutingContext
 import io.ktor.server.routing.delete
-import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.sse.SSE
 import io.ktor.server.sse.ServerSSESession
+import io.ktor.server.sse.heartbeat
 import io.ktor.server.sse.sse
+import io.ktor.sse.ServerSentEvent
 import io.ktor.util.collections.ConcurrentMap
 import io.ktor.util.pipeline.PipelineContext
 import io.ktor.utils.io.KtorDsl
-import io.modelcontextprotocol.kotlin.sdk.JSONRPCMessage
-import io.modelcontextprotocol.kotlin.sdk.JSONRPCRequest
-import io.modelcontextprotocol.kotlin.sdk.Method
 import io.modelcontextprotocol.kotlin.sdk.server.ServerSession
 import io.modelcontextprotocol.kotlin.sdk.server.SseServerTransport
-import io.modelcontextprotocol.kotlin.sdk.shared.McpJson
+import io.modelcontextprotocol.kotlin.sdk.server.StreamableHttpServerTransport
 import io.modelcontextprotocol.kotlin.sdk.shared.Transport
-import kotlinx.coroutines.CancellationException
+import io.modelcontextprotocol.kotlin.sdk.types.McpJson
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.decodeFromJsonElement
 import kotlin.coroutines.CoroutineContext
+import kotlin.time.Duration.Companion.seconds
 
 private val logger = logger<RoutingContext>()
+
+/**
+ * MCP Streamable HTTP session header.
+ */
+internal const val MCP_SESSION_ID_HEADER: String = "mcp-session-id"
+
+private val SSE_HEARTBEAT_PERIOD = 5.seconds
+
+private val SSE_HEARTBEAT_EVENT = ServerSentEvent(comments = "heartbeat")
+private val PENDING_TRANSPORT_TIMEOUT = 15.seconds
 
 @KtorDsl
 fun Application.mcpPatched(
   prePhase: suspend PipelineContext<*, PipelineCall>.() -> Unit,
-  block: suspend (ApplicationCall, Transport) -> ServerSession,
+  block: suspend (ApplicationCall, Transport) -> Pair<ServerSession, CoroutineScope>,
 ) {
-  val transports = ConcurrentMap<String, SseServerTransport>()
-  val streamableSessions = ConcurrentMap<String, StreamableSession>()
+  val sseTransports = ConcurrentMap<String, SseServerTransport>()
+  val streamableTransports = ConcurrentMap<String, StreamableHttpServerTransport>()
+  // transports created during POST initialize but not yet connected to a GET SSE stream.
+  val pendingTransports = ConcurrentMap<String, StreamableHttpServerTransport>()
+  val streamableSessionScopes = ConcurrentMap<String, CoroutineScope>()
 
   install(SSE)
+  install(ContentNegotiation) { json(McpJson) }
 
   routing {
     intercept(ApplicationCallPipeline.Plugins) {
       prePhase()
+      if (context.request.httpMethod == HttpMethod.Get) {
+        val sessionId = context.request.header(MCP_SESSION_ID_HEADER)
+        if (sessionId != null && (streamableTransports[sessionId] != null || pendingTransports[sessionId] != null)) {
+          context.response.header(MCP_SESSION_ID_HEADER, sessionId)
+        }
+      }
     }
 
     sse("/sse") {
-      mcpSseEndpoint("/message", transports, block)
+      heartbeat {
+        period = SSE_HEARTBEAT_PERIOD
+      }
+
+      mcpSseEndpoint("/message", sseTransports, block)
     }
 
     post("/message") {
-      mcpPostEndpoint(transports)
+      mcpPostEndpoint(sseTransports)
     }
 
     route("/stream") {
+      sse {
+        val sessionId = call.request.headers[MCP_SESSION_ID_HEADER]
+        try {
+          if (sessionId.isNullOrEmpty()) {
+            call.respond(HttpStatusCode.BadRequest, "Missing $MCP_SESSION_ID_HEADER header")
+            return@sse
+          }
+
+          val transport = pendingTransports.remove(sessionId)?.also { streamableTransports[sessionId] = it }
+                          ?: streamableTransports[sessionId]
+          if (transport == null) {
+            call.respond(HttpStatusCode.NotFound, "Streamable HTTP session not found")
+            return@sse
+          }
+
+          launchSseHeartbeat()
+          transport.handleRequest(this, call)
+        }
+        finally {
+          if (sessionId != null) {
+            //todo temp fix for flaky tests
+            streamableTransports.remove(sessionId)
+            streamableSessionScopes.remove(sessionId)?.cancel()
+            service<McpDiagnosticService>().sessionEnded(sessionId = sessionId)
+          }
+        }
+      }
+
       post {
-        handleStreamablePost(streamableSessions, block)
+        val transport = obtainOrCreateStreamableTransport(call,
+                                                          streamableTransports,
+                                                          pendingTransports,
+                                                          this@mcpPatched,
+                                                          block,
+                                                          streamableSessionScopes) ?: return@post
+        transport.handleRequest(null, call)
       }
-      get {
-        handleStreamableGet(streamableSessions)
-      }
+
       delete {
-        handleStreamableDelete(streamableSessions)
+        val transport = existingStreamableTransport(call, streamableTransports) ?: return@delete
+        transport.handleRequest(null, call)
       }
     }
   }
@@ -85,11 +146,11 @@ fun Application.mcpPatched(
 private suspend fun ServerSSESession.mcpSseEndpoint(
   postEndpoint: String,
   transports: ConcurrentMap<String, SseServerTransport>,
-  block: suspend (ApplicationCall, Transport) -> ServerSession,
+  block: suspend (ApplicationCall, Transport) -> Pair<ServerSession, CoroutineScope>,
 ) {
   val transport = mcpSseTransport(postEndpoint, transports)
 
-  val serverSession = block(call, transport)
+  val (serverSession, _) = block(call, transport)
 
   serverSession.onClose {
     logger.trace { "Server connection closed for sessionId: ${transport.sessionId}" }
@@ -137,152 +198,106 @@ internal suspend fun RoutingContext.mcpPostEndpoint(
   logger.trace { "Message handled for sessionId: $sessionId" }
 }
 
-private suspend fun RoutingContext.handleStreamablePost(
-  sessions: ConcurrentMap<String, StreamableSession>,
-  block: suspend (ApplicationCall, Transport) -> ServerSession,
-) {
-  val rawBody = try {
-    call.receiveText()
+/**
+ * Returns the transport already associated with the `mcp-session-id` header, or responds with an error
+ * and returns `null`. Used for GET and DELETE.
+ */
+private suspend fun existingStreamableTransport(
+  call: ApplicationCall,
+  transports: ConcurrentMap<String, StreamableHttpServerTransport>,
+): StreamableHttpServerTransport? {
+  val sessionId = call.request.headers[MCP_SESSION_ID_HEADER]
+  if (sessionId.isNullOrEmpty()) {
+    call.respond(HttpStatusCode.BadRequest, "Missing $MCP_SESSION_ID_HEADER header")
+    return null
   }
-  catch (t: Throwable) {
-    if (t is CancellationException) throw t
-    respondJsonError(HttpStatusCode.BadRequest, -32700, "Failed to read request body: ${t.message ?: "unknown error"}")
-    return
+  val transport = transports[sessionId]
+  if (transport == null) {
+    call.respond(HttpStatusCode.NotFound, "Streamable HTTP session not found")
+    return null
   }
-
-  val parsed = try {
-    parseMessages(rawBody)
-  }
-  catch (t: Throwable) {
-    if (t is CancellationException) throw t
-    respondJsonError(
-      HttpStatusCode.BadRequest,
-      -32700,
-      "Invalid JSON-RPC payload: ${t.message ?: t.javaClass.simpleName}",
-    )
-    return
-  }
-
-  val sessionHeader = call.request.headers[StreamableHttpServerTransport.MCP_SESSION_ID_HEADER]
-  val hasInitialization = parsed.messages.any { message ->
-    message is JSONRPCRequest && message.method == Method.Defined.Initialize.value
-  }
-
-  val session = when {
-    sessionHeader != null -> sessions[sessionHeader]
-                             ?: run {
-                               respondJsonError(HttpStatusCode.NotFound, -32000, "Streamable HTTP session not found")
-                               return
-                             }
-    hasInitialization -> createStreamableSession(call, sessions, block)
-    else -> {
-      respondJsonError(
-        HttpStatusCode.BadRequest,
-        -32000,
-        "Missing ${StreamableHttpServerTransport.MCP_SESSION_ID_HEADER} header",
-      )
-      return
-    }
-  }
-
-  session.transport.handlePost(call, parsed.messages, parsed.isBatch)
+  return transport
 }
 
-private suspend fun RoutingContext.handleStreamableGet(
-  sessions: ConcurrentMap<String, StreamableSession>,
-) {
-  val session = findStreamableSession(sessions) ?: return
-  session.transport.handleGet(call)
-}
-
-private suspend fun RoutingContext.handleStreamableDelete(
-  sessions: ConcurrentMap<String, StreamableSession>,
-) {
-  val session = findStreamableSession(sessions) ?: return
-  session.transport.handleDelete(call)
-}
-
-private suspend fun RoutingContext.findStreamableSession(
-  sessions: ConcurrentMap<String, StreamableSession>,
-): StreamableSession? {
-  val sessionId = call.request.headers[StreamableHttpServerTransport.MCP_SESSION_ID_HEADER]
-                  ?: run {
-                    respondJsonError(
-                      HttpStatusCode.BadRequest,
-                      -32000,
-                      "Missing ${StreamableHttpServerTransport.MCP_SESSION_ID_HEADER} header",
-                    )
-                    return null
-                  }
-
-  val session = sessions[sessionId]
-  if (session == null) {
-    respondJsonError(HttpStatusCode.NotFound, -32000, "Streamable HTTP session not found")
+/**
+ * For POST: returns an existing transport from [activeTransports] if the client supplied a known
+ * session id, otherwise creates a new transport, wires lifecycle callbacks, and hands it to [block].
+ * Newly initialized transports are placed into [pendingTransports]. They are promoted to
+ * [activeTransports] when the client opens the GET SSE stream. If the client does not open the
+ * SSE stream within [PENDING_TRANSPORT_TIMEOUT], the transport is evicted and closed.
+ */
+private suspend fun obtainOrCreateStreamableTransport(
+  call: ApplicationCall,
+  activeTransports: ConcurrentMap<String, StreamableHttpServerTransport>,
+  pendingTransports: ConcurrentMap<String, StreamableHttpServerTransport>,
+  scope: CoroutineScope,
+  block: suspend (ApplicationCall, Transport) -> Pair<ServerSession, CoroutineScope>,
+  streamableSessionScopes: ConcurrentMap<String, CoroutineScope>,
+): StreamableHttpServerTransport? {
+  val incomingSessionId = call.request.headers[MCP_SESSION_ID_HEADER]
+  if (incomingSessionId != null) {
+    val existing = activeTransports[incomingSessionId] ?: pendingTransports[incomingSessionId]
+    if (existing != null) return existing
+    call.respond(HttpStatusCode.NotFound, "Streamable HTTP session not found")
     return null
   }
 
-  return session
-}
+  val transport = StreamableHttpServerTransport(
+    StreamableHttpServerTransport.Configuration(enableJsonResponse = true)
+  )
 
-private suspend fun createStreamableSession(
-  applicationCall: ApplicationCall,
-  sessions: ConcurrentMap<String, StreamableSession>,
-  block: suspend (ApplicationCall, Transport) -> ServerSession,
-): StreamableSession {
-  val transport = StreamableHttpServerTransport()
+  transport.setOnSessionInitialized { initializedId ->
+    pendingTransports[initializedId] = transport
+    logger.trace { "New StreamableHttp session initialized with sessionId: $initializedId" }
 
-  transport.onError {
-    logger.error("Error in Streamable HTTP transport", it)
+    // drop if client never opens a GET SSE stream.
+    scope.launch(CoroutineName("pending-transport-timeout-$initializedId")) {
+      delay(PENDING_TRANSPORT_TIMEOUT)
+      if (pendingTransports.remove(initializedId) != null) {
+        streamableSessionScopes.remove(initializedId)
+        logger.warn("Pending StreamableHttp transport timed out without SSE stream: $initializedId")
+        try { transport.close() } catch (_: Exception) {}
+      }
+    }
+  }
+  transport.setOnSessionClosed { closedId ->
+    pendingTransports.remove(closedId)
+    activeTransports.remove(closedId)
+    streamableSessionScopes.remove(closedId)
+    logger.trace { "StreamableHttp session closed: $closedId" }
   }
 
-  val serverSession = block(applicationCall, transport)
-
+  val (serverSession, scope) = block(call, transport)
+  streamableSessionScopes[serverSession.sessionId] = scope
+  transport.setSessionIdGenerator {
+    serverSession.sessionId
+  }
   serverSession.onClose {
-    logger.trace { "Server closed for Streamable HTTP session ${transport.sessionId}" }
-    sessions.remove(transport.sessionId)
+    val id = transport.sessionId
+    if (id != null) {
+      pendingTransports.remove(id)
+      activeTransports.remove(id)
+      streamableSessionScopes.remove(id)
+      logger.trace { "Server connection closed for StreamableHttp sessionId: $id" }
+    }
   }
 
-  val session = StreamableSession(transport, serverSession)
-  sessions[transport.sessionId] = session
-  logger.trace { "Streamable HTTP session started with id ${transport.sessionId}" }
-  return session
+  return transport
 }
 
-private fun parseMessages(body: String): ParsedMessages {
-  val element: JsonElement = McpJson.parseToJsonElement(body)
-  return when (element) {
-    is JsonArray -> ParsedMessages(
-      messages = element.map { McpJson.decodeFromJsonElement<JSONRPCMessage>(it) },
-      isBatch = true,
-    )
-    else -> ParsedMessages(
-      messages = listOf(McpJson.decodeFromJsonElement<JSONRPCMessage>(element)),
-      isBatch = false,
-    )
+private fun ServerSSESession.launchSseHeartbeat() {
+  launch(CoroutineName("sse-heartbeat")) {
+    while (isActive) {
+      send(SSE_HEARTBEAT_EVENT)
+      delay(SSE_HEARTBEAT_PERIOD)
+    }
   }
 }
-
-private suspend fun RoutingContext.respondJsonError(status: HttpStatusCode, code: Int, message: String) {
-  val json = buildJsonObject {
-    put("jsonrpc", JsonPrimitive("2.0"))
-    put(
-      "error",
-      buildJsonObject {
-        put("code", JsonPrimitive(code))
-        put("message", JsonPrimitive(message))
-      },
-    )
-    put("id", JsonNull)
-  }
-  call.respondText(json.toString(), ContentType.Application.Json, status)
-}
-
-private data class ParsedMessages(val messages: List<JSONRPCMessage>, val isBatch: Boolean)
-private data class StreamableSession(val transport: StreamableHttpServerTransport, val server: ServerSession)
 
 //–– your custom context element
 class HttpRequestElement(val request: ApplicationRequest) : CoroutineContext.Element {
   companion object Key : CoroutineContext.Key<HttpRequestElement>
+
   override val key: CoroutineContext.Key<*> = Key
 }
 
@@ -296,4 +311,3 @@ fun Application.installHttpRequestPropagation() {
 }
 
 val CoroutineContext.httpRequestOrNull: ApplicationRequest? get() = get(HttpRequestElement)?.request
-val CoroutineContext.mcpSessionId: String? get() = httpRequestOrNull?.queryParameters?.get("sessionId")

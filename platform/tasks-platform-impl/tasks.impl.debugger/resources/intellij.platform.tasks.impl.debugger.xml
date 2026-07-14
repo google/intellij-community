@@ -1,0 +1,12 @@
+<idea-plugin>
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+  <dependencies>
+    <module name="intellij.platform.tasks"/>
+    <module name="intellij.platform.tasks.impl"/>
+  </dependencies>
+  <!-- endregion -->
+  <extensions defaultExtensionNs="com.intellij">
+    <tasks.contextProvider implementation="com.intellij.platform.tasks.impl.debugger.XDebuggerBreakpointsContextProvider"/>
+    <tasks.contextProvider implementation="com.intellij.platform.tasks.impl.debugger.XDebuggerWatchesProvider"/>
+  </extensions>
+</idea-plugin>

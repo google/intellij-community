@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.java.codeInsight.completion.commands
 
 import com.intellij.codeInsight.CodeInsightBundle
@@ -7,13 +7,18 @@ import com.intellij.codeInsight.completion.command.CommandCompletionLookupElemen
 import com.intellij.codeInsight.completion.command.LookupElementCustomPreviewHolderDocumentationProvider
 import com.intellij.codeInsight.completion.command.configuration.CommandCompletionSettingsService
 import com.intellij.codeInsight.daemon.impl.ProblemDescriptorWithReporterName
+import com.intellij.codeInsight.highlighting.HighlightManager
+import com.intellij.codeInsight.highlighting.HighlightManagerImpl
 import com.intellij.codeInsight.hint.HintManager
 import com.intellij.codeInsight.hint.HintManagerImpl
 import com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
 import com.intellij.codeInsight.lookup.LookupElementCustomPreviewHolder
 import com.intellij.codeInsight.lookup.LookupElementPresentation
+import com.intellij.codeInsight.lookup.LookupManager
 import com.intellij.codeInsight.template.impl.LiveTemplateCompletionContributor
 import com.intellij.codeInsight.template.impl.TemplateManagerImpl
+import com.intellij.codeInsight.template.postfix.settings.PostfixTemplatesSettings
+import com.intellij.codeInspection.IntentionAndQuickFixAction
 import com.intellij.codeInspection.LocalInspectionTool
 import com.intellij.codeInspection.LocalQuickFix
 import com.intellij.codeInspection.ProblemDescriptor
@@ -45,6 +50,7 @@ import com.intellij.psi.CommonClassNames.JAVA_LANG_CLASS
 import com.intellij.psi.JavaElementVisitor
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiElementVisitor
+import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiLocalVariable
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.testFramework.LightProjectDescriptor
@@ -116,6 +122,22 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
     """.trimIndent())
   }
 
+  fun testHighlighting() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+      class A { 
+          private String..getter<caret> aaaaaaaaaaaaaaaaa;
+      }
+      """.trimIndent())
+    val elements = myFixture.completeBasic()
+    val activeLookup = LookupManager.getInstance(project).activeLookup ?: error("Lookup not found")
+    activeLookup.currentItem = elements.firstOrNull { it.lookupString == "getter" }
+    val highlightManagerImpl = HighlightManager.getInstance(project) as HighlightManagerImpl
+    val highlighters = highlightManagerImpl.getHighlighters(editor)
+    val expectedRange = TextRange(15, 29)
+    assertTrue(highlighters.any { it.textRange == expectedRange })
+  }
+
   fun testFormatPreview() {
     Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
     myFixture.configureByText(JavaFileType.INSTANCE, """
@@ -146,7 +168,7 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
         } 
       }
     """.trimIndent()
-    assertEquals(preview.modifiedText(), expected)
+    assertEquals(expected, preview.modifiedText())
   }
 
   fun testPostfixPreview() {
@@ -176,7 +198,47 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
             System.out.println("\"string\" = " + "string");
         } 
       }""".trimIndent()
-    assertEquals(preview.modifiedText(), expected)
+    assertEquals(expected, preview.modifiedText())
+  }
+
+  fun testPostfixPreviewAfterDoubleDot() {
+    LiveTemplateCompletionContributor.setShowTemplatesInTests(true, getTestRootDisposable())
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    Registry.get("ide.completion.group.mode.enabled").setValue(true, getTestRootDisposable())
+    val settings = PostfixTemplatesSettings.getInstance()
+    val oldValue = settings.isShowAsSeparateGroup
+    settings.isShowAsSeparateGroup = true
+    try {
+      myFixture.configureByText(JavaFileType.INSTANCE, """
+        class A {
+          void foo() {
+            "string"..soutv<caret>
+          }
+        }
+        """.trimIndent())
+      val elements = myFixture.completeBasic()
+      val item = elements.first { element -> element.lookupString.contains("sout", ignoreCase = true) }
+        .`as`(LookupElementCustomPreviewHolder::class.java)
+      if (item == null) {
+        fail()
+        return
+      }
+      val preview = item.preview(ActionContext.from(myFixture.editor, myFixture.file))
+      if (preview !is IntentionPreviewInfo.CustomDiff) {
+        fail()
+        return
+      }
+      val expected = """
+        class A {
+          void foo() {
+              System.out.println("\"string\" = " + "string");
+          }
+        }""".trimIndent()
+      assertEquals(expected, preview.modifiedText())
+    }
+    finally {
+      settings.isShowAsSeparateGroup = oldValue
+    }
   }
 
   fun testFormatNothing() {
@@ -201,7 +263,7 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
       fail()
       return
     }
-    assertEquals(preview.content().toString(), CodeInsightBundle.message("command.completion.reformat.nothing"))
+    assertEquals(CodeInsightBundle.message("command.completion.reformat.nothing"), preview.content().toString())
   }
 
   fun testFormatWholeMethod() {
@@ -1748,6 +1810,49 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
     assertTrue(elements.none { element -> element.lookupString.contains("toString", ignoreCase = true) })
   }
 
+  fun testNoJavaCompletionAfterSingleDotInParameterList() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+        class A {
+            void method(String.<caret> text) {
+            }
+        }
+      """.trimIndent())
+    val elements = myFixture.completeBasic()
+    assertTrue(elements == null || elements.isEmpty())
+  }
+
+  fun testVarargsDotCommandIsFirstAfterDoubleDotInParameterList() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+        class A {
+            void method(String..<caret> text) {
+            }
+        }
+      """.trimIndent())
+    val elements = myFixture.completeBasic()
+    assertEquals(".", elements.first().lookupString)
+    assertNotNull(elements.first().`as`(CommandCompletionLookupElement::class.java))
+  }
+
+  fun testVarargsDotCommandInsert() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+        class A {
+            void method(String..<caret> text) {
+            }
+        }
+      """.trimIndent())
+    val elements = myFixture.completeBasic()
+    selectItem(elements.first())
+    myFixture.checkResult("""
+        class A {
+            void method(String... text) {
+            }
+        }
+      """.trimIndent())
+  }
+
   fun testNoCreateFromUsagesAfterDoubleDot() {
     Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
     myFixture.configureByText(JavaFileType.INSTANCE, """
@@ -1878,7 +1983,8 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
     }""".trimIndent())
     val elements = myFixture.completeBasic()
     assertTrue(elements.any { element ->
-      element.lookupString.contains("Parameter info", ignoreCase = true) })
+      element.lookupString.contains("Parameter info", ignoreCase = true)
+    })
   }
 
   fun testShowLiveTemplate() {
@@ -1894,9 +2000,49 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
     assertNotNull(elements.firstOrNull { element -> element.lookupString.contains("Live template", ignoreCase = true) })
   }
 
+  fun testInsertLiveTemplate() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+      class A {
+          void foo() {
+              .insert<caret>
+          }
+      }
+      """.trimIndent())
+    val elements = myFixture.completeBasic()
+    assertNotNull(elements.firstOrNull { element -> element.lookupString.contains("Live template", ignoreCase = true) })
+  }
+
   fun testDynamicGroupToolInspection() {
     Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
     myFixture.enableInspections(MockDynamicGroupInspection(), MockDynamicGroupChildInspection())
+    myFixture.configureByText(JavaFileType.INSTANCE, """
+      class A { 
+        void foo() {
+          int badToken<caret> = 1;
+        } 
+      }
+      """.trimIndent())
+    myFixture.doHighlighting()
+    myFixture.type(".")
+    val elements = myFixture.completeBasic()
+    val command = elements.first { element ->
+      element.lookupString.contains("Replace bad token", ignoreCase = true) &&
+      element.`as`(CommandCompletionLookupElement::class.java) != null
+    }
+    selectItem(command)
+    myFixture.checkResult("""
+      class A { 
+        void foo() {
+          int goodToken = 1;
+        } 
+      }
+    """.trimIndent())
+  }
+
+  fun testFixRenamesItselfDuringIsAvailable() {
+    Registry.get("ide.completion.command.force.enabled").setValue(true, getTestRootDisposable())
+    myFixture.enableInspections(MockRenamingFixInspection())
     myFixture.configureByText(JavaFileType.INSTANCE, """
       class A { 
         void foo() {
@@ -1963,5 +2109,47 @@ class JavaCommandsCompletionTest : LightFixtureCompletionTestCase() {
     override fun getShortName(): String = "MockDynamicGroupChild"
     override fun getDisplayName(): String = "Mock dynamic group child"
     override fun getGroupDisplayName(): String = "Mock"
+  }
+
+  private class MockRenamingFixInspection : LocalInspectionTool() {
+    override fun getShortName(): String = "MockRenamingFix"
+    override fun getDisplayName(): String = "Mock renaming fix"
+    override fun getGroupDisplayName(): String = "Mock"
+
+    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+      return object : JavaElementVisitor() {
+        override fun visitLocalVariable(variable: PsiLocalVariable) {
+          val nameIdentifier = variable.nameIdentifier ?: return
+          if (nameIdentifier.text != "badToken") return
+          holder.registerProblem(nameIdentifier, "Bad token", ProblemHighlightType.GENERIC_ERROR_OR_WARNING, RenamingFix())
+        }
+      }
+    }
+  }
+
+  private class RenamingFix : IntentionAndQuickFixAction() {
+    private var renamed = false
+
+    override fun getFamilyName(): String = "Renaming family"
+    override fun applyFix(
+      project: Project,
+      psiFile: PsiFile?,
+      editor: Editor?,
+    ) {
+      val identifier = psiFile?.findElementAt((editor?.caretModel?.offset ?: 1) - 1) ?: return
+      val factory = JavaPsiFacade.getElementFactory(project)
+      identifier.replace(factory.createIdentifier("goodToken"))
+    }
+
+    override fun getName(): String = if (renamed) "Replace bad token" else "Initial name"
+
+    override fun getText(): String = name
+
+    override fun isAvailable(project: Project, editor: Editor?, file: PsiFile?): Boolean {
+      renamed = true
+      return true
+    }
+
+    override fun startInWriteAction(): Boolean = true
   }
 }

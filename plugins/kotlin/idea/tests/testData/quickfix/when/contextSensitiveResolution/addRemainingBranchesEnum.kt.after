@@ -1,7 +1,7 @@
 // "Add remaining branches" "true"
 // COMPILER_ARGUMENTS: -Xcontext-sensitive-resolution
-// K2_ERROR: 'when' expression must be exhaustive. Add the 'R', 'G' branches or an 'else' branch.
-// IGNORE_K1
+// K2_ERROR: NO_ELSE_IN_WHEN
+
 package test
 
 enum class Color { R, G, B }

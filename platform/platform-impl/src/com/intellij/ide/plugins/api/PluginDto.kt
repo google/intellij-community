@@ -12,13 +12,11 @@ import com.intellij.ide.plugins.newui.PluginSource
 import com.intellij.ide.plugins.newui.PluginUiModel
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.FUSEventSource
-import com.intellij.openapi.util.IntellijInternalApi
 import kotlinx.serialization.Serializable
 import org.jetbrains.annotations.ApiStatus
 
 @Serializable
 @ApiStatus.Internal
-@IntellijInternalApi
 class PluginDto(
   override var name: String? = null,
   override var pluginId: PluginId,
@@ -38,7 +36,7 @@ class PluginDto(
   override var allowBundledUpdate: Boolean = false
   override var isPaid: Boolean = false
   override var source: PluginSource? = null
-  override var dependencies: MutableList<PluginDependencyModel> = mutableListOf()
+  override var dependencies: List<PluginDependencyModel> = emptyList()
   override var dependencyNames: Collection<String>? = null
   override var suggestedFeatures: Collection<String> = emptyList()
   override var vendor: String? = null
@@ -96,7 +94,7 @@ class PluginDto(
   }
 
   override fun addDependency(id: PluginId, optional: Boolean) {
-    dependencies.add(PluginDependencyModel(id, optional))
+    dependencies = dependencies + PluginDependencyModel(id, optional)
   }
 
   override fun equals(other: Any?): Boolean {
@@ -134,7 +132,7 @@ class PluginDto(
         allowBundledUpdate = model.allowBundledUpdate
         isPaid = model.isPaid
         source = model.source
-        dependencies = model.dependencies.toMutableList()
+        dependencies = model.dependencies.toList()
         dependencyNames = model.dependencyNames?.toList()
         suggestedFeatures = model.suggestedFeatures.toList()
         vendor = model.vendor

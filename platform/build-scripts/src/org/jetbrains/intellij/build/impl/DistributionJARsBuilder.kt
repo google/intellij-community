@@ -42,6 +42,7 @@ import org.jetbrains.intellij.build.classPath.generateClassPathByLayoutReport
 import org.jetbrains.intellij.build.classPath.generateCoreClasspathFromPlugins
 import org.jetbrains.intellij.build.executeStep
 import org.jetbrains.intellij.build.fus.createStatisticsRecorderBundledMetadataProviderTask
+import org.jetbrains.intellij.build.impl.moduleRepository.generateRuntimeModuleRepositoryForDistribution
 import org.jetbrains.intellij.build.impl.plugins.BundledPluginsBuildResult
 import org.jetbrains.intellij.build.impl.plugins.buildBundledPlugins
 import org.jetbrains.intellij.build.impl.plugins.buildBundledPluginsForAllPlatforms
@@ -445,6 +446,7 @@ suspend fun testBuildBundledPluginsForAllPlatforms(
   buildPlatformJob: Deferred<List<DistributionFileEntry>>,
   descriptorCacheContainer: DescriptorCacheContainer,
   context: BuildContext,
+  includeAdditionalPlugins: Boolean = true,
 ): List<DistFile> {
   buildBundledPluginsForAllPlatforms(
     state = state,
@@ -454,6 +456,7 @@ suspend fun testBuildBundledPluginsForAllPlatforms(
     isUpdateFromSources = false,
     searchableOptionSetDescriptor = null,
     descriptorCacheContainer = descriptorCacheContainer,
+    includeAdditionalPlugins = includeAdditionalPlugins,
   )
   return context.getDistFiles(os = null, arch = null, libcImpl = null).filter { it.relativePath == PLUGIN_CLASSPATH }
 }
@@ -680,6 +683,19 @@ internal suspend fun layoutPlatformDistribution(
           val sourceBytes = context.outputProvider.readFileContentFromModuleOutput(module, relativePath) ?: error("app info not found")
           val patchedBytes = injectAppInfo(inFileBytes = sourceBytes, newFieldValue = context.appInfoXml)
           moduleOutputPatcher.patchModuleOutput(moduleName = moduleName, path = relativePath, content = patchedBytes)
+
+          // keep the packaged descriptor in sync with the baked constant, so it isn't shipped with raw placeholders
+          val appInfoModuleName = context.productProperties.applicationInfoModule
+          val appInfoResourcePath = "idea/${context.productProperties.platformPrefix ?: ""}ApplicationInfo.xml"
+          val appInfoModule = context.outputProvider.findRequiredModule(appInfoModuleName)
+          if (context.outputProvider.readFileContentFromModuleOutput(appInfoModule, appInfoResourcePath) != null) {
+            moduleOutputPatcher.patchModuleOutput(
+              moduleName = appInfoModuleName,
+              path = appInfoResourcePath,
+              content = context.appInfoXml,
+              overwrite = PatchOverwriteMode.TRUE,
+            )
+          }
         }
       }
     }

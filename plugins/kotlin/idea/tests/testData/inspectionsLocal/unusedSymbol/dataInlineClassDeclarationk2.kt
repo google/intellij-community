@@ -1,8 +1,11 @@
-// PROBLEM: [UNRESOLVED_REFERENCE] Unresolved reference 'Unresolved'.
+// PROBLEM: [UNRESOLVED_REFERENCE]
 // ERROR: Modifier 'data' is incompatible with 'inline'.
 // ERROR: Modifier 'inline' is incompatible with 'data'.
 // ERROR: Unresolved reference 'Unresolved'.
-// IGNORE_K1
+// K2_ERROR: INCOMPATIBLE_MODIFIERS
+// K2_ERROR: INCOMPATIBLE_MODIFIERS
+// K2_ERROR: UNRESOLVED_REFERENCE
+
 // ACTION: Create object 'Unresolved'
 // ACTION: Create enum 'Unresolved'
 // ACTION: Create class 'Unresolved'

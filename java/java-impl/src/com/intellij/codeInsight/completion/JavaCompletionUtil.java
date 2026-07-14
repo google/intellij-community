@@ -186,6 +186,10 @@ import static com.intellij.psi.util.proximity.ReferenceListWeigher.ReferenceList
  * Helper methods to support Java code completion functionality.
  */
 public final class JavaCompletionUtil {
+  /**
+   * Pattern matching PsiElements that are after a dot character.
+   */
+  public static final ElementPattern<PsiElement> AFTER_DOT = psiElement().afterLeaf(".");
   private static final ElementPattern<PsiElement> UNEXPECTED_REFERENCE_AFTER_DOT = or(
     // dot at the statement beginning
     psiElement().afterLeaf(".").insideStarting(psiExpressionStatement()),
@@ -623,6 +627,10 @@ public final class JavaCompletionUtil {
     return false;
   }
 
+  /**
+   * @param position the PsiElement to check
+   * @return true if the position is inside a parameter list, false otherwise
+   */
   public static boolean isInsideParameterList(PsiElement position) {
     PsiElement prev = PsiTreeUtil.prevVisibleLeaf(position);
     PsiModifierList modifierList = PsiTreeUtil.getParentOfType(prev, PsiModifierList.class);
@@ -636,10 +644,19 @@ public final class JavaCompletionUtil {
     return INSIDE_PARAMETER_LIST.accepts(position);
   }
 
+  /**
+   * @param element the PSI element to be checked.
+   * @return true if the element is located after a primitive type or an array (like {@code int.} or {@code int[].}), 
+   * so it makes sense to suggest {@code .class} there. 
+   */
   public static boolean isAfterPrimitiveOrArrayType(PsiElement element) {
     return AFTER_PRIMITIVE_OR_ARRAY.accepts(element);
   }
 
+  /**
+   * @param position element to be checked
+   * @return true if the element is located after a dot, which follows the type, like {@code String.} or {@code int.}.
+   */
   public static boolean isAfterTypeDot(PsiElement position) {
     if (isInsideParameterList(position) || position.getContainingFile() instanceof PsiJavaCodeReferenceCodeFragment) {
       return false;
@@ -709,6 +726,10 @@ public final class JavaCompletionUtil {
     return isEndOfBlock(position);
   }
 
+  /**
+   * @param position position to test
+   * @return true if the element looks like a declaration start, i.e. it's a valid place to start a new declaration.
+   */
   public static boolean isDeclarationStart(@NotNull PsiElement position) {
     if (psiElement().afterLeaf("@", ".").accepts(position)) return false;
 
@@ -724,6 +745,11 @@ public final class JavaCompletionUtil {
     return false;
   }
 
+  /**
+   * @param position position to test
+   * @return true if the element looks like a reference but it's not expected after dot in the current position,
+   * so it doesn't make sense to provide reference completion at this point.
+   */
   public static boolean isUnexpectedReferenceAfterDot(PsiElement position) {
     return UNEXPECTED_REFERENCE_AFTER_DOT.accepts(position);
   }

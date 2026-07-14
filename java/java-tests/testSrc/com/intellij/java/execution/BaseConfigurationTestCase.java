@@ -70,12 +70,22 @@ public abstract class BaseConfigurationTestCase extends JavaProjectTestCase {
   }
 
   protected void createModule(VirtualFile module1Content, boolean addSource) {
-    createModule(module1Content, addSource, "JUnit4");
+    createModule(module1Content,
+                 addSource,
+                 "JUnit4",
+                 IntelliJProjectConfiguration.getModuleLibrary("intellij.libraries.junit4", "JUnit4"));
   }
 
   protected void createModule(VirtualFile module1Content,
                               boolean addSource,
                               String junitLibName) {
+    createModule(module1Content, addSource, junitLibName, IntelliJProjectConfiguration.getProjectLibrary(junitLibName));
+  }
+
+  protected void createModule(VirtualFile module1Content,
+                              boolean addSource,
+                              String junitLibName,
+                              IntelliJProjectConfiguration.LibraryRoots junitLibrary) {
     Module module = createEmptyModule();
     if (addSource) {
       PsiTestUtil.addSourceRoot(module, module1Content, true);
@@ -84,8 +94,7 @@ public abstract class BaseConfigurationTestCase extends JavaProjectTestCase {
       PsiTestUtil.addContentRoot(module, module1Content);
     }
 
-    IntelliJProjectConfiguration.LibraryRoots junit4Library = IntelliJProjectConfiguration.getProjectLibrary(junitLibName);
-    ModuleRootModificationUtil.addModuleLibrary(module, junitLibName, junit4Library.getClassesUrls(), junit4Library.getSourcesUrls());
+    ModuleRootModificationUtil.addModuleLibrary(module, junitLibName, junitLibrary.getClassesUrls(), junitLibrary.getSourcesUrls());
     ModuleRootModificationUtil.setModuleSdk(module, ModuleRootManager.getInstance(myModule).getSdk());
     GlobalSearchScope scope = GlobalSearchScope.moduleWithDependenciesAndLibrariesScope(module);
     if ("JUnit4".equals(junitLibName)) {

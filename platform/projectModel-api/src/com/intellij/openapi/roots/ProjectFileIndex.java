@@ -5,7 +5,6 @@ import com.intellij.openapi.fileTypes.FileTypeRegistry;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.impl.RootDescriptor;
-import com.intellij.openapi.util.IntellijInternalApi;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.platform.workspace.jps.entities.LibraryEntity;
 import com.intellij.platform.workspace.jps.entities.SdkEntity;
@@ -145,7 +144,7 @@ public interface ProjectFileIndex extends FileIndex {
    * @deprecated name of this method may be misleading, actually it doesn't check that {@code file} has the 'class' extension. 
    * Use {@link #isInLibraryClasses} with additional {@code !file.isDirectory()} check instead.   
    */
-  @Deprecated
+  @Deprecated(forRemoval = true)
   @RequiresReadLock
   boolean isLibraryClassFile(@NotNull VirtualFile file);
 
@@ -232,7 +231,6 @@ public interface ProjectFileIndex extends FileIndex {
 
   /// Use [com.intellij.workspaceModel.core.fileIndex.WorkspaceFileIndex.getContentFileSetRoot] instead
   @ApiStatus.Internal
-  @IntellijInternalApi
   @Nullable VirtualFile getWorkspaceContentFileSetRoot(@NotNull VirtualFile fileOrDir);
 
   @ApiStatus.Internal

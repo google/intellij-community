@@ -452,10 +452,10 @@
       "greenForeground": "white",
       "purpleSecondaryBackground": "#8060DB29",
       "purpleSecondaryForeground": "purple-70",
-      "graySecondaryBackground": "#73767C1F",
-      "graySecondaryForeground": "gray-80",
-      "disabledBackground": "#73767C1F",
-      "disabledForeground": "gray-110"
+      "graySecondaryBackground": "#191A1C1A",
+      "graySecondaryForeground": "gray-70",
+      "disabledBackground": "#191A1C1A",
+      "disabledForeground": "#191A1C66"
     },
 
     "Banner": {
@@ -1255,6 +1255,13 @@
     },
 
     "MenuBar.borderColor": "main-window-border",
+    "Diff": {
+      "ContentTitle.gap": 6,
+      "ContentTitle.insets": "6,6,6,6",
+      "HeaderToolbarPanel": {
+        "UI": "com.intellij.diff.impl.ui.DiffToolbarIslandPanelUI"
+      }
+    },
 
     "VersionControl": {
       "Log": {
@@ -1655,6 +1662,13 @@
       "lineSeparatorColor": "#EBECF0"
     },
 
+    "NuGet": {
+      "section": {
+        "background": "#F7F8F9",
+        "hoverBackground": "#F0F1F5"
+      }
+    },
+
     "DataSummary.Chart.barColor": "#3574F0",
 
     "ManagedIdeBadgeBorder": "#DFE1E5",
@@ -1678,6 +1692,12 @@
       "errorBackground": "#FFFAEB",
       "errorBorder": "#FED277",
       "errorForeground": "#000000"
+    },
+
+    "AgentPicker": {
+      "Advertiser": {
+        "background": "gray-160"
+      }
     }
   },
 

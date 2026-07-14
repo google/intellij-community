@@ -49,6 +49,7 @@ public final class GradleCommonClassNames {
   public static final @NonNls String GRADLE_API_FILE_FILE_COLLECTION = "org.gradle.api.file.FileCollection";
   public static final @NonNls String GRADLE_API_FILE_CONFIGURABLE_FILE_TREE = "org.gradle.api.file.ConfigurableFileTree";
   public static final @NonNls String GRADLE_API_FILE_CONFIGURABLE_FILE_COLLECTION = "org.gradle.api.file.ConfigurableFileCollection";
+  public static final @NonNls String GRADLE_API_FILE_SYSTEM_LOCATION_PROPERTY = "org.gradle.api.file.FileSystemLocationProperty";
   public static final @NonNls String GRADLE_API_SCRIPT_HANDLER = "org.gradle.api.initialization.dsl.ScriptHandler";
   public static final @NonNls String GRADLE_API_VERSION_CATALOG_BUILDER = "org.gradle.api.initialization.dsl.VersionCatalogBuilder";
   public static final @NonNls String GRADLE_API_TASK = "org.gradle.api.Task";

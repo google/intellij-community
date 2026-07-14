@@ -42,8 +42,6 @@ class ModuleBasedPluginLayoutProvider(
     productModules = ProductModulesSerialization.loadProductModules(
       productModulesPath.inputStream(),
       productModulesPath.pathString,
-      productMode,
-      runtimeModuleRepository,
       resourceFileResolver,
     )
     mainModulesOfBundledPlugins = productModules.bundledPluginDescriptorModules.mapTo(HashSet()) { it.name }
@@ -52,8 +50,8 @@ class ModuleBasedPluginLayoutProvider(
       { pluginDescriptorModule ->
         val header = runtimeModuleRepository.findBundledPluginHeader(pluginDescriptorModule) ?: return@associateBy emptyList()
         header.includedModules
-          .filter { it.loadingRule == RuntimeModuleLoadingRule.EMBEDDED && it.moduleId.namespace != RuntimeModuleId.LEGACY_JPS_LIBRARY_NAMESPACE
-                    && it.moduleId.namespace != RuntimeModuleId.LEGACY_JPS_MODULE_TESTS_NAMESPACE }
+          .filter { it.loadingRule == RuntimeModuleLoadingRule.EMBEDDED && !it.moduleId.namespace.endsWith(RuntimeModuleId.LEGACY_JPS_LIBRARY_NAMESPACE_SUFFIX)
+                    && !it.moduleId.namespace.endsWith(RuntimeModuleId.LEGACY_JPS_MODULE_TESTS_NAMESPACE_SUFFIX) }
           .map { it.moduleId.name }
       })
   }
@@ -67,7 +65,7 @@ class ModuleBasedPluginLayoutProvider(
       .asSequence()
       .filter { it.loadingRule == RuntimeModuleLoadingRule.EMBEDDED }
       .map { it.moduleId }
-      .filterNot { it.namespace == RuntimeModuleId.LEGACY_JPS_LIBRARY_NAMESPACE }
+      .filterNot { it.namespace.endsWith(RuntimeModuleId.LEGACY_JPS_LIBRARY_NAMESPACE_SUFFIX) }
       .mapNotNull {
         project.findModuleByName(it.name)
       }

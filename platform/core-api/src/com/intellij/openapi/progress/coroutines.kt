@@ -13,12 +13,12 @@ import com.intellij.openapi.application.runReadActionBlocking
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.Computable
-import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.util.progress.internalCreateRawHandleFromContextStepIfExistsAndFresh
 import com.intellij.platform.util.progress.reportRawProgress
 import com.intellij.util.IntelliJCoroutinesFacade
+import com.intellij.util.SystemProperties
 import com.intellij.util.concurrency.BlockingJob
 import com.intellij.util.concurrency.ThreadScopeCheckpoint
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
@@ -601,16 +601,18 @@ fun <T> jobToIndicator(job: Job, indicator: ProgressIndicator, action: () -> T):
   }
 }
 
-@IntellijInternalApi
 @Internal
 fun assertRunBlockingBackgroundThreadAndNoWriteAction() {
-  if (!EDT.isCurrentThreadEdt()) {
-    return
-  }
-
   val app = ApplicationManager.getApplication()
-  if (!app.isDispatchThread || (app.isUnitTestMode && !Registry.`is`("ide.run.blocking.cancellable.assert.in.tests", false))) {
-    return // OK
+
+  val ok = (
+    (!EDT.isCurrentThreadEdt() && !app.isDispatchThread)
+    || (app.isUnitTestMode && !Registry.`is`("ide.run.blocking.cancellable.assert.in.tests", false))
+    // Shared indexes builder runs in a headless mode, and calls `ExternalSystemProjectAware.getSettingsFiles` under WA leading to PY-90652
+    || (app.isHeadlessEnvironment && !SystemProperties.getBooleanProperty("intellij.progress.task.ignoreHeadless", false)))
+
+  if (ok) {
+    return
   }
 
   if (app.isWriteAccessAllowed && !app.isTopmostReadAccessAllowed) {
@@ -627,13 +629,11 @@ fun assertRunBlockingBackgroundThreadAndNoWriteAction() {
   ))
 }
 
-@IntellijInternalApi
 @Internal
 fun getLockPermitContext(forSharing: Boolean = false): Pair<CoroutineContext, AccessToken> {
   return getLockPermitContext(currentThreadContext(), forSharing)
 }
 
-@IntellijInternalApi
 @Internal
 fun getLockPermitContext(baseContext: CoroutineContext, forSharing: Boolean): Pair<CoroutineContext, AccessToken> {
   val application = ApplicationManager.getApplication()
@@ -668,7 +668,6 @@ fun getLockPermitContext(baseContext: CoroutineContext, forSharing: Boolean): Pa
   }
 }
 
-@IntellijInternalApi
 @Internal
 fun CoroutineContext.isRunBlockingUnderReadAction(): Boolean {
   val application = ApplicationManager.getApplication()

@@ -1,7 +1,11 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.sdk
 
+import com.jetbrains.python.allure.Layers
+import com.jetbrains.python.allure.Subsystems
+
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.application.runWriteActionAndWait
 import com.intellij.openapi.module.Module
@@ -27,6 +31,7 @@ import com.jetbrains.python.PythonMockSdk
 import com.jetbrains.python.PythonPluginDisposable
 import com.jetbrains.python.psi.LanguageLevel
 import com.jetbrains.python.psi.PyUtil
+import com.jetbrains.python.sdk.legacy.PythonSdkUtil
 import org.jdom.Element
 import org.jetbrains.annotations.NotNull
 import org.junit.Assume.assumeTrue
@@ -34,7 +39,9 @@ import org.junit.ClassRule
 import org.junit.Rule
 import org.junit.Test
 
-class PySdkPathsTest {
+@Subsystems.Interpreters
+@Layers.Functional
+internal class PySdkPathsTest {
 
   companion object {
     @JvmField
@@ -48,6 +55,7 @@ class PySdkPathsTest {
 
   @Test
   fun sysPathEntryIsExcludedPath() {
+    createModule()
     val sdk = PythonMockSdk.create()
 
     val excluded = createInSdkRoot(sdk, "my_excluded")
@@ -56,7 +64,7 @@ class PySdkPathsTest {
     sdk.putUserData(PythonSdkType.MOCK_SYS_PATH_KEY, listOf(sdk.homePath, excluded.path, included.path))
     mockPythonPluginDisposable()
     runWriteActionAndWait {
-      sdk.getOrCreateAdditionalData()
+      sdk.pySdkAdditionalData
 
       sdk.sdkModificator.apply {
         (sdkAdditionalData as PythonSdkAdditionalData).setExcludedPathsFromVirtualFiles(setOf(excluded))
@@ -84,7 +92,7 @@ class PySdkPathsTest {
       module.pythonSdk = it
     }
 
-    runWriteActionAndWait { sdk.getOrCreateAdditionalData() }.apply { setAddedPathsFromVirtualFiles(setOf(moduleRoot)) }
+    runWriteActionAndWait { sdk.pySdkAdditionalData }.apply { setAddedPathsFromVirtualFiles(setOf(moduleRoot)) }
 
     updateSdkPaths(sdk)
 
@@ -125,7 +133,7 @@ class PySdkPathsTest {
 
     mockPythonPluginDisposable()
     runWriteActionAndWait {
-      sdk.getOrCreateAdditionalData()
+      sdk.pySdkAdditionalData
 
       sdk.sdkModificator.apply {
         (sdkAdditionalData as PythonSdkAdditionalData).setAddedPathsFromVirtualFiles(setOf(userAddedPath))
@@ -196,7 +204,7 @@ class PySdkPathsTest {
     mockPythonPluginDisposable()
 
     runWriteActionAndWait {
-      sdk.getOrCreateAdditionalData()
+      sdk.pySdkAdditionalData
 
       sdk.sdkModificator.apply {
         (sdkAdditionalData as PythonSdkAdditionalData).setAddedPathsFromVirtualFiles(setOf(userAddedPath))
@@ -250,9 +258,9 @@ class PySdkPathsTest {
 
   @Test
   fun sysPathEntryPointingToAnotherModuleRootConfiguresModuleDependency() {
-    assumeTrue("The registry key 'python.detect.cross.module.dependencies' is not enabled", 
+    assumeTrue("The registry key 'python.detect.cross.module.dependencies' is not enabled",
                Registry.`is`("python.detect.cross.module.dependencies"))
-    
+
     val (module1, moduleRoot1) = createModule("m1")
     val (module2, moduleRoot2) = createModule("m2")
 
@@ -261,12 +269,12 @@ class PySdkPathsTest {
       module1.pythonSdk = it
     }
     mockPythonPluginDisposable()
-    
+
     sdk.putUserData(PythonSdkType.MOCK_SYS_PATH_KEY, listOf(moduleRoot2.path))
     updateSdkPaths(sdk)
-    checkRoots(sdk, module1, 
-               moduleRoots = listOf(moduleRoot1), 
-               sdkRoots = listOf(), 
+    checkRoots(sdk, module1,
+               moduleRoots = listOf(moduleRoot1),
+               sdkRoots = listOf(),
                moduleDependencies = listOf(module2))
 
     sdk.putUserData(PythonSdkType.MOCK_SYS_PATH_KEY, listOf())
@@ -279,10 +287,10 @@ class PySdkPathsTest {
 
   /**
    * PY-88807: SDKs with remote home paths (Docker Compose, SFTP, etc.) that lost their
-   * additional data during upgrades must not crash [getOrCreateAdditionalData].
+   * additional data during upgrades must not crash [pySdkAdditionalData].
    * Simulates the real scenario: an SDK is serialized with a remote home path, then
    * deserialized — [PythonSdkType.loadAdditionalData] returns [PyInvalidSdk] for stale
-   * remote interpreters, and [getOrCreateAdditionalData] must recognize it.
+   * remote interpreters, and [pySdkAdditionalData] must recognize it.
    */
   @Test
   fun getOrCreateAdditionalDataForRemoteSdkDoesNotCrash() {
@@ -309,9 +317,45 @@ class PySdkPathsTest {
       sdk.writeExternal(element)
       sdk.readExternal(element)
 
-      assertThat(sdk.sdkAdditionalData).isSameAs(PyInvalidSdk)
-      assertThat(sdk.getOrCreateAdditionalData()).isSameAs(PyInvalidSdk)
+      assertThat(sdk.sdkAdditionalData).isInstanceOf(PyInvalidSdk::class.java)
+      assertThat(sdk.pySdkAdditionalData).isInstanceOf(PyInvalidSdk::class.java)
     }
+  }
+
+  /**
+   * PY-90400: the SDK's own binary skeletons (and bundled typeshed) live under `~/.cache`. When the
+   * project's content root is an ancestor of that cache — e.g. in remote dev, where the whole home
+   * directory is opened as the project — those SDK-owned roots sit under a module content root but
+   * outside the interpreter's venv. The PY-86494 "project-local path" safety net must not drop them.
+   */
+  @Test
+  fun skeletonsUnderContentRootAreKept() {
+    mockPythonPluginDisposable()
+
+    val sdk = PythonMockSdk.create().also { registerSdk(it) }
+
+    // The SDK's binary skeletons live at <systemPath>/python_stubs/<hash>. Open the enclosing
+    // python_stubs directory as the module's content root so the skeletons dir sits under it, while
+    // the interpreter home (MockSdk test data) stays outside it — reproducing the reported topology.
+    val skeletonsRoot = runWriteActionAndWait {
+      VfsUtil.createDirectoryIfMissing(PythonSdkUtil.getSkeletonsRootPath(PathManager.getSystemPath()))
+    }!!
+
+    val module = projectModel.createModule("home")
+    ModuleRootManager.getInstance(module).modifiableModel.apply {
+      addContentEntry(skeletonsRoot)
+      runWriteActionAndWait { commit() }
+    }
+    IndexingTestUtil.waitUntilIndexesAreReady(projectModel.project)
+    module.pythonSdk = sdk
+
+    updateSdkPaths(sdk)
+
+    val skeletonsDir = LocalFileSystem.getInstance().refreshAndFindFileByPath(PythonSdkUtil.getSkeletonsPath(sdk)!!)
+    assertThat(skeletonsDir).describedAs("SDK skeletons directory should exist after the update").isNotNull
+    assertThat(sdk.rootProvider.getFiles(OrderRootType.CLASSES))
+      .describedAs("SDK-owned skeletons root under a content root must not be dropped (PY-90400)")
+      .contains(skeletonsDir)
   }
 
   private fun registerSdk(it: Sdk) {
@@ -328,7 +372,7 @@ class PySdkPathsTest {
     val module = projectModel.createModule(name)
     assertThat(PyUtil.getSourceRoots(module)).isEmpty()
 
-   ModuleRootManager.getInstance(module).modifiableModel.apply {
+    ModuleRootManager.getInstance(module).modifiableModel.apply {
       addContentEntry(moduleRoot)
       runWriteActionAndWait { commit() }
     }
@@ -373,7 +417,7 @@ class PySdkPathsTest {
     module: Module,
     moduleRoots: List<VirtualFile>,
     sdkRoots: List<VirtualFile>,
-    moduleDependencies: List<Module> = emptyList<Module>(),
+    moduleDependencies: List<Module> = emptyList(),
   ) {
     assertThat(PyUtil.getSourceRoots(module)).containsExactlyInAnyOrder(*moduleRoots.toTypedArray())
 

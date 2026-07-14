@@ -1,10 +1,6 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide
 
-import com.intellij.ide.GeneralSettings.Companion.OPEN_PROJECT_ASK
-import com.intellij.ide.GeneralSettings.Companion.OPEN_PROJECT_NEW_WINDOW
-import com.intellij.ide.GeneralSettings.Companion.OPEN_PROJECT_SAME_WINDOW
-import com.intellij.ide.GeneralSettings.Companion.OPEN_PROJECT_SAME_WINDOW_ATTACH
 import com.intellij.ide.ui.UINumericRange
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.application.ApplicationManager
@@ -16,6 +12,7 @@ import com.intellij.openapi.components.Storage
 import com.intellij.openapi.components.service
 import com.intellij.platform.ide.core.customization.IdeLifecycleUiCustomization
 import com.intellij.platform.ide.core.customization.ProjectLifecycleUiCustomization
+import com.intellij.platform.ide.core.customization.ProjectLifecycleUiCustomization.ReopenProjectsOnStartupMode
 import com.intellij.util.PlatformUtils
 import com.intellij.util.xmlb.annotations.OptionTag
 import kotlinx.coroutines.channels.BufferOverflow
@@ -23,6 +20,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import org.intellij.lang.annotations.MagicConstant
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.SystemDependent
 
@@ -41,9 +39,17 @@ class GeneralSettings : PersistentStateComponent<GeneralSettingsState> {
     }
 
   var isReopenLastProject: Boolean
-    get() = ProjectLifecycleUiCustomization.getInstance().canReopenProjectOnStartup && state.reopenLastProject
+    get() = when (ProjectLifecycleUiCustomization.getInstance().reopenProjectsOnStartupMode) {
+      ReopenProjectsOnStartupMode.USER_CONTROLLABLE -> state.reopenLastProject
+      ReopenProjectsOnStartupMode.ALWAYS -> true
+      ReopenProjectsOnStartupMode.NEVER -> false
+    }
     set(value) {
+      val changed = state.reopenLastProject != value
       state.reopenLastProject = value
+      if (changed) {
+        propertyChanged(PropertyNames.reopenLastProject)
+      }
     }
 
   var isDeletingToBin: Boolean
@@ -167,6 +173,7 @@ class GeneralSettings : PersistentStateComponent<GeneralSettingsState> {
     inactiveTimeout,
     autoSaveIfInactive,
     supportScreenReaders,
+    reopenLastProject,
   }
 
   var isSupportScreenReaders: Boolean
@@ -211,6 +218,7 @@ class GeneralSettings : PersistentStateComponent<GeneralSettingsState> {
   @MagicConstant(intValues = [OPEN_PROJECT_ASK.toLong(), OPEN_PROJECT_NEW_WINDOW.toLong(), OPEN_PROJECT_SAME_WINDOW.toLong(), OPEN_PROJECT_SAME_WINDOW_ATTACH.toLong()])
   internal annotation class OpenNewProjectOption
 
+  @get:ApiStatus.ScheduledForRemoval
   @get:Deprecated("Use {@link GeneralLocalSettings#getDefaultProjectDirectory()} instead.")
   val defaultProjectDirectory: @SystemDependent String?
     get() = state.defaultProjectDirectory

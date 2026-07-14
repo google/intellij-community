@@ -29,7 +29,6 @@ import com.intellij.internal.statistic.utils.StatisticsUploadAssistant;
 import com.intellij.lang.Language;
 import com.intellij.lang.annotation.HighlightSeverity;
 import com.intellij.lang.injection.InjectedLanguageManager;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ex.ApplicationEx;
 import com.intellij.openapi.application.ex.ApplicationManagerEx;
 import com.intellij.openapi.diagnostic.Logger;
@@ -77,6 +76,8 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
+import static com.intellij.openapi.diagnostic.LoggerKt.rethrowControlFlowException;
+
 final class InspectionRunner {
   private static final Logger LOG = Logger.getInstance(InspectionRunner.class);
   private final PsiFile myPsiFile;
@@ -85,7 +86,7 @@ final class InspectionRunner {
   private final boolean myInspectInjected;
   private final boolean myIsOnTheFly;
   private final boolean myDumbMode;
-  private final ProgressIndicator myProgress;
+  private final @NotNull ProgressIndicator myProgress;
   private final boolean myIgnoreSuppressed;
   private final InspectionProfileWrapper myInspectionProfileWrapper;
   private final Map<String, Set<PsiElement>> mySuppressedElements;
@@ -454,7 +455,7 @@ final class InspectionRunner {
                                psiElement -> context.holder.visitElement(psiElement, context.visitor));
     }
     catch (Throwable t) {
-      if (Logger.shouldRethrow(t)) throw t;
+      rethrowControlFlowException(t);
       LOG.error(t);
     }
   }
@@ -521,7 +522,7 @@ final class InspectionRunner {
         if (isSuppressedForHost || descriptorPsiElement != null && wrapper.getTool().isSuppressedFor(descriptorPsiElement)) {
           registerSuppressedElements(host, wrapper);
           // remove descriptor at index i from applying
-          descriptors = ContainerUtil.concat(descriptors.subList(0, i), descriptors.subList(i+1, descriptors.size()));
+          descriptors = ContainerUtil.remove(descriptors, i);
           if (LOG.isTraceEnabled()) {
             LOG.trace("startInspectingInjectedPsi:applyInjectedDescriptor: suppressed " + descriptor + " for tool " + wrapper);
           }

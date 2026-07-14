@@ -20,6 +20,8 @@ import com.intellij.util.ui.JBCachingScalableIcon
 import org.intellij.lang.annotations.MagicConstant
 import java.awt.Component
 import java.awt.Graphics
+import java.util.Collections
+import java.util.IdentityHashMap
 import java.util.function.Supplier
 import javax.swing.Icon
 import javax.swing.SwingConstants
@@ -45,6 +47,13 @@ open class LayeredIcon : JBCachingScalableIcon<LayeredIcon>, DarkIconProvider, C
 
   private var deferredMask = 0
   private var sizeIsDirty = true
+
+  /**
+   * True if recursion was detected while modifying the icon,
+   * or if the icon already contains recursion.
+   */
+  @Volatile
+  private var corruptedByRecursion = false
 
   init {
     scaleContext.addUpdateListener(UserScaleContext.UpdateListener { updateSize(allLayers) })
@@ -73,6 +82,10 @@ open class LayeredIcon : JBCachingScalableIcon<LayeredIcon>, DarkIconProvider, C
     hShifts = IntArray(layerCount)
     vShifts = IntArray(layerCount)
     scaledIcons = null
+
+    if (checkRecursion(this, icons)) {
+      reportRecursionDetected(icons)
+    }
   }
 
   private constructor(icons: Supplier<Array<out Icon>>) {
@@ -82,6 +95,9 @@ open class LayeredIcon : JBCachingScalableIcon<LayeredIcon>, DarkIconProvider, C
       hShifts = IntArray(result.size)
       vShifts = IntArray(result.size)
       sizeIsDirty = true
+      if (!corruptedByRecursion && checkRecursion(this, result)) {
+        reportRecursionDetected(result)
+      }
 
       IconState(icons = result, disabledLayers = BooleanArray(result.size))
     }
@@ -113,6 +129,36 @@ open class LayeredIcon : JBCachingScalableIcon<LayeredIcon>, DarkIconProvider, C
       layeredIcon.setIcon(foregroundIcon, 1)
       return layeredIcon
     }
+
+    private fun findUnderlyingLayeredIcon(icon: Icon?): LayeredIcon? {
+      return when (icon) {
+        is LayeredIcon -> icon
+        is RetrievableIcon -> findUnderlyingLayeredIcon(icon.retrieveIcon())
+        else -> null
+      }
+    }
+
+    private fun checkRecursion(layeredIcon: LayeredIcon, allLayers: Array<out Icon?>): Boolean {
+      val path = Collections.newSetFromMap(IdentityHashMap<LayeredIcon, Boolean>())
+
+      fun cycle(cycleLayers: Array<out Icon?>): Boolean {
+        for (icon in cycleLayers) {
+          val unwrappedChild = findUnderlyingLayeredIcon(icon) ?: continue
+          if (!path.add(unwrappedChild)) {
+            return true
+          }
+
+          if (cycle(unwrappedChild.allLayers)) {
+            return true
+          }
+          path.remove(unwrappedChild)
+        }
+        return false
+      }
+
+      path.add(layeredIcon)
+      return cycle(allLayers)
+    }
   }
 
   private constructor(icon: LayeredIcon, replacer: IconReplacer?) : super(icon) {
@@ -139,7 +185,7 @@ open class LayeredIcon : JBCachingScalableIcon<LayeredIcon>, DarkIconProvider, C
   val allLayers: Array<Icon?>
     get() = iconListSupplier.get().icons
 
-  override fun replaceBy(replacer: IconReplacer) = LayeredIcon(icon = this, replacer = replacer)
+  override fun replaceBy(replacer: IconReplacer): LayeredIcon = LayeredIcon(icon = this, replacer = replacer)
 
   override fun copy(): LayeredIcon = LayeredIcon(icon = this, replacer = null)
 
@@ -178,19 +224,26 @@ open class LayeredIcon : JBCachingScalableIcon<LayeredIcon>, DarkIconProvider, C
   }
 
   // for cache, we need distinct hash code, but we cannot compute it by content, as we should not call iconListSupplier to compute hash code
-  override fun hashCode() = System.identityHashCode(this)
+  override fun hashCode(): Int = System.identityHashCode(this)
 
   fun setIcon(icon: Icon?, layer: Int) {
     setIcon(icon = icon, layer = layer, hShift = 0, vShift = 0)
   }
 
-  override fun getIcon(layer: Int) = allLayers[layer]
+  override fun getIcon(layer: Int): Icon? = allLayers[layer]
 
-  override fun getIconCount() = allLayers.size
+  override fun getIconCount(): Int = allLayers.size
 
   fun setIcon(icon: Icon?, layer: Int, hShift: Int, vShift: Int) {
-    if (icon is LayeredIcon) {
-      icon.checkIHaventIconInsideMe(this)
+    if (!corruptedByRecursion && icon != null) {
+      val unwrappedChild = findUnderlyingLayeredIcon(icon)
+      if (unwrappedChild != null && unwrappedChild.checkIHaveIconInsideMe(this)) {
+        reportInsertIconRecursionDetected(icon)
+      }
+    }
+
+    if (corruptedByRecursion) {
+      return
     }
 
     val allLayers = allLayers
@@ -261,13 +314,40 @@ open class LayeredIcon : JBCachingScalableIcon<LayeredIcon>, DarkIconProvider, C
     setIcon(icon, layer, x, y)
   }
 
-  @Suppress("SpellCheckingInspection")
-  private fun checkIHaventIconInsideMe(icon: Icon) {
-    LOG.assertTrue(icon !== this)
+  private fun checkIHaveIconInsideMe(icon: LayeredIcon): Boolean {
+    if (icon === this) {
+      return true
+    }
+
     for (child in allLayers) {
-      if (child is LayeredIcon) {
-        child.checkIHaventIconInsideMe(icon)
+      val unwrappedChild = findUnderlyingLayeredIcon(child)
+      if (unwrappedChild != null && unwrappedChild.checkIHaveIconInsideMe(icon)) {
+        return true
       }
+    }
+
+    return false
+  }
+
+  private fun resolveRecursionCorruption(): Boolean {
+    if (!corruptedByRecursion && checkRecursion(this, allLayers)) {
+      reportRecursionDetected(allLayers)
+    }
+
+    return corruptedByRecursion
+  }
+
+  private fun reportRecursionDetected(allLayers: Array<out Icon?>) {
+    if (!corruptedByRecursion) {
+      corruptedByRecursion = true
+      LOG.error("Recursion detected in ${this.toStringRecursionGuarded(allLayers)}")
+    }
+  }
+
+  private fun reportInsertIconRecursionDetected(icon: Icon) {
+    if (!corruptedByRecursion) {
+      corruptedByRecursion = true
+      LOG.error("Recursion detected in ${this.toStringRecursionGuarded(allLayers)} while inserting $icon")
     }
   }
 
@@ -369,6 +449,11 @@ open class LayeredIcon : JBCachingScalableIcon<LayeredIcon>, DarkIconProvider, C
   }
 
   override fun getDarkIcon(isDark: Boolean): Icon {
+    if (resolveRecursionCorruption()) {
+      // At least we should return something
+      return this
+    }
+
     val newIcon = copy()
     for ((i, icon) in newIcon.allLayers.withIndex()) {
       newIcon.allLayers[i] = icon?.let { getDarkIcon(icon = it, dark = isDark) }
@@ -376,9 +461,28 @@ open class LayeredIcon : JBCachingScalableIcon<LayeredIcon>, DarkIconProvider, C
     return newIcon
   }
 
-  override fun toString() = "LayeredIcon(w=$width, h=$height, icons=[${allLayers.joinToString(", ")}]"
+  override fun toString(): String {
+    return toStringRecursionGuarded(allLayers)
+  }
 
-  override fun getToolTip(composite: Boolean) = combineIconTooltips(allLayers)
+  override fun getToolTip(composite: Boolean): @NlsContexts.Tooltip String? = combineIconTooltips(allLayers)
+
+  private fun toStringRecursionGuarded(allLayers: Array<out Icon?>): String {
+    return if (resolveRecursionCorruption()) {
+      // Don't log "$this" because it could lead to StackOverflowError
+      val rootIcons = allLayers.joinToString(", ") {
+        it.identityString()
+      }
+      "${this.identityString()}(w=$width, h=$height, corruptedByRecursion, rootIcons=[$rootIcons]"
+    }
+    else
+      "LayeredIcon(w=$width, h=$height, icons=[${allLayers.joinToString(", ")}]"
+  }
+
+  private fun Any?.identityString(): String {
+    return if (this == null) "null"
+    else "${this::class.java.simpleName}@${Integer.toHexString(System.identityHashCode(this))}"
+  }
 }
 
 internal fun combineIconTooltips(icons: Array<Icon?>): @NlsContexts.Tooltip String? {
@@ -390,7 +494,6 @@ internal fun combineIconTooltips(icons: Array<Icon?>): @NlsContexts.Tooltip Stri
         val result: @NlsContexts.Tooltip StringBuilder = StringBuilder()
         val seenTooltips = HashSet<String>()
         buildCompositeTooltip(icons = icons, result = result, seenTooltips = seenTooltips)
-        @Suppress("HardCodedStringLiteral")
         return result.toString()
       }
       singleIcon = icon
@@ -404,7 +507,7 @@ internal fun combineIconTooltips(icons: Array<Icon?>): @NlsContexts.Tooltip Stri
 
 private fun buildCompositeTooltip(icons: Array<Icon?>, result: StringBuilder, seenTooltips: MutableSet<String>) {
   for (i in icons.indices) {
-    // the first layer is the actual object (noun), other layers are modifiers (adjectives), so put a first object in the last position
+    // the first layer is the actual object (noun), other layers are modifiers (adjectives), so put the first object in the last position
     val icon = if (i == icons.size - 1) icons[0] else icons[i + 1]
     if (icon is LayeredIcon) {
       buildCompositeTooltip(icons = icon.allLayers, result = result, seenTooltips = seenTooltips)

@@ -16,7 +16,6 @@
   <xi:include href="/idea/ExecutionActions.xml"/>
   <xi:include href="/idea/LangActions.xml"/>
   <xi:include href="/idea/UsageViewActions.xml"/>
-  <xi:include href="/idea/ProblemsViewActions.xml"/>
 
   <xi:include href="/META-INF/Core.xml"/>
   <xi:include href="/META-INF/CoreImpl.xml"/>
@@ -38,6 +37,7 @@
   <xi:include href="/META-INF/LangExtensionPoints.xml"/>
 
   <xi:include href="/META-INF/PlatformExtensions.xml"/>
+  <xi:include href="/META-INF/MinimapExtensions.xml"/>
   <xi:include href="/META-INF/PlatformExecutionExtensions.xml"/>
 
   <xi:include href="/META-INF/LangExtensions.xml"/>
@@ -46,12 +46,6 @@
   <xi:include href="/META-INF/OpenTelemetryExtensions.xml"/>
 
   <xi:include href="/META-INF/WorkspaceModelExtensions.xml"/>
-
-  <xi:include href="intellij.platform.feedback.xml"/>
-
-  <xi:include href="/META-INF/IJent.xml"/>
-
-  <xi:include href="intellij.platform.bookmarks.xml"/>
 
   <xi:include href="intellij.platform.syntax.psi.xml">
     <xi:fallback/>
@@ -74,20 +68,6 @@
     <projectService serviceImplementation="com.intellij.usages.impl.rules.DirectoryGroupingRule" open="true"/>
     <projectService serviceInterface="com.intellij.refactoring.RefactoringFactory" open="true"
                     serviceImplementation="com.intellij.refactoring.openapi.impl.RefactoringFactoryImpl"/>
-    <projectService serviceImplementation="com.intellij.ide.bookmarks.BookmarkManager" open="true"/>
-    <projectService serviceInterface="com.intellij.ide.bookmark.BookmarksManager" open="true"
-                    serviceImplementation="com.intellij.ide.bookmark.BookmarksManagerImpl"/>
-    <bookmarkProvider implementation="com.intellij.ide.favoritesTreeView.AbstractUrlBookmarkProvider" order="first"/>
-    <bookmarkProvider implementation="com.intellij.ide.bookmark.providers.LineBookmarkProvider" order="last"/>
-    <bookmarkProvider implementation="com.intellij.ide.bookmark.providers.ModuleBookmarkProvider"/>
-    <bookmarkProvider implementation="com.intellij.ide.bookmark.providers.RootTypeBookmarkProvider"/>
-    <bookmarksListProvider implementation="com.intellij.ide.bookmark.ui.tree.BookmarkListProvider"/>
-    <bookmarksListProvider implementation="com.intellij.ide.bookmark.ui.tree.GroupListProvider"/>
-    <advancedSetting id="show.line.bookmarks.in.popup" default="true"
-                     bundle="messages.BookmarkBundle" groupKey="group.advanced.settings.bookmarks"/>
-    <advancedSetting id="tasks.enable.bookmark.context.on.branch.switch"
-                     default="true" groupKey="group.advanced.settings.bookmarks" bundle="messages.BookmarkBundle"/>
-
     <moduleRendererFactory implementation="com.intellij.ide.util.PlatformModuleRendererFactory" order="last" id="platform"/>
     <projectService serviceInterface="com.intellij.lang.injection.InjectedLanguageManager"
                     serviceImplementation="com.intellij.psi.impl.source.tree.injected.InjectedLanguageManagerImpl"/>
@@ -134,8 +114,7 @@
 
     <registryKey key="ide.allow.folder.as.project" defaultValue="false"
                  description="Allow opening folder as project without modules" />
-    <projectSettings service="com.intellij.ide.bookmark.BookmarksManagerImpl"/>
     <applicationSettings service="com.intellij.codeInspection.ex.ApplicationInspectionProfileManager"/>
-    <projectSettings service="com.intellij.ide.bookmarks.BookmarkManager"/>
   </extensions>
+
 </idea-plugin>

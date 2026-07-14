@@ -13,7 +13,6 @@
     <module name="intellij.libraries.jackson.dataformat.yaml" loading="embedded"/>
     <module name="intellij.libraries.jackson.dataformat.toml"/>
     <module name="intellij.libraries.jackson.datatype.jdk8"/>
-    <module name="intellij.libraries.jackson.datatype.joda"/>
     <module name="intellij.libraries.jackson.datatype.jsr310"/>
     <module name="intellij.libraries.jackson.module.kotlin" loading="embedded"/>
     <!-- endregion -->
@@ -90,12 +89,17 @@
     <module name="intellij.libraries.protobuf" loading="embedded"/>
     <module name="intellij.libraries.proxy.vole" loading="embedded"/>
     <module name="intellij.libraries.rhino" loading="embedded"/>
+    <module name="intellij.libraries.semver" loading="embedded"/>
     <module name="intellij.libraries.snakeyaml" loading="embedded"/>
     <module name="intellij.libraries.snakeyaml.engine" loading="embedded"/>
     <module name="intellij.libraries.stream" loading="embedded"/>
     <module name="intellij.libraries.velocity" loading="embedded"/>
     <module name="intellij.libraries.xtext.xbase" loading="embedded"/>
     <module name="intellij.libraries.xz" loading="embedded"/>
+    <module name="intellij.libraries.opentelemetry" loading="embedded"/>
+    <module name="intellij.libraries.opentelemetry.extension.kotlin" loading="embedded"/>
+    <module name="intellij.libraries.opentelemetry.exporter.otlp.common" loading="embedded"/>
+    <module name="intellij.libraries.opentelemetry.semconv" loading="embedded"/>
     <module name="intellij.libraries.opentelemetry.sdk.autoconfigure.spi" loading="embedded"/>
     <module name="intellij.libraries.opentelemetry.exporter.sender.jdk" loading="embedded"/>
     <!-- endregion -->

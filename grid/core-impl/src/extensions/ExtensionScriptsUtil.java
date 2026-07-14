@@ -35,7 +35,8 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.function.BiConsumer;
 
-import static com.intellij.database.datagrid.DataGridNotifications.EXTRACTORS_GROUP;
+import com.intellij.database.datagrid.DataGridNotifications;
+import com.intellij.notification.NotificationGroupManager;
 
 public final class ExtensionScriptsUtil {
   private static final String JS_PLUGIN_ID = "org.jetbrains.intellij.scripting-javascript";
@@ -44,22 +45,7 @@ public final class ExtensionScriptsUtil {
   private ExtensionScriptsUtil() {
   }
 
-  public static @Nullable IdeScriptEngine getEngineFor(@Nullable Project project,
-                                                       @Nullable PluginId pluginId,
-                                                       @NotNull Path file,
-                                                       @Nullable BiConsumer<String, Project> installPlugin) {
-    return getEngineFor(project, pluginId, file, installPlugin, true);
-  }
-
-  public static @Nullable IdeScriptEngine getEngineFor(@Nullable Project project,
-                                                       @Nullable PluginId pluginId,
-                                                       @NotNull Path file,
-                                                       @Nullable BiConsumer<String, Project> installPlugin,
-                                                       boolean showBalloon) {
-    return getEngineFor(project, getClassLoader(pluginId), file, installPlugin, showBalloon);
-  }
-
-  public static @Nullable ClassLoader getClassLoader(@Nullable PluginId pluginId) {
+  public static @Nullable ClassLoader getDefaultClassLoader(@Nullable PluginId pluginId) {
     IdeaPluginDescriptor plugin = PluginManagerCore.getPlugin(pluginId);
     plugin = plugin != null ? plugin : PluginManagerCore.getPlugin(PluginManagerCore.CORE_ID);
     IdeaPluginDescriptor descriptor = Objects.requireNonNull(plugin);
@@ -97,7 +83,7 @@ public final class ExtensionScriptsUtil {
     String title = DataGridBundle.message("notification.title.no.script.engine.found.for.file.extension", scriptExtension);
     if ("js".equals(scriptExtension)) {
       String content = DataGridBundle.message("notification.please.install.js.script.engine", JS_PLUGIN_NAME);
-      Notification notification = EXTRACTORS_GROUP.createNotification(title, content, NotificationType.INFORMATION);
+      Notification notification = NotificationGroupManager.getInstance().getNotificationGroup(DataGridNotifications.EXTRACTORS_GROUP_ID).createNotification(title, content, NotificationType.INFORMATION);
       if (installPlugin != null) {
         notification.addAction(new NotificationAction(DataGridBundle.message("notification.install.plugin")) {
           @Override
@@ -168,14 +154,15 @@ public final class ExtensionScriptsUtil {
 
   public static void showScriptExecutionError(@Nullable Project project, @NotNull Path scriptFile, @NotNull Throwable error) {
     //noinspection HardCodedStringLiteral
-    EXTRACTORS_GROUP.createNotification("<a href=\"generator\">" + scriptFile.getFileName() + "</a>: " + ExceptionUtil.getThrowableText(error, "com.intellij."),
+    NotificationGroupManager.getInstance().getNotificationGroup(DataGridNotifications.EXTRACTORS_GROUP_ID)
+      .createNotification("<a href=\"generator\">" + scriptFile.getFileName() + "</a>: " + ExceptionUtil.getThrowableText(error, "com.intellij."),
         NotificationType.ERROR)
       .setListener((notification, event) -> navigateToFile(project, scriptFile))
       .notify(project);
   }
 
   public static void showError(@Nullable Project project, @NlsContexts.NotificationTitle @NotNull String title, @NlsContexts.NotificationContent @NotNull String content) {
-    EXTRACTORS_GROUP.createNotification(title, content, NotificationType.ERROR).notify(project);
+    NotificationGroupManager.getInstance().getNotificationGroup(DataGridNotifications.EXTRACTORS_GROUP_ID).createNotification(title, content, NotificationType.ERROR).notify(project);
   }
 
   public static boolean navigateToFile(@Nullable Project project, @NotNull Path file) {

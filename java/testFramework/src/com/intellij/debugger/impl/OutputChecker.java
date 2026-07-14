@@ -113,10 +113,11 @@ public class OutputChecker {
   public void print(String s, Key<?> outputType) {
     synchronized (this) {
       if (myBuffers != null) {
-        if (outputType == ProcessOutputType.STDERR && ContainerUtil.exists(IGNORED_IN_STDERR, s::contains)) {
+        if (ProcessOutputType.isStderr(outputType) && ContainerUtil.exists(IGNORED_IN_STDERR, s::contains)) {
           return;
         }
-        myBuffers.computeIfAbsent(outputType, k -> new StringBuffer()).append(s);
+        var key = outputType instanceof ProcessOutputType processOutputType ? processOutputType.getBaseOutputType() : outputType;
+        myBuffers.computeIfAbsent(key, _ -> new StringBuffer()).append(s);
       }
     }
   }
@@ -225,7 +226,7 @@ public class OutputChecker {
         result = replacePath(result, DebuggerUtilsImpl.getIdeaRtPath(), "!RT_JAR!");
       }
 
-      var junit4JarPaths = StringUtil.join(IntelliJProjectConfiguration.getProjectLibraryClassesRootPaths("JUnit4"), java.io.File.pathSeparator);
+      var junit4JarPaths = StringUtil.join(IntelliJProjectConfiguration.getModuleLibrary("intellij.libraries.junit4", "JUnit4").getClassesPaths(), java.io.File.pathSeparator);
       result = replacePath(result, junit4JarPaths, "!JUNIT4_JARS!");
 
       @SuppressWarnings("removal") var homeDirectory = JavaAwareProjectJdkTableImpl.getInstanceEx().getInternalJdk().getHomeDirectory();
@@ -238,6 +239,8 @@ public class OutputChecker {
       if (!StringUtil.isEmpty(HOST_NAME)) {
         result = StringUtil.replace(result, HOST_NAME, "!HOST_NAME!", true);
       }
+      result = result.replace("0:0:0:0:0:0:0:1", "!HOST_NAME!");
+      result = result.replace("::1", "!HOST_NAME!");
       result = result.replace("127.0.0.1", "!HOST_NAME!");
 
       var productionFile = Path.of(PathUtil.getJarPathForClass(OutputChecker.class));

@@ -38,8 +38,6 @@ import com.intellij.codeInsight.template.impl.actions.NextVariableAction;
 import com.intellij.codeWithMe.ClientId;
 import com.intellij.featureStatistics.FeatureUsageTracker;
 import com.intellij.ide.PowerSaveMode;
-import com.intellij.injected.editor.DocumentWindow;
-import com.intellij.injected.editor.EditorWindow;
 import com.intellij.internal.statistic.service.fus.collectors.UIEventLogger;
 import com.intellij.lang.LangBundle;
 import com.intellij.lang.Language;
@@ -93,7 +91,6 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.impl.source.tree.injected.InjectedLanguageEditorUtil;
-import com.intellij.psi.impl.source.tree.injected.InjectedLanguageUtil;
 import com.intellij.psi.util.PsiUtilBase;
 import com.intellij.ui.ClickListener;
 import com.intellij.ui.CollectionListModel;
@@ -208,7 +205,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
   /**
    * An arranger that is used for rendering. It's synchronized (i.e., replaced) with {@link #myArranger} during rendering.
    * See {@link #checkReused()}.
-   * Accessed on EDT only. Note though, that {@link #myArranger} is usually the same instance, but it is accessed on any thread.
+   * Accessed on EDT only. Note, {@link #myArranger} is usually the same instance, but it is accessed on any thread.
    */
   private LookupArranger myPresentableArranger;
 
@@ -753,6 +750,8 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
     ModCompletionItem.InsertionContext insertionContext = new ModCompletionItem.InsertionContext(
       completionChar == REPLACE_SELECT_CHAR ? ModCompletionItem.InsertionMode.OVERWRITE : ModCompletionItem.InsertionMode.INSERT,
       completionChar);
+    PsiFile topLevelFile = InjectedLanguageManager.getInstance(psiFile.getProject()).getTopLevelFile(psiFile);
+    psiFile = topLevelFile == null ? psiFile : topLevelFile;
     ActionContext actionContext = ActionContext.from(editor, psiFile);
     ActionContext finalActionContext = actionContext
       .withOffset(start)
@@ -1053,7 +1052,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
                                       @Nullable Supplier<? extends AnAction> delegateActionSupplier,
                                       @NotNull AnActionEvent actionEvent) {
     AnAction action = ActionManager.getInstance().getAction(actionID);
-    DumbAwareAction.create(e -> ActionUtil.performAction(
+    DumbAwareAction.create(_ -> ActionUtil.performAction(
       delegateActionSupplier == null ? action : delegateActionSupplier.get(), actionEvent)
     ).registerCustomShortcutSet(action.getShortcutSet(), list);
   }
@@ -1306,8 +1305,14 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
         // templates whose matcher prefix is "" right after the dot). At that moment the
         // "prefix length" is logically meaningless
         if (prefixLength < 0) return;
+        PsiFile topLevelFile = InjectedLanguageManager.getInstance(getProject()).getTopLevelFile(file);
+        file = topLevelFile == null ? file : topLevelFile;
         ActionContext actionContext = ActionContext.from(editor, file);
         int start = actionContext.offset() - prefixLength;
+        // it can happen when an external change
+        // (split-mode RD-sync or direct caretModel/selectionModel API) bypasses
+        // LookupOffsets state updates; skip for this transient state.
+        if (start < 0) return;
         ActionContext finalActionContext = actionContext
           .withOffset(start)
           .withSelection(TextRange.create(start, actionContext.offset()));
@@ -1343,7 +1348,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
 
   @Override
   public @Nullable PsiFile getPsiFile() {
-    return PsiDocumentManager.getInstance(mySession.getProject()).getPsiFile(getEditor().getDocument());
+    return LookupImplUtil.getPsiFile(this);
   }
 
   @Override
@@ -1353,42 +1358,12 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
 
   @Override
   public @Nullable PsiElement getPsiElement() {
-    PsiFile file = getPsiFile();
-    if (file == null) return null;
-
-    int offset = getLookupStart();
-    Editor editor = getEditor();
-    if (editor instanceof EditorWindow) {
-      offset = editor.logicalPositionToOffset(((EditorWindow)editor).hostToInjected(this.editor.offsetToLogicalPosition(offset)));
-    }
-    if (offset > 0) return file.findElementAt(offset - 1);
-
-    return file.findElementAt(0);
-  }
-
-  private static @Nullable DocumentWindow getInjectedDocument(Project project, Editor editor, int offset) {
-    PsiFile hostFile = PsiDocumentManager.getInstance(project).getPsiFile(editor.getDocument());
-    if (hostFile != null) {
-      // inspired by com.intellij.codeInsight.editorActions.TypedHandler.injectedEditorIfCharTypedIsSignificant()
-      List<DocumentWindow> injected = InjectedLanguageManager.getInstance(project)
-        .getCachedInjectedDocumentsInRange(hostFile, TextRange.create(offset, offset));
-      for (DocumentWindow documentWindow : injected) {
-        if (documentWindow.isValid() && documentWindow.containsRange(offset, offset)) {
-          return documentWindow;
-        }
-      }
-    }
-    return null;
+    return LookupImplUtil.getPsiElement(this);
   }
 
   @Override
   public @NotNull Editor getEditor() {
-    DocumentWindow documentWindow = getInjectedDocument(mySession.getProject(), editor, editor.getCaretModel().getOffset());
-    if (documentWindow != null) {
-      PsiFile injectedFile = PsiDocumentManager.getInstance(mySession.getProject()).getPsiFile(documentWindow);
-      return InjectedLanguageUtil.getInjectedEditorForInjectedFile(editor, injectedFile);
-    }
-    return editor;
+    return LookupImplUtil.getEditor(getProject(), editor);
   }
 
   @Override
@@ -1450,7 +1425,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
   }
 
   @Override
-  public @Unmodifiable List<String> getAdvertisements() {
+  public @Unmodifiable @NotNull List<String> getAdvertisements() {
     return myAdComponent.getAdvertisements();
   }
 
@@ -1608,6 +1583,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
     listPopup.show(new RelativePoint(getComponent(), p));
   }
 
+  @ApiStatus.Internal
   public @NotNull Map<LookupElement, List<Pair<String, Object>>> getRelevanceObjects(@NotNull Iterable<? extends LookupElement> items,
                                                                                      boolean hideSingleValued) {
     return myPresentableArranger.getRelevanceObjects(items, hideSingleValued);

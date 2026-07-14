@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.template.postfix.completion;
 
 import com.intellij.codeInsight.CodeInsightBundle;
@@ -33,7 +33,7 @@ public final class PostfixTemplateCompletionContributor extends CompletionContri
   }
 
   @Override
-  public boolean groupIsEnabled(CompletionParameters parameters) {
+  public boolean groupIsEnabled(@NotNull CompletionParameters parameters) {
     PostfixTemplatesSettings settings = PostfixTemplatesSettings.getInstance();
     boolean isPostfixTemplatesVisible = settings.isPostfixTemplatesEnabled() && settings.isShowAsSeparateGroup();
     if (!isPostfixTemplatesVisible) return false;
@@ -45,12 +45,11 @@ public final class PostfixTemplateCompletionContributor extends CompletionContri
     if (commandCompletionService == null) return false;
     CommandCompletionFactory factory = commandCompletionService.getFactory(parameters.getOriginalFile().getLanguage());
     if (factory == null) return false;
-    boolean supportFiltersWithDoublePrefix = factory.supportFiltersWithDoublePrefix();
     InvocationCommandType commandType = findCommandCompletionType(factory,
                                                                   !parameters.getOriginalFile().isWritable(),
                                                                   parameters.getEditor().getCaretModel().getOffset(),
                                                                   parameters.getEditor());
-    if (commandType instanceof InvocationCommandType.FullSuffix && supportFiltersWithDoublePrefix) return false;
+    if (commandType == null) return false;
     return true;
   }
 

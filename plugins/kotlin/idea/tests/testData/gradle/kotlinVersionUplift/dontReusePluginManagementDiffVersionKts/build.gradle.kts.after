@@ -1,6 +1,6 @@
 plugins {
     id("java")
-    kotlin("jvm") version "1.8.22"
+    kotlin("jvm") version "2.3.0"
 }
 
 group = "testgroup"
@@ -13,6 +13,7 @@ java {
 }
 
 dependencies {
+    testImplementation(kotlin("test"))
 }
 
 tasks.test {

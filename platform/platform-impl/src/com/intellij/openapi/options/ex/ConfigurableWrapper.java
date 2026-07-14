@@ -2,6 +2,7 @@
 package com.intellij.openapi.options.ex;
 
 import com.intellij.diagnostic.PluginException;
+import com.intellij.ide.ui.search.SearchUtilKt;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.ExtensionPoint;
@@ -136,6 +137,23 @@ public class ConfigurableWrapper implements SearchableConfigurable, Weighted, Hi
     return type.isInstance(configurable) ? type.cast(configurable) : null;
   }
 
+  /**
+   * If the configurable behind a {@link ConfigurableWrapper} has not been created yet, returns {@code null}
+   * instead of forcing its construction. Intended for EDT-sensitive paths such as Settings tree rendering,
+   * where eager configurable construction may block the EDT (for example, on persistent state reads over
+   * IJent/WSL). See IJPL-246986.
+   */
+  @ApiStatus.Internal
+  public static @Nullable <T> T castIfCreated(@NotNull Class<T> type, @Nullable UnnamedConfigurable configurable) {
+    if (configurable instanceof ConfigurableWrapper wrapper) {
+      if (wrapper.myConfigurable == null) {
+        return null;
+      }
+      configurable = wrapper.myConfigurable;
+    }
+    return type.isInstance(configurable) ? type.cast(configurable) : null;
+  }
+
   private final ConfigurableEP<?> myEp;
   int myWeight; // see ConfigurableExtensionPointUtil.getConfigurableToReplace
 
@@ -186,7 +204,7 @@ public class ConfigurableWrapper implements SearchableConfigurable, Weighted, Hi
       boolean loaded = myConfigurable != null;
       Configurable configurable = cast(Configurable.class, this);
       if (configurable != null) {
-        String name = configurable.getDisplayName();
+        String name = SearchUtilKt.getDisplayNameSafely(configurable);
         if (!loaded) {
           String message = "No display name specified in plugin descriptor XML file for configurable " + configurable.getClass().getName() + ";\n" +
                            "specify it using 'displayName' or 'key' attribute to avoid necessity to load the configurable class when Settings dialog is opened";
@@ -356,7 +374,10 @@ public class ConfigurableWrapper implements SearchableConfigurable, Weighted, Hi
       if (super.myEp.dynamic) {
         Composite composite = cast(Composite.class, this);
         if (composite != null) {
-          Collections.addAll(list, composite.getConfigurables());
+          var configurables = SearchUtilKt.getConfigurablesSafely(composite);
+          if (configurables != null) {
+            Collections.addAll(list, configurables);
+          }
         }
       }
       if (super.myEp.children != null) {
@@ -422,13 +443,52 @@ public class ConfigurableWrapper implements SearchableConfigurable, Weighted, Hi
     public ConfigurableWrapper addChild(Configurable configurable) {
       if (myComparator != null) {
         int index = Arrays.binarySearch(myKids, configurable, myComparator);
-        LOG.assertTrue(index < 0, "similar configurable is already exist");
-        myKids = ArrayUtil.insert(myKids, -1 - index, configurable);
+        if (index >= 0) {
+          logColliding(configurable, index);
+        }
+        int insertionIndex = index >= 0 ? index : -1 - index;
+        myKids = ArrayUtil.insert(myKids, insertionIndex, configurable);
       }
       else {
         myKids = ArrayUtil.append(myKids, configurable);
       }
       return this;
+    }
+
+    private void logColliding(@Nullable Configurable incoming, int existingIndex) {
+      String parentId = safeId(this);
+      String parentName = safeDisplayName(this);
+      String incomingName = safeDisplayName(incoming);
+      String incomingClass = incoming == null ? "null" : incoming.getClass().getName();
+      Configurable existing = (myKids != null && existingIndex >= 0 && existingIndex < myKids.length)
+                              ? myKids[existingIndex]
+                              : null;
+      String existingName = safeDisplayName(existing);
+      String existingClass = existing == null ? "null" : existing.getClass().getName();
+      LOG.error("Similar configurable already exists. Configurable display-name collision under parent id='" + parentId
+               + "' name='" + parentName + "': incoming displayName='" + incomingName
+               + "' class=" + incomingClass + "; existing displayName='" + existingName
+               + "' class=" + existingClass);
+    }
+
+    private static String safeDisplayName(@Nullable Configurable configurable) {
+      if (configurable == null) return "null";
+      try {
+        return String.valueOf(configurable.getDisplayName());
+      }
+      catch (Throwable t) {
+        return "<getDisplayName threw " + t.getClass().getSimpleName() + ">";
+      }
+    }
+
+    private static String safeId(@Nullable SearchableConfigurable configurable) {
+      if (configurable == null) return "null";
+      try {
+        return configurable.getId();
+      }
+      catch (Throwable t) {
+        return "<getId threw " + t.getClass().getSimpleName() + ">";
+      }
     }
 
     public void setFilter(Predicate<? super Configurable> filter) {

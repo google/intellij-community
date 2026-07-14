@@ -1,10 +1,12 @@
-<idea-plugin package="org.jetbrains.idea.devkit.kotlin.k2">
-
+<idea-plugin>
   <dependencies>
     <plugin id="com.intellij.modules.kotlin.k2"/>
-    <module name="intellij.kotlin.devkit"/>
-    <module name="intellij.kotlin.refactorings.move"/>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+    <module name="intellij.java.psi"/>
     <module name="intellij.kotlin.codeInsight.intentions"/>
+    <module name="intellij.kotlin.devkit"/>
+    <module name="intellij.kotlin.refactorings"/>
+    <!-- endregion -->
   </dependencies>
 
   <extensions defaultExtensionNs="com.intellij">

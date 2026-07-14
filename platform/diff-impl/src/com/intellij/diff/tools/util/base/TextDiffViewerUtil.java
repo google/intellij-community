@@ -1,7 +1,8 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diff.tools.util.base;
 
 import com.intellij.diff.DiffContext;
+import com.intellij.diff.actions.impl.SetEditorSettingsActionGroup;
 import com.intellij.diff.contents.DiffContent;
 import com.intellij.diff.contents.DocumentContent;
 import com.intellij.diff.contents.EmptyContent;
@@ -15,6 +16,7 @@ import com.intellij.diff.util.DiffUserDataKeysEx;
 import com.intellij.diff.util.DiffUtil;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.actionSystem.ActionGroup;
 import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
@@ -23,7 +25,6 @@ import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.actionSystem.Presentation;
-import com.intellij.openapi.actionSystem.Separator;
 import com.intellij.openapi.actionSystem.ToggleAction;
 import com.intellij.openapi.actionSystem.Toggleable;
 import com.intellij.openapi.actionSystem.ex.ComboBoxAction;
@@ -32,9 +33,11 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.diff.DiffBundle;
 import com.intellij.openapi.diff.impl.DiffUsageTriggerCollector;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorModificationUtil;
 import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.editor.ex.EditorEx;
+import com.intellij.openapi.editor.ex.EditorGutterComponentEx;
 import com.intellij.openapi.editor.ex.EditorPopupHandler;
 import com.intellij.openapi.editor.impl.ContextMenuPopupHandler;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
@@ -68,14 +71,25 @@ import static com.intellij.diff.util.DiffUtil.isUserDataFlagSet;
 public final class TextDiffViewerUtil {
   private static final Logger LOG = Logger.getInstance(TextDiffViewerUtil.class);
 
-  public static @NotNull List<AnAction> createEditorPopupActions() {
-    List<AnAction> result = new ArrayList<>();
-    result.add(ActionManager.getInstance().getAction("CompareClipboardWithSelection"));
+  public static void installGutterPopup(@NotNull List<? extends Editor> editors, @NotNull ActionGroup actionGroup) {
+    for (Editor editor : editors) {
+      if (editor.getGutter() instanceof EditorGutterComponentEx gutterEx) {
+        gutterEx.setGutterPopupGroup(actionGroup);
+      }
+    }
+  }
 
-    result.add(Separator.getInstance());
-    ContainerUtil.addAll(result, ActionManager.getInstance().getAction(IdeActions.GROUP_DIFF_EDITOR_POPUP));
+  public static @NotNull ActionGroup createEditorGutterActionGroup(@NotNull SetEditorSettingsActionGroup settingsGroup,
+                                                                   @NotNull List<@NotNull AnAction> additionalActions) {
+    List<AnAction> gutterActions = new ArrayList<>();
+    gutterActions.add(ActionManager.getInstance().getAction(IdeActions.GROUP_DIFF_EDITOR_GUTTER_POPUP));
+    gutterActions.addAll(additionalActions);
+    gutterActions.add(settingsGroup.getAppearanceGroup());
+    return new DefaultActionGroup(gutterActions);
+  }
 
-    return result;
+  public static @NotNull ActionGroup createEditorGutterActionGroup(@NotNull SetEditorSettingsActionGroup settingsGroup) {
+    return createEditorGutterActionGroup(settingsGroup, Collections.emptyList());
   }
 
   public static @NotNull FoldingModelSupport.Settings getFoldingModelSettings(@NotNull DiffContext context) {
@@ -404,12 +418,15 @@ public final class TextDiffViewerUtil {
     @Override
     public void update(@NotNull AnActionEvent e) {
       super.update(e);
-      e.getPresentation().setVisible(!mySettings.isEnableAligningChangesMode());
+      if (mySettings.isEnableAligningChangesMode()) {
+        e.getPresentation().setEnabled(false);
+        Toggleable.setSelected(e.getPresentation(), true);
+      }
     }
 
     @Override
     public boolean isSelected(@NotNull AnActionEvent e) {
-      return mySettings.isEnableSyncScroll();
+      return mySettings.isEnableSyncScroll() || mySettings.isEnableAligningChangesMode();
     }
 
     @Override

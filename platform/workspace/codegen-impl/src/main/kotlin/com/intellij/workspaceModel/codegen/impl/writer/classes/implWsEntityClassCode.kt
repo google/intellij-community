@@ -16,11 +16,12 @@ import com.intellij.workspaceModel.codegen.impl.writer.extensions.defaultJavaBui
 import com.intellij.workspaceModel.codegen.impl.writer.extensions.implPackage
 import com.intellij.workspaceModel.codegen.impl.writer.extensions.javaFullName
 import com.intellij.workspaceModel.codegen.impl.writer.extensions.javaImplName
+import com.intellij.workspaceModel.codegen.impl.writer.fields.getRefsConnectionId
 import com.intellij.workspaceModel.codegen.impl.writer.fields.implWsEntityFieldCode
-import com.intellij.workspaceModel.codegen.impl.writer.fields.javaType
-import com.intellij.workspaceModel.codegen.impl.writer.fields.refsConnectionId
 import com.intellij.workspaceModel.codegen.impl.writer.fields.refsConnectionIdCode
 import com.intellij.workspaceModel.codegen.impl.writer.lines
+import com.intellij.workspaceModel.codegen.impl.writer.symbolicIdFieldName
+import com.intellij.workspaceModel.codegen.impl.writer.symbolicIdImplCode
 
 fun ObjClass<*>.implWsEntityCode(): String {
   val inheritanceModifier = when {
@@ -43,8 +44,8 @@ private companion object {
 ${allRefsFields.lines { refsConnectionIdCode }.trimEnd()}
 ${getLinksOfConnectionIds(this)}
 }
-${allFields.find { it.name == "symbolicId" }?.let { "override val symbolicId: ${it.valueType.javaType} = super.symbolicId\n" } ?: ""}
-${allFields.filter { it.name !in listOf("entitySource", "symbolicId") }.lines { implWsEntityFieldCode }.trimEnd()}
+${symbolicIdImplCode()}
+${allFields.filter { it.name !in listOf("entitySource", symbolicIdFieldName) }.lines { implWsEntityFieldCode }.trimEnd()}
 
 override val entitySource: EntitySource
 get() {
@@ -56,7 +57,7 @@ override fun connectionIdList(): List<${ConnectionId}> {
 return connections
 }
 
-${implWsEntityBuilderCode()}
+${implWsEntityBuilderCode(this)}
 }
 """
 }
@@ -76,6 +77,6 @@ private fun getLinksOfConnectionIds(type: ObjClass<*>): String {
   return lines {
     line(type.allRefsFields.joinToString(separator = ",",
                                          prefix = "private val connections = listOf<$ConnectionId>(",
-                                         postfix = ")") { it.refsConnectionId })
+                                         postfix = ")") { getRefsConnectionId(it) })
   }
 }

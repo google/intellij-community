@@ -3,7 +3,6 @@
 package org.jetbrains.kotlin.idea.k2.refactoring.rename;
 
 import com.intellij.testFramework.TestDataPath;
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode;
 import org.jetbrains.kotlin.idea.base.test.TestRoot;
 import org.jetbrains.kotlin.idea.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils;
@@ -20,12 +19,6 @@ import org.junit.runner.RunWith;
 @RunWith(JUnit3RunnerWithInners.class)
 @TestMetadata("../../idea/tests/testData/refactoring/rename/inplace")
 public class K2InplaceRenameTestGenerated extends AbstractK2InplaceRenameTest {
-    @java.lang.Override
-    @org.jetbrains.annotations.NotNull
-    public final KotlinPluginMode getPluginMode() {
-        return KotlinPluginMode.K2;
-    }
-
     private void runTest(String testDataFilePath) throws Exception {
         KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
@@ -170,6 +163,11 @@ public class K2InplaceRenameTestGenerated extends AbstractK2InplaceRenameTest {
         runTest("../../idea/tests/testData/refactoring/rename/inplace/conflicts/typeParameters/TypeParameterVsTypeAlias.kt");
     }
 
+    @TestMetadata("ContextParameterInHierarchy.kt")
+    public void testContextParameterInHierarchy() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/rename/inplace/ContextParameterInHierarchy.kt");
+    }
+
     @TestMetadata("DisableInplaceRenameOnThis.kt")
     public void testDisableInplaceRenameOnThis() throws Exception {
         runTest("../../idea/tests/testData/refactoring/rename/inplace/DisableInplaceRenameOnThis.kt");
@@ -198,6 +196,21 @@ public class K2InplaceRenameTestGenerated extends AbstractK2InplaceRenameTest {
     @TestMetadata("EraseCompanionName.kt")
     public void testEraseCompanionName() throws Exception {
         runTest("../../idea/tests/testData/refactoring/rename/inplace/EraseCompanionName.kt");
+    }
+
+    @TestMetadata("ExplicitContextArgument.kt")
+    public void testExplicitContextArgument() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/rename/inplace/ExplicitContextArgument.kt");
+    }
+
+    @TestMetadata("ExplicitContextArgument2.kt")
+    public void testExplicitContextArgument2() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/rename/inplace/ExplicitContextArgument2.kt");
+    }
+
+    @TestMetadata("ExplicitContextArgument3.kt")
+    public void testExplicitContextArgument3() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/rename/inplace/ExplicitContextArgument3.kt");
     }
 
     @TestMetadata("expressionsInRange.kt")
@@ -613,6 +626,11 @@ public class K2InplaceRenameTestGenerated extends AbstractK2InplaceRenameTest {
     @TestMetadata("NamedArguments.kt")
     public void testNamedArguments() throws Exception {
         runTest("../../idea/tests/testData/refactoring/rename/inplace/NamedArguments.kt");
+    }
+
+    @TestMetadata("NamedDestructuring.kt")
+    public void testNamedDestructuring() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/rename/inplace/NamedDestructuring.kt");
     }
 
     @TestMetadata("NoReformat.kt")

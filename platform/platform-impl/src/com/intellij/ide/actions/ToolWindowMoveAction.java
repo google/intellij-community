@@ -23,6 +23,7 @@ import com.intellij.openapi.wm.impl.ToolWindowImpl;
 import com.intellij.toolWindow.ToolWindowDragHelper;
 import com.intellij.ui.ExperimentalUI;
 import com.intellij.ui.UIBundle;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -148,12 +149,14 @@ public final class ToolWindowMoveAction extends DumbAwareAction implements FusAw
 
   private final @NotNull Anchor myAnchor;
 
+  @ApiStatus.Internal
   public ToolWindowMoveAction(@NotNull Anchor anchor) {
     super(() -> anchor.toString(), null, () -> anchor.getIcon());
 
     myAnchor = anchor;
   }
 
+  @ApiStatus.Internal
   @Override
   public void actionPerformed(@NotNull AnActionEvent e) {
     ToolWindow toolWindow = getToolWindow(e);
@@ -162,6 +165,7 @@ public final class ToolWindowMoveAction extends DumbAwareAction implements FusAw
     }
   }
 
+  @ApiStatus.Internal
   @Override
   public void update(@NotNull AnActionEvent e) {
     ToolWindow toolWindow = getToolWindow(e);
@@ -169,11 +173,13 @@ public final class ToolWindowMoveAction extends DumbAwareAction implements FusAw
     e.getPresentation().setEnabled(toolWindow != null && !myAnchor.isApplied(toolWindow));
   }
 
+  @ApiStatus.Internal
   @Override
   public @NotNull ActionUpdateThread getActionUpdateThread() {
     return ActionUpdateThread.EDT;
   }
 
+  @ApiStatus.Internal
   @Override
   public @NotNull List<EventPair<?>> getAdditionalUsageData(@NotNull AnActionEvent event) {
     ToolWindow toolWindow = getToolWindow(event);
@@ -183,6 +189,7 @@ public final class ToolWindowMoveAction extends DumbAwareAction implements FusAw
     return Collections.emptyList();
   }
 
+  @ApiStatus.Internal
   public static final class Group extends DefaultActionGroup implements DumbAware {
     public Group() {
       super(UIBundle.messagePointer("tool.window.move.to.action.group.name"), true);

@@ -17,6 +17,7 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.TestOnly;
 import org.jetbrains.annotations.VisibleForTesting;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -31,21 +32,20 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
 
-import static java.nio.file.StandardOpenOption.READ;
-
 @Internal
 public final class PersistentHashMapValueStorage {
   private @Nullable RAReader myCompactionModeReader;
   private volatile long mySize;
   private final Path myPath;
-  private final CompressedAppendableFile myCompressedAppendableFile;
+  private final @NotNull StorageLockContext myStorageLockContext;
+  private final @NotNull ChannelAccessorBackedFileAccessor myFileAccessor;
+  private final @NotNull SyncAbleBufferedOutputStreamOverFileAccessor myAppender;
+  private final MyCompressedAppendableFile myCompressedAppendableFile;
 
   private final CreationTimeOptions myOptions;
 
   private boolean myCompactionMode;
 
-  private static final int CACHE_PROTECTED_QUEUE_SIZE = 10;
-  private static final int CACHE_PROBATIONAL_QUEUE_SIZE = 20;
   private static final long MAX_RETAINED_LIMIT_WHEN_COMPACTING = 100 * 1024 * 1024;
 
   public static final long SOFT_MAX_RETAINED_LIMIT = 10 * 1024 * 1024;
@@ -58,7 +58,7 @@ public final class PersistentHashMapValueStorage {
    * inside some wrapping code. Also, it could be >1 instances of PHMap/ValueStorage to support single
    * top-level structure, and params like READONLY should be the same for all them. But it is quite
    * daunting to pass parameters like READONLY through all the ctors and intermediate methods down to
-   * the point of actual initialization (e.g. READONLY is used in {@linkplain com.intellij.util.io.PagedFileStorage}
+   * the point of actual initialization (e.g. READONLY is used in {@linkplain PagedFileStorage}
    * even). CreationTimeOptions allows to set those arguments in thread-local instance, and get them
    * there they are needed.
    * <br/>
@@ -85,9 +85,9 @@ public final class PersistentHashMapValueStorage {
     private final boolean myUseCompression;
 
     public CreationTimeOptions(boolean readOnly,
-                                boolean compactChunksWithValueDeserialization,
-                                boolean hasNoChunks,
-                                boolean doCompression) {
+                               boolean compactChunksWithValueDeserialization,
+                               boolean hasNoChunks,
+                               boolean doCompression) {
       myReadOnly = readOnly;
       myCompactChunksWithValueDeserialization = compactChunksWithValueDeserialization;
       myHasNoChunks = hasNoChunks;
@@ -124,13 +124,13 @@ public final class PersistentHashMapValueStorage {
       );
     }
 
-    public CreationTimeOptions setCompactChunksWithValueDeserialization(){
+    public CreationTimeOptions setCompactChunksWithValueDeserialization() {
       return new CreationTimeOptions(myReadOnly,
                                      true,
                                      myHasNoChunks, myUseCompression);
     }
 
-    public CreationTimeOptions setHasNoChunks(){
+    public CreationTimeOptions setHasNoChunks() {
       return new CreationTimeOptions(myReadOnly,
                                      myCompactChunksWithValueDeserialization,
                                      true,
@@ -155,7 +155,7 @@ public final class PersistentHashMapValueStorage {
         DO_COMPRESSION.get() == Boolean.TRUE);
     }
 
-    public static @NotNull CreationTimeOptions setThreadLocalOptions(final CreationTimeOptions options){
+    public static @NotNull CreationTimeOptions setThreadLocalOptions(final CreationTimeOptions options) {
       final CreationTimeOptions currentOptions = threadLocalOptions();
       READONLY.set(options.myReadOnly);
       COMPACT_CHUNKS_WITH_VALUE_DESERIALIZATION.set(options.myCompactChunksWithValueDeserialization);
@@ -170,51 +170,16 @@ public final class PersistentHashMapValueStorage {
     return myOptions;
   }
 
-  // cache size is twice larger than constants because (when used) it replaces two caches
-  private static final FileAccessorCache<Path, FileChannelWithSizeTracking> ourFileChannelCache =
-    new FileAccessorCache<Path, FileChannelWithSizeTracking>(2 * CACHE_PROTECTED_QUEUE_SIZE, 2 * CACHE_PROBATIONAL_QUEUE_SIZE) {
-      @Override
-      protected @NotNull FileChannelWithSizeTracking createAccessor(Path path) throws IOException {
-        return new FileChannelWithSizeTracking(path);
-      }
-
-      @Override
-      protected void disposeAccessor(@NotNull FileChannelWithSizeTracking fileAccessor) throws IOException {
-        fileAccessor.close();
-      }
-    };
-
-  private static final FileAccessorCache<Path, SyncAbleBufferedOutputStreamOverCachedFileChannel> ourAppendersCache =
-    new FileAccessorCache<Path, SyncAbleBufferedOutputStreamOverCachedFileChannel>(CACHE_PROTECTED_QUEUE_SIZE, CACHE_PROBATIONAL_QUEUE_SIZE) {
-      @Override
-      protected @NotNull PersistentHashMapValueStorage.SyncAbleBufferedOutputStreamOverCachedFileChannel createAccessor(Path path) {
-        return new SyncAbleBufferedOutputStreamOverCachedFileChannel(path);
-      }
-
-      @Override
-      protected void disposeAccessor(@NotNull PersistentHashMapValueStorage.SyncAbleBufferedOutputStreamOverCachedFileChannel stream) throws IOException {
-        stream.close();
-      }
-    };
-
-  private static final FileAccessorCache<Path, RAReader> ourReadersCache =
-    new FileAccessorCache<Path, RAReader>(CACHE_PROTECTED_QUEUE_SIZE, CACHE_PROBATIONAL_QUEUE_SIZE) {
-      @Override
-      protected @NotNull RAReader createAccessor(Path path) {
-        return new ReaderOverFileChannelCache(path);
-      }
-
-      @Override
-      protected void disposeAccessor(@NotNull RAReader fileAccessor) throws IOException {
-        fileAccessor.dispose();
-      }
-    };
-
   public static final boolean COMPRESSION_ENABLED = SystemProperties.getBooleanProperty("idea.compression.enabled", true);
 
-  PersistentHashMapValueStorage(@NotNull Path path, @NotNull CreationTimeOptions options) throws IOException {
+  PersistentHashMapValueStorage(@NotNull Path path,
+                                @NotNull CreationTimeOptions options,
+                                @NotNull StorageLockContext storageLockContext) throws IOException {
     myPath = path;
     myOptions = options;
+    myStorageLockContext = storageLockContext;
+    myFileAccessor = new ChannelAccessorBackedFileAccessor(path, storageLockContext, options.myReadOnly);
+    myAppender = new SyncAbleBufferedOutputStreamOverFileAccessor(myFileAccessor);
 
     if (myOptions.useCompression()) {
       myCompressedAppendableFile = new MyCompressedAppendableFile();
@@ -222,7 +187,7 @@ public final class PersistentHashMapValueStorage {
     }
     else {
       myCompressedAppendableFile = null;
-      mySize = Files.exists(myPath) ? Files.size(myPath) : 0;
+      mySize = myFileAccessor.sizeIfExists();
     }
   }
 
@@ -237,24 +202,14 @@ public final class PersistentHashMapValueStorage {
 
       // avoid corruption issue when disk fails to write first record synchronously or unexpected first write file increase (IDEA-106306),
       // code depends on correct value of mySize
-      FileAccessorCache.Handle<SyncAbleBufferedOutputStreamOverCachedFileChannel> streamCacheValue = ourAppendersCache.getIfCached(myPath);
-      if (streamCacheValue != null) {
-        try {
-          final SyncAbleBufferedOutputStreamOverCachedFileChannel stream = streamCacheValue.get();
-          stream.flush();
-          stream.sync();
-        }
-        catch (IOException e) {
-          throw new RuntimeException(e);
-        }
-        finally {
-          streamCacheValue.release();
-        }
-      }
+      flushAppender();
+      //Preserves the historical behavior: force the header record
+      //TODO RC: think through, why do we need it/do we (still) need it ?
+      myFileAccessor.force();
 
-      long currentLength = Files.exists(myPath) ? Files.size(myPath) : 0;
+      long currentLength = myFileAccessor.sizeIfExists();
       if (currentLength > mySize) {  // if real file length (unexpectedly) increases
-        Logger.getInstance(getClass().getName()).info("Avoided PSHM corruption due to write failure:" + myPath);
+        Logger.getInstance(getClass()).info("Avoided PSHM corruption due to write failure:" + myPath);
         mySize = currentLength;  // volatile write
       }
     }
@@ -285,9 +240,9 @@ public final class PersistentHashMapValueStorage {
           write(r);
         }
       });
-    } else {
-      FileAccessorCache.@NotNull Handle<SyncAbleBufferedOutputStreamOverCachedFileChannel> appender = ourAppendersCache.get(myPath);
-      dataOutputStream = toDataOutputStream(appender);
+    }
+    else {
+      dataOutputStream = toDataOutputStream(myAppender);
     }
 
     try {
@@ -570,22 +525,20 @@ public final class PersistentHashMapValueStorage {
   private int myLastReportedChunksCount;
 
   /**
-   * Reads bytes pointed by tailChunkAddress into result passed, returns new address if linked list compactification have been performed
+   * Reads bytes pointed by tailChunkAddress, returns new address if linked list compactification have been performed
    */
-  public ReadResult readBytes(long tailChunkAddress) throws IOException {
-    forceAppender(myPath);
+  ReadResult readBytes(long tailChunkAddress) throws IOException {
+    flushAppender();
 
     checkCancellation();
     long startedTime = ourDumpChunkRemovalTime ? System.nanoTime() : 0;
 
     RAReader reader = myCompactionModeReader;
-    FileAccessorCache.Handle<RAReader> readerHandle = null;
     if (myCompressedAppendableFile != null) {
       reader = new ReaderOverCompressedFile(myCompressedAppendableFile);
     }
     if (reader == null) {
-      readerHandle = ourReadersCache.get(myPath);
-      reader = readerHandle.get();
+      reader = new ReaderOverFileAccessor(myFileAccessor);
     }
 
     int chunkCount = 0;
@@ -634,11 +587,6 @@ public final class PersistentHashMapValueStorage {
     catch (OutOfMemoryError error) {
       throw new CorruptedException(myPath);
     }
-    finally {
-      if (readerHandle != null) {
-        readerHandle.release();
-      }
-    }
 
     if (chunkCount > 1) {
       checkCancellation();
@@ -681,7 +629,6 @@ public final class PersistentHashMapValueStorage {
 
       if (myChunks - myLastReportedChunksCount > 1000) {
         myLastReportedChunksCount = myChunks;
-
         System.out.println(myChunks + " chunks were read " + (myChunksReadingTime / 1000000) +
                            "ms, bytes: " + myChunksOriginalBytes +
                            (myChunksOriginalBytes != myChunksBytesAfterRemoval ? "->" + myChunksBytesAfterRemoval : "") +
@@ -729,27 +676,51 @@ public final class PersistentHashMapValueStorage {
     }
   }
 
-  public void force() {
+  public void flush() {
     if (myOptions.myReadOnly) return;
     if (myCompressedAppendableFile != null) {
       myCompressedAppendableFile.force();
     }
     if (mySize < 0) assert false;  // volatile read
-    forceAppender(myPath);
+    flushAppender();
   }
 
-  private static void forceAppender(Path path) {
-    final FileAccessorCache.Handle<? extends OutputStream> cached = ourAppendersCache.getIfCached(path);
-    if (cached != null) {
-      try {
-        cached.get().flush();
-      }
-      catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-      finally {
-        cached.release();
-      }
+  private void flushAppender() {
+    flushAppender(myAppender);
+  }
+
+  private static void flushAppender(@NotNull SyncAbleBufferedOutputStreamOverFileAccessor appender) {
+    try {
+      appender.flushBufferedBytes();
+    }
+    catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static void disposeAppender(@NotNull SyncAbleBufferedOutputStreamOverFileAccessor appender) {
+    try {
+      appender.dispose();
+    }
+    catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static void closeFileAccessor(@NotNull ChannelAccessorBackedFileAccessor fileAccessor) {
+    try {
+      fileAccessor.close();
+    }
+    catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /** Checks all channel-backed files owned by this value storage against both mode-bound cache views. */
+  void assertNoOpenChannels() {
+    myFileAccessor.assertNoOpenChannels();
+    if (myCompressedAppendableFile != null) {
+      myCompressedAppendableFile.assertNoOpenChannels();
     }
   }
 
@@ -759,10 +730,8 @@ public final class PersistentHashMapValueStorage {
     }
     finally {
       if (mySize < 0) assert false; // volatile read
-      ourReadersCache.remove(myPath);
-      ourAppendersCache.remove(myPath);
-
-      ourFileChannelCache.remove(myPath);
+      disposeAppender(myAppender);
+      closeFileAccessor(myFileAccessor);
 
       if (myCompactionModeReader != null) {
         try {
@@ -773,46 +742,176 @@ public final class PersistentHashMapValueStorage {
         }
         myCompactionModeReader = null;
       }
+      assertNoOpenChannels();
     }
   }
 
-  void switchToCompactionMode() throws IOException {
-    ourReadersCache.remove(myPath);
-    ourFileChannelCache.remove(myPath);
-
-    // in compaction mode use faster reader
+  void switchToCompactionMode() {
     if (myCompressedAppendableFile != null) {
       myCompactionModeReader = new ReaderOverCompressedFile(myCompressedAppendableFile);
     }
     else {
-      myCompactionModeReader = new FileReader(myPath);
+      myCompactionModeReader = new ReaderOverFileAccessor(myFileAccessor);
     }
 
     myCompactionMode = true;
   }
 
-  private static @NotNull DataInputStream toDataInputStream(byte @NotNull[] buffer, int offset, int length) {
+  private static @NotNull DataInputStream toDataInputStream(byte @NotNull [] buffer, int offset, int length) {
     return new DataInputStream(new UnsyncByteArrayInputStream(buffer, offset, length));
   }
 
-  private static @NotNull DataOutputStream toDataOutputStream(FileAccessorCache.@NotNull Handle<SyncAbleBufferedOutputStreamOverCachedFileChannel> handle) {
-    return new DataOutputStream(handle.get()) {
+  private static @NotNull DataOutputStream toDataOutputStream(@NotNull SyncAbleBufferedOutputStreamOverFileAccessor appender) {
+    return new DataOutputStream(appender) {
       @Override
       public void close() throws IOException {
-        super.close();
-        handle.close();
+        flush();
       }
     };
   }
 
+  public static PersistentHashMapValueStorage create(@NotNull Path path,
+                                                     @NotNull CreationTimeOptions options,
+                                                     @NotNull StorageLockContext storageLockContext) throws IOException {
+    return new PersistentHashMapValueStorage(path, options, storageLockContext);
+  }
+
   public static PersistentHashMapValueStorage create(@NotNull Path path, @NotNull CreationTimeOptions options) throws IOException {
-    return new PersistentHashMapValueStorage(path, options);
+    return create(path, options, PagedFileStorage.lookupStorageContext(null));
   }
 
   private interface RAReader {
     void get(long addr, byte[] dst, int off, int len) throws IOException;
 
     void dispose() throws IOException;
+  }
+
+  private static final class ChannelAccessorBackedFileAccessor {
+    private static final boolean CHECK_CONSISTENCY =
+      SystemProperties.getBooleanProperty("idea.do.random.access.wrapper.assertions", false);
+
+    private final @NotNull Path myPath;
+    private final @NotNull StorageLockContext myStorageLockContext;
+    private final @NotNull ChannelsAccessor myChannelsAccessor;
+    private final boolean myReadOnly;
+
+    private long myAppendAtOffset;
+
+    ChannelAccessorBackedFileAccessor(@NotNull Path path,
+                                      @NotNull StorageLockContext storageLockContext,
+                                      boolean readOnly) throws IOException {
+      myPath = path;
+      myStorageLockContext = storageLockContext;
+      myChannelsAccessor = storageLockContext.getChannelsAccessor(readOnly);
+      myReadOnly = readOnly;
+      myAppendAtOffset = initialSize();
+    }
+
+    synchronized void append(byte @NotNull [] src, int off, int len) throws IOException {
+      if (myReadOnly) {
+        throw new IOException("Value storage is read-only: " + myPath);
+      }
+
+      if (CHECK_CONSISTENCY) {
+        assert myAppendAtOffset == size();
+      }
+
+      long offset = myAppendAtOffset;
+      myAppendAtOffset += len;
+      ByteBuffer buffer = ByteBuffer.wrap(src, off, len);
+      myChannelsAccessor.executeOp(myPath, channel -> {
+        long writeOffset = offset;
+        while (buffer.hasRemaining()) {
+          int written = channel.write(buffer, writeOffset);
+          if (written <= 0) {
+            throw new IOException("Failed to append data to " + myPath + ": channel made no progress");
+          }
+          writeOffset += written;
+        }
+        return null;
+      });
+    }
+
+    int read(long addr, byte @NotNull [] dst, int off, int len) throws IOException {
+      return myChannelsAccessor.executeOp(myPath, channel -> channel.read(ByteBuffer.wrap(dst, off, len), addr));
+    }
+
+    /** Replaces side-file content while keeping FileChannel lifetime scoped to the accessor operation. */
+    synchronized void replace(byte @NotNull [] src, int len) throws IOException {
+      if (myReadOnly) {
+        throw new IOException("Value storage is read-only: " + myPath);
+      }
+
+      ByteBuffer buffer = ByteBuffer.wrap(src, 0, len);
+      myChannelsAccessor.executeOp(myPath, channel -> {
+        long previousSize = channel.size();
+        long writeOffset = 0;
+        while (buffer.hasRemaining()) {
+          int written = channel.write(buffer, writeOffset);
+          if (written <= 0) {
+            throw new IOException("Failed to replace data in " + myPath + ": channel made no progress");
+          }
+          writeOffset += written;
+        }
+        if (len < previousSize) {
+          channel.truncate(len);
+        }
+        return null;
+      });
+      myAppendAtOffset = len;
+    }
+
+    /** Clears side-file content if it exists and is non-empty. */
+    synchronized void clearIfNonEmpty() throws IOException {
+      if (myReadOnly || !Files.exists(myPath)) return;
+
+      myChannelsAccessor.executeOp(myPath, channel -> {
+        if (channel.size() == 0) return null;
+        channel.truncate(0);
+        return null;
+      });
+      myAppendAtOffset = 0;
+    }
+
+    /** Forces pending writes to the backing file. This is a durability/WAL-drain operation, not a logical visibility barrier. */
+    void force() throws IOException {
+      if (myReadOnly) return;
+      myChannelsAccessor.executeOp(myPath, channel -> {
+        channel.force(true);
+        return null;
+      });
+    }
+
+    void close() throws IOException {
+      try {
+        myChannelsAccessor.closeChannel(myPath);
+      }
+      finally {
+        assertNoOpenChannels();
+      }
+    }
+
+    /** Checks that no cached channel remains for this accessor's file in either mode-bound view. */
+    void assertNoOpenChannels() {
+      myStorageLockContext.assertNoOpenChannels(myPath);
+    }
+
+    private long sizeIfExists() throws IOException {
+      return initialSize();
+    }
+
+    private long initialSize() throws IOException {
+      return Files.exists(myPath) ? size() : 0;
+    }
+
+    private long size() throws IOException {
+      return myChannelsAccessor.executeOp(myPath, channel -> channel.size());
+    }
+
+    @Override
+    public synchronized String toString() {
+      return myPath + " [appendAt: " + myAppendAtOffset + "] @" + Integer.toHexString(hashCode());
+    }
   }
 
   private static final class ReaderOverCompressedFile implements RAReader {
@@ -834,19 +933,16 @@ public final class PersistentHashMapValueStorage {
     }
   }
 
-  private static final class ReaderOverFileChannelCache implements RAReader {
-    private final Path myPath;
+  private static final class ReaderOverFileAccessor implements RAReader {
+    private final @NotNull ChannelAccessorBackedFileAccessor myFileAccessor;
 
-    private ReaderOverFileChannelCache(@NotNull Path path) {
-      myPath = path;
+    private ReaderOverFileAccessor(@NotNull ChannelAccessorBackedFileAccessor fileAccessor) {
+      myFileAccessor = fileAccessor;
     }
 
     @Override
     public void get(final long addr, final byte[] dst, final int off, final int len) throws IOException {
-      try (FileAccessorCache.Handle<FileChannelWithSizeTracking> fileAccessor = ourFileChannelCache.get(myPath)) {
-        FileChannelWithSizeTracking file = fileAccessor.get();
-        file.read(addr, dst, off, len);
-      }
+      myFileAccessor.read(addr, dst, off, len);
     }
 
     @Override
@@ -854,54 +950,72 @@ public final class PersistentHashMapValueStorage {
     }
   }
 
-  private static final class FileReader implements RAReader {
-    private final ResilientFileChannel fileChannel;
+  /** Presents accessor-backed side-file reads as a stream without retaining a FileChannel between reads. */
+  private static final class InputStreamOverFileAccessor extends InputStream {
+    private final @NotNull ChannelAccessorBackedFileAccessor myFileAccessor;
+    private final long myLimit;
+    private long myPosition;
 
-    private FileReader(Path file) throws IOException {
-      fileChannel = new ResilientFileChannel(file, READ);
+    InputStreamOverFileAccessor(@NotNull ChannelAccessorBackedFileAccessor fileAccessor, long limit) {
+      myFileAccessor = fileAccessor;
+      myLimit = limit;
     }
 
     @Override
-    public void get(final long addr, final byte[] dst, final int off, final int len) throws IOException {
-      fileChannel.read(ByteBuffer.wrap(dst, off, len), addr);
+    public int read(byte @NotNull [] b, int off, int len) throws IOException {
+      if (len == 0) return 0;
+      if (myPosition >= myLimit) return -1;
+
+      int bytesToRead = (int)Math.min(len, myLimit - myPosition);
+      int bytesRead = myFileAccessor.read(myPosition, b, off, bytesToRead);
+      if (bytesRead < 0) return -1;
+
+      myPosition += bytesRead;
+      return bytesRead;
     }
 
     @Override
-    public void dispose() throws IOException {
-      fileChannel.close();
+    public int read() throws IOException {
+      byte[] buffer = new byte[1];
+      int read = read(buffer);
+      return read == -1 ? -1 : buffer[0] & 0xFF;
+    }
+
+    @Override
+    public int available() {
+      return (int)Math.min(Integer.MAX_VALUE, Math.max(0, myLimit - myPosition));
     }
   }
 
-  private static final class SyncAbleBufferedOutputStreamOverCachedFileChannel extends BufferedOutputStream {
-    private final Path myPath;
-
-    SyncAbleBufferedOutputStreamOverCachedFileChannel(final Path path) {
-      super(new OutputStreamOverRandomAccessFileCache(path));
-      myPath = path;
+  private static final class SyncAbleBufferedOutputStreamOverFileAccessor extends BufferedOutputStream {
+    SyncAbleBufferedOutputStreamOverFileAccessor(@NotNull ChannelAccessorBackedFileAccessor fileAccessor) {
+      super(new OutputStreamOverFileAccessor(fileAccessor));
     }
 
-    public void sync() throws IOException {
-      final FileAccessorCache.Handle<FileChannelWithSizeTracking> fileAccessor = ourFileChannelCache.get(myPath);
-      final FileChannelWithSizeTracking fileChannel = fileAccessor.get();
-      fileChannel.force();
+    /** Flushes Java-level buffering so later channel reads in this process can see appended bytes. */
+    void flushBufferedBytes() throws IOException {
+      flush();
     }
 
-    /** Implements output stream by writing data through {@link FileChannelWithSizeTracking} out of {@link #ourFileChannelCache} */
-    private static final class OutputStreamOverRandomAccessFileCache extends OutputStream {
-      private final Path myPath;
+    public void dispose() throws IOException {
+      flush();
+    }
 
-      public OutputStreamOverRandomAccessFileCache(Path path) { myPath = path; }
+    @Override
+    public void close() throws IOException {
+      flush();
+    }
+
+    private static final class OutputStreamOverFileAccessor extends OutputStream {
+      private final @NotNull ChannelAccessorBackedFileAccessor myFileAccessor;
+
+      private OutputStreamOverFileAccessor(@NotNull ChannelAccessorBackedFileAccessor fileAccessor) {
+        myFileAccessor = fileAccessor;
+      }
 
       @Override
       public void write(byte @NotNull [] b, int off, int len) throws IOException {
-        FileAccessorCache.Handle<FileChannelWithSizeTracking> fileAccessor = ourFileChannelCache.get(myPath);
-        FileChannelWithSizeTracking file = fileAccessor.get();
-        try {
-          file.write(file.length(), b, off, len);
-        }
-        finally {
-          fileAccessor.release();
-        }
+        myFileAccessor.append(b, off, len);
       }
 
       @Override
@@ -910,37 +1024,67 @@ public final class PersistentHashMapValueStorage {
         write(r);
       }
     }
-
   }
 
   private final class MyCompressedAppendableFile extends CompressedAppendableFile {
+    private final @NotNull ChannelAccessorBackedFileAccessor myChunkLengthFileAccessor;
+    private final @NotNull SyncAbleBufferedOutputStreamOverFileAccessor myChunkLengthAppender;
+    private final @NotNull ChannelAccessorBackedFileAccessor myIncompleteChunkFileAccessor;
+
     MyCompressedAppendableFile() throws IOException {
       super(myPath);
+      myChunkLengthFileAccessor = new ChannelAccessorBackedFileAccessor(getChunkLengthFile(), myStorageLockContext, myOptions.myReadOnly);
+      myChunkLengthAppender = new SyncAbleBufferedOutputStreamOverFileAccessor(myChunkLengthFileAccessor);
+      myIncompleteChunkFileAccessor =
+        new ChannelAccessorBackedFileAccessor(getIncompleteChunkFile(), myStorageLockContext, myOptions.myReadOnly);
     }
 
     @Override
     protected @NotNull InputStream getChunkInputStream(long offset, int pageSize) throws IOException {
-      forceAppender(myPath);
-      FileAccessorCache.Handle<RAReader> fileAccessor = ourReadersCache.get(myPath);
-
-      try {
-        byte[] bytes = new byte[pageSize];
-        fileAccessor.get().get(offset, bytes, 0, pageSize);
-        return new ByteArrayInputStream(bytes);
-      }
-      finally {
-        fileAccessor.release();
-      }
+      flushAppender();
+      byte[] bytes = new byte[pageSize];
+      myFileAccessor.read(offset, bytes, 0, pageSize);
+      return new ByteArrayInputStream(bytes);
     }
 
     @Override
     protected @NotNull DataOutputStream getChunkAppendStream() {
-      return toDataOutputStream(ourAppendersCache.get(myPath));
+      return toDataOutputStream(myAppender);
     }
 
     @Override
     protected @NotNull DataOutputStream getChunkLengthAppendStream() {
-      return toDataOutputStream(ourAppendersCache.get(getChunkLengthFile()));
+      return toDataOutputStream(myChunkLengthAppender);
+    }
+
+    @Override
+    protected long getChunkLengthFileSize() throws IOException {
+      return myChunkLengthFileAccessor.sizeIfExists();
+    }
+
+    @Override
+    protected @NotNull InputStream getChunkLengthInputStream(long limit) {
+      return new BufferedInputStream(new InputStreamOverFileAccessor(myChunkLengthFileAccessor, limit), 32768);
+    }
+
+    @Override
+    protected long getIncompleteChunkFileSize() throws IOException {
+      return myIncompleteChunkFileAccessor.sizeIfExists();
+    }
+
+    @Override
+    protected @NotNull InputStream getIncompleteChunkInputStream(long limit) {
+      return new InputStreamOverFileAccessor(myIncompleteChunkFileAccessor, limit);
+    }
+
+    @Override
+    protected void writeIncompleteChunkFile(byte @NotNull [] buffer, int length) throws IOException {
+      myIncompleteChunkFileAccessor.replace(buffer, length);
+    }
+
+    @Override
+    protected void deleteIncompleteChunkFileIfExists() throws IOException {
+      myIncompleteChunkFileAccessor.clearIfNonEmpty();
     }
 
     @Override
@@ -951,20 +1095,33 @@ public final class PersistentHashMapValueStorage {
     @Override
     public synchronized void force() {
       super.force();
-      forceAppender(getChunkLengthFile());
+      flushAppender(myChunkLengthAppender);
     }
 
     @Override
     public synchronized void dispose() {
       super.dispose();
 
-      ourAppendersCache.remove(getChunkLengthFile());
-      ourFileChannelCache.remove(getChunkLengthFile());
+      disposeAppender(myChunkLengthAppender);
+      closeFileAccessor(myChunkLengthFileAccessor);
+      closeFileAccessor(myIncompleteChunkFileAccessor);
+      assertNoOpenChannels();
+    }
+
+    /** Checks compressed side-files against both mode-bound cache views. */
+    private void assertNoOpenChannels() {
+      myChunkLengthFileAccessor.assertNoOpenChannels();
+      myIncompleteChunkFileAccessor.assertNoOpenChannels();
     }
   }
 
   @TestOnly
   public boolean isReadOnly() {
     return myOptions.myReadOnly;
+  }
+
+  @TestOnly
+  public @NotNull StorageLockContext getStorageLockContext() {
+    return myStorageLockContext;
   }
 }

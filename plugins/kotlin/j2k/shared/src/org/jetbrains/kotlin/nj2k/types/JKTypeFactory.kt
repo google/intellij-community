@@ -17,6 +17,7 @@ import com.intellij.psi.PsiTypeParameter
 import com.intellij.psi.PsiWildcardType
 import com.intellij.psi.impl.source.PsiClassReferenceType
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.components.isMarkedNullable
 import org.jetbrains.kotlin.analysis.api.types.KaClassType
 import org.jetbrains.kotlin.analysis.api.types.KaStarTypeProjection
 import org.jetbrains.kotlin.analysis.api.types.KaType
@@ -29,12 +30,16 @@ import org.jetbrains.kotlin.j2k.Nullability.Nullable
 import org.jetbrains.kotlin.name.FqNameUnsafe
 import org.jetbrains.kotlin.nj2k.JKSymbolProvider
 import org.jetbrains.kotlin.nj2k.NullabilityInfo
+import org.jetbrains.kotlin.nj2k.OriginalJavaSemanticResolver
 import org.jetbrains.kotlin.nj2k.symbols.JKClassSymbol
 import org.jetbrains.kotlin.nj2k.symbols.JKTypeParameterSymbol
 import org.jetbrains.kotlin.nj2k.symbols.JKUnresolvedClassSymbol
 import org.jetbrains.kotlin.resolve.jvm.JvmPrimitiveType
 
-class JKTypeFactory(val symbolProvider: JKSymbolProvider) {
+class JKTypeFactory internal constructor(
+    val symbolProvider: JKSymbolProvider,
+    private val semanticResolver: OriginalJavaSemanticResolver,
+) {
     internal var nullabilityInfo: NullabilityInfo? = null
 
     fun fromPsiType(type: PsiType): JKType = createFromPsiType(type)
@@ -87,7 +92,7 @@ class JKTypeFactory(val symbolProvider: JKSymbolProvider) {
 
         return when (type) {
             is PsiClassType -> {
-                val target = type.resolve()
+                val target = semanticResolver.resolveClassType(type)
                 val parameters = type.parameters.map { fromPsiType(it) }
 
                 when (target) {
@@ -186,7 +191,7 @@ class JKTypeFactory(val symbolProvider: JKSymbolProvider) {
                         createFromKaType(typeArgumentType)
                     }
                 }
-                val nullability = if (type.nullability.isNullable) Nullable else NotNull
+                val nullability = if (type.isMarkedNullable) Nullable else NotNull
                 JKClassType(classReference, typeParameters, nullability)
             }
 

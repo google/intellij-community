@@ -8,6 +8,13 @@ data class Toolset(
   val path: String? = null
 )
 
+data class RemoteConnection(
+  val host: String = "localhost",
+  val port: String = "2222",
+  val username: String = System.getenv("USERNAME") ?: "",
+  val password: String = "wslpassword",
+)
+
 sealed class Toolchain(
   val name: ToolchainNames,
   val compiler: Compiler,
@@ -68,21 +75,23 @@ sealed class Toolchain(
     debugger: Debugger = Debugger.MINGW_CUSTOM_GDB,
     buildTool: BuildTool = BuildTool.DEFAULT,
     name: ToolchainNames = ToolchainNames.MINGW_GDB,
-  ) : Toolchain(name, compiler, debugger, buildTool)
+    toolset: Toolset = Toolset(kind = "MINGW", path = "C:/Tools/msys2/mingw64")
+  ) : Toolchain(name, compiler, debugger, buildTool, toolset)
 
   class MingwCustomGDB(
     compiler: Compiler = Compiler.DEFAULT,
     debugger: Debugger = Debugger.CUSTOM_GDB,
     buildTool: BuildTool = BuildTool.DEFAULT,
     name: ToolchainNames = ToolchainNames.MINGW_GDB,
-  ) : Toolchain(name, compiler, debugger, buildTool)
+    toolset: Toolset = Toolset(kind = "MINGW", path = "\"C:\\Tools\\msys2\\mingw64\"")
+  ) : Toolchain(name, compiler, debugger, buildTool, toolset)
 
   class MSVC(
     compiler: Compiler = Compiler.DEFAULT,
     debugger: Debugger = Debugger.BUNDLED_LLDB,
     buildTool: BuildTool = BuildTool.DEFAULT,
     name: ToolchainNames = ToolchainNames.MSVC,
-    toolset: Toolset = Toolset(kind = "MSVC", path = "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\2026\\BuildTools\"")
+    toolset: Toolset = Toolset(kind = "MSVC", path = "C:/Program Files (x86)/Microsoft Visual Studio/2026/BuildTools")
   ) : Toolchain(name, compiler, debugger, buildTool, toolset)
 
   class Cygwin(
@@ -90,14 +99,16 @@ sealed class Toolchain(
     debugger: Debugger = Debugger.CYGWIN_GDB,
     buildTool: BuildTool = BuildTool.DEFAULT,
     name: ToolchainNames = ToolchainNames.CYGWIN,
-  ) : Toolchain(name, compiler, debugger, buildTool)
+    toolset: Toolset = Toolset(kind = "CYGWIN", path = "C:/Tools/cygwin")
+  ) : Toolchain(name, compiler, debugger, buildTool, toolset)
 
   class WSL(
     compiler: Compiler = Compiler.DEFAULT,
     debugger: Debugger = Debugger.WSL_DEBUGGER,
     buildTool: BuildTool = BuildTool.GMAKE,
     name: ToolchainNames = ToolchainNames.WSL,
-  ) : Toolchain(name, compiler, debugger, buildTool)
+    toolset: Toolset = Toolset(kind = "WSL", path = "ubuntu2204wsl2")
+  ) : Toolchain(name, compiler, debugger, buildTool, toolset)
 
   class Docker(
     compiler: Compiler = Compiler.DEFAULT,
@@ -111,7 +122,14 @@ sealed class Toolchain(
     debugger: Debugger = Debugger.REMOTE_GDB,
     buildTool: BuildTool = BuildTool.GMAKE,
     name: ToolchainNames = ToolchainNames.REMOTE_HOST,
+    val connection: RemoteConnection = RemoteConnection(),
   ) : Toolchain(name, compiler, debugger, buildTool)
+
+  companion object {
+    // Cygwin CMake is the only case where we need to specify CMake path manually. For this reason we did not add a cmake value to
+    // all the sealed Toolchain classes. This property should be removed anyway and should be made an environment variable
+    const val CYGWIN_CMAKE_PATH: String = "C:/Tools/cygwin/bin/cmake.exe"
+  }
 }
 
 enum class BuildTool {
@@ -181,6 +199,7 @@ enum class Debugger {
     override fun getDebuggerFieldName(): String = "Custom GDB executable"
     override fun toString(): String = "Custom GDB"
     override fun type(): String = "GDB"
+    override val shouldTypePath: Boolean = true
   },
 
   CUSTOM_LLDB {
@@ -188,13 +207,15 @@ enum class Debugger {
     override fun getDebuggerFieldName(): String = "Custom LLDB executable"
     override fun toString(): String = "Custom LLDB"
     override fun type(): String = "LLDB"
+    override val shouldTypePath: Boolean = true
   },
 
   CYGWIN_GDB {
-    override fun getDebuggerPath(): String = "Cygwin GDB"
+    override fun getDebuggerPath(): String = "C:\\Tools\\cygwin\\bin\\gdbserver.exe"
     override fun getDebuggerFieldName(): String = "Custom GDB executable"
-    override fun toString(): String = "Cygwin GDB"
+    override fun toString(): String = "Custom Cygwin GDB"
     override fun type(): String = "GDB"
+    override val shouldTypePath: Boolean = true
   },
 
   WSL_DEBUGGER {
@@ -221,6 +242,9 @@ enum class Debugger {
   abstract fun getDebuggerPath(): String
   abstract fun getDebuggerFieldName(): String
   abstract fun type(): String
+
+  /** Whether [ToolchainPanel.setDebugger] must type the debugger path into the field after selecting it from the popup. */
+  open val shouldTypePath: Boolean = false
 }
 
 

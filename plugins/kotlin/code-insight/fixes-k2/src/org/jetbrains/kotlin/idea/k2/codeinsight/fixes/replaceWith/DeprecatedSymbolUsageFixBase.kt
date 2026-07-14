@@ -4,6 +4,8 @@ package org.jetbrains.kotlin.idea.k2.codeinsight.fixes.replaceWith
 
 import com.intellij.codeInsight.intention.HighPriorityAction
 import com.intellij.codeInsight.intention.IntentionAction
+import com.intellij.codeInsight.intention.preview.IntentionPreviewUtils
+import com.intellij.openapi.application.runWriteAction
 import com.intellij.openapi.diagnostic.ControlFlowException
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
@@ -11,8 +13,6 @@ import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotationValue
-import org.jetbrains.kotlin.analysis.api.base.KaConstantValue
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
 import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.KaRendererAnnotationsFilter
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.bodies.KaParameterDefaultValueRenderer
@@ -23,11 +23,13 @@ import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.callabl
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.classifiers.KaNamedClassSymbolRenderer
 import org.jetbrains.kotlin.analysis.api.symbols.KaDeclarationSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
-import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeinsight.api.applicators.fixes.KotlinQuickFixFactory.IntentionBased
+import org.jetbrains.kotlin.idea.codeinsight.api.classic.quickfixes.CleanupFix
 import org.jetbrains.kotlin.idea.codeinsight.api.classic.quickfixes.KotlinPsiOnlyQuickFixAction
+import org.jetbrains.kotlin.idea.codeinsight.utils.AddQualifiersUtil
 import org.jetbrains.kotlin.idea.core.moveCaret
+import org.jetbrains.kotlin.idea.k2.codeinsight.fetchReplaceWithPattern
 import org.jetbrains.kotlin.idea.k2.refactoring.inline.codeInliner.CallableUsageReplacementStrategy
 import org.jetbrains.kotlin.idea.k2.refactoring.inline.codeInliner.ClassUsageReplacementStrategy
 import org.jetbrains.kotlin.idea.k2.refactoring.inline.codeInliner.CodeToInlineBuilder
@@ -90,8 +92,8 @@ internal object DeprecationFixFactory {
         kaSymbol: KaDeclarationSymbol,
         psi: PsiElement
     ): List<IntentionAction> {
-        val deprecatedSymbol = kaSymbol.takeIf { it.deprecationStatus != null }
-            ?: (kaSymbol.containingSymbol as? KaDeclarationSymbol)?.takeIf { it.deprecationStatus != null }
+        val deprecatedSymbol = kaSymbol.takeIf { it.isDeprecated }
+            ?: (kaSymbol.containingSymbol as? KaDeclarationSymbol)?.takeIf { it.isDeprecated }
             ?: return emptyList()
         val referenceExpression = when (val psiElement = psi) {
             is KtArrayAccessExpression -> psiElement
@@ -135,7 +137,7 @@ internal object DeprecationFixFactory {
 class DeprecatedSymbolUsageFix(
     element: KtReferenceExpression,
     replaceWith: ReplaceWithData
-) : DeprecatedSymbolUsageFixBase(element, replaceWith), HighPriorityAction {
+) : DeprecatedSymbolUsageFixBase(element, replaceWith), HighPriorityAction, CleanupFix {
     override fun getFamilyName(): String = KotlinBundle.message("replace.deprecated.symbol.usage")
     override fun getText(): String = KotlinBundle.message("replace.with.0", replaceWith.pattern)
 
@@ -175,8 +177,25 @@ abstract class DeprecatedSymbolUsageFixBase(
 
     final override fun invoke(project: Project, editor: Editor?, file: KtFile) {
         val expression = element ?: return
-        val strategy = buildUsageReplacementStrategy(expression, replaceWith, isUnitTypeReplacement) ?: return
+        val strategy = buildUsageReplacementStrategy(expression,
+            qualifyReplaceWithFragment(expression) ?: replaceWith, isUnitTypeReplacement) ?: return
         invoke(strategy, project, editor)
+    }
+
+    private fun qualifyReplaceWithFragment(expression: KtReferenceExpression): ReplaceWithData? {
+        if (replaceWith.imports.isNotEmpty() && !IntentionPreviewUtils.isIntentionPreviewActive()) {
+            return runWriteAction {
+                val fragment = KtPsiFactory.contextual(expression).createExpressionCodeFragment(replaceWith.pattern, expression)
+                fragment.addImportsFromString(replaceWith.imports.joinToString())
+                val contentElement = fragment.getContentElement()
+                if (contentElement != null) {
+
+                    AddQualifiersUtil.addQualifiersRecursively(contentElement)
+                    ReplaceWithData(fragment.text, replaceWith.imports, replaceWith.replaceInWholeProject)
+                } else null
+            }
+        }
+        return null
     }
 
     protected abstract operator fun invoke(replacementStrategy: UsageReplacementStrategy, project: Project, editor: Editor?)
@@ -222,7 +241,8 @@ abstract class DeprecatedSymbolUsageFixBase(
 
                     val typeElement = typeReference?.typeElement as? KtUserType ?: return null
 
-                    return ClassUsageReplacementStrategy(typeElement, null, project)
+                    return ClassUsageReplacementStrategy(typeElement, null, project,
+                        replaceWith.imports.filter { !it.endsWith(".${typeElement.referencedName}") })
                 }
 
                 is KtCallableDeclaration -> {
@@ -270,21 +290,4 @@ abstract class DeprecatedSymbolUsageFixBase(
             return context
         }
     }
-}
-
-fun fetchReplaceWithPattern(
-    symbol: KaDeclarationSymbol
-): ReplaceWithData? {
-    val annotation = symbol.annotations.find { it.classId?.asSingleFqName() == StandardNames.FqNames.deprecated } ?: return null
-    val replaceWithValue =
-      (annotation.arguments.find { it.name.asString() == "replaceWith" }?.expression as? KaAnnotationValue.NestedAnnotationValue)?.annotation
-            ?: return null
-    val pattern =
-        ((replaceWithValue.arguments.find { it.name.asString() == "expression" }?.expression as? KaAnnotationValue.ConstantValue)?.value as? KaConstantValue.StringValue)?.value
-            ?: return null
-    val imports =
-        (replaceWithValue.arguments.find { it.name.asString() == "imports" }?.expression as? KaAnnotationValue.ArrayValue)?.values?.mapNotNull { ((it as? KaAnnotationValue.ConstantValue)?.value as? KaConstantValue.StringValue)?.value }
-            ?: emptyList()
-
-    return ReplaceWithData(pattern, imports, true)
 }

@@ -1,7 +1,7 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build.productLayout
 
-import com.intellij.platform.pluginGraph.ContentModuleName
+import com.intellij.platform.pluginGraph.PluginModuleId
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.jetbrains.intellij.build.productLayout.util.DeferredFileUpdater
@@ -18,10 +18,6 @@ internal object ModuleSetGenerationTestSource {
   fun regularSet(): ModuleSet = moduleSet("regular") {
     module("intellij.regular.module")
   }
-
-  fun pluginizedSet(): ModuleSet = plugin("pluginized") {
-    module("intellij.pluginized.module")
-  }
 }
 
 /**
@@ -33,7 +29,7 @@ class ProductDslGeneratorTest {
   private fun createSimpleModuleSet(name: String, vararg moduleNames: String): ModuleSet {
     return ModuleSet(
       name = name,
-      modules = moduleNames.map { ContentModule(ContentModuleName(it)) }
+      modules = moduleNames.map { ContentModule(PluginModuleId(it, namespace = "jetbrains")) }
     )
   }
 
@@ -44,7 +40,7 @@ class ProductDslGeneratorTest {
   ): ModuleSet {
     return ModuleSet(
       name = name,
-      modules = moduleNames.map { ContentModule(ContentModuleName(it)) },
+      modules = moduleNames.map { ContentModule(PluginModuleId(it, namespace = "jetbrains")) },
       nestedSets = nestedSets
     )
   }
@@ -181,7 +177,7 @@ class ProductDslGeneratorTest {
   }
 
   @Test
-  fun `doGenerateAllModuleSetsInternal skips pluginized module set xml files`(@TempDir tempDir: Path): Unit = runBlocking {
+  fun `doGenerateAllModuleSetsInternal generates discovered module set xml files`(@TempDir tempDir: Path): Unit = runBlocking {
     val strategy = DeferredFileUpdater(tempDir)
 
     val result = doGenerateAllModuleSetsInternal(
@@ -200,11 +196,11 @@ class ProductDslGeneratorTest {
   }
 
   @Test
-  fun `cleanupOrphanedModuleSetFiles deletes stale pluginized module set xml files`(@TempDir tempDir: Path): Unit = runBlocking {
+  fun `cleanupOrphanedModuleSetFiles deletes stale module set xml files`(@TempDir tempDir: Path): Unit = runBlocking {
     val regularFile = tempDir.resolve("intellij.moduleSets.regular.xml")
-    val pluginizedFile = tempDir.resolve("intellij.moduleSets.pluginized.xml")
+    val staleFile = tempDir.resolve("intellij.moduleSets.stale.xml")
     Files.writeString(regularFile, "<idea-plugin/>")
-    Files.writeString(pluginizedFile, "<idea-plugin/>")
+    Files.writeString(staleFile, "<idea-plugin/>")
 
     val strategy = DeferredFileUpdater(tempDir)
     val result = doGenerateAllModuleSetsInternal(
@@ -217,6 +213,6 @@ class ProductDslGeneratorTest {
     val deleted = cleanupOrphanedModuleSetFiles(result.trackingMap, strategy)
 
     assertThat(deleted.map { it.fileName })
-      .containsExactly("intellij.moduleSets.pluginized.xml")
+      .containsExactly("intellij.moduleSets.stale.xml")
   }
 }

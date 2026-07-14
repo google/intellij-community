@@ -6,15 +6,14 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.extensions.AreaInstance;
 import com.intellij.openapi.fileTypes.FileTypeRegistry;
 import com.intellij.openapi.module.Module;
+import com.intellij.openapi.project.BaseProjectDirectories;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ProjectFileIndex;
-import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import static com.intellij.openapi.progress.ProgressManager.checkCanceled;
-import static com.intellij.openapi.util.registry.Registry.is;
 import static com.intellij.openapi.vfs.VfsUtilCore.isAncestor;
 
 public interface ProjectFileNode {
@@ -50,18 +49,7 @@ public interface ProjectFileNode {
     if (ScratchFileService.getInstance().getRootType(file) != null) return ApplicationManager.getApplication();
     Module module = ProjectFileIndex.getInstance(project).getModuleForFile(file, false);
     if (module != null) return module.isDisposed() ? null : module;
-    if (!is("projectView.show.base.dir")) return null;
-    VirtualFile ancestor = findBaseDir(project);
     // file does not belong to any content root, but it is located under the project directory
-    return ancestor == null || !isAncestor(ancestor, file, false) ? null : project;
-  }
-
-  /**
-   * Returns a base directory for the specified {@code project}, or {@code null} if it does not exist.
-   */
-  static @Nullable VirtualFile findBaseDir(@Nullable Project project) {
-    if (project == null || project.isDisposed()) return null;
-    String path = project.getBasePath();
-    return path == null ? null : LocalFileSystem.getInstance().findFileByPath(path);
+    return BaseProjectDirectories.getInstance(project).getBaseDirectoryFor(file) == null ? null : project;
   }
 }

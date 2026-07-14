@@ -41,7 +41,7 @@ internal object CastExpressionFixFactories {
         override fun getFamilyName(): String =
             KotlinBundle.message("fix.cast.expression.family")
 
-        override fun getPresentation(
+        override fun getActionPresentation(
             context: ActionContext,
             element: PsiElement
         ): Presentation {
@@ -98,6 +98,10 @@ internal object CastExpressionFixFactories {
 
     val returnTypeMismatch = KotlinQuickFixFactory.ModCommandBased { diagnostic: KaFirDiagnostic.ReturnTypeMismatch ->
         createFixes(diagnostic.isMismatchDueToNullability, diagnostic.actualType, diagnostic.expectedType, diagnostic.psi)
+    }
+
+    val javaTypeMismatch = KotlinQuickFixFactory.ModCommandBased { diagnostic: KaFirDiagnostic.JavaTypeMismatch ->
+        createFixes(false, diagnostic.actualType, diagnostic.expectedType, diagnostic.psi)
     }
 
     val initializerTypeMismatch = KotlinQuickFixFactory.ModCommandBased { diagnostic: KaFirDiagnostic.InitializerTypeMismatch ->

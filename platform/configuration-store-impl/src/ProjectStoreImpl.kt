@@ -31,10 +31,10 @@ import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.ReadonlyStatusHandler
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.eel.EelDescriptorWithIsolatedWorkspace
 import com.intellij.platform.eel.provider.asEelPath
 import com.intellij.platform.settings.SettingsController
 import com.intellij.serviceContainer.ComponentManagerImpl
-import com.intellij.util.io.Ksuid
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -178,7 +178,7 @@ open class ProjectStoreImpl(final override val project: Project) : ComponentStor
     var projectWorkspaceId = projectIdManager.id
     if (projectWorkspaceId == null) {
       // do not use the project name as part of id, to ensure a project dir rename does not cause data loss
-      projectWorkspaceId = Ksuid.generate()
+      projectWorkspaceId = ProjectWorkspaceId.generate()
       projectIdManager.id = projectWorkspaceId
     }
 
@@ -190,7 +190,7 @@ open class ProjectStoreImpl(final override val project: Project) : ComponentStor
       else {
         PathManager.getConfigDir()
       }
-      val productWorkspaceFile = basePath.resolve("$CONFIG_WORKSPACE_DIR/$projectWorkspaceId.xml")
+      val productWorkspaceFile = basePath.resolve("$CONFIG_WORKSPACE_DIR/${projectWorkspaceId.value}.xml")
       // storageManager.setMacros(macros) was called before, because we need to read a `ProjectIdManager` state to get projectWorkspaceId
       macros.add(Macro(StoragePathMacros.PRODUCT_WORKSPACE_FILE, productWorkspaceFile))
     }
@@ -234,7 +234,7 @@ open class ProjectStoreImpl(final override val project: Project) : ComponentStor
     }
 
   override val projectWorkspaceId: String?
-    get() = project.service<ProjectIdManager>().id
+    get() = project.service<ProjectIdManager>().id?.value
 
   final override fun <T : Any> getStorageSpecs(component: PersistentStateComponent<T>, stateSpec: State, operation: StateStorageOperation): List<Storage> {
     return storeDescriptor.getStorageSpecs(component = component, stateSpec = stateSpec, operation = operation, storageManager = storageManager)
@@ -303,9 +303,9 @@ open class ProjectStoreImpl(final override val project: Project) : ComponentStor
 
   private fun getMachineWorkspacePath(storeDescriptor: ProjectStoreDescriptor): Path? {
     val projectPath = storeDescriptor.historicalProjectBasePath
-    if (projectPath.fileSystem != FileSystems.getDefault()) return null
+    if (projectPath.fileSystem != FileSystems.getDefault() || !projectPath.isAbsolute) return null
     val descriptor = projectPath.asEelPath().descriptor
-    if (descriptor::class.simpleName != "DockerEelDescriptor") return null
+    if (descriptor !is EelDescriptorWithIsolatedWorkspace) return null
     val pathHash = FileUtilRt.pathHashCode(projectBasePath.invariantSeparatorsPathString)
     return PathManager.getOriginalConfigDir().resolve("$CONFIG_WORKSPACE_DIR/${sanitizeFileName(descriptor.name)}.${pathHash.toHexString()}.xml")
   }

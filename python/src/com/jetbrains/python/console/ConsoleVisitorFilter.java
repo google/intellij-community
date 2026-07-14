@@ -10,7 +10,9 @@ import com.jetbrains.python.inspections.PyPep8Inspection;
 import com.jetbrains.python.inspections.PySingleQuotedDocstringInspection;
 import com.jetbrains.python.inspections.PyStatementEffectInspection;
 import com.jetbrains.python.inspections.PyUnboundLocalVariableInspection;
-import com.jetbrains.python.inspections.unusedLocal.PyUnusedLocalInspection;
+import com.jetbrains.python.inspections.unusedLocal.PyUnusedFunctionInspection;
+import com.jetbrains.python.inspections.unusedLocal.PyUnusedLocalVariableInspection;
+import com.jetbrains.python.inspections.unusedLocal.PyUnusedParameterInspection;
 import com.jetbrains.python.psi.PythonVisitorFilter;
 import com.jetbrains.python.validation.PyDocStringHighlightingAnnotator;
 import org.jetbrains.annotations.NotNull;
@@ -20,13 +22,14 @@ import org.jetbrains.annotations.NotNull;
  *
  * filter out some python inspections and annotations if we're in console
  */
-public final class ConsoleVisitorFilter implements PythonVisitorFilter {
+final class ConsoleVisitorFilter implements PythonVisitorFilter {
   @Override
   public boolean isSupported(final @NotNull Class visitorClass, final @NotNull PsiFile file) {
     //if we're in console
     if (PydevConsoleRunnerUtil.isInPydevConsole(file)) {
       //inspections
-      if (visitorClass == PyUnusedLocalInspection.class || visitorClass == PyUnboundLocalVariableInspection.class ||
+      if (visitorClass == PyUnusedLocalVariableInspection.class || visitorClass == PyUnusedParameterInspection.class ||
+          visitorClass == PyUnusedFunctionInspection.class || visitorClass == PyUnboundLocalVariableInspection.class ||
           visitorClass == PyStatementEffectInspection.class || visitorClass == PySingleQuotedDocstringInspection.class ||
           visitorClass == PyIncorrectDocstringInspection.class || visitorClass == PyMissingOrEmptyDocstringInspection.class ||
           visitorClass == PyMandatoryEncodingInspection.class || visitorClass == PyPep8Inspection.class ||

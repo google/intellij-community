@@ -5,6 +5,7 @@ package org.jetbrains.intellij.build.productLayout.discovery
 
 import com.intellij.platform.pluginGraph.ContentModuleName
 import com.intellij.platform.pluginGraph.PluginId
+import com.intellij.platform.pluginGraph.PluginModuleId
 import com.intellij.platform.pluginSystem.parser.impl.elements.ContentModuleElement
 import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleLoadingRuleValue
 import com.intellij.platform.pluginSystem.parser.impl.parseContentAndXIncludes
@@ -19,6 +20,7 @@ import org.jetbrains.intellij.build.findFileInModuleDependenciesRecursive
 import org.jetbrains.intellij.build.findFileInModuleLibraryDependencies
 import org.jetbrains.intellij.build.findFileInModuleSources
 import org.jetbrains.intellij.build.productLayout.ModuleSet
+import org.jetbrains.intellij.build.productLayout.contentName
 import org.jetbrains.intellij.build.productLayout.model.ErrorSink
 import org.jetbrains.intellij.build.productLayout.model.error.XIncludeResolutionError
 import org.jetbrains.intellij.build.productLayout.util.AsyncCache
@@ -55,10 +57,10 @@ internal enum class PluginSource {
 
 /**
  * Content module with its loading mode.
- * Consolidates module name and loading into a single structure.
+ * Consolidates module id and loading into a single structure.
  */
 internal data class ContentModuleInfo(
-  val name: ContentModuleName,
+  @JvmField val moduleId: PluginModuleId,
   @JvmField val loadingMode: ModuleLoadingRuleValue?,
 )
 
@@ -119,6 +121,10 @@ internal data class PluginContentInfo(
    * Used for IDE capability markers (e.g., `com.intellij.modules.java`, `com.intellij.modules.ruby-capable`).
    */
   @JvmField val pluginAliases: List<PluginId> = emptyList(),
+  /** Action group IDs declared by this plugin.xml and its xi:includes. */
+  @JvmField val declaredActionGroupIds: Set<String> = emptySet(),
+  /** Action group IDs referenced by this plugin.xml and its xi:includes. */
+  @JvmField val referencedActionGroupIds: Set<String> = emptySet(),
 ) {
   /** True if DSL-defined (content computed from spec, not extracted from disk) */
   val isDslDefined: Boolean get() = source == PluginSource.DSL_TEST
@@ -232,7 +238,9 @@ internal suspend fun extractPluginContent(
     pluginXmlPath = pluginXmlPath,
     pluginXmlContent = content,
     pluginId = extractPluginId(content),
-    contentModules = extractedContent.contentModules.map { ContentModuleInfo(name = ContentModuleName(it.name), loadingMode = it.loadingRule) },
+    contentModules = extractedContent.contentModules.map {
+      ContentModuleInfo(moduleId = PluginModuleId(it.name, it.namespace), loadingMode = it.loadingRule)
+    },
 
     moduleDependencies = extractedContent.moduleDependencies,
     pluginDependencies = extractedContent.pluginDependencies,
@@ -240,6 +248,8 @@ internal suspend fun extractPluginContent(
     source = source,
     legacyDepends = extractLegacyDepends(content),
     pluginAliases = extractedContent.pluginAliases,
+    declaredActionGroupIds = extractedContent.declaredActionGroupIds,
+    referencedActionGroupIds = extractedContent.referencedActionGroupIds,
   )
 }
 
@@ -249,6 +259,8 @@ private class ExtractedContent(
   @JvmField val pluginDependencies: Set<PluginId>,
   /** Plugin aliases declared via `<module value="..."/>` elements (main file + xi:includes) */
   @JvmField val pluginAliases: List<PluginId>,
+  @JvmField val declaredActionGroupIds: Set<String>,
+  @JvmField val referencedActionGroupIds: Set<String>,
   /** Deps by source file: first entry = main plugin.xml, subsequent = xi:includes */
   @JvmField val depsByFile: List<FileDepInfo>,
 )
@@ -269,6 +281,8 @@ private suspend fun extractContentModules(
   val allModuleDependencies = LinkedHashSet<ContentModuleName>()
   val allPluginDependencies = LinkedHashSet<PluginId>()
   val allPluginAliases = LinkedHashSet<PluginId>()
+  val allDeclaredActionGroupIds = LinkedHashSet<String>()
+  val allReferencedActionGroupIds = LinkedHashSet<String>()
   val depsByFile = ArrayList<FileDepInfo>()
   val processedPaths = HashSet<String>()
 
@@ -291,6 +305,8 @@ private suspend fun extractContentModules(
       for (alias in result.pluginAliases) {
         allPluginAliases.add(PluginId(alias))
       }
+      allDeclaredActionGroupIds.addAll(result.declaredActionGroupIds)
+      allReferencedActionGroupIds.addAll(result.referencedActionGroupIds)
       // Track deps per file
       depsByFile.add(FileDepInfo(relativePath = path, moduleDependencies = moduleDeps, pluginDependencies = pluginDeps))
     }
@@ -324,6 +340,8 @@ private suspend fun extractContentModules(
     moduleDependencies = allModuleDependencies,
     pluginDependencies = allPluginDependencies,
     pluginAliases = allPluginAliases.toList(),
+    declaredActionGroupIds = allDeclaredActionGroupIds,
+    referencedActionGroupIds = allReferencedActionGroupIds,
     depsByFile = depsByFile,
   )
 }
@@ -368,7 +386,7 @@ private suspend fun resolveXInclude(
 private fun collectEmbeddedModules(moduleSet: ModuleSet, result: MutableSet<ContentModuleName>) {
   for (module in moduleSet.modules) {
     if (module.loading == ModuleLoadingRuleValue.EMBEDDED) {
-      result.add(module.name)
+      result.add(module.contentName())
     }
   }
   for (nestedSet in moduleSet.nestedSets) {

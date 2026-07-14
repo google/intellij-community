@@ -41,8 +41,10 @@ import java.util.UUID;
  */
 // TODO: Use new annotation-based API to save data instead of legacy manual save
 public class PythonSdkAdditionalData implements SdkAdditionalData {
+  private static final PyFlavorAndData<?, ?> UNKNOWN_DATA = new PyFlavorAndData<>(PyFlavorData.Empty.INSTANCE,
+                                                                                                          PythonSdkFlavor.UnknownFlavor.INSTANCE);
   @ApiStatus.Internal
-  public static final @NonNls String REQUIREMENT_TXT_DEFAULT = "requirements.txt";
+  public static final Path REQUIREMENT_TXT_DEFAULT = Path.of("requirements.txt");
 
   private static final @NonNls String PATHS_ADDED_BY_USER_ROOT = "PATHS_ADDED_BY_USER_ROOT";
   private static final @NonNls String PATH_ADDED_BY_USER = "PATH_ADDED_BY_USER";
@@ -80,7 +82,7 @@ public class PythonSdkAdditionalData implements SdkAdditionalData {
   @Deprecated(forRemoval = true)
   public PythonSdkAdditionalData(@Nullable PythonSdkFlavor<?> flavor) {
     this(flavor == null
-         ? PyFlavorAndData.getUNKNOWN_FLAVOR_DATA()
+         ? UNKNOWN_DATA
          : new PyFlavorAndData(PyFlavorData.Empty.INSTANCE, ensureSupportsEmptyData(flavor)));
   }
 
@@ -92,7 +94,7 @@ public class PythonSdkAdditionalData implements SdkAdditionalData {
   }
 
   public PythonSdkAdditionalData(@Nullable PyFlavorAndData<?, ?> flavorAndData) {
-    myFlavorAndData = (flavorAndData != null ? flavorAndData : PyFlavorAndData.getUNKNOWN_FLAVOR_DATA());
+    myFlavorAndData = (flavorAndData != null ? flavorAndData : UNKNOWN_DATA);
     myAddedPaths = VirtualFilePointerManager.getInstance().createContainer(PythonPluginDisposable.getInstance());
     myExcludedPaths = VirtualFilePointerManager.getInstance().createContainer(PythonPluginDisposable.getInstance());
     myPathsToTransfer = VirtualFilePointerManager.getInstance().createContainer(PythonPluginDisposable.getInstance());

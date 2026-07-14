@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diagnostic
 
 import com.intellij.diagnostic.MessagePoolAdvisor.AfterEntryAddedEvent
@@ -35,19 +35,17 @@ object MessagePool {
   private val myErrors: MutableList<AbstractMessage> = ContainerUtil.createLockFreeCopyOnWriteList()
   private val myAdvisors: MutableList<MessagePoolAdvisor> = ContainerUtil.createLockFreeCopyOnWriteList()
 
-  @Deprecated("use {@link #addErrorMessage(AbstractMessage)} instead ")
+  @Suppress("DeprecatedCallableAddReplaceWith")
+  @Deprecated("use 'addErrorMessage' instead", level = DeprecationLevel.ERROR)
   fun addIdeFatalMessage(event: IdeaLoggingEvent) {
-    addIdeFatalMessage(
+    addErrorMessage(
       if (event.data is AbstractMessage) event.data as AbstractMessage
-      else LogMessage(
-        event.throwable,
-        event.message,
-        mutableListOf<Attachment>()
-      )
+      else LogMessage(event.throwable, event.message, mutableListOf<Attachment>())
     )
   }
 
-  @Deprecated("use {@link #addErrorMessage(AbstractMessage)} instead ")
+  @Suppress("DeprecatedCallableAddReplaceWith")
+  @Deprecated("use 'addErrorMessage' instead", level = DeprecationLevel.ERROR)
   fun addIdeFatalMessage(message: AbstractMessage) {
     addErrorMessage(message)
   }
@@ -88,22 +86,21 @@ object MessagePool {
       message.setRead(true) // expire notifications
     }
     myErrors.clear()
-    notifyPoolCleared()
+    val event = PoolClearedEvent()
+    for (it in myAdvisors) {
+      it.poolCleared(event)
+    }
   }
 
-  /**
-   * Noop, unsupported
-   */
+  /** No-op, unsupported */
   @Deprecated("Use MessagePoolAdvisor")
-  fun addListener(@Suppress("unused") listener: MessagePoolListener) {
-  }
+  @Suppress("removal", "DEPRECATION")
+  fun addListener(@Suppress("unused") listener: MessagePoolListener) { }
 
-  /**
-   * Noop, unsupported
-   */
+  /** No-op, unsupported */
   @Deprecated("Use MessagePoolAdvisor")
-  fun removeListener(@Suppress("unused") listener: MessagePoolListener) {
-  }
+  @Suppress("removal", "DEPRECATION")
+  fun removeListener(@Suppress("unused") listener: MessagePoolListener) { }
 
   fun addAdvisor(advisor: MessagePoolAdvisor) {
     myAdvisors.add(advisor)
@@ -113,27 +110,15 @@ object MessagePool {
     myAdvisors.remove(advisor)
   }
 
-  private suspend fun notifyEntryAdded(m: AbstractMessage) {
-    for (it in myAdvisors) {
-      it.afterEntryAdded(AfterEntryAddedEvent(m))
-    }
-  }
-
-  private fun notifyPoolCleared() {
-    for (it in myAdvisors) {
-      it.poolCleared(PoolClearedEvent())
-    }
-  }
-
   private fun notifyEntryRead(m: AbstractMessage) {
-    for (it in myAdvisors) {
-      it.entryWasRead(EntryReadEvent(m))
-    }
+    val event = EntryReadEvent(m)
+    myAdvisors.forEach { it.entryWasRead(event) }
   }
 
   private suspend fun doAddMessage(message: AbstractMessage) {
+    val beforeEvent = BeforeEntryAddedEvent(message)
     for (listener in myAdvisors) {
-      if (!listener.beforeEntryAdded(BeforeEntryAddedEvent(message))) {
+      if (!listener.beforeEntryAdded(beforeEvent)) {
         return
       }
     }
@@ -148,12 +133,13 @@ object MessagePool {
 
     message.setOnReadCallback { notifyEntryRead(message) }
     myErrors.add(message)
-    notifyEntryAdded(message)
+    val afterEvent = AfterEntryAddedEvent(message)
+    for (it in myAdvisors) {
+      it.afterEntryAdded(afterEvent)
+    }
   }
 
   class TooManyErrorsException internal constructor() : Exception(DiagnosticBundle.message("error.monitor.too.many.errors"))
 
-  private fun shallAddSilently(message: AbstractMessage): Boolean {
-    return SlowOperations.isMyMessage(message.getThrowable().message)
-  }
+  private fun shallAddSilently(message: AbstractMessage): Boolean = SlowOperations.isMyMessage(message.getThrowable().message)
 }

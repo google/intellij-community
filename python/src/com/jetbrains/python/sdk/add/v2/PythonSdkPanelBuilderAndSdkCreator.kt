@@ -10,6 +10,7 @@ import com.intellij.openapi.observable.util.or
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.ui.validation.WHEN_PROPERTY_CHANGED
 import com.intellij.platform.eel.provider.localEel
+import com.intellij.python.pytools.Version
 import com.intellij.ui.dsl.builder.Panel
 import com.intellij.ui.dsl.builder.bindText
 import com.intellij.util.asDisposable
@@ -27,12 +28,14 @@ import com.jetbrains.python.sdk.add.v2.PythonInterpreterSelectionMode.CUSTOM
 import com.jetbrains.python.sdk.add.v2.PythonInterpreterSelectionMode.PROJECT_UV
 import com.jetbrains.python.sdk.add.v2.PythonInterpreterSelectionMode.PROJECT_VENV
 import com.jetbrains.python.sdk.add.v2.conda.selectCondaEnvironment
+import com.jetbrains.python.sdk.add.v2.venv.venvBaseVersionError
 import com.jetbrains.python.sdk.add.v2.uv.UvInterpreterSection
 import com.jetbrains.python.sdk.add.v2.venv.setupVirtualenv
 import com.jetbrains.python.statistics.InterpreterCreationMode
 import com.jetbrains.python.statistics.InterpreterTarget
 import com.jetbrains.python.statistics.InterpreterType
-import com.jetbrains.python.util.ShowingMessageErrorSync
+import com.jetbrains.python.errorProcessing.ErrorSink
+import com.jetbrains.python.errorProcessing.withProject
 import com.jetbrains.python.venvReader.VirtualEnvReader
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -79,6 +82,8 @@ internal class PythonSdkPanelBuilderAndSdkCreator(
   private var _projectVenv = propertyGraph.booleanProperty(selectedMode, PROJECT_VENV)
   private var _baseConda = propertyGraph.booleanProperty(selectedMode, BASE_CONDA)
   private var _custom = propertyGraph.booleanProperty(selectedMode, CUSTOM)
+  // false when the selected Project venv base interpreter can't be used to create a venv (< 3.8)
+  private val _venvBaseValid = propertyGraph.property(true)
   private var venvHint = propertyGraph.property("")
 
   private lateinit var pythonBaseVersionComboBox: PythonInterpreterComboBox<PathHolder.Eel>
@@ -100,14 +105,17 @@ internal class PythonSdkPanelBuilderAndSdkCreator(
   private lateinit var model: PythonMutableTargetAddInterpreterModel<PathHolder.Eel>
 
   override fun buildPanel(outerPanel: Panel, projectPathFlows: ProjectPathFlows) {
-    model = PythonLocalAddInterpreterModel(projectPathFlows, FileSystem.Eel(localEel))
+    model = PythonLocalAddInterpreterModel(projectPathFlows, EelFileSystem(localEel))
     model.navigator.selectionMode = selectedMode
+    propertyGraph.dependsOn(_venvBaseValid, model.state.baseInterpreter, deleteWhenChildModified = false) {
+      model.state.baseInterpreter.get()?.let { venvBaseVersionError(it) == null } ?: true
+    }
     uvSection = UvInterpreterSection(model, module, selectedMode, propertyGraph)
 
     custom = PythonAddCustomInterpreter(
       model = model,
       module = module,
-      errorSink = module?.project?.let { ShowingMessageErrorSync.withProject(it) } ?: ShowingMessageErrorSync,
+      errorSink = module?.project?.let { ErrorSink().withProject(it) } ?: ErrorSink(),
       limitExistingEnvironments = limitExistingEnvironments,
       bestGuessCreateSdkInfo = CompletableDeferred(value = null)
     )
@@ -127,7 +135,9 @@ internal class PythonSdkPanelBuilderAndSdkCreator(
         title = message("sdk.create.python.version"),
         selectedSdkProperty = model.state.baseInterpreter,
         validationRequestor = validationRequestor,
-        onPathSelected = model::addManuallyAddedSystemPython
+        onPathSelected = model::addManuallyAddedSystemPython,
+        // The Python version combo is shown only for Project venv, which requires Python 3.8+.
+        additionalValidation = { venvBaseVersionError(it) },
       ) {
         visibleIf(_projectVenv)
       }
@@ -147,7 +157,7 @@ internal class PythonSdkPanelBuilderAndSdkCreator(
 
       row("") {
         comment("").bindText(venvHint)
-      }.visibleIf(_projectVenv or (_baseConda and model.condaViewModel.condaExecutable.isNotNull()) or uvSection.hintVisiblePredicate() or _custom)
+      }.visibleIf((_projectVenv and _venvBaseValid) or (_baseConda and model.condaViewModel.condaExecutable.isNotNull()) or uvSection.hintVisiblePredicate() or _custom)
 
       rowsRange {
         custom.setupUI(this, validationRequestor)

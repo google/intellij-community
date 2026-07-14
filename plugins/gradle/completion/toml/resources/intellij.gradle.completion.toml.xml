@@ -11,5 +11,9 @@
     <completion.contributor language="TOML"
                             id="KotlinGradleTomlCompletionContributor"
                             implementationClass="com.intellij.gradle.completion.toml.GradleTomlCompletionContributor"/>
+    <statistics.collectorExtension implementation="com.intellij.gradle.completion.toml.GradleTomlCompletionUsageCollectorExtension"/>
+    <lookup.usageDetails implementation="com.intellij.gradle.completion.toml.GradleTomlCompletionUsageDescriptor"/>
+    <typedHandler implementation="com.intellij.gradle.completion.toml.GradleTomlDependenciesAutoPopupHandler"
+                  id="GradleTomlDependenciesAutoPopupHandler"/>
   </extensions>
 </idea-plugin>

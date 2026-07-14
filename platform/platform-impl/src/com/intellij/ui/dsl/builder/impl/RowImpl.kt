@@ -11,6 +11,16 @@ import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.icons.design.BlendMode
+import com.intellij.platform.icons.design.Color
+import com.intellij.platform.icons.design.IconDesigner
+import com.intellij.platform.icons.filters.ColorFilter
+import com.intellij.platform.icons.filters.tint
+import com.intellij.platform.icons.icon
+import com.intellij.platform.icons.modifiers.IconModifier
+import com.intellij.platform.icons.modifiers.colorFilter
+import com.intellij.platform.icons.scale.IconScale
+import com.intellij.platform.icons.swing.toSwingIcon
 import com.intellij.ui.ExperimentalUI
 import com.intellij.ui.JBIntSpinner
 import com.intellij.ui.UIBundle
@@ -55,7 +65,6 @@ import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.ThreeStateCheckBox
 import com.intellij.util.ui.UIUtil
-import org.jetbrains.annotations.ApiStatus
 import java.awt.event.ActionEvent
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
@@ -74,7 +83,6 @@ import javax.swing.ListCellRenderer
 import javax.swing.SpinnerNumberModel
 
 @Suppress("OVERRIDE_DEPRECATION")
-@ApiStatus.Internal
 internal open class RowImpl(private val dialogPanelConfig: DialogPanelConfig,
                             private val panelContext: PanelContext,
                             private val parent: PanelImpl,
@@ -311,6 +319,18 @@ internal open class RowImpl(private val dialogPanelConfig: DialogPanelConfig,
     return cell(label)
   }
 
+  override fun icon(icon: com.intellij.platform.icons.Icon, scale: IconScale): CellImpl<JLabel> {
+    val label = JBLabel(icon, scale)
+    label.disabledIcon = com.intellij.platform.icons.icon {
+      icon(icon, IconModifier.colorFilter(ColorFilter.tint(Color.Black, BlendMode.Saturation)))
+    }.toSwingIcon()
+    return cell(label)
+  }
+
+  override fun icon(scale: IconScale, designer: IconDesigner.() -> Unit): Cell<JLabel> {
+    return icon(icon(designer), scale)
+  }
+
   override fun contextHelp(description: String, title: String?): CellImpl<JLabel> {
     return cell(createContextHelp(description, title))
   }
@@ -340,8 +360,8 @@ internal open class RowImpl(private val dialogPanelConfig: DialogPanelConfig,
     return result
   }
 
-  override fun expandableTextField(parser: Function<in String, out MutableList<String>>,
-                                   joiner: Function<in MutableList<String>, String>): Cell<ExpandableTextField> {
+  override fun expandableTextField(parser: Function<in String, out List<String>>,
+                                   joiner: Function<in List<String>, String>): Cell<ExpandableTextField> {
     val result = cell(ExpandableTextField(parser, joiner))
     result.columns(COLUMNS_SHORT)
     return result
@@ -418,6 +438,7 @@ internal open class RowImpl(private val dialogPanelConfig: DialogPanelConfig,
 
   override fun <T> comboBox(model: ComboBoxModel<T>, renderer: ListCellRenderer<in T?>?): Cell<ComboBox<T>> {
     val component = ComboBox(model)
+    component.isUsePreferredSizeAsMinimum = false
 
     if (renderer == null) {
       if (!ExperimentalUI.isNewUI()) {

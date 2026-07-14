@@ -120,6 +120,7 @@ class RetypeLog {
 
 private val LOG: Logger = Logger.getInstance(RetypeLog::class.java)
 
+@ApiStatus.Internal
 class RetypeSession(
   private val project: Project,
   private val editor: EditorImpl,
@@ -147,6 +148,8 @@ class RetypeSession(
   private val oldAddUnambiguous = CodeInsightSettings.getInstance().ADD_UNAMBIGIOUS_IMPORTS_ON_THE_FLY
   private val oldOptimize = CodeInsightWorkspaceSettings.getInstance(project).isOptimizeImportsOnTheFly
   var startNextCallback: (() -> Unit)? = null
+  val typedChars: Int get() = log.typedChars
+  val completedChars: Int get() = log.completedChars
   private val disposeLock = Any()
   private var typedRightBefore = false
 
@@ -590,6 +593,7 @@ class RetypeSession(
     }
   """.trimIndent()
 
+  @ApiStatus.Internal
   companion object {
     val LOG: Logger = Logger.getInstance(RetypeSession::class.java)
     const val INTERFERE_FILE_NAME: String = "IdeaRetypeBackgroundChanges.java"

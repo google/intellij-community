@@ -15,6 +15,10 @@
  */
 package com.jetbrains.python;
 
+import com.jetbrains.python.allure.Components;
+import com.jetbrains.python.allure.Layers;
+import com.jetbrains.python.allure.Subsystems;
+
 import com.jetbrains.python.fixtures.PyLexerTestCase;
 import com.jetbrains.python.highlighting.PyHighlighter;
 import com.jetbrains.python.lexer.PythonHighlightingLexer;
@@ -26,6 +30,9 @@ import static com.jetbrains.python.fixtures.PyTestCase.fixme;
 /**
  * user : catherine
  */
+@Subsystems.CodeInsight
+@Components.Parsing
+@Layers.Functional
 public class PythonHighlightingLexerTest extends PyLexerTestCase {
 
   @Test
@@ -305,6 +312,21 @@ public class PythonHighlightingLexerTest extends PyLexerTestCase {
              """,
            "Py:DEF_KEYWORD", "Py:SPACE", "Py:IDENTIFIER", "Py:LPAR", "Py:RPAR", "Py:COLON", "Py:LINE_BREAK",
            "Py:SPACE", "Py:SPACE", "Py:SPACE", "Py:SPACE", "Py:DOCSTRING", "Py:SPACE", "Py:END_OF_LINE_COMMENT", "Py:LINE_BREAK");
+  }
+
+  // PY-48749
+  @Test
+  public void testCommentInsideMultilineAnnotation() {
+    doTest(LanguageLevel.PYTHON36, """
+             x: Union[
+                 int,  # comment
+                 str,
+             ]""",
+           "Py:IDENTIFIER", "Py:COLON", "Py:SPACE", "Py:IDENTIFIER", "Py:LBRACKET", "Py:LINE_BREAK",
+           "Py:SPACE", "Py:SPACE", "Py:SPACE", "Py:SPACE", "Py:IDENTIFIER", "Py:COMMA", "Py:SPACE", "Py:SPACE", "Py:END_OF_LINE_COMMENT",
+           "Py:LINE_BREAK",
+           "Py:SPACE", "Py:SPACE", "Py:SPACE", "Py:SPACE", "Py:IDENTIFIER", "Py:COMMA", "Py:LINE_BREAK",
+           "Py:RBRACKET");
   }
 
   // PY-40634

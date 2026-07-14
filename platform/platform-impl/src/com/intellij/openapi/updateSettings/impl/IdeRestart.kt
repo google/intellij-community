@@ -1,4 +1,5 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:ApiStatus.Internal
 package com.intellij.openapi.updateSettings.impl
 
 import com.intellij.ide.IdeBundle
@@ -6,15 +7,20 @@ import com.intellij.notification.Notification
 import com.intellij.notification.NotificationAction
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.launchOnShow
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import java.awt.BorderLayout
 import java.awt.event.ActionEvent
 import javax.swing.Action
@@ -24,6 +30,7 @@ import javax.swing.JProgressBar
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import org.jetbrains.annotations.ApiStatus
 
 fun restartOrNotify(
   project: Project,
@@ -67,7 +74,6 @@ internal class CountdownDialog(
 
   private val countdownLabel = JBLabel()
   private val progressBar = JProgressBar(0, 100)
-  private var countdownJob: Job? = null
 
   init {
     title = dialogTitle
@@ -107,19 +113,15 @@ internal class CountdownDialog(
 
   private inner class RestartNowAction : DialogWrapperAction(IdeBundle.message("action.UpdateIde.task.success.restart")) {
     override fun doAction(e: ActionEvent) {
-      countdownJob?.cancel()
       finishSuccessfully()
     }
   }
 
-  override fun doCancelAction() {
-    countdownJob?.cancel()
-    super.doCancelAction()
-  }
-
   private fun finishSuccessfully() {
     close(OK_EXIT_CODE)
-    action()
+    service<ActionService>().scope.launch(Dispatchers.EDT) {
+      action()
+    }
   }
 
   private fun startCountdown() {
@@ -142,4 +144,7 @@ internal class CountdownDialog(
       finishSuccessfully()
     }
   }
+
+  @Service(Service.Level.APP)
+  private class ActionService(val scope: CoroutineScope)
 }

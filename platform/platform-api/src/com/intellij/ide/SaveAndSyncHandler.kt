@@ -9,6 +9,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.ModificationTracker
 import com.intellij.openapi.util.SimpleModificationTracker
 import org.jetbrains.annotations.ApiStatus
+import java.nio.file.Path
 
 abstract class SaveAndSyncHandler {
   companion object {
@@ -38,6 +39,13 @@ abstract class SaveAndSyncHandler {
 
   abstract fun scheduleRefresh()
 
+  @ApiStatus.Internal
+  open fun scheduleRefresh(paths: Collection<Path>) {
+    if (paths.isNotEmpty()) {
+      scheduleRefresh()
+    }
+  }
+
   abstract fun refreshOpenFiles()
 
   open fun disableAutoSave(): AccessToken = AccessToken.EMPTY_ACCESS_TOKEN
@@ -49,6 +57,19 @@ abstract class SaveAndSyncHandler {
   abstract fun blockSyncOnFrameActivation()
 
   abstract fun unblockSyncOnFrameActivation()
+
+  /**
+   * Suppresses ONLY the periodic background VFS refresh (the loop that runs while the user is idle
+   * or the IDE frame is unfocused).
+   *
+   * Unlike [blockSyncOnFrameActivation], refresh-on-frame-activation, scheduled refreshes and
+   * [maybeRefresh] keep working while suppressed, so the IDE still picks up external file changes.
+   * Close the returned token to resume periodic refresh. Reentrant (counted).
+   *
+   * @param reason human-readable cause
+   */
+  @ApiStatus.Internal
+  open fun suppressPeriodicRefresh(reason: String): AccessToken = AccessToken.EMPTY_ACCESS_TOKEN
 
   @ApiStatus.Internal
   abstract fun maybeRefresh(modalityState: ModalityState)

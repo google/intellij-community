@@ -11,7 +11,6 @@ import com.intellij.openapi.application.Application
 import com.intellij.openapi.application.UiWithModelAccess
 import com.intellij.openapi.application.edtWriteAction
 import com.intellij.openapi.application.readAction
-import com.intellij.openapi.application.writeAction
 import com.intellij.openapi.components.ComponentManager
 import com.intellij.openapi.components.ComponentManagerEx
 import com.intellij.openapi.components.serviceAsync
@@ -40,6 +39,7 @@ import com.intellij.openapi.util.registry.RegistryValue
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.newvfs.ManagingFS
 import com.intellij.openapi.vfs.refreshAndFindVirtualFileOrDirectory
 import com.intellij.platform.eel.fs.EelFileSystemApi.CreateTemporaryEntryOptions
 import com.intellij.platform.eel.getOrThrow
@@ -104,6 +104,8 @@ fun tempPathFixture(root: Path? = null, prefix: String = "IJ", subdirName: Strin
   val realTempDir = tempDir.toRealPath()
   initialized(realTempDir) {
     withContext(Dispatchers.IO) {
+      //If files were loaded into VFS, there could be pending updates for them: apply them before deleting the files
+      ManagingFS.getInstanceOrNull()?.flushPendingUpdates()
       repeat(10) {
         try {
           // This method might throw DirectoryNotEmptyException due to races, hence retry
@@ -207,7 +209,7 @@ fun projectFixture(
     newProject
   }
   // Wait until components fully loaded. Otherwise, we might start loading then when a project is already disposed when a test is too fast.
-  project.serviceAsync<RunManager>()
+  RunManager.getInstanceAsync(project)
   initialized(project) {
     ProjectManagerEx.getInstanceEx().forceCloseProjectAsync(project, save = false)
   }
@@ -333,6 +335,11 @@ fun TestFixture<Module>.sourceRootFixture(
     }
     initialized(directory) {
       edtWriteAction {
+        if (!module.isDisposed) {
+          ModuleRootModificationUtil.updateModel(module) { model ->
+            model.contentEntries.firstOrNull { it.file == directoryVfs }?.let(model::removeContentEntry)
+          }
+        }
         directory.delete()
       }
     }
@@ -369,7 +376,9 @@ fun TestFixture<PsiDirectory>.virtualFileFixture(
   }
   initialized(file) {
     edtWriteAction {
-      file.delete(dirFixture)
+      if (file.isValid) {
+        file.delete(dirFixture)
+      }
     }
   }
 }
@@ -385,7 +394,7 @@ fun TestFixture<PsiFile>.editorFixture(): TestFixture<Editor> = testFixture { _ 
   val file = psiFile.virtualFile
   val editor = withContext(Dispatchers.UiWithModelAccess) {
     val fileEditorManager = project.serviceAsync<FileEditorManager>()
-    writeAction {
+    edtWriteAction {
       val editor = fileEditorManager.openTextEditor(OpenFileDescriptor(project, file), true)
       requireNotNull(editor)
 
@@ -400,7 +409,7 @@ fun TestFixture<PsiFile>.editorFixture(): TestFixture<Editor> = testFixture { _ 
   initialized(editor) {
     withContext(Dispatchers.UiWithModelAccess) {
       val fileEditorManager = project.serviceAsync<FileEditorManager>()
-      writeAction {
+      edtWriteAction {
         fileEditorManager.closeFile(file)
       }
     }
@@ -447,7 +456,7 @@ fun TestFixture<Project>.fileEditorManagerFixture(initDockableContentFactory: Bo
       {
         runBlocking {
           withContext(Dispatchers.UiWithModelAccess) {
-            writeAction {
+            edtWriteAction {
               manager.closeAllFiles()
             }
           }

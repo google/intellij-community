@@ -29,7 +29,7 @@ abstract class AbstractKotlinPsiUnifierTest : KotlinLightCodeInsightFixtureTestC
             } as KtElement
         }
 
-        val disableTestDirective = IgnoreTests.DIRECTIVES.of(pluginMode)
+        val disableTestDirective = IgnoreTests.DIRECTIVES.IGNORE_K2
 
         val fileTextWithoutDirectives = dataFile().getTextWithoutDirectives() // contains markers
         val file = myFixture.configureByText(fileName(), fileTextWithoutDirectives) as? KtFile ?: error("Failed to configure file")
@@ -40,7 +40,7 @@ abstract class AbstractKotlinPsiUnifierTest : KotlinLightCodeInsightFixtureTestC
                 .getMatches(file)
                 .joinToString(separator = "\n\n") { "$it\n${it.substring(fileText)}" }
             val testName = getTestName(/* lowercaseFirstLetter = */ true)
-            val matchFile = File(testDataDirectory, "$testName.fir.kt.match").takeIf { isFirPlugin && it.exists() }
+            val matchFile = File(testDataDirectory, "$testName.fir.kt.match").takeIf { it.exists() }
                 ?: File(testDataDirectory, "$testName.kt.match")
             KotlinTestUtils.assertEqualsToFile(matchFile, actualText)
         }
@@ -49,7 +49,7 @@ abstract class AbstractKotlinPsiUnifierTest : KotlinLightCodeInsightFixtureTestC
     override fun getProjectDescriptor(): LightProjectDescriptor = getProjectDescriptorFromTestName()
 
     private fun File.getTextWithoutDirectives(): String {
-        val directives = setOf(IgnoreTests.DIRECTIVES.IGNORE_K1, IgnoreTests.DIRECTIVES.IGNORE_K2)
+        val directives = setOf(IgnoreTests.DIRECTIVES.IGNORE_K2)
 
         return readLines().filterNot { it.trim() in directives }.joinToString("\n")
     }

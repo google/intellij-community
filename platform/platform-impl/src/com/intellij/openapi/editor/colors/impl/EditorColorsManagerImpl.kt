@@ -50,10 +50,12 @@ import com.intellij.openapi.project.ProjectManagerListener
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.installAndEnable
 import com.intellij.openapi.util.InvalidDataException
 import com.intellij.openapi.util.JDOMUtil
+import com.intellij.openapi.util.ModificationTracker
 import com.intellij.psi.PsiManager
 import com.intellij.serviceContainer.NonInjectable
 import com.intellij.ui.ColorUtil
 import com.intellij.ui.ExperimentalUI
+import com.intellij.openapi.editor.colors.CachedVersionedColorScheme
 import com.intellij.util.ComponentTreeEventDispatcher
 import com.intellij.util.ResourceUtil
 import com.intellij.util.concurrency.annotations.RequiresEdt
@@ -67,12 +69,6 @@ import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicLong
 import javax.xml.stream.XMLStreamConstants
 import javax.xml.stream.XMLStreamReader
-
-private val LOG: Logger
-  get() = logger<EditorColorsManagerImpl>()
-
-private const val TEMP_SCHEME_KEY: String = "TEMP_SCHEME_KEY"
-private const val TEMP_SCHEME_FILE_KEY: String = "TEMP_SCHEME_FILE_KEY"
 
 @State(
   name = EditorColorsManagerImpl.COMPONENT_NAME,
@@ -92,6 +88,9 @@ class EditorColorsManagerImpl @NonInjectable constructor(schemeManagerFactory: S
   private var state = State()
   private var themeIsCustomized = false
   private var isInitialConfigurationLoaded = false
+  private val cachedDefaultScheme = CachedVersionedColorScheme { getScheme(EditorColorsScheme.getDefaultSchemeName()) }
+  private val cachedDarculaScheme = CachedVersionedColorScheme { getScheme("Darcula") }
+  private val cachedGlobalScheme = CachedVersionedColorScheme { activeVisibleScheme ?: getEditableDefaultScheme() }
 
   constructor() : this(SchemeManagerFactory.getInstance())
 
@@ -124,6 +123,8 @@ class EditorColorsManagerImpl @NonInjectable constructor(schemeManagerFactory: S
   }
 
   companion object {
+    private const val TEMP_SCHEME_KEY: String = "TEMP_SCHEME_KEY"
+    private const val TEMP_SCHEME_FILE_KEY: String = "TEMP_SCHEME_FILE_KEY"
     @VisibleForTesting
     val ADDITIONAL_TEXT_ATTRIBUTES_EP_NAME: ExtensionPointName<AdditionalTextAttributesEP> =
       ExtensionPointName("com.intellij.additionalTextAttributes")
@@ -163,7 +164,11 @@ class EditorColorsManagerImpl @NonInjectable constructor(schemeManagerFactory: S
     }
   }
 
-  override fun getSchemeModificationCounter(): Long = schemeModificationCounter.get()
+  /**
+  the [SchemeManager] modification (when [SchemeManager.addScheme],[SchemeManager.removeScheme],[SchemeManager.activeScheme] changed) plus
+  our own [schemeModificationCounter] (when someone called [schemeChangedOrSwitched] even though nothing was changed)
+   */
+  override fun getSchemeModificationCounter(): Long = (schemeManager as ModificationTracker).modificationCount + schemeModificationCounter.get()
 
   override fun reloadKeepingActiveScheme() {
     val activeScheme = schemeManager.currentSchemeName
@@ -176,37 +181,39 @@ class EditorColorsManagerImpl @NonInjectable constructor(schemeManagerFactory: S
     }
   }
 
-  // initScheme has to execute only after the LaF has been set in LafManagerImpl.initializeComponent
-  private fun initEditableDefaultSchemesCopies() {
-    val to = ArrayList<EditorColorsScheme>()
-    for (defaultScheme in DefaultColorSchemesManager.getInstance().allSchemes) {
-      if (defaultScheme.hasEditableCopy()) {
-        createEditableCopy(initialScheme = defaultScheme, editableCopyName = defaultScheme.editableCopyName, to = to)
-      }
-    }
-
-    for (scheme in to) {
-      schemeManager.addScheme(scheme)
-    }
-  }
-
   @TestOnly
   fun removeScheme(scheme: EditorColorsScheme) {
     assert(ApplicationManager.getApplication().isUnitTestMode()) { "Test-only method" }
     schemeManager.removeScheme(scheme)
   }
 
+  // initScheme has to execute only after the LaF has been set in LafManagerImpl.initializeComponent
+  private fun initEditableDefaultSchemesCopies() {
+    createEditableCopiesFor(DefaultColorSchemesManager.getInstance().allSchemes.filter {it.hasEditableCopy()})
+  }
+
   private fun initEditableBundledSchemesCopies() {
-    val to = ArrayList<EditorColorsScheme>()
     // process over allSchemes snapshot
-    for (scheme in schemeManager.allSchemes.toList()) {
-      if (scheme is BundledEditorColorScheme) {
-        createEditableCopy(initialScheme = scheme, editableCopyName = Scheme.EDITABLE_COPY_PREFIX + scheme.name, to)
-      }
+    createEditableCopiesFor(schemeManager.allSchemes.filterIsInstance<BundledEditorColorScheme>())
+  }
+
+  private fun createEditableCopiesFor(schemes: List<AbstractColorsScheme>) {
+    for (scheme in schemes) {
+      getOrCreateEditableCopy(initialScheme = scheme, editableCopyName = Scheme.EDITABLE_COPY_PREFIX + scheme.name)
     }
-    for (scheme in to) {
-      schemeManager.addScheme(scheme)
+  }
+
+  private fun getOrCreateEditableCopy(initialScheme: AbstractColorsScheme, editableCopyName: String) {
+    var editableCopy = getScheme(editableCopyName) as AbstractColorsScheme?
+    if (editableCopy == null) {
+      editableCopy = initialScheme.clone() as AbstractColorsScheme
+      editableCopy.name = editableCopyName
+      schemeManager.addScheme(editableCopy)
     }
+    else if (initialScheme is BundledEditorColorScheme) {
+      editableCopy.copyMissingAttributes(initialScheme)
+    }
+    editableCopy.setCanBeDeleted(false)
   }
 
   private fun resolveLinksToBundledSchemes() {
@@ -234,19 +241,6 @@ class EditorColorsManagerImpl @NonInjectable constructor(schemeManagerFactory: S
     if (scheme is AbstractColorsScheme && !scheme.isReadOnly) {
       scheme.resolveParent(schemeManager::findSchemeByName)
     }
-  }
-
-  private fun createEditableCopy(initialScheme: AbstractColorsScheme, editableCopyName: String, to: MutableList<EditorColorsScheme>) {
-    var editableCopy = getScheme(editableCopyName) as AbstractColorsScheme?
-    if (editableCopy == null) {
-      editableCopy = initialScheme.clone() as AbstractColorsScheme
-      editableCopy.name = editableCopyName
-      to.add(editableCopy)
-    }
-    else if (initialScheme is BundledEditorColorScheme) {
-      editableCopy.copyMissingAttributes(initialScheme)
-    }
-    editableCopy.setCanBeDeleted(false)
   }
 
   fun schemeChangedOrSwitched(newScheme: EditorColorsScheme?) {
@@ -313,11 +307,10 @@ class EditorColorsManagerImpl @NonInjectable constructor(schemeManagerFactory: S
   }
 
   fun getDefaultAttributes(key: TextAttributesKey): TextAttributes? {
-    @Suppress("DEPRECATION") val dark = StartupUiUtil.isUnderDarcula && getScheme("Darcula") != null
     // It is reasonable to fetch attributes from a Default color scheme.
     // Otherwise, if we launch IDE and then try to switch from a custom colors scheme (e.g., with a dark background) to the default one.
     // The editor will show incorrect highlighting with "traces" of a color scheme which was active during IDE startup.
-    return getScheme(if (dark) "Darcula" else EditorColorsScheme.getDefaultSchemeName())?.getAttributes(key)
+    return (if (StartupUiUtil.isDarkTheme) cachedDarculaScheme.get() else cachedDefaultScheme.get())?.getAttributes(key)
   }
 
   override fun addColorScheme(scheme: EditorColorsScheme) {
@@ -381,7 +374,7 @@ class EditorColorsManagerImpl @NonInjectable constructor(schemeManagerFactory: S
     }.getOrLogException(LOG)
   }
 
-  override fun getGlobalScheme(): EditorColorsScheme = activeVisibleScheme ?: getEditableDefaultScheme()
+  override fun getGlobalScheme(): EditorColorsScheme = cachedGlobalScheme.get()
 
   override fun getActiveVisibleScheme(): EditorColorsScheme? {
     val scheme = schemeManager.activeScheme
@@ -427,17 +420,12 @@ class EditorColorsManagerImpl @NonInjectable constructor(schemeManagerFactory: S
     if (isTempScheme(scheme)) {
       return scheme
     }
-    val editableCopyName = when {
-      scheme is DefaultColorsScheme && scheme.hasEditableCopy() -> scheme.editableCopyName
-      scheme is BundledEditorColorScheme -> Scheme.EDITABLE_COPY_PREFIX + scheme.name
-      else -> null
+    val editableCopyName = when (scheme) {
+      is DefaultColorsScheme -> if (scheme.hasEditableCopy()) scheme.editableCopyName else return null
+      is BundledEditorColorScheme -> Scheme.EDITABLE_COPY_PREFIX + scheme.name
+      else -> return null
     }
-    if (editableCopyName != null) {
-      getScheme(editableCopyName)?.let {
-        return it
-      }
-    }
-    return null
+    return getScheme(editableCopyName)
   }
 
   override fun getState(): State {
@@ -732,6 +720,9 @@ class EditorColorsManagerImpl @NonInjectable constructor(schemeManagerFactory: S
   }
 }
 
+private val LOG: Logger
+  get() = logger<EditorColorsManagerImpl>()
+
 private fun loadAdditionalTextAttributesForScheme(
   scheme: AbstractColorsScheme,
   attributesProviders: Collection<AdditionalTextAttributesProvider>,
@@ -820,13 +811,12 @@ fun createLoadBundledSchemeRequests(
       })
     }
 
-    for (item in UiThemeProviderListManager.getInstance().getDescriptors()) {
-      val pluginDescriptor = item.pluginDescriptor
+    for ((theme, _, pluginDescriptor) in UiThemeProviderListManager.getInstance().getDescriptors()) {
       if (pluginDescriptor.pluginId == PluginManagerCore.CORE_ID) {
         continue
       }
 
-      val uiTheme = item.theme.get() ?: continue
+      val uiTheme = theme.get() ?: continue
       val editorSchemeId = uiTheme.theme.originalEditorSchemeId ?: continue
       // we must check `originalEditorSchemeId` to load its corresponding editor scheme on the `reloadKeepingActiveScheme` call
       if (!editorSchemeId.endsWith(".xml")) {

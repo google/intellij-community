@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.statistics.impl
 
 import com.intellij.CommonBundle
@@ -14,6 +14,7 @@ import com.intellij.psi.statistics.StatisticsManager
 import com.intellij.util.ScrambledInputStream
 import com.intellij.util.ScrambledOutputStream
 import com.intellij.util.io.outputStream
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
 import java.io.BufferedOutputStream
 import java.io.IOException
@@ -23,6 +24,7 @@ import java.util.Collections
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
+import kotlin.io.path.deleteIfExists
 import kotlin.io.path.inputStream
 import kotlin.math.abs
 import kotlin.math.max
@@ -124,8 +126,8 @@ class StatisticsManagerImpl : StatisticsManager(), SettingsSavingComponent {
   private fun saveUnit(unitNumber: Int) {
     val unit = units[unitNumber]?.get() ?: return
     try {
-      ScrambledOutputStream(BufferedOutputStream(getPathToUnit(unitNumber).outputStream())).use {
-        out -> unit.write(out)
+      ScrambledOutputStream(BufferedOutputStream(getPathToUnit(unitNumber).outputStream())).use { out ->
+        unit.write(out)
       }
     }
     catch (e: IOException) {
@@ -140,12 +142,23 @@ class StatisticsManagerImpl : StatisticsManager(), SettingsSavingComponent {
   @TestOnly
   fun enableStatistics(parentDisposable: Disposable) {
     testingStatistics = true
-    Disposer.register(parentDisposable, Disposable {
+    Disposer.register(parentDisposable) {
       lock.write {
         units.fill(null)
       }
       testingStatistics = false
-    })
+    }
+  }
+
+  @ApiStatus.Internal
+  override fun clearStatistics() {
+    lock.write {
+      units.fill(null)
+      modifiedUnits.clear()
+      for (unitNumber in 0 until UNIT_COUNT) {
+        getPathToUnit(unitNumber).deleteIfExists()
+      }
+    }
   }
 }
 
@@ -163,9 +176,9 @@ private fun loadUnit(unitNumber: Int): StatisticsUnit {
       unit.read(it)
     }
   }
-  catch (ignored: IOException) {
+  catch (_: IOException) {
   }
-  catch (ignored: WrongFormatException) {
+  catch (_: WrongFormatException) {
   }
   return unit
 }

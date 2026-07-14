@@ -390,30 +390,12 @@ fun ideCommon() = moduleSet("ide.common") {
 
 ---
 
-### `plugin(name)` - Create Pluginized Module Set
+### Module-Set Wrapper Plugins
 
-```kotlin
-fun plugin(
-  name: String,
-  pluginId: String? = null,
-  outputModule: String? = null,
-  addToMainModule: Boolean = true,
-  block: ModuleSetBuilder.() -> Unit
-): ModuleSet
-```
+Module-set wrapper plugins are not created by the Product DSL. Existing wrappers under
+`community/module-set-plugins/generated/` and `module-set-plugins/generated/` are static checked-in plugin modules pending migration.
 
-Creates a module set and marks it to be materialized as a standalone bundled plugin wrapper.
-The Product DSL pipeline generates the wrapper module files, `plugin-content.yaml`, and `modules.xml` entries during generation.
-Do not pass the result to product-level or nested `moduleSet(...)` composition APIs; bundle the generated wrapper plugin module instead.
-
-**Example:**
-```kotlin
-fun recentFiles() = plugin("recentFiles") {
-  module("intellij.platform.recentFiles")
-  module("intellij.platform.recentFiles.frontend")
-  module("intellij.platform.recentFiles.backend")
-}
-```
+Create new wrappers as normal plugin modules with `plugin.xml` and `plugin-content.yaml`, and bundle those modules through product layout configuration.
 
 ---
 
@@ -468,8 +450,8 @@ Represents a module with optional loading attribute.
 
 ```kotlin
 data class ContentModule(
-  val name: String,
-  val loading: ModuleLoadingRuleValue? = null,
+  val moduleId: PluginModuleId,
+  val loading: ModuleLoadingRuleValue = ModuleLoadingRuleValue.OPTIONAL,
   val includeDependencies: Boolean = false
 )
 ```

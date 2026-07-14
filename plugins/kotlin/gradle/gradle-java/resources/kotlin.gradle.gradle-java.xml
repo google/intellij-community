@@ -7,12 +7,18 @@
     <module name="intellij.gradle"/>
     <module name="intellij.gradle.java"/>
     <module name="intellij.gradle.toolingExtension.impl"/>
+    <module name="intellij.java.execution.impl"/>
     <module name="intellij.java.psi"/>
     <module name="intellij.java.syntax"/>
+    <module name="intellij.java.ui"/>
     <module name="intellij.kotlin.base.externalSystem"/>
     <module name="intellij.kotlin.gradle.codeInsight.common"/>
     <module name="intellij.kotlin.gradle.gradle"/>
+    <module name="intellij.kotlin.jvm.debugger.coroutines"/>
+    <module name="intellij.kotlin.projectWizard.core"/>
     <module name="intellij.kotlin.runConfigurations.jvm"/>
+    <module name="intellij.platform.smRunner"/>
+    <module name="intellij.platform.testRunner"/>
   </dependencies>
   <!-- endregion -->
 
@@ -128,6 +134,8 @@
 
   <extensions defaultExtensionNs="org.jetbrains.kotlin">
     <projectConfigurator implementation="org.jetbrains.kotlin.idea.gradleJava.configuration.KotlinGradleModuleConfigurator"/>
+    <projectPostConfigurator implementation="org.jetbrains.kotlin.idea.gradleJava.configuration.KaptGradleProjectPostConfigurator"/>
+    <compilerPluginConfigurator implementation="org.jetbrains.kotlin.idea.gradleJava.configuration.KaptGradleKotlinCompilerPluginProjectConfigurator"/>
     <compilerPluginConfigurator implementation="org.jetbrains.kotlin.idea.gradleJava.configuration.SpringGradleKotlinCompilerPluginProjectConfigurator"/>
     <compilerPluginConfigurator implementation="org.jetbrains.kotlin.idea.gradleJava.configuration.LombokGradleKotlinCompilerPluginProjectConfigurator"/>
     <compilerPluginConfigurator implementation="org.jetbrains.kotlin.idea.gradleJava.configuration.JpaGradleKotlinCompilerPluginProjectConfigurator"/>
@@ -160,6 +168,10 @@
 
   <extensions defaultExtensionNs="org.jetbrains.kotlin.idea.gradleTooling">
     <serialization.IdeaKotlinSerializationContext implementation="org.jetbrains.kotlin.idea.gradleJava.configuration.serialize.IntellijIdeaKotlinSerializationContext"/>
+  </extensions>
+
+  <extensions defaultExtensionNs="org.jetbrains.plugins.gradle">
+    <pluginDescriptions implementation="org.jetbrains.kotlin.idea.gradleJava.configuration.KotlinGradlePluginDescriptions"/>
   </extensions>
 
   <actions resource-bundle="messages.KotlinIdeaGradleBundle">

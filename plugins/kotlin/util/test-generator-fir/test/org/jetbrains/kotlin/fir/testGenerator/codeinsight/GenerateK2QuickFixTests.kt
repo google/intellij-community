@@ -77,16 +77,17 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/convertJavaInterfaceToClass", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/convertLateinitPropertyToNotNullDelegate", pattern = pattern)
             model("$idea/quickfix/convertPropertyInitializerToGetter", pattern = pattern)
-            model("$idea/quickfix/convertToAnonymousObject", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/convertToAnonymousObject", pattern = pattern)
             model("$idea/quickfix/convertToBlockBody", pattern = pattern)
             model("$idea/quickfix/convertToIsArrayOfCall", pattern = pattern)
             model("$idea/quickfix/contextParameterWithoutName", pattern = pattern)
             model("$idea/quickfix/contextParameter", pattern = pattern)
+            model("$idea/quickfix/createContextParameterFromNamedArugment", pattern = pattern)
             model("$idea/quickfix/createFromUsage/createClass", pattern = pattern, excludedDirectories = listOf("importDirective/kt21515", "callExpression/typeArguments"))
             model("$idea/quickfix/createFromUsage/createSecondaryConstructor", pattern = pattern)
             model("$idea/quickfix/createFromUsage/createFunction/binaryOperations", pattern = pattern)
             model("$idea/quickfix/createFromUsage/createFunction/call", pattern = pattern,
-                  excludedDirectories = listOf("extensionByExtensionReceiver", "typeArguments"))
+                  excludedDirectories = listOf("extensionByExtensionReceiver"))
             model("$idea/quickfix/createFromUsage/createVariable", pattern = pattern)
             model("$idea/quickfix/createLabel", pattern = pattern)
             model("$idea/quickfix/dataClassConstructorVsCopyVisibility", pattern = pattern)
@@ -134,11 +135,12 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/moveTypeAliasToTopLevel", pattern = pattern)
             model("$idea/quickfix/namedLambdaContextParameter", pattern = pattern)
             model("$idea/quickfix/navigateToConflictingDeclaration", pattern = pattern)
+            model("$idea/quickfix/migration/conflictingExtension", pattern = pattern)
             model("$idea/quickfix/nullables", pattern = pattern)
             model("$idea/quickfix/obsoleteKotlinJsPackages", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/optimizeImports", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/override", pattern = pattern)
-            model("$idea/quickfix/platformClasses", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/platformClasses", pattern = pattern)
             model("$idea/quickfix/platformTypesInspection", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/primitiveCastToConversion", pattern = pattern)
             model("$idea/quickfix/properties", pattern = pattern)
@@ -229,6 +231,31 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             val testMethodName = "doTestWithExtraFile"
             model(
                 "$idea/quickfix/autoImports",
+                pattern = pattern,
+                testMethodName = testMethodName,
+            )
+            model(
+                "$idea/quickfix/typeMismatch",
+                pattern = pattern,
+                testMethodName = testMethodName,
+            )
+            model(
+                "$idea/quickfix/addSpreadOperatorForArrayAsVarargAfterSam",
+                pattern = pattern,
+                testMethodName = testMethodName,
+            )
+            model(
+                "$idea/quickfix/when",
+                pattern = pattern,
+                testMethodName = testMethodName,
+            )
+            model(
+                "$idea/quickfix/specifySuperExplicitly",
+                pattern = pattern,
+                testMethodName = testMethodName,
+            )
+            model(
+                "$idea/quickfix/migration/conflictingExtension",
                 pattern = pattern,
                 testMethodName = testMethodName,
             )
@@ -328,6 +355,11 @@ internal fun MutableTWorkspace.generateK2FixTests() {
                 "$idea/quickfix/override",
                 pattern = pattern,
                 testMethodName = testMethodName
+            )
+            model(
+                "$idea/quickfix/createContextParameterFromNamedArugment/multiFile",
+                pattern = pattern,
+                testMethodName = testMethodName,
             )
         }
 

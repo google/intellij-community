@@ -15,7 +15,7 @@ import com.intellij.openapi.projectRoots.SdkAdditionalData;
 import com.intellij.openapi.util.UserDataHolder;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.util.PatternUtil;
+import com.intellij.python.community.execService.python.VersionParserKt;
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
 import com.intellij.util.ui.EDT;
 import com.jetbrains.python.parser.icons.PythonParserIcons;
@@ -31,18 +31,14 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.Icon;
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static com.jetbrains.python.PythonBinaryKt.PYTHON_VERSION_ARG;
@@ -75,7 +71,6 @@ public abstract class PythonSdkFlavor<D extends PyFlavorData> {
     .maximumSize(1000)
     .build();
 
-  private static final Pattern VERSION_RE = Pattern.compile("((Python|GraalPy) (\\S+)).*", Pattern.DOTALL);
   private static final Logger LOG = Logger.getInstance(PythonSdkFlavor.class);
 
 
@@ -142,12 +137,12 @@ public abstract class PythonSdkFlavor<D extends PyFlavorData> {
   }
 
   /**
-   * Used for distinguishing platform flavors from platform-independent ones in {@link #getPlatformIndependentFlavors()}.
+   * Used for distinguishing platform flavors from platform-independent ones in {@link #getApplicableFlavors(boolean)}.
    *
    * @return whether the flavor is platform independent
    */
   @ApiStatus.Internal
-  public boolean isPlatformIndependent() {
+  protected boolean isPlatformIndependent() {
     return false;
   }
 
@@ -234,6 +229,7 @@ public abstract class PythonSdkFlavor<D extends PyFlavorData> {
    * List of flavors starting from platform-independent, so venv flavor goes before unix or windows flavor.
    * That could be used to find the first flavor that is {@link PythonSdkFlavor#isValidSdkPath(Path)} for example
    */
+  @ApiStatus.Internal
   public static @NotNull List<PythonSdkFlavor<?>> getApplicableFlavors(boolean addPlatformIndependent) {
     List<PythonSdkFlavor<?>> result = new ArrayList<>();
     for (PythonSdkFlavor<?> flavor : EP_NAME.getExtensionList()) {
@@ -257,18 +253,6 @@ public abstract class PythonSdkFlavor<D extends PyFlavorData> {
       PythonSdkFlavor<?> flavor = provider.getFlavor();
       result.add(flavor);
     }
-    return result;
-  }
-
-  @ApiStatus.Internal
-  public static @NotNull List<PythonSdkFlavor<?>> getPlatformIndependentFlavors() {
-    List<PythonSdkFlavor<?>> result = new ArrayList<>();
-    for (PythonSdkFlavor<?> flavor : EP_NAME.getExtensionList()) {
-      if (flavor.isPlatformIndependent()) {
-        result.add(flavor);
-      }
-    }
-
     return result;
   }
 
@@ -338,7 +322,7 @@ public abstract class PythonSdkFlavor<D extends PyFlavorData> {
     if (sdkHome == null) {
       return null;
     }
-    final String runDirectory = new File(sdkHome).getParent();
+    final String runDirectory = Path.of(sdkHome).getParent().toString();
     final ProcessOutput processOutput = PySdkUtil.getProcessOutput(runDirectory, new String[]{sdkHome, PYTHON_VERSION_ARG}, 10000);
     return getVersionStringFromOutput(processOutput);
   }
@@ -362,7 +346,7 @@ public abstract class PythonSdkFlavor<D extends PyFlavorData> {
 
   @ApiStatus.Internal
   public static @Nullable String getVersionStringFromOutput(@NotNull String output) {
-    return PatternUtil.getFirstMatch(Arrays.asList(StringUtil.splitByLines(output)), VERSION_RE);
+    return VersionParserKt.getVersionStringFromOutput(output);
   }
 
   @ApiStatus.Internal
@@ -407,23 +391,8 @@ public abstract class PythonSdkFlavor<D extends PyFlavorData> {
     if (version == null) {
       return LanguageLevel.getDefault();
     }
-    var result = getLanguageLevelFromVersionStringStaticSafe(version);
+    var result = LanguageLevel.getLanguageLevelFromVersionStringStaticSafe(version);
     return (result == null) ? LanguageLevel.getDefault() : result;
-  }
-
-  /**
-   * For <code>python --version</code> output (i.e <code>Python 3.12</code>) returns {@link LanguageLevel}.
-   * Typical usage: call `python --version`, trim, and provide here.
-   *
-   * @param versionString output to look language level for
-   * @return level or null if no parsable output was found
-   */
-  public static @Nullable LanguageLevel getLanguageLevelFromVersionStringStaticSafe(@NotNull String versionString) {
-    final Matcher m = VERSION_RE.matcher(versionString);
-    if (m.matches()) {
-      return LanguageLevel.fromPythonVersionSafe(m.group(3));
-    }
-    return null;
   }
 
   public @NotNull Icon getIcon() {

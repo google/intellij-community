@@ -49,6 +49,7 @@
     <inspection_tool class="81c39993-de39-3a30-9c64-ab89d04bb566" enabled="true" level="TEXT ATTRIBUTES" enabled_by_default="false" editorAttributes="INFO_ATTRIBUTES">
       <scope name="Production" level="TEXT ATTRIBUTES" enabled="true" editorAttributes="INFO_ATTRIBUTES" />
     </inspection_tool>
+    <inspection_tool class="2f2f891d-a1a8-40ae-b3cb-e52290744728" enabled="true" level="WARNING" enabled_by_default="true" />
     <inspection_tool class="92d42a73-fb88-340b-88e5-4f09e27f9db6" enabled="true" level="WEAK WARNING" enabled_by_default="false" editorAttributes="INFO_ATTRIBUTES">
       <scope name="Go" level="WEAK WARNING" enabled="true" />
     </inspection_tool>
@@ -1911,6 +1912,27 @@
         <constraint name="runnable" nameOfExprType="java.lang.Runnable" exprTypeWithinHierarchy="true" within="" contains="" />
         <constraint name="__context__" within="" contains="" />
       </searchConfiguration>
+      <searchConfiguration name="ApiStatus.Internal is redundant on internal declarations" uuid="60116a3f-d0e5-3ea6-bf7a-7856244d8ffc" description="Prefer internal modifier in Kotlin to @ApiStatus.Internal annotation. &#10;&#10;There is no need for annotation if the internal modifier is already used." suppressId="ApiStatusInternalRedundantOnInternalDeclaration" text="@$Annotation$ internal class $Name$" recursive="true" caseInsensitive="false" type="Kotlin" pattern_context="default" search_injected="false">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="Annotation" regexp="Internal" target="true" within="" contains="" />
+        <constraint name="Name" within="" contains="" />
+      </searchConfiguration>
+      <searchConfiguration name="ApiStatus.Internal is redundant on internal declarations" uuid="60116a3f-d0e5-3ea6-bf7a-7856244d8ffc" text="@$Annotation$ internal object $Name$" recursive="true" caseInsensitive="false" type="Kotlin" pattern_context="default" search_injected="false">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="Annotation" regexp="Internal" target="true" within="" contains="" />
+        <constraint name="Name" within="" contains="" />
+      </searchConfiguration>
+      <searchConfiguration name="ApiStatus.Internal is redundant on internal declarations" uuid="60116a3f-d0e5-3ea6-bf7a-7856244d8ffc" text="@$Annotation$ internal interface $Name$" recursive="true" caseInsensitive="false" type="Kotlin" pattern_context="default" search_injected="false">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="Annotation" regexp="Internal" target="true" within="" contains="" />
+        <constraint name="Name" within="" contains="" />
+      </searchConfiguration>
+      <searchConfiguration name="ApiStatus.Internal is redundant on internal declarations" uuid="60116a3f-d0e5-3ea6-bf7a-7856244d8ffc" text="@$Annotation$ internal fun $Name$($Params$)" recursive="true" caseInsensitive="false" type="Kotlin" pattern_context="default" search_injected="false">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="Annotation" regexp="Internal" target="true" within="" contains="" />
+        <constraint name="Name" within="" contains="" />
+        <constraint name="Params" minCount="0" maxCount="2147483647" within="" contains="" />
+      </searchConfiguration>
       <replaceConfiguration name="Arrays.asList() is not immutable" text="val $Field$ = java.util.Arrays.asList($elements$)" recursive="false" caseInsensitive="true" type="Kotlin" pattern_context="default" reformatAccordingToStyle="true" shortenFQN="true" replacement="val $Field$ = listOf($elements$)">
         <constraint name="__context__" within="" contains="" />
         <constraint name="Field" within="" contains="" />
@@ -1963,19 +1985,19 @@
         <constraint name="lType" nameOfExprType="org\.jetbrains\.kotlin\.analysis\.api\.types\.KaType" within="" contains="" />
         <constraint name="rType" within="" contains="" />
       </replaceConfiguration>
-      <replaceConfiguration name="can be simplified to ReadAction.compute()" uuid="44cf5267-e665-3ff5-9d2f-0de5c6983156" text="$application$.runReadAction(new $Computable$() {&#10;  public $SearchScope$ compute() {&#10;    return $e$;&#10;  }&#10;})" recursive="false" caseInsensitive="true" type="JAVA" pattern_context="default" reformatAccordingToStyle="true" shortenFQN="true" replacement="com.intellij.openapi.application.ReadAction.computeBlocking(()-&gt;$e$)">
+      <replaceConfiguration name="can be simplified to ReadAction.compute()" uuid="44cf5267-e665-3ff5-9d2f-0de5c6983156" suppressId="CanBeSimplifiedToReadActionCompute" text="$application$.runReadAction(new $Computable$() {&#10;  public $SearchScope$ compute() {&#10;    return $e$;&#10;  }&#10;})" recursive="false" caseInsensitive="true" type="JAVA" pattern_context="default" reformatAccordingToStyle="true" shortenFQN="true" replacement="com.intellij.openapi.application.ReadAction.computeBlocking(()-&gt;$e$)">
         <constraint name="SearchScope" within="" contains="" />
         <constraint name="e" within="" contains="" />
         <constraint name="application" nameOfExprType="com.intellij.openapi.application.Application" exprTypeWithinHierarchy="true" within="" contains="" />
         <constraint name="Computable" within="" contains="" />
       </replaceConfiguration>
-      <replaceConfiguration name="can be simplified to ReadAction.compute()" uuid="44cf5267-e665-3ff5-9d2f-0de5c6983156" text="$application$.runReadAction(($C$)()-&gt;$e$)" recursive="false" caseInsensitive="true" type="JAVA" pattern_context="default" reformatAccordingToStyle="true" shortenFQN="true" replacement="com.intellij.openapi.application.ReadAction.computeBlocking(()-&gt;$e$)">
+      <replaceConfiguration name="can be simplified to ReadAction.compute()" uuid="44cf5267-e665-3ff5-9d2f-0de5c6983156" suppressId="CanBeSimplifiedToReadActionCompute" text="$application$.runReadAction(($C$)()-&gt;$e$)" recursive="false" caseInsensitive="true" type="JAVA" pattern_context="default" reformatAccordingToStyle="true" shortenFQN="true" replacement="com.intellij.openapi.application.ReadAction.computeBlocking(()-&gt;$e$)">
         <constraint name="e" within="" contains="" />
         <constraint name="C" minCount="0" within="" contains="" />
         <constraint name="application" nameOfExprType="com.intellij.openapi.application.Application" exprTypeWithinHierarchy="true" within="" contains="" />
         <constraint name="__context__" within="" contains="" />
       </replaceConfiguration>
-      <replaceConfiguration name="can be simplified to ReadAction.compute()" uuid="44cf5267-e665-3ff5-9d2f-0de5c6983156" text="$application$.runReadAction($Computable$() {&#10;  fun compute() {&#10;    return $e$&#10;  }&#10;})" recursive="false" caseInsensitive="true" type="Kotlin" pattern_context="default" reformatAccordingToStyle="true" shortenFQN="true" replacement="com.intellij.openapi.application.ReadAction.computeBlocking { $e$ }">
+      <replaceConfiguration name="can be simplified to ReadAction.compute()" uuid="44cf5267-e665-3ff5-9d2f-0de5c6983156" suppressId="CanBeSimplifiedToReadActionCompute" text="$application$.runReadAction($Computable$() {&#10;  fun compute() {&#10;    return $e$&#10;  }&#10;})" recursive="false" caseInsensitive="true" type="Kotlin" pattern_context="default" reformatAccordingToStyle="true" shortenFQN="true" replacement="com.intellij.openapi.application.ReadAction.computeBlocking { $e$ }">
         <constraint name="e" within="" contains="" />
         <constraint name="application" nameOfExprType="com.intellij.openapi.application.Application" exprTypeWithinHierarchy="true" within="" contains="" />
         <constraint name="Computable" within="" contains="" />
@@ -2355,6 +2377,24 @@
       <replaceConfiguration name="Do not hardcode &quot;.venv&quot;, use constant" description="It is better to use constant from the suggested class. Moreover, read doc carefully. It could be you do not need it. " suppressId="VENV_IS_OK" problemDescriptor="&quot;.venv&quot; hardcoded instead of a constant" text="&quot;.venv&quot;" recursive="false" caseInsensitive="false" type="Kotlin" pattern_context="default" reformatAccordingToStyle="false" shortenFQN="true" replacement="com.jetbrains.python.venvReader.VirtualEnvReader.DEFAULT_VIRTUALENV_DIRNAME">
         <constraint name="__context__" within="" contains="" />
       </replaceConfiguration>
+      <searchConfiguration name="Do not setupSdk directory" description="User `createSdk.kt` funcs of `FileSystem#setupSdk`" suppressId="SETUP_SDK_DIRECTLY" problemDescriptor="DoNotSetupSdkDirectory" text="$Before$.$MethodCall$($Parameter$)" recursive="true" caseInsensitive="true" type="Kotlin" pattern_context="default">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="Before" nameOfExprType="SdkConfigurationUtil" minCount="0" within="" contains="" />
+        <constraint name="MethodCall" regexp="createSdk" target="true" within="" contains="" />
+        <constraint name="Parameter" minCount="0" maxCount="2147483647" within="" contains="" />
+      </searchConfiguration>
+      <searchConfiguration name="Do not setupSdk directory" text="$Before$.$MethodCall$($Parameter$)" recursive="true" caseInsensitive="true" type="Kotlin" pattern_context="default">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="Before" nameOfExprType="SdkConfigurationUtil" minCount="0" within="" contains="" />
+        <constraint name="MethodCall" regexp="setupSdk" target="true" within="" contains="" />
+        <constraint name="Parameter" minCount="0" maxCount="2147483647" within="" contains="" />
+      </searchConfiguration>
+      <searchConfiguration name="Do not setupSdk directory" text="$Before$.$MethodCall$($Parameter$)" recursive="true" caseInsensitive="true" type="Kotlin" pattern_context="default">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="Before" nameOfExprType="SdkConfigurationUtil" minCount="0" within="" contains="" />
+        <constraint name="MethodCall" regexp="addSdk" target="true" within="" contains="" />
+        <constraint name="Parameter" minCount="0" maxCount="2147483647" within="" contains="" />
+      </searchConfiguration>
       <searchConfiguration name="Do not use jdi mirrorOf directly" problemDescriptor="Do not use jdi mirrorOf directly - use DebuggerUtilsEx.mirrorOfString instead" text="$Instance$.mirrorOf($Parameter$)" recursive="true" caseInsensitive="false" type="JAVA" pattern_context="default" search_injected="false">
         <constraint name="__context__" within="" contains="" />
         <constraint name="Instance" nameOfExprType="com\.sun\.jdi\.VirtualMachine" exprTypeWithinHierarchy="true" within="" contains="" />
@@ -2410,6 +2450,14 @@
         <constraint name="__context__" within="" contains="" />
         <constraint name="source" within="" contains="" />
       </replaceConfiguration>
+      <searchConfiguration name="Do not use runCatching in CLion code" description="Prefer to use regular exception handling to make it explicit which exceptions are handled, rethrown and/or ignored.&#10;runCatching is also bad for coroutine code and cancellation handling." text="runCatching {&#10;    $statement$&#10;}" recursive="true" caseInsensitive="false" type="Kotlin" pattern_context="default">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="statement" minCount="0" maxCount="2147483647" within="" contains="" />
+      </searchConfiguration>
+      <searchConfiguration name="Do not use runCatching in CLion code" text="runCatching(::$function$)" recursive="true" caseInsensitive="false" type="Kotlin" pattern_context="default">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="function" within="" contains="" />
+      </searchConfiguration>
       <replaceConfiguration name="Don't read channels with for, use consume/consumeEach" suppressId="CHAN_WITH_FOR" text="for ($Item$ in $Collection$) {&#10;  $Statement$&#10;}" recursive="false" caseInsensitive="true" type="Kotlin" pattern_context="default" reformatAccordingToStyle="true" shortenFQN="false" replacement="$Collection$.consumeEach { $Item$ -&gt;&#10;  $Statement$&#10;}">
         <constraint name="__context__" within="" contains="" />
         <constraint name="Item" within="" contains="" />
@@ -2921,6 +2969,11 @@
         <constraint name="ARGS" maxCount="2147483647" within="" contains="" />
         <constraint name="DO" maxCount="2147483647" within="" contains="" />
       </searchConfiguration>
+      <replaceConfiguration name="replace `relativeTo` with `relativeToOrNull`" description="`relativeTo` is error prone and, always have a safe fallback `relativeToOrNull` or `relativeToOrSelf`" text="$path$.relativeTo($arg$)" recursive="false" caseInsensitive="true" type="Kotlin" pattern_context="default" reformatAccordingToStyle="false" shortenFQN="false" replacement="$path$.relativeToOrNull($arg$)">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="path" nameOfExprType="java\.nio\.file\.Path" exprTypeWithinHierarchy="true" within="" contains="" />
+        <constraint name="arg" within="" contains="" />
+      </replaceConfiguration>
       <replaceConfiguration name="Replace explicit RExpression#getType() with RTypeUtil#getType()" uuid="260bf7ef-989c-3b5b-b926-edbfeb9271cc" text="((RExpression)$foo$).getType()" recursive="false" caseInsensitive="true" type="JAVA" pattern_context="default" reformatAccordingToStyle="false" shortenFQN="true" replacement="org.jetbrains.plugins.ruby.ruby.codeInsight.types.RTypeUtil.getType($foo$)">
         <constraint name="__context__" within="" contains="" />
         <constraint name="foo" within="" contains="" />
@@ -2928,6 +2981,22 @@
       <replaceConfiguration name="Replace explicit RExpression#getType() with RTypeUtil#getType()" uuid="260bf7ef-989c-3b5b-b926-edbfeb9271cc" text="($foo$ as RExpression).type" recursive="false" caseInsensitive="true" type="Kotlin" pattern_context="default" reformatAccordingToStyle="false" shortenFQN="true" replacement="org.jetbrains.plugins.ruby.ruby.codeInsight.types.RTypeUtil.getType($foo$)">
         <constraint name="__context__" within="" contains="" />
         <constraint name="foo" within="" contains="" />
+      </replaceConfiguration>
+      <replaceConfiguration name="Rethow ControlFlowException using platform utility function" description="Replaces if (e instanceOf ControlFlowException) throw e with a convenient helper utility call" suppressId="RethowControlFlowExceptionWithUtil" text="if ($Expr$ instanceof ControlFlowException) {&#10;  throw $Expr$;&#10;}" recursive="false" caseInsensitive="false" type="JAVA" pattern_context="default" search_injected="false" reformatAccordingToStyle="true" shortenFQN="true" useStaticImport="true" replacement="com.intellij.openapi.diagnostic.LoggerKt.rethrowControlFlowException($Expr$);">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="Expr" within="" contains="" />
+      </replaceConfiguration>
+      <replaceConfiguration name="Rethow ControlFlowException using platform utility function" text="if ($Expr$ is ControlFlowException) {&#10;  throw $Expr$&#10;}" recursive="false" caseInsensitive="false" type="Kotlin" pattern_context="default" search_injected="false" reformatAccordingToStyle="true" shortenFQN="true" replacement="com.intellij.openapi.diagnostic.rethrowControlFlowException($Expr$)">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="Expr" within="" contains="" />
+      </replaceConfiguration>
+      <replaceConfiguration name="Rethow ControlFlowException using platform utility function" text="if (Logger.shouldRethrow($Expr$)) {&#10;  throw $Expr$;&#10;}" recursive="false" caseInsensitive="false" type="JAVA" pattern_context="default" search_injected="false" reformatAccordingToStyle="true" shortenFQN="true" useStaticImport="true" replacement="com.intellij.openapi.diagnostic.LoggerKt.rethrowControlFlowException($Expr$);">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="Expr" within="" contains="" />
+      </replaceConfiguration>
+      <replaceConfiguration name="Rethow ControlFlowException using platform utility function" text="if (Logger.shouldRethrow($Expr$)) {&#10;  throw $Expr$&#10;}" recursive="false" caseInsensitive="false" type="Kotlin" pattern_context="default" search_injected="false" reformatAccordingToStyle="true" shortenFQN="true" useStaticImport="true" replacement="com.intellij.openapi.diagnostic.rethrowControlFlowException($Expr$)">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="Expr" within="" contains="" />
       </replaceConfiguration>
       <searchConfiguration name="Rpc functions must be suspend" text="interface $Class$: RemoteApi&lt;Unit&gt; {&#10;  suspend fun $Method$ ($Parameter$ : $ParameterType$)&#10;&#10;  fun $Method2$($Parameter2$ : $ParameterType2$)&#10;}" recursive="true" caseInsensitive="false" type="Kotlin" pattern_context="default">
         <constraint name="__context__" within="" contains="" />
@@ -3303,6 +3372,14 @@
         <constraint name="s1" nameOfExprType="java\.lang\.String" within="" contains="" />
         <constraint name="s2" nameOfExprType="java\.lang\.String" within="" contains="" />
       </replaceConfiguration>
+      <searchConfiguration name="Use 'Process#descendants' with care" description="The method is susceptible to PID reuse problem on Windows, sometimes making it return unrelated processes.&#10;Don't use the returned list for killing child processes – prefer 'OSProcessUtil' instead." suppressId="UseProcessDescendantsWithCare" text="$Instance$.descendants()" recursive="true" caseInsensitive="true" type="JAVA" pattern_context="default">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="Instance" nameOfExprType="java\.lang\.Process|java\.lang\.ProcessHandle" within="" contains="" />
+      </searchConfiguration>
+      <searchConfiguration name="Use 'Process#descendants' with care" text="$Instance$.descendants()" recursive="true" caseInsensitive="true" type="Kotlin" pattern_context="default">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="Instance" nameOfExprType="java\.lang\.Process|java\.lang\.ProcessHandle" within="" contains="" />
+      </searchConfiguration>
       <searchConfiguration name="Use `lt` instead of `lifetime` as argument name" uuid="75974233-e6df-342f-bb28-90fa3ddfde86" description="`lifetime` has higher priority as variable and shadows `lifetime` of nested scopes. It leads to subscription leaks.&#10;Just renaming it to `lt` helps a lot." text="class $Name$($Param1$: $T1$, $Param2$: $T2$, $Param3$: $T3$)" recursive="true" caseInsensitive="false" type="Kotlin" pattern_context="default">
         <constraint name="__context__" within="" contains="" />
         <constraint name="Name" script="&quot;import org.jetbrains.kotlin.psi.KtClass&#10;&#10;def cls = __context__ as KtClass&#10;!(&quot;Lifetimed&quot; in cls.superTypeList?.entries?.text ?: [])&quot;" within="" contains="" />
@@ -3757,6 +3834,17 @@
         <constraint name="FieldName" within="" contains="" />
         <constraint name="FieldType" regexp="Collection" within="" contains="" />
       </searchConfiguration>
+      <replaceConfiguration name="Use runReadActionBlocking instead of Application.runReadAction" uuid="2f2f891d-a1a8-40ae-b3cb-e52290744728" description="Application.runReadAction should be replaced with runReadActionBlocking" suppressId="UseRunReadActionBlockingShortcut" problemDescriptor="Use runReadActionBlocking instead of Application.runReadAction" text="$application$.runReadAction { $Parameter$ -&gt; $Expr$ }" recursive="false" caseInsensitive="false" type="Kotlin" pattern_context="default" search_injected="false" reformatAccordingToStyle="true" shortenFQN="true" replacement="com.intellij.openapi.application.runReadActionBlocking { $Expr$ }">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="Parameter" minCount="0" maxCount="2147483647" within="" contains="" />
+        <constraint name="Expr" minCount="0" maxCount="2147483647" within="" contains="" />
+        <constraint name="application" regexp="(ApplicationManager\.getApplication\(\))|(application)" within="" contains="" />
+      </replaceConfiguration>
+      <replaceConfiguration name="Use runReadActionBlocking instead of Application.runReadAction" uuid="2f2f891d-a1a8-40ae-b3cb-e52290744728" description="Application.runReadAction should be replaced with ReadAction.runBlocking" suppressId="UseRunReadActionBlockingShortcut" problemDescriptor="Use ReadAction.runBlocking instead of Application.runReadAction" text="$application$.runReadAction($runnable$)" recursive="false" caseInsensitive="false" type="JAVA" pattern_context="default" reformatAccordingToStyle="true" shortenFQN="true" replacement="com.intellij.openapi.application.ReadAction.runBlocking($runnable$)">
+        <constraint name="__context__" within="" contains="" />
+        <constraint name="application" nameOfExprType="com.intellij.openapi.application.Application" exprTypeWithinHierarchy="true" within="" contains="" />
+        <constraint name="runnable" nameOfExprType="java.lang.Runnable" within="" contains="" />
+      </replaceConfiguration>
       <replaceConfiguration name="Use Strings.areSameInstance instead of ==" description="Comparing Strings by references usually indicate a mistake, if you really need to do this (for performance reeasons or to implement &quot;Sentinel&quot; pattern), use Strings.areSameInstance method to make the intention explicit and get rid of warning." suppressId="StringEqualitySSR" problemDescriptor="Use !Strings.areSameInstance instead of '!=' if you really need to compare strings by reference" text="$s1$ == $s2$" recursive="false" caseInsensitive="false" type="JAVA" pattern_context="default" search_injected="false" reformatAccordingToStyle="false" shortenFQN="true" replacement="com.intellij.openapi.util.text.Strings.areSameInstance($s1$, $s2$)">
         <constraint name="__context__" within="" contains="" />
         <constraint name="s1" nameOfExprType="java\.lang\.String" within="" contains="" />
@@ -4038,6 +4126,9 @@
     </inspection_tool>
     <inspection_tool class="acb41802-9e8a-3e32-8b29-0e1d0a2aa770" enabled="true" level="WARNING" enabled_by_default="false">
       <scope name="EntityStorage" level="WARNING" enabled="true" />
+    </inspection_tool>
+    <inspection_tool class="b1ea9b48-958a-3fb9-b7b0-56879a7275b0" enabled="true" level="WARNING" enabled_by_default="false">
+      <scope name="Python" level="Strong Warning" enabled="true" editorAttributes="Strong Warning" />
     </inspection_tool>
     <inspection_tool class="be0e4d0f-a75b-39d7-8c95-5c554e8fcb40" enabled="true" level="WARNING" enabled_by_default="false">
       <scope name="Go" level="WARNING" enabled="true" />

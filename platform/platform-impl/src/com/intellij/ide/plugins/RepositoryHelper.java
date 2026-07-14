@@ -26,11 +26,13 @@ import com.intellij.util.Url;
 import com.intellij.util.Urls;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.io.URLUtil;
+import com.intellij.util.system.CpuArch;
 import com.intellij.util.text.VersionComparatorUtil;
 import org.jdom.JDOMException;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -48,6 +50,7 @@ import java.util.Set;
 import static com.intellij.ide.plugins.BrokenPluginFileKt.isBrokenPlugin;
 import static com.intellij.ide.plugins.PluginManagerCore.MARKETPLACE_PLUGIN_ID;
 import static com.intellij.ide.plugins.PluginManagerCore.ULTIMATE_PLUGIN_ID;
+import static com.intellij.ide.plugins.marketplace.utils.MarketplaceUrlsKt.buildOsParameter;
 
 public final class RepositoryHelper {
   private static final Logger LOG = Logger.getInstance(RepositoryHelper.class);
@@ -103,7 +106,7 @@ public final class RepositoryHelper {
    * deprecated, use {@link #loadPluginModels}
    */
   @Deprecated(forRemoval = true)
-  public static @NotNull List<PluginNode> loadPlugins(
+  public static @NotNull @Unmodifiable List<PluginNode> loadPlugins(
     @Nullable String repositoryUrl,
     @Nullable BuildNumber build,
     @Nullable ProgressIndicator indicator
@@ -114,7 +117,7 @@ public final class RepositoryHelper {
 
   @Deprecated(forRemoval = true)
   @ApiStatus.Internal
-  public static @NotNull List<PluginNode> loadPlugins(
+  public static @NotNull @Unmodifiable List<PluginNode> loadPlugins(
     @Nullable String repositoryUrl,
     @Nullable BuildNumber build,
     @Nullable ProgressIndicator indicator,
@@ -154,15 +157,23 @@ public final class RepositoryHelper {
     }
 
     if (!URLUtil.FILE_PROTOCOL.equals(url.getScheme())) {
-      url = url.addParameters(Map.of("build", ApplicationInfoImpl.orFromPluginCompatibleBuild(build)));
+      url = url
+        .addParameters(Map.of(
+          "build", ApplicationInfoImpl.orFromPluginCompatibleBuild(build),
+          "os", buildOsParameter(),
+          "arch", CpuArch.CURRENT.name()
+        ));
     }
 
     if (indicator != null) {
       indicator.setText2(IdeBundle.message("progress.connecting.to.plugin.manager", url.getAuthority()));
     }
 
+    String urlTarget = url.toExternalForm();
+    LOG.debug("Downloading list of plugins from " + urlTarget);
+
     var message = IdeBundle.message("progress.downloading.list.of.plugins", url.getAuthority());
-    var descriptors = MarketplaceRequests.readOrUpdateFile(pluginListFile, url.toExternalForm(), indicator, message,
+    var descriptors = MarketplaceRequests.readOrUpdateFile(pluginListFile, urlTarget, indicator, message,
                                                            input -> MarketplaceRequests.parsePluginList(input, factory));
     return process(descriptors, build != null ? build : PluginManagerCore.getBuildNumber(), repositoryUrl);
   }
@@ -232,7 +243,7 @@ public final class RepositoryHelper {
   @ApiStatus.Internal
   @Deprecated(forRemoval = true)
   @SuppressWarnings("DeprecatedIsStillUsed")
-  public static @NotNull Collection<PluginNode> mergePluginsFromRepositories(
+  public static @NotNull @Unmodifiable Collection<PluginNode> mergePluginsFromRepositories(
     @NotNull List<PluginNode> marketplacePlugins,
     @NotNull List<PluginNode> customPlugins,
     boolean addMissing) {
@@ -301,7 +312,7 @@ public final class RepositoryHelper {
   /**
    * Looks for the given plugins in the Marketplace and custom repositories. Only compatible plugins are returned.
    */
-  public static @NotNull Collection<PluginNode> loadPlugins(@NotNull Set<PluginId> pluginIds) {
+  public static @NotNull @Unmodifiable Collection<PluginNode> loadPlugins(@NotNull Set<PluginId> pluginIds) {
     @SuppressWarnings("deprecation") var mpPlugins = MarketplaceRequests.loadLastCompatiblePluginDescriptors(pluginIds);
     var customPlugins = loadPluginsFromCustomRepositories(null).stream().filter(p -> pluginIds.contains(p.getPluginId())).toList();
     return mergePluginsFromRepositories(mpPlugins, customPlugins, true);

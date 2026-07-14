@@ -40,6 +40,7 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataSink;
+import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.actionSystem.Separator;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.WriteIntentReadAction;
@@ -148,15 +149,9 @@ public class SimpleDiffViewer extends TwosideTextDiffViewer {
 
   @Override
   protected @NotNull List<AnAction> createToolbarActions() {
-    List<AnAction> diffActions = new ArrayList<>();
-    diffActions.add(new MyToggleExpandByDefaultAction());
-    diffActions.add(new MyToggleAutoScrollAction());
-    diffActions.addAll(myTextDiffProvider.getDiffSettingsActions());
-    myEditorSettingsAction.setDiffActions(diffActions);
-
     List<AnAction> group = new ArrayList<>();
+    group.add(new MyToggleExpandByDefaultAction());
     group.add(new MyReadOnlyLockAction());
-    group.add(myEditorSettingsAction);
 
     group.add(Separator.getInstance());
     group.addAll(super.createToolbarActions());
@@ -165,31 +160,60 @@ public class SimpleDiffViewer extends TwosideTextDiffViewer {
   }
 
   @Override
+  protected @NotNull List<AnAction> createRightToolbarActions() {
+    List<AnAction> diffActions = new ArrayList<>();
+    addTwoSideSettingsActions(diffActions);
+    myEditorSettingsAction.setSettingsActions(diffActions, myTextDiffProvider.getDiffSettingsActions());
+
+    return List.of(myEditorSettingsAction);
+  }
+
+  @Override
   protected @NotNull List<AnAction> createPopupActions() {
-    List<AnAction> group = new ArrayList<>();
-    group.add(new MyToggleExpandByDefaultAction());
-    group.add(new MyToggleAutoScrollAction());
-    group.addAll(myTextDiffProvider.getDiffSettingsActions());
+    List<AnAction> group = new ArrayList<>(myTextDiffProvider.getDiffSettingsActions());
 
     group.add(Separator.getInstance());
     group.addAll(super.createPopupActions());
+    group.add(Separator.getInstance());
+    group.add(new MyToggleExpandByDefaultAction());
+    addTwoSideSettingsActions(group);
 
     return group;
   }
 
   @Override
-  protected @NotNull List<AnAction> createEditorPopupActions() {
-    List<AnAction> group = new ArrayList<>();
+  protected @NotNull List<@NotNull AnAction> createAdditionalEditorGutterActions() {
+    List<AnAction> actions = new ArrayList<>();
+    actions.add(new MyToggleExpandByDefaultAction());
+    addTwoSideSettingsActions(actions);
+    return actions;
+  }
 
-    group.add(new ReplaceSelectedChangesAction(Side.LEFT));
-    group.add(new AppendSelectedChangesAction(Side.LEFT));
-    group.add(new ReplaceSelectedChangesAction(Side.RIGHT));
-    group.add(new AppendSelectedChangesAction(Side.RIGHT));
+  protected @NotNull List<@NotNull AnAction> createEditorPopupChangesActions() {
+    List<AnAction> actions = new ArrayList<>();
+    actions.add(new ReplaceSelectedChangesAction(Side.LEFT));
+    actions.add(new AppendSelectedChangesAction(Side.LEFT));
+    actions.add(new ReplaceSelectedChangesAction(Side.RIGHT));
+    actions.add(new AppendSelectedChangesAction(Side.RIGHT));
+    return actions;
+  }
+
+  @Override
+  protected @NotNull List<AnAction> createEditorPopupActions() {
+    List<AnAction> group = new ArrayList<>(createEditorPopupChangesActions());
+    group.add(Separator.getInstance());
+    group.add(ActionManager.getInstance().getAction(IdeActions.GROUP_DIFF_EDITOR_POPUP));
 
     group.add(Separator.getInstance());
-    group.addAll(super.createEditorPopupActions());
+    group.add(new MyToggleExpandByDefaultAction());
+    addTwoSideSettingsActions(group);
 
     return group;
+  }
+
+  private void addTwoSideSettingsActions(@NotNull List<AnAction> actions) {
+    ContainerUtil.addIfNotNull(actions, ActionManager.getInstance().getAction("Vcs.Diff.ToggleDiffAligningMode"));
+    actions.add(new MyToggleAutoScrollAction());
   }
 
   @Override
@@ -268,7 +292,7 @@ public class SimpleDiffViewer extends TwosideTextDiffViewer {
     final Document document2 = getContent2().getDocument();
 
     CharSequence[] texts =
-      ReadAction.compute(() -> new CharSequence[]{document1.getImmutableCharSequence(), document2.getImmutableCharSequence()});
+      ReadAction.computeBlocking(() -> new CharSequence[]{document1.getImmutableCharSequence(), document2.getImmutableCharSequence()});
 
     List<LineFragment> lineFragments = myTextDiffProvider.compare(texts[0], texts[1], indicator);
 

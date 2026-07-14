@@ -1,30 +1,19 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.compose.ide.plugin.resources.folding
 
-import com.intellij.compose.ide.plugin.resources.ANDROID_MAIN
 import com.intellij.compose.ide.plugin.resources.ComposeResourcesTestCase
 import com.intellij.compose.ide.plugin.resources.TARGET_GRADLE_VERSION
 import com.intellij.lang.folding.FoldingDescriptor
 import com.intellij.openapi.application.EDT
 import com.intellij.psi.PsiDocumentManager
-import com.intellij.testFramework.common.runAll
+import com.intellij.testFramework.common.timeoutRunBlocking
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 import org.jetbrains.kotlin.test.TestMetadata
 import org.jetbrains.plugins.gradle.tooling.annotation.TargetVersions
-import org.junit.Assume.assumeTrue
 import org.junit.Test
 import kotlin.test.assertNotNull as kAssertNotNull
 
 class ComposeResourcesFoldingTest : ComposeResourcesTestCase() {
-
-  override fun tearDownFixtures() {
-    runAll(
-      { _codeInsightTestFixture?.tearDown() },
-      { _codeInsightTestFixture = null },
-      { resetTestFixture() },
-    )
-  }
 
   @TargetVersions(TARGET_GRADLE_VERSION)
   @Test
@@ -69,18 +58,21 @@ class ComposeResourcesFoldingTest : ComposeResourcesTestCase() {
     assertTrue("Quick mode should return no folding descriptors", descriptors.isEmpty())
   }
 
-  private fun doFoldingTest(quick: Boolean = false, assertions: (Array<out FoldingDescriptor?>) -> Unit) = runBlocking(Dispatchers.EDT) {
-    assumeTrue("temporarily disable for androidMain since it's not recognised as source root", sourceSetName != ANDROID_MAIN)
+  private fun doFoldingTest(quick: Boolean = false, assertions: (Array<out FoldingDescriptor?>) -> Unit) {
     val files = importProjectFromTestData()
-    codeInsightTestFixture.openFileInEditor(files.first { it.path.endsWith("composeApp/src/$sourceSetName/kotlin/org/example/project/test.$sourceSetName.kt") })
 
-    val foldingBuilder = ComposeResourcesFoldingBuilder()
-    val psiFile = codeInsightTestFixture.file
-    val document = PsiDocumentManager.getInstance(myProject).getDocument(psiFile)
-    kAssertNotNull(document, "Document should not be null")
-    val descriptors = foldingBuilder.buildFoldRegions(psiFile, document, quick)
+    timeoutRunBlocking(context = Dispatchers.EDT) {
 
-    assertions(descriptors)
+      codeInsightTestFixture.openFileInEditor(files.first { it.path.endsWith("composeApp/src/$sourceSetName/kotlin/org/example/project/test.$sourceSetName.kt") })
+
+      val foldingBuilder = ComposeResourcesFoldingBuilder()
+      val psiFile = codeInsightTestFixture.file
+      val document = PsiDocumentManager.getInstance(myProject).getDocument(psiFile)
+      kAssertNotNull(document, "Document should not be null")
+      val descriptors = foldingBuilder.buildFoldRegions(psiFile, document, quick)
+
+      assertions(descriptors)
+    }
   }
 
   private fun Array<out FoldingDescriptor?>.findByResourceRef(ref: String): FoldingDescriptor? =

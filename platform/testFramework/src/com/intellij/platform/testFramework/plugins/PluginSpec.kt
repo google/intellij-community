@@ -7,7 +7,6 @@ import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleLoadingRule
 import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleVisibilityValue
 import org.intellij.lang.annotations.Language
 
-
 class PluginSpec internal constructor(
   val id: String?,
   val name: String?,
@@ -31,7 +30,6 @@ class PluginSpec internal constructor(
 
   val pluginAliases: List<String>,
   val incompatibleWith: List<String>,
-  val namespace: String?,
   val content: List<ContentModuleSpec>,
 
   val resourceBundle: String?,
@@ -48,6 +46,7 @@ class PluginSpec internal constructor(
 
 data class PluginSpecClassReference(val className: String, val classLoader: ClassLoader? = null)
 
+@PluginBuilderDsl
 class PluginSpecBuilder(
   var id: String? = null,
   var name: String? = null,
@@ -71,7 +70,6 @@ class PluginSpecBuilder(
   var moduleVisibility: ModuleVisibilityValue = ModuleVisibilityValue.PRIVATE,
   var pluginAliases: List<String> = emptyList(),
   var incompatibleWith: List<String> = emptyList(),
-  var namespace: String? = null,
   internal var content: List<ContentModuleSpec> = emptyList(),
 
   var resourceBundle: String? = null,
@@ -93,23 +91,27 @@ class PluginSpecBuilder(
     vendor = vendor, description = description, pluginDependencies = pluginDependencies, moduleDependencies = moduleDependencies,
     moduleVisibility = moduleVisibility,
     pluginMainModuleDependencies = pluginMainModuleDependencies, pluginAliases = pluginAliases, incompatibleWith = incompatibleWith,
-    namespace = namespace,
     content = content, resourceBundle = resourceBundle, actions = actions, applicationListeners = applicationListeners,
     extensionPoints = extensionPoints, extensions = extensions, body = body, classFiles = classFiles, packageClassFiles = packageClassFiles
   )
 }
 
+@PluginBuilderDsl
 class ContentModuleSpec internal constructor(
-  val moduleId: String,
+  val moduleName: String,
+  val namespace: String?,
   val loadingRule: ModuleLoadingRuleValue,
   val requiredIfAvailable: String?,
   val spec: PluginSpec,
 )
 
+@PluginBuilderDsl
 class DependsSpec internal constructor(val pluginId: String, val optional: Boolean, val configFile: String?, val spec: PluginSpec?) {
   init { require((configFile != null) == (spec != null)) }
 }
 
+@PluginBuilderDsl
 class ModuleDependencySpec internal constructor(val name: String, val namespace: String? = null)
 
+@PluginBuilderDsl
 class ExtensionsSpec internal constructor(val ns: String, @Language("XML") val content: String)

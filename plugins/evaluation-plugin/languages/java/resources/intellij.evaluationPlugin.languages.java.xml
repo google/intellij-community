@@ -1,11 +1,16 @@
 <idea-plugin>
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
-    <module name="intellij.java.backend"/>
-    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
-    <module name="intellij.maven"/>
     <module name="intellij.gradle"/>
-    <!-- endregion -->
+    <module name="intellij.java"/>
+    <module name="intellij.java.frontback.psi"/>
+    <module name="intellij.java.impl"/>
+    <module name="intellij.java.psi"/>
+    <module name="intellij.maven"/>
+    <module name="intellij.platform.smRunner"/>
+    <module name="intellij.platform.testRunner"/>
   </dependencies>
+  <!-- endregion -->
 
   <extensions defaultExtensionNs="com.intellij.cce">
     <completionEvaluationVisitor implementation="com.intellij.cce.java.visitor.JavaRenameVisitor"/>

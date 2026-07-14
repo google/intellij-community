@@ -631,6 +631,11 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
       return it
     }
 
+    // Use name cached from the previous IDE session to avoid I/O on non-local paths (e.g., WSL)
+    synchronized(stateLock) {
+      state.additionalInfo.get(path)?.customProjectName
+    }?.let { return it }
+
     synchronized(namesToResolve) {
       namesToResolve.add(path)
     }
@@ -716,12 +721,13 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
     LOG.trace { "openOneByOne: openPaths=$openPaths index=$index someProjectWasOpened=$someProjectWasOpened" }
 
     val (key, value) = openPaths.get(index)
+    val projectFile = Path.of(key)
     try {
-      EelInitialization.runEelInitialization(key)
+      EelInitialization.runEelInitialization(projectFile.getEelDescriptor())
     } catch (e : EelUnavailableException) {
       LOG.error(e)
     }
-    val project = openProject(projectFile = Path.of(key), options = OpenProjectTask {
+    val project = openProject(projectFile = projectFile, options = OpenProjectTask {
       forceOpenInNewFrame = true
       showWelcomeScreen = false
       projectWorkspaceId = value.projectWorkspaceId
@@ -924,6 +930,7 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
           }
         }
         info.displayName = getProjectDisplayName(project)
+        info.customProjectName = project.name.takeIf { path == null || it != getProjectNameOnlyByPath(path) }
         info.projectWorkspaceId = workspaceId
         info.projectFrameTypeId = frameHelper.projectFrameTypeId
         info.frameTitle = frame.title
@@ -1032,9 +1039,17 @@ int32 "extendedState"
 
   @Internal
   fun updateProjectColor(projectBasePath: String, info: RecentProjectColorInfo) {
+    var updated = false
     synchronized(stateLock) {
-      getProjectMetaInfo(projectBasePath)?.colorInfo = info
-      modCounter.increment()
+      val metaInfo = state.additionalInfo.get(projectBasePath)
+      if (metaInfo != null) {
+        metaInfo.colorInfo = info
+        modCounter.increment()
+        updated = true
+      }
+    }
+    if (updated) {
+      fireProjectColorChangeEvent(projectBasePath)
     }
   }
 
@@ -1083,6 +1098,15 @@ int32 "extendedState"
 private fun fireChangeEvent() {
   ApplicationManager.getApplication().invokeLater {
     ApplicationManager.getApplication().messageBus.syncPublisher(RecentProjectsManager.RECENT_PROJECTS_CHANGE_TOPIC).change()
+  }
+}
+
+private fun fireProjectColorChangeEvent(projectBasePath: String) {
+  ApplicationManager.getApplication().invokeLater {
+    ApplicationManager.getApplication()
+      .messageBus
+      .syncPublisher(ProjectWindowCustomizerService.PROJECT_COLOR_CHANGE_TOPIC)
+      .projectColorChanged(projectBasePath)
   }
 }
 

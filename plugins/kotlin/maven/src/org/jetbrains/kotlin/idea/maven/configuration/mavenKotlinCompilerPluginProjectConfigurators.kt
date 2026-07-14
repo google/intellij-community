@@ -5,7 +5,6 @@ import com.intellij.modcommand.ActionContext
 import com.intellij.modcommand.ModCommand
 import com.intellij.openapi.module.Module
 import com.intellij.psi.xml.XmlFile
-import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.idea.maven.dom.model.MavenDomPlugin
 import org.jetbrains.idea.maven.dom.model.MavenDomPluginExecution
 import org.jetbrains.idea.maven.model.MavenId
@@ -26,6 +25,7 @@ import org.jetbrains.kotlin.idea.maven.configuration.KotlinMavenConfigurator.Com
 import org.jetbrains.kotlin.idea.maven.createChildTag
 import org.jetbrains.kotlin.idea.maven.findSubTagOrCreate
 import org.jetbrains.kotlin.idea.util.application.executeWriteCommand
+import java.nio.file.Files
 
 abstract class AbstractMavenKotlinCompilerPluginProjectConfigurator: KotlinCompilerPluginProjectConfigurator {
     override fun isApplicable(module: Module): Boolean =
@@ -51,14 +51,15 @@ abstract class AbstractMavenKotlinCompilerPluginProjectConfigurator: KotlinCompi
                 pluginDependencyMavenId?.let {
                     pom.addPluginDependency(kotlinPlugin, it)
                 }
-                pom.customizeKotlinPlugin(kotlinPlugin)
+                pom.customizeKotlinPlugin(kotlinPlugin, module)
                 configurationResultBuilder.configuredModule(module)
             }
         }
     }
 
     protected open fun PomFile.customizeKotlinPlugin(
-        kotlinPlugin: MavenDomPlugin
+        kotlinPlugin: MavenDomPlugin,
+        module: Module
     ) {
     }
 
@@ -84,7 +85,7 @@ abstract class AbstractMavenKotlinCompilerPluginProjectConfigurator: KotlinCompi
                 pluginDependencyMavenId?.let {
                     pom.addPluginDependency(kotlinPlugin, it)
                 }
-                pom.customizeKotlinPlugin(kotlinPlugin)
+                pom.customizeKotlinPlugin(kotlinPlugin, module)
             }
         }.andThen(KotlinDependencyProvider.syncModCommand(xmlFile))
     }
@@ -106,7 +107,7 @@ abstract class AbstractMavenKotlinCompilerPluginProjectConfigurator: KotlinCompi
 
     private fun Module.findSuitablePomFileWithPlugin(pluginId: MavenId): XmlFile? {
         // try to find suitable maven kotlin plugin in current module pom file
-        val pomFile = findModulePomFile(this) as? XmlFile ?: return null
+        val pomFile = findModulePomFile(this) ?: return null
         if (pomFile.hasSuitablePlugin(pluginId, extraCheck = { it.findExecutionWithKotlinCompileGoal() != null })) return pomFile
 
         val project = this.project
@@ -148,6 +149,16 @@ class LombokMavenKotlinCompilerPluginProjectConfigurator : AbstractMavenKotlinCo
     override val pluginDependencyMavenId: MavenId
         get() = MavenId(GROUP_ID, "kotlin-maven-lombok", $$"${$$KOTLIN_VERSION_PROPERTY}")
 
+    override fun PomFile.customizeKotlinPlugin(kotlinPlugin: MavenDomPlugin, module: Module) {
+        val configPath = module.findLombokConfigPath() ?: return
+        val configurationElement = kotlinPlugin.configuration.ensureTagExists()
+        val pluginOptions = configurationElement.findSubTagOrCreate("pluginOptions")
+        val option = "lombok:config=$configPath"
+        if (pluginOptions.findSubTags("option").any { it.value.text == option }) return
+
+        pluginOptions.add(pluginOptions.createChildTag("option", option))
+    }
+
 }
 
 class JpaMavenKotlinCompilerPluginProjectConfigurator : AbstractMavenKotlinCompilerPluginProjectConfigurator() {
@@ -157,7 +168,7 @@ class JpaMavenKotlinCompilerPluginProjectConfigurator : AbstractMavenKotlinCompi
     override val pluginDependencyMavenId: MavenId
         get() = MavenId(GROUP_ID, "kotlin-maven-noarg", $$"${$$KOTLIN_VERSION_PROPERTY}")
 
-    override fun PomFile.customizeKotlinPlugin(kotlinPlugin: MavenDomPlugin) {
+    override fun PomFile.customizeKotlinPlugin(kotlinPlugin: MavenDomPlugin, module: Module) {
         val propertyTag = this.findProperty(KOTLIN_VERSION_PROPERTY) ?: return
         val version = IdeKotlinVersion.get(propertyTag.value.text)
         if (version.kotlinVersion.isAtLeast(2, 3, 20)) return
@@ -165,7 +176,21 @@ class JpaMavenKotlinCompilerPluginProjectConfigurator : AbstractMavenKotlinCompi
         addAllOpenKotlinCompilerPluginPreset(kotlinPlugin, kotlinCompilerPluginId)
     }
 }
-@ApiStatus.Internal
+
+private fun Module.findLombokConfigPath(): String? {
+    val mavenProjectsManager = MavenProjectsManager.getInstance(project)
+    val mavenProject = mavenProjectsManager.findProject(this) ?: return null
+    val moduleConfig = mavenProject.directoryPath.resolve("lombok.config")
+    if (Files.exists(moduleConfig)) return "lombok.config"
+
+    val parentConfig = mavenProject.parentId
+        ?.let(mavenProjectsManager::findProject)
+        ?.directoryPath
+        ?.resolve("lombok.config")
+        ?.takeIf(Files::exists)
+    return parentConfig?.toString()
+}
+
 internal fun PomFile.addAllOpenKotlinCompilerPluginPreset(kotlinPlugin: MavenDomPlugin, kotlinCompilerPluginId: String) {
     val allOpenPluginName = "all-open"
 

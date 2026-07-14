@@ -3,7 +3,6 @@ package org.jetbrains.kotlin.idea.fir.injection
 
 import com.intellij.testFramework.LightProjectDescriptor
 import org.jetbrains.annotations.NonNls
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode
 import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCase
 import org.jetbrains.kotlin.idea.test.KotlinWithJdkAndRuntimeLightProjectDescriptor
 
@@ -11,9 +10,8 @@ import org.jetbrains.kotlin.idea.test.KotlinWithJdkAndRuntimeLightProjectDescrip
  * @author Bas Leijdekkers
  */
 class KotlinRegExpHighlightingTest : KotlinLightCodeInsightFixtureTestCase() {
-    override val pluginMode: KotlinPluginMode = KotlinPluginMode.K2
 
-    fun testUnescapedDollarSign() = doTest("\\\\\$<error descr=\"[UNRESOLVED_REFERENCE] Unresolved reference 'A'.\">A</error>")
+    fun testUnescapedDollarSign() = doTest("\\\\\$<error descr=\"[UNRESOLVED_REFERENCE]\">A</error>")
 
     private fun doTest(@NonNls code: String) {
         // we need this allow call here because KotlinLanguageInjectionContributor does some resolve that loads the AST

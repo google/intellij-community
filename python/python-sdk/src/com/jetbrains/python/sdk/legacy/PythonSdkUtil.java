@@ -25,11 +25,8 @@ import com.jetbrains.python.PyNames;
 import com.jetbrains.python.module.PyModuleService;
 import com.jetbrains.python.sdk.PyRemoteSdkAdditionalDataMarker;
 import com.jetbrains.python.sdk.PySdkUtil;
-import com.jetbrains.python.sdk.PythonEnvironment;
-import com.jetbrains.python.sdk.PythonEnvironmentKt;
 import com.jetbrains.python.venvReader.VirtualEnvReaderKt;
 import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
@@ -85,7 +82,6 @@ public final class PythonSdkUtil {
    */
   public static boolean isFreeTier() {
     return PlatformUtils.isPyCharm() &&
-           (!PlatformUtils.isDataSpell()) &&
            PluginManagerCore.isDisabled(PluginManagerCore.ULTIMATE_PLUGIN_ID);
   }
 
@@ -288,14 +284,5 @@ public final class PythonSdkUtil {
       }
     }
     return null;
-  }
-
-  @Deprecated(forRemoval = true)
-  @Contract("null -> false")
-  public static boolean isVirtualEnv(@Nullable String path) {
-    if (path == null) return false;
-    var envResult = PythonEnvironmentKt.detectPythonEnvironment(Path.of(path));
-    var env = envResult.getSuccessOrNull();
-    return env instanceof PythonEnvironment.Venv;
   }
 }

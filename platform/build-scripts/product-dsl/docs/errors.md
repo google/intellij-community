@@ -14,7 +14,6 @@ Complete reference of validation errors, their causes, and fixes.
 | [PluginDependencyNotBundledError](#plugin-to-plugin-dependency-error) | Error | No | Plugin depends on another plugin not bundled in same product |
 | [XIncludeResolutionError](#xinclude-resolution-error) | Error | No | xi:include path cannot be resolved |
 | [MissingModuleSetsError](#missing-module-sets) | Error | No | Referenced module set not found |
-| [PluginizedModuleSetReferenceError](#pluginized-module-set-reference) | Error | No | Pluginized module set used through `moduleSet()` |
 | [Structural Violations](#structural-loading-violations) | Error | Yes* | Loading mode constraint violations |
 | [MissingContentModulePluginDep](#missing-content-module-plugin-dependency) | Error | No | Content module missing plugin dep |
 | [MissingTestPluginPluginDep](#missing-test-plugin-plugin-dependency) | Error | No | Test plugin missing plugin dep |
@@ -234,24 +233,6 @@ Emitted by `PluginContentStructureValidator` (ruleName `pluginContentStructureVa
 
 ---
 
-## Pluginized Module-Set Reference
-
-```
-❌ Product 'IDEA' references pluginized module set 'debugger.streams' as a regular module set
-
-  * Pluginized module sets are standalone bundled plugin wrappers and are not inlined through moduleSet(...) references
-
-Fix:
-1. Remove the moduleSet(...) reference to 'debugger.streams'
-2. Bundle 'intellij.moduleSet.plugin.debugger.streams' in products that should ship it
-```
-
-**Cause**: A module set created via `plugin(...)` is still being used through `moduleSet(...)` in a product spec or nested under a regular module set.
-
-**Fix**: Remove the `moduleSet()` reference and bundle the generated wrapper plugin module instead.
-
----
-
 ## DSL Constraint Errors
 
 ### Invalid Loading Overrides
@@ -297,14 +278,14 @@ Note: You cannot override nested set modules.
 ```
 ❌ Product specification errors: Redundant module set references detected
 
-  ✗ Product 'GoLand': module set 'ssh' is redundant (already nested in 'ide.ultimate')
+  ✗ Product 'GoLand': module set 'duplicates.ultimate' is redundant (already nested in 'ide.ultimate')
 
 💡 Hint: Remove redundant module sets from product's getProductContentDescriptor() method.
 
    Example fix:
    override fun getProductContentDescriptor() = productModules {
-     // moduleSet(ssh())           // ← REMOVE (already in ide.ultimate)
-     moduleSet(ideUltimate())       // ← KEEP (includes ssh)
+     // moduleSet(duplicatesUltimate())  // ← REMOVE (already in ide.ultimate)
+     moduleSet(ideUltimate())            // ← KEEP (includes duplicates.ultimate)
    }
 ```
 
@@ -468,37 +449,20 @@ The dependency generator expects `<idea-plugin>` as the root element. Descriptor
 
 ## Investigation Tools
 
-Use Plugin Model Analyzer MCP to debug dependency issues:
+Use the Plugin Model Analyzer skill to debug dependency issues. It calls the Product DSL analyzer directly through Bazel:
 
-```kotlin
-// Find dependency path between modules
-mcp__PluginModelAnalyzer__find_dependency_path(
-  fromModule = "intellij.platform.vcs.impl",
-  toModule = "intellij.c.core"
-)
-
-// Check which module sets contain a dependency
-mcp__PluginModelAnalyzer__suggest_module_set_for_modules(
-  moduleNames = ["intellij.c.core"]
-)
-
-// Check module reachability within a module set
-mcp__PluginModelAnalyzer__check_module_reachability(
-  moduleName = "intellij.platform.kernel",
-  moduleSetName = "core.platform"
-)
-
-// Get module info including products/sets
-mcp__PluginModelAnalyzer__get_module_info(
-  moduleName = "intellij.fullLine.cpp"
-)
+```bash
+bazel run --ui_event_filters=-info --noshow_progress //platform/buildScripts:plugin-model-tool -- --json='{"filter":"dependencyPath","fromModule":"intellij.platform.vcs.impl","toModule":"intellij.c.core","includeScopes":true}'
+bazel run --ui_event_filters=-info --noshow_progress //platform/buildScripts:plugin-model-tool -- --json='{"filter":"suggestModuleSetsForModules","modules":["intellij.c.core"]}'
+bazel run --ui_event_filters=-info --noshow_progress //platform/buildScripts:plugin-model-tool -- --json='{"filter":"moduleReachability","module":"intellij.platform.kernel","moduleSet":"core.platform"}'
+bazel run --ui_event_filters=-info --noshow_progress //platform/buildScripts:plugin-model-tool -- --json='{"filter":"moduleInfo","module":"intellij.fullLine.cpp"}'
 ```
 
 ---
 
 ## Investigation Strategy
 
-1. **Identify dependency chain**: Use `find_dependency_path` to understand why dep is needed
+1. **Identify dependency chain**: Use the `dependencyPath` JSON filter to understand why dep is needed
 2. **Check if cross-plugin**: Is missing module in non-bundled plugin? Check source module's loading
 3. **Find right fix level**:
    - Missing module set → add nested set

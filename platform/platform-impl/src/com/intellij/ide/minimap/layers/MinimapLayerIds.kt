@@ -2,7 +2,6 @@
 package com.intellij.ide.minimap.layers
 
 object MinimapLayerIds {
-  val LEGACY_PREVIEW: MinimapLayerId = MinimapLayerId("legacyPreview")
   val TOKEN_FILLER: MinimapLayerId = MinimapLayerId("tokenFiller")
   val SELECTION: MinimapLayerId = MinimapLayerId("selection")
   val DIAGNOSTICS: MinimapLayerId = MinimapLayerId("diagnostics")
@@ -11,4 +10,5 @@ object MinimapLayerIds {
   val HOVER: MinimapLayerId = MinimapLayerId("hover")
   val CARET: MinimapLayerId = MinimapLayerId("caret")
   val THUMB: MinimapLayerId = MinimapLayerId("thumb")
+  val EDITOR_SEPARATOR: MinimapLayerId = MinimapLayerId("editorSeparator")
 }

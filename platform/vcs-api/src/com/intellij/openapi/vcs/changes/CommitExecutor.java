@@ -18,7 +18,6 @@ public interface CommitExecutor {
   /**
    * Allows registering additional commit actions for local changes.
    *
-   * @see ChangeListManager#registerCommitExecutor(CommitExecutor)
    * @see com.intellij.openapi.vcs.changes.actions.CommitExecutorAction
    */
   ProjectExtensionPointName<CommitExecutor> LOCAL_COMMIT_EXECUTOR =
@@ -75,7 +74,7 @@ public interface CommitExecutor {
   /**
    * @deprecated Prefer overriding {@link #createCommitSession(CommitContext)}
    */
-  @Deprecated
+  @Deprecated(forRemoval = true)
   default @NotNull CommitSession createCommitSession() {
     throw new AbstractMethodError();
   }

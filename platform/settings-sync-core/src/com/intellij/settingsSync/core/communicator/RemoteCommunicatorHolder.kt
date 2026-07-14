@@ -1,5 +1,3 @@
-@file:OptIn(IntellijInternalApi::class)
-
 package com.intellij.settingsSync.core.communicator
 
 import com.intellij.icons.AllIcons
@@ -20,7 +18,6 @@ import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.updateSettings.impl.PluginDownloader
 import com.intellij.openapi.util.Disposer
-import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.platform.ide.progress.ModalTaskOwner
 import com.intellij.platform.ide.progress.TaskCancellation
 import com.intellij.platform.ide.progress.withModalProgress
@@ -237,7 +234,7 @@ object RemoteCommunicatorHolder : SettingsSyncEventListener {
             logger.error("Cannot download plugin '${marketplacePluginId.idString}' from marketplace!")
             return@withContext false
           }
-          val marketplacePluginFile = marketplacePluginDownloader.filePath
+          val marketplacePluginFile = marketplacePluginDownloader.getFilePath()
           val targetFile = PluginInstaller.unpackPlugin(marketplacePluginFile, Path.of(PathManager.getPluginsPath()))
 
           val targetDescriptor = loadDescriptor(targetFile, false, PluginXmlPathResolver.DEFAULT_PATH_RESOLVER) ?: let {
@@ -260,7 +257,7 @@ object RemoteCommunicatorHolder : SettingsSyncEventListener {
             return@withContext false
           }
 
-          val syncPluginFile = syncPluginDownloader.filePath
+          val syncPluginFile = syncPluginDownloader.getFilePath()
           val syncPluginDescriptor = loadDescriptorFromArtifact(syncPluginFile, null) ?: let {
             logger.error("Cannot load plugin descriptor for ${settingsSyncPluginId.idString}")
             return@withContext false

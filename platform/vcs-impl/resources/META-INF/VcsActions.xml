@@ -1,7 +1,9 @@
+<!--suppress PluginXmlRegistrationCheck -->
 <idea-plugin>
-  <actions>
+  <actions resource-bundle="messages.ActionsBundle">
     <action id="Vcs.ShowTabbedFileHistory" class="com.intellij.openapi.vcs.actions.TabbedShowHistoryAction"
             icon="AllIcons.Vcs.History"/>
+    <!--suppress PluginXmlCapitalization -->
     <action id="Vcs.ShowHistoryForRevision" class="com.intellij.openapi.vcs.actions.TabbedShowHistoryForRevisionAction"
             icon="AllIcons.Vcs.History"/>
 
@@ -21,7 +23,7 @@
       <synonym key="action.Annotate.synonym1"/>
       <synonym key="action.Annotate.with.Blame.text"/>
       <add-to-group group-id="Diff.EditorPopupMenu"/>
-      <add-to-group group-id="Diff.EditorGutterPopupMenu" anchor="before" relative-to-action="Diff.EditorGutterPopupMenu.DiffModes"/>
+      <add-to-group group-id="Diff.EditorGutterPopupMenu" anchor="first"/>
     </action>
     <action id="Show.Current.Revision" class="com.intellij.openapi.vcs.actions.ShowBaseRevisionAction"/>
     <action id="Compare.SameVersion" class="com.intellij.openapi.vcs.actions.CompareWithTheSameVersionAction" icon="AllIcons.Actions.Diff"/>
@@ -47,6 +49,7 @@
       <keyboard-shortcut first-keystroke="control T" keymap="$default"/>
       <add-to-group group-id="SegmentedVcsActionsBarGroup" anchor="first"/>
     </action>
+    <!--suppress PluginXmlCapitalization -->
     <action id="Vcs.Toolbar.ShowMoreActions" class="com.intellij.openapi.vcs.actions.VcsQuickActionsToolbarPopup">
       <add-to-group group-id="SegmentedVcsActionsBarGroup" anchor="last"/>
     </action>
@@ -158,6 +161,7 @@
       </action>
       <add-to-group group-id="ChangesViewToolbar.Shared" anchor="first"/>
     </group>
+    <!--suppress PluginXmlCapitalization -->
     <action id="ChangesView.SaveToShelve" class="com.intellij.openapi.vcs.changes.actions.SaveToShelveAction"/>
 
     <action id="Vcs.Diff.ShowCombinedDiff" class="com.intellij.openapi.vcs.changes.actions.diff.ShowCombinedDiffAction"
@@ -185,7 +189,10 @@
       <reference ref="ChangesView.Move"/>
       <reference ref="Diff.ShowDiff"/>
       <reference ref="Diff.ShowStandaloneDiff"/>
-      <action id="ChangesView.EditSource" class="com.intellij.openapi.vcs.actions.ChangesViewPopupJumpToSourceAction"/>
+      <action id="ChangesView.EditSource"
+              class="com.intellij.openapi.vcs.actions.ChangesViewPopupJumpToSourceAction"
+              use-shortcut-of="EditSource"
+      />
       <reference ref="CopyReferencePopupGroup"/>
       <separator/>
       <reference ref="$Delete"/>
@@ -445,40 +452,38 @@
       <action id="Vcs.RollbackChangedLines" class="com.intellij.openapi.vcs.ex.RollbackLineStatusAction" icon="AllIcons.Actions.Rollback"/>
       <action id="Vcs.ShowDiffChangedLines" class="com.intellij.openapi.vcs.ex.ShowDiffLineStatusAction" icon="AllIcons.Actions.Diff"/>
       <action id="Vcs.MoveChangedLinesToChangelist" class="com.intellij.openapi.vcs.ex.MoveChangesLineStatusAction"/>
+      <!--suppress PluginXmlCapitalization -->
       <action id="Vcs.Diff.ToggleDiffAligningMode" class="com.intellij.diff.actions.impl.ToggleDiffAligningModeAction">
-        <add-to-group group-id="Diff.EditorGutterPopupMenu.EditorSettings"/>
         <override-text place="popup@DiffToolbar"/>
       </action>
-      <action id="Vcs.Diff.ResolveConflictsInImports" class="com.intellij.diff.merge.ResolveConflictsInImportsToggleAction">
-        <add-to-group group-id="Diff.EditorGutterPopupMenu.EditorSettings"/>
-      </action>
+      <action id="Vcs.Diff.ResolveConflictsInImports" class="com.intellij.diff.merge.ResolveConflictsInImportsToggleAction"/>
       <action id="Vcs.Diff.ShowDiffInEditorTab" class="com.intellij.diff.editor.MoveDiffEditorAction$ToEditor">
-        <add-to-group group-id="Diff.EditorGutterPopupMenu.DiffModes" anchor="first"/>
+        <add-to-group group-id="Diff.DiffModes" anchor="first"/>
         <add-to-group group-id="Diff.Binary.Settings" anchor="last"/>
       </action>
       <action id="Vcs.Diff.ShowDiffInNewWindow"
               icon="AllIcons.Actions.MoveToWindow"
               class="com.intellij.diff.editor.MoveDiffEditorAction$ToWindow">
-        <add-to-group group-id="Diff.EditorGutterPopupMenu.DiffModes"/>
+        <add-to-group group-id="Diff.DiffModes"/>
         <add-to-group group-id="Diff.Binary.Settings"/>
         <add-to-group group-id="EditorTabPopupMenu" anchor="before" relative-to-action="SplitVertically"/>
       </action>
       <action id="Vcs.Diff.EnableDisableCombinedDiff"
               class="com.intellij.diff.actions.impl.CombinedDiffToggleAction">
-        <add-to-group group-id="Diff.EditorGutterPopupMenu.DiffModes"/>
+        <add-to-group group-id="Diff.DiffModes"/>
         <add-to-group group-id="EditorTabPopupMenu" anchor="before" relative-to-action="SplitVertically"/>
       </action>
       <group id="Vcs.Diff.EditorTabs.Group" searchable="false">
-        <separator/>
         <action id="Vcs.CombinedDiff.ToggleCollapseAllBlock"
                 class="com.intellij.diff.tools.combined.CombinedToggleBlockCollapseAllAction"/>
         <add-to-group group-id="EditorTabPopupMenu" anchor="before" relative-to-action="SplitVertically"/>
-        <add-to-group group-id="Diff.EditorGutterPopupMenu.EditorSettings" anchor="last"/>
+        <add-to-group group-id="Diff.ViewerSettings" anchor="last"/>
       </group>
 
       <add-to-group group-id="Diff.KeymapGroup"/>
     </group>
 
+    <!--suppress PluginXmlCapitalization -->
     <action id="Vcs.Diff.ToggleSearchInChanges" class="com.intellij.openapi.diff.impl.ToggleSearchInChangesAction">
       <add-to-group group-id="Editor.Search.Filter.Results"/>
     </action>
@@ -573,7 +578,6 @@
       <reference ref="ChangesView.SetDefault"/>
       <reference ref="ChangesView.Move"/>
       <reference ref="Diff.ShowDiff"/>
-      <reference ref="ChangesView.SingleClickPreview"/>
       <reference ref="$Delete"/>
       <reference ref="ChangesView.AddUnversioned"/>
       <reference ref="ChangesView.RemoveDeleted"/>

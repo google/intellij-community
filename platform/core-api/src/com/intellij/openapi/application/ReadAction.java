@@ -6,9 +6,11 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.util.ThrowableComputable;
 import com.intellij.util.RunnableCallable;
 import com.intellij.util.ThrowableRunnable;
+import com.intellij.util.concurrency.ThreadingAssertions;
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
 import com.intellij.util.concurrency.annotations.RequiresBlockingContext;
 import com.intellij.util.concurrency.annotations.RequiresReadLock;
+import kotlin.ReplaceWith;
 import kotlinx.coroutines.Job;
 import org.jetbrains.annotations.ApiStatus.Internal;
 import org.jetbrains.annotations.Contract;
@@ -21,34 +23,13 @@ import static com.intellij.openapi.application.ActionsKt.isReadAllowedButNotWrit
 /**
  * See <a href="https://plugins.jetbrains.com/docs/intellij/threading-model.html">Threading Model</a>
  *
- * @param <T> Result type.
  * @see WriteAction
  * @see CoroutinesKt#readAction
  */
-public abstract class ReadAction<T> extends BaseActionRunnable<T> {
-  /**
-   * @deprecated use {@link #runBlocking(ThrowableRunnable)} or {@link #computeBlocking(ThrowableComputable)} instead of creating subclasses
-   */
-  @Deprecated
-  protected ReadAction() {
-  }
+public final class ReadAction {
 
-  /**
-   * @deprecated use {@link #runBlocking(ThrowableRunnable)} or {@link #computeBlocking(ThrowableComputable)} instead
-   */
-  @Deprecated
-  @Override
-  public @NotNull RunResult<T> execute() {
-    final RunResult<T> result = new RunResult<>(this);
-    return computeBlocking(() -> result.run());
+  private ReadAction() {
   }
-
-  /**
-   * @deprecated use {@link #runBlocking(ThrowableRunnable)} or {@link #computeBlocking(ThrowableComputable)} instead
-   */
-  @Deprecated
-  @Override
-  protected abstract void run(@NotNull Result<? super T> result) throws Throwable;
 
   /**
    * @see ReadAction#nonBlocking for background processing without suspend
@@ -59,7 +40,7 @@ public abstract class ReadAction<T> extends BaseActionRunnable<T> {
    * @deprecated use {@link ReadAction#nonBlocking(Callable)} or {@link #computeBlocking(ThrowableComputable)} (for explicitly non-cancellable read actions)
    */
   @Deprecated
-  @RequiresBlockingContext
+  @RequiresBlockingContext(replaceWith = @ReplaceWith(expression = "readActionBlocking(action)", imports = {}))
   public static <E extends Throwable> void run(@NotNull ThrowableRunnable<E> action) throws E {
     runBlocking(action);
   }
@@ -73,14 +54,20 @@ public abstract class ReadAction<T> extends BaseActionRunnable<T> {
    * @deprecated use {@link ReadAction#nonBlocking(Callable)} or {@link #computeBlocking(ThrowableComputable)} (for explicitly non-cancellable read actions)
    */
   @Deprecated
-  @RequiresBlockingContext
+  @RequiresBlockingContext(replaceWith = @ReplaceWith(expression = "readActionBlocking(action)", imports = {}))
   public static <T, E extends Throwable> T compute(@NotNull ThrowableComputable<T, E> action) throws E {
     return computeBlocking(action);
   }
 
   /**
    * Runs the specified computation in a blocking read action (as opposed to {@link NonBlockingReadAction}).
-   * Can be called from any thread. Do not get canceled if a write action is pending, executed at most once.
+   * Can be called from any thread.
+   * <p>
+   * When called as the outermost (top-level) read action, it is not canceled if a write action is pending and is executed at most once.
+   * When called inside an already-active cancellable read action (e.g., inside {@link #computeCancellableUnsafe}
+   * or a {@link NonBlockingReadAction}), the supplied computation runs directly in that outer context:
+   * it may be canceled when a write action is pending, and it may run more than once if the outer action is retried.
+   * Only the outermost read action boundary controls cancellation and retry behavior.
    * <p>
    * Avoid usage in background threads as it will likely cause UI freezes. Use it only under modal progress or from EDT.
    * <p>
@@ -91,7 +78,7 @@ public abstract class ReadAction<T> extends BaseActionRunnable<T> {
    * @see NonBlockingReadAction#executeSynchronously for synchronous execution in background threads
    * @see CoroutinesKt#readAction for suspend contexts
    */
-  @RequiresBlockingContext
+  @RequiresBlockingContext(replaceWith = @ReplaceWith(expression = "readActionBlocking(action)", imports = {}))
   public static <T, E extends Throwable> T computeBlocking(@NotNull ThrowableComputable<T, E> action) throws E {
     Application application = ApplicationManager.getApplication();
     if (isReadAllowedButNotWrite(application)) {
@@ -103,20 +90,27 @@ public abstract class ReadAction<T> extends BaseActionRunnable<T> {
 
   /**
    * Runs the specified computation in a blocking read action (as opposed to {@link NonBlockingReadAction}).
-   * Can be called from any thread. Do not get canceled if a write action is pending, executed at most once.
+   * Can be called from any thread.
+   * <p>
+   * When called as the outermost (top-level) read action, it is not canceled if a write action is pending and is executed at most once.
+   * When called inside an already-active cancellable read action (e.g., inside {@link #computeCancellableUnsafe}
+   * or a {@link NonBlockingReadAction}), the supplied computation runs directly in that outer context:
+   * it may be canceled when a write action is pending, and it may run more than once if the outer action is retried.
+   * Only the outermost read action boundary controls cancellation and retry behavior.
    * <p>
    * Avoid usage in background threads as it will likely cause UI freezes.
    * Use it only under modal progress or from EDT.
    * <p>
    * The computation is executed immediately if no write action is currently running or the write action is running on the current thread.
-   * Otherwise, the action is **blocked** until the currently running write action completes.
+   * Otherwise, the action is <b>blocked</b> until the currently running write action completes.
    *
    * @see ReadAction#nonBlocking for background processing without suspend
    * @see NonBlockingReadAction#executeSynchronously for synchronous execution in background threads
    * @see CoroutinesKt#readAction for suspend contexts
    */
-  @SuppressWarnings("SSBasedInspection") // to not replace application call to ReadAction.compute
-  @RequiresBlockingContext
+   // to not replace application call to ReadAction.compute
+  @SuppressWarnings("CanBeSimplifiedToReadActionCompute")
+  @RequiresBlockingContext(replaceWith = @ReplaceWith(expression = "readActionBlocking(action)", imports = {}))
   public static <E extends Throwable> void runBlocking(@NotNull ThrowableRunnable<E> action) throws E {
     Application application = ApplicationManager.getApplication();
     if (isReadAllowedButNotWrite(application)) {
@@ -137,7 +131,7 @@ public abstract class ReadAction<T> extends BaseActionRunnable<T> {
    * or pass explicit {@code Callable<Void>} to {@link #nonBlocking(Callable)}, if this method is really needed
    * <p>
    * The {@code task} might be executed several times, it may be canceled on write action,
-   * and then restarted again once write action is finished.
+   * and then restarted again once a write action is finished.
    * If the client doesn't expect a result, then the task is mutating some outer state,
    * which greatly lowers its probability of being idempotent,
    * which in turn may cause delayed bugs in unrelated places and races.
@@ -162,22 +156,47 @@ public abstract class ReadAction<T> extends BaseActionRunnable<T> {
   }
 
   /**
-   * Runs the specified computation in a cancellable read action with a single attempt.
-   * <p/>
-   * If there is running or a requested write action, this method throws {@link CannotReadException},
-   * otherwise the computation is executed immediately in the current thread.
-   * If a write action is requested during the computation, the computation becomes canceled
-   * (i.e., {@link ProgressManager#checkCanceled()} starts to throw inside the computation),
-   * and this method throws {@link CannotReadException}.
+   * Runs the specified computation in a single read action attempt that is canceled when it would otherwise block
+   * a write action.
+   * <p>
+   * This is a lower-level method for callers that are prepared for the read action attempt to fail with {@link CannotReadException}
+   * because a write action took priority.
+   * Prefer higher-level read action APIs unless custom retry, drop, or fallback logic is really needed.
+   * <p>
+   * <h3>Semantics</h3>
+   * <ul>
+   *   <li>If this method is invoked while the read or write access is allowed (see {@link ThreadingAssertions#assertReadAccess()}),
+   *   then it calls {@code computable} directly.</li>
+   *   <li>Otherwise, if there is a pending or running write action, this method throws {@link CannotReadException}.</li>
+   *   <li>Otherwise, this method starts a read action attempt.
+   *   It can throw {@link CannotReadException} on the next {@link ProgressManager#checkCanceled()} if there is a pending write action.</li>
+   * </ul>
    *
    * @throws CannotReadException if the read action cannot be started,
    *                             or if it was canceled by a requested write action during its execution
+   * @throws ProcessCanceledException if {@code computable} or the current progress is canceled for another reason
+   *
+   * @see #computeBlocking(ThrowableComputable)
+   * @see #nonBlocking(Callable)
+   * @see CoroutinesKt#readAction
    */
+  @RequiresBackgroundThread
+  public static <T, E extends Throwable> T computeCancellableUnsafe(
+    @RequiresReadLock ThrowableComputable<T, E> computable
+  ) throws E, CannotReadException {
+    return ApplicationManager.getApplication().getService(ReadWriteActionSupport.class).computeCancellableUnsafe(computable);
+  }
+
+  /**
+   * @deprecated Consider using {@link #nonBlocking(Callable)} or {@link #computeBlocking(ThrowableComputable)}.
+   *             If custom retry logic is really needed, use {@link #computeCancellableUnsafe(ThrowableComputable)}.
+   */
+  @Deprecated
   @RequiresBackgroundThread
   public static <T, E extends Throwable> T computeCancellable(
     @RequiresReadLock ThrowableComputable<T, E> computable
   ) throws E, CannotReadException {
-    return ApplicationManager.getApplication().getService(ReadWriteActionSupport.class).computeCancellable(computable);
+    return computeCancellableUnsafe(computable);
   }
 
   public static final class CannotReadException extends ProcessCanceledException {

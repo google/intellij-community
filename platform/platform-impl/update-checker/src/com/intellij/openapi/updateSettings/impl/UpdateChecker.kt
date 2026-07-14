@@ -12,6 +12,7 @@ import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.ide.plugins.PluginNode
 import com.intellij.ide.plugins.PluginStringSetFile
 import com.intellij.ide.plugins.marketplace.MarketplaceRequests
+import com.intellij.ide.plugins.marketplace.utils.MarketplaceCustomizationService
 import com.intellij.ide.plugins.newui.PluginUiModel
 import com.intellij.ide.plugins.newui.UiPluginManager
 import com.intellij.ide.plugins.updateBrokenPlugins
@@ -42,10 +43,8 @@ import com.intellij.openapi.progress.Task
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
-import com.intellij.openapi.updateSettings.impl.PluginDownloader.compareVersionsSkipBrokenAndIncompatible
 import com.intellij.openapi.util.ActionCallback
 import com.intellij.openapi.util.BuildNumber
-import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.JDOMUtil
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.text.HtmlBuilder
@@ -206,7 +205,6 @@ object UpdateChecker {
   fun updateAndShowResult(): ActionCallback = service<UpdateCheckerHelper>().updateAndShowResult(showResults = true)
 
   @ApiStatus.Internal
-  @IntellijInternalApi
   fun getUpdates(): ActionCallback = service<UpdateCheckerHelper>().updateAndShowResult(showResults = false)
 
   /**
@@ -245,7 +243,6 @@ object UpdateChecker {
   @JvmStatic
   @JvmName("getPlatformUpdates")
   @ApiStatus.Internal
-  @IntellijInternalApi
   internal fun getPlatformUpdates(
     settings: UpdateSettings = UpdateSettings.getInstance(),
     indicator: ProgressIndicator? = null,
@@ -321,14 +318,13 @@ object UpdateChecker {
     indicator: ProgressIndicator? = null,
     buildNumber: BuildNumber? = null,
   ): InternalPluginResults {
-    val backends = collectPluginRepositories(MarketplacePluginRepository())
+    val backends = collectPluginRepositories(MarketplaceLikePluginRepository())
 
     return getInternalPluginUpdates(backends, plugins, indicator, buildNumber)
   }
 
   @RequiresBackgroundThread
   @RequiresReadLockAbsence
-  @IntellijInternalApi
   @ApiStatus.Internal
   @JvmStatic
   @JvmOverloads
@@ -342,17 +338,16 @@ object UpdateChecker {
   private fun collectPluginRepositories(marketplaceBackend: RemotePluginRepository): List<RemotePluginRepository> {
     val pluginHosts = UpdateCheckerPluginsFacade.getInstance().getPluginHosts()
     return pluginHosts.mapNotNull { host ->
-      if (isMarketplaceBackend(host))
-        marketplaceBackend
-      else if (host != null)
-        CustomPluginRepository(host)
-      else
-        null
+      when {
+        isMarketplaceBackend(host) -> marketplaceBackend
+        host == null -> MarketplaceLikePluginRepository() // non-official marketplace-like backend
+        else -> CustomPluginRepository(host)
+      }
     }
   }
 
   private fun isMarketplaceBackend(host: String?): Boolean {
-    return host == null && ApplicationInfoEx.getInstanceEx().usesJetBrainsPluginRepository()
+    return host == null && MarketplaceCustomizationService.getInstance().usesJetBrainsPluginRepository()
   }
 
   private fun getInternalPluginUpdates(
@@ -461,7 +456,6 @@ object UpdateChecker {
 
   @JvmOverloads
   @JvmStatic
-  @IntellijInternalApi
   @ApiStatus.Internal
   fun getExternalPluginUpdates(
     updateSettings: UpdateSettings,
@@ -505,9 +499,9 @@ object UpdateChecker {
     val installedPlugin = UpdateCheckerPluginsFacade.getInstance().getPlugin(pluginId)
     if (installedPlugin == null
         || pluginVersion == null
-        || (compareVersionsSkipBrokenAndIncompatible(pluginVersion, installedPlugin, buildNumber) > 0
+        || (PluginDownloader.compareVersionsSkipBrokenAndIncompatible(pluginVersion, installedPlugin, buildNumber) > 0
             && allowedUpgrade(installedPlugin, originalDownloader.descriptor))
-        || (compareVersionsSkipBrokenAndIncompatible(pluginVersion, installedPlugin, buildNumber) < 0
+        || (PluginDownloader.compareVersionsSkipBrokenAndIncompatible(pluginVersion, installedPlugin, buildNumber) < 0
             && allowedDowngrade(installedPlugin, originalDownloader.descriptor))) {
       val oldDownloader = ourUpdatedPlugins[pluginId]
       val downloader = if (UpdateCheckerPluginsFacade.getInstance().isDisabled(pluginId)) {
@@ -577,7 +571,6 @@ object UpdateChecker {
 
   /** A helper method for manually testing platform updates (see com.intellij.internal.ShowUpdateInfoDialogAction). */
   @ApiStatus.Internal
-  @IntellijInternalApi
   fun testPlatformUpdate(
     project: Project?,
     updateDataText: String,
@@ -640,7 +633,6 @@ object UpdateChecker {
   @Suppress("unused")
   @JvmOverloads
   @JvmStatic
-  @IntellijInternalApi
   @ApiStatus.Internal
   @Deprecated(message = "Use PluginUpdateCheckService instead", replaceWith = ReplaceWith("PluginUpdateCheckService.getInstance().getPluginUpdate(pluginId, indicator)"))
   fun getInternalPluginUpdates(
@@ -660,7 +652,6 @@ object UpdateChecker {
     return result
   }
 
-  @IntellijInternalApi
   @ApiStatus.Internal
   @Deprecated("Must not be used by plugins, only IDE itself. To remove without replacement!")
   @ApiStatus.ScheduledForRemoval
@@ -798,10 +789,10 @@ private suspend fun doUpdateAndShowResult(
 
   if (!showResults) {
     if (platformUpdates is PlatformUpdates.Loaded) {
-      UpdateSettingsEntryPointActionProvider.newPlatformUpdate(platformUpdates, notIgnoredDownloaders, incompatiblePluginNames)
+      UpdateSettingsEntryPointActionProvider.newPlatformUpdate(platformUpdates, updatesForPlugins, incompatiblePluginNames, notIgnoredDownloaders)
     }
     else {
-      UpdateSettingsEntryPointActionProvider.newPluginUpdates(notIgnoredDownloaders, customRepoPlugins)
+      UpdateSettingsEntryPointActionProvider.newPluginUpdates(updatesForPlugins, customRepoPlugins)
     }
     callback?.setDone()
     return null
@@ -823,7 +814,6 @@ private suspend fun doUpdateAndShowResult(
     else {
       showResults(
         project = project,
-        sessionId = updatesModel.sessionId,
         downloaders = notIgnoredDownloaders,
         pluginUpdates = updatesForPlugins,
         customRepoPlugins = customRepoPlugins,
@@ -849,7 +839,6 @@ private fun showErrors(project: Project?, @NlsContexts.DialogMessage message: St
 @RequiresEdt
 private suspend fun showResults(
   project: Project?,
-  sessionId: String,
   downloaders: List<PluginDownloader>,
   pluginUpdates: List<PluginUiModel>,
   customRepoPlugins: Collection<PluginUiModel>,
@@ -872,7 +861,7 @@ private suspend fun showResults(
       if (dialog.showAndGet()) {
         val selectedPlugins = dialog.getSelectedPluginModels()
         service<CoreUiCoroutineScopeHolder>().coroutineScope.launch(Dispatchers.IO) {
-          PluginUpdateHandler.getInstance().installUpdates(sessionId, selectedPlugins, dialog.contentPanel, dialog.finishCallback)
+          PluginUpdateHandler.getInstance().installUpdates(selectedPlugins, dialog.contentPanel, dialog.finishCallback)
         }
       }
     }
@@ -881,11 +870,11 @@ private suspend fun showResults(
       showUpdateDialog()
     }
     else {
-      UpdateSettingsEntryPointActionProvider.newPluginUpdates(downloaders, customRepoPlugins)
+      UpdateSettingsEntryPointActionProvider.newPluginUpdates(pluginUpdates, customRepoPlugins)
 
       if (userInitiated) {
         // offer to update only enabled plugins
-        showUpdatePluginsNotification(sessionId, pluginUpdates, project, showUpdateDialog)
+        showUpdatePluginsNotification(pluginUpdates, project, showUpdateDialog)
       }
     }
   }
@@ -926,7 +915,6 @@ private suspend fun showResults(
 }
 
 private fun showUpdatePluginsNotification(
-  sessionId: String,
   updatesForPlugins: List<PluginUiModel>,
   project: Project?,
   showUpdateDialog: () -> Unit,
@@ -947,13 +935,16 @@ private fun showUpdatePluginsNotification(
       NotificationAction.createExpiring(IdeBundle.message("updates.all.plugins.action", updatesForPlugins.size)) { e, _ ->
         coroutineScope.launch {
           val component = e.getData(PlatformCoreDataKeys.CONTEXT_COMPONENT) as JComponent?
-          PluginUpdateHandler.getInstance().installUpdates(sessionId, updatesForPlugins, component, null)
+          updatesForPlugins.forEach {
+            PluginUpdateSourceService.getInstance().setPluginUpdateSourceId(it)
+          }
+          PluginUpdateHandler.getInstance().installUpdates(updatesForPlugins, component, null)
         }
       },
       NotificationAction.createSimpleExpiring(IdeBundle.message("updates.plugins.dialog.action"), showUpdateDialog),
       NotificationAction.createSimpleExpiring(IdeBundle.message("updates.ignore.updates.link", updatesForPlugins.size)) {
         coroutineScope.launch {
-          PluginUpdateHandler.getInstance().ignorePluginUpdates(sessionId)
+          PluginUpdateHandler.getInstance().ignorePluginUpdates()
         }
       },
     ),
@@ -988,7 +979,7 @@ private fun showResults(
     showUpdateDialog()
   }
   else {
-    UpdateSettingsEntryPointActionProvider.newPlatformUpdate(platformUpdates, updatesForPlugins, incompatiblePluginNames)
+    UpdateSettingsEntryPointActionProvider.newPlatformUpdate(platformUpdates, updatesForPlugins.map { it.uiModel }, incompatiblePluginNames, updatesForPlugins)
 
     if (showNotification) {
       IdeUpdateUsageTriggerCollector.NOTIFICATION_SHOWN.log(project)

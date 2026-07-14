@@ -49,6 +49,7 @@ public final class PyTokenTypes {
   public static final PyElementType LAMBDA_KEYWORD = new PyElementType("LAMBDA_KEYWORD");
   public static final PyElementType MATCH_KEYWORD = new PyElementType("MATCH_KEYWORD");
   public static final PyElementType TYPE_KEYWORD = new PyElementType("TYPE_KEYWORD");
+  public static final PyElementType LAZY_KEYWORD = new PyElementType("LAZY_KEYWORD");
   public static final PyElementType NOT_KEYWORD = new PyElementType("NOT_KEYWORD");
   public static final PyElementType OR_KEYWORD = new PyElementType("OR_KEYWORD");
   public static final PyElementType PASS_KEYWORD = new PyElementType("PASS_KEYWORD");
@@ -121,19 +122,19 @@ public final class PyTokenTypes {
   public static final PyElementType TICK = new PyElementType("TICK");// `
   public static final PyElementType EQ = new PyElementType("EQ");// =
   public static final PyElementType SEMICOLON = new PyElementType("SEMICOLON");// ;
-  public static final PyElementType PLUSEQ = new PyElementType("PLUSEQ");// +=
-  public static final PyElementType MINUSEQ = new PyElementType("MINUSEQ");// -=
-  public static final PyElementType MULTEQ = new PyElementType("MULTEQ");// *=
-  public static final PyElementType ATEQ = new PyElementType("ATEQ"); // @=
-  public static final PyElementType DIVEQ = new PyElementType("DIVEQ"); // /=
-  public static final PyElementType FLOORDIVEQ = new PyElementType("FLOORDIVEQ"); // //=
-  public static final PyElementType PERCEQ = new PyElementType("PERCEQ");// %=
-  public static final PyElementType ANDEQ = new PyElementType("ANDEQ");// &=
-  public static final PyElementType OREQ = new PyElementType("OREQ");// |=
-  public static final PyElementType XOREQ = new PyElementType("XOREQ");// ^=
-  public static final PyElementType LTLTEQ = new PyElementType("LTLTEQ");// <<=
-  public static final PyElementType GTGTEQ = new PyElementType("GTGTEQ");// >>=
-  public static final PyElementType EXPEQ = new PyElementType("EXPEQ");// **=
+  public static final PyElementType PLUSEQ = new PyElementType("PLUSEQ", "__iadd__");// +=
+  public static final PyElementType MINUSEQ = new PyElementType("MINUSEQ", "__isub__");// -=
+  public static final PyElementType MULTEQ = new PyElementType("MULTEQ", "__imul__");// *=
+  public static final PyElementType ATEQ = new PyElementType("ATEQ", "__imatmul__"); // @=
+  public static final PyElementType DIVEQ = new PyElementType("DIVEQ", "__itruediv__"); // /=
+  public static final PyElementType FLOORDIVEQ = new PyElementType("FLOORDIVEQ", "__ifloordiv__"); // //=
+  public static final PyElementType PERCEQ = new PyElementType("PERCEQ", "__imod__");// %=
+  public static final PyElementType ANDEQ = new PyElementType("ANDEQ", "__iand__");// &=
+  public static final PyElementType OREQ = new PyElementType("OREQ", "__ior__");// |=
+  public static final PyElementType XOREQ = new PyElementType("XOREQ", "__ixor__");// ^=
+  public static final PyElementType LTLTEQ = new PyElementType("LTLTEQ", "__ilshift__");// <<=
+  public static final PyElementType GTGTEQ = new PyElementType("GTGTEQ", "__irshift__");// >>=
+  public static final PyElementType EXPEQ = new PyElementType("EXPEQ", "__ipow__");// **=
   public static final PyElementType RARROW = new PyElementType("RARROW");// ->
   public static final PyElementType COLONEQ = new PyElementType("COLONEQ");// :=
 

@@ -18,6 +18,7 @@ import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.NamedColorUtil
 import com.intellij.util.ui.UIUtil
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import org.jetbrains.annotations.TestOnly
 import java.awt.Color
@@ -28,6 +29,7 @@ import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.Rectangle
 import javax.accessibility.Accessible
+import javax.accessibility.AccessibleAction
 import javax.accessibility.AccessibleContext
 import javax.accessibility.AccessibleRole
 import javax.swing.Icon
@@ -193,6 +195,7 @@ open class TextPanel @JvmOverloads constructor(private val toolTipTextSupplier: 
   }
 
   open class WithIconAndArrows : TextPanel {
+    @ApiStatus.Internal
     companion object {
       private val GAP = JBUIScale.scale(2)
     }
@@ -269,9 +272,17 @@ open class TextPanel @JvmOverloads constructor(private val toolTipTextSupplier: 
     return accessibleContext
   }
 
-  private inner class AccessibleTextPanel : AccessibleJComponent() {
-    override fun getAccessibleRole(): AccessibleRole = AccessibleRole.LABEL
+  protected open inner class AccessibleTextPanel : AccessibleJComponent() {
+    private val accessibleAction = StatusBarAccessibilityUtil.createAccessibleAction(this@TextPanel)
+
+    override fun getAccessibleRole(): AccessibleRole =
+      if (this@TextPanel.isFocusable) AccessibleRole.PUSH_BUTTON else AccessibleRole.LABEL
 
     override fun getAccessibleName(): String? = text
+
+    override fun getAccessibleDescription(): @Nls String? = StatusBarAccessibilityUtil.getAccessibleDescription(this@TextPanel)
+
+    override fun getAccessibleAction(): AccessibleAction? =
+      if (this@TextPanel.isFocusable) accessibleAction else null
   }
 }

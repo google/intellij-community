@@ -9,8 +9,8 @@ import com.intellij.concurrency.IdeaForkJoinWorkerThreadFactory
 import com.intellij.diagnostic.CoroutineTracerShim
 import com.intellij.diagnostic.StartUpMeasurer
 import com.intellij.ide.BootstrapBundle
-import com.intellij.ide.plugins.PluginMainDescriptor
 import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.ide.plugins.PluginModuleDescriptor
 import com.intellij.ide.startup.StartupActionScriptManager
 import com.intellij.openapi.application.ApplicationNamesInfo
 import com.intellij.openapi.application.InitialConfigImportState
@@ -148,7 +148,7 @@ private suspend fun startApp(args: List<String>, mainScope: CoroutineScope, busy
     // must be after runMarketplaceCommandsInActionScript
     span("marketplace init") {
       // 'marketplace' plugin breaks JetBrains Client, so for now this condition is used to disable it
-      if (changeClassPath == null) {  
+      if (changeClassPath == null) {
         initMarketplace()
       }
     }
@@ -177,14 +177,8 @@ private suspend fun startApp(args: List<String>, mainScope: CoroutineScope, busy
     }
 
     startApplication(
-      scope = this,
-      args = args,
-      configImportNeededDeferred = configImportNeededDeferred,
-      customTargetDirectoryToImportConfig = customTargetDirectoryToImportConfig,
-      mainClassLoaderDeferred = mainClassLoaderDeferred,
-      appStarterDeferred = appStarterDeferred,
-      mainScope = mainScope,
-      busyThread = busyThread,
+      scope = this, args, configImportNeededDeferred, customTargetDirectoryToImportConfig, mainClassLoaderDeferred,
+      appStarterDeferred, mainScope, busyThread
     )
   }
 }
@@ -207,7 +201,7 @@ private fun initRemoteDev(args: List<String>) {
     error("JBR version 17.0.6b796 or later is required to run a remote-dev server with lux")
   }
 
-  val isSplitMode = args.firstOrNull() == WellKnownCommands.SPLIT_MODE
+  val isSplitMode = args.firstOrNull() == WellKnownCommand.SPLIT_MODE
 
   // avoid an icon jumping in dock for the backend process
   if (OS.CURRENT == OS.macOS) {
@@ -286,84 +280,95 @@ private fun addBootstrapTiming(name: String, startupTimings: MutableList<Any>) {
   startupTimings.add(System.nanoTime())
 }
 
-private fun preprocessArgs(args: Array<String>): List<String> {
-  if (args.isEmpty()) {
-    return listOf()
-  }
+private fun preprocessArgs(rawArgs: Array<String>): List<String> {
+  if (rawArgs.isEmpty()) return listOf()
 
   // a buggy DE may fail to strip an unused parameter from a .desktop file
-  if (args.size == 1 && args[0] == "%f") {
-    return listOf()
-  }
+  if (rawArgs.size == 1 && rawArgs[0] == "%f") return listOf()
 
-  val (propertyArgs, args) = args.partition { it.startsWith("-D") && it.contains('=') }
+  val (propertyArgs, args) = rawArgs.partition { it.startsWith("-D") && it.contains('=') }
   for (arg in propertyArgs) {
     val (option, value) = arg.removePrefix("-D").split('=', limit = 2)
     System.setProperty(option, value)
   }
 
-  when (ApplicationStartArguments.stripKnownArguments(args).firstOrNull()) {
-    "--help" -> {
-      println("""
-        Basic commands and options:
-        --help           prints the short list of basic commands and options
-        --list-commands  prints the full list of commands available in this installation
-        --version        shows version information
-
-        /project/dir
-          opens a project from the given directory
-
-        [/project/dir|--temp-project] [--wait] [--line <line>] [--column <column>] file
-          opens the file, either in a context of the given project or as a temporary single-file project,
-          optionally waiting until the editor tab is closed
-
-        -e [--wait] /some/file
-        --edit [--wait] /some/file
-          opens the file in the LightEdit mode, optionally waiting until the editor tab is closed
-        """.trimIndent()
-      )
+  val filteredArgs = ApplicationStartArguments.stripKnownArguments(args)
+  val firstArg = when (filteredArgs.firstOrNull()) {
+    "-e", "--edit" -> filteredArgs.getOrNull(1)
+    else -> filteredArgs.firstOrNull()
+  }
+  when {
+    firstArg == "--help" || firstArg == "-h" || firstArg == "-?" -> {
+      printBasicHelp()
       exitProcess(0)
     }
-
-    "--list-commands" -> {
-      @Suppress("RAW_RUN_BLOCKING")
-      val pluginSet = runBlocking {
-        val zipPoolDeferred = CompletableDeferred(ZipFilePoolImpl().apply { ZipFilePool.PATH_CLASSLOADER_POOL = this })
-        PluginManagerCore.scheduleDescriptorLoading(
-          coroutineScope = this, zipPoolDeferred, mainClassLoaderDeferred = null, logDeferred = null
-        ).await()
-      }
-      val isInternal = System.getProperty(ApplicationManagerEx.IS_INTERNAL_PROPERTY).toBoolean()
-      pluginSet.enabledPlugins.forEach { plugin ->
-        val starters = (sequenceOf(plugin) + plugin.contentModules.asSequence())
-          .flatMap { it.extensions["com.intellij.appStarter"] ?: emptyList() }
-          .filter { isInternal || !it.element?.attributes?.get("internal").toBoolean() }
-          .toList()
-        if (starters.isNotEmpty()) {
-          println("=== ${if (plugin.pluginId == PluginManagerCore.CORE_ID) "Built-in" else plugin.name} commands")
-          starters.forEach { starter ->
-            val message = starterHelp(plugin, starter).replace("\n", "\n  ")
-            println("\n${starter.orderId}\n  ${message}")
-          }
-          println()
-        }
-      }
+    firstArg == "--list-commands" -> {
+      printCommands()
       exitProcess(0)
     }
-
-    "--version", "-version" -> {
-      val appInfo = ApplicationInfoImpl.getShadowInstance()
-      val edition = ApplicationNamesInfo.getInstance().editionName?.let { " (${it})" } ?: ""
-      println("${appInfo.fullApplicationName}${edition}\nBuild #${appInfo.build.asString()}")
+    firstArg == "--version" || firstArg == "-version" || firstArg == "-v" -> {
+      printVersion()
       exitProcess(0)
+    }
+    firstArg != null && firstArg.startsWith('-') -> {
+      println("unrecognized option: ${firstArg}")
+      exitProcess(1)
     }
   }
 
   return args
 }
 
-private fun starterHelp(plugin: PluginMainDescriptor, starter: ExtensionDescriptor): String {
-  val classLoader = plugin.pluginClassLoader
+private fun printBasicHelp() {
+  println("""
+    Basic commands and options:
+    --help           prints the short list of basic commands and options
+    --list-commands  prints the full list of commands available in this installation
+    --version        shows version information
+
+    /project/dir
+      opens a project from the given directory
+
+    [/project/dir|--temp-project] [--wait] [--line <line>] [--column <column>] file
+      opens the file, either in a context of the given project or as a temporary single-file project,
+      optionally waiting until the editor tab is closed
+
+    -e [--wait] /some/file
+    --edit [--wait] /some/file
+      opens the file in the LightEdit mode, optionally waiting until the editor tab is closed
+    """.trimIndent()
+  )
+}
+
+private fun printCommands() {
+  @Suppress("RAW_RUN_BLOCKING")
+  val pluginSet = runBlocking {
+    val zipPoolDeferred = CompletableDeferred(ZipFilePoolImpl().apply { ZipFilePool.PATH_CLASSLOADER_POOL = this })
+    PluginManagerCore.scheduleDescriptorLoading(
+      coroutineScope = this, zipPoolDeferred, mainClassLoaderDeferred = null, logDeferred = null
+    ).await()
+  }
+  val isInternal = System.getProperty(ApplicationManagerEx.IS_INTERNAL_PROPERTY).toBoolean()
+  pluginSet.enabledPlugins.forEach { plugin ->
+    val startersWithOwners = (sequenceOf(plugin) + plugin.contentModules.asSequence())
+      .flatMap { owningModule ->
+        owningModule.extensions["com.intellij.appStarter"].orEmpty().map { it to owningModule }
+      }
+      .filter { (starter, _) -> isInternal || !starter.element?.attributes?.get("internal").toBoolean() }
+      .toList()
+    if (startersWithOwners.isNotEmpty()) {
+      println("=== ${if (plugin.pluginId == PluginManagerCore.CORE_ID) "Built-in" else plugin.name} commands")
+      startersWithOwners.forEach { (starter, owningModule) ->
+        val message = starterHelp(owningModule, starter).replace("\n", "\n  ")
+        println("\n${starter.orderId}\n  ${message}")
+      }
+      println()
+    }
+  }
+}
+
+private fun starterHelp(owner: PluginModuleDescriptor, starter: ExtensionDescriptor): String {
+  val classLoader = owner.pluginClassLoader
   if (classLoader != null) {
     val bundle = starter.element?.attributes?.get("bundle")
     val key = starter.element?.attributes?.get("key")
@@ -375,6 +380,12 @@ private fun starterHelp(plugin: PluginMainDescriptor, starter: ExtensionDescript
     return "internal command; consult with the source code"
   }
   return "(no description)"
+}
+
+private fun printVersion() {
+  val appInfo = ApplicationInfoImpl.getShadowInstance()
+  val edition = ApplicationNamesInfo.getInstance().editionName?.let { " (${it})" } ?: ""
+  println("${appInfo.fullApplicationName}${edition}\nBuild #${appInfo.build.asString()}")
 }
 
 private fun runMarketplaceCommandsInActionScript() {

@@ -9,8 +9,8 @@
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="25" />
-            <stringArg name="apiVersion" arg="2.3" />
-            <stringArg name="languageVersion" arg="2.3" />
+            <stringArg name="apiVersion" arg="2.4" />
+            <stringArg name="languageVersion" arg="2.4" />
           </stringArguments>
           <arrayArguments>
             <arrayArg name="pluginClasspaths">
@@ -50,8 +50,6 @@
     <orderEntry type="module" module-name="intellij.libraries.kotlinx.io" />
     <orderEntry type="module" module-name="intellij.libraries.ktor.client" />
     <orderEntry type="library" exported="" name="package-search-api-client" level="project" />
-    <orderEntry type="module" module-name="intellij.libraries.kotlinx.document.store.mvstore" />
-    <orderEntry type="module" module-name="intellij.libraries.mvstore" />
     <orderEntry type="module" module-name="intellij.platform.eel" />
   </component>
 </module>

@@ -17,15 +17,18 @@ import com.intellij.openapi.ui.MessageType
 import com.intellij.openapi.util.NlsActions
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.ui.ComponentWithMnemonics
 import com.intellij.ui.components.ActionLink
 import com.intellij.util.ui.JBDimension
 import com.intellij.util.ui.JBUI
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import java.awt.BorderLayout
 import java.awt.Cursor
 import java.awt.Dimension
 import java.awt.FlowLayout
 import java.awt.Graphics
+import java.awt.event.ActionEvent
 import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
 import java.awt.event.MouseListener
@@ -57,7 +60,7 @@ class ErrorNotificationPanel private constructor(
   items: List<PanelItem>,
   private val hideErrorAction: Runnable?,
   private val messageType: MessageType = MessageType.ERROR,
-) : JPanel(BorderLayout()), UiDataProvider {
+) : JPanel(BorderLayout()), UiDataProvider, ComponentWithMnemonics {
   private var copyProvider: CopyProvider? = null
   private val textPane: JTextArea?
   private val content: JPanel
@@ -70,6 +73,7 @@ class ErrorNotificationPanel private constructor(
     initComponent(items, horizontalLayout)
   }
 
+  @ApiStatus.ScheduledForRemoval
   @Deprecated("This method is deprecated and will be deleted soon." +
               " To provide custom fixes to notification panel, implement the" +
               " [com.intellij.database.connection.throwable.info.RuntimeErrorActionProvider]" +
@@ -248,7 +252,7 @@ class ErrorNotificationPanel private constructor(
     private val mnemonicCode: Int? = null,
   ) : PanelItem {
     override fun buildComponent(): JComponent {
-      return ActionLink(linkText) { onClickAction() }.apply {
+      return MnemonicActionLink(linkText) { onClickAction() }.apply {
         font = UIManager.getFont("ToolTip.font")
         if (mnemonicCode != null) {
           mnemonic = mnemonicCode
@@ -257,6 +261,9 @@ class ErrorNotificationPanel private constructor(
       }
     }
   }
+
+  private class MnemonicActionLink(@Nls linkText: String, onClickAction: (ActionEvent) -> Unit) :
+    ActionLink(linkText, onClickAction), ComponentWithMnemonics
 
   private class IconLink(
     private val icon: Icon,

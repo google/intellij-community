@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.jvm.k2.scratch
 
@@ -9,6 +9,8 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.module.Module
+import com.intellij.openapi.roots.ModuleRootManager
+import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.testFramework.FileEditorManagerTestCase
 import com.intellij.testFramework.IndexingTestUtil
@@ -19,26 +21,23 @@ import com.intellij.testFramework.TestDataProvider
 import com.intellij.util.ui.UIUtil
 import kotlinx.coroutines.job
 import org.jetbrains.kotlin.idea.KotlinLanguage
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode
 import org.jetbrains.kotlin.idea.base.test.InTextDirectivesUtils
 import org.jetbrains.kotlin.idea.jvm.shared.scratch.getScratchEditorForSelectedFile
 import org.jetbrains.kotlin.idea.jvm.shared.scratch.output.ScratchToolWindowFactory
 import org.jetbrains.kotlin.idea.jvm.shared.scratch.ui.ScratchFileEditorWithPreview
-import org.jetbrains.kotlin.idea.test.ExpectedPluginModeProvider
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils.assertEqualsToFile
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils.getTestDataFileName
 import org.jetbrains.kotlin.idea.test.KotlinWithJdkAndRuntimeLightProjectDescriptor
 import org.jetbrains.kotlin.idea.test.TestMetadataUtil
-import org.jetbrains.kotlin.idea.test.setUpWithKotlinPlugin
 import org.junit.Assert
 import kotlin.io.path.Path
 import kotlin.io.path.readText
 
-abstract class AbstractK2ScratchRunActionTest : FileEditorManagerTestCase(), ExpectedPluginModeProvider {
-    override val pluginMode: KotlinPluginMode
-        get() = KotlinPluginMode.K2
+abstract class AbstractK2ScratchRunActionTest : FileEditorManagerTestCase() {
 
     override fun getTestDataPath() = TestMetadataUtil.getTestDataPath(this::class.java)
+
+    protected abstract val isExplainEnabled: Boolean
 
     fun doScratchTest(unused: String) {
         val fileName = getTestDataFileName(this::class.java, this.name) ?: error("scratch file not found")
@@ -54,7 +53,7 @@ abstract class AbstractK2ScratchRunActionTest : FileEditorManagerTestCase(), Exp
         UIUtil.dispatchAllInvocationEvents()
 
         val consoleView = ToolWindowManager.getInstance(project).getToolWindow(ScratchToolWindowFactory.ID)?.contentManager?.contents
-            ?.firstNotNullOfOrNull { it.component as? ConsoleViewImpl } ?:error("failed to get console view")
+            ?.firstNotNullOfOrNull { it.component as? ConsoleViewImpl } ?: error("failed to get console view")
         consoleView.flushDeferredText()
 
         val actualOutput = consoleView.editor?.document?.text ?: error("failed to get output text")
@@ -66,10 +65,12 @@ abstract class AbstractK2ScratchRunActionTest : FileEditorManagerTestCase(), Exp
                 .replace(Regex("(?m)^WARNING:[^\n]*\n"), "")
         }
 
-        val previewText = editorWithPreview.dumpExplainContent()
-        val expectedExplainFile = Path(testDataPath, fileName.replace(".kts", ".explain"))
-        assertEqualsToFile(expectedExplainFile, previewText) { output ->
-            output.replace(hexAddressRegex, "<address>")
+        if (isExplainEnabled) {
+            val previewText = editorWithPreview.dumpExplainContent()
+            val expectedExplainFile = Path(testDataPath, fileName.replace(".kts", ".explain"))
+            assertEqualsToFile(expectedExplainFile, previewText) { output ->
+                output.replace(hexAddressRegex, "<address>")
+            }
         }
     }
 
@@ -92,7 +93,7 @@ abstract class AbstractK2ScratchRunActionTest : FileEditorManagerTestCase(), Exp
             getScratchEditorForSelectedFile(it, myFixture.file.virtualFile)
         } ?: error("Couldn't find scratch file")
 
-        configureOptions(scratchFileEditor, text, myFixture.module)
+        configureOptions(scratchFileEditor, text, myFixture.module, isExplainEnabled)
 
         return scratchFileEditor
     }
@@ -113,15 +114,14 @@ abstract class AbstractK2ScratchRunActionTest : FileEditorManagerTestCase(), Exp
         return KotlinWithJdkAndRuntimeLightProjectDescriptor.getInstanceFullJdk()
     }
 
-    override fun setUp() {
-        setUpWithKotlinPlugin { super.setUp() }
-    }
+    
 
     companion object {
         fun configureOptions(
             scratchFileEditor: ScratchFileEditorWithPreview,
             fileText: String,
-            module: Module?
+            module: Module?,
+            isExplainEnabled: Boolean,
         ) {
             val scratchFile = scratchFileEditor.scratchFile.apply {
                 saveOptions { copy(isMakeBeforeRun = false) }
@@ -131,8 +131,16 @@ abstract class AbstractK2ScratchRunActionTest : FileEditorManagerTestCase(), Exp
                 scratchFile.setModule(module)
             }
 
-            val isPreviewEnabled = InTextDirectivesUtils.isDirectiveDefined(fileText, "// PREVIEW_ENABLED")
-            scratchFileEditor.setPreviewEnabled(isPreviewEnabled)
+            if (InTextDirectivesUtils.isDirectiveDefined(fileText, "// SELECTED_JDK_FROM_PROJECT")) {
+                val sdk = ProjectRootManager.getInstance(scratchFile.project).projectSdk
+                    ?: module?.let { ModuleRootManager.getInstance(it).sdk }
+                checkNotNull(sdk) {
+                    "`// SELECTED_JDK_FROM_PROJECT` requires a project SDK or a module-attached SDK; the descriptor exposes neither"
+                }
+                scratchFile.saveOptions { copy(selectedJdkHome = sdk.homePath) }
+            }
+
+            scratchFileEditor.setPreviewEnabled(isExplainEnabled)
         }
     }
 }

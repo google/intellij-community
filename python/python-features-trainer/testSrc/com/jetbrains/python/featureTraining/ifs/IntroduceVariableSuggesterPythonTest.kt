@@ -1,6 +1,10 @@
 // Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.jetbrains.python.featureTraining.ifs
 
+import com.jetbrains.python.allure.Components
+import com.jetbrains.python.allure.Layers
+import com.jetbrains.python.allure.Subsystems
+
 import training.featuresSuggester.FeatureSuggesterTestUtils.copyCurrentSelection
 import training.featuresSuggester.FeatureSuggesterTestUtils.cutBetweenLogicalPositions
 import training.featuresSuggester.FeatureSuggesterTestUtils.deleteSymbolAtCaret
@@ -10,16 +14,41 @@ import training.featuresSuggester.FeatureSuggesterTestUtils.pasteFromClipboard
 import training.featuresSuggester.FeatureSuggesterTestUtils.selectBetweenLogicalPositions
 import training.featuresSuggester.FeatureSuggesterTestUtils.testInvokeLater
 import training.featuresSuggester.FeatureSuggesterTestUtils.typeAndCommit
+import com.intellij.openapi.util.registry.Registry
 import training.featuresSuggester.IntroduceVariableSuggesterTest
 
 /**
  * Note: when user is declaring variable and it's name starts with any language keyword suggestion will not be thrown
  * Use `intellij.python.tests` module as a classpath to run this test locally
  */
+@Subsystems.IDE
+@Components.FeatureTrainer
+@Layers.Functional
 class IntroduceVariableSuggesterPythonTest : IntroduceVariableSuggesterTest() {
   override val testingCodeFileName = "PythonCodeExample.py"
 
   override fun getTestDataPath() = PythonSuggestersTestUtils.testDataPath
+
+  override fun setUp() {
+    super.setUp()
+    // Incremental reparse of PyStatementList produces the same PSI tree as full reparse, but the
+    // platform DiffTree algorithm generates a different sequence of ChildAdded/ChildReplaced events
+    // when diffing a replaced statement list vs a fully reparsed file. The IFS state machine is
+    // sensitive to event ordering, so disable incremental reparse to get the same events as full reparse.
+    Registry.get("python.statement.lists.incremental.reparse").setValue(false)
+  }
+
+  override fun tearDown() {
+    try {
+      Registry.get("python.statement.lists.incremental.reparse").resetToDefault()
+    }
+    catch (e: Throwable) {
+      addSuppressedException(e)
+    }
+    finally {
+      super.tearDown()
+    }
+  }
 
   override fun `testIntroduce expression from IF and get suggestion`() {
     with(myFixture) {

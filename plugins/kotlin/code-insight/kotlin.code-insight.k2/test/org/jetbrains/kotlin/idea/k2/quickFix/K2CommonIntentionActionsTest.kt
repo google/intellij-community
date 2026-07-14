@@ -34,6 +34,7 @@ import com.intellij.lang.jvm.actions.methodRequest
 import com.intellij.lang.jvm.actions.stringAttribute
 import com.intellij.lang.jvm.actions.typeRequest
 import com.intellij.lang.jvm.types.JvmSubstitutor
+import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Pair.pair
@@ -53,11 +54,14 @@ import org.intellij.lang.annotations.Language
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
 import org.jetbrains.kotlin.asJava.toLightElements
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode
 import org.jetbrains.kotlin.idea.base.util.allScope
+import org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage.CreateConstructorFromKotlinUsageRequest
 import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCaseBase
 import org.jetbrains.kotlin.idea.test.KotlinWithJdkAndRuntimeLightProjectDescriptor
+import org.jetbrains.kotlin.idea.test.util.elementByOffset
+import org.jetbrains.kotlin.psi.KtCallElement
 import org.jetbrains.kotlin.psi.KtClass
+import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtModifierListOwner
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.uast.UClass
@@ -69,7 +73,6 @@ import org.junit.runner.RunWith
 
 @RunWith(JUnit38ClassRunner::class)
 class K2CommonIntentionActionsTest : KotlinLightCodeInsightFixtureTestCaseBase() {
-    override val pluginMode: KotlinPluginMode = KotlinPluginMode.K2
 
     private class SimpleMethodRequest(
         project: Project,
@@ -1174,6 +1177,24 @@ class K2CommonIntentionActionsTest : KotlinLightCodeInsightFixtureTestCaseBase()
         |}
         """.trim().trimMargin(), true
         )
+    }
+
+    fun testChangePrimaryConstructorNoJavaFix() {
+        myFixture.configureByText(
+            "foo.kt", """
+        private val test = Foo("1<caret>23")
+        class Foo(i: Int)
+        """
+        )
+
+        val intentionActions =  ActionUtil.underModalProgress(project, "") {
+            val call = PsiTreeUtil.getParentOfType(myFixture.elementByOffset, KtCallElement::class.java)!!
+            createConstructorActions(
+                (myFixture.file as KtFile).declarations.filterIsInstance<KtClass>().first().toUElement() as JvmClass,
+                CreateConstructorFromKotlinUsageRequest(call, emptyList())
+            )
+        }
+        assertSize(1, intentionActions)
     }
 
     fun testRemoveConstructorParameters() {

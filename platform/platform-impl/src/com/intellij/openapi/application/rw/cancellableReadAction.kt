@@ -8,13 +8,19 @@ import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.progress.prepareForInstallation
 import com.intellij.openapi.progress.prepareThreadContext
 import com.intellij.openapi.progress.util.ProgressIndicatorUtils.runActionAndCancelBeforeWrite
+import com.intellij.util.application
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.cancellation.CancellationException
 
-internal fun <X> cancellableReadAction(action: () -> X): X = prepareThreadContext { ctx ->
-  cancellableReadActionInternal(ctx, action)
+internal fun <X> cancellableReadAction(action: () -> X): X {
+  if (application.isReadAccessAllowed) {
+    return action()
+  }
+  return prepareThreadContext { ctx ->
+    cancellableReadActionInternal(ctx, action)
+  }
 }
 
 internal fun <X> cancellableReadActionInternal(ctx: CoroutineContext, action: () -> X): X {
@@ -52,7 +58,7 @@ internal fun <X> cancellableReadActionInternal(ctx: CoroutineContext, action: ()
     // `job.completeExceptionally(e)` will fail parent Job,
     // which is not desired when this Job is a read action Job.
     //
-    // ReadAction.computeCancellable {
+    // ReadAction.computeCancellableUnsafe {
     //   throw X
     // }
     // X will be re-thrown, but the caller is not expected to become cancelled

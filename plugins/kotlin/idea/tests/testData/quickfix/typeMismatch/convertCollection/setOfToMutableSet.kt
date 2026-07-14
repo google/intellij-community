@@ -1,9 +1,9 @@
 // "Replace 'setOf(…)' with 'mutableSetOf(…)'" "true"
-// K2_ERROR: Return type mismatch: expected 'MutableSet<String>', actual 'Set<String>'.
+// K2_ERROR: RETURN_TYPE_MISMATCH
 
 fun bar(): MutableSet<String> {
     return setOf<caret>("a", "b")
 }
 
-// IGNORE_K1
+
 // FUS_K2_QUICKFIX_NAME: org.jetbrains.kotlin.idea.k2.codeinsight.fixes.ReplaceWithMutableCollectionFactoryFix

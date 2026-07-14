@@ -5,7 +5,6 @@ import com.github.benmanes.caffeine.cache.AsyncLoadingCache
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.intellij.execution.target.FullPathOnTarget
 import com.intellij.openapi.progress.runBlockingMaybeCancellable
-import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.python.community.execService.BinOnEel
 import com.intellij.python.community.execService.BinOnTarget
 import com.intellij.python.community.execService.BinaryToExec
@@ -20,7 +19,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.future.asDeferred
 import kotlinx.coroutines.withContext
-import org.jetbrains.annotations.ApiStatus
 import java.nio.file.Path
 import java.util.Locale
 import java.util.concurrent.Executor
@@ -28,9 +26,7 @@ import kotlin.io.path.name
 import kotlin.time.Duration
 import kotlin.time.toJavaDuration
 
-@ApiStatus.Internal
-@IntellijInternalApi
-class PyCondaEnvProvider(
+internal class PyCondaEnvProvider(
   refreshInterval: Duration,
   ttlAfterWrite: Duration,
   executor: Executor = Dispatchers.Default.asExecutor(),

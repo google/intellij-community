@@ -17,11 +17,12 @@
  */
 package com.intellij.compose.ide.plugin.resources.vectorDrawable.preview
 
+import com.intellij.compose.ide.plugin.resources.ComposeResourcesDataProvider
 import com.intellij.compose.ide.plugin.resources.ResourceType
-import com.intellij.compose.ide.plugin.resources.getAllComposeResourcesDirs
 import com.intellij.compose.ide.plugin.shared.isFileInAndroidModule
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.AsyncFileEditorProvider
 import com.intellij.openapi.fileEditor.FileDocumentManager
@@ -37,6 +38,7 @@ import com.intellij.ui.JBSplitter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.jetbrains.kotlin.idea.core.util.toPsiDirectory
 
 internal class ComposeResourceEditorProvider : AsyncFileEditorProvider, DumbAware {
   override fun accept(project: Project, file: VirtualFile): Boolean {
@@ -47,21 +49,17 @@ internal class ComposeResourceEditorProvider : AsyncFileEditorProvider, DumbAwar
     val parent = file.parent ?: return false
     if (!parent.name.startsWith(ResourceType.DRAWABLE.dirName, ignoreCase = true)) return false
 
-    val composeResourcesDir = parent.parent ?: return false
-
     // It takes a few milliseconds for Gradle to get this information
-    val allDirs = project.getAllComposeResourcesDirs()
-    if (allDirs.isNotEmpty()) {
-      val composeResourcesDirPath = composeResourcesDir.toNioPath()
-      return allDirs.any { it.directoryPath == composeResourcesDirPath }
-    }
-
+    val psiDirectory = parent.toPsiDirectory(project) ?: return false
+    val composeData = ComposeResourcesDataProvider.findProviderForProject(project)
+      ?.getComposeDataForResourceFolder(psiDirectory)
     // Fallback during Gradle Sync, let Android XMLs go to the Android Previewer
-    return !isFileInAndroidModule(project, file)
+    return composeData != null || !isFileInAndroidModule(project, file)
   }
 
   override fun createEditor(project: Project, file: VirtualFile): FileEditor {
-    error("ComposeResourceEditorProvider.createEditor should not be called")
+    thisLogger().warn("ComposeResourceEditorProvider.createEditor should not be called")
+    return TextEditorProvider.getInstance().createEditor(project, file)
   }
 
   override suspend fun createFileEditor(

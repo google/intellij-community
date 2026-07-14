@@ -3,7 +3,6 @@ package com.jetbrains.python.sdk.add.v2.poetry
 
 import com.intellij.openapi.observable.properties.ObservableMutableProperty
 import com.intellij.openapi.observable.properties.PropertyGraph
-import com.intellij.platform.eel.provider.localEel
 import com.jetbrains.python.sdk.add.v2.FileSystem
 import com.jetbrains.python.sdk.add.v2.PathHolder
 import com.jetbrains.python.sdk.add.v2.PythonToolViewModel
@@ -12,7 +11,7 @@ import com.jetbrains.python.sdk.add.v2.ValidatedPath
 import com.jetbrains.python.sdk.poetry.getPoetryExecutable
 import kotlinx.coroutines.CoroutineScope
 
-class PoetryViewModel<P : PathHolder>(
+internal class PoetryViewModel<P : PathHolder>(
   fileSystem: FileSystem<P>,
   propertyGraph: PropertyGraph,
 ) : PythonToolViewModel {
@@ -23,15 +22,7 @@ class PoetryViewModel<P : PathHolder>(
     toolVersionPrefix = "poetry",
     backProperty = poetryExecutable,
     propertyGraph = propertyGraph,
-    defaultPathSupplier = {
-      when (fileSystem) {
-        is FileSystem.Eel -> {
-          if (fileSystem.eelApi == localEel) getPoetryExecutable()?.let { PathHolder.Eel(it) } as P?
-          else null // getPoetryExecutable() works only with localEel currently
-        }
-        else -> null
-      }
-    }
+    defaultPathSupplier = { getPoetryExecutable(fileSystem) }
   )
 
   override fun initialize(scope: CoroutineScope) {

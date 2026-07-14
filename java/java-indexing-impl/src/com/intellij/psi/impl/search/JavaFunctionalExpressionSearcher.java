@@ -17,10 +17,12 @@ import com.intellij.openapi.module.ModuleManager;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.DumbService;
+import com.intellij.openapi.project.IndexNotReadyException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.LanguageLevelModuleExtension;
 import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.util.TextRange;
+import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.pom.java.JavaFeature;
 import com.intellij.pom.java.LanguageLevel;
@@ -115,6 +117,15 @@ public final class JavaFunctionalExpressionSearcher extends QueryExecutorBase<Ps
   private static @NotNull List<SamDescriptor> calcDescriptors(@NotNull Session session) {
     PsiClass aClass = session.elementToSearch;
     Project project = PsiUtilCore.getProjectInReadAction(aClass);
+    boolean failFastInDumbMode = Registry.is("java.functional.expression.search.fail.fast.in.dumb.mode");
+    if (failFastInDumbMode && DumbService.isDumb(project)) {
+      // Fail fast instead of blocking the calling thread in ReadAction.nonBlocking(...).inSmartMode(...).executeSynchronously()
+      // which would freeze the search until indexes become ready.
+      // ExecutorsQuery handles IndexNotReadyException by skipping this executor, so the overall search keeps working
+      // (other executors may still contribute results) and the situation is visible in logs instead of being silently empty.
+      // see com.intellij.openapi.project.DumbService.runReadActionInSmartMode(java.lang.Runnable)
+      throw IndexNotReadyException.create();
+    }
 
     Callable<List<SamDescriptor>> runnable = () -> {
       if (!aClass.isValid() || !aClass.isInterface()) {
@@ -145,7 +156,12 @@ public final class JavaFunctionalExpressionSearcher extends QueryExecutorBase<Ps
       }
       return descriptors;
     };
-    return ReadAction.nonBlocking(runnable).inSmartMode(project).executeSynchronously();
+    if (!failFastInDumbMode) {
+      return ReadAction.nonBlocking(runnable).inSmartMode(project).executeSynchronously();
+    }
+    else {
+      return ReadAction.nonBlocking(runnable).executeSynchronously();
+    }
   }
 
   private static @NotNull Set<VirtualFile> getLikelyFiles(@NotNull List<? extends SamDescriptor> descriptors,

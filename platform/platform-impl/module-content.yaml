@@ -1,4 +1,12 @@
 - name: dist.all/lib/intellij.platform.ide.impl.jar
+  projectLibraries:
+  - name: diogen-analysis
+    files:
+    - name: $MAVEN_REPOSITORY$/org/jetbrains/diogen/diogen-analysis/0/diogen-analysis-0.jar
+    - name: $MAVEN_REPOSITORY$/com/hankcs/aho-corasick-double-array-trie/1/aho-corasick-double-array-trie-1.jar
+  - name: zip-signer
+    files:
+    - name: $MAVEN_REPOSITORY$/org/jetbrains/marketplace-zip-signer/0/marketplace-zip-signer-0.jar
   modules:
   - name: intellij.platform.buildData
   - name: intellij.platform.codeStyle.impl
@@ -21,7 +29,3 @@
   - name: intellij.platform.syntax.psi
   - name: intellij.platform.syntax.tree
   - name: intellij.platform.syntax.util
-  - name: intellij.platform.ui.jcef
-  library: zip-signer
-  files:
-  - name: $MAVEN_REPOSITORY$/org/jetbrains/marketplace-zip-signer/0/marketplace-zip-signer-0.jar

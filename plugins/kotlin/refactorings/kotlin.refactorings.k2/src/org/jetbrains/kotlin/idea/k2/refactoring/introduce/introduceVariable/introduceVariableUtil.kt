@@ -48,7 +48,16 @@ internal fun chooseDestructuringNames(
     val listOfVariants = listOf(
         singleVariable,
         if (expression.languageVersionSettings.supportsFeature(NameBasedDestructuring)) {
-            KotlinBundle.message("text.create.name.based.destructuring.declaration")
+            val positionalDestructuringType = analyzeInModalWindow(expression, KotlinBundle.message("find.usages.prepare.dialog.progress")) {
+                val expressionType =
+                    expression.expressionType?.lowerBoundIfFlexible() as? KaClassType ?: return@analyzeInModalWindow null
+                isPositionalDestructuringType(expressionType)
+            } ?: false
+            if (positionalDestructuringType) {
+                KotlinBundle.message("text.create.positional.based.destructuring.declaration")
+            } else {
+                KotlinBundle.message("text.create.name.based.destructuring.declaration")
+            }
         } else {
             KotlinBundle.message("text.create.destructuring.declaration")
         },
@@ -115,7 +124,7 @@ internal fun suggestNameBasedDestructuringPropertyNames(
         val names = extractDataClassParameters(expressionType)
             ?.takeIf { entriesCount <= it.size }
             ?.take(entriesCount)
-            ?.map { it.name.asString() } ?: return@analyzeInModalWindow null
+            ?.map { it.name } ?: return@analyzeInModalWindow null
         NameBasedDestructuringForm(names, positionalDestructuringType, useFullForm)
     }
 }

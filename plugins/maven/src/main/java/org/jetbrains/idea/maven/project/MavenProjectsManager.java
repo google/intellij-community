@@ -16,13 +16,13 @@ import com.intellij.openapi.roots.ModifiableRootModel;
 import com.intellij.openapi.roots.ModuleOrderEntry;
 import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.roots.OrderEntry;
-import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.roots.impl.ModifiableModelCommitter;
 import com.intellij.openapi.roots.ui.configuration.actions.ModuleDeleteProvider;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.ModificationTracker;
 import com.intellij.openapi.util.Pair;
+import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.util.SmartList;
@@ -100,6 +100,7 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
   private final ModificationTracker myModificationTracker;
 
   private final AtomicReference<MavenSyncConsole> mySyncConsole = new AtomicReference<>();
+  private final CoroutineScope coroutineScope;
   private final MavenMergingUpdateQueue mySaveQueue;
   private static final int SAVE_DELAY = 1000;
   protected Module myPreviewModule;
@@ -116,6 +117,7 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
   public MavenProjectsManager(@NotNull Project project, @NotNull CoroutineScope coroutineScope) {
     super(project);
 
+    this.coroutineScope = coroutineScope;
     myEmbeddersManager = new MavenEmbeddersManager(project);
     myModificationTracker = new MavenModificationTracker(this);
     mySaveQueue = new MavenMergingUpdateQueue("Maven save queue", SAVE_DELAY, !MavenUtil.isMavenUnitTestModeEnabled(), coroutineScope);
@@ -134,17 +136,15 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
   }
 
   protected boolean wasMavenized() {
-    return !myState.originalFiles.isEmpty();
+    return !myState.getOriginalFiles().isEmpty();
   }
 
 
   @Override
   public void loadState(@NotNull MavenProjectsManagerState state) {
+    var originalFiles = new ArrayList<>(state.getOriginalFiles());
+    MavenLog.LOG.debug("loadState: originalFiles: " + originalFiles);
     myState = state;
-    if (isInitialized()) {
-      applyStateToTree(getProjectsTree(), this);
-      scheduleUpdateAllMavenProjects(MavenSyncSpec.incremental("MavenProjectsManager.loadState"));
-    }
   }
 
   @Override
@@ -175,12 +175,6 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
   public Path getRepositoryPath() {
     return MavenSettingsCache.getInstance(myProject).getEffectiveUserLocalRepo();
   }
-
-  @ApiStatus.Internal
-  public int getFilterConfigCrc(@NotNull ProjectFileIndex projectFileIndex) {
-    return getProjectsTree().getFilterConfigCrc(projectFileIndex);
-  }
-
 
   @TestOnly
   public void initForTests() {
@@ -230,7 +224,7 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
 
   public MavenSyncConsole getSyncConsole() {
     if (null == mySyncConsole.get()) {
-      mySyncConsole.compareAndSet(null, new MavenSyncConsole(myProject));
+      mySyncConsole.compareAndSet(null, new MavenSyncConsole(myProject, coroutineScope));
     }
     return mySyncConsole.get();
   }
@@ -242,9 +236,12 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
     doActivate();
     var tree = getProjectsTree();
 
-    if (!tree.getManagedFilesPaths().isEmpty() && tree.getRootProjects().isEmpty()) {
-      MavenLog.LOG.warn("MavenProjectsTree is inconsistent");
-      scheduleUpdateAllMavenProjects(MavenSyncSpec.full("MavenProjectsManager.onProjectStartup"));
+    if (!myState.getOriginalFiles().isEmpty() && tree.getRootProjects().isEmpty()) {
+      boolean autoImportDisabled = Registry.is("external.system.auto.import.disabled");
+      MavenLog.LOG.warn("MavenProjectsTree is inconsistent, auto import disabled = " + autoImportDisabled);
+      if (!autoImportDisabled) {
+        scheduleUpdateAllMavenProjects(MavenSyncSpec.full("MavenProjectsManager.onProjectStartup"));
+      }
     }
   }
 
@@ -269,17 +266,11 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
   }
 
   private void applyTreeToState(MavenProjectsTree tree) {
-    myState.originalFiles = tree.getManagedFilesPaths();
     myState.ignoredFiles = new HashSet<>(tree.getIgnoredFilesPaths());
     myState.ignoredPathMasks = tree.getIgnoredFilesPatterns();
-    var profiles = tree.getExplicitProfiles();
-    myState.enabledProfiles = new ArrayList<>(profiles.getEnabledProfiles());
-    myState.disabledProfiles = new ArrayList<>(profiles.getDisabledProfiles());
   }
 
   private static void applyStateToTree(MavenProjectsTree tree, MavenProjectsManager manager) {
-    MavenExplicitProfiles explicitProfiles = new MavenExplicitProfiles(manager.myState.enabledProfiles, manager.myState.disabledProfiles);
-    tree.resetManagedFilesPathsAndProfiles(manager.myState.originalFiles, explicitProfiles);
     tree.setIgnoredFilesPaths(new ArrayList<>(manager.myState.ignoredFiles));
     tree.setIgnoredFilesPatterns(manager.myState.ignoredPathMasks);
   }
@@ -416,9 +407,23 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
         getGeneralSettings().setMavenHomeType(MavenWrapper.INSTANCE);
       }
     }
-    var tree = getProjectsTree();
-    tree.addManagedFilesWithProfiles(files, profiles);
-    setNewTreeFromSync(tree);
+    doAddManagedFiles(files);
+    setExplicitProfiles(profiles);
+  }
+
+  private void doAddManagedFiles(List<VirtualFile> files) {
+    var state = getState();
+
+    for (String path : MavenUtil.collectPaths(files)) {
+      state.addOriginalFile(path);
+    }
+  }
+
+  private void doRemoveManagedFiles(List<VirtualFile> files) {
+    var state = getState();
+
+    Set<String> pathsToRemove = new HashSet<>(MavenUtil.collectPaths(files));
+    state.removeOriginalFiles(pathsToRemove);
   }
 
   public void addManagedFiles(@NotNull List<VirtualFile> files) {
@@ -437,7 +442,7 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
   }
 
   public boolean isManagedFile(@NotNull VirtualFile f) {
-    return getProjectsTree().isManagedFile(f);
+    return getState().getOriginalFiles().contains(f.getPath());
   }
 
   public @NotNull MavenExplicitProfiles getExplicitProfiles() {
@@ -449,7 +454,7 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
   }
 
   public @NotNull Collection<Pair<String, MavenProfileKind>> getProfilesWithStates() {
-    return getProjectsTree().getProfilesWithStates();
+    return getProjectsTree().getProfilesWithStates(getExplicitProfiles());
   }
 
   public boolean hasProjects() {
@@ -553,7 +558,7 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
     return getProjectsTree().findAggregator(mavenProject);
   }
 
-  public @Nullable MavenProject findRootProject(@NotNull MavenProject mavenProject) {
+  public @NotNull MavenProject findRootProject(@NotNull MavenProject mavenProject) {
     return getProjectsTree().findRootProject(mavenProject);
   }
 
@@ -616,7 +621,6 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
     var tree = myProjectsTreeRef.get();
     if (tree == null) {
       tree = new MavenProjectsTree(myProject);
-      applyStateToTree(tree, this);
     }
     return tree;
   }
@@ -628,16 +632,13 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
   protected abstract List<Module> updateAllMavenProjectsSync();
 
   public synchronized void removeManagedFiles(@NotNull List<@NotNull VirtualFile> files) {
-    getProjectsTree().removeManagedFiles(files);
+    doRemoveManagedFiles(files);
     scheduleUpdateAllMavenProjects(MavenSyncSpec.full("MavenProjectsManager.removeManagedFiles", true));
   }
 
   public synchronized void setExplicitProfiles(MavenExplicitProfiles profiles) {
     myState.enabledProfiles = new ArrayList<>(profiles.getEnabledProfiles());
     myState.disabledProfiles = new ArrayList<>(profiles.getDisabledProfiles());
-    if (isInitialized()) {
-      getProjectsTree().setExplicitProfiles(profiles);
-    }
     myProject.getMessageBus().syncPublisher(MavenProjectsTree.Listener.TOPIC).profilesChanged();
   }
 
@@ -679,7 +680,7 @@ public abstract class MavenProjectsManager extends MavenSimpleProjectComponent
    * @deprecated Use {@link #scheduleUpdateAllMavenProjects(MavenSyncSpec)}}
    */
   // used in third-party plugins
-  @Deprecated
+  @Deprecated(forRemoval = true)
   public Promise<List<Module>> scheduleImportAndResolve() {
     var promise = new AsyncPromise<List<Module>>();
     var modules = updateAllMavenProjectsSync();

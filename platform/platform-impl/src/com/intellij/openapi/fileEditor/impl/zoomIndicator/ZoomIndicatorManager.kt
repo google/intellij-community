@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.fileEditor.impl.zoomIndicator
 
 import com.intellij.openapi.actionSystem.ActionPlaces
@@ -18,11 +18,13 @@ import com.intellij.ui.BalloonImpl
 import com.intellij.ui.ExperimentalUI
 import com.intellij.ui.JBColor
 import com.intellij.util.Alarm
+import org.jetbrains.annotations.ApiStatus
 
 private const val POPUP_TIMEOUT_MS = 5000
 
 @Service(Service.Level.PROJECT)
 class ZoomIndicatorManager(project: Project) {
+  @ApiStatus.Internal
   companion object {
     @JvmField
     val SUPPRESS_ZOOM_INDICATOR: Key<Boolean> = Key.create("SUPPRESS_ZOOM_INDICATOR")
@@ -49,7 +51,9 @@ class ZoomIndicatorManager(project: Project) {
   }
 
   fun createOrGetBalloon(editorEx: EditorImpl): Balloon? {
-    val view = ZoomIndicatorView(editorEx)
+    val view = ZoomIndicatorView(editorEx).apply {
+      isOpaque = false
+    }
     val b = balloon
     if (editorEx == editor && (b as? BalloonImpl)?.isVisible == true) {
       b.getView().updateFontSize()

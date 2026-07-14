@@ -44,6 +44,7 @@ import org.jetbrains.intellij.build.WindowsDistributionCustomizer
 import org.jetbrains.intellij.build.computeAppInfoXml
 import org.jetbrains.intellij.build.findProductModulesFile
 import org.jetbrains.intellij.build.impl.PlatformJarNames.PLATFORM_CORE_NIO_FS
+import org.jetbrains.intellij.build.impl.moduleRepository.MODULE_DESCRIPTORS_COMPACT_PATH
 import org.jetbrains.intellij.build.impl.plugins.PluginAutoPublishList
 import org.jetbrains.intellij.build.io.runProcess
 import org.jetbrains.intellij.build.jarCache.JarCacheManager
@@ -257,7 +258,7 @@ class BuildContextImpl internal constructor(
     }
     if (!options.compatiblePluginsToIgnore.isEmpty()) {
       productProperties.productLayout.compatiblePluginsToIgnore =
-        productProperties.productLayout.compatiblePluginsToIgnore.addAll(options.compatiblePluginsToIgnore)
+        productProperties.productLayout.compatiblePluginsToIgnore.addingAll(options.compatiblePluginsToIgnore)
     }
     check(options.isInDevelopmentMode || bundledRuntime.prefix == productProperties.runtimeDistribution.artifactPrefix || LibcImpl.current(OsFamily.currentOs) == LinuxLibcImpl.MUSL) {
       "The runtime type doesn't match the one specified in the product properties: ${bundledRuntime.prefix} != ${productProperties.runtimeDistribution.artifactPrefix}"
@@ -339,8 +340,7 @@ class BuildContextImpl internal constructor(
   private val _frontendModuleFilter = suspendingLazy("frontend module filter") {
     val rootModule = productProperties.embeddedFrontendRootModule
     if (rootModule != null && options.enableEmbeddedFrontend) {
-      val productModules = loadRawProductModules(rootModule, ProductMode.FRONTEND, this@BuildContextImpl)
-      FrontendModuleFilterImpl.createFrontendModuleFilter(project = project, productModules = productModules, outputProvider = outputProvider)
+      FrontendModuleFilterImpl.createFrontendModuleFilter(project = project)
     }
     else {
       productProperties.frontendModuleFilter?.invoke(this@BuildContextImpl) ?: EmptyFrontendModuleFilter
@@ -521,7 +521,7 @@ class BuildContextImpl internal constructor(
 
   override fun addExtraExecutablePattern(os: OsFamily, pattern: String) {
     extraExecutablePatterns.updateAndGet { prev ->
-      prev.with(os, (prev.get(os) ?: persistentListOf()).add(pattern))
+      prev.with(os, (prev.get(os) ?: persistentListOf()).adding(pattern))
     }
   }
 

@@ -1,9 +1,8 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.k2.refactoring.introduce;
 
 import com.intellij.testFramework.TestDataPath;
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode;
 import org.jetbrains.kotlin.idea.base.test.TestRoot;
 import org.jetbrains.kotlin.idea.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils;
@@ -22,12 +21,6 @@ public abstract class K2ExtractionTestGenerated extends AbstractK2ExtractionTest
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/refactoring/extractSuperclass")
     public static class ExtractSuperclass extends AbstractK2ExtractionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doExtractSuperclassTest, this, testDataFilePath);
         }
@@ -131,17 +124,16 @@ public abstract class K2ExtractionTestGenerated extends AbstractK2ExtractionTest
         public void testTypealiasAlreadyExists() throws Exception {
             runTest("../../idea/tests/testData/refactoring/extractSuperclass/typealiasAlreadyExists.kt");
         }
+
+        @TestMetadata("valueClassPropertyType.kt")
+        public void testValueClassPropertyType() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractSuperclass/valueClassPropertyType.kt");
+        }
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/refactoring/extractInterface")
     public static class ExtractInterface extends AbstractK2ExtractionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doExtractInterfaceTest, this, testDataFilePath);
         }
@@ -219,6 +211,11 @@ public abstract class K2ExtractionTestGenerated extends AbstractK2ExtractionTest
         @TestMetadata("specialName.kt")
         public void testSpecialName() throws Exception {
             runTest("../../idea/tests/testData/refactoring/extractInterface/specialName.kt");
+        }
+
+        @TestMetadata("valueClassPropertyType.kt")
+        public void testValueClassPropertyType() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractInterface/valueClassPropertyType.kt");
         }
     }
 }

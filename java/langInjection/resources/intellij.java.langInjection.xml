@@ -1,16 +1,18 @@
 <idea-plugin visibility="internal">
+  <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
-    <module name="intellij.platform.langInjection"/>
     <module name="intellij.platform.langInjection.backend"/>
-    <module name="intellij.regexp"/>
-    <module name="intellij.platform.backend"/>
-
     <module name="intellij.java"/>
-    <module name="intellij.java.indexing"/>
     <module name="intellij.java.compiler.impl"/>
     <module name="intellij.java.impl"/>
+    <module name="intellij.java.indexing"/>
     <module name="intellij.java.langInjection.jps"/>
+    <module name="intellij.java.psi"/>
+    <module name="intellij.java.syntax"/>
+    <module name="intellij.platform.backend"/>
+    <module name="intellij.platform.langInjection"/>
   </dependencies>
+  <!-- endregion -->
   <extensions defaultExtensionNs="com.intellij">
     <localInspection language="JAVA" shortName="UnknownLanguage" groupKey="inspections.language.injection.group.name" enabledByDefault="true"
                      level="ERROR" implementationClass="org.intellij.plugins.intelliLang.inject.java.validation.UnknownLanguageID"
@@ -33,6 +35,7 @@
                      key="inspection.pattern.overridden.by.non.annotated.method.display.name" bundle="messages.IntelliLangBundle"/>
 
     <concatenationAwareInjector implementation="org.intellij.plugins.intelliLang.inject.java.ConcatenationInjector"/>
+    <multiHostInjector implementation="org.intellij.plugins.intelliLang.inject.java.JavaFormatInjector"/>
 
     <psi.referenceContributor language="UAST" implementation="org.intellij.plugins.intelliLang.inject.java.LanguageReferenceProvider"/>
   </extensions>

@@ -13,6 +13,7 @@
     <module name="intellij.platform.ide"/>
     <module name="intellij.platform.ide.core"/>
     <module name="intellij.platform.ide.impl"/>
+    <module name="intellij.platform.kernel"/>
     <module name="intellij.platform.lang.core"/>
     <module name="intellij.platform.lang.impl"/>
     <module name="intellij.platform.projectModel"/>
@@ -25,6 +26,8 @@
   <extensionPoints>
     <extensionPoint qualifiedName="com.intellij.platform.ide.welcomeScreenContentProvider"
                     interface="com.intellij.platform.ide.nonModalWelcomeScreen.rightTab.WelcomeRightTabContentProvider" dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.platform.ide.welcomeScreenCustomTabProvider"
+                    interface="com.intellij.platform.ide.nonModalWelcomeScreen.rightTab.WelcomeRightCustomTabProvider" dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.platform.ide.welcomeScreenFeatureUi"
                     interface="com.intellij.platform.ide.nonModalWelcomeScreen.rightTab.WelcomeScreenFeatureUI" dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.platform.ide.welcomeScreenRightTabBannerProvider"
@@ -34,8 +37,10 @@
   <extensions defaultExtensionNs="com.intellij">
     <projectService serviceInterface="com.intellij.openapi.wm.ex.WelcomeScreenTabService"
                     serviceImplementation="com.intellij.platform.ide.nonModalWelcomeScreen.WelcomeScreenTabServiceImpl"
-                    overrides="true"/>
-    <projectFrameCapabilitiesProvider implementation="com.intellij.platform.ide.nonModalWelcomeScreen.NonModalWelcomeScreenProjectFrameCapabilitiesProvider"/>
+                    overrides="true"
+                    open="true"/>
+    <projectFrameCapabilitiesProvider
+      implementation="com.intellij.platform.ide.nonModalWelcomeScreen.NonModalWelcomeScreenProjectFrameCapabilitiesProvider"/>
     <postStartupActivity implementation="com.intellij.platform.ide.nonModalWelcomeScreen.WelcomeScreenProjectActivity"/>
 
     <noProjectStateHandler implementation="com.intellij.platform.ide.nonModalWelcomeScreen.WelcomeScreenNoProjectStateHandler" order="first"/>

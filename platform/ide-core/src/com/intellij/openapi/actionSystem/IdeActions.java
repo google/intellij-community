@@ -183,8 +183,8 @@ public interface IdeActions {
   String DIFF_VIEWER_POPUP = "Diff.ViewerPopupMenu";
   String DIFF_VIEWER_TOOLBAR = "Diff.ViewerToolbar";
   String GROUP_DIFF_EDITOR_GUTTER_POPUP = "Diff.EditorGutterPopupMenu";
-  String GROUP_DIFF_EDITOR_MODES = "Diff.EditorGutterPopupMenu.DiffModes";
-  String GROUP_DIFF_EDITOR_SETTINGS = "Diff.EditorGutterPopupMenu.EditorSettings";
+  String GROUP_DIFF_EDITOR_MODES = "Diff.DiffModes";
+  String GROUP_DIFF_VIEWER_SETTINGS = "Diff.ViewerSettings";
 
   String ACTION_EXPAND_ALL = "ExpandAll";
   String ACTION_COLLAPSE_ALL = "CollapseAll";

@@ -5,9 +5,8 @@ import com.intellij.codeInsight.intention.preview.IntentionPreviewUtils;
 import com.intellij.codeInsight.template.Template;
 import com.intellij.codeInsight.template.TemplateManager;
 import com.intellij.lang.Language;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
-import com.intellij.openapi.application.ex.ApplicationEx;
+import com.intellij.openapi.application.ex.ApplicationManagerEx;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileTypes.LanguageFileType;
@@ -169,7 +168,7 @@ public class Replacer {
     if (IntentionPreviewUtils.isIntentionPreviewActive()) {
       doReplaceAll(infos, new EmptyProgressIndicator());
     } else {
-      ((ApplicationEx)ApplicationManager.getApplication()).runWriteActionWithCancellableProgressInDispatchThread(
+      ApplicationManagerEx.getApplicationEx().runWriteActionWithCancellableProgressInDispatchThread(
         SSRBundle.message("structural.replace.title"),
         project,
         null,
@@ -315,7 +314,7 @@ public class Replacer {
           } else {
             final String scriptText = StringUtil.unquoteString(definition.getScriptCodeConstraint());
             try {
-              ScriptSupport.buildScript(definition.getName(), scriptText, options.getMatchOptions());
+              ScriptSupport.buildScript(project, definition.getName(), scriptText, options.getMatchOptions());
             } catch (MalformedPatternException e) {
               throw new MalformedPatternException(
                 SSRBundle.message("replacement.variable.is.not.valid", replacementSegmentName, e.getLocalizedMessage())

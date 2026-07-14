@@ -70,7 +70,7 @@ public abstract class PerformFixesModalTask implements SequentialTask {
   }
 
   public int getNumberOfSucceededFixes() {
-    return myResultCount.get(Result.SUCCESS);
+    return myResultCount.getOrDefault(Result.SUCCESS, 0);
   }
 
   public void doRun(ProgressIndicator indicator) {
@@ -85,7 +85,7 @@ public abstract class PerformFixesModalTask implements SequentialTask {
 
   @Override
   public boolean iteration(@NotNull ProgressIndicator indicator) {
-    final @Nullable Pair<CommonProblemDescriptor, Boolean> pair = nextDescriptor();
+    @Nullable Pair<CommonProblemDescriptor, Boolean> pair = nextDescriptor();
     if (pair == null) {
       return isDone();
     }

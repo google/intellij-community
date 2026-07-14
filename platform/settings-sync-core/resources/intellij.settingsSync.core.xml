@@ -31,6 +31,7 @@
     <module name="intellij.platform.vcs.impl"/>
     <module name="intellij.platform.vcs.log"/>
     <module name="intellij.platform.vcs.log.impl"/>
+    <module name="intellij.vcs.git.backend"/>
   </dependencies>
   <!-- endregion -->
   <extensions defaultExtensionNs="com.intellij">
@@ -91,7 +92,7 @@
     </group>
 
     <action id="SettingsSyncSeparator" class="com.intellij.openapi.actionSystem.Separator">
-      <add-to-group group-id="SettingsEntryPointGroup" anchor="after" relative-to-action="WelcomeScreen.Plugins"/>
+      <add-to-group group-id="SettingsEntryPointGroup" anchor="after" relative-to-action="ShowPlugins"/>
     </action>
 
     <action id="SettingsSyncStatusAction" class="com.intellij.settingsSync.core.config.SettingsSyncStatusAction">

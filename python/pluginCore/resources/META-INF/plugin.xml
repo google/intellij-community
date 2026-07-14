@@ -22,13 +22,16 @@ The Python plug-in provides smart editing for Python scripts. The feature set of
     <plugin id="com.intellij.modules.lang"/>
     <plugin id="com.intellij.modules.python-core-capable"/>
     <module name="intellij.platform.debugger.impl.shared"/>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+    <plugin id="org.toml.lang"/>
+    <!-- endregion -->
   </dependencies>
 
   <content namespace="jetbrains">
     <!--<module name="intellij.grid.charts.impl"/>-->
 
     <!-- Frontend-safe modules: keep loading="required" -->
-    <module name="intellij.python.common" loading="required"/>
+    <module name="intellij.python.community.common" loading="required"/>
     <module name="intellij.python.parser" loading="required"/>
     <module name="intellij.python.ast" loading="required"/>
     <module name="intellij.python.syntax.core" loading="required"/>
@@ -49,14 +52,14 @@ The Python plug-in provides smart editing for Python scripts. The feature set of
     <module name="intellij.python.sdkConfigurator.frontend"/>
     <module name="intellij.python.community.impl.poetry.common"/>
     <module name="intellij.python.community.impl.poetry.backend"/>
-    <module name="intellij.python.community.impl.uv.common"/>
-    <module name="intellij.python.community.impl.uv.backend"/>
+    <module name="intellij.python.uv.common"/>
+    <module name="intellij.python.uv.backend"/>
     <module name="intellij.python.community.impl.pipenv"/>
     <module name="intellij.python.community.impl.conda"/>
     <module name="intellij.python.community.core.impl"/>
     <module name="intellij.python.community.helpersLocator"/>
     <module name="intellij.python.community"/>
-    <module name="intellij.python.community.impl" loading="optional"/>
+    <module name="intellij.python.community.impl" required-if-available="intellij.platform.backend"/>
     <module name="intellij.python.community.execService"/>
     <module name="intellij.python.community.execService.python"/>
     <module name="intellij.python.community.impl.installer"/>
@@ -65,6 +68,7 @@ The Python plug-in provides smart editing for Python scripts. The feature set of
     <module name="intellij.python.hatch"/>
     <module name="intellij.python.packaging"/>
     <module name="intellij.python.requirements"/>
+    <module name="intellij.python.pytools"/>
     <module name="intellij.python.community.services.shared"/>
     <module name="intellij.python.community.services.internal.impl"/>
     <module name="intellij.python.community.services.systemPython"/>
@@ -84,7 +88,22 @@ The Python plug-in provides smart editing for Python scripts. The feature set of
     <module name="intellij.python.grazie"/>
     <module name="intellij.python.langInjection"/>
     <module name="intellij.python.markdown"/>
+    <module name="intellij.python.mcp"/>
     <module name="intellij.python.ml.features"/>
-    <module name="intellij.python.terminal"/>
+    <module name="intellij.python.terminal.shared"/>
+    <module name="intellij.python.terminal.backend"/>
+    <module name="intellij.python.terminal.frontend"/>
+    <module name="intellij.python.pytools.ui"/>
+    <module name="intellij.python.black"/>
+    <module name="intellij.python.lsp.core"/>
+    <module name="intellij.python.lsp.impl"/>
+    <module name="intellij.python.typeEngine"/>
+    <module name="intellij.python.ty"/>
+    <module name="intellij.python.ruff"/>
+    <module name="intellij.python.pyrefly"/>
+    <module name="intellij.python.pyright"/>
+  </content>
+  <content>
+    <module name="intellij.libraries.tuweni.toml"/>
   </content>
 </idea-plugin>

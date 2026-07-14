@@ -1,5 +1,5 @@
 // "Change type argument to String" "true"
-// K2_ERROR: Type of 'val x: String' is not a subtype of overridden property 'val x: Int' defined in 'Outer.FooImpl'.
+// K2_ERROR: PROPERTY_TYPE_MISMATCH_ON_OVERRIDE
 
 interface Foo<T> { val x: T}
 
@@ -9,5 +9,5 @@ class Outer {
       override val x : kotlin<caret>.String = ""
    }
 }
-// IGNORE_K1
+
 // FUS_K2_QUICKFIX_NAME: org.jetbrains.kotlin.idea.k2.codeinsight.fixes.ChangeSuperTypeListEntryTypeArgumentFixFactory$ChangeSuperTypeListEntryTypeArgumentFix

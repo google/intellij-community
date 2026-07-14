@@ -1,6 +1,7 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:OptIn(IntellijInternalApi::class, ExperimentalStdlibApi::class)
+@file:OptIn(ExperimentalStdlibApi::class)
 
+@file:ApiStatus.Internal
 package com.intellij.openapi.actionSystem.impl
 
 import com.intellij.CommonBundle
@@ -51,6 +52,7 @@ import com.intellij.openapi.application.UI
 import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.application.readActionUndispatched
+import com.intellij.openapi.application.runReadActionBlocking
 import com.intellij.openapi.components.service
 import com.intellij.openapi.components.serviceIfCreated
 import com.intellij.openapi.diagnostic.logger
@@ -65,9 +67,9 @@ import com.intellij.openapi.progress.impl.ProgressManagerImpl
 import com.intellij.openapi.progress.prepareThreadContext
 import com.intellij.openapi.progress.util.PotemkinOverlayProgress
 import com.intellij.openapi.progress.util.ProgressIndicatorUtils
+import com.intellij.openapi.progress.util.SuvorovProgress
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.EmptyRunnable
-import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.registry.Registry
@@ -174,14 +176,10 @@ private val LOG = logger<Utils>()
 // 3. Fast-track toolbars in a limited dispatcher, and limit subsequent fast-tracks
 // 4. Regular toolbars in a limited dispatcher
 internal val fastParallelism = (Runtime.getRuntime().availableProcessors() - 1).coerceAtLeast(2)
-@OptIn(ExperimentalCoroutinesApi::class)
-private val shortcutUpdateDispatcher = Dispatchers.IO.limitedParallelism(fastParallelism)
-@OptIn(ExperimentalCoroutinesApi::class)
-private val contextMenuDispatcher = Dispatchers.IO.limitedParallelism(fastParallelism)
-@OptIn(ExperimentalCoroutinesApi::class)
-private val toolbarFastDispatcher = Dispatchers.IO.limitedParallelism(2)
-@OptIn(ExperimentalCoroutinesApi::class)
-private val toolbarDispatcher = Dispatchers.Default.limitedParallelism(2)
+private val shortcutUpdateDispatcher = Dispatchers.IO.limitedParallelism(fastParallelism, "shortcutUpdateDispatcher")
+private val contextMenuDispatcher = Dispatchers.IO.limitedParallelism(fastParallelism, "contextMenuDispatcher")
+private val toolbarFastDispatcher = Dispatchers.IO.limitedParallelism(2, "toolbarFastDispatcher")
+private val toolbarDispatcher = Dispatchers.Default.limitedParallelism(2, "toolbarDIspatcher")
 
 // Stacking fast-tracks UI freeze protection
 private var lastFailedFastTrackFinishNanos = 0L
@@ -1393,6 +1391,12 @@ private object AltEdtDispatcher : CoroutineDispatcher() {
           val runnable = queue.poll(1, TimeUnit.MILLISECONDS)
           if (runnable != null) {
             runnable.run()
+          } else {
+            // so the queue of action's runnable does not have anything.
+            // At this point, we might be blocked by a background write action that has just submitted invokeAndWait.
+            // It is important to unblock the system (some actions could be waiting for this background WA),
+            // so here we are dispatching important events synchronously
+            SuvorovProgress.dispatchImportantEvents()
           }
         }
       }
@@ -1470,7 +1474,7 @@ internal suspend inline fun <R> readActionUndispatchedForActionExpand(noinline b
   }
   else {
     @Suppress("ForbiddenInSuspectContextMethod")
-    return ApplicationManager.getApplication().runReadAction<R, Throwable> { block() }
+    return runReadActionBlocking { block() }
   }
 }
 

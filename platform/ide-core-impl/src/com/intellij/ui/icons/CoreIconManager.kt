@@ -8,8 +8,8 @@ import com.intellij.AbstractBundle
 import com.intellij.DynamicBundle
 import com.intellij.icons.AllIcons
 import com.intellij.ide.IconLayerProvider
-import com.intellij.ide.plugins.PluginManager
 import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.ide.plugins.PluginUtils
 import com.intellij.ide.plugins.cl.PluginAwareClassLoader
 import com.intellij.ide.plugins.contentModules
 import com.intellij.openapi.application.ApplicationManager
@@ -193,6 +193,8 @@ class CoreIconManager : IconManager, CoreAwareIconManager {
 
   override fun createLayered(vararg icons: Icon): Icon = LayeredIcon.layeredIcon(icons)
 
+  override fun createIconWithOverlay(mainIcon: Icon, overlayIcon: Icon): Icon = iconWithAutoOverlay(mainIcon, overlayIcon)
+
   override fun getIcon(file: VirtualFile, flags: Int, project: Project?): Icon = IconUtil.getIcon(file, flags, project)
 
   override fun wakeUpNeo(reason: Any): Runnable = MacUtil.wakeUpNeo(reason)
@@ -249,6 +251,9 @@ class CoreIconManager : IconManager, CoreAwareIconManager {
     return hasher.asLong
   }
 
+  /**
+   * Ensure to also change ModuleImageResourceLocation in icons-impl/intellij
+   */
   override fun getPluginAndModuleId(classLoader: ClassLoader): Pair<String, String?> {
     if (classLoader is PluginAwareClassLoader) {
       return classLoader.pluginId.idString to classLoader.moduleId
@@ -258,6 +263,9 @@ class CoreIconManager : IconManager, CoreAwareIconManager {
     }
   }
 
+  /**
+   * Ensure to also change ModuleImageResourceLoader in icons-impl/intellij/rendering
+   */
   override fun getClassLoader(pluginId: String, moduleId: String?): ClassLoader? {
     val plugin = PluginManagerCore.findPlugin(PluginId.getId(pluginId)) ?: return null
     if (moduleId == null) {
@@ -269,9 +277,7 @@ class CoreIconManager : IconManager, CoreAwareIconManager {
   }
 
   override fun getClassLoaderByClassName(className: String): ClassLoader? {
-    val pluginId = PluginManager.getPluginByClassNameAsNoAccessToClass(className)
-    val plugin = PluginManagerCore.getPlugin(pluginId)
-    return plugin?.classLoader
+    return PluginUtils.getPluginDescriptorOrPlatformByClassName(className)?.pluginClassLoader
   }
 
   companion object {

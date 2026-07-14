@@ -48,7 +48,16 @@ export interface SearchCapabilities {
 
 export interface AnalysisCapabilities {
   hasLintFiles: boolean
+  hasLintFilesFiles: boolean
+  hasLintFilesFilePaths: boolean
   supportsLintFiles: boolean
+}
+
+export interface FormattingCapabilities {
+  hasReformatFile: boolean
+  hasReformatFileFiles: boolean
+  hasReformatFilePaths: boolean
+  supportsReformatFile: boolean
 }
 
 export interface ReadCapabilities {

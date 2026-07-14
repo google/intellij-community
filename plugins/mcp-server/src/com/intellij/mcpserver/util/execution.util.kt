@@ -2,6 +2,7 @@ package com.intellij.mcpserver.util
 
 import com.intellij.execution.CommonProgramRunConfigurationParameters
 import com.intellij.execution.ExecutionManager
+import com.intellij.execution.ExecutionTargetManager
 import com.intellij.execution.Executor
 import com.intellij.execution.ProgramRunnerUtil
 import com.intellij.execution.RunManager
@@ -15,7 +16,7 @@ import com.intellij.execution.lineMarker.RunLineMarkerContributor
 import com.intellij.execution.lineMarker.RunLineMarkerContributor.Info
 import com.intellij.execution.process.ProcessEvent
 import com.intellij.execution.process.ProcessListener
-import com.intellij.execution.process.ProcessOutputTypes
+import com.intellij.execution.process.ProcessOutputType
 import com.intellij.execution.runners.ExecutionEnvironmentBuilder
 import com.intellij.execution.runners.ProgramRunner
 import com.intellij.execution.ui.RunContentDescriptor
@@ -89,7 +90,7 @@ suspend fun checkUserConfirmationIfNeeded(@NlsContexts.Label notificationText: S
 
   fun rejected(): McpExpectedError = McpExpectedError("User rejected command execution")
 
-  val commandExecutionMode = currentCoroutineContext().mcpCallInfo.mcpSessionOptions?.commandExecutionMode
+  val commandExecutionMode = currentCoroutineContext().mcpCallInfo.mcpSessionOptions.commandExecutionMode
   when (commandExecutionMode) {
     McpServerService.AskCommandExecutionMode.ASK -> {
       if (!askConfirmation(project, notificationText, command)) throw rejected()
@@ -488,7 +489,7 @@ private fun createProcessCallback(
     val exitCodeDeferred = CompletableDeferred<Int>()
     processHandler.addProcessListener(object : ProcessListener {
       override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
-        if (outputType == ProcessOutputTypes.SYSTEM) return
+        if (ProcessOutputType.isSystem(outputType)) return
         outputCollector.append(event.text)
       }
 
@@ -619,13 +620,21 @@ private fun createExecutionEnvironment(
   runConfiguration: RunConfiguration,
   useOriginalSettings: Boolean,
   runnerAndConfigurationSettings: RunnerAndConfigurationSettings,
-) = if (useOriginalSettings) {
-  // Reuse persisted settings when we are launching the original configuration instance.
-  ExecutionEnvironmentBuilder.create(executor, runnerAndConfigurationSettings).build()
-}
-else {
-  // Use the effective configuration directly when this launch uses a cloned configuration with overrides.
-  ExecutionEnvironmentBuilder.create(project, executor, runConfiguration).build()
+) = run {
+  // Bind a real execution target for multi-target run configurations (CMake, Gradle, ...).
+  // Without this the builder falls back to <default>, which `ProgramRunnerUtil.executeConfigurationAsync`
+  // rejects with `Cannot run '<name>' on '<default>'`.
+  val target = ExecutionTargetManager.getInstance(project).findTarget(runConfiguration)
+  val builder = if (useOriginalSettings) {
+    // Reuse persisted settings when we are launching the original configuration instance.
+    ExecutionEnvironmentBuilder.create(executor, runnerAndConfigurationSettings)
+  }
+  else {
+    // Use the effective configuration directly when this launch uses a cloned configuration with overrides.
+    ExecutionEnvironmentBuilder.create(project, executor, runConfiguration)
+  }
+  if (target != null) builder.target(target)
+  builder.build()
 }
 
 /**

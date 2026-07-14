@@ -41,8 +41,6 @@ import com.intellij.openapi.wm.IdeGlassPane;
 import com.intellij.openapi.wm.WeakFocusStackManager;
 import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.components.panels.Wrapper;
-import com.intellij.ui.jcef.HwFacadeJPanel;
-import com.intellij.ui.jcef.HwFacadeNonOpaquePanel;
 import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.Alarm;
 import com.intellij.util.Consumer;
@@ -130,7 +128,7 @@ public final class BalloonImpl implements Balloon, IdeTooltip.Ui, ScreenAreaCons
 
   /**
    * This key is supposed to be used as client property of content component (with value Boolean.TRUE) to suppress shadow painting
-   *  when a builder is being created indirectly and a client cannot call its methods
+   * when a builder is being created indirectly and a client cannot call its methods
    */
   public static final Key<Boolean> FORCED_NO_SHADOW = Key.create("BALLOON_FORCED_NO_SHADOW");
 
@@ -822,7 +820,7 @@ public final class BalloonImpl implements Balloon, IdeTooltip.Ui, ScreenAreaCons
 
   private void createComponent() {
     component = new MyComponent(myContent, this, myShadowBorderProvider != null ? null :
-                                              myShowPointer ? myPosition.createBorder(this) : getPointlessBorder());
+                                                 myShowPointer ? myPosition.createBorder(this) : getPointlessBorder());
 
     if (myActionProvider == null) {
       final Consumer<MouseEvent> listener = event -> {
@@ -941,10 +939,12 @@ public final class BalloonImpl implements Balloon, IdeTooltip.Ui, ScreenAreaCons
     }
   }
 
+  @ApiStatus.Internal
   public @Nullable ShadowBorderProvider getShadowBorderProvider() {
     return myShadowBorderProvider;
   }
 
+  @ApiStatus.Internal
   public void setShadowBorderProvider(@NotNull ShadowBorderProvider provider) {
     myShadowBorderProvider = provider;
   }
@@ -964,6 +964,7 @@ public final class BalloonImpl implements Balloon, IdeTooltip.Ui, ScreenAreaCons
     return myShadowBorderProvider != null || myShadow && Registry.is("ide.balloon.shadowEnabled");
   }
 
+  @ApiStatus.Internal
   public interface ShadowBorderProvider {
     @NotNull
     Insets getInsets();
@@ -2372,6 +2373,7 @@ public final class BalloonImpl implements Balloon, IdeTooltip.Ui, ScreenAreaCons
     }
   }
 
+  @ApiStatus.Internal
   public interface HideListenerWithMouse extends Runnable {
     void run(MouseEvent event);
   }

@@ -26,6 +26,7 @@ kotlin {
   wasmJs {
     browser {}
   }
+  sourceSets.jvmMain.configure { resources.srcDir(layout.projectDirectory.dir("../resources")) }
   sourceSets.commonMain.configure { kotlin.srcDir(layout.projectDirectory.dir("../srcCommonMain")) }
   sourceSets.commonMain.configure { resources.srcDir(layout.projectDirectory.dir("../resourcesCommonMain")) }
   sourceSets.commonTest.configure { kotlin.srcDir(layout.projectDirectory.dir("../srcCommonTest")) }
@@ -46,11 +47,14 @@ kotlin {
     }
   }
   sourceSets.jvmMain.dependencies {
-    api(jps.org.junit.jupiter.junit.jupiter.api1894444205.get())
-    api(jps.org.junit.jupiter.junit.jupiter.params1101092435.get().let { "${it.group}:${it.name}:${it.version}" }) {
+    api(jps.org.junit.jupiter.junit.jupiter.engine1404327319.get().let { "${it.group}:${it.name}:${it.version}" }) {
       isTransitive = false
     }
-    api(jps.org.junit.jupiter.junit.jupiter.engine1404327319.get().let { "${it.group}:${it.name}:${it.version}" }) {
+    api(jps.org.jetbrains.kotlin.kotlin.test.junit5960045374.get().let { "${it.group}:${it.name}:${it.version}" }) {
+      isTransitive = false
+    }
+    api(jps.org.junit.jupiter.junit.jupiter.api1894444205.get())
+    api(jps.org.junit.jupiter.junit.jupiter.params1101092435.get().let { "${it.group}:${it.name}:${it.version}" }) {
       isTransitive = false
     }
     api(jps.org.junit.platform.junit.platform.launcher1454626487.get().let { "${it.group}:${it.name}:${it.version}" }) {
@@ -59,9 +63,6 @@ kotlin {
       exclude(group = "org.junit.platform", module = "junit-platform-commons")
     }
     api(jps.org.hamcrest.hamcrest1545074716.get().let { "${it.group}:${it.name}:${it.version}" }) {
-      isTransitive = false
-    }
-    api(jps.org.jetbrains.kotlin.kotlin.test.junit5960045374.get().let { "${it.group}:${it.name}:${it.version}" }) {
       isTransitive = false
     }
   }

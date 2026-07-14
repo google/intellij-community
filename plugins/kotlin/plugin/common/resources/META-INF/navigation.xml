@@ -33,5 +33,6 @@
     <gotoSymbolContributor implementation="org.jetbrains.kotlin.idea.goto.KotlinGotoJvmNameSymbolContributor"/>
 
     <gotoByName.defaultProvider.ignoreLanguage language="kotlin"/>
+
   </extensions>
 </idea-plugin>

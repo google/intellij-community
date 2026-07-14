@@ -219,7 +219,6 @@
     <extensionPoint name="bookmarkProvider" interface="com.intellij.ide.bookmark.BookmarkProvider" area="IDEA_PROJECT" dynamic="true"/>
     <extensionPoint name="bookmarksListProvider" interface="com.intellij.ide.bookmark.BookmarksListProvider" area="IDEA_PROJECT" dynamic="true"/>
     <extensionPoint name="favoriteNodeProvider" interface="com.intellij.ide.favoritesTreeView.FavoriteNodeProvider" area="IDEA_PROJECT" dynamic="true"/>
-    <extensionPoint name="favoritesListProvider" interface="com.intellij.ide.favoritesTreeView.FavoritesListProvider" area="IDEA_PROJECT" dynamic="true"/>
 
     <!-- File-Based Index-->
     <extensionPoint name="include.provider" interface="com.intellij.psi.impl.include.FileIncludeProvider" dynamic="true"/>
@@ -537,11 +536,7 @@
 
     <extensionPoint name="filePasteProvider" interface="com.intellij.ide.PasteProvider" dynamic="true"/>
 
-    <extensionPoint name="testFinder" interface="com.intellij.testIntegration.TestFinder" dynamic="true"/>
     <extensionPoint name="testSrcLocator" interface="com.intellij.testIntegration.TestLocationProvider" dynamic="true"/>
-    <extensionPoint name="testCreator" beanClass="com.intellij.lang.LanguageExtensionPoint" dynamic="true">
-      <with attribute="implementationClass" implements="com.intellij.testIntegration.TestCreator"/>
-    </extensionPoint>
 
     <extensionPoint name="moduleConfigurationEditorProvider" beanClass="com.intellij.openapi.roots.ui.configuration.impl.ModuleConfigurationEditorProviderEp"
                     dynamic="true">
@@ -591,8 +586,6 @@
 
     <extensionPoint name="problemFileHighlightFilter" interface="com.intellij.openapi.util.Condition" area="IDEA_PROJECT" dynamic="true"/>
     <extensionPoint name="problemHighlightFilter" interface="com.intellij.codeInsight.daemon.ProblemHighlightFilter" dynamic="true"/>
-    <extensionPoint name="problemsViewPanelProvider" interface="com.intellij.analysis.problemsView.toolWindow.ProblemsViewPanelProvider" area="IDEA_PROJECT" dynamic="true"/>
-    <extensionPoint name="problemsViewHighlightingProblemFactory" interface="com.intellij.analysis.problemsView.toolWindow.HighlightingProblemFactory" dynamic="true"/>
 
     <extensionPoint name="uiDebuggerExtension" interface="com.intellij.ui.debugger.UiDebuggerExtension"/>
 
@@ -608,12 +601,6 @@
                     interface="com.intellij.workspaceModel.ide.OptionalExclusionContributor"/>
 
     <extensionPoint name="elementPreviewProvider" interface="com.intellij.codeInsight.preview.ElementPreviewProvider" dynamic="true"/>
-
-    <extensionPoint name="testActionProvider" interface="com.intellij.execution.testframework.ToggleModelActionProvider" dynamic="true"/>
-
-     <extensionPoint name="testDiffProvider" beanClass="com.intellij.lang.LanguageExtensionPoint" dynamic="true">
-      <with attribute="implementationClass" implements="com.intellij.execution.testframework.actions.TestDiffProvider"/>
-    </extensionPoint>
 
     <extensionPoint name="diffPreviewProvider" interface="com.intellij.openapi.diff.impl.settings.DiffPreviewProvider"/>
 
@@ -727,8 +714,6 @@
     <extensionPoint name="safeDeleteTargetProvider" interface="com.intellij.refactoring.safeDelete.api.SafeDeleteTargetProvider" dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.codeInsight.daemon.impl.injectedLanguageHighlightingRangeReducer"
                     interface="com.intellij.codeInsight.daemon.impl.InjectedLanguageHighlightingRangeReducer"/>
-    <extensionPoint qualifiedName="com.intellij.platform.ijent.ijentExecFileProvider" dynamic="true"
-                    interface="com.intellij.platform.ijent.IjentExecFileProvider"/>
     <extensionPoint qualifiedName="com.intellij.platform.lang.lsWidget.itemsProvider" dynamic="true"
                     interface="com.intellij.platform.lang.lsWidget.LanguageServiceWidgetItemsProvider"/>
     <extensionPoint name="editorSearchAreaProvider" interface="com.intellij.find.impl.livePreview.EditorSearchAreaProvider" dynamic="true"/>

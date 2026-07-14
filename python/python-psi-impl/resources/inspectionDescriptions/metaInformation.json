@@ -229,7 +229,19 @@
       "codeQualityCategory": "Reliability"
     },
     {
-      "id": "PyUnusedLocalInspection",
+      "id": "PyDisjointBaseInspection",
+      "codeQualityCategory": "Reliability"
+    },
+    {
+      "id": "PyUnusedLocalVariableInspection",
+      "codeQualityCategory": "Code Style"
+    },
+    {
+      "id": "PyUnusedParameterInspection",
+      "codeQualityCategory": "Code Style"
+    },
+    {
+      "id": "PyUnusedFunctionInspection",
       "codeQualityCategory": "Code Style"
     },
     {
@@ -283,10 +295,6 @@
     {
       "id": "PyByteLiteralInspection",
       "codeQualityCategory": "Sanity"
-    },
-    {
-      "id": "PyTupleAssignmentBalanceInspection",
-      "codeQualityCategory": "Reliability"
     },
     {
       "id": "PyReturnFromInitInspection",

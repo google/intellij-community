@@ -8,6 +8,7 @@ import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.roots.ModuleRootModificationUtil
 import com.intellij.openapi.project.IntelliJProjectUtil
 import com.intellij.openapi.module.ModuleManager
+import com.intellij.openapi.util.registry.RegistryManager
 import com.intellij.psi.PsiFile
 import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.common.timeoutRunBlocking
@@ -26,8 +27,10 @@ internal class SplitModeDependencyQuickFixesTest : JavaCodeInsightFixtureTestCas
   override fun setUp() {
     super.setUp()
     IntelliJProjectUtil.markAsIntelliJPlatformProject(project, true)
+    RegistryManager.getInstance().get("devkit.split.mode.inspections.enable.in.implicit.module.kind")
+      .setValue(true, testRootDisposable)
 
-    val service = SplitModeApiRestrictionsService.getInstance()
+    val service = SplitModeApiRestrictionsService.getInstance(project)
     service.scheduleLoadRestrictions()
     timeoutRunBlocking {
       waitUntil("API restrictions failed to load", 2.seconds) { service.isLoaded() }
@@ -52,8 +55,12 @@ internal class SplitModeDependencyQuickFixesTest : JavaCodeInsightFixtureTestCas
     )
     myFixture.configureFromExistingVirtualFile(pluginXml.virtualFile)
 
-    launchActionAndWait("Make module 'unique.module.name.quick.fix.1' work in 'frontend' only") {
-      getModuleDependencyNames(pluginXml).contains("intellij.platform.frontend")
+    val intention = myFixture.findSingleIntention("Make module 'unique.module.name.quick.fix.1' work in 'frontend' only")
+    myFixture.checkPreviewAndLaunchAction(intention)
+    timeoutRunBlocking {
+      waitUntil("Quick fix was not applied", 5.seconds) {
+        getModuleDependencyNames(pluginXml).contains("intellij.platform.frontend")
+      }
     }
 
     val result = myFixture.file.text
@@ -254,7 +261,7 @@ internal class SplitModeDependencyQuickFixesTest : JavaCodeInsightFixtureTestCas
             <module name="unique.module.name.quick.fix.6" loading="embedded"/>
           </content>
           <extensions defaultExtensionNs="com.intellij">
-            <typedHandler<caret>/>
+            <toolWindow<caret>/>
           </extensions>
         </idea-plugin>
       """.trimIndent()
@@ -290,7 +297,7 @@ internal class SplitModeDependencyQuickFixesTest : JavaCodeInsightFixtureTestCas
             <module name="intellij.platform.core"/>
           </dependencies>
           <extensions defaultExtensionNs="com.intellij">
-            <applicationConfigurable<caret>/>
+            <annotator<caret>/>
           </extensions>
         </idea-plugin>
       """.trimIndent()

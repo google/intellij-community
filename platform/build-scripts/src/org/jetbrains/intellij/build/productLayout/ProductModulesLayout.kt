@@ -22,10 +22,22 @@ import org.jetbrains.intellij.build.impl.PluginLayout
  */
 val DEFAULT_BUNDLED_PLUGINS: PersistentList<String> = persistentListOf(
   "intellij.dev",
+  "intellij.java.aetherDependencyResolver.plugin",
   "intellij.jcef.plugin",
-  "intellij.moduleSet.plugin.grid.core",
-  "intellij.moduleSet.plugin.recentFiles",
-  "intellij.moduleSet.plugin.vcs.frontend",
+  "intellij.libraries.misc.plugin",
+  "intellij.platform.bookmarks.plugin",
+  "intellij.grid.core.plugin",
+  "intellij.platform.navbar.plugin",
+  "intellij.platform.problemView.plugin",
+  "intellij.platform.testRunner.plugin",
+  "intellij.platform.recentFiles.plugin",
+  "intellij.platform.structuralSearch.plugin",
+  "intellij.platform.structureView.plugin",
+  "intellij.platform.tasks.plugin",
+  "intellij.platform.execution.serviceView.plugin",
+  "intellij.platform.todo.plugin",
+  "intellij.platform.vcs.plugin",
+  "intellij.platform.acp.plugin",
   "intellij.platform.images",
 )
 
@@ -135,7 +147,7 @@ class ProductModulesLayout {
    */
   @ApiStatus.Internal
   var skipUnresolvedContentModules: Boolean = false
-  
+
   /**
    * Module names which should be excluded from this product.
    * Allows filtering out default platform modules (both api and implementation) as well as product modules.

@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diff.tools.simple;
 
 import com.intellij.diff.DiffContext;
@@ -55,19 +55,21 @@ public class SimpleOnesideDiffViewer extends OnesideTextDiffViewer {
 
   @Override
   protected @NotNull List<AnAction> createToolbarActions() {
-    List<AnAction> diffActions = new ArrayList<>();
-    diffActions.add(new MyToggleExpandByDefaultAction());
-    diffActions.addAll(myTextDiffProvider.getDiffSettingsActions());
-    myEditorSettingsAction.setDiffActions(diffActions);
-
     List<AnAction> group = new ArrayList<>();
+    group.add(new MyToggleExpandByDefaultAction());
     group.add(new MyReadOnlyLockAction());
-    group.add(myEditorSettingsAction);
-
     group.add(Separator.getInstance());
     group.addAll(super.createToolbarActions());
 
     return group;
+  }
+
+  @Override
+  protected @NotNull List<AnAction> createRightToolbarActions() {
+    List<AnAction> diffActions = new ArrayList<>();
+    myEditorSettingsAction.setSettingsActions(diffActions, myTextDiffProvider.getDiffSettingsActions());
+
+    return List.of(myEditorSettingsAction);
   }
 
   @Override
@@ -77,6 +79,13 @@ public class SimpleOnesideDiffViewer extends OnesideTextDiffViewer {
     group.addAll(super.createPopupActions());
 
     return group;
+  }
+
+  @Override
+  protected @NotNull List<@NotNull AnAction> createAdditionalEditorGutterActions() {
+    List<AnAction> actions = new ArrayList<>();
+    actions.add(new MyToggleExpandByDefaultAction());
+    return actions;
   }
 
   @Override

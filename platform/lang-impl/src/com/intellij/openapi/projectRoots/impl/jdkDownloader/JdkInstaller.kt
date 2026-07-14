@@ -27,7 +27,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectBundle
 import com.intellij.openapi.projectRoots.JdkUtil
 import com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallerEel.unpackJdkOnEel
-import com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallerWSL.unpackJdkOnWsl
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.OSAgnosticPathUtil
 import com.intellij.openapi.util.registry.Registry
@@ -38,6 +37,7 @@ import com.intellij.platform.eel.EelPosixProcess
 import com.intellij.platform.eel.EelWindowsProcess
 import com.intellij.platform.eel.LocalEelApi
 import com.intellij.platform.eel.path.EelPath
+import com.intellij.platform.eel.provider.LocalEelDescriptor
 import com.intellij.platform.eel.provider.asEelPath
 import com.intellij.platform.eel.provider.asNioPath
 import com.intellij.platform.eel.provider.getEelDescriptor
@@ -57,6 +57,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.Nls
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
@@ -103,13 +104,13 @@ interface JdkInstallerListener {
    * Executed at the moment, when a download process for
    * a given [request] is started
    */
-  fun onJdkDownloadStarted(request: JdkInstallRequest, project: Project?) { }
+  fun onJdkDownloadStarted(request: JdkInstallRequest, project: Project?) {}
 
   /**
    * This event is executed when download process is finished,
    * for all possible outcomes, no matter it was a success or a failure
    */
-  fun onJdkDownloadFinished(request: JdkInstallRequest, project: Project?) { }
+  fun onJdkDownloadFinished(request: JdkInstallRequest, project: Project?) {}
 }
 
 @Service
@@ -172,7 +173,8 @@ class JdkInstaller : JdkInstallerBase() {
     try {
       super.installJdkImpl(request, indicator, project)
       runCatching { service<JdkInstallerStore>().registerInstall(request.item, request.installDir) }
-    } finally {
+    }
+    finally {
       JDK_INSTALL_LISTENER_EP_NAME.forEachExtensionSafe { it.onJdkDownloadFinished(request, project) }
     }
   }
@@ -195,15 +197,15 @@ class JdkInstaller : JdkInstallerBase() {
     val userHome = eel.fs.user.home
 
     val relativePath = when (eel.platform) {
-        is EelPlatform.Windows, is EelPlatform.Linux, is EelPlatform.FreeBSD -> ".jdks"
-        is EelPlatform.Darwin -> "Library/Java/JavaVirtualMachines"
+      is EelPlatform.Windows, is EelPlatform.Linux, is EelPlatform.FreeBSD -> ".jdks"
+      is EelPlatform.Darwin -> "Library/Java/JavaVirtualMachines"
     }
 
     val jdks = userHome.resolve(relativePath)
     return jdks.asNioPath()
   }
 
-  private fun defaultInstallDir(wslDistribution: WSLDistribution?) : Path {
+  private fun defaultInstallDir(wslDistribution: WSLDistribution?): Path {
     wslDistribution?.let { dist ->
       dist.userHome?.let { home ->
         return Path.of(dist.getWindowsPath("$home/.jdks"))
@@ -292,6 +294,7 @@ abstract class JdkInstallerBase {
   /**
    * @see [JdkInstallRequest.javaHome] for the actual java home, it may not match the [JdkInstallRequest.installDir]
    */
+  @Throws(IOException::class)
   fun installJdk(jdkInstallRequest: JdkInstallRequest, indicator: ProgressIndicator?, project: Project?) {
     var request = jdkInstallRequest
 
@@ -318,6 +321,7 @@ abstract class JdkInstallerBase {
   /**
    * @see [JdkInstallRequest.javaHome] for the actual java home, it may not match the [JdkInstallRequest.installDir]
    */
+  @Throws(IOException::class)
   protected open fun installJdkImpl(request: JdkInstallRequest, indicator: ProgressIndicator?, project: Project?) {
     val item = request.item
     indicator?.text = ProjectBundle.message("progress.text.installing.jdk.1", item.fullPresentationText)
@@ -332,18 +336,6 @@ abstract class JdkInstallerBase {
     }
 
     val eel = eelFromPath(targetDir)?.eel
-    val wslDistribution: OsAbstractionForJdkInstaller.Wsl?
-    if (eel != null) {
-      wslDistribution = null
-    }
-    else {
-      wslDistribution = wslDistributionFromPath(targetDir)
-      if (wslDistribution != null && item.os != "linux") {
-        JdkDownloaderLogger.logFailed(JdkDownloaderLogger.DownloadFailure.WSLIssue)
-        logFailed = true
-        error("Cannot install non-linux JDK into WSL environment to $targetDir from $item")
-      }
-    }
 
     indicator?.text2 = ProjectBundle.message("progress.text2.downloading.jdk")
     // TODO Sanitize `archiveFileName` in a way that it doesn't replace `.` with `_`. `FileUtil.sanitizeFileName` can't be applied here.
@@ -360,11 +352,10 @@ abstract class JdkInstallerBase {
           throw RuntimeException("Downloaded file does not exist: $downloadFile")
         }
       }
-      catch (t: Throwable) {
-        if (t is ControlFlowException) throw t
+      catch (t: IOException) {
         JdkDownloaderLogger.logFailed(JdkDownloaderLogger.DownloadFailure.RuntimeException)
         logFailed = true
-        throw RuntimeException("Failed to download ${item.fullPresentationText} from $url. ${t.message}", t)
+        throw t
       }
 
       val sizeDiff = runCatching { Files.size(downloadFile) - item.archiveSize }.getOrNull()
@@ -372,11 +363,12 @@ abstract class JdkInstallerBase {
         JdkDownloaderLogger.logFailed(JdkDownloaderLogger.DownloadFailure.IncorrectFileSize)
         logFailed = true
         throw RuntimeException("The downloaded ${item.fullPresentationText} has incorrect file size,\n" +
-                               "the difference is ${sizeDiff?.absoluteValue ?: "unknown" } bytes.\n" +
+                               "the difference is ${sizeDiff?.absoluteValue ?: "unknown"} bytes.\n" +
                                "Check your internet connection and try again later")
       }
 
-      val actualHashCode = runCatching { com.google.common.io.Files.asByteSource(downloadFile.toFile()).hash(Hashing.sha256()).toString() }.getOrNull()
+      val actualHashCode =
+        runCatching { com.google.common.io.Files.asByteSource(downloadFile.toFile()).hash(Hashing.sha256()).toString() }.getOrNull()
       if (!actualHashCode.equals(item.sha256, ignoreCase = true)) {
         JdkDownloaderLogger.logFailed(JdkDownloaderLogger.DownloadFailure.ChecksumMismatch)
         throw RuntimeException("Failed to verify SHA-256 checksum for ${item.fullPresentationText}\n\n" +
@@ -389,12 +381,9 @@ abstract class JdkInstallerBase {
       indicator?.text2 = ProjectBundle.message("progress.text2.unpacking.jdk")
 
       try {
-        if (eel != null) {
+        if (eel != null && eel.descriptor !is LocalEelDescriptor) {
           val targetDirEel = targetDir.asEelPath()
           unpackJdkOnEel(eel, downloadFile, targetDirEel, item.packageRootPrefix)
-        }
-        else if (wslDistribution != null) {
-          unpackJdkOnWsl(wslDistribution, item.packageType, downloadFile, targetDir, item.packageRootPrefix)
         }
         else {
           item.packageType.openDecompressor(downloadFile)
@@ -409,11 +398,10 @@ abstract class JdkInstallerBase {
         runCatching { writeMarkerFile(request) }
         JdkDownloaderLogger.logDownload(item)
       }
-      catch (t: Throwable) {
-        if (t is ControlFlowException) throw t
+      catch (t: IOException) {
         JdkDownloaderLogger.logFailed(JdkDownloaderLogger.DownloadFailure.ExtractionFailed)
         logFailed = true
-        throw RuntimeException("Failed to extract ${item.fullPresentationText}. ${t.message}", t)
+        throw t
       }
     }
     catch (t: Throwable) {
@@ -441,8 +429,10 @@ abstract class JdkInstallerBase {
    * The [JdkInstallRequest] may have another [targetPath] if there is such JDK already installed,
    * or it is being installed right now
    *
-   * @throws JdkInstallationException if [targetPath] is invalid JDK installation directory.
+   * @throws IOException if [targetPath] is invalid JDK installation directory.
    */
+
+  @Throws(IOException::class)
   fun prepareJdkInstallation(jdkItem: JdkItem, targetPath: Path): JdkInstallRequest {
     if (Registry.`is`("jdk.downloader.reuse.installed")) {
       val distribution = wslDistributionFromPath(targetPath)
@@ -454,7 +444,8 @@ abstract class JdkInstallerBase {
       return myLock.withLock {
         myPendingDownloads.computeIfAbsent(jdkItem on targetPath.getEelDescriptor()) { prepareJdkInstallationImpl(jdkItem, targetPath) }
       }
-    } else {
+    }
+    else {
       return prepareJdkInstallationDirect(jdkItem, targetPath)
     }
   }
@@ -465,12 +456,14 @@ abstract class JdkInstallerBase {
    *
    * @see prepareJdkInstallation
    */
+  @Throws(IOException::class)
   fun prepareJdkInstallationDirect(jdkItem: JdkItem, targetPath: Path): JdkInstallRequest = prepareJdkInstallationImpl(jdkItem, targetPath)
 
-  private fun prepareJdkInstallationImpl(jdkItem: JdkItem, targetPath: Path) : PendingJdkRequest {
+  @Throws(IOException::class) // See Files:: call
+  private fun prepareJdkInstallationImpl(jdkItem: JdkItem, targetPath: Path): PendingJdkRequest {
     val (home, error) = validateInstallDir(targetPath.toString())
     if (home == null || error != null) {
-      throw JdkInstallationException(error ?: ProjectBundle.message("dialog.message.error.target.path.invalid"))
+      throw IOException(error ?: ProjectBundle.message("dialog.message.error.target.path.invalid"))
     }
 
     val javaHome = jdkItem.resolveJavaHome(targetPath)
@@ -489,8 +482,7 @@ abstract class JdkInstallerBase {
     try {
       request.item.writeMarkerFile(markerFile)
     }
-    catch (t: Throwable) {
-      if (t is ControlFlowException) throw t
+    catch (t: IOException) {
       LOG.warn("Failed to write marker file to $markerFile. ${t.message}", t)
     }
   }
@@ -530,7 +522,7 @@ abstract class JdkInstallerBase {
     }
   }
 
-  private fun findAlreadyInstalledJdk(feedItem: JdkItem, distribution: OsAbstractionForJdkInstaller?) : JdkInstallRequest? {
+  private fun findAlreadyInstalledJdk(feedItem: JdkItem, distribution: OsAbstractionForJdkInstaller?): JdkInstallRequest? {
     try {
       val localRoots = run {
         val defaultInstallDir = defaultInstallDir(distribution)
@@ -555,7 +547,8 @@ abstract class JdkInstallerBase {
           return LocallyFoundJdk(feedItem, installDir, jdkHome)
         }
       }
-    } catch (t: Throwable) {
+    }
+    catch (t: Throwable) {
       return null
     }
 
@@ -563,7 +556,7 @@ abstract class JdkInstallerBase {
   }
 
   protected open fun findHistoryRoots(feedItem: JdkItem): List<Path> = listOf()
-  protected open fun wslDistributionFromPath(targetDir: Path) : OsAbstractionForJdkInstaller.Wsl? = null
+  protected open fun wslDistributionFromPath(targetDir: Path): OsAbstractionForJdkInstaller.Wsl? = null
   protected open fun eelFromPath(targetDir: Path): OsAbstractionForJdkInstaller.Eel? = null
 
   private data class JdkItemByEnvironmentKey(val jdkItem: JdkItem, val eelDescriptor: EelDescriptor)
@@ -576,18 +569,20 @@ abstract class JdkInstallerBase {
 private data class PendingJdkRequest(
   override val item: JdkItem,
   override val installDir: Path,
-  override val javaHome: Path) : JdkInstallRequest {
+  override val javaHome: Path,
+) : JdkInstallRequest {
   private val isRunning = AtomicBoolean(false)
   private val future = CompletableFuture<Unit>()
 
 
   @Volatile
-  private var progressIndicator : ProgressIndicator? = null
+  private var progressIndicator: ProgressIndicator? = null
 
   fun tryStartInstallOrWait(indicator: ProgressIndicator?, installAction: () -> Unit) {
     if (isRunning.compareAndSet(false, true)) {
       doRealDownload(indicator, installAction)
-    } else {
+    }
+    else {
       waitForDownload(indicator)
     }
   }
@@ -642,7 +637,8 @@ private data class PendingJdkRequest(
     parentProgress.addStateDelegate(delegate)
     try {
       return action()
-    } finally {
+    }
+    finally {
       parentProgress.removeStateDelegate(delegate)
     }
   }
@@ -655,7 +651,8 @@ private data class PendingJdkRequest(
 private data class LocallyFoundJdk(
   override val item: JdkItem,
   override val installDir: Path,
-  override val javaHome: Path) : JdkInstallRequest {
+  override val javaHome: Path,
+) : JdkInstallRequest {
 
   override fun toString(): String {
     return "LocallyFoundJdk(item=$item, installDir=$installDir)"
@@ -684,7 +681,7 @@ class JdkInstallerStateEntry : BaseState() {
   val installPath: Path? get() = installDir?.let { Path.of(it) }
   val javaHomePath: Path? get() = javaHomeDir?.let { Path.of(it) }
 
-  fun matches(item: JdkItem) : Boolean {
+  fun matches(item: JdkItem): Boolean {
     if (fullText != item.fullPresentationText) return false
     if (versionText != item.versionPresentationText) return false
     if (url != item.url) return false
@@ -710,22 +707,24 @@ class JdkInstallerStore : SimplePersistentStateComponent<JdkInstallerState>(JdkI
   }
 
   fun registerInstall(jdkItem: JdkItem, targetPath: Path): Unit = lock.withLock {
-    state.installedItems.removeIf { run {
-      arrayOf<LinkOption>()
-      it.installPath?.isDirectory()
-    } != null || it.matches(jdkItem) }
+    state.installedItems.removeIf {
+      run {
+        arrayOf<LinkOption>()
+        it.installPath?.isDirectory()
+      } != null || it.matches(jdkItem)
+    }
     state.installedItems.add(JdkInstallerStateEntry().apply { copyForm(jdkItem, targetPath) })
     state.intIncrementModificationCount()
   }
 
-  fun findInstallations(jdkItem: JdkItem) : List<Path> = lock.withLock {
+  fun findInstallations(jdkItem: JdkItem): List<Path> = lock.withLock {
     state.installedItems.filter { it.matches(jdkItem) }.mapNotNull { it.installPath }.filter {
       arrayOf<LinkOption>()
       it.isDirectory()
     }
   }
 
-  fun listJdkInstallHomes() : List<Path> = lock.withLock {
+  fun listJdkInstallHomes(): List<Path> = lock.withLock {
     state.installedItems.mapNotNull { it.javaHomePath }
   }
 
@@ -733,8 +732,3 @@ class JdkInstallerStore : SimplePersistentStateComponent<JdkInstallerState>(JdkI
     fun getInstance(): JdkInstallerStore = service<JdkInstallerStore>()
   }
 }
-
-@Internal
-class JdkInstallationException(
-  val reason: @Nls String,
-) : Exception(reason)

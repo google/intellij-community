@@ -1,14 +1,14 @@
 module(name = "community")
 
-bazel_dep(name = "bazel_features", version = "1.43.0")
+bazel_dep(name = "bazel_features", version = "1.47.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "rules_kotlin", version = "2.2.2")
 archive_override(
     module_name = "rules_kotlin",
-    sha256 = "6c7550c333f10fd49c59a5c05714c2747802077906822be066bc738c10038324",
-    strip_prefix = "rules_kotlin-2f7b666442f78bfcb5fd6360a3150b2938233cef",
-    url = "https://github.com/JetBrains/rules_kotlin/archive/2f7b666442f78bfcb5fd6360a3150b2938233cef.zip",
+    sha256 = "cd26fd62ec0d026ad4d143dedfef3e6ca858a2d0be483f57109897b27069b2c3",
+    strip_prefix = "rules_kotlin-4db4cd06b0ca11742f7dccec5e19fd642c5c2cb1",
+    url = "https://github.com/JetBrains/rules_kotlin/archive/4db4cd06b0ca11742f7dccec5e19fd642c5c2cb1.zip",
 )
 
 bazel_dep(name = "rules_java", version = "9.6.1")
@@ -69,8 +69,8 @@ local_path_override(
     path = "build/jvm-rules",
 )
 
-bazel_dep(name = "windows_support", version = "0.1.1")
-bazel_dep(name = "llvm", version = "0.7.9")
+bazel_dep(name = "windows_support", version = "0.2.0")
+bazel_dep(name = "llvm", version = "0.8.9")
 single_version_override(
     module_name = "llvm",
     patch_strip = 1,
@@ -91,6 +91,7 @@ kotlin_test_deps = use_repo_rule("//plugins/kotlin:kotlin_test_dependencies.bzl"
 kotlin_test_deps(name = "kotlin_test_deps")
 
 include("//:debugger_test_deps.MODULE.bazel")
+include("//platform/jewel:jewel_deps.MODULE.bazel")
 
 jbr_toolchains = use_extension("@community//build:jbr-toolchains.bzl", "jbr_toolchains")
 

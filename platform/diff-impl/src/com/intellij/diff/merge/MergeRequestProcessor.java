@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diff.merge;
 
 import com.intellij.CommonBundle;
@@ -6,6 +6,8 @@ import com.intellij.diff.DiffManagerEx;
 import com.intellij.diff.DiffNotificationIdsHolder;
 import com.intellij.diff.actions.impl.DiffNextDifferenceAction;
 import com.intellij.diff.actions.impl.DiffPreviousDifferenceAction;
+import com.intellij.diff.impl.ui.DiffHeaderToolbarPanel;
+import com.intellij.diff.impl.ui.DiffHeaderToolbarUtil;
 import com.intellij.diff.tools.util.DiffDataKeys;
 import com.intellij.diff.util.DiffPlaces;
 import com.intellij.diff.util.DiffUserDataKeys;
@@ -31,6 +33,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.diff.DiffBundle;
+import com.intellij.openapi.editor.colors.EditorColorsManager;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.util.BackgroundTaskUtil;
 import com.intellij.openapi.project.DumbAwareAction;
@@ -41,6 +44,7 @@ import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.wm.ex.IdeFocusTraversalPolicy;
 import com.intellij.ui.EditorNotificationPanel;
+import com.intellij.ui.JBColor;
 import com.intellij.ui.LightColors;
 import com.intellij.ui.components.panels.NonOpaquePanel;
 import com.intellij.ui.components.panels.Wrapper;
@@ -86,6 +90,7 @@ public abstract class MergeRequestProcessor implements Disposable {
   private final @NotNull MyPanel myMainPanel;
   private final @NotNull Wrapper myContentPanel;
   private final @NotNull Wrapper myToolbarPanel;
+  private final @NotNull Wrapper myRightToolbarPanel;
   private final @NotNull Wrapper myToolbarStatusPanel;
   private final @NotNull Wrapper myNotificationPanel;
   private final @NotNull Wrapper myButtonsPanel;
@@ -105,18 +110,30 @@ public abstract class MergeRequestProcessor implements Disposable {
     myAvailableTools = DiffManagerEx.getInstance().getMergeTools();
 
     myMainPanel = new MyPanel();
+    myMainPanel.setBackground(JBColor.lazy(() -> {
+      EditorColorsManager manager = EditorColorsManager.getInstance();
+      return manager.getGlobalScheme().getDefaultBackground();
+    }));
     myContentPanel = new Wrapper();
     myToolbarPanel = new Wrapper();
     myToolbarPanel.setFocusable(true);
+    myRightToolbarPanel = new Wrapper();
     myToolbarStatusPanel = new Wrapper();
     myNotificationPanel = new Wrapper();
     myButtonsPanel = new Wrapper();
+    myButtonsPanel.setOpaque(true);
 
     myPanel = JBUI.Panels.simplePanel(myMainPanel);
 
-    JPanel topPanel = JBUI.Panels.simplePanel(myToolbarPanel)
-      .addToRight(myToolbarStatusPanel)
-      .addToBottom(myNotificationPanel);
+
+    DiffHeaderToolbarPanel headerPanel = new DiffHeaderToolbarPanel(new BorderLayout());
+    var headerLayoutPanel = DiffHeaderToolbarUtil.createLayoutPanel(myToolbarPanel, myToolbarStatusPanel, myRightToolbarPanel);
+    headerPanel.add(headerLayoutPanel, BorderLayout.CENTER);
+
+    var topPanel = JBUI.Panels.simplePanel()
+      .addToTop(headerPanel)
+      .addToBottom(myNotificationPanel)
+      .andTransparent();
 
     myMainPanel.add(topPanel, BorderLayout.NORTH);
     myMainPanel.add(myContentPanel, BorderLayout.CENTER);
@@ -190,11 +207,12 @@ public abstract class MergeRequestProcessor implements Disposable {
 
     MergeTool.ToolbarComponents toolbarComponents = myViewer.init();
 
-    buildToolbar(toolbarComponents.toolbarActions);
+    buildToolbar(toolbarComponents.toolbarActions, toolbarComponents.rightToolbarActions);
     myToolbarStatusPanel.setContent(toolbarComponents.statusPanel);
     myCloseHandler = toolbarComponents.closeHandler == null ? null : () -> toolbarComponents.closeHandler.invoke();
 
     updateBottomActions();
+    requestFocusInWindow();
   }
 
   @RequiresEdt
@@ -205,6 +223,7 @@ public abstract class MergeRequestProcessor implements Disposable {
 
     myContentPanel.setContent(null);
     myToolbarPanel.setContent(null);
+    myRightToolbarPanel.setContent(null);
     myToolbarStatusPanel.setContent(null);
     myButtonsPanel.setContent(null);
     myCloseHandler = null;
@@ -280,15 +299,24 @@ public abstract class MergeRequestProcessor implements Disposable {
     return group;
   }
 
-  protected void buildToolbar(@Nullable List<? extends AnAction> viewerActions) {
+  protected void buildToolbar(@Nullable List<? extends AnAction> viewerActions,
+                              @Nullable List<? extends AnAction> rightViewerActions) {
     ActionGroup group = collectToolbarActions(viewerActions);
     ActionToolbar toolbar = ActionManager.getInstance().createActionToolbar(ActionPlaces.DIFF_TOOLBAR, group, true);
+    toolbar.getComponent().setOpaque(false);
     toolbar.setShowSeparatorTitles(true);
 
     toolbar.setTargetComponent(myContentPanel.getTargetComponent());
 
     myToolbarPanel.setContent(toolbar.getComponent());
     recursiveRegisterShortcutSet(group, myMainPanel, null);
+
+    DefaultActionGroup rightGroup = new DefaultActionGroup();
+    DiffUtil.addActionBlock(rightGroup, rightViewerActions, false);
+    ActionToolbar rightToolbar = ActionManager.getInstance().createActionToolbar(ActionPlaces.DIFF_RIGHT_TOOLBAR, rightGroup, true);
+    rightToolbar.setTargetComponent(myContentPanel.getTargetComponent());
+    rightToolbar.getComponent().setOpaque(false);
+    myRightToolbarPanel.setContent(rightToolbar.getComponent());
   }
 
   private @NotNull MergeTool getFittedTool(@NotNull MergeRequest request) {

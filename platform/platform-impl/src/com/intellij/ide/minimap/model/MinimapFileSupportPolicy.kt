@@ -26,15 +26,6 @@ interface MinimapFileSupportPolicy {
    */
   fun getSupportLevel(fileType: FileType): MinimapSupportLevel?
 
-  /**
-   * Registry keys whose change should trigger a minimap refresh across all open editors.
-   *
-   * Override when your policy uses a dedicated registry key (e.g. `jupyter.editor.minimap.enabled`)
-   * instead of relying solely on `editor.minimap.mode`. [com.intellij.ide.minimap.MinimapService] collects these keys at
-   * startup and registers listeners automatically — no separate service or startup activity needed.
-   */
-  fun getWatchedRegistryKeys(): List<String> = emptyList()
-
   companion object {
     @JvmField
     val EP_NAME: ExtensionPointName<MinimapFileSupportPolicy> =
@@ -55,5 +46,6 @@ interface MinimapFileSupportPolicy {
       }
       return DefaultMinimapFileSupportPolicy.getSupportLevel(fileType)
     }
+
   }
 }

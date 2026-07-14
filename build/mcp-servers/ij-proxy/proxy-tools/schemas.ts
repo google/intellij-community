@@ -149,7 +149,7 @@ export function createSearchSymbolSchema(): ToolInputSchema {
 export function createLintFilesSchema(): ToolInputSchema {
   return objectSchema(
     {
-      file_paths: {
+      files: {
         type: 'array',
         description: 'List of project-relative file paths to analyze. Duplicate paths are ignored after normalization.',
         items: {
@@ -165,7 +165,22 @@ export function createLintFilesSchema(): ToolInputSchema {
         description: 'Timeout in milliseconds for the full batch.'
       }
     },
-    ['file_paths']
+    ['files']
+  )
+}
+
+export function createReformatFileSchema(): ToolInputSchema {
+  return objectSchema(
+    {
+      files: {
+        type: 'array',
+        description: 'List of project-relative file paths to reformat. Duplicate paths are ignored after normalization.',
+        items: {
+          type: 'string'
+        }
+      }
+    },
+    ['files']
   )
 }
 

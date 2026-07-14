@@ -38,12 +38,6 @@ internal class McpToolFilterSettings : SimplePersistentStateComponent<McpToolFil
       _toolsFilterFlow.value = value
     }
 
-  var showExperimental: Boolean
-    get() = state.showExperimental
-    set(value) {
-      state.showExperimental = value
-    }
-
   var invocationMode: McpSessionInvocationMode
     get() = state.invocationMode?.let { McpSessionInvocationMode.valueOf(it) } ?: McpSessionInvocationMode.DIRECT
     set(value) {
@@ -52,7 +46,6 @@ internal class McpToolFilterSettings : SimplePersistentStateComponent<McpToolFil
 
   internal class MyState : BaseState() {
     var toolsFilter: String? by string(DEFAULT_FILTER)
-    var showExperimental: Boolean by property(false)
     var invocationMode: String? by string(McpSessionInvocationMode.DIRECT.name)
   }
 }

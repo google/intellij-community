@@ -23,7 +23,26 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Methods related to process execution: start a process, collect stdin/stdout/stderr of the process, etc.
+ * Process execution inside the environment: starting a process and accessing its standard streams (stdin, stdout, stderr).
+ *
+ * Use this instead of `ProcessBuilder` when the process belongs to the project environment — it runs the process *there* (in WSL,
+ * a container, …), not on the IDE host. Reach it via [EelApi.exec].
+ *
+ * [spawnProcess] is the entry point. It takes a builder (see [ExecuteProcessOptions]); configure it fluently and finish with `eelIt()`:
+ * ```kotlin
+ * val process = eel.exec.spawnProcess(exePath)
+ *   .args("--version")
+ *   .workingDirectory(projectRoot)
+ *   .eelIt()
+ * val exitCode = process.exitCode.await()
+ * ```
+ * The result is an [EelProcess] whose stdin/stdout/stderr and exit code are accessed through that handle.
+ *
+ * All arguments and paths must be valid *for the environment*, with no automatic host↔environment path mapping: if a value is a path
+ * the spawned process will read, pass the environment-side form (e.g. an [EelPath] / `asEelPath()`), not the host path.
+ *
+ * Besides spawning, this API also exposes the environment's executable lookup ([findExeFilesInPath]) and its environment variables
+ * ([environmentVariables]).
  */
 @ApiStatus.Experimental
 sealed interface EelExecApi {
@@ -63,8 +82,16 @@ sealed interface EelExecApi {
     }
   }
 
+  /**
+   * Options for [spawnProcess]: the executable plus how to run it (arguments, working directory, environment, terminal mode, lifetime).
+   *
+   * Normally built fluently via the [spawnProcess] builder rather than implemented directly.
+   */
   @ApiStatus.Experimental
   interface ExecuteProcessOptions {
+    /**
+     * Command-line arguments passed to the process, not including the executable itself.
+     */
     @get:ApiStatus.Experimental
     val args: List<String> get() = listOf()
 
@@ -114,7 +141,7 @@ sealed interface EelExecApi {
   @Suppress("FunctionName")
   @ApiStatus.Internal
   @ApiStatus.Obsolete
-  fun `_private useEnvironmentVariableDefaultInFetchLoginShellEnvVariables`(): Boolean = false
+  suspend fun `_private useEnvironmentVariableDefaultInFetchLoginShellEnvVariables`(): EnvironmentVariablesOptions.Mode? = null
 
   /**
    * Use [environmentVariables] instead.
@@ -126,9 +153,12 @@ sealed interface EelExecApi {
   @ApiStatus.Experimental
   @ApiStatus.Obsolete
   suspend fun fetchLoginShellEnvVariables(): Map<String, String> {
-    if (`_private useEnvironmentVariableDefaultInFetchLoginShellEnvVariables`()) {
-      @Suppress("checkedExceptions")
-      return environmentVariables().eelIt().await()
+    when (val delegateToMode = `_private useEnvironmentVariableDefaultInFetchLoginShellEnvVariables`()) {
+      null -> {}
+      else -> {
+        @Suppress("checkedExceptions")
+        return environmentVariables().mode(delegateToMode).eelIt().await()
+      }
     }
 
     return when (this) {
@@ -199,6 +229,12 @@ sealed interface EelExecApi {
   fun environmentVariables(@GeneratedBuilder opts: EnvironmentVariablesOptions): EnvironmentVariablesDeferred
 
   /**
+   * Returns the path to the user's login shell on the Eel target.
+   */
+  @ApiStatus.Internal
+  suspend fun getUserLoginShell(): EelPath
+
+  /**
    * Indicates on the failure during fetching environment variables.
    * As an API user, you can't gracefully handle this error. You can either ignore it or show the message to the user as a critical error.
    * The message text may be localized with the locale of the remote machine.
@@ -215,7 +251,7 @@ sealed interface EelExecApi {
   @ApiStatus.Experimental
   class EnvironmentVariablesDeferred @ApiStatus.Internal constructor(
     @ApiStatus.Experimental
-    val deferred: Deferred<Map<String, String>>
+    val deferred: Deferred<Map<String, String>>,
   ) {
     @ApiStatus.Experimental
     @ThrowsChecked(EnvironmentVariablesException::class)
@@ -229,15 +265,77 @@ sealed interface EelExecApi {
   }
 
   interface EnvironmentVariablesOptions {
+    val mode: Mode get() = Mode.DEFAULT
+
     /**
      * The implementation MAY cache the environment variables by default because they rarely change in real life.
      * By setting this value to `true`, the cache will be refreshed, and the result will contain the freshest environment variables.
      *
      * Makes sense only for remote Eels (via IJent)
-     * or with such [EelExecPosixApi.PosixEnvironmentVariablesOptions.mode] that invoke a shell.
+     * or with such [mode] that invoke a shell.
      * In other cases this option has no effect.
      */
     val onlyActual: Boolean get() = false
+
+    enum class Mode {
+      /**
+       * Platform-defined fallback, never throws [EnvironmentVariablesException].
+       *
+       * * On remote POSIX Eel — like [LOGIN_NON_INTERACTIVE], but on error returns [MINIMAL] instead of throwing.
+       * * On remote Windows Eel — registry view (like [LOGIN_NON_INTERACTIVE]).
+       * * On local Windows/Linux — like [MINIMAL] (historical: the IDE rarely called the shell for env).
+       * * On local macOS — like [LOGIN_NON_INTERACTIVE] + [MINIMAL], with values cached at start (historical).
+       */
+      DEFAULT,
+
+      /**
+       * Fastest path: inherited environment of the IJent process, no shell, no registry.
+       * `PATH` is guaranteed; nothing else is.
+       *
+       * Never throws [EnvironmentVariablesException].
+       */
+      MINIMAL,
+
+      /**
+       * Fresh-logon snapshot.
+       *
+       * * On POSIX — non-interactive shell loading `~/.profile`, `~/.bashrc`, `~/.zshrc`, `/etc/profile` etc.
+       *   May skip parts of `~/.bashrc` (e.g. `[ -z "$PS1" ] && return` early-exits).
+       * * On Windows — registry view: `HKLM\...\Session Manager\Environment` merged with `HKCU\Environment`.
+       *   No shell profile.
+       *
+       * **Notice:** MAY throw [EnvironmentVariablesException].
+       */
+      LOGIN_NON_INTERACTIVE,
+
+      /**
+       *  **Use with caution, avoid when possible.**
+       *
+       * Full interactive shell session.
+       *
+       * * On POSIX — interactive shell loading `~/.profile`, `~/.bashrc`, `~/.zshrc`, `/etc/profile` etc.
+       *   Reads all environment variables unlike [LOGIN_NON_INTERACTIVE], but interactive shells aren't meant
+       *   to run without a user. Real-world cases that broke users:
+       *   * `ssh-add` in `~/.bashrc` waits for a passphrase — the shell hangs forever, IDE becomes unusable.
+       *   * `~/.bashrc` starts `screen` or `tmux` — the shell hangs forever.
+       *   * `~/.bashrc` starts `ssh-agent` — the OS gets polluted with unused agents.
+       *   * `~/.bashrc` calls `curl` for weather/news/jokes — CPU usage grows, IDE slows down.
+       * * On Windows — PowerShell with the user's `$PROFILE` loaded.
+       *   Falls back to the registry view if PowerShell is unavailable or fails within the timeout.
+       *
+       * **Notice:** MAY throw [EnvironmentVariablesException].
+       */
+      @EelDelicateApi
+      LOGIN_INTERACTIVE,
+
+      /**
+       * Like [LOGIN_INTERACTIVE], but uses the unified [LoginShellSpawner.spawnLoginShell] pipeline.
+       *
+       * **Notice:** MAY throw [EnvironmentVariablesException].
+       */
+      @ApiStatus.Internal
+      LOGIN_INTERACTIVE_VIA_SHELL,
+    }
   }
 
   /**
@@ -421,6 +519,9 @@ sealed interface EelExecApi {
   }
 }
 
+/**
+ * [EelExecApi] for a POSIX environment. Spawns an [EelPosixProcess] and exposes POSIX environment-variable options.
+ */
 @ApiStatus.Experimental
 interface EelExecPosixApi : EelExecApi {
   @ThrowsChecked(ExecuteProcessException::class)
@@ -432,84 +533,42 @@ interface EelExecPosixApi : EelExecApi {
     @GeneratedBuilder(PosixEnvironmentVariablesOptions::class) opts: EelExecApi.EnvironmentVariablesOptions,
   ): EelExecApi.EnvironmentVariablesDeferred
 
-  interface PosixEnvironmentVariablesOptions : EelExecApi.EnvironmentVariablesOptions {
-    val mode: Mode get() = Mode.DEFAULT
-
-    enum class Mode {
-      /**
-       * * On remote Eel it works like [LOGIN_NON_INTERACTIVE], but in case of an error it returns [MINIMAL] instead of throwing an exception.
-       * * On local Windows and Linux it always works like [MINIMAL]
-       *   because historically the IDE haven't called the shell for environment variables in most cases.
-       * * On local macOS it works like [LOGIN_NON_INTERACTIVE] + [MINIMAL], but it returns values cached at start
-       *   with no effect from the [onlyActual] option. This is the historical behaviour too.
-       *
-       * In this mode [EelExecApi.EnvironmentVariablesException] is not thrown.
-       */
-      DEFAULT,
-
-      /**
-       * The fastest way to get environment variables. It doesn't call shell scripts written by users.
-       * At least, the environment variable `PATH` exists, but it may differ from what the user has in their `~/.profile` written.
-       * No guarantee for other environment variables.
-       *
-       * In this mode [EelExecApi.EnvironmentVariablesException] is not thrown.
-       */
-      MINIMAL,
-
-      /**
-       * This mode executes a shell process supposed to load various profile scripts:
-       * `~/.profile`, `~/.bashrc`, `~/.zshrc`, `/etc/profile` and so on.
-       *
-       * This mode may load not all environment variables, depending on what's written in user's configs
-       * because default `~/.bashrc` files in some distros like Debian and Ubuntu contain strings like `[ -z "$PS1" ] && return`.
-       * Often people put their adjustments at the bottom of the profile file, and therefore their code is not executed in the non-interactive mode.
-       *
-       * **Notice:** In this mode [EelExecApi.EnvironmentVariablesException] MAY be thrown.
-       */
-      LOGIN_NON_INTERACTIVE,
-
-      /**
-       *  **Use with caution, avoid when possible.**
-       *
-       * This mode executes a shell process supposed to load various profile scripts:
-       * `~/.profile`, `~/.bashrc`, `~/.zshrc`, `/etc/profile` and so on.
-       *
-       * The implementation launches an interactive shell session, so it reads all environment variables unlike [LOGIN_NON_INTERACTIVE].
-       *
-       * However, it's not conventional to run interactive shells without having an actual user interaction.
-       * And no way for user interaction is provided.
-       *
-       * Here are some real cases reported by our users. They're not exceptional cases but rather usual things.
-       * In these cases this mode led to inability to fetch environment variables or high CPU consumption:
-       * * `ssh-add` in `~/.bashrc` waits for a key passphrase, and the shell process hangs forever, IDE becomes unusable.
-       * * `~/.bashrc` starts `screen` or `tmux`, the shell process hangs forever.
-       * * `~/.bashrc` starts `ssh-agent`, and the operating system quickly becomes polluted with lots of unused SSH agents.
-       * * `~/.bashrc` calls `curl` to write the current weather, news, jokes, etc. CPU consumption grows, IDE works slower.
-       *
-       * **Notice:** In this mode [EelExecApi.EnvironmentVariablesException] MAY be thrown.
-       */
-      @EelDelicateApi
-      LOGIN_INTERACTIVE,
-    }
-  }
+  interface PosixEnvironmentVariablesOptions : EelExecApi.EnvironmentVariablesOptions
 }
 
+/**
+ * [EelExecApi] for a Windows environment. Spawns an [EelWindowsProcess] and exposes Windows environment-variable options.
+ */
 @ApiStatus.Experimental
 interface EelExecWindowsApi : EelExecApi {
   @ThrowsChecked(ExecuteProcessException::class)
   @ApiStatus.Experimental
   override suspend fun spawnProcess(@GeneratedBuilder generatedBuilder: ExecuteProcessOptions): EelWindowsProcess
+
+  @ApiStatus.Experimental
+  override fun environmentVariables(
+    @GeneratedBuilder(WindowsEnvironmentVariablesOptions::class) opts: EelExecApi.EnvironmentVariablesOptions,
+  ): EelExecApi.EnvironmentVariablesDeferred
+
+  interface WindowsEnvironmentVariablesOptions : EelExecApi.EnvironmentVariablesOptions
 }
 
+/**
+ * Returns the first executable named [exe] found in the environment's `PATH`, or `null` if none — like the Unix `which` command.
+ *
+ * Convenience over [findExeFilesInPath].
+ */
 @ApiStatus.Experimental
 suspend fun EelExecApi.where(exe: String): EelPath? {
   return this.findExeFilesInPath(exe).firstOrNull()
 }
 
+/** Convenience builder over `spawnProcess` for an executable given as an [EelPath], pre-filling [ExecuteProcessOptions.args]. */
 @ApiStatus.Experimental
 fun EelExecApi.spawnProcess(exe: EelPath, vararg args: String): EelExecApiHelpers.SpawnProcess =
   spawnProcess(exe.toString()).args(*args)
 
+/** Convenience builder over `spawnProcess` for an executable given by path or name, pre-filling [ExecuteProcessOptions.args]. */
 @ApiStatus.Experimental
 fun EelExecApi.spawnProcess(exe: String, vararg args: String): EelExecApiHelpers.SpawnProcess =
   spawnProcess(exe).args(*args)
@@ -543,6 +602,15 @@ suspend fun EelExecApi.getShell(): Pair<EelPath, String> {
     }
   }
   return Pair(EelPath.parse(shell, descriptor), cmdArg)
+}
+
+/**
+ * Prepare execution of [commands] in shell [getShell].
+ */
+@ApiStatus.Internal
+suspend fun EelExecApi.execInShell(vararg commands: String): EelExecApiHelpers.SpawnProcess {
+  val (shell, arg) = getShell()
+  return spawnProcess(shell, arg, *commands)
 }
 
 /** Hopefully, it's a temporary workaround. */

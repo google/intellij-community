@@ -8,20 +8,17 @@ load(
 KotlincOptions = _RKKotlincOptions
 
 KotlincExtraOptionsInfo = provider(
+    doc = "Extra Kotlin compiler options not covered by the standard KotlincOptions provider.",
     fields = {
-        "api_version": "Kotlin API version used by the JPS backend.",
-        "language_version": "Kotlin language version used by the JPS backend.",
-        "plugin_options": "Additional -P compiler options for the JPS backend.",
-        "x_allow_result_return_type": "Enable kotlin.Result as a return type for the JPS backend.",
-        "x_strict_java_nullability_assertions": "Enable strict Java nullability assertions for the JPS backend.",
-        "x_wasm_attach_js_exception": "Enable attaching JS exceptions for Wasm in the JPS backend.",
-        "x_wasm_kclass_fqn": "Enable KClass::qualifiedName support for Wasm in the JPS backend.",
+        "plugin_options": "Additional -P compiler options.",
+        "x_allow_result_return_type": "Enable kotlin.Result as a return type.",
+        "x_strict_java_nullability_assertions": "Enable strict Java nullability assertions.",
+        "x_wasm_attach_js_exception": "Enable attaching JS exceptions for Wasm.",
+        "x_wasm_kclass_fqn": "Enable KClass::qualifiedName support for Wasm.",
     },
 )
 
 _EXTRA_OPTION_FIELDS = [
-    "api_version",
-    "language_version",
     "plugin_options",
     "x_allow_result_return_type",
     "x_strict_java_nullability_assertions",
@@ -30,14 +27,6 @@ _EXTRA_OPTION_FIELDS = [
 ]
 
 _EXTRA_OPTION_ATTRS = {
-    "api_version": attr.string(
-        default = "",
-        doc = "Allow using declarations only from the specified version of Kotlin bundled libraries.",
-    ),
-    "language_version": attr.string(
-        default = "",
-        doc = "Provide source compatibility with the specified version of Kotlin.",
-    ),
     "plugin_options": attr.string_list(
         default = [],
         doc = "Define compiler plugin options to pass as repeated -P entries.",
@@ -140,14 +129,6 @@ def _extra_options_to_flags(kotlinc_extra_options):
         return []
 
     flags = []
-
-    api_version = getattr(kotlinc_extra_options, "api_version", None)
-    if api_version:
-        flags.append("-api-version=%s" % api_version)
-
-    language_version = getattr(kotlinc_extra_options, "language_version", None)
-    if language_version:
-        flags.append("-language-version=%s" % language_version)
 
     plugin_options = getattr(kotlinc_extra_options, "plugin_options", None)
     if plugin_options:

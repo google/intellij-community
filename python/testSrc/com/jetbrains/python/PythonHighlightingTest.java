@@ -1,6 +1,10 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python;
 
+import com.jetbrains.python.allure.Components;
+import com.jetbrains.python.allure.Layers;
+import com.jetbrains.python.allure.Subsystems;
+
 import com.intellij.openapi.editor.colors.EditorColorsManager;
 import com.intellij.openapi.editor.colors.EditorColorsScheme;
 import com.intellij.openapi.editor.colors.TextAttributesKey;
@@ -20,6 +24,9 @@ import java.awt.Font;
 /**
  * Test highlighting added by annotators.
  */
+@Subsystems.CodeInsight
+@Components.Highlighting
+@Layers.Functional
 public class PythonHighlightingTest extends PyTestCase {
 
   private EditorColorsScheme myOriginalScheme;
@@ -608,6 +615,11 @@ public class PythonHighlightingTest extends PyTestCase {
 
   // PY-20401
   public void testAnnotations() {
+    runWithLanguageLevel(LanguageLevel.PYTHON36, this::doTest);
+  }
+
+  // PY-48749
+  public void testCommentInsideMultilineAnnotation() {
     runWithLanguageLevel(LanguageLevel.PYTHON36, this::doTest);
   }
 

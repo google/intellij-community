@@ -2,9 +2,8 @@
 package org.jetbrains.plugins.gradle.service.execution.statistics
 
 import org.gradle.tooling.events.ProgressEvent
-import org.gradle.tooling.events.internal.DefaultFinishEvent
+import org.gradle.tooling.events.task.TaskFinishEvent
 import org.gradle.tooling.events.task.internal.DefaultTaskFailureResult
-import org.gradle.tooling.events.task.internal.DefaultTaskFinishEvent
 import org.jetbrains.plugins.gradle.util.GradleTaskClassifier.classifyTaskName
 
 class GradleTaskExecutionListener(val handler: GradleTaskExecutionHandler) {
@@ -18,6 +17,8 @@ class GradleTaskExecutionListener(val handler: GradleTaskExecutionHandler) {
 
     private const val UP_TO_DATE = "UP-TO-DATE"
     private const val FROM_CACHE = "FROM-CACHE"
+
+    private val QUOTED_IDENTIFIER: Regex = Regex("'([^']+)'")
   }
 
   private val inflightTasks: MutableMap<String, AggregatedTaskReport> = HashMap()
@@ -27,7 +28,7 @@ class GradleTaskExecutionListener(val handler: GradleTaskExecutionHandler) {
     if (flushed) {
       return
     }
-    if (event is DefaultTaskFinishEvent) {
+    if (event is TaskFinishEvent) {
       addTaskFinish(event)
     }
   }
@@ -41,7 +42,7 @@ class GradleTaskExecutionListener(val handler: GradleTaskExecutionHandler) {
     flushed = true
   }
 
-  private fun addTaskFinish(event: DefaultTaskFinishEvent) {
+  private fun addTaskFinish(event: TaskFinishEvent) {
     val source = event.getTaskSource()
     var taskName: String = USER_DEFINED_TASK_NAME_REPLACEMENT
     var taskSource: String = UNKNOWN
@@ -71,15 +72,18 @@ class GradleTaskExecutionListener(val handler: GradleTaskExecutionHandler) {
       }
   }
 
-  private fun DefaultTaskFinishEvent.getClassifiedTaskName(): String = descriptor.taskPath
+  private fun TaskFinishEvent.getClassifiedTaskName(): String = descriptor.taskPath
     .split(":")
     .last()
     .trim()
     .let { classifyTaskName(it) }
 
-  private fun DefaultTaskFinishEvent.getTaskSource(): String = descriptor.originPlugin?.displayName ?: UNKNOWN
+  private fun TaskFinishEvent.getTaskSource(): String {
+    val displayName = descriptor.originPlugin?.displayName ?: return UNKNOWN
+    return QUOTED_IDENTIFIER.find(displayName)?.groupValues?.get(1) ?: displayName
+  }
 
-  private fun DefaultFinishEvent<*, *>.duration(): Long = result.run { endTime - startTime }
+  private fun TaskFinishEvent.duration(): Long = result.run { endTime - startTime }
 
   private fun isKnownTaskSource(name: String?): Boolean = name != null && (name.startsWith(ORG_GRADLE_PACKAGE) || name.startsWith(
     ORG_JETBRAINS_PACKAGE))

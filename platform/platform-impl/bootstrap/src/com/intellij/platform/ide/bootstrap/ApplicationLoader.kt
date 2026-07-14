@@ -6,6 +6,7 @@ package com.intellij.platform.ide.bootstrap
 
 import com.intellij.diagnostic.COROUTINE_DUMP_HEADER
 import com.intellij.diagnostic.LoadingState
+import com.intellij.diagnostic.LocksActionsDumper
 import com.intellij.diagnostic.PluginException
 import com.intellij.diagnostic.ProgressIndicatorDumper
 import com.intellij.diagnostic.WriteLockMeasurer
@@ -25,6 +26,7 @@ import com.intellij.ide.ProtocolHandler
 import com.intellij.ide.bootstrap.InitAppContext
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.ide.plugins.PluginSet
+import com.intellij.ide.plugins.ThirdPartyPluginsPrivacyConsentState
 import com.intellij.ide.plugins.marketplace.statistics.PluginManagerUsageCollector
 import com.intellij.ide.plugins.marketplace.statistics.enums.DialogAcceptanceResultEnum
 import com.intellij.ide.plugins.saveBundledPluginsState
@@ -276,7 +278,6 @@ internal suspend fun loadApp(
 private val asyncAppListenerAllowListForNonCorePlugin = java.util.Set.of(
   "com.jetbrains.rdserver.unattendedHost.logs.BackendMessagePoolExporter\$MyAppListener",
   "com.intellij.settingsSync.core.SettingsSynchronizerApplicationInitializedListener",
-  "com.intellij.dataspell.ide.impl.jupyter.JupyterDSProjectLifecycleListener",
   "com.jetbrains.gateway.GatewayBuildDateExpirationListener",
   "com.intellij.ide.misc.PluginAgreementUpdateScheduler",
   "org.jetbrains.kotlin.idea.macros.ApplicationWideKotlinBundledPathMacroCleaner",
@@ -383,8 +384,11 @@ private suspend fun enableJstack() {
 $COROUTINE_DUMP_HEADER
 ${dumpCoroutines(stripDump = false)}
 
-${ProgressIndicatorDumper.PROGRESS_INDICATOR_DUMP_HEADER}
-${ProgressIndicatorDumper.dumpProgressIndicatorState() ?: "No progress indicator dump"}
+${ProgressIndicatorDumper.dumpProgressIndicatorState()}
+${LocksActionsDumper.dumpLocksAndActionsStateOrNull().let {
+  if (it == null) "" else "\n$it"
+}
+}
 """
     }
   }
@@ -599,7 +603,7 @@ fun callAppInitialized(scope: CoroutineScope, listeners: List<ApplicationInitial
 }
 
 private suspend fun checkThirdPartyPluginsAllowed() {
-  val noteAccepted = PluginManagerCore.consumeThirdPartyPluginsNoteAcceptedFlag() ?: return
+  val noteAccepted = ThirdPartyPluginsPrivacyConsentState.consumeState() ?: return
   if (noteAccepted) {
     serviceAsync<UpdateSettings>().isThirdPartyPluginsAllowed = true
     PluginManagerUsageCollector.thirdPartyAcceptanceCheck(DialogAcceptanceResultEnum.ACCEPTED)

@@ -3,8 +3,8 @@ package com.intellij.util.io;
 
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.io.FileUtil;
+import com.intellij.util.io.ChannelsAccessor.FileChannelOperation;
 import com.intellij.util.io.FileChannelInterruptsRetryer.FileChannelIdempotentOperation;
-import com.intellij.util.io.OpenChannelsCache.FileChannelOperation;
 import com.intellij.util.io.pagecache.FilePageCacheStatistics;
 import com.intellij.util.io.pagecache.Page;
 import com.intellij.util.io.pagecache.PagedStorage;
@@ -48,7 +48,7 @@ public final class PagedFileStorageWithRWLockedPageContent implements PagedStora
   private static final int MAX_ATTEMPTS_TO_ACQUIRE_PAGE = getIntProperty("vfs.lock-free-impl.max-attempts-to-acquire-page", 10_000);
 
 
-  private final @NotNull StorageLockContext storageLockContext;
+  private final @NotNull ChannelsAccessor channelsAccessor;
 
   private final @NotNull Path file;
 
@@ -159,14 +159,14 @@ public final class PagedFileStorageWithRWLockedPageContent implements PagedStora
 
     this.file = file;
 
-    this.storageLockContext = storageLockContext;
+    channelsAccessor = storageLockContext.getChannelsAccessor(readOnly);
     this.pageSize = pageSize;
     this.readOnly = readOnly;
     this.nativeBytesOrder = nativeBytesOrder;
 
     this.pageContentLockingStrategy = strategy;
 
-    pageCache = this.storageLockContext.pageCache();
+    pageCache = storageLockContext.pageCache();
     pages = pageCache.registerStorage(this);
 
     try {
@@ -551,14 +551,16 @@ public final class PagedFileStorageWithRWLockedPageContent implements PagedStora
     return pages;
   }
 
-  <R> R executeOp(final @NotNull FileChannelOperation<R> operation,
-                  final boolean readOnly) throws IOException {
-    return storageLockContext.executeOp(file, operation, readOnly);
+  <R> R executeOp(final @NotNull FileChannelOperation<R> operation) throws IOException {
+    return channelsAccessor.executeOp(file, operation);
   }
 
-  <R> R executeIdempotentOp(final @NotNull FileChannelIdempotentOperation<R> operation,
-                            final boolean readOnly) throws IOException {
-    return storageLockContext.executeIdempotentOp(file, operation, readOnly);
+  <R> R executeIdempotentOp(final @NotNull FileChannelIdempotentOperation<R> operation) throws IOException {
+    return channelsAccessor.executeIdempotentOp(file, operation);
+  }
+
+  void closeChannel() throws IOException {
+    channelsAccessor.closeChannel(file);
   }
 
   private PageImpl createUninitializedPage(final int pageIndex) {
@@ -585,7 +587,7 @@ public final class PagedFileStorageWithRWLockedPageContent implements PagedStora
         }
         pageCacheStatistics.pageRead(bytesActuallyRead, startedAtNs);
         return pageBuffer;
-      }, isReadOnly());
+      });
     }
     catch (Throwable t) {
       pageCache.reclaimPageBuffer(pageSize, pageBuffer);
@@ -601,7 +603,7 @@ public final class PagedFileStorageWithRWLockedPageContent implements PagedStora
     executeIdempotentOp(ch -> {
       ch.write(bufferToSave, offsetInFile);
       return null;
-    }, isReadOnly());
+    });
 
     pageCacheStatistics.pageWritten(bytesToStore, startedAtNs);
   }

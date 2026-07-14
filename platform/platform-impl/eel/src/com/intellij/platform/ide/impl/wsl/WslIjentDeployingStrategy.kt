@@ -4,9 +4,10 @@ package com.intellij.platform.ide.impl.wsl
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.wsl.WSLCommandLineOptions
 import com.intellij.execution.wsl.WSLDistribution
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.platform.ijent.IjentExecFileProvider
 import com.intellij.platform.ijent.ParentOfIjentScopes
 import com.intellij.platform.ijent.spi.IjentConnectionStrategy
 import com.intellij.platform.ijent.spi.IjentDeployingOverShellProcessStrategy
@@ -28,7 +29,7 @@ class WslIjentDeployingStrategy(
   override suspend fun mapPath(path: Path): String? =
     distribution.getWslPath(path)
 
-  @OptIn(IntellijInternalApi::class, DelicateCoroutinesApi::class)
+  @OptIn(DelicateCoroutinesApi::class)
   override suspend fun createShellProcess(): Process {
     // IJent can start an interactive shell by itself whenever it needs.
     // Enabling an interactive shell for IJent by default can bring problems, because stdio of IJent must not be populated
@@ -53,4 +54,6 @@ class WslIjentDeployingStrategy(
       }
     }
   }
+
+  override val ijentExecFileProvider: IjentExecFileProvider = service()
 }

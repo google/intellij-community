@@ -5,7 +5,7 @@ import com.intellij.openapi.diagnostic.fileLogger
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.roots.ModuleRootManager
 import com.jetbrains.python.sdk.associatedModulePath
-import com.jetbrains.python.sdk.getOrCreateAdditionalData
+import com.jetbrains.python.sdk.pySdkAdditionalData
 import com.jetbrains.python.sdk.isAssociatedWithAnotherModule
 import com.jetbrains.python.sdk.isAssociatedWithModule
 import com.jetbrains.python.venvReader.VirtualEnvReader
@@ -75,9 +75,10 @@ suspend fun <P : PathHolder> sortForExistingEnvironment(
         is InstallableSelectableInterpreter -> error("$it is unexpected")
         is DetectedSelectableInterpreter -> {
           if (module != null) {
-            when (it.homePath) {
+            val homePath = it.homePath
+            when (homePath) {
               is PathHolder.Eel -> {
-                if (ModuleRootManager.getInstance(module).contentRoots.any { root -> it.homePath.path.startsWith(root.toNioPath()) }) {
+                if (ModuleRootManager.getInstance(module).contentRoots.any { root -> homePath.path.startsWith(root.toNioPath()) }) {
                   return@groupBy Group.ASSOC_WITH_PROJ_ROOT
                 }
               }
@@ -95,7 +96,7 @@ suspend fun <P : PathHolder> sortForExistingEnvironment(
               return@groupBy Group.REDUNDANT // Foreign SDK
             }
           }
-          else if (it.sdkWrapper.sdk.getOrCreateAdditionalData().associatedModulePath != null) {
+          else if (it.sdkWrapper.sdk.pySdkAdditionalData.associatedModulePath != null) {
             // module == null, associated path != null: associated sdk can't be used without a module
             return@groupBy Group.REDUNDANT
           }
@@ -117,4 +118,3 @@ suspend fun <P : PathHolder> sortForExistingEnvironment(
     }.distinctBy { it.homePath }
   }
 }
-

@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diagnostic
 
 import com.intellij.errorreport.error.InternalEAPException
@@ -23,12 +23,13 @@ import com.intellij.platform.ide.productInfo.IdeProductInfo
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.ui.JBAccountInfoService
 import com.intellij.ui.LicensingFacade
+import com.intellij.util.net.ssl.CertificateManager
 import com.intellij.util.system.CpuArch
+import com.intellij.util.system.LowLevelLocalMachineAccess
 import com.intellij.util.system.OS
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import org.jetbrains.annotations.ApiStatus
@@ -43,14 +44,19 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
+import java.security.KeyStore
 import java.time.Duration
+import java.util.Base64
 import java.util.zip.GZIPOutputStream
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.TrustManagerFactory
+import javax.net.ssl.X509TrustManager
 import kotlin.io.path.Path
 import kotlin.io.path.bufferedReader
 
 @Service
 internal class ITNProxyCoroutineScopeHolder(coroutineScope: CoroutineScope) {
-  @OptIn(ExperimentalCoroutinesApi::class)
   @JvmField
   val dispatcher: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(2)
 
@@ -59,12 +65,28 @@ internal class ITNProxyCoroutineScopeHolder(coroutineScope: CoroutineScope) {
 }
 
 @ApiStatus.Internal
+@OptIn(LowLevelLocalMachineAccess::class)
 object ITNProxy {
-  private const val DEFAULT_ENDPOINT = "https://ea-report.jetbrains.com/trackerRpc/idea/createScr"
   private const val REPORT_ENDPOINT_KEY = "ea.diagnostic.endpoint"
+  private const val REPORT_ENDPOINT_PUBLIC_KEY_KEY = "ea.diagnostic.endpoint.public.key"
   private const val JETBRAINS_HOST_SUFFIX = ".jetbrains.com"
   private const val DIOGEN_VIEW_URL = "https://diogen.labs.jb.gg/report/"
+
+  private val DEFAULT_ENDPOINT = URI.create("https://ea-report.jetbrains.com/trackerRpc/idea/createScr")
   private val LOG = logger<ITNProxy>()
+
+  private typealias Endpoint = Pair<URI, ByteArray?>
+
+  private val endpoint: Endpoint by lazy {
+    val uri = getConfiguredReportEndpoint()
+    if (uri != null) {
+      val pinnedPublicKey = getConfiguredReportEndpointPublicKey()
+      if (pinnedPublicKey != null) {
+        return@lazy Endpoint(uri, pinnedPublicKey)
+      }
+    }
+    Endpoint(DEFAULT_ENDPOINT, null)
+  }
 
   internal val DEVICE_ID: String by lazy {
     DeviceIdManager.getOrGenerateId(object : DeviceIdManager.DeviceIdToken {}, "EA")
@@ -178,7 +200,14 @@ object ITNProxy {
     return isJetBrainsEmail || isJetBrainsTeam
   }
 
-  private val httpClient by lazy {
+  private val jdkDefaultTrustManager: X509TrustManager by lazy {
+    val trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+    trustManagerFactory.init(null as KeyStore?)
+    trustManagerFactory.trustManagers.filterIsInstance<X509TrustManager>().firstOrNull()
+      ?: error("No X509TrustManager available")
+  }
+
+  private val defaultHttpClient by lazy {
     HttpClient.newBuilder()
       .followRedirects(HttpClient.Redirect.NORMAL)
       .connectTimeout(Duration.ofMinutes(2))
@@ -186,10 +215,10 @@ object ITNProxy {
   }
 
   @Throws(Exception::class)
-  internal suspend fun sendError(error: ErrorBean, newThreadPostUrl: String?): Long {
+  internal suspend fun sendError(error: ErrorBean, postUrl: URI?): Long {
     val context = currentCoroutineContext()
     val request = createRequest(error.event, error)
-    val response = post(newThreadPostUrl ?: getReportEndpoint(), request)
+    val response = post(resolveReportEndpoint(postUrl), request)
     context.ensureActive()
     val reportId = handleResponse(response)
     logger<ITNProxy>().info("report ID: ${reportId}")
@@ -200,36 +229,52 @@ object ITNProxy {
   @Throws(Exception::class)
   fun sendError(event: IdeaLoggingEvent): Long {
     val request = createRequest(event, errorBean = null)
-    val response = post(getReportEndpoint(), request)
+    val response = post(resolveReportEndpoint(postUrl = null), request)
     return handleResponse(response)
   }
 
-  private fun getReportEndpoint(): String {
-    val endpoint = getConfiguredReportEndpoint() ?: return DEFAULT_ENDPOINT
-
-    if (!isEndpointValid(endpoint)) {
-      LOG.debug("Ignoring $REPORT_ENDPOINT_KEY=$endpoint: expected an HTTPS endpoint whose host ends with $JETBRAINS_HOST_SUFFIX")
-      return DEFAULT_ENDPOINT
-    }
-
-    return endpoint
+  private fun resolveReportEndpoint(postUrl: URI?): Endpoint = when {
+    postUrl != null -> Endpoint(postUrl, null)
+    else -> endpoint
   }
 
-  private fun getConfiguredReportEndpoint(): String? {
-    if (LoadingState.COMPONENTS_LOADED.isOccurred) {
-      Registry.stringValue(REPORT_ENDPOINT_KEY, "").trim().takeIf { it.isNotEmpty() }?.let {
-        return it
-      }
+  private fun getConfiguredReportEndpoint(): URI? {
+    val raw = when {
+      LoadingState.COMPONENTS_LOADED.isOccurred -> Registry.stringValue(REPORT_ENDPOINT_KEY, "")
+      else -> System.getProperty(REPORT_ENDPOINT_KEY)
     }
-    return System.getProperty(REPORT_ENDPOINT_KEY)?.trim()?.takeIf { it.isNotEmpty() }
+    if (raw.isNullOrBlank()) return null
+    val uri = runCatching { URI(raw.trim()) }.getOrNull()
+    if (
+      uri == null ||
+      !"https".equals(uri.scheme, ignoreCase = true) ||
+      uri.host?.endsWith(JETBRAINS_HOST_SUFFIX, ignoreCase = true) != true
+    ) {
+      LOG.error("Ignoring $REPORT_ENDPOINT_KEY=${raw}: expected an HTTPS endpoint in the ${JETBRAINS_HOST_SUFFIX} domain")
+      return null
+    }
+    return uri
   }
 
-  private fun isEndpointValid(endpoint: String): Boolean {
-    val uri = runCatching { URI(endpoint) }.getOrNull() ?: return false
-    val host = uri.host ?: return false
-    if (!uri.scheme.equals("https", ignoreCase = true)) return false
-    if (!host.endsWith(JETBRAINS_HOST_SUFFIX, ignoreCase = true)) return false
-    return true
+  private fun getConfiguredReportEndpointPublicKey(): ByteArray? {
+    val raw = when {
+      LoadingState.COMPONENTS_LOADED.isOccurred -> Registry.stringValue(REPORT_ENDPOINT_PUBLIC_KEY_KEY, "")
+      else -> System.getProperty(REPORT_ENDPOINT_PUBLIC_KEY_KEY)
+    }
+    if (raw.isNullOrBlank()) {
+      LOG.error("Custom error reporting endpoint requires a pinned public key.")
+      return null
+    }
+    val normalized = raw.lineSequence()
+      .map(String::trim)
+      .filterNot { it.isEmpty() || it.startsWith("-----BEGIN") || it.startsWith("-----END") }
+      .joinToString(separator = "")
+    val bytes = runCatching { Base64.getDecoder().decode(normalized) }.getOrNull()
+    if (bytes == null || bytes.isEmpty()) {
+      LOG.error("Invalid endpoint public key. Expected Base64-encoded X.509 public key bytes or PEM text.")
+      return null
+    }
+    return bytes
   }
 
   private fun handleResponse(response: HttpResponse<String>): Long {
@@ -310,16 +355,19 @@ object ITNProxy {
 
       append(builder, "error.description", errorBean.comment)
 
-      PluginManagerCore.loadedPlugins
-        .filter { !it.isBundled }
+      PluginManagerCore.loadedPlugins.asSequence()
+        .filter { !it.isBundled && !PluginManagerCore.isUpdatedBundledPlugin(it) }
         .map { it.pluginId }
         .filter { getPluginInfoById(it).isSafeToReport() }
+        .toList()
         .takeIf { it.isNotEmpty() }
         ?.joinToString(",") { it.idString }
         ?.let { append(builder, "plugins.nonbundled", it) }
+      appendDynamicPluginUnloadInfo(builder, event)
 
       if (errorBean.isAutoReportedByPlatform) {
         append(builder, "report.automatic", "true")
+        append(builder, "report.automatic.source", ExceptionAutoReportUtil.getAutoReportSource(event.throwable))
 
         ExceptionAutoReportUtil.getAutoReportTag()?.let {
           append(builder, "report.automatic.tag", it)
@@ -330,6 +378,13 @@ object ITNProxy {
     return builder
   }
 
+  private fun appendDynamicPluginUnloadInfo(builder: StringBuilder, event: IdeaLoggingEvent) {
+    val message = event.data as? AbstractMessage ?: return
+    if (DynamicPluginUnloadDiagnosticState.wasUnloadAttemptedBefore(message.date.time)) {
+      append(builder, "plugins.dynamic.unload.attempted", "true")
+    }
+  }
+
   private fun append(builder: StringBuilder, key: String, value: String?) {
     if (!value.isNullOrEmpty()) {
       if (builder.isNotEmpty()) builder.append('&')
@@ -338,18 +393,40 @@ object ITNProxy {
   }
 
   @Throws(Exception::class)
-  private fun post(url: String, formData: CharSequence): HttpResponse<String> {
+  private fun post(endpoint: Endpoint, formData: CharSequence): HttpResponse<String> {
     val compressed = BufferExposingByteArrayOutputStream(formData.length)
     OutputStreamWriter(GZIPOutputStream(compressed), StandardCharsets.UTF_8).use { writer ->
       for (element in formData) {
         writer.write(element.code)
       }
     }
-    val request = HttpRequest.newBuilder(URI(url))
+    val (url, pinnedPublicKey) = endpoint
+    val request = HttpRequest.newBuilder(url)
       .header("Content-Type", "application/x-www-form-urlencoded; charset=" + StandardCharsets.UTF_8.name())
       .header("Content-Encoding", "gzip")
       .POST(HttpRequest.BodyPublishers.ofByteArray(compressed.toByteArray(), 0, compressed.size()))
       .build()
-    return httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+    val client = if (pinnedPublicKey != null) createPinnedHttpClient(pinnedPublicKey) else defaultHttpClient
+    return client.send(request, HttpResponse.BodyHandlers.ofString())
+  }
+
+  private fun createPinnedHttpClient(expectedPublicKey: ByteArray): HttpClient {
+    val sslContext = SSLContext.getInstance("TLS")
+    sslContext.init(null, arrayOf<TrustManager>(PinnedPublicKeyTrustManager(getEndpointTrustManager(), expectedPublicKey)), null)
+    return HttpClient.newBuilder()
+      .followRedirects(HttpClient.Redirect.NORMAL)
+      .connectTimeout(Duration.ofMinutes(2))
+      .sslContext(sslContext)
+      .build()
+  }
+
+  private fun getEndpointTrustManager(): X509TrustManager {
+    if (LoadingState.COMPONENTS_LOADED.isOccurred) {
+      runCatching { CertificateManager.getInstance().trustManager }
+        .onFailure { LOG.warn("Cannot use IDE certificate trust manager for pinned error report endpoint", it) }
+        .getOrNull()
+        ?.let { return it }
+    }
+    return jdkDefaultTrustManager
   }
 }

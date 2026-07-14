@@ -3,8 +3,9 @@ package com.intellij.platform.pluginSystem.testFramework
 
 import com.intellij.ide.plugins.PluginManagerState
 import com.intellij.ide.plugins.PluginSet
+import com.intellij.platform.testFramework.plugins.PluginBuilderDsl
 import com.intellij.platform.testFramework.plugins.PluginSpecBuilder
-import com.intellij.platform.testFramework.plugins.buildDir
+import com.intellij.platform.testFramework.plugins.installAt
 import java.nio.file.Path
 import com.intellij.platform.testFramework.plugins.plugin as buildPlugin
 
@@ -14,15 +15,16 @@ import com.intellij.platform.testFramework.plugins.plugin as buildPlugin
  *                       [com.intellij.testFramework.rules.InMemoryFsExtension]
  */
 //todo: move this to some testFramework module
-fun buildPluginSet(pluginsDirPath: Path, builder: PluginSetSpecBuilder.() -> Unit): PluginSet {
-  return buildPluginSetState(pluginsDirPath, builder).pluginSet
+fun buildPluginSet(pluginsDirPath: Path, configureClassLoaders: Boolean = true, builder: PluginSetSpecBuilder.() -> Unit): PluginSet {
+  return buildPluginSetState(pluginsDirPath, configureClassLoaders, builder).pluginSet
 }
 
-fun buildPluginSetState(pluginsDirPath: Path, builder: PluginSetSpecBuilder.() -> Unit): PluginManagerState {
+fun buildPluginSetState(pluginsDirPath: Path, configureClassLoaders: Boolean = true, builder: PluginSetSpecBuilder.() -> Unit): PluginManagerState {
   builder(PluginSetSpecBuilder(pluginsDirPath))
-  return PluginSetTestBuilder.fromPath(pluginsDirPath).buildState()
+  return PluginSetTestBuilder.fromPath(pluginsDirPath).buildState(configureClassLoaders)
 }
 
+@PluginBuilderDsl
 class PluginSetSpecBuilder internal constructor(private val pluginsDirPath: Path) {
   fun plugin(id: String? = null, body: PluginSpecBuilder.() -> Unit) {
     val pluginSpec = if (id != null) {
@@ -31,6 +33,6 @@ class PluginSetSpecBuilder internal constructor(private val pluginsDirPath: Path
     else {
       buildPlugin(body = body)
     }
-    pluginSpec.buildDir(pluginsDirPath.resolve(pluginSpec.id!!))
+    pluginSpec.installAt(pluginsDirPath)
   }
 }

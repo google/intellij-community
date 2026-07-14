@@ -1,4 +1,4 @@
-<idea-plugin visibility="internal" package="com.intellij.platform.clouds">
+<idea-plugin visibility="internal">
   <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
   <dependencies>
     <plugin id="com.intellij.modules.remoteServers"/>
@@ -9,6 +9,7 @@
     <module name="intellij.platform.ide.core"/>
     <module name="intellij.platform.lang"/>
     <module name="intellij.platform.remoteServers"/>
+    <module name="intellij.platform.remoteServers.impl"/>
     <module name="intellij.platform.util.ui"/>
   </dependencies>
   <!-- endregion -->

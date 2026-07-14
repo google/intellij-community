@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.github.pullrequest.action
 
 import com.intellij.collaboration.messages.CollaborationToolsBundle
@@ -13,7 +13,9 @@ import com.intellij.openapi.components.serviceIfCreated
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.ui.ClientProperty
+import com.intellij.ui.JBColor
 import com.intellij.util.ui.JButtonAction
+import com.intellij.util.ui.UIUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.plugins.github.i18n.GithubBundle
@@ -21,6 +23,12 @@ import org.jetbrains.plugins.github.pullrequest.ui.review.GHPROnCurrentBranchSer
 import org.jetbrains.plugins.github.pullrequest.ui.review.GHPRReviewViewModel
 import org.jetbrains.plugins.github.pullrequest.ui.review.GHPRSubmitReviewPopup
 import javax.swing.JButton
+
+private const val BUTTON_BACKGROUND_COLOR_KEY = "JButton.backgroundColor"
+
+private val BACKGROUND_COLOR = JBColor.lazy {
+  UIUtil.getTextFieldBackground()
+}
 
 class GHPRReviewSubmitAction
   : JButtonAction(StringUtil.ELLIPSIS, GithubBundle.message("pull.request.review.submit.action.description")) {
@@ -59,10 +67,10 @@ class GHPRReviewSubmitAction
     }
 
     return if (pendingComments == null) {
-      CollaborationToolsBundle.message("review.start.submit.action.short")
+      CollaborationToolsBundle.message("review.start.submit.action")
     }
     else {
-      CollaborationToolsBundle.message("review.start.submit.action.short.with.comments", pendingComments)
+      CollaborationToolsBundle.message("review.start.submit.action.with.comments", pendingComments)
     }
   }
 
@@ -88,8 +96,14 @@ class GHPRReviewSubmitAction
   private fun findVm(e: AnActionEvent): GHPRReviewViewModel? =
     e.getData(GHPRReviewViewModel.DATA_KEY) ?: e.project?.serviceIfCreated<GHPROnCurrentBranchService>()?.vmState?.value
 
+  override fun createButton(): JButton = super.createButton().apply {
+    putClientProperty(BUTTON_BACKGROUND_COLOR_KEY, BACKGROUND_COLOR)
+  }
+
   override fun updateButtonFromPresentation(button: JButton, presentation: Presentation) {
     super.updateButtonFromPresentation(button, presentation)
-    ClientProperty.put(button, DarculaButtonUI.DEFAULT_STYLE_KEY, presentation.getClientProperty(DarculaButtonUI.DEFAULT_STYLE_KEY))
+    val isDefaultStyle = presentation.getClientProperty(DarculaButtonUI.DEFAULT_STYLE_KEY) == true
+    ClientProperty.put(button, DarculaButtonUI.DEFAULT_STYLE_KEY, isDefaultStyle)
+    button.putClientProperty(BUTTON_BACKGROUND_COLOR_KEY, if (isDefaultStyle) null else BACKGROUND_COLOR)
   }
 }

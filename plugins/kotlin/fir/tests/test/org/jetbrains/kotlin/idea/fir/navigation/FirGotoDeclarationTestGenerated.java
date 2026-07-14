@@ -3,7 +3,6 @@
 package org.jetbrains.kotlin.idea.fir.navigation;
 
 import com.intellij.testFramework.TestDataPath;
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode;
 import org.jetbrains.kotlin.idea.base.test.TestRoot;
 import org.jetbrains.kotlin.idea.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils;
@@ -20,12 +19,6 @@ import org.junit.runner.RunWith;
 @RunWith(JUnit3RunnerWithInners.class)
 @TestMetadata("../../idea/tests/testData/navigation/gotoDeclaration")
 public class FirGotoDeclarationTestGenerated extends AbstractFirGotoDeclarationTest {
-    @java.lang.Override
-    @org.jetbrains.annotations.NotNull
-    public final KotlinPluginMode getPluginMode() {
-        return KotlinPluginMode.K2;
-    }
-
     private void runTest(String testDataFilePath) throws Exception {
         KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
@@ -148,6 +141,11 @@ public class FirGotoDeclarationTestGenerated extends AbstractFirGotoDeclarationT
     @TestMetadata("destructuringDeclarationInitializer.test")
     public void testDestructuringDeclarationInitializer() throws Exception {
         runTest("../../idea/tests/testData/navigation/gotoDeclaration/destructuringDeclarationInitializer.test");
+    }
+
+    @TestMetadata("destructuringDeclarationInitializerShortForm.test")
+    public void testDestructuringDeclarationInitializerShortForm() throws Exception {
+        runTest("../../idea/tests/testData/navigation/gotoDeclaration/destructuringDeclarationInitializerShortForm.test");
     }
 
     @TestMetadata("enumEntries.test")

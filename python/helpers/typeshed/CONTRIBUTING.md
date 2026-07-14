@@ -176,10 +176,10 @@ supported:
   This defaults to `types-<distribution>` and should only be set in special
   cases.
 * `upstream-repository` (recommended): The URL of the upstream repository.
-* `obsolete-since` (optional): This field is part of our process for
+* `obsolete-since` (optional): This table is part of our process for
   [removing obsolete third-party libraries](#third-party-library-removal-policy).
   It contains the first version of the corresponding library that ships
-  its own `py.typed` file.
+  its own `py.typed` file, and the date when that version was released.
 * `no-longer-updated` (optional): This field is set to `true` before removing
   stubs for other reasons than the upstream library shipping with type
   information.
@@ -187,8 +187,8 @@ supported:
   uploads to PyPI. This should only be used in special cases, e.g. when the stubs
   break the upload.
 * `partial-stub` (optional): This field marks the type stub package as
-  [partial](https://peps.python.org/pep-0561/#partial-stub-packages). This is for
-  3rd-party stubs that don't cover the entirety of the package's public API.
+  [partial](https://typing.python.org/en/latest/spec/distributing.html#partial-stub-packages).
+  This is for 3rd-party stubs that don't cover the entirety of the package's public API.
 * `requires-python` (optional): The minimum version of Python required to install
   the type stub package. It must be in the form `>=3.*`. If omitted, the oldest
   Python version supported by typeshed is used.
@@ -366,10 +366,6 @@ Features from the `typing` module that are not present in all
 supported Python versions must be imported from `typing_extensions`
 instead in typeshed stubs. This currently affects:
 
-- `TypeAlias` (new in Python 3.10)
-- `Concatenate` (new in Python 3.10)
-- `ParamSpec` (new in Python 3.10)
-- `TypeGuard` (new in Python 3.10)
 - `Self` (new in Python 3.11)
 - `Never` (new in Python 3.11)
 - `LiteralString` (new in Python 3.11)
@@ -445,7 +441,7 @@ these steps:
 
 1. Open an issue explaining why the stubs should be removed.
 2. A maintainer will add the
-   ["stubs: removal" label](https://github.com/python/typeshed/labels/%22stubs%3A%20removal%22).
+   ["stubs: removal" label](https://github.com/python/typeshed/labels/stubs%3A%20removal).
 3. Open a PR that sets the `no-longer-updated` field in the `METADATA.toml`
    file to `true`.
 4. When a new version of the package was automatically uploaded to PyPI (which
@@ -456,7 +452,7 @@ for any stub obsoletions or removals.
 
 ### Marking PRs as "deferred"
 
-We sometimes use the ["status: deferred" label](https://github.com/python/typeshed/labels/%22status%3A%20deferred%22)
+We sometimes use the ["status: deferred" label](https://github.com/python/typeshed/labels/status%3A%20deferred)
 to mark PRs and issues that we'd like to accept, but that are blocked by some
 external factor. Blockers can include:
 

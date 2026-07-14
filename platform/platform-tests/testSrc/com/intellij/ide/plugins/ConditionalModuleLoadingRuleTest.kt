@@ -5,9 +5,9 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.platform.pluginSystem.parser.impl.elements.ModuleLoadingRuleValue
 import com.intellij.platform.pluginSystem.testFramework.PluginSetTestBuilder
 import com.intellij.platform.runtime.product.ProductMode
-import com.intellij.platform.testFramework.plugins.buildDir
 import com.intellij.platform.testFramework.plugins.content
 import com.intellij.platform.testFramework.plugins.dependencies
+import com.intellij.platform.testFramework.plugins.installAt
 import com.intellij.platform.testFramework.plugins.module
 import com.intellij.platform.testFramework.plugins.plugin
 import com.intellij.testFramework.TestLoggerFactory
@@ -42,7 +42,7 @@ class ConditionalModuleLoadingRuleValueTest {
           dependencies { module("unavailable") }
         }
       }
-    }.buildDir(pluginsDirPath.resolve("foo"))
+    }.installAt(pluginsDirPath)
     val pluginSet = buildPluginSet { withProductMode(ProductMode.findById(appMode)!!) }
     if (appMode == "frontend") {
       assertThat(pluginSet).hasExactlyEnabledPlugins("foo")
@@ -62,7 +62,7 @@ class ConditionalModuleLoadingRuleValueTest {
           dependencies { module("unavailable") }
         }
       }
-    }.buildDir(pluginsDirPath.resolve("foo"))
+    }.installAt(pluginsDirPath)
     val pluginSet = buildPluginSet { withProductMode(ProductMode.findById(appMode)!!) }
     if (appMode == "backend") {
       assertThat(pluginSet).hasExactlyEnabledPlugins("foo")
@@ -82,7 +82,7 @@ class ConditionalModuleLoadingRuleValueTest {
           dependencies { module("unavailable") }
         }
       }
-    }.buildDir(pluginsDirPath.resolve("foo"))
+    }.installAt(pluginsDirPath)
     val pluginSet = buildPluginSet { withProductMode(ProductMode.findById(appMode)!!) }
     if (appMode != "frontend") {
       assertThat(pluginSet).hasExactlyEnabledPlugins("foo")
@@ -94,7 +94,7 @@ class ConditionalModuleLoadingRuleValueTest {
   }
 
   @Test
-  fun `content module with required-if-available and a dependency on an optional content module may break plugin loading`() {
+  fun `content module with required-if-available and a dependency on an optional content module loads`() {
     plugin("foo") {
       content {
         module("foo.optional", loadingRule = ModuleLoadingRuleValue.OPTIONAL) {}
@@ -102,22 +102,15 @@ class ConditionalModuleLoadingRuleValueTest {
           dependencies { module("foo.optional") }
         }
       }
-    }.buildDir(pluginsDirPath.resolve("foo"))
+    }.installAt(pluginsDirPath)
 
     val pluginSetFrontend = buildPluginSet { withProductMode(ProductMode.findById("frontend")!!) }
     assertThat(pluginSetFrontend).hasExactlyEnabledPlugins("foo")
 
     val pluginSetMonolith = buildPluginSet { withProductMode(ProductMode.findById("monolith")!!) }
-    if (PluginManagerCore.fallbackToOldPluginSetResolution()) {
-      assertThat(pluginSetMonolith).doesNotHaveEnabledPlugins()
-      assertThat(loadingErrors).hasSizeGreaterThan(0)
-      assertThat(loadingErrors[0].htmlMessage.toString()).contains("foo", "cannot be loaded", "form a dependency cycle")
-    } else {
-      // now there is no artificial edge foo -> foo.maybe.req, so foo.maybe.req -> foo.optional -> foo is allowed
-      assertThat(pluginSetMonolith).hasExactlyEnabledPlugins("foo")
-      assertThat(pluginSetMonolith.getEnabledModules()).hasSize(3)
-      assertThat(loadingErrors).isEmpty()
-    }
+    assertThat(pluginSetMonolith).hasExactlyEnabledPlugins("foo")
+    assertThat(pluginSetMonolith.getEnabledModules()).hasSize(3)
+    assertThat(loadingErrors).isEmpty()
   }
 
   private fun buildPluginSet(builder: PluginSetTestBuilder.() -> Unit = {}): PluginSet {

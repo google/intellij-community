@@ -1,5 +1,6 @@
 package com.intellij.driver.sdk.ui.components.settings
 
+import com.intellij.driver.model.TreePathToRow
 import com.intellij.driver.sdk.ui.Finder
 import com.intellij.driver.sdk.ui.QueryBuilder
 import com.intellij.driver.sdk.ui.components.ComponentData
@@ -13,7 +14,9 @@ import com.intellij.driver.sdk.ui.components.elements.button
 import com.intellij.driver.sdk.ui.components.elements.textField
 import com.intellij.driver.sdk.ui.should
 import com.intellij.driver.sdk.ui.ui
+import com.intellij.ide.IdeBundle
 import javax.swing.JDialog
+import javax.swing.JFrame
 import javax.swing.JTextField
 import kotlin.time.Duration.Companion.seconds
 
@@ -21,13 +24,13 @@ fun IdeaFrameUI.settingsDialog(action: SettingsDialogUiComponent.() -> Unit = {}
 fun WelcomeScreenUI.settingsDialog(action: SettingsDialogUiComponent.() -> Unit = {}): SettingsDialogUiComponent = driver.ui.onSettingsDialog(action = action)
 
 private fun Finder.onSettingsDialog(
-  locator: QueryBuilder.() -> String = { and(byType(JDialog::class.java), byAccessibleName("Settings")) },
+  locator: QueryBuilder.() -> String = { and(or(byType(JDialog::class.java), byType(JFrame::class.java)), byAccessibleName("Settings")) },
   action: SettingsDialogUiComponent.() -> Unit,
 ): SettingsDialogUiComponent =
   x(SettingsDialogUiComponent::class.java, locator).apply(action)
 
 open class SettingsDialogUiComponent(data: ComponentData) : DialogUiComponent(data) {
-  open val settingsTree: JTreeUiComponent = accessibleTree { byAccessibleName("Settings categories") }
+  open val settingsTree: JTreeUiComponent = accessibleTree(SettingsTreeUiComponent::class.java) { byAccessibleName("Settings categories") }
   val searchTextField = textField { and(byType(JTextField::class.java), byAccessibleName("Search")) }
   val applyButton = button("Apply")
 
@@ -38,4 +41,14 @@ open class SettingsDialogUiComponent(data: ComponentData) : DialogUiComponent(da
 
   fun content(action: UiComponent.() -> Unit = {}): UiComponent =
     x { byType("com.intellij.openapi.options.ex.ConfigurableCardPanel") }.apply(action)
+
+  protected class SettingsTreeUiComponent(data: ComponentData): JTreeUiComponent(data) {
+    override fun collectExpandedPaths(): List<TreePathToRow> {
+      return super.collectExpandedPaths().map {
+        it.apply {
+          path = path.map { rowValue -> rowValue.substringBeforeLast(" " + IdeBundle.message("badge.text.new")) } // remove "New" badge
+        }
+      }
+    }
+  }
 }

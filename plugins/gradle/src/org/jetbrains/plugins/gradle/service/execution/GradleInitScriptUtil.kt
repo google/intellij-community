@@ -4,10 +4,12 @@
 package org.jetbrains.plugins.gradle.service.execution
 
 import com.amazon.ion.IonType
+import com.esotericsoftware.kryo.kryo5.Kryo
 import com.google.common.collect.Multimap
 import com.google.gson.GsonBuilder
 import com.intellij.gradle.toolingExtension.GradleToolingExtensionClass
 import com.intellij.gradle.toolingExtension.impl.GradleToolingExtensionImplClass
+import com.intellij.gradle.toolingExtension.util.GradleVersionSpecificsUtil
 import com.intellij.gradle.toolingExtension.util.GradleVersionUtil
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.ex.ApplicationManagerEx
@@ -18,7 +20,6 @@ import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.platform.diagnostic.telemetry.rt.PlatformTelemetryRtClass
 import com.intellij.platform.eel.path.EelPath
 import com.intellij.platform.externalSystem.rt.ExternalSystemRtClass
-import gnu.trove.TObjectHash
 import groovy.lang.MissingMethodException
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.context.ImplicitContextKeyed
@@ -87,7 +88,6 @@ val GRADLE_TOOLING_EXTENSION_CLASSES: Set<Class<*>> = setOf(
   IonType::class.java,  // ion serialisation
   Multimap::class.java, // guava
   StringUtils::class.java, // apache commons
-  TObjectHash::class.java, // trove hashing
   OpenTelemetry::class.java, // opentelemetry-api
   OpenTelemetrySdk::class.java, // opentelemetry-sdk
   ImplicitContextKeyed::class.java, // opentelemetry-context
@@ -99,21 +99,42 @@ val GRADLE_TOOLING_EXTENSION_PROXY_CLASSES: Set<Class<*>> = GRADLE_TOOLING_EXTEN
   Gradle::class.java, // gradle-api jar
   LoggerFactory::class.java, JDK14LoggerFactory::class.java, // logging jars
   Main::class.java, // gradle tooling proxy module
-  MissingMethodException::class.java // groovy runtime for serialization
+  MissingMethodException::class.java, // groovy runtime for serialization
+  Kryo::class.java, // kryo
 )
 
 @ApiStatus.Internal
-fun createMainInitScript(isBuildSrcProject: Boolean, toolingExtensionClasses: Set<Class<*>>): Path {
-  val initScript = joinInitScripts(
-    loadToolingExtensionProvidingInitScript(GRADLE_TOOLING_EXTENSION_CLASSES + toolingExtensionClasses),
-    loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/RegistryProcessor.gradle"),
-    loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/JetGradlePlugin.gradle"),
-    loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/Init.gradle", mapOf(
-      "IS_BUILD_SCR_PROJECT" to isBuildSrcProject.toString()
-    ))
-  )
-  return createInitScript(MAIN_INIT_SCRIPT_NAME, initScript)
-}
+fun createMainInitScript(isBuildSrcProject: Boolean, toolingExtensionClasses: Set<Class<*>>): List<VersionSpecificInitScript> = listOf(
+  LazyVersionSpecificInitScript(
+    filePrefix = MAIN_INIT_SCRIPT_NAME,
+    isApplicable = { GradleVersionSpecificsUtil.isBuildScopeModelBuilderSupported(it) },
+    scriptSupplier = {
+      joinInitScripts(
+        loadToolingExtensionProvidingInitScript(GRADLE_TOOLING_EXTENSION_CLASSES + toolingExtensionClasses),
+        loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/modelFetchAction/GradleDaemonClassLoaderModelInit.gradle"),
+        loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/RegistryProcessor.gradle"),
+        loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/JetGradlePlugin.gradle"),
+        loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/Init.gradle", mapOf(
+          "IS_BUILD_SCR_PROJECT" to isBuildSrcProject.toString()
+        ))
+      )
+    }
+  ),
+  LazyVersionSpecificInitScript(
+    filePrefix = MAIN_INIT_SCRIPT_NAME,
+    isApplicable = { !GradleVersionSpecificsUtil.isBuildScopeModelBuilderSupported(it) },
+    scriptSupplier = {
+      joinInitScripts(
+        loadToolingExtensionProvidingInitScript(GRADLE_TOOLING_EXTENSION_CLASSES + toolingExtensionClasses),
+        loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/RegistryProcessor.gradle"),
+        loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/JetGradlePlugin.gradle"),
+        loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/Init.gradle", mapOf(
+          "IS_BUILD_SCR_PROJECT" to isBuildSrcProject.toString()
+        ))
+      )
+    }
+  ),
+)
 
 @ApiStatus.Internal
 fun createIdeaPluginConfiguratorInitScript(): Path {

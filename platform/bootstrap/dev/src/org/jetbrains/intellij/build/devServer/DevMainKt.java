@@ -1,7 +1,8 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build.devServer;
 
 import com.intellij.util.lang.PathClassLoader;
+import org.jetbrains.annotations.ApiStatus;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -11,12 +12,13 @@ import java.nio.file.Path;
 import java.util.AbstractMap;
 import java.util.Collection;
 
-// in java - don't use kotlin to avoid loading non-JDK classes
+// in Java; don't use Kotlin to avoid loading non-JRE classes
+@ApiStatus.Internal
 public final class DevMainKt {
   private DevMainKt() { }
 
   @SuppressWarnings("UseOfSystemOutOrSystemErr")
-  public static void main(String[] rawArgs) throws Throwable {
+  static void main(String[] rawArgs) throws Throwable {
     var start = System.currentTimeMillis();
 
     var lookup = MethodHandles.lookup();
@@ -30,22 +32,22 @@ public final class DevMainKt {
       return;
     }
 
-    // separate method to not retain local variables like implClass
-    var mainClassName = build(lookup, classLoader);
+    // separate method to avoid retaining local variables like `implClass`
+    var mainClassName = build(lookup, classLoader, rawArgs);
 
     System.setProperty("idea.vendor.name", "JetBrains");
     System.setProperty("idea.use.dev.build.server", "true");
 
-    //noinspection UseOfSystemOutOrSystemErr
-    System.out.println("build completed in " + (System.currentTimeMillis() - start) + "ms");
+    IO.println("build completed in " + (System.currentTimeMillis() - start) + "ms");
 
     var mainClass = classLoader.loadClass(mainClassName);
     //noinspection ConfusingArgumentToVarargsMethod
     lookup.findStatic(mainClass, "main", MethodType.methodType(void.class, String[].class)).invokeExact(rawArgs);
   }
 
-  private static String build(MethodHandles.Lookup lookup, PathClassLoader classLoader) throws Throwable {
-    AbstractMap.SimpleImmutableEntry<String, Collection<Path>> mainClassAndClassPath;
+  private static String build(MethodHandles.Lookup lookup, PathClassLoader classLoader, String[] rawArgs) throws Throwable {
+    String mainClass;
+    Collection<Path> classPath;
 
     // do not use classLoader as a parent - make sure that we don't make the initial classloader dirty
     // (say, do not load kotlin coroutine classes)
@@ -53,14 +55,17 @@ public final class DevMainKt {
     try (var tempClassLoader = new URLClassLoader(classLoader.getUrls().toArray(URL[]::new), ClassLoader.getPlatformClassLoader())) {
       var implClass = tempClassLoader.loadClass("org.jetbrains.intellij.build.devServer.DevMainImpl");
 
-      //noinspection unchecked
-      mainClassAndClassPath = (AbstractMap.SimpleImmutableEntry<String, Collection<Path>>)
-        lookup
-          .findStatic(implClass, "buildDevMain", MethodType.methodType(AbstractMap.SimpleImmutableEntry.class))
-          .invokeExact();
+      @SuppressWarnings({"unchecked", "ConfusingArgumentToVarargsMethod"})
+      var mainClassAndClassPath = (AbstractMap.SimpleImmutableEntry<String, Collection<Path>>)lookup
+        .findStatic(implClass, "buildDevMain", MethodType.methodType(AbstractMap.SimpleImmutableEntry.class, String[].class))
+        .invokeExact(rawArgs);
+
+      mainClass = mainClassAndClassPath.getKey();
+      classPath = mainClassAndClassPath.getValue();
     }
 
-    classLoader.reset(mainClassAndClassPath.getValue());
-    return mainClassAndClassPath.getKey();
+    classLoader.reset(classPath);
+
+    return mainClass;
   }
 }

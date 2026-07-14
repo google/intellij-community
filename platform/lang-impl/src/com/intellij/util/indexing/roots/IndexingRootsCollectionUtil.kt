@@ -3,6 +3,7 @@
 
 package com.intellij.util.indexing.roots
 
+import com.intellij.openapi.extensions.forEachExtensionSafeInline
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.progress.Cancellation
 import com.intellij.openapi.progress.ProgressManager
@@ -156,10 +157,10 @@ internal class WorkspaceIndexingRootsBuilder(private val ignoreModuleRoots: Bool
     fun registerEntitiesFromContributors(entityStorage: EntityStorage,
                                          settings: Settings = Settings.DEFAULT): WorkspaceIndexingRootsBuilder {
       val builder = WorkspaceIndexingRootsBuilder(!settings.collectExplicitRootsForModules)
-      for (contributor in WorkspaceFileIndexImpl.EP_NAME.extensionList) {
+      WorkspaceFileIndexImpl.EP_NAME.forEachExtensionSafeInline { contributor ->
         ProgressManager.checkCanceled()
         if (settings.shouldIgnore(contributor)) {
-          continue
+          return@forEachExtensionSafeInline
         }
         builder.registerEntitiesFromContributor(contributor, entityStorage)
       }
@@ -264,6 +265,10 @@ internal fun processModuleRoot(fileSet: WorkspaceFileSetWithCustomData<*>, proje
 }
 
 internal fun processLibraryEntity(entity: LibraryEntity, fileSet: WorkspaceFileSet): Pair<LibraryOrigin, IndexableFilesIterator> {
+  return processLibrary(entity.name, fileSet)
+}
+
+internal fun processLibrary(libraryName: String, fileSet: WorkspaceFileSet): Pair<LibraryOrigin, IndexableFilesIterator> {
   val sourceRoot = fileSet.kind == WorkspaceFileKind.EXTERNAL_SOURCE
   val origin = if (sourceRoot) {
     LibraryOriginImpl(emptyList(), listOf(fileSet.root))
@@ -271,7 +276,7 @@ internal fun processLibraryEntity(entity: LibraryEntity, fileSet: WorkspaceFileS
   else {
     LibraryOriginImpl(listOf(fileSet.root), emptyList())
   }
-  val iterator = GenericDependencyIterator.forLibraryEntity(origin, entity.name, fileSet.root, sourceRoot)
+  val iterator = GenericDependencyIterator.forLibraryEntity(origin, libraryName, fileSet.root, sourceRoot)
   return origin to iterator
 }
 

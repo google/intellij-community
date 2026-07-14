@@ -9,12 +9,14 @@ import com.intellij.psi.PsiReference
 import com.intellij.psi.impl.source.resolve.reference.ReferenceProvidersRegistry
 import com.intellij.psi.impl.source.tree.LeafPsiElement
 import com.intellij.util.IncorrectOperationException
+import org.jetbrains.annotations.ApiStatus
 
 class MarkdownCodeSpan(node: ASTNode) : MarkdownCompositePsiElementBase(node), PsiExternalReferenceHost {
   override fun getPresentableTagName(): String = "code_span"
   override fun getReferences(): Array<PsiReference> = ReferenceProvidersRegistry.getReferencesFromProviders(this)
 
-  internal fun getContentRange(): TextRange? {
+  @ApiStatus.Internal
+  fun getContentRange(): TextRange? {
     val text = text
     val openingMarkerLength = text.takeWhile { it == '`' }.length
     val closingMarkerLength = text.takeLastWhile { it == '`' }.length
@@ -45,7 +47,6 @@ class MarkdownCodeSpan(node: ASTNode) : MarkdownCompositePsiElementBase(node), P
     override fun getRangeInElement(element: MarkdownCodeSpan): TextRange = element.getContentRange() ?: TextRange.EMPTY_RANGE
 
     private fun replaceContentLeaf(element: MarkdownCodeSpan, range: TextRange, newContent: String): MarkdownCodeSpan? {
-      if (newContent.contains('`')) return null
       val leaf = element.node.findLeafElementAt(range.startOffset)?.psi as? LeafPsiElement ?: return null
       val leafRange = leaf.textRangeInParent
       if (range.startOffset < leafRange.startOffset || range.endOffset > leafRange.endOffset) {
@@ -53,7 +54,7 @@ class MarkdownCodeSpan(node: ASTNode) : MarkdownCompositePsiElementBase(node), P
       }
 
       val leafChangeRange = range.shiftLeft(leafRange.startOffset)
-      leaf.replaceWithText(leafChangeRange.replace(leaf.text, newContent))
+      leaf.replaceWithText(leafChangeRange.replace(leaf.text, newContent.removeSurrounding("`")))
       return element
     }
   }

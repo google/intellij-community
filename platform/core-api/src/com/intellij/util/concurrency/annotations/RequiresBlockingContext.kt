@@ -49,14 +49,33 @@ import org.jetbrains.annotations.ApiStatus
  * }
  * ```
  *
- * Note: the inspection is currently disabled due to generating too many false positives.
+ * ## Specifying a replacement
+ *
+ * Use the [replaceWith] parameter to specify the suspend function that should be used instead:
+ * ```
+ * @RequiresBlockingContext(ReplaceWith("awaitFileOpenedByLspServer(project, file)",
+ *                                       "com.intellij.platform.lsp.testFramework.awaitFileOpenedByLspServer"))
+ * fun waitUntilFileOpenedByLspServer(project: Project, file: VirtualFile) {
+ *   ...
+ * }
+ * ```
+ *
+ * This enables IDE inspections to provide quick-fixes that replace the blocking call
+ * with the suspend alternative, and generates documentation hints via `@see`.
+ *
+ * @param replaceWith specifies the code fragment that should be used as a replacement
+ *                    for the blocking call, along with any necessary imports.
+ *                    See [ReplaceWith] for the format.
+ * @see ReplaceWith
  */
 @MustBeDocumented
-@Retention(AnnotationRetention.SOURCE)
+@Retention(AnnotationRetention.BINARY)
 @Target(
   AnnotationTarget.FUNCTION,
   AnnotationTarget.PROPERTY_GETTER,
   AnnotationTarget.PROPERTY_SETTER,
 )
 @ApiStatus.Experimental
-annotation class RequiresBlockingContext
+annotation class RequiresBlockingContext(
+  val replaceWith: ReplaceWith = ReplaceWith(""),
+)

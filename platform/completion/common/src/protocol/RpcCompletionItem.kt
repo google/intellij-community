@@ -5,6 +5,9 @@ import com.intellij.codeInsight.completion.CodeCompletionHandlerBase
 import com.intellij.codeInsight.completion.CompletionItemLookupElement
 import com.intellij.codeInsight.completion.CompletionResult
 import com.intellij.codeInsight.completion.command.RemDevCommandCompletionHelpers
+import com.intellij.codeInsight.completion.command.RemDevCommandCompletionHelpers.getCommandState
+import com.intellij.codeInsight.completion.command.getCustomPreviewHolder
+import com.intellij.codeInsight.completion.group.CompletionGroup
 import com.intellij.codeInsight.completion.impl.TopPriorityLookupElement
 import com.intellij.codeInsight.lookup.AutoCompletionPolicy
 import com.intellij.codeInsight.lookup.LookupElement
@@ -31,6 +34,8 @@ data class RpcCompletionItem(
   val hasModCommand: Boolean = false,
   val isTopPriorityItem: Boolean = false,
   val isNeverAutoselectTopPriorityItem: Boolean = false,
+  val completionGroup: RpcCompletionGroup? = null,
+  val hasCustomPreview: Boolean = false,
 ) {
   override fun toString(): String = buildToString("RpcCompletionItem") {
     field("id", id)
@@ -49,6 +54,8 @@ data class RpcCompletionItem(
     fieldWithDefault("hasModCommand", hasModCommand, false)
     fieldWithDefault("isTopPriorityItem", isTopPriorityItem, false)
     fieldWithDefault("isNeverAutoselectTopPriorityItem", isNeverAutoselectTopPriorityItem, false)
+    fieldWithDefault("completionGroup", completionGroup, null)
+    fieldWithDefault("hasCustomPreview", hasCustomPreview, false)
   }
 }
 
@@ -71,10 +78,12 @@ fun CompletionResult.toRpc(): RpcCompletionItem {
     isDirectInsertion = element.getUserData(CodeCompletionHandlerBase.DIRECT_INSERTION) != null,
     prefixMatcher = prefixMatcher.toRpc(id),
     isWorthShowingInAutoPopup = element.isWorthShowingInAutoPopup(),
-    commandState = RemDevCommandCompletionHelpers.getCommandState(element),
+    commandState = element.getCommandState(),
     hasModCommand = element is CompletionItemLookupElement,
     isTopPriorityItem = TopPriorityLookupElement.isTopPriorityItem(element),
     isNeverAutoselectTopPriorityItem = TopPriorityLookupElement.isNeverAutoselectTopPriorityItem(element),
+    completionGroup = CompletionGroup.get(lookupElement)?.toRpc(),
+    hasCustomPreview = element.getCustomPreviewHolder()?.hasPreview() == true,
   )
 }
 

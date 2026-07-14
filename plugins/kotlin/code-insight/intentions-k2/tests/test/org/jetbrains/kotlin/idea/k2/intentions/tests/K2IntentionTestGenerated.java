@@ -3,7 +3,6 @@
 package org.jetbrains.kotlin.idea.k2.intentions.tests;
 
 import com.intellij.testFramework.TestDataPath;
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode;
 import org.jetbrains.kotlin.idea.base.test.TestRoot;
 import org.jetbrains.kotlin.idea.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils;
@@ -25,12 +24,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/addFullQualifier/callExpressions")
         public static class CallExpressions extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -94,12 +87,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/addFullQualifier/methodReferences")
         public static class MethodReferences extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -203,12 +190,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/addFullQualifier/references")
         public static class References extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -277,12 +258,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/addFullQualifier")
         public static class Uncategorized extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -311,12 +286,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/addFullQualifier/userTypes")
         public static class UserTypes extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -361,12 +330,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/addMissingClassKeyword")
     public static class AddMissingClassKeyword extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -415,12 +378,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/addNameToArgument")
     public static class AddNameToArgument extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -729,12 +686,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/addNamesToCallArguments")
     public static class AddNamesToCallArguments extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -823,12 +774,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/addNamesToFollowingArguments")
     public static class AddNamesToFollowingArguments extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -897,12 +842,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/addOpenModifier")
     public static class AddOpenModifier extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -984,12 +923,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/addPropertyAccessors/both")
         public static class Both extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -1073,12 +1006,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/addPropertyAccessors/getter")
         public static class Getter extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -1172,12 +1099,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/addPropertyAccessors/setter")
         public static class Setter extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -1267,12 +1188,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/specifyTypeExplicitly")
     public static class SpecifyTypeExplicitly extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -1300,6 +1215,11 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @TestMetadata("classNameClashing.kt")
         public void testClassNameClashing() throws Exception {
             runTest("../../../idea/tests/testData/intentions/specifyTypeExplicitly/classNameClashing.kt");
+        }
+
+        @TestMetadata("collectionTypeParameter.kt")
+        public void testCollectionTypeParameter() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/specifyTypeExplicitly/collectionTypeParameter.kt");
         }
 
         @TestMetadata("constructor.kt")
@@ -1581,12 +1501,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/importAllMembers")
     public static class ImportAllMembers extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -1740,12 +1654,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/importMember")
     public static class ImportMember extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -1892,12 +1800,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/chop/argumentList")
         public static class ArgumentList extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -1966,12 +1868,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/chop/parameterList")
         public static class ParameterList extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -2031,12 +1927,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertConcatenationToBuildString")
     public static class ConvertConcatenationToBuildString extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -2083,12 +1973,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/convertLambdaToReference")
         public static class Uncategorized extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -2181,6 +2065,11 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @TestMetadata("constructor2.kt")
             public void testConstructor2() throws Exception {
                 runTest("../../../idea/tests/testData/intentions/convertLambdaToReference/constructor2.kt");
+            }
+
+            @TestMetadata("contextParameters.kt")
+            public void testContextParameters() throws Exception {
+                runTest("../../../idea/tests/testData/intentions/convertLambdaToReference/contextParameters.kt");
             }
 
             @TestMetadata("conversion.kt")
@@ -2747,12 +2636,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/convertLambdaToReference/version1_1")
         public static class Version1_1 extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -2812,12 +2695,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertStringTemplateToBuildString")
     public static class ConvertStringTemplateToBuildString extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -2871,12 +2748,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertStringTemplateToBuildStringMultiDollarPrefix")
     public static class ConvertStringTemplateToBuildStringMultiDollarPrefix extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -2926,12 +2797,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/convertFilteringFunctionWithDemorgansLaw/anyToAll/toAll")
             public static class ToAll extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -2945,12 +2810,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/convertFilteringFunctionWithDemorgansLaw/anyToAll/toAny")
             public static class ToAny extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -2964,12 +2823,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/convertFilteringFunctionWithDemorgansLaw/anyToAll")
             public static class Uncategorized extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -3012,12 +2865,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/convertFilteringFunctionWithDemorgansLaw/anyToNone/toAny")
             public static class ToAny extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -3031,12 +2878,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/convertFilteringFunctionWithDemorgansLaw/anyToNone/toNone")
             public static class ToNone extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -3060,12 +2901,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/convertFilteringFunctionWithDemorgansLaw/anyToNone")
             public static class Uncategorized extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -3111,12 +2946,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
                 @RunWith(JUnit3RunnerWithInners.class)
                 @TestMetadata("../../../idea/tests/testData/intentions/convertFilteringFunctionWithDemorgansLaw/callToOpposite/allToNone/predicate")
                 public static class Predicate extends AbstractK2IntentionTest {
-                    @java.lang.Override
-                    @org.jetbrains.annotations.NotNull
-                    public final KotlinPluginMode getPluginMode() {
-                        return KotlinPluginMode.K2;
-                    }
-
                     private void runTest(String testDataFilePath) throws Exception {
                         KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                     }
@@ -3150,12 +2979,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
                 @RunWith(JUnit3RunnerWithInners.class)
                 @TestMetadata("../../../idea/tests/testData/intentions/convertFilteringFunctionWithDemorgansLaw/callToOpposite/allToNone")
                 public static class Uncategorized extends AbstractK2IntentionTest {
-                    @java.lang.Override
-                    @org.jetbrains.annotations.NotNull
-                    public final KotlinPluginMode getPluginMode() {
-                        return KotlinPluginMode.K2;
-                    }
-
                     private void runTest(String testDataFilePath) throws Exception {
                         KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                     }
@@ -3190,12 +3013,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/convertFilteringFunctionWithDemorgansLaw/callToOpposite/filterNotToFilter")
             public static class FilterNotToFilter extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -3214,12 +3031,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/convertFilteringFunctionWithDemorgansLaw/callToOpposite/filterNotToToFilterTo")
             public static class FilterNotToToFilterTo extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -3233,12 +3044,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/convertFilteringFunctionWithDemorgansLaw/callToOpposite/filterToFilterNot")
             public static class FilterToFilterNot extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -3257,12 +3062,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/convertFilteringFunctionWithDemorgansLaw/callToOpposite/filterToToFilterNotTo")
             public static class FilterToToFilterNotTo extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -3276,12 +3075,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/convertFilteringFunctionWithDemorgansLaw/callToOpposite/noneToAll")
             public static class NoneToAll extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -3295,12 +3088,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/convertFilteringFunctionWithDemorgansLaw/callToOpposite/takeIfToTakeUnless")
             public static class TakeIfToTakeUnless extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -3314,12 +3101,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/convertFilteringFunctionWithDemorgansLaw/callToOpposite/takeUnlessToTakeIf")
             public static class TakeUnlessToTakeIf extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -3333,12 +3114,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/convertFilteringFunctionWithDemorgansLaw/callToOpposite")
             public static class Uncategorized extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -3374,12 +3149,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertToBlockBody")
     public static class ConvertToBlockBody extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -3603,12 +3372,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/removeForLoopIndices")
     public static class RemoveForLoopIndices extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -3652,12 +3415,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/addWhenRemainingBranches")
     public static class AddWhenRemainingBranches extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -3696,12 +3453,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertToConcatenatedString")
     public static class ConvertToConcatenatedString extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -3900,12 +3651,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertToStringTemplate")
     public static class ConvertToStringTemplate extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -4204,12 +3949,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertToStringTemplateInterpolationPrefix")
     public static class ConvertToStringTemplateInterpolationPrefix extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -4253,12 +3992,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/declarations/split")
     public static class Split extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -4342,12 +4075,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/removeExplicitType")
     public static class RemoveExplicitType extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -4756,12 +4483,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/replaceUnderscoreWithTypeArgument")
     public static class ReplaceUnderscoreWithTypeArgument extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -4903,12 +4624,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/convertForEachToForLoop/forEachIndexed")
         public static class ForEachIndexed extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -4962,12 +4677,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/convertForEachToForLoop")
         public static class Uncategorized extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -5092,12 +4801,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/joinArgumentList")
     public static class JoinArgumentList extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -5176,12 +4879,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/joinParameterList")
     public static class JoinParameterList extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -5238,12 +4935,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/addNamesInCommentToJavaCallArguments/fakeOverrides")
         public static class FakeOverrides extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -5272,12 +4963,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/addNamesInCommentToJavaCallArguments")
         public static class Uncategorized extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -5362,12 +5047,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/trailingComma")
     public static class TrailingComma extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -5381,12 +5060,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/insertExplicitTypeArguments")
     public static class InsertExplicitTypeArguments extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -5553,12 +5226,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/removeSingleArgumentName/MixedNamedArgumentsInTheirOwnPosition")
         public static class MixedNamedArgumentsInTheirOwnPosition extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -5587,12 +5254,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/removeSingleArgumentName")
         public static class Uncategorized extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -5687,12 +5348,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertUnsafeCastCallToUnsafeCast")
     public static class ConvertUnsafeCastCallToUnsafeCast extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -5711,12 +5366,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/expandBooleanExpression")
     public static class ExpandBooleanExpression extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -5790,12 +5439,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/removeAllArgumentNames")
     public static class RemoveAllArgumentNames extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -5919,12 +5562,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/removeEmptyPrimaryConstructor")
     public static class RemoveEmptyPrimaryConstructor extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -5988,12 +5625,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertPropertyGetterToInitializer")
     public static class ConvertPropertyGetterToInitializer extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -6062,12 +5693,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertToRawStringTemplate")
     public static class ConvertToRawStringTemplate extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -6126,12 +5751,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/toRawStringLiteral")
     public static class ToRawStringLiteral extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -6250,12 +5869,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/movePropertyToConstructor")
     public static class MovePropertyToConstructor extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -6369,12 +5982,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/branched/ifWhen/whenToIf")
     public static class WhenToIf extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -6548,12 +6155,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/branched/folding/ifToReturnAsymmetrically")
     public static class IfToReturnAsymmetrically extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -6575,56 +6176,8 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
-    @TestMetadata("testData/intentions")
-    public abstract static class Intentions extends AbstractK2IntentionTest {
-        @RunWith(JUnit3RunnerWithInners.class)
-        @TestMetadata("testData/intentions/branched")
-        public abstract static class Branched extends AbstractK2IntentionTest {
-            @RunWith(JUnit3RunnerWithInners.class)
-            @TestMetadata("testData/intentions/branched/whenToIf")
-            public static class WhenToIf extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
-                private void runTest(String testDataFilePath) throws Exception {
-                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
-                }
-
-                @TestMetadata("comment.kt")
-                public void testComment() throws Exception {
-                    runTest("testData/intentions/branched/whenToIf/comment.kt");
-                }
-
-                @TestMetadata("kt12040.kt")
-                public void testKt12040() throws Exception {
-                    runTest("testData/intentions/branched/whenToIf/kt12040.kt");
-                }
-
-                @TestMetadata("sideEffectWithoutSubjectSeparation.kt")
-                public void testSideEffectWithoutSubjectSeparation() throws Exception {
-                    runTest("testData/intentions/branched/whenToIf/sideEffectWithoutSubjectSeparation.kt");
-                }
-
-                @TestMetadata("whenWithDotQualifiedExpression.kt")
-                public void testWhenWithDotQualifiedExpression() throws Exception {
-                    runTest("testData/intentions/branched/whenToIf/whenWithDotQualifiedExpression.kt");
-                }
-            }
-        }
-    }
-
-    @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertBinaryExpressionWithDemorgansLaw")
     public static class ConvertBinaryExpressionWithDemorgansLaw extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -6758,12 +6311,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/invertIfCondition")
     public static class InvertIfCondition extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -6796,6 +6343,11 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @TestMetadata("branchingIfStatements.kt")
         public void testBranchingIfStatements() throws Exception {
             runTest("../../../idea/tests/testData/intentions/invertIfCondition/branchingIfStatements.kt");
+        }
+
+        @TestMetadata("elvisOperator.kt")
+        public void testElvisOperator() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/invertIfCondition/elvisOperator.kt");
         }
 
         @TestMetadata("endOfLineCommentBug.kt")
@@ -7067,12 +6619,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/lambdaToAnonymousFunction")
     public static class LambdaToAnonymousFunction extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -7236,12 +6782,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/replaceWithOrdinaryAssignment")
     public static class ReplaceWithOrdinaryAssignment extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -7295,12 +6835,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/specifyExplicitLambdaSignature")
     public static class SpecifyExplicitLambdaSignature extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -7407,12 +6941,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/changeVisibility/internal")
         public static class Internal extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -7486,12 +7014,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/changeVisibility/private")
         public static class Private extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -7730,12 +7252,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/changeVisibility/protected")
         public static class Protected extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -7839,12 +7355,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/changeVisibility/public")
         public static class Public extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -7923,12 +7433,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/changeVisibility/publicExplicitApi")
         public static class PublicExplicitApi extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -7953,12 +7457,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/evaluateCompileTimeExpression")
     public static class EvaluateCompileTimeExpression extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -8047,12 +7545,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/replaceUnderscoreWithParameterName")
     public static class ReplaceUnderscoreWithParameterName extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -8106,12 +7598,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertFunctionToProperty")
     public static class ConvertFunctionToProperty extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -8288,12 +7774,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/conventionNameCalls/replaceCallWithUnaryOperator")
         public static class ReplaceCallWithUnaryOperator extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -8377,12 +7857,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/conventionNameCalls/replaceInvoke")
         public static class ReplaceInvoke extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -8477,12 +7951,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/mergeIfs")
     public static class MergeIfs extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -8546,12 +8014,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertTrimIndentToTrimMargin")
     public static class ConvertTrimIndentToTrimMargin extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -8590,12 +8052,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertTrimMarginToTrimIndent")
     public static class ConvertTrimMarginToTrimIndent extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -8654,12 +8110,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/iterateExpression")
     public static class IterateExpression extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -8768,12 +8218,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/implementAsConstructorParameter")
     public static class ImplementAsConstructorParameter extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -8837,12 +8281,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/insertCurlyBracesToTemplate")
     public static class InsertCurlyBracesToTemplate extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -8918,12 +8356,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertLateinitPropertyToNullable")
     public static class ConvertLateinitPropertyToNullable extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -8952,12 +8384,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/swapStringEqualsIgnoreCase")
     public static class SwapStringEqualsIgnoreCase extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -8981,12 +8407,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/replaceExplicitFunctionLiteralParamWithIt")
     public static class ReplaceExplicitFunctionLiteralParamWithIt extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -9125,12 +8545,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/nullableBooleanEqualityCheckToElvis")
     public static class NullableBooleanEqualityCheckToElvis extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -9166,12 +8580,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/introduceImportAlias")
     public static class IntroduceImportAlias extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -9350,12 +8758,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/addForLoopIndices")
     public static class AddForLoopIndices extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -9405,6 +8807,26 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             runTest("../../../idea/tests/testData/intentions/addForLoopIndices/iterable.kt");
         }
 
+        @TestMetadata("nameBasedDestructuringComplete.kt")
+        public void testNameBasedDestructuringComplete() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addForLoopIndices/nameBasedDestructuringComplete.kt");
+        }
+
+        @TestMetadata("nameBasedDestructuringCompleteWithValue.kt")
+        public void testNameBasedDestructuringCompleteWithValue() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addForLoopIndices/nameBasedDestructuringCompleteWithValue.kt");
+        }
+
+        @TestMetadata("nameBasedDestructuringNameMismatch.kt")
+        public void testNameBasedDestructuringNameMismatch() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addForLoopIndices/nameBasedDestructuringNameMismatch.kt");
+        }
+
+        @TestMetadata("nameBasedDestructuringOnlySyntax.kt")
+        public void testNameBasedDestructuringOnlySyntax() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addForLoopIndices/nameBasedDestructuringOnlySyntax.kt");
+        }
+
         @TestMetadata("noBody.kt")
         public void testNoBody() throws Exception {
             runTest("../../../idea/tests/testData/intentions/addForLoopIndices/noBody.kt");
@@ -9434,12 +8856,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/moveDeclarationToSeparateFile")
     public static class MoveDeclarationToSeparateFile extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -9458,12 +8874,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertCamelCaseTestFunctionToSpaced")
     public static class ConvertCamelCaseTestFunctionToSpaced extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -9507,12 +8917,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertPropertyInitializerToGetter")
     public static class ConvertPropertyInitializerToGetter extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -9601,12 +9005,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/toInfixCall")
     public static class ToInfixCall extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -9715,12 +9113,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertArrayParameterToVararg")
     public static class ConvertArrayParameterToVararg extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -9794,12 +9186,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertVariableAssignmentToExpression")
     public static class ConvertVariableAssignmentToExpression extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -9836,12 +9222,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertObjectLiteralToClass")
     public static class ConvertObjectLiteralToClass extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -9912,12 +9292,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/declarations/convertMemberToExtension")
     public static class ConvertMemberToExtension extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -10202,12 +9576,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertSealedClassToEnum")
     public static class ConvertSealedClassToEnum extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -10285,12 +9653,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertFunctionTypeParameterToReceiver")
     public static class ConvertFunctionTypeParameterToReceiver extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -10394,12 +9756,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertPrimaryConstructorToSecondary")
     public static class ConvertPrimaryConstructorToSecondary extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -10611,12 +9967,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/allTarget")
         public static class AllTarget extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -10673,12 +10023,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor")
             public static class Uncategorized extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -10697,12 +10041,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/val")
             public static class Val extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -10756,12 +10094,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/var")
             public static class Var extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -10819,12 +10151,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/function")
             public static class Function extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -10878,12 +10204,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/property")
             public static class Property extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -10941,12 +10261,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/delegate")
             public static class Delegate extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -11000,12 +10314,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property")
             public static class Uncategorized extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -11019,12 +10327,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/val")
             public static class Val extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -11078,12 +10380,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/valNoBacking")
             public static class ValNoBacking extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -11137,12 +10433,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/var")
             public static class Var extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -11196,12 +10486,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/varNoBacking")
             public static class VarNoBacking extends AbstractK2IntentionTest {
-                @java.lang.Override
-                @org.jetbrains.annotations.NotNull
-                public final KotlinPluginMode getPluginMode() {
-                    return KotlinPluginMode.K2;
-                }
-
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
                 }
@@ -11256,12 +10540,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget")
         public static class Uncategorized extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -11296,12 +10574,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertEnumToSealedClass")
     public static class ConvertEnumToSealedClass extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -11362,12 +10634,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/samConversionToAnonymousObject")
     public static class SamConversionToAnonymousObject extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -11496,12 +10762,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertFunctionTypeReceiverToParameter")
     public static class ConvertFunctionTypeReceiverToParameter extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -11565,12 +10825,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/addLabeledReturnInLambda")
     public static class AddLabeledReturnInLambda extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -11646,12 +10900,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/branched/elvisToIfThen")
     public static class ElvisToIfThen extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -11780,12 +11028,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/branched/safeAccessToIfThen")
     public static class SafeAccessToIfThen extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -11952,12 +11194,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/branched/ifWhen/ifToWhen/javaSyntheticProperties")
         public static class JavaSyntheticProperties extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -11991,12 +11227,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/branched/ifWhen/ifToWhen")
         public static class Uncategorized extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -12275,12 +11505,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/branched/ifWhen/ifToWhen/whenGuards")
         public static class WhenGuards extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -12330,12 +11554,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/branched/when/flatten")
     public static class Flatten extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -12364,12 +11582,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/branched/when/eliminateSubject")
     public static class EliminateSubject extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -12438,12 +11650,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/introduceVariable")
     public static class IntroduceVariable extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -12522,12 +11728,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertToMultiDollarString")
     public static class ConvertToMultiDollarString extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -12779,12 +11979,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/convertToIndexedFunctionCall/basic")
         public static class Basic extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -12883,12 +12077,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/convertToIndexedFunctionCall")
         public static class Uncategorized extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -12941,12 +12129,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/concatenationToBuildCollection/explicitThis")
         public static class ExplicitThis extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -12980,12 +12162,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/concatenationToBuildCollection/implicitThis")
         public static class ImplicitThis extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -13019,12 +12195,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/concatenationToBuildCollection/inapplicable")
         public static class Inapplicable extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -13058,12 +12228,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/concatenationToBuildCollection/list")
         public static class List extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -13122,12 +12286,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/concatenationToBuildCollection/set")
         public static class Set extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -13177,12 +12335,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/moveMemberToTopLevel")
     public static class MoveMemberToTopLevel extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -13281,12 +12433,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/moveOutOfCompanion")
     public static class MoveOutOfCompanion extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -13294,11 +12440,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @TestMetadata("companionAsImplicitReceiver.kt")
         public void testCompanionAsImplicitReceiver() throws Exception {
             runTest("../../../idea/tests/testData/intentions/moveOutOfCompanion/companionAsImplicitReceiver.kt");
-        }
-
-        @TestMetadata("companionAsImplicitReceiverK2.kt")
-        public void testCompanionAsImplicitReceiverK2() throws Exception {
-            runTest("../../../idea/tests/testData/intentions/moveOutOfCompanion/companionAsImplicitReceiverK2.kt");
         }
 
         @TestMetadata("hasJvmFieldInInterface.kt")
@@ -13355,12 +12496,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/anonymousFunctionToLambda")
     public static class AnonymousFunctionToLambda extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -13504,12 +12639,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/copyConcatenatedStringToClipboard")
     public static class CopyConcatenatedStringToClipboard extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -13546,12 +12675,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/convertToScope/convertToAlso")
         public static class ConvertToAlso extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -13670,12 +12793,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/convertToScope/convertToApply")
         public static class ConvertToApply extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -13819,12 +12936,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/convertToScope/convertToRun")
         public static class ConvertToRun extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -13983,12 +13094,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/convertToScope/convertToWith")
         public static class ConvertToWith extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -14136,12 +13241,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/implementAbstractMember/function")
         public static class Function extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -14215,12 +13314,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/implementAbstractMember/property")
         public static class Property extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -14297,12 +13390,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/replaceTypeArgumentWithUnderscore")
     public static class ReplaceTypeArgumentWithUnderscore extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -14466,12 +13553,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/movePropertyToClassBody")
     public static class MovePropertyToClassBody extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -14540,12 +13621,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/replaceAddWithPlusAssign")
     public static class ReplaceAddWithPlusAssign extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -14594,12 +13669,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/reconstructTypeInCastOrIs")
     public static class ReconstructTypeInCastOrIs extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -14633,12 +13702,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertParameterToReceiver")
     public static class ConvertParameterToReceiver extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -14792,12 +13855,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertCollectionConstructorToFunction")
     public static class ConvertCollectionConstructorToFunction extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -14845,12 +13902,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/moveToCompanion")
     public static class MoveToCompanion extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -15009,12 +14060,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/addThrowsAnnotation")
     public static class AddThrowsAnnotation extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -15178,12 +14223,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/replaceItWithExplicitFunctionLiteralParam")
     public static class ReplaceItWithExplicitFunctionLiteralParam extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -15219,12 +14258,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertPropertyToFunction")
     public static class ConvertPropertyToFunction extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -15353,12 +14386,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertReceiverToParameter")
     public static class ConvertReceiverToParameter extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -15482,12 +14509,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertSnakeCaseTestFunctionToSpaced")
     public static class ConvertSnakeCaseTestFunctionToSpaced extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -15506,12 +14527,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/addValOrVar")
     public static class AddValOrVar extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -15580,12 +14595,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertBlockCommentToLineComment")
     public static class ConvertBlockCommentToLineComment extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -15631,12 +14640,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/convertToConcatenatedStringMultiDollarPrefix")
     public static class ConvertToConcatenatedStringMultiDollarPrefix extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -15723,12 +14726,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/contextParameters/contextParameterToReceiver")
         public static class ContextParameterToReceiver extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -15852,12 +14849,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/contextParameters/contextParameterToRegularParameter")
         public static class ContextParameterToRegularParameter extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -16076,12 +15067,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/contextParameters/receiverToContextParameter")
         public static class ReceiverToContextParameter extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -16200,12 +15185,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/intentions/contextParameters/regularParameterToContextParameter")
         public static class RegularParameterToContextParameter extends AbstractK2IntentionTest {
-            @java.lang.Override
-            @org.jetbrains.annotations.NotNull
-            public final KotlinPluginMode getPluginMode() {
-                return KotlinPluginMode.K2;
-            }
-
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -16315,12 +15294,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/replaceRepeatWithForLoop")
     public static class ReplaceRepeatWithForLoop extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -16429,12 +15402,6 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/intentions/replaceForLoopWithRepeat")
     public static class ReplaceForLoopWithRepeat extends AbstractK2IntentionTest {
-        @java.lang.Override
-        @org.jetbrains.annotations.NotNull
-        public final KotlinPluginMode getPluginMode() {
-            return KotlinPluginMode.K2;
-        }
-
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
@@ -16527,6 +15494,187 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @TestMetadata("zero.kt")
         public void testZero() throws Exception {
             runTest("../../../idea/tests/testData/intentions/replaceForLoopWithRepeat/zero.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/intentions/replaceForEachWithRepeat")
+    public static class ReplaceForEachWithRepeat extends AbstractK2IntentionTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("comments.kt")
+        public void testComments() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/comments.kt");
+        }
+
+        @TestMetadata("empty.kt")
+        public void testEmpty() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/empty.kt");
+        }
+
+        @TestMetadata("expression.kt")
+        public void testExpression() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/expression.kt");
+        }
+
+        @TestMetadata("for.kt")
+        public void testFor() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/for.kt");
+        }
+
+        @TestMetadata("implicitIt.kt")
+        public void testImplicitIt() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/implicitIt.kt");
+        }
+
+        @TestMetadata("list.kt")
+        public void testList() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/list.kt");
+        }
+
+        @TestMetadata("long.kt")
+        public void testLong() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/long.kt");
+        }
+
+        @TestMetadata("namedParameter.kt")
+        public void testNamedParameter() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/namedParameter.kt");
+        }
+
+        @TestMetadata("nestedLambda.kt")
+        public void testNestedLambda() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/nestedLambda.kt");
+        }
+
+        @TestMetadata("nestedRepeat.kt")
+        public void testNestedRepeat() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/nestedRepeat.kt");
+        }
+
+        @TestMetadata("noNewLines.kt")
+        public void testNoNewLines() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/noNewLines.kt");
+        }
+
+        @TestMetadata("nonLocalReturn.kt")
+        public void testNonLocalReturn() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/nonLocalReturn.kt");
+        }
+
+        @TestMetadata("parenthesizedReciver.kt")
+        public void testParenthesizedReciver() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/parenthesizedReciver.kt");
+        }
+
+        @TestMetadata("returnForEach.kt")
+        public void testReturnForEach() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/returnForEach.kt");
+        }
+
+        @TestMetadata("returnValue.kt")
+        public void testReturnValue() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/returnValue.kt");
+        }
+
+        @TestMetadata("safeCall.kt")
+        public void testSafeCall() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/safeCall.kt");
+        }
+
+        @TestMetadata("simple.kt")
+        public void testSimple() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/simple.kt");
+        }
+
+        @TestMetadata("string.kt")
+        public void testString() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/string.kt");
+        }
+
+        @TestMetadata("underscore.kt")
+        public void testUnderscore() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/underscore.kt");
+        }
+
+        @TestMetadata("until.kt")
+        public void testUntil() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/until.kt");
+        }
+
+        @TestMetadata("userLabel.kt")
+        public void testUserLabel() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/userLabel.kt");
+        }
+
+        @TestMetadata("variable.kt")
+        public void testVariable() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/variable.kt");
+        }
+
+        @TestMetadata("wrongRange.kt")
+        public void testWrongRange() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/wrongRange.kt");
+        }
+
+        @TestMetadata("wrongRange2.kt")
+        public void testWrongRange2() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/wrongRange2.kt");
+        }
+
+        @TestMetadata("zeroIterations.kt")
+        public void testZeroIterations() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/replaceForEachWithRepeat/zeroIterations.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/intentions/addParameterNameAtAllCallsites")
+    public static class AddParameterNameAtAllCallsites extends AbstractK2IntentionTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("enumPrimaryConstructor.kt")
+        public void testEnumPrimaryConstructor() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addParameterNameAtAllCallsites/enumPrimaryConstructor.kt");
+        }
+
+        @TestMetadata("enumSecondaryConstructor.kt")
+        public void testEnumSecondaryConstructor() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addParameterNameAtAllCallsites/enumSecondaryConstructor.kt");
+        }
+
+        @TestMetadata("javaUsage.kt")
+        public void testJavaUsage() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addParameterNameAtAllCallsites/javaUsage.kt");
+        }
+
+        @TestMetadata("lambdaArgument.kt")
+        public void testLambdaArgument() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addParameterNameAtAllCallsites/lambdaArgument.kt");
+        }
+
+        @TestMetadata("nested.kt")
+        public void testNested() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addParameterNameAtAllCallsites/nested.kt");
+        }
+
+        @TestMetadata("primaryConstructor.kt")
+        public void testPrimaryConstructor() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addParameterNameAtAllCallsites/primaryConstructor.kt");
+        }
+
+        @TestMetadata("secondaryConstructor.kt")
+        public void testSecondaryConstructor() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addParameterNameAtAllCallsites/secondaryConstructor.kt");
+        }
+
+        @TestMetadata("simple.kt")
+        public void testSimple() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addParameterNameAtAllCallsites/simple.kt");
         }
     }
 }

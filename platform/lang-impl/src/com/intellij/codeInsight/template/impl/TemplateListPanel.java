@@ -55,8 +55,10 @@ import com.intellij.ui.speedSearch.SpeedSearchSupply;
 import com.intellij.util.Alarm;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.containers.ContainerUtil;
+import com.intellij.util.containers.TreeTraversal;
 import com.intellij.util.ui.tree.TreeUtil;
 import com.intellij.util.ui.update.UiNotifyConnector;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -105,6 +107,7 @@ import static com.intellij.codeInsight.template.impl.TemplateContext.getDifferen
 import static com.intellij.codeInsight.template.impl.TemplateContext.getDifferenceType;
 import static com.intellij.codeInsight.template.impl.TemplateGroup.PATH_SEPARATOR;
 
+@ApiStatus.Internal
 public class TemplateListPanel extends JPanel implements Disposable {
   private static final String NO_SELECTION = "NoSelection";
   private static final String TEMPLATE_SETTINGS = "TemplateSettings";
@@ -1155,7 +1158,7 @@ public class TemplateListPanel extends JPanel implements Disposable {
   }
 
   private void selectTemplate(final @Nullable String groupName, final @Nullable String templateKey) {
-    TreeUtil.traverseDepth(myTreeRoot, node -> {
+    TreeUtil.treeNodeTraverser(myTreeRoot).traverse(TreeTraversal.PRE_ORDER_DFS).processEach(node -> {
       Object o = ((DefaultMutableTreeNode)node).getUserObject();
       if (templateKey == null && o instanceof TemplateGroup && Objects.equals(groupName, ((TemplateGroup)o).getName()) ||
           o instanceof TemplateImpl &&

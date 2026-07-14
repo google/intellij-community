@@ -300,14 +300,14 @@ object Workspace {
     val WillRenameFiles: RequestType<RenameFilesParams, WorkspaceEdit?, Unit> =
         RequestType("workspace/willRenameFiles", RenameFilesParams.serializer(), WorkspaceEdit.serializer().nullable, Unit.serializer())
 
-    val RefreshCodeLenses: RequestType<Unit, Unit, Unit> =
-        RequestType("workspace/codeLens/refresh", Unit.serializer(), Unit.serializer(), Unit.serializer())
+    val RefreshCodeLenses: RequestType<Nothing?, Nothing?, Nothing?> =
+        RequestType("workspace/codeLens/refresh", NoValueSerializer, NoValueSerializer, NoValueSerializer)
 
-    val RefreshInlayHints: RequestType<Unit, Unit, Unit> =
-        RequestType("workspace/inlayHint/refresh", Unit.serializer(), Unit.serializer(), Unit.serializer())
+    val RefreshInlayHints: RequestType<Nothing?, Nothing?, Nothing?> =
+        RequestType("workspace/inlayHint/refresh", NoValueSerializer, NoValueSerializer, NoValueSerializer)
 
-    val RefreshSemanticTokens: RequestType<Unit, Unit, Unit> =
-        RequestType("workspace/semanticTokens/refresh", Unit.serializer(), Unit.serializer(), Unit.serializer())
+    val RefreshSemanticTokens: RequestType<Nothing?, Nothing?, Nothing?> =
+        RequestType("workspace/semanticTokens/refresh", NoValueSerializer, NoValueSerializer, NoValueSerializer)
 
     val DidChangeWatchedFiles: NotificationType<DidChangeWatchedFilesParams> =
         NotificationType("workspace/didChangeWatchedFiles", DidChangeWatchedFilesParams.serializer())

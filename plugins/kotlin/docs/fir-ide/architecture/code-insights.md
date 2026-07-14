@@ -7,7 +7,6 @@ Intentions can be considered as small refactoring actions.
 
 ### Location
 - `kotlin.code-insight.intentions.k2`
-- `kotlin.code-insight.intentions.shared`
 
 Preferably, an intention should extend `KotlinApplicableModCommandAction`.
 It works over the ModCommand API that allows to perform analysis on a background thread.\
@@ -55,7 +54,6 @@ They inspect code and report some kind of warnings and can recommend how to chan
 
 ### Location
 - `kotlin.code-insight.inspections.k2`
-- `kotlin.code-insight.inspections.shared`
 
 There are several classes for inspections: `KotlinApplicableInspectionBase.Simple`, `KotlinDiagnosticBasedInspectionBase`,
 and `AbstractKotlinInspection`.
@@ -94,8 +92,12 @@ There are two ways to register a quick-fix factory:
 1. `registerFactory(factory)`
     - `factory` can be:
         - `KotlinQuickFixFactory.ModCommandBased`, which is preferable as the one that produces a list of `ModCommandActions`:
-            - Use `PsiUpdateModCommandAction` if no element context is required.
+            - Use `KotlinPsiUpdateModCommandAction.ElementContextless` if no element context is required.
             - Use `KotlinPsiUpdateModCommandAction.ElementBased` if an element context is required.
+            - Both classes provide the "Fix All" option by default.
+            - Override `getActionPresentation(context, element)` to customize the presentation of the quick fix.
+            - Override `addFixAllOption(context, element)` and return `false` to disable the default "Fix All" option.
+            - Do not override `getPresentation(context, element)`; use `getActionPresentation(context, element)` instead.
         - `KotlinQuickFixFactory.IntentionBased`, which produces a list of `IntentionAction`.
 
 2. `registerPsiQuickFixes(diagnosticClass, factories)`

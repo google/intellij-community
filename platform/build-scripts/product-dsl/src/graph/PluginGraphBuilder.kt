@@ -10,6 +10,8 @@ import com.intellij.platform.pluginGraph.EDGE_BUNDLES
 import com.intellij.platform.pluginGraph.EDGE_BUNDLES_TEST
 import com.intellij.platform.pluginGraph.EDGE_CONTAINS_CONTENT
 import com.intellij.platform.pluginGraph.EDGE_CONTAINS_CONTENT_TEST
+import com.intellij.platform.pluginGraph.EDGE_CONTAINS_CONTENT_TEST_WITH_NAMESPACE
+import com.intellij.platform.pluginGraph.EDGE_CONTAINS_CONTENT_WITH_NAMESPACE
 import com.intellij.platform.pluginGraph.EDGE_CONTAINS_MODULE
 import com.intellij.platform.pluginGraph.EDGE_INCLUDES_MODULE_SET
 import com.intellij.platform.pluginGraph.EDGE_MAIN_TARGET
@@ -23,6 +25,7 @@ import com.intellij.platform.pluginGraph.LOADING_OPTIONAL
 import com.intellij.platform.pluginGraph.LOADING_REQUIRED
 import com.intellij.platform.pluginGraph.MutablePluginGraphStore
 import com.intellij.platform.pluginGraph.NODE_CONTENT_MODULE
+import com.intellij.platform.pluginGraph.NODE_CONTENT_MODULE_WITH_NAMESPACE
 import com.intellij.platform.pluginGraph.NODE_FLAG_HAS_DESCRIPTOR
 import com.intellij.platform.pluginGraph.NODE_FLAG_IS_ALIAS
 import com.intellij.platform.pluginGraph.NODE_FLAG_IS_DSL_DEFINED
@@ -38,11 +41,13 @@ import com.intellij.platform.pluginGraph.PLUGIN_DEP_LEGACY_MASK
 import com.intellij.platform.pluginGraph.PLUGIN_DEP_MODERN_MASK
 import com.intellij.platform.pluginGraph.PluginGraph
 import com.intellij.platform.pluginGraph.PluginId
+import com.intellij.platform.pluginGraph.PluginModuleId
 import com.intellij.platform.pluginGraph.TEST_DESCRIPTOR_SUFFIX
 import com.intellij.platform.pluginGraph.TargetDependencyScope
 import com.intellij.platform.pluginGraph.TargetName
 import com.intellij.platform.pluginGraph.aliasNodeName
 import com.intellij.platform.pluginGraph.baseModuleName
+import com.intellij.platform.pluginGraph.contentName
 import com.intellij.platform.pluginGraph.packEdgeEntry
 import com.intellij.platform.pluginGraph.packPluginDepEntry
 import com.intellij.platform.pluginGraph.packTargetDependencyEntry
@@ -58,9 +63,11 @@ import kotlinx.coroutines.coroutineScope
 import org.jetbrains.intellij.build.ModuleOutputProvider
 import org.jetbrains.intellij.build.productLayout.LIB_MODULE_PREFIX
 import org.jetbrains.intellij.build.productLayout.ModuleSet
+import org.jetbrains.intellij.build.productLayout.contentName
 import org.jetbrains.intellij.build.productLayout.dependency.ModuleDescriptorCache
 import org.jetbrains.intellij.build.productLayout.dependency.PluginContentProvider
 import org.jetbrains.intellij.build.productLayout.discovery.PluginContentInfo
+import org.jetbrains.intellij.build.productLayout.isModuleSetPluginModuleName
 import org.jetbrains.intellij.build.productLayout.model.ErrorSink
 import org.jetbrains.intellij.build.productLayout.model.error.MissingPluginInGraphError
 import org.jetbrains.intellij.build.productLayout.validator.rule.isTestPlugin
@@ -136,11 +143,12 @@ internal class PluginGraphBuilder(
     isModuleSetWrapper: Boolean = false,
     isAlias: Boolean = false,
   ): Int {
+    val moduleSetWrapper = isModuleSetWrapper || isModuleSetPluginModuleName(name.value)
     val existing = store.nameIndex[NODE_PLUGIN].getOrDefault(name.value, -1)
     if (existing >= 0) {
       val flags = (if (isTest) NODE_FLAG_IS_TEST else 0) or
                   (if (isDslDefined) NODE_FLAG_IS_DSL_DEFINED else 0) or
-                  (if (isModuleSetWrapper) NODE_FLAG_IS_MODULE_SET_WRAPPER else 0) or
+                  (if (moduleSetWrapper) NODE_FLAG_IS_MODULE_SET_WRAPPER else 0) or
                   (if (isAlias) NODE_FLAG_IS_ALIAS else 0)
       if (flags != 0) {
         store.kinds[existing] = store.kinds[existing] or flags
@@ -174,7 +182,7 @@ internal class PluginGraphBuilder(
     store.kinds.add(NODE_PLUGIN
               or (if (isTest) NODE_FLAG_IS_TEST else 0)
               or (if (isDslDefined) NODE_FLAG_IS_DSL_DEFINED else 0)
-              or (if (isModuleSetWrapper) NODE_FLAG_IS_MODULE_SET_WRAPPER else 0)
+              or (if (moduleSetWrapper) NODE_FLAG_IS_MODULE_SET_WRAPPER else 0)
               or (if (isAlias) NODE_FLAG_IS_ALIAS else 0))
     store.mutableNameIndex(NODE_PLUGIN).set(name.value, id)
 
@@ -224,10 +232,36 @@ internal class PluginGraphBuilder(
   }
 
   /**
+   * Add or get a module with namespace vertex. Returns the node ID.
+   */
+  fun addModule(moduleId: PluginModuleId): Int {
+    val stringId = if (moduleId.namespace != null) "${moduleId.namespace}:${moduleId.name}" else moduleId.name
+    val existing = store.nameIndex[NODE_CONTENT_MODULE_WITH_NAMESPACE].getOrDefault(stringId, -1)
+    if (existing >= 0) return existing
+
+    val id = store.names.size
+    store.names.add(stringId)
+    val flags = if (moduleId.name.endsWith("._test")) NODE_FLAG_IS_TEST_DESCRIPTOR else 0
+    store.kinds.add(NODE_CONTENT_MODULE_WITH_NAMESPACE or flags)
+    store.mutableNameIndex(NODE_CONTENT_MODULE_WITH_NAMESPACE).set(stringId, id)
+    store.descriptorFlagsComplete = false
+    return id
+  }
+
+  /**
    * Mark a content module as having a descriptor on disk, creating the module node if needed.
    */
   fun markContentModuleHasDescriptor(name: ContentModuleName): Int {
     val id = addModule(name)
+    store.kinds[id] = store.kinds[id] or NODE_FLAG_HAS_DESCRIPTOR
+    return id
+  }
+
+  /**
+   * Mark a content module as having a descriptor on disk, creating the module node if needed.
+   */
+  fun markContentModuleHasDescriptor(moduleId: PluginModuleId): Int {
+    val id = addModule(moduleId)
     store.kinds[id] = store.kinds[id] or NODE_FLAG_HAS_DESCRIPTOR
     return id
   }
@@ -326,10 +360,12 @@ internal class PluginGraphBuilder(
    * Link product contains content module directly.
    * Loading mode is packed into edge entries (not stored in edgeLoadingModes map).
    */
-  fun linkProductContainsContent(productName: String, contentModuleName: ContentModuleName, loadingMode: ModuleLoadingRuleValue) {
+  fun linkProductContainsContent(productName: String, pluginModuleId: PluginModuleId, loadingMode: ModuleLoadingRuleValue) {
+    val contentModuleName = pluginModuleId.contentName()
     val productId = addProduct(productName)
     val moduleId = addModule(contentModuleName)
     addContentEdge(productId, moduleId, EDGE_CONTAINS_CONTENT, loadingMode)
+    addContentEdge(productId, addModule(pluginModuleId), EDGE_CONTAINS_CONTENT_WITH_NAMESPACE, loadingMode)
 
     // Also create target vertex and backedBy edge
     val targetName = TargetName(contentModuleName.baseModuleName().value)
@@ -345,11 +381,14 @@ internal class PluginGraphBuilder(
    *   - false: [EDGE_CONTAINS_CONTENT] (production)
    *   - true: [EDGE_CONTAINS_CONTENT_TEST] (test)
    */
-  fun linkPluginContent(pluginName: TargetName, contentModuleName: ContentModuleName, loadingMode: ModuleLoadingRuleValue, isTest: Boolean) {
+  fun linkPluginContent(pluginName: TargetName, pluginModuleId: PluginModuleId, loadingMode: ModuleLoadingRuleValue, isTest: Boolean) {
+    val contentModuleName = pluginModuleId.contentName()
     val pluginId = addPlugin(pluginName, isTest = isTest)
     val moduleId = addModule(contentModuleName)
     val edgeType = if (isTest) EDGE_CONTAINS_CONTENT_TEST else EDGE_CONTAINS_CONTENT
     addContentEdge(pluginId, moduleId, edgeType, loadingMode)
+    val edgeTypeWithNamespace = if (isTest) EDGE_CONTAINS_CONTENT_TEST_WITH_NAMESPACE else EDGE_CONTAINS_CONTENT_WITH_NAMESPACE
+    addContentEdge(pluginId, addModule(pluginModuleId), edgeTypeWithNamespace, loadingMode)
 
     // Also create target vertex and backedBy edge
     val targetName = TargetName(contentModuleName.baseModuleName().value)
@@ -378,15 +417,16 @@ internal class PluginGraphBuilder(
     content: PluginContentInfo,
     testFrameworkContentModules: Set<ContentModuleName>,
   ) {
-    val contentModuleNames = content.contentModules.mapTo(HashSet()) { it.name }
+    val contentModuleNames = content.contentModules.mapTo(HashSet()) { it.moduleId.contentName() }
     val isTest = content.isTestPlugin || isTestPlugin(pluginModule, contentModuleNames, testFrameworkContentModules)
 
     addPlugin(pluginModule, isTest = isTest, isDslDefined = content.isDslDefined, pluginId = content.pluginId, pluginAliases = content.pluginAliases)
     linkPluginMainTarget(pluginModule)
 
     for (module in content.contentModules) {
+      val moduleId = module.moduleId
       val loadingMode = module.loadingMode ?: ModuleLoadingRuleValue.OPTIONAL
-      linkPluginContent(pluginName = pluginModule, contentModuleName = module.name, loadingMode = loadingMode, isTest = isTest)
+      linkPluginContent(pluginName = pluginModule, pluginModuleId = moduleId, loadingMode = loadingMode, isTest = isTest)
     }
   }
 
@@ -672,11 +712,12 @@ internal class PluginGraphBuilder(
     val moduleSetId = addModuleSet(moduleSet.name, selfContained = moduleSet.selfContained)
 
     for (module in moduleSet.modules) {
-      val moduleId = addModule(module.name)
+      val moduleName = module.contentName()
+      val moduleId = addModule(moduleName)
       addContentEdge(moduleSetId, moduleId, EDGE_CONTAINS_MODULE, module.loading)
 
       // Create target vertex and backedBy edge
-      val targetName = TargetName(module.name.baseModuleName().value)
+      val targetName = TargetName(moduleName.baseModuleName().value)
       val targetId = addTarget(targetName)
       addEdge(moduleId, targetId, EDGE_BACKED_BY)
     }
@@ -812,7 +853,7 @@ internal class PluginGraphBuilder(
       for (module in pluginInfo.contentModules) {
         linkPluginContent(
           pluginName = pluginModule,
-          contentModuleName = module.name,
+          pluginModuleId = module.moduleId,
           loadingMode = module.loadingMode ?: ModuleLoadingRuleValue.OPTIONAL,
           isTest = false,
         )

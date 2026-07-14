@@ -1,0 +1,12 @@
+<idea-plugin>
+  <dependencies>
+    <!-- region Generated dependencies - run `Generate Product Layouts` to regenerate -->
+    <module name="intellij.python.terminal.shared"/>
+    <module name="intellij.terminal.frontend"/>
+    <!-- endregion -->
+  </dependencies>
+
+  <extensions defaultExtensionNs="org.jetbrains.plugins.terminal">
+    <terminalSettingsProvider implementation="com.intellij.python.terminal.frontend.PyVirtualEnvTerminalSettingsProvider"/>
+  </extensions>
+</idea-plugin>

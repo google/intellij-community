@@ -1,5 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.intention.impl;
 
 import com.intellij.codeInsight.ExternalAnnotationsManager;
@@ -16,7 +15,10 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiAnnotation;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiModifierListOwner;
+import com.intellij.psi.PsiType;
+import com.intellij.psi.util.PsiUtil;
 import com.intellij.util.containers.ContainerUtil;
+import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -25,7 +27,7 @@ import java.util.Objects;
 
 public class DeannotateIntentionAction implements ModCommandAction {
   private final @NlsSafe String myAnnotationName;
-  
+
   public DeannotateIntentionAction() {
     myAnnotationName = null;
   }
@@ -47,23 +49,33 @@ public class DeannotateIntentionAction implements ModCommandAction {
     PsiModifierListOwner listOwner = AddAnnotationPsiFix.getContainer(context.file(), context.offset(), true);
     if (listOwner != null) {
       final ExternalAnnotationsManager externalAnnotationsManager = ExternalAnnotationsManager.getInstance(context.project());
-      final PsiAnnotation[] annotations = externalAnnotationsManager.findExternalAnnotations(listOwner);
+      final PsiAnnotation[] annotations = getAnnotations(externalAnnotationsManager, listOwner);
       if (annotations.length > 0) {
-        String message;
-        if (annotations.length == 1) {
-          message = JavaBundle.message("deannotate.intention.action.text", "@" + annotations[0].getQualifiedName());
-        } else {
-          message = JavaBundle.message("deannotate.intention.action.several.text");
-        }
+        String message = annotations.length == 1
+                         ? JavaBundle.message("deannotate.intention.action.text", "@" + annotations[0].getQualifiedName())
+                         : JavaBundle.message("deannotate.intention.action.several.text");
         final List<PsiFile> files = externalAnnotationsManager.findExternalAnnotationsFiles(listOwner);
         if (files == null || files.isEmpty()) return null;
-        final VirtualFile virtualFile = files.get(0).getVirtualFile();
+        final VirtualFile virtualFile = files.getFirst().getVirtualFile();
         if (virtualFile != null && (virtualFile.isWritable() || virtualFile.isInLocalFileSystem())) {
           return Presentation.of(message).withPriority(PriorityAction.Priority.LOW);
         }
       }
     }
     return null;
+  }
+
+  private static PsiAnnotation @NotNull [] getAnnotations(ExternalAnnotationsManager externalAnnotationsManager,
+                                                          PsiModifierListOwner listOwner) {
+    PsiType type = PsiUtil.getTypeByPsiElement(listOwner);
+    PsiAnnotation[] annotations = externalAnnotationsManager.findExternalAnnotations(listOwner);
+    if (type != null) {
+      return StreamEx.of(type.getAnnotations())
+        .filter(ExternalAnnotationsManager::isExternal)
+        .prepend(annotations)
+        .toArray(PsiAnnotation.EMPTY_ARRAY);
+    }
+    return annotations;
   }
 
   @Override
@@ -75,10 +87,14 @@ public class DeannotateIntentionAction implements ModCommandAction {
     if (myAnnotationName != null) {
       return annotationsManager.deannotateModCommand(List.of(listOwner), List.of(myAnnotationName));
     }
-    final PsiAnnotation[] externalAnnotations = annotationsManager.findExternalAnnotations(listOwner);
+    final PsiAnnotation[] externalAnnotations = getAnnotations(annotationsManager, listOwner);
     if (externalAnnotations.length == 0) return ModCommand.nop();
-    return ModCommand.chooseAction(JavaBundle.message("deannotate.intention.chooser.title"),
-                                   ContainerUtil.map(externalAnnotations, anno -> new DeannotateIntentionAction(
-                                     Objects.requireNonNull(anno.getQualifiedName()))));
+    List<DeannotateIntentionAction> map =
+      StreamEx.of(externalAnnotations).map(PsiAnnotation::getQualifiedName)
+        .nonNull()
+        .sorted()
+        .map(DeannotateIntentionAction::new)
+        .toList();
+    return ModCommand.chooseAction(JavaBundle.message("deannotate.intention.chooser.title"), map);
   }
 }

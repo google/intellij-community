@@ -1,37 +1,64 @@
-### auto-generated section `build intellij.junit.v6.rt` start
-load("@rules_jvm//:jvm.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_provided_library")
 
-jvm_library(
-  name = "junit-v6-rt",
-  module_name = "intellij.junit.v6.rt",
-  visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java", "src/**/*.form"], allow_empty = True),
-  kotlinc_opts = "@community//:k17",
-  deps = [
-    "//plugins/junit5_rt:junit-v5-rt",
-    "@lib//:junit6-provided",
-    "@lib//:junit6Launcher-provided",
-  ]
+### auto-generated section `build intellij.junit.v6.rt` start
+jvm_provided_library(
+    name = "libraries_junit6_provided",
+    lib = "//libraries/junit6",
+)
+
+jvm_provided_library(
+    name = "libraries_junit6-launcher_provided",
+    lib = "//libraries/junit6-launcher",
 )
 
 jvm_library(
-  name = "junit-v6-rt_test_lib",
-  testonly = True,
-  module_name = "intellij.junit.v6.rt",
-  visibility = ["//visibility:public"],
-  srcs = glob([], allow_empty = True),
-  kotlinc_opts = "@community//:k17",
-  runtime_deps = [
-    ":junit-v6-rt",
-    "//plugins/junit5_rt:junit-v5-rt_test_lib",
-    "@lib//:junit6-provided",
-    "@lib//:junit6Launcher-provided",
-  ]
+    name = "junit-v6-rt",
+    srcs = glob(
+        [
+            "src/**/*.kt",
+            "src/**/*.java",
+            "src/**/*.form",
+        ],
+        allow_empty = True,
+    ),
+    kotlinc_opts = "@community//:k17",
+    module_name = "intellij.junit.v6.rt",
+    visibility = ["//visibility:public"],
+    deps = [
+        # do not sort,
+        "//plugins/junit5_rt:junit-v5-rt",
+        ":libraries_junit6_provided",
+        ":libraries_junit6-launcher_provided",
+    ],
+)
+
+jvm_library(
+    name = "junit-v6-rt_test_lib",
+    testonly = True,
+    srcs = glob(
+        [],
+        allow_empty = True,
+    ),
+    kotlinc_opts = "@community//:k17",
+    module_name = "intellij.junit.v6.rt",
+    visibility = ["//visibility:public"],
+    runtime_deps = [
+        # do not sort,
+        ":junit-v6-rt",
+        "//libraries/junit6",
+        "//libraries/junit6:junit6_test_lib",
+        "//libraries/junit6-launcher",
+        "//libraries/junit6-launcher:junit6-launcher_test_lib",
+        "//plugins/junit5_rt:junit-v5-rt_test_lib",
+    ],
 )
 ### auto-generated section `build intellij.junit.v6.rt` end
 
 ### auto-generated section `iml intellij.junit.v6.rt` start
-exports_files([
-  "intellij.junit.v6.rt.iml",
-], visibility = ["//visibility:public"])
+exports_files(
+    [
+        "intellij.junit.v6.rt.iml",
+    ],
+    visibility = ["//visibility:public"],
+)
 ### auto-generated section `iml intellij.junit.v6.rt` end

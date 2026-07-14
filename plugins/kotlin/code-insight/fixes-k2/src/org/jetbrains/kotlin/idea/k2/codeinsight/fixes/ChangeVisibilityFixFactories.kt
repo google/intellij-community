@@ -32,7 +32,7 @@ import org.jetbrains.kotlin.idea.codeinsight.utils.canBeProtected
 import org.jetbrains.kotlin.idea.codeinsight.utils.canBePublic
 import org.jetbrains.kotlin.idea.codeinsight.utils.isRedundantSetter
 import org.jetbrains.kotlin.idea.codeinsight.utils.removeRedundantSetter
-import org.jetbrains.kotlin.idea.codeinsight.utils.toVisibility
+import org.jetbrains.kotlin.idea.codeinsight.utils.toCompilerVisibility
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.SpecialNames
@@ -72,7 +72,7 @@ internal object ChangeVisibilityFixFactories {
             visibilityModifier,
         )
 
-        override fun getPresentation(
+        override fun getActionPresentation(
             context: ActionContext,
             element: KtDeclaration,
         ): Presentation {
@@ -109,8 +109,8 @@ internal object ChangeVisibilityFixFactories {
 
     private class ChangeToPrivateModCommandAction(element: KtDeclaration, elementName: String) :
         ChangeVisibilityModCommandAction(element, ElementContext(elementName), false, KtTokens.PRIVATE_KEYWORD) {
-            override fun getPresentation(context: ActionContext, element: KtDeclaration): Presentation =
-                super.getPresentation(context, element).withPriority(PriorityAction.Priority.HIGH)
+            override fun getActionPresentation(context: ActionContext, element: KtDeclaration): Presentation =
+                super.getActionPresentation(context, element).withPriority(PriorityAction.Priority.HIGH)
         }
 
     private class ChangeToInternalModCommandAction(element: KtDeclaration, elementName: String):
@@ -121,8 +121,8 @@ internal object ChangeVisibilityFixFactories {
 
     private class ChangeToPublicModCommandAction(element: KtDeclaration, elementName: String, forceUsingExplicitModifier: Boolean = true) :
         ChangeVisibilityModCommandAction(element, ElementContext(elementName), forceUsingExplicitModifier, KtTokens.PUBLIC_KEYWORD) {
-            override fun getPresentation(context: ActionContext, element: KtDeclaration): Presentation =
-                super.getPresentation(context, element).withPriority(PriorityAction.Priority.HIGH)
+            override fun getActionPresentation(context: ActionContext, element: KtDeclaration): Presentation =
+                super.getActionPresentation(context, element).withPriority(PriorityAction.Priority.HIGH)
         }
 
     val noExplicitVisibilityInApiMode =
@@ -258,9 +258,9 @@ internal object ChangeVisibilityFixFactories {
                 addIfNotNull(createFixToTargetVisibility(referencedSymbol, referencedDeclaration, Visibilities.Internal))
                 val visibilityModifierType = referencedDeclaration.visibilityModifierType() ?: KtTokens.PUBLIC_KEYWORD
                 if (inlineDeclaration is KtPropertyAccessor) {
-                    addIfNotNull(createFixToTargetVisibility(inlineSymbol, inlineDeclaration.property, visibilityModifierType.toVisibility()))
+                    addIfNotNull(createFixToTargetVisibility(inlineSymbol, inlineDeclaration.property, visibilityModifierType.toCompilerVisibility()))
                 } else {
-                    addIfNotNull(createFixToTargetVisibility(inlineSymbol, inlineDeclaration, visibilityModifierType.toVisibility()))
+                    addIfNotNull(createFixToTargetVisibility(inlineSymbol, inlineDeclaration, visibilityModifierType.toCompilerVisibility()))
                 }
                 if (visibilityModifierType != KtTokens.PUBLIC_KEYWORD) {
                     addIfNotNull(createFixToTargetVisibility(referencedSymbol, referencedDeclaration, Visibilities.Public))
@@ -425,4 +425,3 @@ internal object ChangeVisibilityFixFactories {
         }
     }
 }
-

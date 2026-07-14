@@ -15,7 +15,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
 import java.util.function.BiConsumer;
+
+import static com.intellij.database.extensions.ExtensionScriptsUtil.getDefaultClassLoader;
 
 public class BaseExtractorsHelper implements ExtractorsHelper {
   public static final BaseExtractorsHelper INSTANCE = new BaseExtractorsHelper();
@@ -112,7 +115,11 @@ public class BaseExtractorsHelper implements ExtractorsHelper {
       }
 
       ExtensionScriptsUtil.prepareScript(script);
-      IdeScriptEngine engine = ExtensionScriptsUtil.getEngineFor(config.getProject(), ExtractorScripts.getPluginId(), script, myInstallPlugin);
+      IdeScriptEngine engine = ExtensionScriptsUtil.getEngineFor(config.getProject(),
+                                                                 getDefaultClassLoader(ExtractorScripts.getPluginId()),
+                                                                 script,
+                                                                 myInstallPlugin,
+                                                                 true);
       return engine == null ? null : new NoDbScriptDataExtractor(config.getProject(), script, engine, config.getObjectFormatter(), false, true /* TODO: support detection */);
     }
 
@@ -125,8 +132,31 @@ public class BaseExtractorsHelper implements ExtractorsHelper {
 
       ExtensionScriptsUtil.prepareScript(script);
 
-      IdeScriptEngine engine = ExtensionScriptsUtil.getEngineFor(config.getProject(), ExtractorScripts.getPluginId(), script, null, false);
+      IdeScriptEngine engine = ExtensionScriptsUtil.getEngineFor(config.getProject(),
+                                                                 getDefaultClassLoader(ExtractorScripts.getPluginId()),
+                                                                 script,
+                                                                 null,
+                                                                 false);
       return engine == null ? null : new NoDbScriptDataExtractor(config.getProject(), script, engine, config.getObjectFormatter(), true, true /* TODO: support detection */);
+    }
+
+    /** Script extractor names that do not support transposed output. */
+    private static final Set<String> EXTRACTORS_NO_TRANSPOSE = Set.of(
+      "JSON-Groovy.json.groovy",
+      "One-row.sql.groovy",
+      "Python-DataFrame.py.groovy",
+      "SQL-Insert-Multirow.sql.groovy",
+      "SQL-Insert-Statements.sql.groovy"
+    );
+
+    // Scripts support transpose except those explicitly opted out by name.
+    @Override
+    public @NotNull Set<ExtractorConfigOption> getApplicableOptions() {
+      Set<ExtractorConfigOption> options = DataAggregatorFactory.super.getApplicableOptions();
+      if (EXTRACTORS_NO_TRANSPOSE.contains(getName())) {
+        options.remove(ExtractorConfigOption.TRANSPOSE);
+      }
+      return options;
     }
   }
 }

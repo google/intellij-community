@@ -12,6 +12,7 @@ import com.intellij.debugger.impl.DebuggerUtilsEx;
 import com.intellij.debugger.jdi.VirtualMachineProxyImpl;
 import com.intellij.debugger.requests.ClassPrepareRequestor;
 import com.intellij.debugger.ui.breakpoints.JavaLineBreakpointType;
+import com.intellij.ide.IdeBundle;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
@@ -44,7 +45,6 @@ import com.intellij.psi.search.FilenameIndex;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.util.PsiUtil;
-import com.intellij.ui.UIBundle;
 import com.intellij.util.concurrency.annotations.RequiresReadLock;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.EDT;
@@ -191,19 +191,7 @@ public class PositionManagerImpl implements PositionManager, MultiRequestPositio
       sourcePosition = SourcePosition.createFromLine(psiFile, lineNumber);
     }
 
-    int lambdaOrdinal = -1;
-    if (DebuggerUtilsEx.isLambda(method)) {
-      int line = sourcePosition.getLine() + 1;
-      Set<Method> lambdas = StreamEx.of(location.declaringType().methods())
-        .filter(DebuggerUtilsEx::isLambda)
-        .filter(m -> !DebuggerUtilsEx.locationsOfLine(m, line).isEmpty())
-        .toSet();
-      if (lambdas.size() > 1) {
-        ArrayList<Method> lambdasList = new ArrayList<>(lambdas);
-        lambdasList.sort(DebuggerUtilsEx.LAMBDA_ORDINAL_COMPARATOR);
-        lambdaOrdinal = lambdasList.indexOf(method);
-      }
-    }
+    int lambdaOrdinal = LambdaOrdinalResolver.findLambdaOrdinal(sourcePosition, method);
 
     SourcePosition condRetPos = adjustPositionForConditionalReturn(location, psiFile, lineNumber);
     if (condRetPos != null) {
@@ -684,7 +672,7 @@ public class PositionManagerImpl implements PositionManager, MultiRequestPositio
           .runProcessWithProgressSynchronously(() ->
                                                  ReadAction.computeCancellable(
                                                    () -> file.getViewProvider().getDocument()),
-                                               UIBundle.message("progress.decompiling.file", file.getName()), true, file.getProject());
+                                               IdeBundle.message("progress.title.preparing.navigation"), true, file.getProject());
       }
       else {
         file.getViewProvider().getDocument(); // to ensure decompilation

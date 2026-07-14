@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diff.tools.combined
 
 import com.intellij.diff.DiffContext
@@ -55,7 +55,7 @@ interface CombinedDiffManager {
 @ApiStatus.Internal
 class CombinedDiffComponentProcessorImpl(
   val model: CombinedDiffModel,
-  goToChangeAction: AnAction?,
+  goToChangeAction: AnAction,
 ) : CombinedDiffComponentProcessor {
 
   override val disposable = Disposer.newCheckedDisposable()
@@ -157,7 +157,7 @@ class CombinedDiffComponentProcessorImpl(
     return CombinedDiffViewer(context, MyBlockListener(), blockState, mainUi.getUiState()).also { viewer ->
       Disposer.register(disposable, viewer)
       context.putUserData(COMBINED_DIFF_VIEWER_KEY, viewer)
-      mainUi.setContent(viewer, blockState)
+      mainUi.setContent(viewer)
     }
   }
 

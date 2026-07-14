@@ -3,7 +3,6 @@
 
 package org.jetbrains.intellij.build
 
-import com.intellij.util.xml.dom.XmlElement
 import com.intellij.util.xml.dom.readXmlAsModel
 import org.jetbrains.intellij.build.impl.ModuleItem
 import org.jetbrains.intellij.build.impl.PluginLayout
@@ -17,20 +16,22 @@ import java.util.concurrent.ConcurrentHashMap
 
 // production-only - JpsJavaClasspathKind.PRODUCTION_RUNTIME
 internal class JarPackagerDependencyHelper(private val outputProvider: ModuleOutputProvider) {
-  private val libraryCache = ConcurrentHashMap<JpsModule, List<JpsLibraryDependency>>()
+  private val productionLibraryCache = ConcurrentHashMap<JpsModule, List<JpsLibraryDependency>>()
+  private val testRuntimeLibraryCache = ConcurrentHashMap<JpsModule, List<JpsLibraryDependency>>()
 
   fun getModuleDependencies(moduleName: String): Sequence<String> {
     return outputProvider.findRequiredModule(moduleName).getProductionModuleDependencies(withTests = false).map { it.moduleReference.moduleName }
   }
 
-  fun isPluginModulePackedIntoSeparateJar(module: JpsModule, layout: PluginLayout?, frontendModuleFilter: FrontendModuleFilter): Boolean {
-    if (layout != null && !frontendModuleFilter.isModuleCompatibleWithFrontend(layout.mainModule) && frontendModuleFilter.isModuleCompatibleWithFrontend(module.name)) {
+  fun isPluginModulePackedIntoSeparateJar(module: JpsModule, layout: PluginLayout, frontendModuleFilter: FrontendModuleFilter): Boolean {
+    if (!layout.modulesWithExcludedModuleLibraries.contains(module.name) &&
+        getLibraryDependencies(module = module, withTests = false).any { it.libraryReference.parentReference is JpsModuleReference }) {
       return true
     }
-
-    val modulesWithExcludedModuleLibraries = layout?.modulesWithExcludedModuleLibraries ?: emptySet()
-    return !modulesWithExcludedModuleLibraries.contains(module.name) &&
-           getLibraryDependencies(module = module, withTests = false).any { it.libraryReference.parentReference is JpsModuleReference }
+    if (!frontendModuleFilter.isModuleCompatibleWithFrontend(layout.mainModule) && frontendModuleFilter.isModuleCompatibleWithFrontend(module.name)) {
+      return true
+    }
+    return false
   }
 
   fun isTestPluginModule(moduleName: String, module: JpsModule?): Boolean {
@@ -52,6 +53,7 @@ internal class JarPackagerDependencyHelper(private val outputProvider: ModuleOut
     }
 
     if (moduleName.contains(".test.")) {
+      @Suppress("RedundantIf", "RedundantSuppression")
       if (module?.sourceRoots?.none { it.rootType.isForTests } == true) {
         return false
       }
@@ -76,23 +78,9 @@ internal class JarPackagerDependencyHelper(private val outputProvider: ModuleOut
     return element.content!!
   }
 
-  // The x-include is not resolved. If the plugin.xml includes any files, the content from these included files will not be considered.
-  fun readPluginIncompleteContentFromDescriptor(pluginModule: JpsModule, contentModuleFilter: ContentModuleFilter): Sequence<String> {
-    val pluginXml = findFileInModuleSources(pluginModule, "META-INF/plugin.xml") ?: return emptySequence()
-    return readPluginContentFromDescriptor(readXmlAsModel(pluginXml)).mapNotNull { (moduleName, loadingRule) ->
-      if (isOptionalLoadingRule(loadingRule) && !contentModuleFilter.isOptionalModuleIncluded(moduleName, pluginModule.name)) {
-        return@mapNotNull null
-      }
-      moduleName
-    }
-  }
-
   fun getLibraryDependencies(module: JpsModule, withTests: Boolean): List<JpsLibraryDependency> {
-    //TODO Please write some sane code here, caching is broken, a proper caching crashes dev build
-    if (module.name == "intellij.python.pyproject" && withTests) {
-      return java.util.List.of()
-    }
-    return libraryCache.computeIfAbsent(module) {
+    val cache = if (withTests) testRuntimeLibraryCache else productionLibraryCache
+    return cache.computeIfAbsent(module) {
       val javaExtensionService = JpsJavaExtensionService.getInstance()
       val result = mutableListOf<JpsLibraryDependency>()
       for (element in module.dependenciesList.dependencies) {
@@ -130,17 +118,3 @@ internal class JarPackagerDependencyHelper(private val outputProvider: ModuleOut
     return false
   }
 }
-
-internal fun readPluginContentFromDescriptor(pluginDescriptor: XmlElement): Sequence<Pair<String, String?>> {
-  return sequence {
-    for (content in pluginDescriptor.children("content")) {
-      for (module in content.children("module")) {
-        val moduleName = module.attributes.get("name")?.takeIf { !it.contains('/') } ?: continue
-        val loadingRuleString = module.attributes.get("loading")
-        yield(moduleName to loadingRuleString)
-      }
-    }
-  }
-}
-
-internal fun isOptionalLoadingRule(loadingRule: String?): Boolean = loadingRule != "required" && loadingRule != "embedded"

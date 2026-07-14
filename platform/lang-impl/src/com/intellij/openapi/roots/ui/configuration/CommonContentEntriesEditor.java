@@ -72,7 +72,7 @@ import java.util.Map;
  */
 public class CommonContentEntriesEditor extends ModuleElementsEditor {
   private static final Logger LOG = Logger.getInstance(CommonContentEntriesEditor.class);
-
+  @ApiStatus.Internal
   protected ContentEntryTreeEditor myRootTreeEditor;
   private MyContentEntryEditorListener myContentEntryEditorListener;
   protected JPanel myEditorsPanel;
@@ -223,6 +223,7 @@ public class CommonContentEntriesEditor extends ModuleElementsEditor {
     return null;
   }
 
+  @ApiStatus.Internal
   protected ContentEntryTreeEditor createContentEntryTreeEditor(Project project) {
     return new ContentEntryTreeEditor(project, myEditHandlers);
   }
@@ -260,6 +261,7 @@ public class CommonContentEntriesEditor extends ModuleElementsEditor {
     myEditorsPanel.add(component);
   }
 
+  @ApiStatus.Internal
   protected ContentEntryEditor createContentEntryEditor(String contentEntryUrl) {
     return new ContentEntryEditor(contentEntryUrl, myEditHandlers) {
       @Override
@@ -431,6 +433,7 @@ public class CommonContentEntriesEditor extends ModuleElementsEditor {
         }
       };
       myDescriptor.putUserData(LangDataKeys.MODULE_CONTEXT, getModule());
+      myDescriptor.setEnvironmentRestricted(true);
       myDescriptor.setTitle(ProjectBundle.message("module.paths.add.content.title"));
       myDescriptor.setDescription(ProjectBundle.message("module.paths.add.content.prompt"));
       myDescriptor.putUserData(FileChooserKeys.DELETE_ACTION_AVAILABLE, false);

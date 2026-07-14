@@ -2,7 +2,7 @@ package com.jetbrains.rhizomedb
 
 import com.jetbrains.rhizomedb.impl.EidGen
 import com.jetbrains.rhizomedb.impl.generateSeed
-import fleet.util.openmap.MutableOpenMap
+import fleet.openmap.MutableOpenMap
 
 /**
  * Interface for db mutation.
@@ -14,6 +14,11 @@ interface Mut : Q {
    * Partition where all new entities are created by this instance.
    * */
   val defaultPart: Part
+
+  /**
+   * Controls whether creating an entity auto-registers its [EntityType]
+   * */
+  val registerEntityTypeOnEntityCreation: Boolean
 
   /**
    * Persistent snapshot of [DB] from which the transaction is started.

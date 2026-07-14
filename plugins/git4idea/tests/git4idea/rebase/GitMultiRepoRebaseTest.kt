@@ -14,6 +14,7 @@ import git4idea.repo.GitRepository
 import git4idea.test.UNKNOWN_ERROR_TEXT
 import git4idea.test.git
 import git4idea.test.resolveConflicts
+import git4idea.test.runUnderProgress
 import org.mockito.Mockito
 
 class GitMultiRepoRebaseTest : GitRebaseBaseTest() {
@@ -213,7 +214,9 @@ class GitMultiRepoRebaseTest : GitRebaseBaseTest() {
     val uiHandler = Mockito.mock(GitBranchUiHandler::class.java)
     Mockito.`when`(uiHandler.progressIndicator).thenReturn(EmptyProgressIndicator())
     try {
-      GitBranchWorker(project, git, uiHandler).rebaseOnCurrent(allRepositories, "feature")
+      runUnderProgress {
+        GitBranchWorker(project, git, uiHandler).rebaseOnCurrent(allRepositories, "feature")
+      }
     }
     finally {
       git.setShouldRebaseFail { false }

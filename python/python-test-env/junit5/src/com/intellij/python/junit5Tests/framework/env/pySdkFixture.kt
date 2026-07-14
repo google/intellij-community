@@ -2,18 +2,18 @@
 package com.intellij.python.junit5Tests.framework.env
 
 import com.intellij.openapi.application.edtWriteAction
+import com.intellij.openapi.application.writeAction
 import com.intellij.openapi.projectRoots.ProjectJdkTable
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.python.test.env.common.PredefinedPyEnvironments
-import com.intellij.python.test.env.common.createEnvironment
 import com.intellij.python.test.env.core.PyEnvironment
 import com.intellij.python.test.env.core.PyEnvironmentFactory
+import com.intellij.python.test.env.core.PyEnvironmentSpec
 import com.intellij.python.test.env.junit5.RunOnEnvironmentsExtension
 import com.intellij.python.test.env.junit5.getOrCreatePyEnvironmentFactory
 import com.intellij.testFramework.junit5.fixture.TestFixture
 import com.intellij.testFramework.junit5.fixture.TestFixtureInitializer
 import com.intellij.testFramework.junit5.fixture.testFixture
-import com.jetbrains.python.sdk.persist
 
 /**
  * Create sdk fixture using tags from [@PyEnvTestCase][com.intellij.python.junit5Tests.framework.env.PyEnvTestCase] annotation.
@@ -31,16 +31,20 @@ fun pySdkFixture(): TestFixture<SdkFixture<PyEnvironment>> = testFixture { conte
  */
 fun pySdkFixture(
   env: PredefinedPyEnvironments,
+): TestFixture<SdkFixture<PyEnvironment>> = pySdkFixture(env.spec)
+
+fun pySdkFixture(
+  envSpec: PyEnvironmentSpec<*>,
 ): TestFixture<SdkFixture<PyEnvironment>> = testFixture { context ->
   val factory = getOrCreatePyEnvironmentFactory(context.extensionContext)
-  initializedPySdkFixture(factory, env)
+  initializedPySdkFixture(factory, envSpec)
 }
 
 private suspend fun TestFixtureInitializer.R<SdkFixture<PyEnvironment>>.initializedPySdkFixture(
   factory: PyEnvironmentFactory,
-  env: PredefinedPyEnvironments,
+  envSpec: PyEnvironmentSpec<*>,
 ): TestFixtureInitializer.InitializedTestFixture<SdkFixture<PyEnvironment>> {
-  val env = factory.createEnvironment(env)
+  val env = factory.createEnvironment(envSpec)
   return initializedTestFixture(env)
 }
 
@@ -48,7 +52,11 @@ private suspend fun TestFixtureInitializer.R<SdkFixture<PyEnvironment>>.initiali
   env: PyEnvironment,
 ): TestFixtureInitializer.InitializedTestFixture<SdkFixture<PyEnvironment>> {
   val sdk = env.prepareSdk()
-  sdk.persist()
+  writeAction {
+    if (ProjectJdkTable.getInstance().findJdk(sdk.name) == null) {
+      ProjectJdkTable.getInstance().addJdk(sdk)
+    }
+  }
   return initialized(SdkFixture(sdk, env)) {
     edtWriteAction {
       ProjectJdkTable.getInstance().removeJdk(sdk)

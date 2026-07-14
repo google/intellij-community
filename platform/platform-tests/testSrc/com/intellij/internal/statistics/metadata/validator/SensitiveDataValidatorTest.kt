@@ -1,16 +1,12 @@
-// Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.internal.statistics.metadata.validator
 
 import com.intellij.internal.statistic.eventLog.EventLogBuild
 import com.intellij.internal.statistic.eventLog.EventLogGroup
 import com.intellij.internal.statistic.eventLog.FeatureUsageData
-import com.jetbrains.fus.reporting.api.IGroupValidators
-import com.jetbrains.fus.reporting.api.ValidationResultType
-import com.jetbrains.fus.reporting.api.emptyGroupValidators
 import com.intellij.internal.statistic.eventLog.validator.rules.EventContext
 import com.intellij.internal.statistic.eventLog.validator.rules.impl.CustomValidationRule
 import com.intellij.internal.statistic.eventLog.validator.rules.impl.LocalEnumCustomValidationRule
-import com.jetbrains.fus.reporting.api.RecorderDataValidationRule
 import com.intellij.internal.statistic.eventLog.validator.storage.FusComponentProvider
 import com.intellij.openapi.extensions.Extensions
 import com.intellij.openapi.util.Disposer
@@ -18,14 +14,17 @@ import com.jetbrains.fus.reporting.FileHandle
 import com.jetbrains.fus.reporting.FileStorage
 import com.jetbrains.fus.reporting.FileStorageMode
 import com.jetbrains.fus.reporting.MetadataStorage
+import com.jetbrains.fus.reporting.api.IEventContext
+import com.jetbrains.fus.reporting.api.IGroupValidators
+import com.jetbrains.fus.reporting.api.RecorderDataValidationRule
+import com.jetbrains.fus.reporting.api.ValidationResultType
+import com.jetbrains.fus.reporting.api.emptyGroupValidators
 import junit.framework.TestCase
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import org.junit.Assert
 import org.junit.Test
 import java.util.Collections
 
-@Suppress("SameParameterValue")
+@Suppress("SameParameterValue", "EventLogDescription")
 class SensitiveDataValidatorTest : BaseSensitiveDataValidatorTest() {
 
   @Test
@@ -578,13 +577,15 @@ class SensitiveDataValidatorTest : BaseSensitiveDataValidatorTest() {
       override fun getSkipAnonymizationIds(): Set<String> = throw NotImplementedError()
       override fun getSystemDataRulesRevisions(): RecorderDataValidationRule = throw NotImplementedError()
       override fun isUnreachable(): Boolean = true
-      override fun reload() = Unit
-      override fun update(): Boolean = false
-      override suspend fun update(scope: CoroutineScope): Job = throw NotImplementedError()
+      override suspend fun reload() = Unit
+      override suspend fun scheduleUpdate() = Unit
+      override suspend fun update(): Boolean = false
     }
 
     val components = createFusComponents(object : FileStorage {
       override fun exists(path: String): Boolean = false
+      override fun list(path: String): List<String> = emptyList()
+      override fun delete(path: String) = Unit
       override fun openFileHandle(path: String, mode: FileStorageMode): FileHandle = throw NotImplementedError()
       override fun read(path: String): ByteArray = ByteArray(0)
       override fun write(path: String, content: ByteArray) = throw NotImplementedError()
@@ -656,15 +657,14 @@ class SensitiveDataValidatorTest : BaseSensitiveDataValidatorTest() {
   @Suppress("unused")
   internal enum class TestCustomActionId {FIRST, SECOND, THIRD}
 
-  internal inner class TestLocalEnumCustomValidationRule : LocalEnumCustomValidationRule("custom_action_id", TestCustomActionId::class.java)
+  internal class TestLocalEnumCustomValidationRule : LocalEnumCustomValidationRule("custom_action_id", TestCustomActionId::class.java)
 
-  internal inner class TestExistingValidationRule : LocalEnumCustomValidationRule("existing_rule", TestCustomActionId::class.java)
+  internal class TestExistingValidationRule : LocalEnumCustomValidationRule("existing_rule", TestCustomActionId::class.java)
 
-  internal inner class TestThirdPartyValidationRule : CustomValidationRule() {
+  internal class TestThirdPartyValidationRule : CustomValidationRule() {
     override fun getRuleId(): String = "third_party_rule"
 
-    override fun doValidate(data: String, context: EventContext): com.intellij.internal.statistic.eventLog.validator.ValidationResultType {
-      return if (data == "FIRST") com.intellij.internal.statistic.eventLog.validator.ValidationResultType.ACCEPTED else com.intellij.internal.statistic.eventLog.validator.ValidationResultType.THIRD_PARTY
-    }
+    override fun doValidate(data: String, context: IEventContext): ValidationResultType =
+      if (data == "FIRST") ValidationResultType.ACCEPTED else ValidationResultType.THIRD_PARTY
   }
 }

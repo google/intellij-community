@@ -2,9 +2,15 @@ package com.intellij.platform.ide.nonModalWelcomeScreen.rightTab
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CornerSize
@@ -31,14 +38,19 @@ import androidx.compose.ui.draganddrop.awtTransferable
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.intellij.icons.AllIcons
 import com.intellij.ide.dnd.FileCopyPasteUtil
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -46,15 +58,20 @@ import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
 import com.intellij.openapi.fileEditor.impl.FileEditorOpenOptions
 import com.intellij.openapi.options.advanced.AdvancedSettings
 import com.intellij.openapi.project.Project
-import com.intellij.platform.ide.nonModalWelcomeScreen.GoFileDragAndDropHandler
+import com.intellij.openapi.util.Disposer
 import com.intellij.platform.ide.nonModalWelcomeScreen.NON_MODAL_WELCOME_SCREEN_SETTING_ID
 import com.intellij.platform.ide.nonModalWelcomeScreen.NonModalWelcomeScreenBundle
+import com.intellij.platform.ide.nonModalWelcomeScreen.WelcomeScreenComboBoxKind
 import com.intellij.platform.ide.nonModalWelcomeScreen.WelcomeScreenTabUsageCollector
 import com.intellij.platform.ide.nonModalWelcomeScreen.rightTab.WelcomeRightTabContentProvider.FeatureButtonModelWithBackend
+import com.intellij.platform.ide.nonModalWelcomeScreen.rightTab.WelcomeRightTabContentProvider.WelcomeContent
 import com.intellij.platform.ide.nonModalWelcomeScreen.rightTab.WelcomeScreenRightTabComboBoxModel.KeymapModel
+import com.intellij.platform.ide.nonModalWelcomeScreen.rightTab.WelcomeScreenRightTabComboBoxModel.StartupSwitchModel
 import com.intellij.platform.ide.nonModalWelcomeScreen.rightTab.WelcomeScreenRightTabComboBoxModel.ThemeModel
 import com.intellij.platform.ide.nonModalWelcomeScreen.rightTab.components.WelcomeScreenCustomButton
 import com.intellij.platform.ide.nonModalWelcomeScreen.rightTab.components.WelcomeScreenCustomListComboBox
+import com.intellij.platform.project.ProjectId
+import com.intellij.platform.project.projectId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -66,6 +83,7 @@ import org.jetbrains.jewel.bridge.retrieveColorOrUnspecified
 import org.jetbrains.jewel.foundation.modifier.onActivated
 import org.jetbrains.jewel.foundation.modifier.trackComponentActivation
 import org.jetbrains.jewel.foundation.theme.JewelTheme
+import org.jetbrains.jewel.ui.component.ActionButton
 import org.jetbrains.jewel.ui.component.CheckboxRow
 import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.SimpleListItem
@@ -77,23 +95,61 @@ import org.jetbrains.jewel.ui.component.styling.ButtonStyle
 import org.jetbrains.jewel.ui.component.styling.ComboBoxColors
 import org.jetbrains.jewel.ui.component.styling.ComboBoxStyle
 import org.jetbrains.jewel.ui.icon.IconKey
+import org.jetbrains.jewel.ui.icon.PathIconKey
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
-import org.jetbrains.jewel.ui.theme.colorPalette
 import org.jetbrains.jewel.ui.theme.comboBoxStyle
 import org.jetbrains.jewel.ui.theme.defaultButtonStyle
 import org.jetbrains.jewel.ui.theme.scrollbarStyle
+import java.awt.Cursor
 import java.awt.datatransfer.DataFlavor
+import java.util.function.Supplier
 import javax.swing.JComponent
 
 @ApiStatus.Internal
 class WelcomeScreenRightTab(
   val project: Project,
-  val contentProvider: WelcomeRightTabContentProvider
+  val contentProvider: WelcomeRightTabContentProvider,
+  suppressInitialContentFocus: Boolean = false,
 ) {
+  private val showCustomContent = mutableStateOf(false)
+  private var customTabContentProvider: WelcomeRightCustomTabProvider? = null
+
+  /**
+   * While `true`, activating the tab does not pull input focus into its content, so that the left project view's
+   * recent-projects search field keeps focus during the passive startup open (accessibility: up/down navigation,
+   * IJPL-248588). Cleared via [enableContentFocus] once the initial startup focus has settled on the project view,
+   * so later user-driven activations (Esc from the project view, clicking the tab) focus the content.
+   */
+  private var contentFocusSuppressed = suppressInitialContentFocus
+
   val component: JComponent by lazy {
     JewelComposePanel {
       WelcomeScreen()
     }
+  }
+
+  /**
+   * Switches to a custom content view if the content provider supports it.
+   */
+  fun switchToCustomContent(provider: WelcomeRightCustomTabProvider) {
+    customTabContentProvider = provider
+    showCustomContent.value = true
+  }
+
+  /**
+   * Switches back to the default welcome screen view.
+   */
+  fun switchToDefaultContent() {
+    showCustomContent.value = false
+  }
+
+  /**
+   * Re-enables moving focus into the tab content when the tab is activated. Called once the initial startup focus
+   * has settled on the left project view (IJPL-248588); afterwards, activating the tab (Esc from the project view,
+   * clicking the tab) focuses its content as usual.
+   */
+  fun enableContentFocus() {
+    contentFocusSuppressed = false
   }
 
   @OptIn(ExperimentalComposeUiApi::class)
@@ -103,11 +159,20 @@ class WelcomeScreenRightTab(
       object : DragAndDropTarget {
         override fun onDrop(event: DragAndDropEvent): Boolean {
           val files = FileCopyPasteUtil.getFiles(event.awtTransferable)
-          return GoFileDragAndDropHandler.openFiles(project, files)
+          return contentProvider.getFileDragAndDropHandler().openFiles(project, files)
         }
       }
     }
     val focusRequester = remember { FocusRequester() }
+    val isShowingCustomContent = showCustomContent.value
+
+    val provider = customTabContentProvider
+    val headerSubtitle = if (isShowingCustomContent && provider?.customSubtitle != null) {
+      provider.customSubtitle ?: contentProvider.secondaryTitle
+    }
+    else {
+      contentProvider.secondaryTitle
+    }
 
     Box(
       modifier = Modifier
@@ -116,7 +181,7 @@ class WelcomeScreenRightTab(
         .focusRequester(focusRequester)
         .trackComponentActivation(component)
         .onActivated { activated ->
-          if (activated) {
+          if (activated && !contentFocusSuppressed) {
             focusRequester.requestFocus(FocusDirection.Enter)
           }
         }
@@ -127,6 +192,7 @@ class WelcomeScreenRightTab(
           target = dragAndDropTarget
         )
     ) {
+      // Always show the background
       Image(
         imageVector = backgroundImageVector,
         contentDescription = null,
@@ -134,6 +200,8 @@ class WelcomeScreenRightTab(
         // ImageVector has very sharp boundaries, apply the blur to soften them
         modifier = Modifier.fillMaxSize().blur(128.dp)
       )
+
+      // Main content layout - same structure for both modes
       val scrollState = rememberScrollState()
       VerticallyScrollableContainer(
         scrollState = scrollState,
@@ -145,35 +213,120 @@ class WelcomeScreenRightTab(
           horizontalAlignment = Alignment.CenterHorizontally,
           verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-              Text(contentProvider.title.get(),
-                   fontSize = 20.sp, lineHeight = 24.sp, color = fontColor)
-              Spacer(modifier = Modifier.height(8.dp))
-              Text(contentProvider.secondaryTitle.get(),
-                   fontSize = 13.sp, lineHeight = 16.sp, color = secondaryFontColor)
-            }
-            Spacer(modifier = Modifier.height(32.dp))
+          Header(headerSubtitle)
+          Spacer(modifier = Modifier.height(32.dp))
 
+          val provider = customTabContentProvider
+          if (isShowingCustomContent && provider != null) {
+            provider.TabContent(project)
+          }
+          else {
             FeatureGrid(modifier = Modifier.wrapContentSize(Alignment.Center))
+            AdditionalComponents()
             Spacer(modifier = Modifier.height(24.dp))
-
             WelcomeScreenRightTabBannerProvider.SingleBanner(project, modifier = Modifier.wrapContentSize(Alignment.Center))
-        }
-        var showOnStartup by remember { mutableStateOf(isRightTabEnabled) }
-        Column(modifier = Modifier.align(Alignment.BottomCenter),
-               horizontalAlignment = Alignment.CenterHorizontally) {
-          SwitchPanel()
-
-          if (contentProvider.isDisableOptionVisible) {
-            CheckboxRow(text = NonModalWelcomeScreenBundle.message("welcome.screen.enabled.checkbox"),
-                        textStyle = TextStyle(color = fontColor),
-                        modifier = Modifier.padding(bottom = 12.dp),
-                        checked = showOnStartup, onCheckedChange = {
-              showOnStartup = it
-              isRightTabEnabled = it
-            })
           }
         }
+      }
+
+      if (isShowingCustomContent) {
+        CustomContentBackButton()
+      }
+
+      // Footer (always visible at bottom)
+      Footer()
+    }
+  }
+
+  @Composable
+  private fun Header(subtitle: Supplier<String>) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+      // Product icon (48x48) if provided
+      val productIconVector = contentProvider.productIcon
+      if (productIconVector != null) {
+        Image(
+          imageVector = productIconVector,
+          contentDescription = "Product icon",
+          modifier = Modifier.size(48.dp)
+        )
+        Spacer(modifier = Modifier.height(32.dp))
+      }
+
+      Text(
+        contentProvider.title.get(),
+        fontSize = 20.sp,
+        lineHeight = 24.sp,
+        color = fontColor
+      )
+      Spacer(modifier = Modifier.height(8.dp))
+      Text(
+        subtitle.get(),
+        fontSize = 13.sp,
+        lineHeight = 16.sp,
+        color = secondaryFontColor
+      )
+    }
+  }
+
+  @Composable
+  private fun AdditionalComponents() {
+    val additionalComponents = contentProvider.getAdditionalComponents(project)
+    if (additionalComponents.isNotEmpty()) {
+      Spacer(modifier = Modifier.height(24.dp))
+      Column(
+        modifier = Modifier.wrapContentSize(Alignment.Center),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+      ) {
+        for (row in additionalComponents) {
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+          ) {
+            for (component in row) {
+              when (component) {
+                is WelcomeContent.Text -> WelcomeScreenText(component)
+                is WelcomeContent.Link -> WelcomeScreenLink(component)
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  @Composable
+  private fun CustomContentBackButton() {
+    ActionButton(modifier = Modifier.padding(16.dp),
+                 onClick = ::switchToDefaultContent) {
+      Row {
+        Icon(PathIconKey("actions/back.svg", AllIcons::class.java), contentDescription = "back")
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(NonModalWelcomeScreenBundle.message("welcome.screen.right.tab.back.to.default"))
+      }
+    }
+  }
+
+  @Composable
+  private fun BoxScope.Footer() {
+    var showOnStartup by remember { mutableStateOf(isRightTabEnabled) }
+    Column(
+      modifier = Modifier.align(Alignment.BottomCenter),
+      horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+      SwitchPanel()
+
+      if (contentProvider.isDisableOptionVisible) {
+        CheckboxRow(
+          text = NonModalWelcomeScreenBundle.message("welcome.screen.enabled.checkbox"),
+          textStyle = TextStyle(color = fontColor),
+          modifier = Modifier.padding(bottom = 12.dp),
+          checked = showOnStartup,
+          onCheckedChange = {
+            showOnStartup = it
+            isRightTabEnabled = it
+          }
+        )
       }
     }
   }
@@ -194,7 +347,7 @@ class WelcomeScreenRightTab(
         it !is FeatureButtonModelWithBackend || it.isAlwaysAvailable || it.featureKey in backendFeatureIds
       }
 
-      for (row in featureModels.chunked(3)) {
+      for (row in featureModels.chunked(contentProvider.buttonsPerRow)) {
         Row(modifier = Modifier.wrapContentSize(Alignment.Center), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
           for (model in row) {
             FeatureButton(model, coroutineScope)
@@ -239,18 +392,83 @@ class WelcomeScreenRightTab(
 
   @Composable
   fun SwitchPanel() {
-    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(bottom = 12.dp)) {
-      InfoPanelItem(themeIconKey,
-                    NonModalWelcomeScreenBundle.message("welcome.screen.right.tab.theme.switch.prefix"),
-                    ThemeModel())
-      InfoPanelItem(AllIconsKeys.General.Keyboard,
-                    NonModalWelcomeScreenBundle.message("welcome.screen.right.tab.keymap.switch.prefix"),
-                    KeymapModel())
+    val additionalButtons = contentProvider.getAdditionalInfoButtonModels(project).map { ButtonInfoPanelModel(it) }
+    val buttons = buildList {
+      add(ComboBoxInfoPanelModel(themeIconKey,
+                             "welcome.screen.right.tab.theme.switch.prefix",
+                             ThemeModel()))
+      add(ComboBoxInfoPanelModel(AllIconsKeys.General.Keyboard,
+                             "welcome.screen.right.tab.keymap.switch.prefix",
+                             KeymapModel()))
+      if (contentProvider.isStartupSwitchPanelOptionVisible) {
+        add(ComboBoxInfoPanelModel(AllIconsKeys.General.Settings,
+                               "welcome.screen.right.tab.startup.switch.prefix",
+                               StartupSwitchModel()))
+      }
+      addAll(additionalButtons)
+    }
+
+    val buttonsPerRow = contentProvider.buttonsPerRow
+    val coroutineScope = contentProvider.coroutineScope
+    for (row in buttons.chunked(buttonsPerRow)) {
+      Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+        for (model in row) {
+          when (model) {
+            is ComboBoxInfoPanelModel -> InfoPanelItem(model.iconKey, model.itemPrefix, model.model, project, getStatisticLogger(model))
+            is ButtonInfoPanelModel -> InfoPanelButton(model.iconKey, model.itemPrefix, model.onClick, coroutineScope)
+          }
+        }
+      }
     }
   }
 
+  private fun getStatisticLogger(comboBoxInfoPanelModel: ComboBoxInfoPanelModel): ((String, Int) -> Unit)? {
+    return when (comboBoxInfoPanelModel.model) {
+      is ThemeModel -> { _, _ ->
+        WelcomeScreenTabUsageCollector.logComboBoxValueChanged(WelcomeScreenComboBoxKind.THEME)
+      }
+      is KeymapModel -> { _, _ ->
+        WelcomeScreenTabUsageCollector.logComboBoxValueChanged(WelcomeScreenComboBoxKind.KEYMAP)
+      }
+      is StartupSwitchModel -> { _, index ->
+        WelcomeScreenTabUsageCollector.logComboBoxValueChanged(WelcomeScreenComboBoxKind.STARTUP)
+        WelcomeScreenTabUsageCollector.logStartupOptionChanged(comboBoxInfoPanelModel.model.items[index])
+      }
+      else -> null
+    }
+  }
+
+
+  sealed interface InfoPanelModel {
+    val iconKey: IconKey
+    val itemPrefix: String
+  }
+
+  private class ComboBoxInfoPanelModel(
+    override val iconKey: IconKey,
+    val itemPrefixKey: String,
+    val model: WelcomeScreenRightTabComboBoxModel<out Any>,
+  ) : InfoPanelModel {
+    override val itemPrefix: String
+      get() = NonModalWelcomeScreenBundle.message(itemPrefixKey)
+  }
+
+  private class ButtonInfoPanelModel(private val model: WelcomeRightTabContentProvider.InfoButtonModel) : InfoPanelModel {
+    override val iconKey: IconKey
+      get() = model.icon
+    override val itemPrefix: String
+      get() = model.text
+    val onClick: (Project, CoroutineScope) -> Unit = model.onClick
+  }
+
   @Composable
-  internal fun InfoPanelItem(iconKey: IconKey, itemPrefix: String, model: WelcomeScreenRightTabComboBoxModel<out Any>) {
+  internal fun InfoPanelItem(
+    iconKey: IconKey,
+    itemPrefix: String,
+    model: WelcomeScreenRightTabComboBoxModel<out Any>,
+    project: Project,
+    afterOnSelectedItemChanged: ((newSelection: String, index: Int) -> Unit)? = null,
+  ) {
     Box {
       WelcomeScreenCustomListComboBox(
         iconKey = iconKey,
@@ -259,9 +477,11 @@ class WelcomeScreenRightTab(
         style = CustomComboBoxStyle(),
         maxPopupHeight = 300.dp,
         minPopupWidth = 200.dp,
+        externalUpdateListener = model.externalUpdateListener(project),
         initialSelectedIndex = model.currentItemIndex(),
         onSelectedItemChange = { index, newSelection ->
           model.setByIndex(index, newSelection)
+          afterOnSelectedItemChanged?.invoke(newSelection, index)
         },
       ) { item, isSelected, isActive ->
         SimpleListItem(
@@ -272,6 +492,57 @@ class WelcomeScreenRightTab(
         )
       }
     }
+  }
+
+  @Composable
+  private fun InfoPanelButton(
+    icon: IconKey,
+    text: String,
+    onClick: (Project, CoroutineScope) -> Unit,
+    coroutineScope: CoroutineScope,
+  ) {
+    WelcomeScreenCustomButton(
+      onClick = {
+        onClick(project, coroutineScope)
+      },
+      style = InfoPanelButtonStyle(),
+    ) {
+      Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.focusable(false).focusProperties { canFocus = false }) {
+        Box(contentAlignment = Alignment.Center) {
+          Icon(key = icon, contentDescription = text)
+        }
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(text = text, color = fontColor, maxLines = 1, style = JewelTheme.defaultTextStyle, overflow = TextOverflow.Ellipsis)
+      }
+    }
+  }
+
+  @Composable
+  fun InfoPanelButtonStyle(): ButtonStyle {
+    val defaultButtonStyle = JewelTheme.defaultButtonStyle
+    return ButtonStyle(
+      colors = with(defaultButtonStyle.colors) {
+        ButtonColors(
+          background = SolidColor(Color.Transparent),
+          backgroundDisabled = backgroundDisabled,
+          backgroundFocused = SolidColor(Color.Transparent),
+          backgroundPressed = featureButtonBackgroundPressedColor,
+          backgroundHovered = featureButtonBackgroundHoveredColor,
+          content = content,
+          contentDisabled = contentDisabled,
+          contentFocused = contentFocused,
+          contentPressed = contentPressed,
+          contentHovered = contentHovered,
+          border = border,
+          borderDisabled = borderDisabled,
+          borderFocused = borderFocused,
+          borderPressed = border,
+          borderHovered = border,
+        )
+      },
+      metrics = defaultButtonStyle.metrics,
+      focusOutlineAlignment = defaultButtonStyle.focusOutlineAlignment
+    )
   }
 
   @Composable
@@ -364,15 +635,70 @@ class WelcomeScreenRightTab(
     )
   }
 
+  @Composable
+  private fun WelcomeScreenText(model: WelcomeContent.Text) {
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+      Text(
+        text = model.text,
+        color = model.tint.takeIf { it != Color.Unspecified } ?: fontColor,
+        fontSize = 13.sp,
+        lineHeight = 16.sp,
+      )
+      model.icon?.let { icon ->
+        Icon(
+          key = icon,
+          contentDescription = null,
+        )
+      }
+    }
+  }
+
+  @Composable
+  private fun WelcomeScreenLink(model: WelcomeContent.Link) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val restingColor = model.tint.takeIf { it != Color.Unspecified } ?: fontColor
+    val textColor = if (isHovered) {
+      model.tintHovered.takeIf { it != Color.Unspecified } ?: restingColor
+    } else {
+      restingColor
+    }
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(4.dp),
+      modifier = Modifier
+        .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
+        .hoverable(interactionSource)
+        .clickable(
+          interactionSource = interactionSource,
+          indication = null,
+          onClick = { model.onClick(project) },
+        ),
+    ) {
+      Text(
+        text = model.text,
+        color = textColor,
+        fontSize = 13.sp,
+        lineHeight = 16.sp,
+      )
+      Icon(
+        key = AllIconsKeys.Ide.External_link_arrow,
+        contentDescription = null,
+        tint = restingColor,
+        modifier = Modifier.size(14.dp),
+      )
+    }
+  }
+
 
   private val fontColor
     get() = retrieveColorOrUnspecified("*.foreground")
 
-  @get:Composable
   private val secondaryFontColor
-    get() = color(dark = JewelTheme.colorPalette.grayOrNull(10),
-                  light = JewelTheme.colorPalette.grayOrNull(1),
-                  fallback = Color(0xFFB4B8BF))
+    get() = retrieveColorOrUnspecified("Component.infoForeground")
 
   private val panelBackgroundColor
     get() = retrieveColorOrUnspecified("EditorTabs.background")
@@ -413,18 +739,44 @@ class WelcomeScreenRightTab(
     }
 
   companion object {
+    private val projectToTabMap = mutableMapOf<ProjectId, WelcomeScreenRightTab>()
+
+    /**
+     * Gets the current WelcomeScreenRightTab instance for the given project if it exists.
+     */
+    fun getInstance(project: Project): WelcomeScreenRightTab? = projectToTabMap[project.projectId()]
+
+    /**
+     * Opens the welcome right tab.
+     *
+     * @param focusContent whether focus should be moved into the tab content once it is activated. Pass `false`
+     * (default) for the passive startup open, so the left project view's recent-projects search field keeps input
+     * focus (accessibility, IJPL-248588); pass `true` for an explicit user-initiated open (e.g. the "Open Welcome
+     * Screen" action).
+     */
     @ApiStatus.Internal
-    suspend fun show(project: Project) {
+    suspend fun show(project: Project, focusContent: Boolean = false) {
       if (!isRightTabEnabled) return
       val contentProvider = WelcomeRightTabContentProvider.getSingleExtension() ?: return
       withContext(Dispatchers.EDT) {
-        val settingsFile = WelcomeScreenRightTabVirtualFile(WelcomeScreenRightTab(project, contentProvider), project)
+        val tab = WelcomeScreenRightTab(project, contentProvider, suppressInitialContentFocus = !focusContent)
+        addToMap(project, tab)
+
+        val settingsFile = WelcomeScreenRightTabVirtualFile(tab, project)
         val fileEditorManager = FileEditorManager.getInstance(project) as FileEditorManagerEx
         val options = FileEditorOpenOptions(reuseOpen = true, isSingletonEditorInWindow = true,
                                             selectAsCurrent = contentProvider.shouldBeFocused(project))
         fileEditorManager.openFile(settingsFile, options)
         WelcomeScreenTabUsageCollector.logWelcomeScreenTabOpened()
       }
+    }
+
+    private fun addToMap(project: Project, tab: WelcomeScreenRightTab) {
+      val projectId = project.projectId()
+      Disposer.register(project) {
+        projectToTabMap.remove(projectId)
+      }
+      projectToTabMap[projectId] = tab
     }
 
     private var isRightTabEnabled: Boolean

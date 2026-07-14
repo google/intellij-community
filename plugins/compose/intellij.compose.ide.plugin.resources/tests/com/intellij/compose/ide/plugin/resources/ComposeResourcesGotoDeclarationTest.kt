@@ -7,42 +7,35 @@ import com.intellij.openapi.application.EDT
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.util.parentOfType
 import com.intellij.psi.xml.XmlTag
-import com.intellij.testFramework.common.runAll
+import com.intellij.testFramework.common.timeoutRunBlocking
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 import org.jetbrains.kotlin.asJava.namedUnwrappedElement
 import org.jetbrains.kotlin.daemon.common.trimQuotes
 import org.jetbrains.kotlin.test.TestMetadata
 import org.jetbrains.plugins.gradle.tooling.annotation.TargetVersions
-import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 class ComposeResourcesGotoDeclarationTest : ComposeResourcesTestCase() {
 
-  override fun tearDownFixtures() {
-    runAll(
-      { _codeInsightTestFixture?.tearDown() },
-      { _codeInsightTestFixture = null },
-      { resetTestFixture() },
-    )
-  }
-
   @TargetVersions(TARGET_GRADLE_VERSION)
   @Test
   @TestMetadata("ComposeResources")
-  fun `test common composeResources are accessible`() = runBlocking(Dispatchers.EDT) {
-    assumeTrue("temporarily disable for androidMain since it's not recognised as source root", sourceSetName != ANDROID_MAIN)
+  fun `test common composeResources are accessible`() {
     val files = importProjectFromTestData()
-    files.openInEditor(sourceSetName = sourceSetName)
 
-    doTestNavigation(qualifiedName = "Res.drawable.test", expectedSize = 1, expectedType = ResourceType.DRAWABLE)
-    doTestNavigation(qualifiedName = "Res.drawable.compose_multiplatform", expectedSize = 2, expectedType = ResourceType.DRAWABLE)
+    timeoutRunBlocking(context = Dispatchers.EDT) {
+      files.openInEditor(sourceSetName = sourceSetName)
 
-    doTestNavigation(qualifiedName = "Res.string.test", expectedSize = 4, expectedType = ResourceType.STRING)
-    doTestNavigation(qualifiedName = "Res.array.test", expectedSize = 1, expectedType = ResourceType.STRING_ARRAY)
-    doTestNavigation(qualifiedName = "Res.plurals.test", expectedSize = 1, expectedType = ResourceType.PLURAL_STRING)
+      doTestNavigation(qualifiedName = "Res.drawable.test", expectedSize = 1, expectedType = ResourceType.DRAWABLE)
+      doTestNavigation(qualifiedName = "Res.drawable.compose_multiplatform", expectedSize = 2, expectedType = ResourceType.DRAWABLE)
 
-    doTestNavigation(qualifiedName = "Res.font.test", expectedSize = 1, expectedType = ResourceType.FONT)
+      doTestNavigation(qualifiedName = "Res.string.test", expectedSize = 4, expectedType = ResourceType.STRING)
+      doTestNavigation(qualifiedName = "Res.array.test", expectedSize = 4, expectedType = ResourceType.STRING_ARRAY)
+      doTestNavigation(qualifiedName = "Res.plurals.test", expectedSize = 4, expectedType = ResourceType.PLURAL_STRING)
+
+      doTestNavigation(qualifiedName = "Res.font.test", expectedSize = 1, expectedType = ResourceType.FONT)
+    }
+
   }
 
   private fun List<VirtualFile>.openInEditor(sourceSetName: String) =

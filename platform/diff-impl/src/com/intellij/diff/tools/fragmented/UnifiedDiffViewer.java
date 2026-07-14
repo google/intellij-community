@@ -39,12 +39,14 @@ import com.intellij.diff.util.LineCol;
 import com.intellij.diff.util.LineRange;
 import com.intellij.diff.util.Side;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.actionSystem.ActionGroup;
 import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataSink;
+import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.actionSystem.PlatformCoreDataKeys;
 import com.intellij.openapi.actionSystem.Separator;
 import com.intellij.openapi.application.ApplicationManager;
@@ -270,7 +272,7 @@ public class UnifiedDiffViewer extends ListenerDiffViewerBase implements EditorD
     titles = ContainerUtil.skipNulls(titles);
     if (titles.isEmpty()) return null;
 
-    return DiffUtil.createStackedComponents(titles, DiffUtil.TITLE_GAP);
+    return DiffUtil.createStackedTitleComponents(titles);
   }
 
   @RequiresEdt
@@ -292,15 +294,9 @@ public class UnifiedDiffViewer extends ListenerDiffViewerBase implements EditorD
   @Override
   @RequiresEdt
   public @NotNull List<AnAction> createToolbarActions() {
-    List<AnAction> diffActions = new ArrayList<>();
-    diffActions.add(new MyToggleExpandByDefaultAction());
-    diffActions.addAll(myTextDiffProvider.getDiffSettingsActions());
-    myEditorSettingsAction.setDiffActions(diffActions);
-
     List<AnAction> group = new ArrayList<>();
+    group.add(new MyToggleExpandByDefaultAction());
     group.add(new MyReadOnlyLockAction());
-    group.add(myEditorSettingsAction);
-
     group.add(Separator.getInstance());
     group.addAll(super.createToolbarActions());
 
@@ -309,31 +305,57 @@ public class UnifiedDiffViewer extends ListenerDiffViewerBase implements EditorD
 
   @Override
   @RequiresEdt
+  public @NotNull List<AnAction> createRightToolbarActions() {
+    List<AnAction> diffActions = new ArrayList<>();
+    myEditorSettingsAction.setSettingsActions(diffActions, myTextDiffProvider.getDiffSettingsActions());
+
+    return List.of(myEditorSettingsAction);
+  }
+
+  @Override
+  @RequiresEdt
   public @NotNull List<AnAction> createPopupActions() {
-    List<AnAction> group = new ArrayList<>();
-    group.add(new MyToggleExpandByDefaultAction());
-    group.addAll(myTextDiffProvider.getDiffSettingsActions());
+    List<AnAction> group = new ArrayList<>(myTextDiffProvider.getDiffSettingsActions());
 
     group.add(Separator.getInstance());
     group.addAll(super.createPopupActions());
+    group.add(Separator.getInstance());
+    group.add(new MyToggleExpandByDefaultAction());
 
     return group;
   }
 
-  protected @NotNull List<AnAction> createEditorPopupActions() {
-    List<AnAction> group = new ArrayList<>();
+  protected @NotNull List<@NotNull AnAction> createAdditionalEditorGutterActions() {
+    List<AnAction> actions = new ArrayList<>();
+    actions.add(new MyToggleExpandByDefaultAction());
+    return actions;
+  }
 
-    group.add(new ReplaceSelectedChangesAction(Side.LEFT));
-    group.add(new ReplaceSelectedChangesAction(Side.RIGHT));
+
+  private @NotNull List<AnAction> createEditorPopupActions() {
+    List<AnAction> group = new ArrayList<>(createEditorPopupChangesActions());
     group.add(Separator.getInstance());
-    group.addAll(TextDiffViewerUtil.createEditorPopupActions());
+    group.add(ActionManager.getInstance().getAction(IdeActions.GROUP_DIFF_EDITOR_POPUP));
+
+    group.add(Separator.getInstance());
+    group.add(new MyToggleExpandByDefaultAction());
 
     return group;
+  }
+
+  protected @NotNull List<@NotNull AnAction> createEditorPopupChangesActions() {
+    List<AnAction> actions = new ArrayList<>();
+    actions.add(new ReplaceSelectedChangesAction(Side.LEFT));
+    actions.add(new ReplaceSelectedChangesAction(Side.RIGHT));
+    return actions;
   }
 
   @RequiresEdt
   protected void installEditorListeners() {
     new TextDiffViewerUtil.EditorActionsPopup(createEditorPopupActions()).install(getEditors(), myPanel);
+    ActionGroup gutterActionGroup =
+      TextDiffViewerUtil.createEditorGutterActionGroup(myEditorSettingsAction, createAdditionalEditorGutterActions());
+    TextDiffViewerUtil.installGutterPopup(getEditors(), gutterActionGroup);
   }
 
   @ApiStatus.Internal
@@ -395,12 +417,12 @@ public class UnifiedDiffViewer extends ListenerDiffViewerBase implements EditorD
     final Document document1 = getContent1().getDocument();
     final Document document2 = getContent2().getDocument();
 
-    final CharSequence[] texts = ReadAction.compute(
+    CharSequence[] texts = ReadAction.computeBlocking(
       () -> new CharSequence[]{document1.getImmutableCharSequence(), document2.getImmutableCharSequence()});
 
     final List<LineFragment> fragments = myTextDiffProvider.compare(texts[0], texts[1], indicator);
 
-    UnifiedDiffState builder = ReadAction.compute(() -> {
+    UnifiedDiffState builder = ReadAction.computeBlocking(() -> {
       indicator.checkCanceled();
       return new SimpleUnifiedFragmentBuilder(document1, document2, myMasterSide).exec(fragments);
     });
@@ -438,7 +460,7 @@ public class UnifiedDiffViewer extends ListenerDiffViewerBase implements EditorD
     final DocumentContent content2 = getContent2();
 
     UnifiedDiffHighlightersData unifiedDiffHighlightersData = BackgroundTaskUtil.tryComputeFast(_ -> {
-      return ReadAction.compute(() -> {
+      return ReadAction.computeBlocking(() -> {
         EditorHighlighter highlighter =
           UnifiedEditorHighlighter.buildHighlighter(myProject, myDocument, content1, content2,
                            texts[0], texts[1], builder.getRanges(),
@@ -1156,7 +1178,7 @@ public class UnifiedDiffViewer extends ListenerDiffViewerBase implements EditorD
   public @NotNull List<? extends Editor> getHighlightEditors() {
     if (myProject == null) return Collections.emptyList();
 
-    return ReadAction.compute(() -> {
+    return ReadAction.computeBlocking(() -> {
       List<Editor> result = new ArrayList<>();
       result.add(myEditor);
       ContainerUtil.addIfNotNull(result, createImaginaryEditor(Side.LEFT));

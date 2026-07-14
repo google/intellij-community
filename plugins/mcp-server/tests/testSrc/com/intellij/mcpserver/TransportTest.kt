@@ -6,8 +6,8 @@ import com.intellij.mcpserver.annotations.McpToolHintValue.TRUE
 import com.intellij.mcpserver.annotations.McpToolHints
 import com.intellij.mcpserver.impl.McpServerService
 import com.intellij.mcpserver.impl.util.asTool
-import com.intellij.mcpserver.impl.util.projectPathParameterName
 import com.intellij.mcpserver.impl.util.network.McpServerConnectionAddressProvider
+import com.intellij.mcpserver.impl.util.projectPathParameterName
 import com.intellij.mcpserver.stdio.IJ_MCP_SERVER_PROJECT_PATH
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
@@ -136,6 +136,19 @@ class TransportTest {
     delay(500.milliseconds)
   }
 
+  @ParameterizedTest
+  @MethodSource("getTransports")
+  fun list_tools_strips_project_path_when_session_header_present(transport: TransportHolder) = transportTest(transport) { client ->
+    val listTools = client.listTools()
+    assertThat(listTools.tools).isNotEmpty()
+    for ((name, inputSchema) in listTools.tools) {
+      val properties = inputSchema.properties
+      assertThat(properties?.containsKey(projectPathParameterName))
+        .describedAs("Tool '$name' should not have '$projectPathParameterName' in schema when session project path is set")
+        .isFalse()
+    }
+  }
+
   val projectFromTool = CompletableDeferred<Project?>()
 
   @com.intellij.mcpserver.annotations.McpTool(title = "Test title")
@@ -212,13 +225,21 @@ class StdioTransportHolder(project: Project) : TransportHolder() {
 }
 
 class SseTransportHolder(project: Project) : TransportHolder() {
+  private val httpClient = HttpClient {
+    install(SSE)
+  }
+
   override val transport: AbstractTransport by lazy {
     val addressProvider = McpServerConnectionAddressProvider.getInstanceOrNull() ?: throw AssertionError("No address provider")
     val transportUrl = addressProvider.serverSseUrl
-    SseClientTransport(HttpClient {
-      install(SSE)
-    }, transportUrl) {
+    SseClientTransport(httpClient, transportUrl) {
       project.basePath?.let { header(IJ_MCP_SERVER_PROJECT_PATH, it) }
+    }
+  }
+
+  override fun close() {
+    httpClient.use {
+      super.close()
     }
   }
 
@@ -226,13 +247,21 @@ class SseTransportHolder(project: Project) : TransportHolder() {
 }
 
 class HttpTransportHolder(project: Project) : TransportHolder() {
+  private val httpClient = HttpClient {
+    install(SSE)
+  }
+
   override val transport: AbstractTransport by lazy {
     val addressProvider = McpServerConnectionAddressProvider.getInstanceOrNull() ?: throw AssertionError("No address provider")
     val transportUrl = addressProvider.serverStreamUrl
-    StreamableHttpClientTransport(HttpClient {
-      install(SSE)
-    }, transportUrl) {
+    StreamableHttpClientTransport(httpClient, transportUrl) {
       project.basePath?.let { header(IJ_MCP_SERVER_PROJECT_PATH, it) }
+    }
+  }
+
+  override fun close() {
+    httpClient.use {
+      super.close()
     }
   }
 

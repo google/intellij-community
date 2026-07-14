@@ -159,7 +159,7 @@
     "Badge": {
       "greenOutlineForeground": "Green7",
       "greenOutlineBorderColor": "Green5",
-      "blueSecondaryBackground": "#35538FCC",
+      "blueSecondaryBackground": "#375FADCC",
       "blueSecondaryForeground": "Blue12",
       "blueBackground": "Blue8",
       "blueForeground": "Gray1",
@@ -169,10 +169,10 @@
       "greenForeground": "Gray1",
       "purpleSecondaryBackground": "#6C469CCC",
       "purpleSecondaryForeground": "Purple12",
-      "graySecondaryBackground": "#B4B8BF33",
-      "graySecondaryForeground": "Gray10",
-      "disabledBackground": "#B4B8BF33",
-      "disabledForeground": "Gray8"
+      "graySecondaryBackground": "#FFFFFF29",
+      "graySecondaryForeground": "#FFFFFFCC",
+      "disabledBackground": "#FFFFFF29",
+      "disabledForeground": "#FFFFFF66"
     },
 
     "Bookmark": {
@@ -1213,6 +1213,13 @@
       "disabledForeground": "Gray7",
       "infoForeground": "Gray11",
       "lineSeparatorColor": "Gray3"
+    },
+
+    "NuGet": {
+      "section": {
+        "background": "#252629",
+        "hoverBackground": "#292B2E"
+      }
     },
     
     "DataSummary.Chart.barColor": "Blue6",

@@ -17,6 +17,7 @@ import git4idea.test.branch
 import git4idea.test.checkout
 import git4idea.test.checkoutNew
 import git4idea.test.prepareConflict
+import git4idea.test.runUnderProgress
 import git4idea.test.tac
 import git4idea.test.waitScheduledChangelistDeletions
 
@@ -99,7 +100,7 @@ abstract class GitCherryPickTest : GitSingleRepoTest() {
   protected fun cherryPick(vararg hashes: String, expectSuccess: Boolean = true) {
     updateChangeListManager()
     val details = readDetails(*hashes)
-    val cherryPickResult = GitCherryPicker(project).cherryPick(details)
+    val cherryPickResult = runUnderProgress { GitCherryPicker(project).cherryPick(details) }
     assertEquals(expectSuccess, cherryPickResult)
   }
 

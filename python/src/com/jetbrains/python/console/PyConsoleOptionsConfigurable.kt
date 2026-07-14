@@ -10,6 +10,7 @@ import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.panel
 import com.jetbrains.python.PyBundle
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import javax.swing.JComponent
 
@@ -17,6 +18,7 @@ private const val CONSOLE_SETTINGS_HELP_REFERENCE: String = "reference.project.s
 private const val CONSOLE_SETTINGS_HELP_REFERENCE_PYTHON: String = "reference.project.settings.console.python"
 
 
+@ApiStatus.Internal
 class PyConsoleOptionsConfigurable(private val myProject: Project) : SearchableConfigurable.Parent.Abstract(), Configurable.NoScroll {
 
   enum class CodeCompletionOption {
@@ -80,23 +82,23 @@ class PyConsoleOptionsConfigurable(private val myProject: Project) : SearchableC
         row {
           @Suppress("DialogTitleCapitalization") // 'Debug Console' in text is a name and properly capitalized.
           checkBox(PyBundle.message("form.console.options.always.show.debug.console"))
-            .bindSelected({ consoleOptions.isShowDebugConsoleByDefault }, { consoleOptions.isShowDebugConsoleByDefault = it })
+            .bindSelected(consoleOptions::isShowDebugConsoleByDefault)
         }
         row {
           checkBox(PyBundle.message("form.console.options.use.ipython.if.available"))
-            .bindSelected({ consoleOptions.isIpythonEnabled }, { consoleOptions.isIpythonEnabled = it })
+            .bindSelected(consoleOptions::isIpythonEnabled)
         }
         row {
           checkBox(PyBundle.message("form.console.options.show.console.variables.by.default"))
-            .bindSelected({ consoleOptions.isShowVariableByDefault }, { consoleOptions.setShowVariablesByDefault(it) })
+            .bindSelected(consoleOptions::isShowVariableByDefault)
         }
         row {
           checkBox(PyBundle.message("form.console.options.use.existing.console.for.run.with.python.console"))
-            .bindSelected({ consoleOptions.isUseExistingConsole }, { consoleOptions.isUseExistingConsole = it })
+            .bindSelected(consoleOptions::isUseExistingConsole)
         }
         row {
           checkBox(PyBundle.message("form.console.options.use.command.queue"))
-            .bindSelected({ consoleOptions.isCommandQueueEnabled }, { consoleOptions.isCommandQueueEnabled = it })
+            .bindSelected(consoleOptions::isCommandQueueEnabled)
         }
         row(PyBundle.message("form.console.options.code.completion")) {
           comboBox(CodeCompletionOption.entries)
@@ -112,7 +114,7 @@ class PyConsoleOptionsConfigurable(private val myProject: Project) : SearchableC
     settings: PyConsoleOptions.PyConsoleSettings,
     helpReference: String,
   ): SearchableConfigurable {
-    return object : SearchableConfigurable {
+    return object : SearchableConfigurable, Configurable.NoScroll {
       override fun getId(): String = "PyConsoleConfigurable.$name"
       override fun getDisplayName(): @NlsContexts.ConfigurableName String = name
       override fun getHelpTopic(): String = helpReference
@@ -120,6 +122,7 @@ class PyConsoleOptionsConfigurable(private val myProject: Project) : SearchableC
       override fun isModified(): Boolean = panel.isModified
       override fun apply() = panel.apply()
       override fun reset() = panel.reset()
+      override fun disposeUIResources() = panel.disposeUIResources()
     }
   }
 }

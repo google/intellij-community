@@ -1,4 +1,4 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.lookup.impl;
 
 import com.intellij.codeInsight.lookup.LookupElement;
@@ -29,10 +29,10 @@ public final class LookupOffsets implements DocumentListener {
 
   public LookupOffsets(@NotNull Editor editor) {
     myEditor = editor;
-    int caret = getPivotOffset();
+    int caret = LookupImplUtil.getPivotOffset(myEditor);
     myLookupOriginalStartMarker = createLeftGreedyMarker(caret);
     myLookupStartMarker = createLeftGreedyMarker(caret);
-    myEditor.getElfDocument().addDocumentListener(this);
+    myEditor.getDocument().addDocumentListener(this);
   }
 
   @Override
@@ -63,15 +63,9 @@ public final class LookupOffsets implements DocumentListener {
   }
 
   private @NotNull RangeMarker createLeftGreedyMarker(int start) {
-    RangeMarker marker = myEditor.getElfDocument().createRangeMarker(start, start);
+    RangeMarker marker = myEditor.getDocument().createRangeMarker(start, start);
     marker.setGreedyToLeft(true);
     return marker;
-  }
-
-  private int getPivotOffset() {
-    return myEditor.getSelectionModel().hasSelection()
-                 ? myEditor.getSelectionModel().getSelectionStart()
-                 : myEditor.getCaretModel().getOffset();
   }
 
   /**
@@ -129,7 +123,7 @@ public final class LookupOffsets implements DocumentListener {
   }
 
   private int calculateStartOffset(int minLookupItemPrefixLength, boolean considerPrefixes) {
-    int start = getPivotOffset() - minLookupItemPrefixLength;
+    int start = LookupImplUtil.getPivotOffset(myEditor) - minLookupItemPrefixLength;
     if (considerPrefixes) {
       start = start - myAdditionalPrefix.length() + myRemovedPrefix;
     }
@@ -166,7 +160,7 @@ public final class LookupOffsets implements DocumentListener {
   }
 
   void disposeMarkers() {
-    myEditor.getElfDocument().removeDocumentListener(this);
+    myEditor.getDocument().removeDocumentListener(this);
     myLookupStartMarker.dispose();
     myLookupOriginalStartMarker.dispose();
   }

@@ -1,18 +1,18 @@
-// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.ide.impl.wsl.ijent.nio
 
-import com.intellij.execution.wsl.WslDistributionManager
 import com.intellij.execution.wsl.WslPath
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.platform.core.nio.fs.RoutingAwareFileSystemProvider
 import com.intellij.platform.eel.EelDescriptor
+import com.intellij.platform.eel.channels.EelDelicateApi
+import com.intellij.platform.eel.provider.utils.impl.localToIjent
 import com.intellij.platform.eel.provider.utils.EelPathTransfer
 import com.intellij.platform.ijent.community.impl.nio.IjentNioPath
 import com.intellij.platform.ijent.community.impl.nio.fs.getCachedFileAttributesAndWrapToDosAttributesAdapter
 import com.intellij.platform.ijent.community.impl.nio.fs.getFileAttributeViewUsingDosAttributesAdapter
 import com.intellij.platform.ijent.community.impl.nio.fs.readAttributesUsingDosAttributesAdapter
-import com.intellij.util.io.sanitizeFileName
 import org.jetbrains.annotations.ApiStatus
 import java.io.IOException
 import java.io.InputStream
@@ -39,7 +39,6 @@ import java.nio.file.attribute.FileAttributeView
 import java.nio.file.spi.FileSystemProvider
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.path.ExperimentalPathApi
 
 /**
@@ -56,8 +55,7 @@ import kotlin.io.path.ExperimentalPathApi
  * Nevertheless, in case when this filesystem should be accessed directly,
  * an instance of [IjentWslNioFileSystem] can be obtained with a URL like "ijent://wsl/distribution-name".
  */
-@ApiStatus.Internal
-class IjentWslNioFileSystemProvider(
+internal class IjentWslNioFileSystemProvider(
   val wslId: @NlsSafe String,
   private val ijentFsProvider: FileSystemProvider,
   internal val originalFsProvider: FileSystemProvider,
@@ -68,7 +66,7 @@ class IjentWslNioFileSystemProvider(
   private val createdFileSystems: MutableMap<String, IjentWslNioFileSystem> = ConcurrentHashMap()
 
   internal fun removeFileSystem(wslId: String) {
-    createdFileSystems.remove(wslId)
+    createdFileSystems.remove(wslId.lowercase())
   }
 
   override fun toString(): String = """${javaClass.simpleName}(${wslId})"""
@@ -83,11 +81,15 @@ class IjentWslNioFileSystemProvider(
       this is IjentWslNioPath -> presentablePath.toIjentPath()
 
       isAbsolute ->
-        fold(ijentFsProvider.getPath(ijentFsUri) as IjentNioPath, { nioPath, newPart -> nioPath.resolve(newPart.toString()) })
+        fold(ijentFsProvider.getPath(ijentFsUri) as IjentNioPath, { nioPath, newPart ->
+          @OptIn(EelDelicateApi::class)
+          nioPath.resolve(localToIjent(newPart.toString ()))
+        })
 
       else -> {
         val ijentNioFs = ijentFsProvider.getFileSystem(ijentFsUri)
-        ijentNioFs.getPath(toString().replace("\\", ijentNioFs.separator)) as IjentNioPath
+        @OptIn(EelDelicateApi::class)
+        ijentNioFs.getPath(localToIjent(toString().replace("\\", ijentNioFs.separator))) as IjentNioPath
       }
     }
 
@@ -129,11 +131,11 @@ class IjentWslNioFileSystemProvider(
     getFileSystem(uri)
 
   private fun getFileSystem(wslId: String): IjentWslNioFileSystem {
-    return createdFileSystems.computeIfAbsent(wslId) { wslId ->
+    return createdFileSystems.computeIfAbsent(wslId.lowercase()) { _ ->
       IjentWslNioFileSystem(
         provider = this,
-        wslId = wslId,
-        ijentFs = ijentFsProvider.getFileSystem(URI("ijent", "wsl", "/$wslId", null, null)),
+        wslId = this.wslId,
+        ijentFs = ijentFsProvider.getFileSystem(ijentFsUri),
         originalFs = originalFsProvider.getFileSystem(URI("file:/")),
         eelDescriptor = eelDescriptor,
       )
@@ -144,8 +146,8 @@ class IjentWslNioFileSystemProvider(
     val root = path.toAbsolutePath().root.toString()
     val wslMarker = """\\wsl"""
     if (!root.startsWith(wslMarker, ignoreCase = true)) return null
-    val wslIdWithProbablyWrongCase = root.substring(wslMarker.length).substringAfter('\\').trimEnd('\\')
-    return allWslDistributionIds.get().singleOrNull { wslId -> wslId.equals(wslIdWithProbablyWrongCase, ignoreCase = true) }
+    val wslId = root.substring(wslMarker.length).substringAfter('\\').trimEnd('\\')
+    return wslId.ifEmpty { null }
   }
 
   override fun checkAccess(path: Path, vararg modes: AccessMode): Unit =
@@ -221,7 +223,7 @@ class IjentWslNioFileSystemProvider(
           override fun next(): Path {
             // resolve() can't be used there because WindowsPath.resolve() checks that the other path is WindowsPath.
             val ijentPath = delegateIterator.next().toIjentPath()
-            val originalPath = dir.resolve(sanitizeFileName(ijentPath.fileName.toString()))
+            val originalPath = dir.resolve(ijentPath.fileName.toString())
 
             return IjentWslNioPath(getFileSystem(wslId), originalPath.toOriginalPathWithSameNotation(), ijentPath.getCachedFileAttributesAndWrapToDosAttributesAdapter())
           }
@@ -331,22 +333,16 @@ class IjentWslNioFileSystemProvider(
     ijentFsProvider.setAttribute(path.toIjentPath(), attribute, value, *options)
   }
 
-  companion object {
-    private val allWslDistributionIds: AtomicReference<Set<String>> by lazy {
-      val ref = AtomicReference(emptySet<String>())
-      val wslDistributionManager = WslDistributionManager.getInstance()
-      wslDistributionManager.addWslDistributionsChangeListener { old, new ->
-        ref.updateAndGet { oldFromRef ->
-          val result = HashSet(oldFromRef)
-          result.removeAll(old.map { it.id })
-          result.addAll(new.map { it.id })
-          result
-        }
-      }
-      ref.set(wslDistributionManager.installedDistributions.map { it.id }.toHashSet())
-      ref
-    }
+  override fun equals(other: Any?): Boolean =
+    this === other ||
+    other is IjentWslNioFileSystemProvider &&
+    wslId == other.wslId
 
+  override fun hashCode(): Int {
+    return wslId.hashCode()
+  }
+
+  companion object {
     private val LOG = logger<IjentWslNioFileSystemProvider>()
   }
 }

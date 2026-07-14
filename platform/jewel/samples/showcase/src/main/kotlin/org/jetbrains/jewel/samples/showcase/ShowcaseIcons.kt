@@ -5,8 +5,8 @@ import org.jetbrains.jewel.ui.icon.PathIconKey
 
 public object ShowcaseIcons {
     public val componentsMenu: PathIconKey = PathIconKey("icons/structure.svg", ShowcaseIcons::class.java)
-    public val gitHub: PathIconKey = PathIconKey("icons/github.svg", ShowcaseIcons::class.java)
     public val jewelLogo: PathIconKey = PathIconKey("icons/jewel-logo.svg", ShowcaseIcons::class.java)
+    public val gitHub: PathIconKey = PathIconKey("icons/github.svg", ShowcaseIcons::class.java)
     public val markdown: PathIconKey = PathIconKey("icons/markdown.svg", ShowcaseIcons::class.java)
     public val themeDark: PathIconKey = PathIconKey("icons/darkTheme.svg", ShowcaseIcons::class.java)
     public val themeLight: PathIconKey = PathIconKey("icons/lightTheme.svg", ShowcaseIcons::class.java)
@@ -15,6 +15,7 @@ public object ShowcaseIcons {
     public val themeSystem: PathIconKey = PathIconKey("icons/systemTheme.svg", ShowcaseIcons::class.java)
     public val welcome: PathIconKey = PathIconKey("icons/meetNewUi.svg", ShowcaseIcons::class.java)
     public val sunny: PathIconKey = PathIconKey("icons/sunny.svg", ShowcaseIcons::class.java)
+    public val terminal: PathIconKey = PathIconKey("icons/terminal.svg", ShowcaseIcons::class.java)
 
     public object Components {
         public val badge: PathIconKey = PathIconKey("icons/components/badge.svg", ShowcaseIcons::class.java)

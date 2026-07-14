@@ -3,13 +3,9 @@ package com.intellij.terminal.frontend.session
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.editor.impl.DocumentImpl
-import com.intellij.openapi.project.Project
 import com.intellij.platform.eel.EelDescriptor
-import com.intellij.platform.util.coroutines.childScope
 import com.intellij.platform.util.coroutines.flow.IncrementalUpdateFlowProducer
 import com.intellij.platform.util.coroutines.flow.MutableStateWithIncrementalUpdates
-import com.intellij.terminal.frontend.session.hyperlinks.BackendTerminalHyperlinkFacade
-import com.intellij.terminal.frontend.session.hyperlinks.TerminalHyperlinkFilterContextImpl
 import com.intellij.util.asDisposable
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -21,8 +17,6 @@ import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.channelFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import org.jetbrains.plugins.terminal.block.reworked.TerminalSessionModel
@@ -42,8 +36,6 @@ import org.jetbrains.plugins.terminal.session.impl.TerminalCommandFinishedEvent
 import org.jetbrains.plugins.terminal.session.impl.TerminalCommandStartedEvent
 import org.jetbrains.plugins.terminal.session.impl.TerminalContentUpdatedEvent
 import org.jetbrains.plugins.terminal.session.impl.TerminalCursorPositionChangedEvent
-import org.jetbrains.plugins.terminal.session.impl.TerminalHyperlinkClickedEvent
-import org.jetbrains.plugins.terminal.session.impl.TerminalHyperlinksHeartbeatEvent
 import org.jetbrains.plugins.terminal.session.impl.TerminalInitialStateEvent
 import org.jetbrains.plugins.terminal.session.impl.TerminalInputEvent
 import org.jetbrains.plugins.terminal.session.impl.TerminalOutputEvent
@@ -74,9 +66,7 @@ import kotlin.time.TimeSource
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class StateAwareTerminalSession(
-  project: Project,
   private val delegate: TerminalSession,
-  eelDescriptor: EelDescriptor?,
   private val startupOptions: TerminalStartupOptions,
   override val coroutineScope: CoroutineScope,
 ) : TerminalSession {
@@ -84,12 +74,8 @@ internal class StateAwareTerminalSession(
 
   private val sessionModel: TerminalSessionModel = TerminalSessionModelImpl()
   private val outputModel: MutableTerminalOutputModel
-  private val outputHyperlinkFacade: BackendTerminalHyperlinkFacade
   private val alternateBufferModel: MutableTerminalOutputModel
-  private val alternateBufferHyperlinkFacade: BackendTerminalHyperlinkFacade
   private val blocksModel: TerminalBlocksModelImpl
-
-  private val inputChannel: SendChannel<TerminalInputEvent>
 
   private val outputLatencyReporter = BatchLatencyReporter(batchSize = 100) { samples ->
     ReworkedTerminalUsageCollector.logBackendOutputLatency(
@@ -109,28 +95,18 @@ internal class StateAwareTerminalSession(
   }
 
   init {
-    val hyperlinkScope = coroutineScope.childScope("StateAwareTerminalSession hyperlink facades")
     // Create a Non-AWT thread document to be able to update it without switching to EDT and Write Action.
     // It is OK here to handle synchronization manually, because this document will be used only in our services.
     val outputDocument = DocumentImpl("", true)
     outputModel = MutableTerminalOutputModelImpl(outputDocument, TerminalUiUtils.getDefaultMaxOutputLength())
-    val filterContext = eelDescriptor?.let {
-      TerminalHyperlinkFilterContextImpl(sessionModel, eelDescriptor, coroutineScope)
-    }
-    outputHyperlinkFacade = BackendTerminalHyperlinkFacade(project, hyperlinkScope, outputModel, isInAlternateBuffer = false, filterContext)
 
     val alternateBufferDocument = DocumentImpl("", true)
     alternateBufferModel = MutableTerminalOutputModelImpl(alternateBufferDocument, maxOutputLength = 0)
-    alternateBufferHyperlinkFacade = BackendTerminalHyperlinkFacade(project, hyperlinkScope, alternateBufferModel, isInAlternateBuffer = true, filterContext)
 
     blocksModel = TerminalBlocksModelImpl(outputModel, sessionModel, coroutineScope.asDisposable())
 
     coroutineScope.launch(CoroutineName("StateAwareTerminalSession: models updating")) {
-      merge(
-        delegate.getOutputFlow(),
-        outputHyperlinkFacade.heartbeatFlow.map { listOf(it) },
-        alternateBufferHyperlinkFacade.heartbeatFlow.map { listOf(it) },
-      ).collect { events ->
+      delegate.getOutputFlow().collect { events ->
         try {
           outputFlowProducer.handleUpdate(events)
         }
@@ -141,43 +117,11 @@ internal class StateAwareTerminalSession(
         }
       }
     }
-
-    inputChannel = Channel<TerminalInputEvent>(capacity = Channel.UNLIMITED)
-    coroutineScope.launch(CoroutineName("StateAwareTerminalSession: input channel")) {
-      val original = delegate.getInputChannel()
-      try {
-        for (event in inputChannel) {
-          original.send(event)
-          handleInputEvent(event)
-        }
-      }
-      finally {
-        inputChannel.close()
-        original.close()
-      }
-    }
   }
 
   override suspend fun getInputChannel(): SendChannel<TerminalInputEvent> {
-    return inputChannel
+    return delegate.getInputChannel()
   }
-
-  private fun handleInputEvent(event: TerminalInputEvent) {
-    if (event is TerminalHyperlinkClickedEvent) {
-      coroutineScope.launch(CoroutineName("StateAwareTerminalSession: hyperlink click")) {
-        getHyperlinkFacade(event)?.hyperlinkClicked(event.hyperlinkId, event.mouseEvent)
-      }
-    }
-  }
-
-  private fun getHyperlinkFacade(event: TerminalHyperlinkClickedEvent): BackendTerminalHyperlinkFacade? =
-    getHyperlinkFacade(event.isInAlternateBuffer)
-
-  private fun getHyperlinkFacade(event: TerminalHyperlinksHeartbeatEvent): BackendTerminalHyperlinkFacade? =
-    getHyperlinkFacade(event.isInAlternateBuffer)
-
-  fun getHyperlinkFacade(isInAlternateBuffer: Boolean): BackendTerminalHyperlinkFacade? =
-    if (isInAlternateBuffer) alternateBufferHyperlinkFacade else outputHyperlinkFacade
 
   override suspend fun getOutputFlow(): Flow<List<TerminalOutputEvent>> {
     return channelFlow {
@@ -231,7 +175,7 @@ internal class StateAwareTerminalSession(
       return update
     }
 
-    private fun handleEvent(event: TerminalOutputEvent): TerminalOutputEvent? {
+    private fun handleEvent(event: TerminalOutputEvent): TerminalOutputEvent {
       when (event) {
         is TerminalContentUpdatedEvent -> {
           val model = getCurrentOutputModel()
@@ -268,15 +212,6 @@ internal class StateAwareTerminalSession(
             block.copy(exitCode = event.exitCode)
           }
         }
-        is TerminalHyperlinksHeartbeatEvent -> {
-          val facade = getHyperlinkFacade(event)
-          checkNotNull(facade) { "The hyperlink facade is null, so who sent the TerminalHyperlinksHeartbeatEvent event then? It's a bug" }
-          val changeEvent = facade.collectResultsAndMaybeStartNewTask()
-          if (changeEvent != null) {
-            facade.updateModelState(changeEvent)
-          }
-          return changeEvent // if null, don't send anything, otherwise send the update, not the heartbeat
-        }
         else -> {
           // Do nothing: other events are not related to the models we update
         }
@@ -291,8 +226,6 @@ internal class StateAwareTerminalSession(
         outputModelState = outputModel.dumpState().toDto(),
         alternateBufferState = alternateBufferModel.dumpState().toDto(),
         blocksModelState = blocksModel.dumpState().toDto(),
-        outputHyperlinksState = outputHyperlinkFacade.dumpState().toDto(),
-        alternateBufferHyperlinksState = alternateBufferHyperlinkFacade.dumpState().toDto(),
       )
       return listOf(listOf(event))
     }

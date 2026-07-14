@@ -4,7 +4,6 @@
 package com.intellij.ide
 
 import com.intellij.openapi.components.BaseState
-import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.wm.impl.FrameInfo
 import com.intellij.util.xmlb.annotations.Attribute
@@ -28,6 +27,12 @@ class RecentProjectMetaInfo : BaseState() {
 
   @get:Attribute
   var displayName: @NlsSafe String? by string()
+
+  /**
+   * Cached only when the project name differs from its directory name (i.e., a custom .idea/.name exists).
+   * Avoids non-local I/O (e.g., WSL) when resolving names on the Welcome Screen.
+   */
+  var customProjectName: @NlsSafe String? by string()
 
   // to set frame title as early as possible
   @get:Attribute
@@ -53,7 +58,7 @@ class RecentProjectMetaInfo : BaseState() {
   @get:Internal
   @set:Internal
   var frame: FrameInfo? by property()
-  @IntellijInternalApi
+  @get:Internal
   val windowBounds: Rectangle?
     get() = frame?.bounds
 }
