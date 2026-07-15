@@ -8,8 +8,10 @@ import com.intellij.mcpserver.McpTool
 import com.intellij.mcpserver.McpToolCategory
 import com.intellij.mcpserver.McpToolsMarkdownExporter
 import com.intellij.mcpserver.impl.McpServerService
-import com.intellij.mcpserver.toolsets.general.UniversalToolset
+import com.intellij.mcpserver.presentableDescription
+import com.intellij.mcpserver.presentableName
 import com.intellij.mcpserver.settings.McpToolDisallowListSettings.ToolState
+import com.intellij.mcpserver.toolsets.general.UniversalToolset
 import com.intellij.openapi.fileChooser.FileChooserFactory
 import com.intellij.openapi.fileChooser.FileSaverDescriptor
 import com.intellij.openapi.options.SearchableConfigurable
@@ -31,7 +33,6 @@ import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.rows
 import com.intellij.ui.dsl.builder.selected
 import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
-import com.intellij.util.text.NameUtilCore
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.ThreeStateCheckBox
 import com.intellij.util.ui.UIUtil
@@ -459,11 +460,13 @@ class McpToolFilterConfigurable : SearchableConfigurable {
     allToolStates.putAll(normalizedToolStates)
     searchableToolTexts.clear()
     searchableToolTexts.putAll(allTools.associate { tool ->
-      toolKey(tool) to listOf(
+      toolKey(tool) to listOfNotNull(
         tool.descriptor.name,
         tool.descriptor.category.shortName,
         tool.descriptor.description,
-        NameUtilCore.splitNameIntoWordList(tool.descriptor.category.shortName.removeSuffix("Toolset")).joinToString(" "),
+        tool.descriptor.presentableDescription,
+        tool.descriptor.category.presentableName,
+        tool.descriptor.category.presentableDescription,
       ).joinToString("\n").lowercase()
     })
 
@@ -531,7 +534,7 @@ class McpToolFilterConfigurable : SearchableConfigurable {
       add(controlsPanel, HorizontalLayout.Group.RIGHT)
     }
     val descriptionRow = NonOpaquePanel(BorderLayout()).apply {
-      add(ToolDescriptionPane(toolId, tool.descriptor.description.trimIndent()), BorderLayout.CENTER)
+      add(ToolDescriptionPane(toolId, tool.descriptor.presentableDescription.trimIndent()), BorderLayout.CENTER)
     }
 
     val panel = NonOpaquePanel(VerticalLayout(0)).apply {
@@ -595,8 +598,7 @@ class McpToolFilterConfigurable : SearchableConfigurable {
       isOpaque = false
     }
 
-    @Suppress("HardCodedStringLiteral")
-    val readableTitle = NameUtilCore.splitNameIntoWordList(group.category.shortName.removeSuffix("Toolset")).joinToString(" ")
+    val readableTitle = group.category.presentableName
     val separator = CollapsibleTitledSeparatorImpl(readableTitle).apply {
       expanded = categoryExpandedStates.getOrDefault(categoryKey, true)
       setLabelFocusable(true)
@@ -661,6 +663,13 @@ class McpToolFilterConfigurable : SearchableConfigurable {
     refreshCategoryState(categoryView)
 
     categoryPanel.add(headerPanel)
+    group.category.presentableDescription?.let { groupDescription ->
+      categoryPanel.add(JBLabel(groupDescription).apply {
+        foreground = UIUtil.getContextHelpForeground()
+        font = JBUI.Fonts.smallFont()
+        border = JBUI.Borders.emptyLeft(JBUI.scale(20))
+      })
+    }
     categoryPanel.add(contentPanel)
     return categoryView
   }

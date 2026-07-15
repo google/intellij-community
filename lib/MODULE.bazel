@@ -29,10 +29,10 @@ http_file(
 )
 
 http_file(
-    name = "ai_grazie-grazie-rule-engine-0_3_261_http",
-    downloaded_file_path = "grazie-rule-engine-0.3.261.jar",
-    sha256 = "980412becb7767ab746be7436f6f4a97be01deaa84de37e0a4a6a01283a6371c",
-    url = "https://cache-redirector.jetbrains.com/packages.jetbrains.team/maven/p/grazi/grazie-platform-public/ai/grazie/grazie-rule-engine/0.3.261/grazie-rule-engine-0.3.261.jar",
+    name = "ai_grazie-grazie-rule-engine-0_3_266_http",
+    downloaded_file_path = "grazie-rule-engine-0.3.266.jar",
+    sha256 = "15143f6f3b92e4797b7961245a4969f3891c9eb273993aa05df59fde59e9db45",
+    url = "https://cache-redirector.jetbrains.com/packages.jetbrains.team/maven/p/grazi/grazie-platform-public/ai/grazie/grazie-rule-engine/0.3.266/grazie-rule-engine-0.3.266.jar",
 )
 
 http_file(
@@ -43,10 +43,10 @@ http_file(
 )
 
 http_file(
-    name = "ai_grazie-grazie-rule-engine-0_3_261-sources_http",
-    downloaded_file_path = "grazie-rule-engine-0.3.261-sources.jar",
-    sha256 = "40cf15b3b95d5dda4c6b8033feb8dc3184b60b33ece1b9d9194822544ecc8349",
-    url = "https://cache-redirector.jetbrains.com/packages.jetbrains.team/maven/p/grazi/grazie-platform-public/ai/grazie/grazie-rule-engine/0.3.261/grazie-rule-engine-0.3.261-sources.jar",
+    name = "ai_grazie-grazie-rule-engine-0_3_266-sources_http",
+    downloaded_file_path = "grazie-rule-engine-0.3.266-sources.jar",
+    sha256 = "de45bba42621b30d4082d6696a9e7243f227f841fb8913549f2da0f2c6d951e6",
+    url = "https://cache-redirector.jetbrains.com/packages.jetbrains.team/maven/p/grazi/grazie-platform-public/ai/grazie/grazie-rule-engine/0.3.266/grazie-rule-engine-0.3.266-sources.jar",
 )
 
 http_file(
@@ -7316,10 +7316,10 @@ http_file(
 )
 
 http_file(
-    name = "com_android_tools_layoutlib-layoutlib-16_2_1_http",
-    downloaded_file_path = "layoutlib-16.2.1.jar",
-    sha256 = "1752e5b49746d030c2c6c0dfa266490ac4fbf9f12a4a4866720b91f1c69fc7e1",
-    url = "https://cache-redirector.jetbrains.com/dl.google.com/dl/android/maven2/com/android/tools/layoutlib/layoutlib/16.2.1/layoutlib-16.2.1.jar",
+    name = "com_android_tools_layoutlib-layoutlib-16_2_2_http",
+    downloaded_file_path = "layoutlib-16.2.2.jar",
+    sha256 = "00817c06c244b7baf7254fce9dee4cac2bcb109b9348e73717b3d5f042e6556a",
+    url = "https://cache-redirector.jetbrains.com/dl.google.com/dl/android/maven2/com/android/tools/layoutlib/layoutlib/16.2.2/layoutlib-16.2.2.jar",
 )
 
 http_file(
@@ -15709,31 +15709,31 @@ http_file(
 )
 
 http_file(
-    name = "org_jetbrains_intellij_deps-studio-platform-2025_3_1-387_http",
-    downloaded_file_path = "studio-platform-2025.3.1-387.jar",
-    sha256 = "137223cd3103a427e6ece83cd819519771135a69de708ff34af11b6157edf44a",
-    url = "https://cache-redirector.jetbrains.com/packages.jetbrains.team/maven/p/ij/intellij-dependencies/org/jetbrains/intellij/deps/studio-platform/2025.3.1-387/studio-platform-2025.3.1-387.jar",
+    name = "org_jetbrains_intellij_deps-studio-platform-2025_3_2-389_http",
+    downloaded_file_path = "studio-platform-2025.3.2-389.jar",
+    sha256 = "5333ae3d6594881220cd0b49974e61f1200d05387778f68074b7796b111f1caa",
+    url = "https://cache-redirector.jetbrains.com/packages.jetbrains.team/maven/p/ij/intellij-dependencies/org/jetbrains/intellij/deps/studio-platform/2025.3.2-389/studio-platform-2025.3.2-389.jar",
 )
 
 http_file(
-    name = "org_jetbrains_intellij_deps-studio-platform-2025_3_1-387-sources_http",
-    downloaded_file_path = "studio-platform-2025.3.1-387-sources.jar",
-    sha256 = "7a362b3ab0215437c9a63b09d5c130b081d61091f490d2b023951d9d5c3dee31",
-    url = "https://cache-redirector.jetbrains.com/packages.jetbrains.team/maven/p/ij/intellij-dependencies/org/jetbrains/intellij/deps/studio-platform/2025.3.1-387/studio-platform-2025.3.1-387-sources.jar",
+    name = "org_jetbrains_intellij_deps-studio-platform-2025_3_2-389-sources_http",
+    downloaded_file_path = "studio-platform-2025.3.2-389-sources.jar",
+    sha256 = "aef5c169ee225c71c6998b84b2258050943daf9147dcc8277b8734bf29ffbdf4",
+    url = "https://cache-redirector.jetbrains.com/packages.jetbrains.team/maven/p/ij/intellij-dependencies/org/jetbrains/intellij/deps/studio-platform/2025.3.2-389/studio-platform-2025.3.2-389-sources.jar",
 )
 
 http_file(
-    name = "org_jetbrains_intellij_deps-studio-test-platform-2025_3_1-387_http",
-    downloaded_file_path = "studio-test-platform-2025.3.1-387.jar",
-    sha256 = "e0179141f3697b53bf872f656796d12b220660521efe4a5aa68d57ddcf775398",
-    url = "https://cache-redirector.jetbrains.com/packages.jetbrains.team/maven/p/ij/intellij-dependencies/org/jetbrains/intellij/deps/studio-test-platform/2025.3.1-387/studio-test-platform-2025.3.1-387.jar",
+    name = "org_jetbrains_intellij_deps-studio-test-platform-2025_3_2-389_http",
+    downloaded_file_path = "studio-test-platform-2025.3.2-389.jar",
+    sha256 = "91ad58918e8af664196e3fec52472795577343ea15837fdc989523ef44b362ff",
+    url = "https://cache-redirector.jetbrains.com/packages.jetbrains.team/maven/p/ij/intellij-dependencies/org/jetbrains/intellij/deps/studio-test-platform/2025.3.2-389/studio-test-platform-2025.3.2-389.jar",
 )
 
 http_file(
-    name = "org_jetbrains_intellij_deps-studio-test-platform-2025_3_1-387-sources_http",
-    downloaded_file_path = "studio-test-platform-2025.3.1-387-sources.jar",
-    sha256 = "ad6e9dca8b085645c4f1bffc79f29516a8ecc9c29fe571bc20780070e9c25bc0",
-    url = "https://cache-redirector.jetbrains.com/packages.jetbrains.team/maven/p/ij/intellij-dependencies/org/jetbrains/intellij/deps/studio-test-platform/2025.3.1-387/studio-test-platform-2025.3.1-387-sources.jar",
+    name = "org_jetbrains_intellij_deps-studio-test-platform-2025_3_2-389-sources_http",
+    downloaded_file_path = "studio-test-platform-2025.3.2-389-sources.jar",
+    sha256 = "50aea6b611c84198affbcaf8ea2b8da0e86784516917f4a603b10e94c8223d28",
+    url = "https://cache-redirector.jetbrains.com/packages.jetbrains.team/maven/p/ij/intellij-dependencies/org/jetbrains/intellij/deps/studio-test-platform/2025.3.2-389/studio-test-platform-2025.3.2-389-sources.jar",
 )
 
 http_file(

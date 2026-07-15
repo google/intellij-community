@@ -505,6 +505,9 @@ open class PyTypeCheckerInspection : PyInspection() {
         if (info == null || info.attributeKind != PyStdlibTypeProvider.EnumAttributeKind.MEMBER) return
 
         val expected = getEnumValueType(scopeOwner, myTypeEvalContext)
+        // `assignedValueType` is the member value type produced by the enum's metaclass/constructor. For enums that
+        // transform the declaration (e.g. Django's `ChoicesType.__new__` drops a trailing label), the type provider
+        // already stripped the extra elements, so a plain match here is correct for both stdlib and framework enums.
         val actual = info.assignedValueType
         if (!match(expected, actual, myTypeEvalContext)) {
           registerTypeMismatch(PyTypeCheckerSuppressionCode.BAD_ASSIGNMENT, assignedValue, expected, actual,

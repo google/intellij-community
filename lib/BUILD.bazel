@@ -85,9 +85,9 @@ jvm_import(
 )
 
 copy_file(
-    name = "ai.grazie/grazie-rule-engine-0.3.261.jar_copy",
-    src = "@ai_grazie-grazie-rule-engine-0_3_261_http//file",
-    out = "ai.grazie/grazie-rule-engine-0.3.261.jar",
+    name = "ai.grazie/grazie-rule-engine-0.3.266.jar_copy",
+    src = "@ai_grazie-grazie-rule-engine-0_3_266_http//file",
+    out = "ai.grazie/grazie-rule-engine-0.3.266.jar",
     allow_symlink = True,
     visibility = ["//visibility:public"],
 )
@@ -105,15 +105,15 @@ java_library(
     visibility = ["//visibility:public"],
     exports = [
         # do not sort,
-        ":ai_grazie-grazie-rule-engine-0_3_261_http_import",
+        ":ai_grazie-grazie-rule-engine-0_3_266_http_import",
         ":net_fellbaum-jemoji-1_3_1_http_import",
     ],
 )
 
 jvm_import(
-    name = "ai_grazie-grazie-rule-engine-0_3_261_http_import",
-    jar = "@ai_grazie-grazie-rule-engine-0_3_261_http//file",
-    source_jar = "@ai_grazie-grazie-rule-engine-0_3_261-sources_http//file",
+    name = "ai_grazie-grazie-rule-engine-0_3_266_http_import",
+    jar = "@ai_grazie-grazie-rule-engine-0_3_266_http//file",
+    source_jar = "@ai_grazie-grazie-rule-engine-0_3_266-sources_http//file",
 )
 
 jvm_import(
@@ -6406,6 +6406,13 @@ jvm_import(
     source_jar = "@io_modelcontextprotocol-kotlin-sdk-core-jvm-0_12_0-sources_http//file",
 )
 
+java_library(
+    name = "io-modelcontextprotocol-kotlin-sdk-provided",
+    neverlink = True,
+    visibility = ["//visibility:public"],
+    exports = [":io-modelcontextprotocol-kotlin-sdk"],
+)
+
 copy_file(
     name = "io.qameta.allure/allure-java-commons-2.25.0.jar_copy",
     src = "@io_qameta_allure-allure-java-commons-2_25_0_http//file",
@@ -9541,16 +9548,16 @@ jvm_import(
 )
 
 copy_file(
-    name = "com.android.tools.layoutlib/layoutlib-16.2.1.jar_copy",
-    src = "@com_android_tools_layoutlib-layoutlib-16_2_1_http//file",
-    out = "com.android.tools.layoutlib/layoutlib-16.2.1.jar",
+    name = "com.android.tools.layoutlib/layoutlib-16.2.2.jar_copy",
+    src = "@com_android_tools_layoutlib-layoutlib-16_2_2_http//file",
+    out = "com.android.tools.layoutlib/layoutlib-16.2.2.jar",
     allow_symlink = True,
     visibility = ["//visibility:public"],
 )
 
 jvm_import(
     name = "layoutlib",
-    jar = "@com_android_tools_layoutlib-layoutlib-16_2_1_http//file",
+    jar = "@com_android_tools_layoutlib-layoutlib-16_2_2_http//file",
     visibility = ["//visibility:public"],
 )
 
@@ -20272,17 +20279,17 @@ jvm_import(
 )
 
 copy_file(
-    name = "org.jetbrains.intellij.deps/studio-platform-2025.3.1-387.jar_copy",
-    src = "@org_jetbrains_intellij_deps-studio-platform-2025_3_1-387_http//file",
-    out = "org.jetbrains.intellij.deps/studio-platform-2025.3.1-387.jar",
+    name = "org.jetbrains.intellij.deps/studio-platform-2025.3.2-389.jar_copy",
+    src = "@org_jetbrains_intellij_deps-studio-platform-2025_3_2-389_http//file",
+    out = "org.jetbrains.intellij.deps/studio-platform-2025.3.2-389.jar",
     allow_symlink = True,
     visibility = ["//visibility:public"],
 )
 
 jvm_import(
     name = "studio-platform",
-    jar = "@org_jetbrains_intellij_deps-studio-platform-2025_3_1-387_http//file",
-    source_jar = "@org_jetbrains_intellij_deps-studio-platform-2025_3_1-387-sources_http//file",
+    jar = "@org_jetbrains_intellij_deps-studio-platform-2025_3_2-389_http//file",
+    source_jar = "@org_jetbrains_intellij_deps-studio-platform-2025_3_2-389-sources_http//file",
     visibility = ["//visibility:public"],
 )
 
@@ -20294,17 +20301,17 @@ java_library(
 )
 
 copy_file(
-    name = "org.jetbrains.intellij.deps/studio-test-platform-2025.3.1-387.jar_copy",
-    src = "@org_jetbrains_intellij_deps-studio-test-platform-2025_3_1-387_http//file",
-    out = "org.jetbrains.intellij.deps/studio-test-platform-2025.3.1-387.jar",
+    name = "org.jetbrains.intellij.deps/studio-test-platform-2025.3.2-389.jar_copy",
+    src = "@org_jetbrains_intellij_deps-studio-test-platform-2025_3_2-389_http//file",
+    out = "org.jetbrains.intellij.deps/studio-test-platform-2025.3.2-389.jar",
     allow_symlink = True,
     visibility = ["//visibility:public"],
 )
 
 jvm_import(
     name = "studio-test-platform",
-    jar = "@org_jetbrains_intellij_deps-studio-test-platform-2025_3_1-387_http//file",
-    source_jar = "@org_jetbrains_intellij_deps-studio-test-platform-2025_3_1-387-sources_http//file",
+    jar = "@org_jetbrains_intellij_deps-studio-test-platform-2025_3_2-389_http//file",
+    source_jar = "@org_jetbrains_intellij_deps-studio-test-platform-2025_3_2-389-sources_http//file",
     visibility = ["//visibility:public"],
 )
 
