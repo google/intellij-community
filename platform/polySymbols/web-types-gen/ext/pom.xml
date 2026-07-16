@@ -19,7 +19,7 @@
     <dependency>
       <groupId>org.jsonschema2pojo</groupId>
       <artifactId>jsonschema2pojo-core</artifactId>
-      <version>1.0.2</version>
+      <version>1.3.0</version>
     </dependency>
   </dependencies>
 </project>
